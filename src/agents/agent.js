@@ -40,7 +40,7 @@ export class Agent {
       }
 
       // Simple echo response for now - TODO: Implement actual reasoning
-      const response = await this.generateResponse(input);
+      const response = await this.generateResponse(sessionId, input);
       
       // Save agent response
       await this.db.saveMessage(sessionId, this.generation, 'assistant', response.content, response.toolCalls, this.contextSize);
@@ -53,7 +53,7 @@ export class Agent {
     }
   }
 
-  async generateResponse(input) {
+  async generateResponse(sessionId, input) {
     try {
       // Build conversation history for context
       const messages = [
@@ -319,7 +319,7 @@ Focus on executing your assigned task efficiently.`;
     return subagent;
   }
 
-  async delegateTask(task, options = {}) {
+  async delegateTask(sessionId, task, options = {}) {
     // Orchestrator decides which model to use based on task complexity
     const agentConfig = this.chooseAgentForTask(task, options);
     
@@ -329,7 +329,7 @@ Focus on executing your assigned task efficiently.`;
     });
 
     // Execute the task with the specialized agent
-    const result = await subagent.generateResponse(task);
+    const result = await subagent.generateResponse(sessionId, task);
     
     if (this.verbose) {
       console.log(`✅ Task completed by ${agentConfig.role} agent`);
