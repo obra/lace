@@ -1,12 +1,18 @@
 {
   "snapshots": [
     {
+      "snapshotId": "2025-06-05T23-58-16-checkpoint",
+      "timestamp": "2025-06-05T23:58:16.999Z",
+      "type": "checkpoint",
+      "description": "Manual checkpoint"
+    },
+    {
       "snapshotId": "2025-06-05T23-58-16-pre-tool-t-exec",
       "timestamp": "2025-06-05T23:58:16.849Z",
       "type": "pre-tool",
       "description": null
     }
   ],
-  "lastUpdated": "2025-06-05T23:58:16.999Z",
+  "lastUpdated": "2025-06-05T23:58:17.156Z",
   "version": "1.0"
 }
