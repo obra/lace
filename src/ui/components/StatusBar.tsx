@@ -9,21 +9,39 @@ interface StatusBarProps {
   scrollPosition?: number;
   totalMessages?: number;
   isLoading?: boolean;
+  filterMode?: 'all' | 'conversation' | 'search';
+  searchTerm?: string;
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({ 
   isNavigationMode = false, 
   scrollPosition = 0, 
   totalMessages = 0,
-  isLoading = false
+  isLoading = false,
+  filterMode = 'all',
+  searchTerm = ''
 }) => {
+  const getFilterText = () => {
+    switch (filterMode) {
+      case 'conversation':
+        return 'conversation';
+      case 'search':
+        return searchTerm ? `'${searchTerm}'` : 'search';
+      case 'all':
+      default:
+        return 'all';
+    }
+  };
+
   return (
     <Box borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false}>
       <Text color="cyan">lace-ink</Text>
       <Text> | </Text>
+      <Text color="magenta">Filter: {getFilterText()}</Text>
+      <Text> | </Text>
       {isNavigationMode ? (
         <>
-          <Text color="yellow">Nav: j/k</Text>
+          <Text color="yellow">Nav: j/k/c/a</Text>
           <Text> | </Text>
           <Text color="dim">Line {scrollPosition + 1} of {totalMessages}</Text>
         </>

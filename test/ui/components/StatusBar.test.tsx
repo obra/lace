@@ -36,8 +36,8 @@ describe('StatusBar Component', () => {
     const element = StatusBar({ isNavigationMode: false }) as any;
     const children = element.props.children;
     
-    // The third child is the fragment containing Ready and navigation hint
-    const fragment = children[2];
+    // The fifth child is the fragment containing Ready and navigation hint (after filter display)
+    const fragment = children[4];
     const fragmentChildren = fragment.props.children;
     
     // Find the "Ready" text element
@@ -53,8 +53,8 @@ describe('StatusBar Component', () => {
     const element = StatusBar({ isNavigationMode: false }) as any;
     const children = element.props.children;
     
-    // The third child is the fragment containing Ready and navigation hint
-    const fragment = children[2];
+    // The fifth child is the fragment containing Ready and navigation hint (after filter display)
+    const fragment = children[4];
     const fragmentChildren = fragment.props.children;
     
     // Find the navigation hint text element
@@ -70,13 +70,13 @@ describe('StatusBar Component', () => {
     const element = StatusBar({ isNavigationMode: true, scrollPosition: 2, totalMessages: 4 }) as any;
     const children = element.props.children;
     
-    // The third child is the fragment containing Nav mode info
-    const fragment = children[2];
+    // The fifth child is the fragment containing Nav mode info (after filter display)
+    const fragment = children[4];
     const fragmentChildren = fragment.props.children;
     
-    // Find the "Nav: j/k" text element
+    // Find the "Nav: j/k/c/a" text element (updated to include filter keys)
     const navModeElement = fragmentChildren.find((child: any) => 
-      child.type === Text && child.props.children === 'Nav: j/k'
+      child.type === Text && child.props.children === 'Nav: j/k/c/a'
     );
     
     expect(navModeElement).toBeTruthy();

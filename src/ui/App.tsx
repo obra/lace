@@ -8,12 +8,20 @@ import ConversationView from './components/ConversationView';
 import StatusBar from './components/StatusBar';
 import InputBar from './components/InputBar';
 
+type ConversationMessage = 
+  | { type: 'user'; content: string }
+  | { type: 'assistant'; content: string }
+  | { type: 'loading'; content: string }
+  | { type: 'agent_activity'; summary: string; content: string[]; folded: boolean };
+
 const App: React.FC = () => {
   const [isNavigationMode, setIsNavigationMode] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [conversation, setConversation] = useState([
+  const [filterMode, setFilterMode] = useState<'all' | 'conversation' | 'search'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [conversation, setConversation] = useState<ConversationMessage[]>([
     { type: 'user' as const, content: 'Hello' },
     { type: 'assistant' as const, content: 'Hi! How can I help you today?' },
     { 
@@ -28,7 +36,24 @@ const App: React.FC = () => {
     { type: 'user' as const, content: 'Can you write a function?' },
     { type: 'assistant' as const, content: 'Sure! Here is a basic function:\n\n```javascript\nfunction hello() {\n  return "Hello World";\n}\n```' }
   ]);
-  const totalMessages = conversation.length;
+  const filterMessages = (messages: ConversationMessage[]) => {
+    switch (filterMode) {
+      case 'conversation':
+        return messages.filter(msg => msg.type === 'user' || msg.type === 'assistant');
+      case 'search':
+        if (!searchTerm.trim()) return messages;
+        return messages.filter(msg => {
+          const content = msg.type === 'agent_activity' ? msg.summary + ' ' + msg.content.join(' ') : msg.content;
+          return content.toLowerCase().includes(searchTerm.toLowerCase());
+        });
+      case 'all':
+      default:
+        return messages;
+    }
+  };
+
+  const filteredConversation = filterMessages(conversation);
+  const totalMessages = filteredConversation.length;
 
   const mockResponses = [
     'Hi! How can I help you today?',
@@ -110,14 +135,22 @@ const App: React.FC = () => {
         setScrollPosition(prev => Math.max(prev - 1, 0));
       } else if (input === ' ') {
         // Space key to toggle fold state of current message
-        const currentMessage = conversation[scrollPosition];
+        const currentMessage = filteredConversation[scrollPosition];
         if (currentMessage && currentMessage.type === 'agent_activity') {
           setConversation(prev => prev.map((msg, index) => 
-            index === scrollPosition 
+            index === conversation.indexOf(currentMessage) && msg.type === 'agent_activity'
               ? { ...msg, folded: !msg.folded }
               : msg
           ));
         }
+      } else if (input === 'c') {
+        // c key for conversation-only mode
+        setFilterMode('conversation');
+        setScrollPosition(0);
+      } else if (input === 'a') {
+        // a key for show-all mode
+        setFilterMode('all');
+        setScrollPosition(0);
       }
     }
   });
@@ -127,13 +160,15 @@ const App: React.FC = () => {
       <ConversationView 
         scrollPosition={scrollPosition} 
         isNavigationMode={isNavigationMode} 
-        messages={conversation}
+        messages={filteredConversation}
       />
       <StatusBar 
         isNavigationMode={isNavigationMode} 
         scrollPosition={scrollPosition} 
         totalMessages={totalMessages} 
         isLoading={isLoading}
+        filterMode={filterMode}
+        searchTerm={searchTerm}
       />
       <InputBar 
         isNavigationMode={isNavigationMode} 

@@ -12,18 +12,18 @@ describe('Step 4: Navigation Mode Integration', () => {
     const navElement = StatusBar({ isNavigationMode: true, scrollPosition: 1, totalMessages: 4 }) as any;
     
     // Normal mode should show "Ready"
-    const normalFragment = normalElement.props.children[2];
+    const normalFragment = normalElement.props.children[4];
     const normalFragmentChildren = normalFragment.props.children;
     const readyElement = normalFragmentChildren.find((child: any) => 
       child.props.children === 'Ready'
     );
     expect(readyElement).toBeTruthy();
     
-    // Navigation mode should show "Nav: j/k" and position
-    const navFragment = navElement.props.children[2];
+    // Navigation mode should show "Nav: j/k/c/a" and position
+    const navFragment = navElement.props.children[4];
     const navFragmentChildren = navFragment.props.children;
     const navModeElement = navFragmentChildren.find((child: any) => 
-      child.props.children === 'Nav: j/k'
+      child.props.children === 'Nav: j/k/c/a'
     );
     expect(navModeElement).toBeTruthy();
     expect(navModeElement.props.color).toBe('yellow');
@@ -70,7 +70,7 @@ describe('Step 4: Navigation Mode Integration', () => {
     const conversationView = ConversationView({ scrollPosition, isNavigationMode }) as any;
     
     // StatusBar should show navigation info
-    const statusFragment = statusBar.props.children[2];
+    const statusFragment = statusBar.props.children[4];
     const statusChildren = statusFragment.props.children;
     const positionElement = statusChildren.find((child: any) => 
       Array.isArray(child.props.children) && child.props.children[0] === 'Line '

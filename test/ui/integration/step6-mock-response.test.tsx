@@ -43,7 +43,7 @@ describe('Step 6: Mock Agent Response Integration', () => {
     }) as any;
     
     // Should show loading status instead of "Ready"
-    const fragment = element.props.children[2];
+    const fragment = element.props.children[4];
     const fragmentChildren = fragment.props.children;
     
     const statusElement = fragmentChildren.find((child: any) => 
