@@ -11,6 +11,7 @@ export class ToolRegistry {
   constructor(options = {}) {
     this.tools = new Map();
     this.activityLogger = options.activityLogger || null;
+    this.progressTracker = options.progressTracker || null;
   }
 
   async initialize() {
@@ -52,6 +53,9 @@ export class ToolRegistry {
       tool.setAgent(agent);
       if (sessionId && typeof tool.setSessionId === 'function') {
         tool.setSessionId(sessionId);
+      }
+      if (this.progressTracker && typeof tool.setProgressTracker === 'function') {
+        tool.setProgressTracker(this.progressTracker);
       }
     }
 

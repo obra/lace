@@ -8,6 +8,7 @@ import { Console } from './interface/console.js';
 import { ModelProvider } from './models/model-provider.js';
 import { ToolApprovalManager } from './safety/tool-approval.js';
 import { ActivityLogger } from './logging/activity-logger.js';
+import { ProgressTracker } from './tools/progress-tracker.js';
 
 export class Lace {
   constructor(options = {}) {
@@ -18,8 +19,14 @@ export class Lace {
     // Initialize activity logger first so it can be passed to other components
     this.activityLogger = new ActivityLogger();
     
+    // Initialize progress tracker for agent coordination
+    this.progressTracker = new ProgressTracker();
+    
     this.db = new ConversationDB(this.memoryPath);
-    this.tools = new ToolRegistry({ activityLogger: this.activityLogger });
+    this.tools = new ToolRegistry({ 
+      activityLogger: this.activityLogger,
+      progressTracker: this.progressTracker 
+    });
     this.modelProvider = new ModelProvider({
       anthropic: {
         // Default to using Anthropic models
@@ -95,5 +102,11 @@ export class Lace {
     });
     
     return this.primaryAgent;
+  }
+
+  async cleanup() {
+    if (this.progressTracker) {
+      this.progressTracker.destroy();
+    }
   }
 }
