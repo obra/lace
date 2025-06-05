@@ -17,6 +17,9 @@ program
   .option('--no-interactive', 'disable interactive tool approval (auto-deny dangerous tools)')
   .option('--auto-approve <tools>', 'comma-separated list of tools to auto-approve', (value) => value.split(','))
   .option('--deny <tools>', 'comma-separated list of tools to always deny', (value) => value.split(','))
+  .option('--log-level <level>', 'stderr debug output level (debug/info/warn/error/off)', 'off')
+  .option('--log-file <path>', 'file path for debug log output')
+  .option('--log-file-level <level>', 'file debug output level (debug/info/warn/error/off)', 'off')
   .action(async (options) => {
     const lace = new Lace(options);
     await lace.start();

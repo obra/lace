@@ -53,7 +53,12 @@ export class Lace {
       role: 'orchestrator',
       assignedModel: 'claude-3-5-sonnet-20241022',
       assignedProvider: 'anthropic',
-      capabilities: ['orchestration', 'reasoning', 'planning', 'delegation']
+      capabilities: ['orchestration', 'reasoning', 'planning', 'delegation'],
+      debugLogging: {
+        logLevel: options.logLevel || 'off',
+        logFile: options.logFile,
+        logFileLevel: options.logFileLevel || 'off'
+      }
     });
 
     await this.console.start(this.primaryAgent);
@@ -73,7 +78,12 @@ export class Lace {
       modelProvider: this.modelProvider,
       verbose: this.verbose,
       inheritedContext: compressedContext,
-      memoryAgents: this.memoryAgents
+      memoryAgents: this.memoryAgents,
+      debugLogging: {
+        logLevel: this.options.logLevel || 'off',
+        logFile: this.options.logFile,
+        logFileLevel: this.options.logFileLevel || 'off'
+      }
     });
     
     return this.primaryAgent;
