@@ -12,6 +12,7 @@ const App: React.FC = () => {
   const [isNavigationMode, setIsNavigationMode] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [conversation, setConversation] = useState([
     { type: 'user' as const, content: 'Hello' },
     { type: 'assistant' as const, content: 'Hi! How can I help you today?' },
@@ -20,10 +21,40 @@ const App: React.FC = () => {
   ]);
   const totalMessages = conversation.length;
 
+  const mockResponses = [
+    'Hi! How can I help you today?',
+    'I\'d be happy to assist you with that.',
+    'That\'s an interesting question! Let me think about it.',
+    'Here\'s what I can help you with...',
+    'I understand what you\'re asking. Let me provide some insight.',
+    'Great question! Here\'s my response to that.',
+    'I can definitely help you with this task.',
+    'Let me break this down for you step by step.'
+  ];
+
+  const getRandomResponse = () => {
+    return mockResponses[Math.floor(Math.random() * mockResponses.length)];
+  };
+
   const submitMessage = () => {
-    if (inputText.trim()) {
+    if (inputText.trim() && !isLoading) {
+      // Add user message
       setConversation(prev => [...prev, { type: 'user' as const, content: inputText.trim() }]);
       setInputText('');
+      
+      // Start loading state
+      setIsLoading(true);
+      setConversation(prev => [...prev, { type: 'loading' as const, content: 'Assistant is thinking...' }]);
+      
+      // Simulate agent response after delay
+      setTimeout(() => {
+        setConversation(prev => {
+          // Remove loading message and add agent response
+          const withoutLoading = prev.slice(0, -1);
+          return [...withoutLoading, { type: 'assistant' as const, content: getRandomResponse() }];
+        });
+        setIsLoading(false);
+      }, 1500); // 1.5 second delay
     }
   };
 
@@ -32,8 +63,8 @@ const App: React.FC = () => {
       process.exit(0);
     }
 
-    if (!isNavigationMode) {
-      // Input mode: handle text input and submission
+    if (!isNavigationMode && !isLoading) {
+      // Input mode: handle text input and submission (disabled during loading)
       if (key.return) {
         if (inputText.trim()) {
           // Submit message if input has content
@@ -49,6 +80,12 @@ const App: React.FC = () => {
       } else if (input && !key.ctrl && !key.meta && input.length === 1) {
         // Handle regular character input
         setInputText(prev => prev + input);
+      }
+    } else if (!isNavigationMode && isLoading) {
+      // During loading, only allow entering navigation mode with empty input
+      if (key.return && !inputText.trim()) {
+        setIsNavigationMode(true);
+        setScrollPosition(0);
       }
     } else {
       // Navigation mode
@@ -73,7 +110,12 @@ const App: React.FC = () => {
         isNavigationMode={isNavigationMode} 
         messages={conversation}
       />
-      <StatusBar isNavigationMode={isNavigationMode} scrollPosition={scrollPosition} totalMessages={totalMessages} />
+      <StatusBar 
+        isNavigationMode={isNavigationMode} 
+        scrollPosition={scrollPosition} 
+        totalMessages={totalMessages} 
+        isLoading={isLoading}
+      />
       <InputBar 
         isNavigationMode={isNavigationMode} 
         inputText={inputText}

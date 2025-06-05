@@ -5,14 +5,26 @@ import React from 'react';
 import { Text, Box } from 'ink';
 
 interface MessageProps {
-  type: 'user' | 'assistant';
+  type: 'user' | 'assistant' | 'loading';
   content: string;
   isHighlighted?: boolean;
 }
 
 const Message: React.FC<MessageProps> = ({ type, content, isHighlighted = false }) => {
-  const prefix = type === 'user' ? '> ' : '🤖 ';
-  const prefixColor = type === 'user' ? 'cyan' : 'green';
+  const getPrefix = () => {
+    if (type === 'user') return '> ';
+    if (type === 'assistant') return '🤖 ';
+    return '⠋ '; // Spinner for loading
+  };
+  
+  const getPrefixColor = () => {
+    if (type === 'user') return 'cyan';
+    if (type === 'assistant') return 'green';
+    return 'yellow'; // Yellow for loading
+  };
+  
+  const prefix = getPrefix();
+  const prefixColor = getPrefixColor();
 
   return (
     <Box flexDirection="column">

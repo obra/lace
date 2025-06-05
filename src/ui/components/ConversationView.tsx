@@ -16,7 +16,7 @@ const mockConversation = [
 interface ConversationViewProps {
   scrollPosition?: number;
   isNavigationMode?: boolean;
-  messages?: Array<{type: 'user' | 'assistant', content: string}>;
+  messages?: Array<{type: 'user' | 'assistant' | 'loading', content: string}>;
 }
 
 const ConversationView: React.FC<ConversationViewProps> = ({ 

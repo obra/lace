@@ -8,12 +8,14 @@ interface StatusBarProps {
   isNavigationMode?: boolean;
   scrollPosition?: number;
   totalMessages?: number;
+  isLoading?: boolean;
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({ 
   isNavigationMode = false, 
   scrollPosition = 0, 
-  totalMessages = 0 
+  totalMessages = 0,
+  isLoading = false
 }) => {
   return (
     <Box borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false}>
@@ -24,6 +26,12 @@ const StatusBar: React.FC<StatusBarProps> = ({
           <Text color="yellow">Nav: j/k</Text>
           <Text> | </Text>
           <Text color="dim">Line {scrollPosition + 1} of {totalMessages}</Text>
+        </>
+      ) : isLoading ? (
+        <>
+          <Text color="yellow">Thinking...</Text>
+          <Text> | </Text>
+          <Text color="dim">Please wait</Text>
         </>
       ) : (
         <>
