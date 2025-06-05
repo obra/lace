@@ -121,7 +121,7 @@ const mockConversation = [
 
 ## Phase 2: Navigation & Interaction
 
-### Step 4: Keyboard Navigation Mode
+### Step 4: Keyboard Navigation Mode ✅ COMPLETE
 **Goal**: Enter/exit navigation mode to scroll through conversation
 
 **Features**:
@@ -138,9 +138,17 @@ const mockConversation = [
 
 **Acceptance**: Can navigate entire conversation with keyboard
 
+**Implementation Notes**:
+- Navigation state managed with useState hooks in App component
+- useInput hook handles Enter/j/k/Escape key bindings
+- Message highlighting uses inverse text styling
+- StatusBar shows "Nav: j/k" and "Line X of Y" in navigation mode
+- InputBar displays "Navigation mode - Press Escape to exit"
+- Comprehensive integration tests verify component coordination
+
 ---
 
-### Step 5: Basic Input Handling
+### Step 5: Basic Input Handling ✅ COMPLETE
 **Goal**: Accept user input and add to conversation
 
 **Features**:
@@ -152,6 +160,16 @@ const mockConversation = [
 **Test**: User can type and submit messages
 
 **Acceptance**: New messages appear in conversation view
+
+**Implementation Notes**:
+- Input state managed with useState in App component
+- Character input and backspace handling in useInput hook
+- InputBar displays typed text with cursor indicator
+- ConversationView accepts dynamic messages prop
+- Submit logic prevents empty/whitespace-only messages
+- Input field resets after successful submission
+- Enter behavior is mode-aware (submit vs navigation)
+- 9 comprehensive automated tests verify all functionality
 
 ---
 

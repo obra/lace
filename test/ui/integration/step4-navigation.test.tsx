@@ -33,12 +33,13 @@ describe('Step 4: Navigation Mode Integration', () => {
     const normalElement = InputBar({ isNavigationMode: false }) as any;
     const navElement = InputBar({ isNavigationMode: true }) as any;
     
-    // Normal mode shows placeholder
-    const normalText = normalElement.props.children[1];
+    // Normal mode shows placeholder in fragment
+    const normalFragment = normalElement.props.children[1];
+    const normalText = normalFragment.props.children[0]; // First child of fragment is placeholder
     expect(normalText.props.children).toBe('Type your message...');
     expect(normalText.props.color).toBe('dim');
     
-    // Navigation mode shows instruction
+    // Navigation mode shows instruction directly (not in fragment)
     const navText = navElement.props.children[1];
     expect(navText.props.children).toBe('Navigation mode - Press Escape to exit');
     expect(navText.props.color).toBe('yellow');

@@ -32,9 +32,15 @@ describe('InputBar Component', () => {
   test('contains placeholder text with dim color', () => {
     const element = InputBar({}) as any;
     const children = element.props.children;
-    const [, placeholderElement] = children;
+    const [, fragmentElement] = children;
     
-    // Second child should be the placeholder
+    // Second child is now a fragment containing the placeholder
+    expect(fragmentElement.type).toBe(React.Fragment);
+    
+    // Fragment contains the placeholder text
+    const fragmentChildren = fragmentElement.props.children;
+    const placeholderElement = fragmentChildren[0]; // First child is placeholder when no input text
+    
     expect(placeholderElement.type).toBe(Text);
     expect(placeholderElement.props.color).toBe('dim');
     expect(placeholderElement.props.children).toBe('Type your message...');

@@ -11,7 +11,21 @@ import InputBar from './components/InputBar';
 const App: React.FC = () => {
   const [isNavigationMode, setIsNavigationMode] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
-  const totalMessages = 4;
+  const [inputText, setInputText] = useState('');
+  const [conversation, setConversation] = useState([
+    { type: 'user' as const, content: 'Hello' },
+    { type: 'assistant' as const, content: 'Hi! How can I help you today?' },
+    { type: 'user' as const, content: 'Can you write a function?' },
+    { type: 'assistant' as const, content: 'Sure! Here is a basic function:\n\nfunction hello() {\n  return "Hello World";\n}' }
+  ]);
+  const totalMessages = conversation.length;
+
+  const submitMessage = () => {
+    if (inputText.trim()) {
+      setConversation(prev => [...prev, { type: 'user' as const, content: inputText.trim() }]);
+      setInputText('');
+    }
+  };
 
   useInput((input, key) => {
     if (key.ctrl && input === 'c') {
@@ -19,10 +33,22 @@ const App: React.FC = () => {
     }
 
     if (!isNavigationMode) {
-      // Input mode: Enter to enter navigation mode
+      // Input mode: handle text input and submission
       if (key.return) {
-        setIsNavigationMode(true);
-        setScrollPosition(0);
+        if (inputText.trim()) {
+          // Submit message if input has content
+          submitMessage();
+        } else {
+          // Enter navigation mode if input is empty
+          setIsNavigationMode(true);
+          setScrollPosition(0);
+        }
+      } else if (key.backspace || key.delete) {
+        // Handle backspace/delete
+        setInputText(prev => prev.slice(0, -1));
+      } else if (input && !key.ctrl && !key.meta && input.length === 1) {
+        // Handle regular character input
+        setInputText(prev => prev + input);
       }
     } else {
       // Navigation mode
@@ -42,9 +68,17 @@ const App: React.FC = () => {
 
   return (
     <Box flexDirection="column" height="100%">
-      <ConversationView scrollPosition={scrollPosition} isNavigationMode={isNavigationMode} />
+      <ConversationView 
+        scrollPosition={scrollPosition} 
+        isNavigationMode={isNavigationMode} 
+        messages={conversation}
+      />
       <StatusBar isNavigationMode={isNavigationMode} scrollPosition={scrollPosition} totalMessages={totalMessages} />
-      <InputBar isNavigationMode={isNavigationMode} />
+      <InputBar 
+        isNavigationMode={isNavigationMode} 
+        inputText={inputText}
+        showCursor={true}
+      />
     </Box>
   );
 };

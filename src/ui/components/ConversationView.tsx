@@ -16,15 +16,17 @@ const mockConversation = [
 interface ConversationViewProps {
   scrollPosition?: number;
   isNavigationMode?: boolean;
+  messages?: Array<{type: 'user' | 'assistant', content: string}>;
 }
 
 const ConversationView: React.FC<ConversationViewProps> = ({ 
   scrollPosition = 0, 
-  isNavigationMode = false 
+  isNavigationMode = false,
+  messages = mockConversation
 }) => {
   return (
     <Box flexDirection="column" flexGrow={1} padding={1}>
-      {mockConversation.map((message, index) => (
+      {messages.map((message, index) => (
         <Message 
           key={`message-${index}-${message.type}`} 
           type={message.type} 
