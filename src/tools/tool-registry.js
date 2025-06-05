@@ -5,6 +5,7 @@ import { ShellTool } from './shell-tool.js';
 import { FileTool } from './file-tool.js';
 import { JavaScriptTool } from './javascript-tool.js';
 import { SearchTool } from './search-tool.js';
+import { TaskTool } from './task-tool.js';
 
 export class ToolRegistry {
   constructor(options = {}) {
@@ -18,6 +19,7 @@ export class ToolRegistry {
     this.register('file', new FileTool());
     this.register('javascript', new JavaScriptTool());
     this.register('search', new SearchTool());
+    this.register('task', new TaskTool());
 
     // Initialize all tools
     for (const tool of this.tools.values()) {
@@ -35,7 +37,7 @@ export class ToolRegistry {
     return this.tools.get(name);
   }
 
-  async callTool(name, method, params, sessionId = null) {
+  async callTool(name, method, params, sessionId = null, agent = null) {
     const tool = this.tools.get(name);
     if (!tool) {
       throw new Error(`Tool '${name}' not found`);
@@ -43,6 +45,14 @@ export class ToolRegistry {
     
     if (typeof tool[method] !== 'function') {
       throw new Error(`Method '${method}' not found on tool '${name}'`);
+    }
+
+    // Set agent context for TaskTool
+    if (name === 'task' && agent && typeof tool.setAgent === 'function') {
+      tool.setAgent(agent);
+      if (sessionId && typeof tool.setSessionId === 'function') {
+        tool.setSessionId(sessionId);
+      }
     }
 
     // Log tool execution start

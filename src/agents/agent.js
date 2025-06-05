@@ -427,7 +427,7 @@ Focus on executing your assigned task efficiently.`;
       throw new Error(`Tool '${toolName}' not found`);
     }
 
-    return await this.tools.callTool(toolName, methodName, toolCall.input, sessionId);
+    return await this.tools.callTool(toolName, methodName, toolCall.input, sessionId, this);
   }
 
   async synthesizeToolResponse(toolResult, toolCall, sessionId, synthesisPrompt) {
