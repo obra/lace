@@ -7,7 +7,6 @@ yarn-error.log*
 # Local configuration and sensitive data
 .claude/
 lace-memory.db
-.private-journal/
 
 # Debug and temporary files
 debug-tool.js
