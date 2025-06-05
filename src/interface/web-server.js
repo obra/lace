@@ -69,6 +69,23 @@ export class WebServer {
     const webDir = path.join(__dirname, '../../web');
     this.app.use(express.static(webDir));
 
+    // Request validation middleware
+    const validateSessionId = (req, res, next) => {
+      const { sessionId } = req.params;
+      if (!sessionId || typeof sessionId !== 'string' || sessionId.length > 100) {
+        return res.status(400).json({ error: 'Invalid session ID' });
+      }
+      next();
+    };
+
+    const validatePagination = (req, res, next) => {
+      const limit = parseInt(req.query.limit);
+      if (req.query.limit && (isNaN(limit) || limit < 1 || limit > 1000)) {
+        return res.status(400).json({ error: 'Invalid limit parameter (1-1000)' });
+      }
+      next();
+    };
+
     // Health check endpoint
     this.app.get('/api/health', (req, res) => {
       res.json({ 
@@ -93,7 +110,7 @@ export class WebServer {
       }
     });
 
-    this.app.get('/api/sessions/:sessionId/messages', async (req, res) => {
+    this.app.get('/api/sessions/:sessionId/messages', validateSessionId, validatePagination, async (req, res) => {
       try {
         if (!this.db) {
           return res.status(503).json({ error: 'Database not available' });
@@ -110,7 +127,7 @@ export class WebServer {
       }
     });
 
-    this.app.get('/api/sessions/:sessionId/stats', async (req, res) => {
+    this.app.get('/api/sessions/:sessionId/stats', validateSessionId, async (req, res) => {
       try {
         if (!this.db) {
           return res.status(503).json({ error: 'Database not available' });
@@ -144,7 +161,7 @@ export class WebServer {
     });
 
     // Tool execution API endpoints
-    this.app.get('/api/sessions/:sessionId/tools', async (req, res) => {
+    this.app.get('/api/sessions/:sessionId/tools', validateSessionId, validatePagination, async (req, res) => {
       try {
         if (!this.activityLogger) {
           return res.status(503).json({ error: 'Activity logger not available' });
@@ -234,7 +251,7 @@ export class WebServer {
     });
 
     // Agent orchestration API endpoints
-    this.app.get('/api/sessions/:sessionId/agents', async (req, res) => {
+    this.app.get('/api/sessions/:sessionId/agents', validateSessionId, async (req, res) => {
       try {
         if (!this.db) {
           return res.status(503).json({ error: 'Database not available' });
@@ -297,6 +314,145 @@ export class WebServer {
       if (messageCount === 0) return 'spawned';
       return 'idle';
     }
+
+    // System metrics API endpoint
+    this.app.get('/api/system/metrics', async (req, res) => {
+      try {
+        const hours = parseInt(req.query.hours) || 24;
+        const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+        
+        // Get activity metrics
+        let totalEvents = 0;
+        let sessionCount = 0;
+        let avgEventsPerSession = 0;
+        
+        if (this.activityLogger && this.db) {
+          try {
+            const eventCount = await this.activityLogger.getEvents({ since, limit: 10000 });
+            totalEvents = eventCount.length;
+            
+            const sessions = await this.db.all(
+              'SELECT DISTINCT session_id FROM conversations WHERE timestamp > ?',
+              [since]
+            );
+            sessionCount = sessions.length;
+            avgEventsPerSession = sessionCount > 0 ? totalEvents / sessionCount : 0;
+          } catch (metricsError) {
+            // Non-critical error, continue with default values
+          }
+        }
+
+        res.json({
+          uptime: process.uptime(),
+          memoryUsage: process.memoryUsage(),
+          nodeVersion: process.version,
+          platform: process.platform,
+          connectedClients: this.connectedClients.size,
+          metrics: {
+            totalEvents,
+            sessionCount,
+            avgEventsPerSession: Math.round(avgEventsPerSession * 100) / 100,
+            timeRange: `${hours} hours`
+          }
+        });
+      } catch (error) {
+        console.error('Error fetching system metrics:', error);
+        res.status(500).json({ error: 'Failed to fetch system metrics' });
+      }
+    });
+
+    // Activity events API endpoint for advanced filtering
+    this.app.get('/api/activity/events', async (req, res) => {
+      try {
+        if (!this.activityLogger) {
+          return res.status(503).json({ error: 'Activity logger not available' });
+        }
+
+        const limit = parseInt(req.query.limit) || 100;
+        const sessionId = req.query.sessionId;
+        const eventType = req.query.eventType;
+        const since = req.query.since;
+        
+        const filters = { limit };
+        if (sessionId) filters.sessionId = sessionId;
+        if (eventType) filters.eventType = eventType;
+        if (since) filters.since = since;
+        
+        const events = await this.activityLogger.getEvents(filters);
+        res.json(events.reverse()); // Return in chronological order
+      } catch (error) {
+        console.error('Error fetching activity events:', error);
+        res.status(500).json({ error: 'Failed to fetch activity events' });
+      }
+    });
+
+    // Session analytics endpoint
+    this.app.get('/api/sessions/:sessionId/analytics', validateSessionId, async (req, res) => {
+      try {
+        if (!this.db || !this.activityLogger) {
+          return res.status(503).json({ error: 'Database or activity logger not available' });
+        }
+
+        const { sessionId } = req.params;
+        
+        // Get conversation analytics
+        const conversations = await this.db.all(
+          'SELECT role, COUNT(*) as count, AVG(context_size) as avg_tokens, SUM(context_size) as total_tokens FROM conversations WHERE session_id = ? GROUP BY role',
+          [sessionId]
+        );
+
+        // Get activity timeline
+        const activities = await this.activityLogger.getEvents({ 
+          sessionId: sessionId, 
+          limit: 1000 
+        });
+
+        // Process activity data
+        const eventsByType = {};
+        const hourlyActivity = {};
+        
+        activities.forEach(event => {
+          // Count by event type
+          eventsByType[event.event_type] = (eventsByType[event.event_type] || 0) + 1;
+          
+          // Count by hour
+          const hour = new Date(event.timestamp).toISOString().slice(0, 13);
+          hourlyActivity[hour] = (hourlyActivity[hour] || 0) + 1;
+        });
+
+        // Calculate session duration
+        const sortedActivities = activities.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        const sessionStart = sortedActivities[0]?.timestamp;
+        const sessionEnd = sortedActivities[sortedActivities.length - 1]?.timestamp;
+        const duration = sessionStart && sessionEnd ? 
+          new Date(sessionEnd) - new Date(sessionStart) : 0;
+
+        res.json({
+          sessionId,
+          duration: Math.round(duration / 1000), // seconds
+          conversations: conversations.reduce((acc, conv) => {
+            acc[conv.role] = {
+              count: conv.count,
+              avgTokens: Math.round(conv.avg_tokens || 0),
+              totalTokens: conv.total_tokens || 0
+            };
+            return acc;
+          }, {}),
+          activitySummary: {
+            totalEvents: activities.length,
+            eventsByType,
+            hourlyActivity
+          },
+          timeline: {
+            start: sessionStart,
+            end: sessionEnd
+          }
+        });
+      } catch (error) {
+        console.error('Error fetching session analytics:', error);
+        res.status(500).json({ error: 'Failed to fetch session analytics' });
+      }
+    });
 
     // Default route serves the React app
     this.app.get('*', (req, res) => {
