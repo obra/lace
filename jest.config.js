@@ -8,13 +8,19 @@ export default {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
       useESM: true,
       tsconfig: {
-        jsx: 'react-jsx'
+        jsx: 'react-jsx',
+        skipLibCheck: true,
+        noImplicitAny: false,
+        moduleResolution: 'node'
       }
     }]
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(ink)/)'
+  ],
   testEnvironment: 'node',
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
   testMatch: [
-    '**/test/ui/**/*.test.(ts|tsx)'
+    '**/test/ui/**/*.test.(ts|tsx|js)'
   ]
 };
