@@ -78,6 +78,8 @@ export class Agent {
 
       // Execute any tool calls
       const toolResults = [];
+      let finalContent = response.content;
+
       if (response.toolCalls && response.toolCalls.length > 0) {
         for (const toolCall of response.toolCalls) {
           try {
@@ -86,6 +88,11 @@ export class Agent {
               toolCall,
               result
             });
+
+            // If this was a calculation, append the result to the content
+            if (toolCall.name.includes('calculate') && result.success) {
+              finalContent += `\n\nResult: ${result.result}`;
+            }
           } catch (error) {
             toolResults.push({
               toolCall,
@@ -96,7 +103,7 @@ export class Agent {
       }
 
       return {
-        content: response.content,
+        content: finalContent,
         toolCalls: response.toolCalls,
         toolResults,
         usage: response.usage
