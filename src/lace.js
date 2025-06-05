@@ -6,6 +6,7 @@ import { ToolRegistry } from './tools/tool-registry.js';
 import { Agent } from './agents/agent.js';
 import { Console } from './interface/console.js';
 import { ModelProvider } from './models/model-provider.js';
+import { ToolApprovalManager } from './safety/tool-approval.js';
 
 export class Lace {
   constructor(options = {}) {
@@ -20,6 +21,14 @@ export class Lace {
         // Default to using Anthropic models
       }
     });
+    
+    // Tool approval system - can be configured
+    this.toolApproval = new ToolApprovalManager({
+      interactive: options.interactive !== false,
+      autoApproveTools: options.autoApprove || options.autoApproveTools || [],
+      alwaysDenyTools: options.deny || options.alwaysDenyTools || []
+    });
+    
     this.console = new Console();
     
     this.primaryAgent = null;
@@ -39,6 +48,7 @@ export class Lace {
       tools: this.tools,
       db: this.db,
       modelProvider: this.modelProvider,
+      toolApproval: this.toolApproval,
       verbose: this.verbose,
       role: 'orchestrator',
       assignedModel: 'claude-3-5-sonnet-20241022',

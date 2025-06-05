@@ -44,6 +44,23 @@ export class Console {
           continue;
         }
 
+        if (input.trim() === '/approval') {
+          this.showApprovalStatus(agent);
+          continue;
+        }
+
+        if (input.trim().startsWith('/auto-approve ')) {
+          const toolName = input.trim().substring('/auto-approve '.length);
+          this.manageAutoApproval(agent, toolName, true);
+          continue;
+        }
+
+        if (input.trim().startsWith('/deny ')) {
+          const toolName = input.trim().substring('/deny '.length);
+          this.manageDenyList(agent, toolName, true);
+          continue;
+        }
+
         if (input.trim().startsWith('/')) {
           console.log(chalk.red(`Unknown command: ${input.trim()}`));
           continue;
@@ -65,10 +82,13 @@ export class Console {
 
   showHelp() {
     console.log(chalk.cyan('\nAvailable commands:'));
-    console.log('  /help     - Show this help message');
-    console.log('  /tools    - List available tools');
-    console.log('  /memory   - Show conversation history');
-    console.log('  /quit     - Exit lace\n');
+    console.log('  /help             - Show this help message');
+    console.log('  /tools            - List available tools');
+    console.log('  /memory           - Show conversation history');
+    console.log('  /approval         - Show tool approval settings');
+    console.log('  /auto-approve <tool> - Add tool to auto-approve list');
+    console.log('  /deny <tool>      - Add tool to deny list');
+    console.log('  /quit             - Exit lace\n');
   }
 
   showTools(agent) {
@@ -116,14 +136,74 @@ export class Console {
     if (response.toolResults && response.toolResults.length > 0) {
       console.log(chalk.cyan('\nTool results:'));
       for (const result of response.toolResults) {
-        if (result.error) {
+        if (result.denied) {
+          console.log(chalk.red(`  🚫 ${result.toolCall.name}: ${result.error}`));
+        } else if (result.error) {
           console.log(chalk.red(`  ❌ ${result.toolCall.name}: ${result.error}`));
         } else {
-          console.log(chalk.green(`  ✅ ${result.toolCall.name}: Success`));
+          const approvalIcon = result.approved ? '✅' : '⚠️';
+          console.log(chalk.green(`  ${approvalIcon} ${result.toolCall.name}: Success`));
         }
       }
     }
 
     console.log();
+  }
+
+  showApprovalStatus(agent) {
+    if (!agent.toolApproval) {
+      console.log(chalk.yellow('\nTool approval system not enabled'));
+      return;
+    }
+
+    const status = agent.toolApproval.getStatus();
+    console.log(chalk.cyan('\nTool Approval Settings:'));
+    console.log(`  Interactive mode: ${status.interactive ? chalk.green('Enabled') : chalk.red('Disabled')}`);
+    
+    if (status.autoApprove.length > 0) {
+      console.log(chalk.green('\n  Auto-approve tools:'));
+      for (const tool of status.autoApprove) {
+        console.log(`    ✅ ${tool}`);
+      }
+    }
+    
+    if (status.denyList.length > 0) {
+      console.log(chalk.red('\n  Denied tools:'));
+      for (const tool of status.denyList) {
+        console.log(`    🚫 ${tool}`);
+      }
+    }
+    
+    console.log();
+  }
+
+  manageAutoApproval(agent, toolName, add) {
+    if (!agent.toolApproval) {
+      console.log(chalk.yellow('Tool approval system not enabled'));
+      return;
+    }
+
+    if (add) {
+      agent.toolApproval.addAutoApprove(toolName);
+      console.log(chalk.green(`✅ Added '${toolName}' to auto-approve list`));
+    } else {
+      agent.toolApproval.removeAutoApprove(toolName);
+      console.log(chalk.yellow(`Removed '${toolName}' from auto-approve list`));
+    }
+  }
+
+  manageDenyList(agent, toolName, add) {
+    if (!agent.toolApproval) {
+      console.log(chalk.yellow('Tool approval system not enabled'));
+      return;
+    }
+
+    if (add) {
+      agent.toolApproval.addDenyList(toolName);
+      console.log(chalk.red(`🚫 Added '${toolName}' to deny list`));
+    } else {
+      agent.toolApproval.removeDenyList(toolName);
+      console.log(chalk.yellow(`Removed '${toolName}' from deny list`));
+    }
   }
 }

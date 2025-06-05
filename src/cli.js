@@ -14,6 +14,9 @@ program
   .version('0.1.0')
   .option('-v, --verbose', 'enable verbose output')
   .option('--memory-path <path>', 'path to conversation database', './lace-memory.db')
+  .option('--no-interactive', 'disable interactive tool approval (auto-deny dangerous tools)')
+  .option('--auto-approve <tools>', 'comma-separated list of tools to auto-approve', (value) => value.split(','))
+  .option('--deny <tools>', 'comma-separated list of tools to always deny', (value) => value.split(','))
   .action(async (options) => {
     const lace = new Lace(options);
     await lace.start();

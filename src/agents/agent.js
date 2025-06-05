@@ -18,6 +18,9 @@ export class Agent {
     this.task = options.task || null;
     this.capabilities = options.capabilities || ['reasoning', 'tool_calling'];
     
+    // Tool approval system
+    this.toolApproval = options.toolApproval || null;
+    
     this.contextSize = 0;
     this.maxContextSize = 100000; // TODO: Get from model API
     this.handoffThreshold = 0.8; // Handoff at 80% capacity
@@ -76,23 +79,61 @@ export class Agent {
         };
       }
 
-      // Execute any tool calls
+      // Execute any tool calls with approval
       const toolResults = [];
       let finalContent = response.content;
+      let shouldStop = false;
 
       if (response.toolCalls && response.toolCalls.length > 0) {
         for (const toolCall of response.toolCalls) {
           try {
-            const result = await this.executeTool(toolCall);
+            // Request approval if approval system is available
+            let approvedCall = toolCall;
+            let postExecutionComment = null;
+            
+            if (this.toolApproval) {
+              const approval = await this.toolApproval.requestApproval(toolCall, {
+                reasoning: response.content,
+                agent: this.role,
+                sessionId: sessionId
+              });
+
+              if (!approval.approved) {
+                toolResults.push({
+                  toolCall,
+                  error: `Tool execution denied: ${approval.reason}`,
+                  denied: true
+                });
+
+                if (approval.shouldStop) {
+                  shouldStop = true;
+                  finalContent += '\n\n⏸️ Execution stopped by user. Please provide further instructions.';
+                  break;
+                }
+                continue;
+              }
+
+              approvedCall = approval.modifiedCall || toolCall;
+              postExecutionComment = approval.postExecutionComment;
+            }
+
+            const result = await this.executeTool(approvedCall);
             toolResults.push({
-              toolCall,
-              result
+              toolCall: approvedCall,
+              result,
+              approved: true
             });
 
             // If this was a calculation, append the result to the content
-            if (toolCall.name.includes('calculate') && result.success) {
+            if (approvedCall.name.includes('calculate') && result.success) {
               finalContent += `\n\nResult: ${result.result}`;
             }
+
+            // Add post-execution comment if provided
+            if (postExecutionComment) {
+              finalContent += `\n\n💭 User note: ${postExecutionComment}`;
+            }
+
           } catch (error) {
             toolResults.push({
               toolCall,
@@ -106,7 +147,8 @@ export class Agent {
         content: finalContent,
         toolCalls: response.toolCalls,
         toolResults,
-        usage: response.usage
+        usage: response.usage,
+        stopped: shouldStop
       };
     } catch (error) {
       return {
