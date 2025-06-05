@@ -2,6 +2,7 @@
 // ABOUTME: Implements multi-generational memory and subagent coordination
 
 import { ActivityLogger } from '../logging/activity-logger.js';
+import { DebugLogger } from '../logging/debug-logger.js';
 
 export class Agent {
   constructor(options = {}) {
@@ -26,6 +27,16 @@ export class Agent {
     // Activity logging
     this.activityLogger = options.activityLogger || null;
     
+    // Debug logging
+    this.debugLogger = null;
+    if (options.debugLogging) {
+      this.debugLogger = new DebugLogger({
+        logLevel: options.debugLogging.logLevel || 'off',
+        logFile: options.debugLogging.logFile,
+        logFileLevel: options.debugLogging.logFileLevel || 'off'
+      });
+    }
+    
     this.contextSize = 0;
     this.maxContextSize = this.getModelContextWindow();
     this.handoffThreshold = 0.8; // Handoff at 80% capacity
@@ -40,7 +51,9 @@ export class Agent {
       
       // Check if we need to handoff context
       if (this.shouldHandoff()) {
-        console.log('🔄 Context approaching limit, preparing handoff...');
+        if (this.debugLogger) {
+          this.debugLogger.info('🔄 Context approaching limit, preparing handoff...');
+        }
         // TODO: Implement handoff logic
       }
 
@@ -78,7 +91,9 @@ export class Agent {
         iteration++;
         
         if (this.verbose) {
-          console.log(`🔄 Agentic iteration ${iteration}/${maxIterations}`);
+          if (this.debugLogger) {
+            this.debugLogger.debug(`🔄 Agentic iteration ${iteration}/${maxIterations}`);
+          }
         }
 
         // Get available tools for the LLM
@@ -219,10 +234,12 @@ export class Agent {
         const contextUsage = this.calculateContextUsage(totalUsage.total_tokens);
         const cost = this.calculateCost(totalUsage.prompt_tokens, totalUsage.completion_tokens);
         
-        console.log(`\n📈 Session totals: ${totalUsage.prompt_tokens} in, ${totalUsage.completion_tokens} out, ${totalUsage.total_tokens} total tokens`);
-        console.log(`📊 Context usage: ${contextUsage.used}/${contextUsage.total} tokens (${contextUsage.percentage.toFixed(1)}%)`);
-        if (cost) {
-          console.log(`💰 Cost: $${cost.totalCost.toFixed(4)} (in: $${cost.inputCost.toFixed(4)}, out: $${cost.outputCost.toFixed(4)})`);
+        if (this.debugLogger) {
+          this.debugLogger.info(`\n📈 Session totals: ${totalUsage.prompt_tokens} in, ${totalUsage.completion_tokens} out, ${totalUsage.total_tokens} total tokens`);
+          this.debugLogger.info(`📊 Context usage: ${contextUsage.used}/${contextUsage.total} tokens (${contextUsage.percentage.toFixed(1)}%)`);
+          if (cost) {
+            this.debugLogger.info(`💰 Cost: $${cost.totalCost.toFixed(4)} (in: $${cost.inputCost.toFixed(4)}, out: $${cost.outputCost.toFixed(4)})`);
+          }
         }
       }
 
@@ -423,7 +440,9 @@ Focus on executing your assigned task efficiently.`;
     }
 
     if (this.verbose) {
-      console.log(`🔬 Synthesizing tool response (${estimatedTokens} estimated tokens)`);
+      if (this.debugLogger) {
+        this.debugLogger.debug(`🔬 Synthesizing tool response (${estimatedTokens} estimated tokens)`);
+      }
     }
 
     // Create synthesis agent
@@ -455,7 +474,9 @@ ${responseText}`;
       };
     } catch (error) {
       if (this.verbose) {
-        console.log(`⚠️ Tool synthesis failed: ${error.message}, using original result`);
+        if (this.debugLogger) {
+          this.debugLogger.warn(`⚠️ Tool synthesis failed: ${error.message}, using original result`);
+        }
       }
       return toolResult; // Fallback to original result
     }
@@ -582,11 +603,20 @@ ${responseText}`;
       db: this.db,
       modelProvider: this.modelProvider,
       generation: this.generation + 0.1, // Sub-generation
-      verbose: this.verbose
+      verbose: this.verbose,
+      toolApproval: this.toolApproval,
+      activityLogger: this.activityLogger,
+      debugLogging: options.debugLogging || (this.debugLogger ? {
+        logLevel: this.debugLogger.stderrLevel,
+        logFile: this.debugLogger.filePath,
+        logFileLevel: this.debugLogger.fileLevel
+      } : null)
     });
 
     if (this.verbose) {
-      console.log(`🤖 Spawned ${options.role} agent with ${options.assignedModel}`);
+      if (this.debugLogger) {
+        this.debugLogger.debug(`🤖 Spawned ${options.role} agent with ${options.assignedModel}`);
+      }
     }
 
     return subagent;
@@ -605,7 +635,9 @@ ${responseText}`;
     const result = await subagent.generateResponse(sessionId, task);
     
     if (this.verbose) {
-      console.log(`✅ Task completed by ${agentConfig.role} agent`);
+      if (this.debugLogger) {
+        this.debugLogger.info(`✅ Task completed by ${agentConfig.role} agent`);
+      }
     }
 
     return result;

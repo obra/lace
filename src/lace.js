@@ -91,7 +91,7 @@ export class Lace {
         logFile: this.options.logFile,
         logFileLevel: this.options.logFileLevel || 'off'
       },
-      activityLogger: this.console.activityLogger
+      activityLogger: this.activityLogger
     });
     
     return this.primaryAgent;
