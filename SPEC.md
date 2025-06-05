@@ -71,7 +71,15 @@
 - InputBar: Cyan prompt with dim placeholder text
 - Comprehensive functional tests (21 tests) verifying component behavior
 
-**⏳ Step 3 Pending**: Basic Message Display
-- Message list with user/assistant conversation history
-- Proper message formatting and styling
-- Scroll handling for message overflow
+**✅ Step 3 Complete**: Basic Message Display
+- Message component with user/assistant conversation history
+- User messages: cyan "> " prefix, Assistant messages: green "🤖 " prefix
+- Multi-line content support including code blocks
+- Mock conversation data displaying properly formatted messages
+- Comprehensive tests (27 total) verifying message rendering and layout
+- 10-second demo timeout for manual testing
+
+**⏳ Step 4 Pending**: Keyboard Navigation Mode
+- Enter/exit navigation mode to scroll through conversation
+- j/k keys for scroll up/down, Escape to exit
+- Visual indicator of current mode and cursor position
