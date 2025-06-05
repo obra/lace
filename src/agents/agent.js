@@ -132,7 +132,10 @@ export class Agent {
             response.usage?.output_tokens || response.usage?.completion_tokens || 0
           );
           
-          await this.activityLogger.logEvent('model_response', sessionId, null, {
+          // Use model provider session ID if available
+          const modelSessionId = response.sessionId || null;
+          
+          await this.activityLogger.logEvent('model_response', sessionId, modelSessionId, {
             content: response.content || '',
             tokens_in: response.usage?.input_tokens || response.usage?.prompt_tokens || 0,
             tokens_out: response.usage?.output_tokens || response.usage?.completion_tokens || 0,
