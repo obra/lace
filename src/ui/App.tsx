@@ -26,7 +26,7 @@ const App: React.FC = () => {
       folded: true
     },
     { type: 'user' as const, content: 'Can you write a function?' },
-    { type: 'assistant' as const, content: 'Sure! Here is a basic function:\n\nfunction hello() {\n  return "Hello World";\n}' }
+    { type: 'assistant' as const, content: 'Sure! Here is a basic function:\n\n```javascript\nfunction hello() {\n  return "Hello World";\n}\n```' }
   ]);
   const totalMessages = conversation.length;
 

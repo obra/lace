@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
+import { processContentWithHighlighting } from '../utils/syntax-highlight';
 
 interface MessageProps {
   type: 'user' | 'assistant' | 'loading' | 'agent_activity';
@@ -68,11 +69,15 @@ const Message: React.FC<MessageProps> = ({
       }
     } else {
       // Regular message types (user, assistant, loading)
+      const displayContent = type === 'assistant' && typeof content === 'string' 
+        ? processContentWithHighlighting(content)
+        : content;
+        
       return (
         <Box>
           <Text color={prefixColor}>{prefix}</Text>
           {/* @ts-expect-error - inverse prop exists in runtime but TypeScript is having issues */}
-          <Text inverse={isHighlighted}>{content}</Text>
+          <Text inverse={isHighlighted}>{displayContent}</Text>
         </Box>
       );
     }
