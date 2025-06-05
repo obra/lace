@@ -66,8 +66,8 @@ describe('Step 4: Navigation Mode Integration', () => {
     const inputBar = InputBar({ isNavigationMode }) as any;
     const conversationView = ConversationView({ scrollPosition, isNavigationMode }) as any;
     
-    // StatusBar should show navigation info
-    const statusFragment = statusBar.props.children[4];
+    // StatusBar should show navigation info (last fragment)
+    const statusFragment = statusBar.props.children[statusBar.props.children.length - 1];
     const statusChildren = statusFragment.props.children;
     const positionElement = statusChildren.find((child: any) => 
       child.props.children && typeof child.props.children === 'string' && child.props.children.includes('Line ')

@@ -4,6 +4,11 @@
 import React from 'react';
 import { Text, Box } from 'ink';
 
+interface TokenUsage {
+  used: number;
+  total: number;
+}
+
 interface StatusBarProps {
   isNavigationMode?: boolean;
   scrollPosition?: number;
@@ -14,6 +19,9 @@ interface StatusBarProps {
   isSearchMode?: boolean;
   searchResults?: { messageIndex: number; message: any }[];
   searchResultIndex?: number;
+  tokenUsage?: TokenUsage;
+  modelName?: string;
+  terminalWidth?: number;
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({ 
@@ -25,8 +33,18 @@ const StatusBar: React.FC<StatusBarProps> = ({
   searchTerm = '',
   isSearchMode = false,
   searchResults = [],
-  searchResultIndex = 0
+  searchResultIndex = 0,
+  tokenUsage,
+  modelName,
+  terminalWidth = 100
 }) => {
+  const formatTokens = (tokens: number): string => {
+    if (tokens >= 1000) {
+      return `${(tokens / 1000).toFixed(1)}k`;
+    }
+    return tokens.toString();
+  };
+
   const getFilterText = () => {
     switch (filterMode) {
       case 'conversation':
@@ -39,10 +57,44 @@ const StatusBar: React.FC<StatusBarProps> = ({
     }
   };
 
+  const isNarrowTerminal = terminalWidth < 80;
+  const showFullInfo = terminalWidth >= 120;
+
   return (
     <Box borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false}>
       <Text color="cyan">lace-ink</Text>
       <Text> | </Text>
+      
+      {/* Token usage display */}
+      {tokenUsage && (
+        <>
+          <Text color="blue">
+            Tokens: {formatTokens(tokenUsage.used)}/{formatTokens(tokenUsage.total)}
+          </Text>
+          <Text> | </Text>
+        </>
+      )}
+      
+      {/* Model name display */}
+      {modelName && showFullInfo && (
+        <>
+          <Text color="green">{modelName}</Text>
+          <Text> | </Text>
+        </>
+      )}
+      {modelName && isNarrowTerminal && (
+        <>
+          <Text color="green">{modelName.split('-')[0] + '-3.5'}</Text>
+          <Text> | </Text>
+        </>
+      )}
+      {modelName && !showFullInfo && !isNarrowTerminal && (
+        <>
+          <Text color="green">{modelName}</Text>
+          <Text> | </Text>
+        </>
+      )}
+      
       <Text color="magenta">Filter: {getFilterText()}</Text>
       <Text> | </Text>
       {isSearchMode ? (
