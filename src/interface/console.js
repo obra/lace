@@ -42,12 +42,9 @@ export class Console {
     while (true) {
       try {
         const response = await prompts({
-          type: 'autocomplete',
+          type: 'text',
           name: 'input',
-          message: chalk.green('lace>'),
-          choices: this.getCompletions.bind(this),
-          suggest: this.suggest.bind(this),
-          fallback: { title: 'Continue typing...', value: null }
+          message: chalk.green('lace>')
         });
 
         // Handle Ctrl+C or empty input
