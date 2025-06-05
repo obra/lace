@@ -1,0 +1,34 @@
+{
+  "name": "lace",
+  "version": "0.1.0",
+  "description": "Your lightweight agentic coding environment",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "lace": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "dev": "node --watch src/cli.js",
+    "test": "node --test test/**/*.test.js",
+    "lint": "eslint src test",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "commander": "^12.0.0",
+    "inquirer": "^9.2.0",
+    "sqlite3": "^5.1.0",
+    "chalk": "^5.3.0",
+    "@anthropic-ai/sdk": "^0.32.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["ai", "agent", "development", "tool", "automation"],
+  "author": "Jesse",
+  "license": "MIT"
+}

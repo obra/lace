@@ -1,0 +1,10 @@
+import { APIResource } from "../../../resource.js";
+import * as MessagesAPI from "./messages.js";
+import { MessageCreateParams, MessageCreateParamsNonStreaming, MessageCreateParamsStreaming, Messages, PromptCachingBetaCacheControlEphemeral, PromptCachingBetaImageBlockParam, PromptCachingBetaMessage, PromptCachingBetaMessageParam, PromptCachingBetaTextBlockParam, PromptCachingBetaTool, PromptCachingBetaToolResultBlockParam, PromptCachingBetaToolUseBlockParam, PromptCachingBetaUsage, RawPromptCachingBetaMessageStartEvent, RawPromptCachingBetaMessageStreamEvent } from "./messages.js";
+export declare class PromptCaching extends APIResource {
+    messages: MessagesAPI.Messages;
+}
+export declare namespace PromptCaching {
+    export { Messages as Messages, type PromptCachingBetaCacheControlEphemeral as PromptCachingBetaCacheControlEphemeral, type PromptCachingBetaImageBlockParam as PromptCachingBetaImageBlockParam, type PromptCachingBetaMessage as PromptCachingBetaMessage, type PromptCachingBetaMessageParam as PromptCachingBetaMessageParam, type PromptCachingBetaTextBlockParam as PromptCachingBetaTextBlockParam, type PromptCachingBetaTool as PromptCachingBetaTool, type PromptCachingBetaToolResultBlockParam as PromptCachingBetaToolResultBlockParam, type PromptCachingBetaToolUseBlockParam as PromptCachingBetaToolUseBlockParam, type PromptCachingBetaUsage as PromptCachingBetaUsage, type RawPromptCachingBetaMessageStartEvent as RawPromptCachingBetaMessageStartEvent, type RawPromptCachingBetaMessageStreamEvent as RawPromptCachingBetaMessageStreamEvent, type MessageCreateParams as MessageCreateParams, type MessageCreateParamsNonStreaming as MessageCreateParamsNonStreaming, type MessageCreateParamsStreaming as MessageCreateParamsStreaming, };
+}
+//# sourceMappingURL=prompt-caching.d.ts.map
