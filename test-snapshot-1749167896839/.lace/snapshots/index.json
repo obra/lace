@@ -1,5 +1,12 @@
 {
-  "snapshots": [],
-  "lastUpdated": "2025-06-05T23:58:16.848Z",
+  "snapshots": [
+    {
+      "snapshotId": "2025-06-05T23-58-16-pre-tool-t-exec",
+      "timestamp": "2025-06-05T23:58:16.849Z",
+      "type": "pre-tool",
+      "description": null
+    }
+  ],
+  "lastUpdated": "2025-06-05T23:58:16.999Z",
   "version": "1.0"
 }

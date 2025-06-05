@@ -1,0 +1,19 @@
+{
+  "snapshotId": "2025-06-05T23-58-16-pre-tool-t-exec",
+  "timestamp": "2025-06-05T23:58:16.849Z",
+  "type": "pre-tool",
+  "gitCommitSha": "58a5a9eec415e4613abff0a0f15bc0c95d097bec",
+  "realRepoSha": "unknown",
+  "toolCall": {
+    "toolName": "file-tool",
+    "operation": "write",
+    "parameters": {},
+    "executionId": "test-exec"
+  },
+  "context": {},
+  "performance": {
+    "filesChanged": 43,
+    "snapshotSizeBytes": 0,
+    "processingTimeMs": 125
+  }
+}
