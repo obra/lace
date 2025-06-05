@@ -1,30 +1,48 @@
 // ABOUTME: Integration tests for Step 2 layout structure
-// ABOUTME: Tests complete layout assembly and component interaction
+// ABOUTME: Tests complete App component assembly and layout
+
+import React from 'react';
+import App from '../../../src/ui/App';
+import { Box } from 'ink';
 
 describe('Step 2: Basic Layout Structure', () => {
-  test('layout structure implemented', () => {
-    // This test documents that Step 2 layout structure is complete
-    // Files created: App.tsx, StatusBar.tsx, ConversationView.tsx, InputBar.tsx
-    // Layout: ConversationView (flexGrow) → StatusBar → InputBar
-    expect(true).toBe(true);
+  test('App renders correct layout structure', () => {
+    const element = App({}) as any;
+    
+    // Should return a Box with column direction and full height
+    expect(element.type).toBe(Box);
+    expect(element.props.flexDirection).toBe('column');
+    expect(element.props.height).toBe('100%');
+    expect(React.isValidElement(element)).toBe(true);
   });
 
-  test('npm run ui command works', () => {
-    // This test documents that the UI can be launched
-    // Command: npm run ui
-    // Result: Full layout displays without errors
-    expect(true).toBe(true);
+  test('App contains all three main components in correct order', () => {
+    const element = App({}) as any;
+    const children = element.props.children;
+    
+    // Should have exactly 3 children
+    expect(children).toHaveLength(3);
+    
+    // First child should be ConversationView component
+    expect(children[0].type.name).toBe('ConversationView');
+    
+    // Second child should be StatusBar component  
+    expect(children[1].type.name).toBe('StatusBar');
+    
+    // Third child should be InputBar component
+    expect(children[2].type.name).toBe('InputBar');
   });
 
-  test('manual verification: Step 2 acceptance criteria', () => {
-    // Manual verification checklist - run `npm run ui` and verify:
-    // ✅ Full window layout with 3 sections (top to bottom)
-    // ✅ ConversationView: "Conversation will appear here..." + "Ready for messages and responses."
-    // ✅ StatusBar: "lace-ink | Ready | ↑/↓ to navigate" with top border line
-    // ✅ InputBar: "> Type your message..." (cyan prompt + dim placeholder)
-    // ✅ No auto-exit behavior (runs until Ctrl+C)
-    // ✅ Layout fills entire terminal window
-    // ✅ Terminal resize adjusts ConversationView height
-    expect(true).toBe(true);
+  test('App properly composes all components', () => {
+    const element = App({}) as any;
+    
+    // Test that the app successfully renders without crashing
+    expect(element).toBeTruthy();
+    expect(React.isValidElement(element)).toBe(true);
+    
+    // Test that the structure is what we expect
+    const children = element.props.children;
+    expect(Array.isArray(children)).toBe(true);
+    expect(children.length).toBe(3);
   });
 });

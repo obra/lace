@@ -1,22 +1,45 @@
-// ABOUTME: Unit tests for ConversationView component  
-// ABOUTME: Tests that component file exists and layout behavior
+// ABOUTME: Unit tests for ConversationView component
+// ABOUTME: Tests actual component behavior and layout properties
+
+import React from 'react';
+import ConversationView from '../../../src/ui/components/ConversationView';
+import { Box, Text } from 'ink';
 
 describe('ConversationView Component', () => {
-  test('ConversationView component structure valid', () => {
-    // This test documents that ConversationView component exists and is structured correctly
-    // File: src/ui/components/ConversationView.tsx
-    // Exports: React functional component with flexGrow={1}
-    expect(true).toBe(true);
+  test('renders correct JSX structure with layout props', () => {
+    const element = ConversationView({}) as any;
+    
+    // Should return a Box element with flexGrow and column direction
+    expect(element.type).toBe(Box);
+    expect(element.props.flexDirection).toBe('column');
+    expect(element.props.flexGrow).toBe(1);
+    expect(element.props.padding).toBe(1);
+    expect(React.isValidElement(element)).toBe(true);
   });
 
-  test('manual verification: displays placeholder content', () => {
-    // Manual test: Shows "Conversation will appear here..." and "Ready for messages and responses."
-    expect(true).toBe(true);
+  test('displays placeholder message', () => {
+    const element = ConversationView({}) as any;
+    const children = element.props.children;
+    
+    // Find the placeholder text element
+    const placeholderElement = children.find((child: any) => 
+      child.type === Text && child.props.children.includes('Conversation will appear here')
+    );
+    
+    expect(placeholderElement).toBeTruthy();
+    expect(placeholderElement.props.color).toBe('dim');
   });
 
-  test('manual verification: fills remaining space', () => {
-    // Manual test: Takes up space between top and StatusBar
-    // Uses flexGrow={1} to expand
-    expect(true).toBe(true);
+  test('displays ready message', () => {
+    const element = ConversationView({}) as any;
+    const children = element.props.children;
+    
+    // Find the ready text element
+    const readyElement = children.find((child: any) => 
+      child.type === Text && child.props.children.includes('Ready for messages and responses')
+    );
+    
+    expect(readyElement).toBeTruthy();
+    expect(readyElement.props.color).toBe('dim');
   });
 });
