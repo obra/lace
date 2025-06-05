@@ -2,11 +2,17 @@
   "snapshots": [
     {
       "snapshotId": "2025-06-05T23-58-16-checkpoint",
+      "timestamp": "2025-06-05T23:58:16.536Z",
+      "type": "checkpoint",
+      "description": "Second"
+    },
+    {
+      "snapshotId": "2025-06-05T23-58-16-checkpoint",
       "timestamp": "2025-06-05T23:58:16.386Z",
       "type": "checkpoint",
       "description": "First"
     }
   ],
-  "lastUpdated": "2025-06-05T23:58:16.535Z",
+  "lastUpdated": "2025-06-05T23:58:16.684Z",
   "version": "1.0"
 }
