@@ -1,7 +1,7 @@
 // ABOUTME: Interactive tool execution approval system for user safety
 // ABOUTME: Provides allow/deny/modify workflow for tool calls before execution
 
-import inquirer from 'inquirer';
+import prompts from 'prompts';
 import chalk from 'chalk';
 
 export class ToolApprovalManager {
@@ -10,6 +10,7 @@ export class ToolApprovalManager {
     this.alwaysDenyTools = new Set(options.alwaysDenyTools || []);
     this.interactive = options.interactive !== false; // Default to interactive
   }
+
 
   async requestApproval(toolCall, context = {}) {
     // Check if tool is always denied
@@ -57,20 +58,18 @@ export class ToolApprovalManager {
     const riskColor = riskLevel === 'high' ? chalk.red : riskLevel === 'medium' ? chalk.yellow : chalk.green;
     console.log(riskColor(`Risk level: ${riskLevel}`));
 
-    const { action } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'action',
-        message: 'What would you like to do?',
-        choices: [
-          { name: '✅ Yes, execute as-is', value: 'approve' },
-          { name: '✏️  Yes, but let me modify the arguments first', value: 'modify' },
-          { name: '💬 Yes, and add a comment after execution', value: 'approve_with_comment' },
-          { name: '❌ No, skip this tool call', value: 'deny' },
-          { name: '🛑 No, stop and let me give instructions', value: 'stop' }
-        ]
-      }
-    ]);
+    const { action } = await prompts({
+      type: 'select',
+      name: 'action',
+      message: 'What would you like to do?',
+      choices: [
+        { title: '✅ Yes, execute as-is', value: 'approve' },
+        { title: '✏️  Yes, but let me modify the arguments first', value: 'modify' },
+        { title: '💬 Yes, and add a comment after execution', value: 'approve_with_comment' },
+        { title: '❌ No, skip this tool call', value: 'deny' },
+        { title: '🛑 No, stop and let me give instructions', value: 'stop' }
+      ]
+    });
 
     switch (action) {
       case 'approve':
@@ -122,14 +121,12 @@ export class ToolApprovalManager {
     const modifiedInput = {};
     
     for (const [key, value] of Object.entries(toolCall.input)) {
-      const { newValue } = await inquirer.prompt([
-        {
-          type: 'input',
-          name: 'newValue',
-          message: `${key}:`,
-          default: JSON.stringify(value)
-        }
-      ]);
+      const { newValue } = await prompts({
+        type: 'text',
+        name: 'newValue',
+        message: `${key}:`,
+        initial: JSON.stringify(value)
+      });
 
       try {
         modifiedInput[key] = JSON.parse(newValue);
@@ -147,14 +144,12 @@ export class ToolApprovalManager {
     console.log(chalk.green('\nModified tool call:'));
     console.log(chalk.gray(JSON.stringify(modifiedCall, null, 2)));
 
-    const { confirm } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'confirm',
-        message: 'Execute with these modifications?',
-        default: true
-      }
-    ]);
+    const { confirm } = await prompts({
+      type: 'confirm',
+      name: 'confirm',
+      message: 'Execute with these modifications?',
+      initial: true
+    });
 
     if (confirm) {
       return {
@@ -172,14 +167,12 @@ export class ToolApprovalManager {
   }
 
   async approveWithComment(toolCall) {
-    const { comment } = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'comment',
-        message: 'Enter comment to add after execution:',
-        validate: input => input.trim().length > 0 || 'Comment cannot be empty'
-      }
-    ]);
+    const { comment } = await prompts({
+      type: 'text',
+      name: 'comment',
+      message: 'Enter comment to add after execution:',
+      validate: input => input.trim().length > 0 || 'Comment cannot be empty'
+    });
 
     return { comment };
   }

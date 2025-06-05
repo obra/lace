@@ -1,87 +1,260 @@
-// ABOUTME: Interactive console interface for user interaction with agents
-// ABOUTME: Handles input parsing, session management, and output formatting
+// ABOUTME: Interactive console interface for user interaction with agents  
+// ABOUTME: Handles input parsing, session management, and output formatting with prompts library
 
-import inquirer from 'inquirer';
+import prompts from 'prompts';
+import fs from 'fs';
+import path from 'path';
 import chalk from 'chalk';
 
 export class Console {
   constructor() {
     this.sessionId = `session-${Date.now()}`;
+    this.currentAgent = null;
+    this.isProcessing = false;
+    this.abortController = null;
+    this.history = [];
   }
 
   async start(agent) {
+    this.currentAgent = agent;
+    this.history = this.loadHistory();
+    
     console.log(chalk.blue(`Starting session: ${this.sessionId}`));
-    console.log(chalk.gray('Type /help for commands, /quit to exit\n'));
+    console.log(chalk.gray('Type /help for commands, /quit to exit'));
+    console.log(chalk.gray('Use Tab for completion, Ctrl+C to interrupt, Up/Down for history\n'));
 
+    // Configure prompts for interrupt handling
+    prompts.override({
+      onCancel: () => {
+        if (this.isProcessing && this.abortController) {
+          console.log(chalk.yellow('\n⚠️  Aborting inference...'));
+          this.abortController.abort();
+          this.isProcessing = false;
+          return false; // Continue prompting
+        } else {
+          console.log(chalk.yellow('\nUse /quit to exit'));
+          return false; // Continue prompting
+        }
+      }
+    });
+
+    // Main input loop
     while (true) {
       try {
-        const { input } = await inquirer.prompt([
-          {
-            type: 'input',
-            name: 'input',
-            message: chalk.green('lace>'),
-            prefix: ''
-          }
-        ]);
+        const response = await prompts({
+          type: 'autocomplete',
+          name: 'input',
+          message: chalk.green('lace>'),
+          choices: this.getCompletions.bind(this),
+          suggest: this.suggest.bind(this),
+          fallback: { title: 'Continue typing...', value: null }
+        });
 
-        if (input.trim() === '/quit' || input.trim() === '/exit') {
+        // Handle Ctrl+C or empty input
+        if (response.input === undefined) {
+          continue;
+        }
+
+        const input = response.input.trim();
+        
+        // Save to history
+        if (input && !this.history.includes(input)) {
+          this.history.push(input);
+          this.saveHistory(input);
+        }
+
+        if (input === '/quit' || input === '/exit') {
           console.log(chalk.yellow('Goodbye!'));
           break;
         }
 
-        if (input.trim() === '/help') {
-          this.showHelp();
-          continue;
-        }
-
-        if (input.trim() === '/tools') {
-          this.showTools(agent);
-          continue;
-        }
-
-        if (input.trim() === '/memory') {
-          await this.showMemory(agent);
-          continue;
-        }
-
-        if (input.trim() === '/approval') {
-          this.showApprovalStatus(agent);
-          continue;
-        }
-
-        if (input.trim() === '/status') {
-          this.showAgentStatus(agent);
-          continue;
-        }
-
-        if (input.trim().startsWith('/auto-approve ')) {
-          const toolName = input.trim().substring('/auto-approve '.length);
-          this.manageAutoApproval(agent, toolName, true);
-          continue;
-        }
-
-        if (input.trim().startsWith('/deny ')) {
-          const toolName = input.trim().substring('/deny '.length);
-          this.manageDenyList(agent, toolName, true);
-          continue;
-        }
-
-        if (input.trim().startsWith('/')) {
-          console.log(chalk.red(`Unknown command: ${input.trim()}`));
-          continue;
-        }
-
-        if (!input.trim()) {
-          continue;
-        }
-
-        // Process user input with agent
-        const response = await agent.processInput(this.sessionId, input.trim());
-        this.displayResponse(response);
+        await this.handleInput(input);
 
       } catch (error) {
         console.error(chalk.red(`Error: ${error.message}`));
       }
+    }
+  }
+
+  async handleInput(input) {
+    if (input === '/help') {
+      this.showHelp();
+      return;
+    }
+
+    if (input === '/tools') {
+      this.showTools(this.currentAgent);
+      return;
+    }
+
+    if (input === '/memory') {
+      await this.showMemory(this.currentAgent);
+      return;
+    }
+
+    if (input === '/approval') {
+      this.showApprovalStatus(this.currentAgent);
+      return;
+    }
+
+    if (input === '/status') {
+      this.showAgentStatus(this.currentAgent);
+      return;
+    }
+
+    if (input.startsWith('/auto-approve ')) {
+      const toolName = input.substring('/auto-approve '.length);
+      this.manageAutoApproval(this.currentAgent, toolName, true);
+      return;
+    }
+
+    if (input.startsWith('/deny ')) {
+      const toolName = input.substring('/deny '.length);
+      this.manageDenyList(this.currentAgent, toolName, true);
+      return;
+    }
+
+    if (input.startsWith('/')) {
+      console.log(chalk.red(`Unknown command: ${input}`));
+      return;
+    }
+
+    if (!input) {
+      return;
+    }
+
+    // Process user input with agent
+    this.isProcessing = true;
+    this.abortController = new AbortController();
+    
+    try {
+      const response = await this.currentAgent.processInput(
+        this.sessionId, 
+        input, 
+        { 
+          signal: this.abortController.signal,
+          onToken: this.handleStreamingToken.bind(this)
+        }
+      );
+      this.displayResponse(response);
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log(chalk.yellow('Operation was aborted.'));
+      } else {
+        console.error(chalk.red(`Error: ${error.message}`));
+      }
+    } finally {
+      this.isProcessing = false;
+      this.abortController = null;
+    }
+  }
+
+  handleStreamingToken(token) {
+    // Write token directly to stdout without newline
+    process.stdout.write(token);
+  }
+
+  getCompletions(input = '') {
+    const completions = [];
+    
+    // Command completions
+    const commands = [
+      '/help', '/tools', '/memory', '/status', '/approval', 
+      '/auto-approve', '/deny', '/quit', '/exit'
+    ];
+    
+    // Add history items (reversed to show recent first)
+    const historyItems = this.history?.slice().reverse().slice(0, 10) || [];
+    
+    if (input?.startsWith('/')) {
+      // Command completion
+      const matches = commands.filter(cmd => cmd.startsWith(input));
+      completions.push(...matches.map(cmd => ({ title: cmd, value: cmd })));
+      
+      // Tool name completion for /auto-approve and /deny
+      if (input.startsWith('/auto-approve ') || input.startsWith('/deny ')) {
+        const prefix = input.startsWith('/auto-approve ') ? '/auto-approve ' : '/deny ';
+        const partial = input.substring(prefix.length);
+        const tools = this.currentAgent?.tools?.listTools() || [];
+        const toolMatches = tools
+          .filter(tool => tool?.startsWith(partial))
+          .map(tool => ({ title: prefix + tool, value: prefix + tool }));
+        completions.push(...toolMatches);
+      }
+    } else {
+      // File path completion
+      const pathCompletions = this.getFileCompletions(input);
+      completions.push(...pathCompletions.map(path => ({ title: path, value: path })));
+      
+      // History completion
+      const historyMatches = historyItems
+        .filter(item => item?.toLowerCase().includes(input?.toLowerCase() || ''))
+        .slice(0, 5)
+        .map(item => ({ title: `${item} (history)`, value: item }));
+      completions.push(...historyMatches);
+    }
+    
+    return completions;
+  }
+
+  suggest(input = '', choices = []) {
+    return choices.filter(choice => 
+      choice?.title?.toLowerCase().includes(input?.toLowerCase() || '')
+    );
+  }
+
+  getFileCompletions(partial = '') {
+    try {
+      const dir = partial?.includes('/') ? path.dirname(partial) : '.';
+      const base = path.basename(partial);
+      
+      if (!fs.existsSync(dir)) {
+        return [];
+      }
+      
+      const files = fs.readdirSync(dir);
+      return files
+        .filter(file => file?.startsWith(base))
+        .map(file => {
+          const fullPath = path.join(dir, file);
+          const isDir = fs.statSync(fullPath).isDirectory();
+          return isDir ? fullPath + '/' : fullPath;
+        });
+    } catch (error) {
+      return [];
+    }
+  }
+
+  loadHistory() {
+    try {
+      const laceDir = path.join(process.cwd(), '.lace');
+      const historyPath = path.join(laceDir, 'history');
+      
+      if (fs.existsSync(historyPath)) {
+        return fs.readFileSync(historyPath, 'utf8')
+          .split('\n')
+          .filter(line => line.trim())
+          .slice(-1000); // Keep last 1000 entries
+      }
+    } catch (error) {
+      // Ignore history loading errors
+    }
+    return [];
+  }
+
+  saveHistory(input) {
+    if (!input.trim()) return;
+    
+    try {
+      const laceDir = path.join(process.cwd(), '.lace');
+      if (!fs.existsSync(laceDir)) {
+        fs.mkdirSync(laceDir, { recursive: true });
+      }
+      
+      const historyPath = path.join(laceDir, 'history');
+      fs.appendFileSync(historyPath, input + '\n');
+    } catch (error) {
+      // Ignore history saving errors
     }
   }
 

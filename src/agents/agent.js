@@ -28,7 +28,7 @@ export class Agent {
     this.systemPrompt = this.buildSystemPrompt();
   }
 
-  async processInput(sessionId, input) {
+  async processInput(sessionId, input, options = {}) {
     try {
       // Save user message
       await this.db.saveMessage(sessionId, this.generation, 'user', input);
@@ -40,7 +40,7 @@ export class Agent {
       }
 
       // Simple echo response for now - TODO: Implement actual reasoning
-      const response = await this.generateResponse(sessionId, input);
+      const response = await this.generateResponse(sessionId, input, options);
       
       // Save agent response
       await this.db.saveMessage(sessionId, this.generation, 'assistant', response.content, response.toolCalls, this.contextSize);
@@ -53,7 +53,7 @@ export class Agent {
     }
   }
 
-  async generateResponse(sessionId, input) {
+  async generateResponse(sessionId, input, options = {}) {
     try {
       // Agentic loop with circuit breaker
       const maxIterations = 25;
@@ -81,6 +81,11 @@ export class Agent {
 
         // Track token usage during streaming
         const onTokenUpdate = (tokenData) => {
+          // Forward streaming tokens to user interface if callback provided
+          if (options.onToken && tokenData.token) {
+            options.onToken(tokenData.token);
+          }
+          
           if (this.verbose && tokenData.streaming) {
             process.stdout.write(`\r📊 Tokens: ${tokenData.inputTokens} in, ${tokenData.outputTokens} out`);
           } else if (this.verbose && !tokenData.streaming) {
@@ -88,13 +93,19 @@ export class Agent {
           }
         };
 
+        // Check for abort signal before making request
+        if (options.signal?.aborted) {
+          throw new Error('Operation was aborted');
+        }
+
         // Use assigned model and provider with streaming
         const response = await this.modelProvider.chat(messages, {
           provider: this.assignedProvider,
           model: this.assignedModel,
           tools: availableTools,
           maxTokens: 4096,
-          onTokenUpdate: this.verbose ? onTokenUpdate : null
+          onTokenUpdate: onTokenUpdate,
+          signal: options.signal
         });
 
         if (!response.success) {
