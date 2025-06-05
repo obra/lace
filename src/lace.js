@@ -5,6 +5,7 @@ import { ConversationDB } from './database/conversation-db.js';
 import { ToolRegistry } from './tools/tool-registry.js';
 import { Agent } from './agents/agent.js';
 import { Console } from './interface/console.js';
+import { WebServer } from './interface/web-server.js';
 import { ModelProvider } from './models/model-provider.js';
 import { ToolApprovalManager } from './safety/tool-approval.js';
 import { ActivityLogger } from './logging/activity-logger.js';
@@ -36,6 +37,14 @@ export class Lace {
     
     this.console = new Console({ activityLogger: this.activityLogger });
     
+    // Web server for companion UI (optional)
+    this.webServer = new WebServer({
+      port: parseInt(options.webPort) || 3000,
+      activityLogger: this.activityLogger,
+      db: this.db,
+      verbose: this.verbose
+    });
+    
     this.primaryAgent = null;
     this.memoryAgents = new Map(); // generationId -> agent
     this.currentGeneration = 0;
@@ -49,6 +58,16 @@ export class Lace {
     await this.tools.initialize();
     await this.modelProvider.initialize();
     
+    // Start web server (optional - don't fail if it can't start)
+    try {
+      await this.webServer.start();
+    } catch (error) {
+      if (this.verbose) {
+        console.error('Failed to start web companion:', error.message);
+        console.log('Continuing with console-only mode...');
+      }
+    }
+    
     this.primaryAgent = new Agent({
       generation: this.currentGeneration,
       tools: this.tools,
@@ -61,9 +80,9 @@ export class Lace {
       assignedProvider: 'anthropic',
       capabilities: ['orchestration', 'reasoning', 'planning', 'delegation'],
       debugLogging: {
-        logLevel: options.logLevel || 'off',
-        logFile: options.logFile,
-        logFileLevel: options.logFileLevel || 'off'
+        logLevel: this.options.logLevel || 'off',
+        logFile: this.options.logFile,
+        logFileLevel: this.options.logFileLevel || 'off'
       },
       activityLogger: this.activityLogger
     });
@@ -95,5 +114,29 @@ export class Lace {
     });
     
     return this.primaryAgent;
+  }
+
+  async shutdown() {
+    if (this.verbose) {
+      console.log('🧵 Shutting down Lace...');
+    }
+
+    // Stop web server if running
+    try {
+      await this.webServer.stop();
+    } catch (error) {
+      if (this.verbose) {
+        console.error('Error stopping web server:', error.message);
+      }
+    }
+
+    // Close database connections
+    if (this.db) {
+      await this.db.close();
+    }
+
+    if (this.activityLogger) {
+      await this.activityLogger.close();
+    }
   }
 }

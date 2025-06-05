@@ -5,9 +5,11 @@ import Database from 'sqlite3';
 import { promisify } from 'util';
 import { promises as fs } from 'fs';
 import { dirname } from 'path';
+import { EventEmitter } from 'events';
 
-export class ActivityLogger {
+export class ActivityLogger extends EventEmitter {
   constructor(dbPath = '.lace/activity.db') {
+    super();
     this.dbPath = dbPath;
     this.db = null;
   }
@@ -73,6 +75,18 @@ export class ActivityLogger {
          VALUES (?, ?, ?, ?, ?)`,
         [timestamp, eventType, localSessionId, modelSessionId, dataJson]
       );
+
+      // Emit event for real-time streaming
+      const event = {
+        id: Date.now(), // Temporary ID for real-time events
+        timestamp,
+        event_type: eventType,
+        local_session_id: localSessionId,
+        model_session_id: modelSessionId,
+        data: dataJson
+      };
+      
+      this.emit('activity', event);
     } catch (error) {
       // Activity logging failures should not break normal operation
       console.error('ActivityLogger: Failed to log event:', error.message);
@@ -115,6 +129,17 @@ export class ActivityLogger {
     }
 
     return await this.all(query, params);
+  }
+
+  async getRecentEvents(limit = 50) {
+    if (!this.db) {
+      throw new Error('ActivityLogger: Database not initialized');
+    }
+
+    return await this.all(
+      'SELECT * FROM events ORDER BY timestamp DESC LIMIT ?',
+      [limit]
+    );
   }
 
   async close() {
