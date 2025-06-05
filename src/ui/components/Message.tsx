@@ -4,6 +4,7 @@
 import React from 'react';
 import { Text, Box } from 'ink';
 import { processContentWithHighlighting } from '../utils/syntax-highlight';
+import { highlightSearchTerm } from '../utils/search-highlight';
 
 interface MessageProps {
   type: 'user' | 'assistant' | 'loading' | 'agent_activity';
@@ -11,6 +12,8 @@ interface MessageProps {
   summary?: string;
   folded?: boolean;
   isHighlighted?: boolean;
+  searchTerm?: string;
+  isSearchResult?: boolean;
 }
 
 const Message: React.FC<MessageProps> = ({ 
@@ -18,7 +21,9 @@ const Message: React.FC<MessageProps> = ({
   content, 
   summary, 
   folded = false, 
-  isHighlighted = false 
+  isHighlighted = false,
+  searchTerm = '',
+  isSearchResult = false
 }) => {
   const getPrefix = () => {
     if (type === 'user') return '> ';
@@ -41,13 +46,15 @@ const Message: React.FC<MessageProps> = ({
 
   const renderContent = () => {
     if (type === 'agent_activity') {
+      const displaySummary = searchTerm && summary ? highlightSearchTerm(summary, searchTerm) : summary;
+      
       if (folded) {
         // Show only summary when folded
         return (
           <Box>
             <Text color={prefixColor}>{prefix}</Text>
             {/* @ts-expect-error - inverse prop exists in runtime but TypeScript is having issues */}
-            <Text inverse={isHighlighted}>{summary}</Text>
+            <Text inverse={isHighlighted}>{displaySummary}</Text>
           </Box>
         );
       } else {
@@ -57,21 +64,29 @@ const Message: React.FC<MessageProps> = ({
             <Box>
               <Text color={prefixColor}>{prefix}</Text>
               {/* @ts-expect-error - inverse prop exists in runtime but TypeScript is having issues */}
-              <Text inverse={isHighlighted}>{summary}</Text>
+              <Text inverse={isHighlighted}>{displaySummary}</Text>
             </Box>
-            {Array.isArray(content) && content.map((item, index) => (
-              <Box key={index}>
-                <Text>  {item}</Text>
-              </Box>
-            ))}
+            {Array.isArray(content) && content.map((item, index) => {
+              const displayItem = searchTerm ? highlightSearchTerm(item, searchTerm) : item;
+              return (
+                <Box key={index}>
+                  <Text>  {displayItem}</Text>
+                </Box>
+              );
+            })}
           </Box>
         );
       }
     } else {
       // Regular message types (user, assistant, loading)
-      const displayContent = type === 'assistant' && typeof content === 'string' 
+      let displayContent = type === 'assistant' && typeof content === 'string' 
         ? processContentWithHighlighting(content)
         : content;
+      
+      // Apply search highlighting if search term exists and content is string
+      if (searchTerm && typeof displayContent === 'string') {
+        displayContent = highlightSearchTerm(displayContent, searchTerm);
+      }
         
       return (
         <Box>

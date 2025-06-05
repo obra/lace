@@ -21,6 +21,8 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [filterMode, setFilterMode] = useState<'all' | 'conversation' | 'search'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchMode, setIsSearchMode] = useState(false);
+  const [searchResultIndex, setSearchResultIndex] = useState(0);
   const [conversation, setConversation] = useState<ConversationMessage[]>([
     { type: 'user' as const, content: 'Hello' },
     { type: 'assistant' as const, content: 'Hi! How can I help you today?' },
@@ -52,7 +54,25 @@ const App: React.FC = () => {
     }
   };
 
+  const findSearchResults = (messages: ConversationMessage[], term: string) => {
+    if (!term.trim()) return [];
+    const results: { messageIndex: number; message: ConversationMessage }[] = [];
+    
+    messages.forEach((msg, index) => {
+      const content = msg.type === 'agent_activity' 
+        ? msg.summary + ' ' + msg.content.join(' ') 
+        : msg.content;
+      
+      if (content.toLowerCase().includes(term.toLowerCase())) {
+        results.push({ messageIndex: index, message: msg });
+      }
+    });
+    
+    return results;
+  };
+
   const filteredConversation = filterMessages(conversation);
+  const searchResults = isSearchMode ? findSearchResults(conversation, searchTerm) : [];
   const totalMessages = filteredConversation.length;
 
   const mockResponses = [
@@ -97,7 +117,40 @@ const App: React.FC = () => {
       process.exit(0);
     }
 
-    if (!isNavigationMode && !isLoading) {
+    if (isSearchMode) {
+      // Search mode: handle search input and navigation
+      if (key.escape) {
+        // Escape to exit search mode
+        setIsSearchMode(false);
+        setSearchTerm('');
+        setFilterMode('all');
+        setSearchResultIndex(0);
+      } else if (key.return) {
+        // Enter to execute search
+        if (searchTerm.trim()) {
+          setFilterMode('search');
+          setIsSearchMode(false);
+          setIsNavigationMode(true);
+          setScrollPosition(0);
+        }
+      } else if (key.backspace || key.delete) {
+        // Handle backspace in search
+        setSearchTerm(prev => prev.slice(0, -1));
+      } else if (input && !key.ctrl && !key.meta && input.length === 1) {
+        // Handle character input in search
+        setSearchTerm(prev => prev + input);
+      } else if (input === 'n' && searchResults.length > 0) {
+        // Navigate to next search result
+        setSearchResultIndex(prev => (prev + 1) % searchResults.length);
+        const nextResult = searchResults[(searchResultIndex + 1) % searchResults.length];
+        setScrollPosition(nextResult.messageIndex);
+      } else if (input === 'N' && searchResults.length > 0) {
+        // Navigate to previous search result
+        setSearchResultIndex(prev => (prev - 1 + searchResults.length) % searchResults.length);
+        const prevResult = searchResults[(searchResultIndex - 1 + searchResults.length) % searchResults.length];
+        setScrollPosition(prevResult.messageIndex);
+      }
+    } else if (!isNavigationMode && !isLoading) {
       // Input mode: handle text input and submission (disabled during loading)
       if (key.return) {
         if (inputText.trim()) {
@@ -151,6 +204,21 @@ const App: React.FC = () => {
         // a key for show-all mode
         setFilterMode('all');
         setScrollPosition(0);
+      } else if (input === '/') {
+        // / key to enter search mode
+        setIsSearchMode(true);
+        setSearchTerm('');
+        setIsNavigationMode(false);
+      } else if (input === 'n' && filterMode === 'search' && searchResults.length > 0) {
+        // n key to navigate to next search result
+        setSearchResultIndex(prev => (prev + 1) % searchResults.length);
+        const nextResult = searchResults[(searchResultIndex + 1) % searchResults.length];
+        setScrollPosition(nextResult.messageIndex);
+      } else if (input === 'N' && filterMode === 'search' && searchResults.length > 0) {
+        // N key to navigate to previous search result  
+        setSearchResultIndex(prev => (prev - 1 + searchResults.length) % searchResults.length);
+        const prevResult = searchResults[(searchResultIndex - 1 + searchResults.length) % searchResults.length];
+        setScrollPosition(prevResult.messageIndex);
       }
     }
   });
@@ -161,6 +229,8 @@ const App: React.FC = () => {
         scrollPosition={scrollPosition} 
         isNavigationMode={isNavigationMode} 
         messages={filteredConversation}
+        searchTerm={filterMode === 'search' || isSearchMode ? searchTerm : ''}
+        searchResults={searchResults}
       />
       <StatusBar 
         isNavigationMode={isNavigationMode} 
@@ -169,11 +239,15 @@ const App: React.FC = () => {
         isLoading={isLoading}
         filterMode={filterMode}
         searchTerm={searchTerm}
+        isSearchMode={isSearchMode}
+        searchResults={searchResults}
+        searchResultIndex={searchResultIndex}
       />
       <InputBar 
         isNavigationMode={isNavigationMode} 
-        inputText={inputText}
+        inputText={isSearchMode ? searchTerm : inputText}
         showCursor={true}
+        isSearchMode={isSearchMode}
       />
     </Box>
   );

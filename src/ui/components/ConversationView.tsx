@@ -22,25 +22,34 @@ interface ConversationViewProps {
     summary?: string;
     folded?: boolean;
   }>;
+  searchTerm?: string;
+  searchResults?: { messageIndex: number; message: any }[];
 }
 
 const ConversationView: React.FC<ConversationViewProps> = ({ 
   scrollPosition = 0, 
   isNavigationMode = false,
-  messages = mockConversation
+  messages = mockConversation,
+  searchTerm = '',
+  searchResults = []
 }) => {
   return (
     <Box flexDirection="column" flexGrow={1} padding={1}>
-      {messages.map((message, index) => (
-        <Message 
-          key={`message-${index}-${message.type}`} 
-          type={message.type} 
-          content={message.content}
-          summary={message.summary}
-          folded={message.folded}
-          isHighlighted={isNavigationMode && index === scrollPosition}
-        />
-      ))}
+      {messages.map((message, index) => {
+        const isSearchResult = searchResults.some(result => result.messageIndex === index);
+        return (
+          <Message 
+            key={`message-${index}-${message.type}`} 
+            type={message.type} 
+            content={message.content}
+            summary={message.summary}
+            folded={message.folded}
+            isHighlighted={isNavigationMode && index === scrollPosition}
+            searchTerm={searchTerm}
+            isSearchResult={isSearchResult}
+          />
+        );
+      })}
     </Box>
   );
 };

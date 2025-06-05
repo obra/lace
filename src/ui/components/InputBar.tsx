@@ -8,17 +8,30 @@ interface InputBarProps {
   isNavigationMode?: boolean;
   inputText?: string;
   showCursor?: boolean;
+  isSearchMode?: boolean;
 }
 
 const InputBar: React.FC<InputBarProps> = ({ 
   isNavigationMode = false, 
   inputText = '',
-  showCursor = false 
+  showCursor = false,
+  isSearchMode = false
 }) => {
   return (
     <Box>
-      <Text color="cyan">{'> '}</Text>
-      {isNavigationMode ? (
+      <Text color="cyan">{isSearchMode ? '/ ' : '> '}</Text>
+      {isSearchMode ? (
+        <>
+          {inputText ? (
+            <Text>{inputText}</Text>
+          ) : (
+            <Text color="dim">Search...</Text>
+          )}
+          {showCursor && (
+            <Text>|</Text>
+          )}
+        </>
+      ) : isNavigationMode ? (
         <Text color="yellow">Navigation mode - Press Escape to exit</Text>
       ) : (
         <>
