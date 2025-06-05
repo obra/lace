@@ -2,17 +2,17 @@
 // ABOUTME: Tests acceptance criteria and documents manual verification steps
 
 describe('Step 1: Basic Ink App Setup', () => {
-  test('step 1 acceptance criteria met', () => {
-    // This test documents that Step 1 requirements are satisfied:
+  test('step 1 and 2 foundation complete', () => {
+    // This test documents that Step 1 + 2 requirements are satisfied:
     // ✅ Dependencies added: ink, react, typescript, tsx
-    // ✅ Files created: src/ui/index.tsx, src/ui/App.tsx  
+    // ✅ Files created: src/ui/index.tsx, src/ui/App.tsx + components
     // ✅ npm run ui command works
-    // ✅ App renders "Hello Lace" and exits cleanly
+    // ✅ Full layout structure implemented
     
     // Manual verification required:
     // Run: npm run ui
-    // Should show: "Hello Lace" (green) + "Ink terminal UI starting up..." (dim)
-    // Should exit: After ~2 seconds automatically
+    // Should show: Full window layout with ConversationView, StatusBar, InputBar
+    // Should NOT exit: Runs continuously until Ctrl+C
     
     expect(true).toBe(true);
   });

@@ -1,30 +1,18 @@
 // ABOUTME: Main Ink application component for Lace terminal UI
-// ABOUTME: Renders the basic "Hello Lace" greeting and exits after 2 seconds
+// ABOUTME: Implements full-window layout with ConversationView, StatusBar, and InputBar
 
-import React, { useEffect, useState } from 'react';
-import { Text, Box } from 'ink';
+import React from 'react';
+import { Box } from 'ink';
+import ConversationView from './components/ConversationView';
+import StatusBar from './components/StatusBar';
+import InputBar from './components/InputBar';
 
 const App: React.FC = () => {
-  const [shouldExit, setShouldExit] = useState<boolean>(false);
-
-  useEffect(() => {
-    // Auto-exit after 2 seconds for Step 1 demo
-    const timer = setTimeout(() => {
-      setShouldExit(true);
-      process.exit(0);
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
-    <Box flexDirection="column">
-      <Text color="green" bold>
-        Hello Lace
-      </Text>
-      <Text color="dim">
-        Ink terminal UI starting up...
-      </Text>
+    <Box flexDirection="column" height="100%">
+      <ConversationView />
+      <StatusBar />
+      <InputBar />
     </Box>
   );
 };
