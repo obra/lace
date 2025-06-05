@@ -7,6 +7,7 @@ import { Agent } from './agents/agent.js';
 import { Console } from './interface/console.js';
 import { ModelProvider } from './models/model-provider.js';
 import { ToolApprovalManager } from './safety/tool-approval.js';
+import { ActivityLogger } from './logging/activity-logger.js';
 
 export class Lace {
   constructor(options = {}) {
@@ -14,8 +15,11 @@ export class Lace {
     this.verbose = options.verbose || false;
     this.memoryPath = options.memoryPath || './lace-memory.db';
     
+    // Initialize activity logger first so it can be passed to other components
+    this.activityLogger = new ActivityLogger();
+    
     this.db = new ConversationDB(this.memoryPath);
-    this.tools = new ToolRegistry();
+    this.tools = new ToolRegistry({ activityLogger: this.activityLogger });
     this.modelProvider = new ModelProvider({
       anthropic: {
         // Default to using Anthropic models
@@ -26,10 +30,11 @@ export class Lace {
     this.toolApproval = new ToolApprovalManager({
       interactive: options.interactive !== false,
       autoApproveTools: options.autoApprove || options.autoApproveTools || [],
-      alwaysDenyTools: options.deny || options.alwaysDenyTools || []
+      alwaysDenyTools: options.deny || options.alwaysDenyTools || [],
+      activityLogger: this.activityLogger
     });
     
-    this.console = new Console();
+    this.console = new Console({ activityLogger: this.activityLogger });
     
     this.primaryAgent = null;
     this.memoryAgents = new Map(); // generationId -> agent
@@ -39,6 +44,7 @@ export class Lace {
   async start() {
     console.log('🧵 Lace - Your lightweight agentic coding environment');
     
+    await this.activityLogger.initialize();
     await this.db.initialize();
     await this.tools.initialize();
     await this.modelProvider.initialize();
@@ -59,7 +65,7 @@ export class Lace {
         logFile: options.logFile,
         logFileLevel: options.logFileLevel || 'off'
       },
-      activityLogger: this.console.activityLogger
+      activityLogger: this.activityLogger
     });
 
     await this.console.start(this.primaryAgent);

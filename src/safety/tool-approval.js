@@ -9,26 +9,63 @@ export class ToolApprovalManager {
     this.autoApproveTools = new Set(options.autoApproveTools || []);
     this.alwaysDenyTools = new Set(options.alwaysDenyTools || []);
     this.interactive = options.interactive !== false; // Default to interactive
+    this.activityLogger = options.activityLogger || null;
   }
 
 
   async requestApproval(toolCall, context = {}) {
+    // Parse tool name and method from LLM response
+    const [toolName, methodName] = toolCall.name.split('_');
+    const riskLevel = this.assessRisk(toolCall);
+    
+    // Log tool approval request
+    if (this.activityLogger && context.sessionId) {
+      await this.activityLogger.logEvent('tool_approval_request', context.sessionId, null, {
+        tool: toolName,
+        method: methodName,
+        params: toolCall.input,
+        risk_level: riskLevel
+      });
+    }
+
     // Check if tool is always denied
     if (this.alwaysDenyTools.has(toolCall.name)) {
-      return {
+      const decision = {
         approved: false,
         reason: 'Tool is on deny list',
         modifiedCall: null
       };
+      
+      // Log approval decision
+      if (this.activityLogger && context.sessionId) {
+        await this.activityLogger.logEvent('tool_approval_decision', context.sessionId, null, {
+          approved: false,
+          modified_params: null,
+          user_decision: 'denied_by_policy'
+        });
+      }
+      
+      return decision;
     }
 
     // Check if tool is auto-approved
     if (this.autoApproveTools.has(toolCall.name)) {
-      return {
+      const decision = {
         approved: true,
         reason: 'Tool is on auto-approve list',
         modifiedCall: toolCall
       };
+      
+      // Log approval decision
+      if (this.activityLogger && context.sessionId) {
+        await this.activityLogger.logEvent('tool_approval_decision', context.sessionId, null, {
+          approved: true,
+          modified_params: toolCall.input,
+          user_decision: 'auto_approved'
+        });
+      }
+      
+      return decision;
     }
 
     // Interactive approval if enabled
@@ -37,11 +74,22 @@ export class ToolApprovalManager {
     }
 
     // Default to deny if no interactive mode
-    return {
+    const decision = {
       approved: false,
       reason: 'Interactive mode disabled and tool not auto-approved',
       modifiedCall: null
     };
+    
+    // Log approval decision
+    if (this.activityLogger && context.sessionId) {
+      await this.activityLogger.logEvent('tool_approval_decision', context.sessionId, null, {
+        approved: false,
+        modified_params: null,
+        user_decision: 'denied_non_interactive'
+      });
+    }
+    
+    return decision;
   }
 
   async interactiveApproval(toolCall, context = {}) {
@@ -73,49 +121,104 @@ export class ToolApprovalManager {
 
     switch (action) {
       case 'approve':
-        return {
+        const approveDecision = {
           approved: true,
           reason: 'User approved',
           modifiedCall: toolCall
         };
+        
+        // Log approval decision
+        if (this.activityLogger && context.sessionId) {
+          await this.activityLogger.logEvent('tool_approval_decision', context.sessionId, null, {
+            approved: true,
+            modified_params: toolCall.input,
+            user_decision: 'approved'
+          });
+        }
+        
+        return approveDecision;
 
       case 'modify':
-        return await this.modifyToolCall(toolCall);
+        return await this.modifyToolCall(toolCall, context);
 
       case 'approve_with_comment':
         const result = await this.approveWithComment(toolCall);
-        return {
+        const commentDecision = {
           approved: true,
           reason: 'User approved with comment',
           modifiedCall: toolCall,
           postExecutionComment: result.comment
         };
+        
+        // Log approval decision
+        if (this.activityLogger && context.sessionId) {
+          await this.activityLogger.logEvent('tool_approval_decision', context.sessionId, null, {
+            approved: true,
+            modified_params: toolCall.input,
+            user_decision: 'approved_with_comment'
+          });
+        }
+        
+        return commentDecision;
 
       case 'deny':
-        return {
+        const denyDecision = {
           approved: false,
           reason: 'User denied',
           modifiedCall: null
         };
+        
+        // Log approval decision
+        if (this.activityLogger && context.sessionId) {
+          await this.activityLogger.logEvent('tool_approval_decision', context.sessionId, null, {
+            approved: false,
+            modified_params: null,
+            user_decision: 'denied'
+          });
+        }
+        
+        return denyDecision;
 
       case 'stop':
-        return {
+        const stopDecision = {
           approved: false,
           reason: 'User requested stop',
           modifiedCall: null,
           shouldStop: true
         };
+        
+        // Log approval decision
+        if (this.activityLogger && context.sessionId) {
+          await this.activityLogger.logEvent('tool_approval_decision', context.sessionId, null, {
+            approved: false,
+            modified_params: null,
+            user_decision: 'stopped'
+          });
+        }
+        
+        return stopDecision;
 
       default:
-        return {
+        const unknownDecision = {
           approved: false,
           reason: 'Unknown action',
           modifiedCall: null
         };
+        
+        // Log approval decision
+        if (this.activityLogger && context.sessionId) {
+          await this.activityLogger.logEvent('tool_approval_decision', context.sessionId, null, {
+            approved: false,
+            modified_params: null,
+            user_decision: 'unknown'
+          });
+        }
+        
+        return unknownDecision;
     }
   }
 
-  async modifyToolCall(toolCall) {
+  async modifyToolCall(toolCall, context = {}) {
     console.log(chalk.cyan('\nModify tool arguments:'));
     
     const modifiedInput = {};
@@ -152,17 +255,39 @@ export class ToolApprovalManager {
     });
 
     if (confirm) {
-      return {
+      const modifiedDecision = {
         approved: true,
         reason: 'User approved with modifications',
         modifiedCall
       };
+      
+      // Log approval decision
+      if (this.activityLogger && context.sessionId) {
+        await this.activityLogger.logEvent('tool_approval_decision', context.sessionId, null, {
+          approved: true,
+          modified_params: modifiedCall.input,
+          user_decision: 'approved_with_modifications'
+        });
+      }
+      
+      return modifiedDecision;
     } else {
-      return {
+      const cancelledDecision = {
         approved: false,
         reason: 'User cancelled after modifications',
         modifiedCall: null
       };
+      
+      // Log approval decision
+      if (this.activityLogger && context.sessionId) {
+        await this.activityLogger.logEvent('tool_approval_decision', context.sessionId, null, {
+          approved: false,
+          modified_params: null,
+          user_decision: 'cancelled_after_modifications'
+        });
+      }
+      
+      return cancelledDecision;
     }
   }
 

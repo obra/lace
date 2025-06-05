@@ -7,8 +7,9 @@ import { JavaScriptTool } from './javascript-tool.js';
 import { SearchTool } from './search-tool.js';
 
 export class ToolRegistry {
-  constructor() {
+  constructor(options = {}) {
     this.tools = new Map();
+    this.activityLogger = options.activityLogger || null;
   }
 
   async initialize() {
@@ -34,7 +35,7 @@ export class ToolRegistry {
     return this.tools.get(name);
   }
 
-  async callTool(name, method, params) {
+  async callTool(name, method, params, sessionId = null) {
     const tool = this.tools.get(name);
     if (!tool) {
       throw new Error(`Tool '${name}' not found`);
@@ -44,7 +45,40 @@ export class ToolRegistry {
       throw new Error(`Method '${method}' not found on tool '${name}'`);
     }
 
-    return await tool[method](params);
+    // Log tool execution start
+    if (this.activityLogger && sessionId) {
+      await this.activityLogger.logEvent('tool_execution_start', sessionId, null, {
+        tool: name,
+        method: method,
+        params: params
+      });
+    }
+
+    const startTime = Date.now();
+    let success = true;
+    let result = null;
+    let error = null;
+
+    try {
+      result = await tool[method](params);
+    } catch (err) {
+      success = false;
+      error = err.message;
+      throw err;
+    } finally {
+      // Log tool execution complete
+      if (this.activityLogger && sessionId) {
+        const duration = Date.now() - startTime;
+        await this.activityLogger.logEvent('tool_execution_complete', sessionId, null, {
+          success: success,
+          result: success ? result : null,
+          error: error,
+          duration_ms: duration
+        });
+      }
+    }
+
+    return result;
   }
 
   getToolSchema(name) {

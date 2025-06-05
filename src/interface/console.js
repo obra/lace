@@ -8,13 +8,13 @@ import chalk from 'chalk';
 import { ActivityLogger } from '../logging/activity-logger.js';
 
 export class Console {
-  constructor() {
+  constructor(options = {}) {
     this.sessionId = `session-${Date.now()}`;
     this.currentAgent = null;
     this.isProcessing = false;
     this.abortController = null;
     this.history = [];
-    this.activityLogger = new ActivityLogger();
+    this.activityLogger = options.activityLogger || new ActivityLogger();
   }
 
   async start(agent) {

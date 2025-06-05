@@ -384,7 +384,7 @@ Focus on executing your assigned task efficiently.`;
     }
 
     // Execute the tool
-    const result = await this.executeTool(approvedCall);
+    const result = await this.executeTool(approvedCall, sessionId);
     
     // Check if tool response needs synthesis (over 200 tokens)
     const synthesisPrompt = `Summarize this ${approvedCall.name} result for continued reasoning. Focus on key findings and next steps.`;
@@ -399,7 +399,7 @@ Focus on executing your assigned task efficiently.`;
     };
   }
 
-  async executeTool(toolCall) {
+  async executeTool(toolCall, sessionId) {
     // Parse tool name and method from LLM response
     const [toolName, methodName] = toolCall.name.split('_');
     
@@ -407,7 +407,7 @@ Focus on executing your assigned task efficiently.`;
       throw new Error(`Tool '${toolName}' not found`);
     }
 
-    return await this.tools.callTool(toolName, methodName, toolCall.input);
+    return await this.tools.callTool(toolName, methodName, toolCall.input, sessionId);
   }
 
   async synthesizeToolResponse(toolResult, toolCall, sessionId, synthesisPrompt) {
