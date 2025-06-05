@@ -199,7 +199,7 @@ const mockConversation = [
 
 ## Phase 3: Advanced Display Features
 
-### Step 7: Foldable Sections
+### Step 7: Foldable Sections ✅ COMPLETE
 **Goal**: Collapsible agent activity and tool output sections
 
 **Features**:
@@ -224,6 +224,15 @@ const mockConversation = [
 **Test**: Sections fold/unfold correctly
 
 **Acceptance**: Space key toggles sections, navigation works around folds
+
+**Implementation Notes**:
+- Extended message types to support 'agent_activity' with summary and content arrays
+- Message component renders ▶/▼ indicators with blue color for agent activity
+- Space key in navigation mode toggles fold state of current agent_activity message
+- Folded state shows only summary, unfolded shows summary + indented content items
+- Fold state persists in conversation array with individual message folded property
+- Navigation highlighting works correctly with foldable sections
+- 10 comprehensive automated tests verify folding behavior and navigation integration
 
 ---
 

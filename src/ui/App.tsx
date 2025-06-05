@@ -16,6 +16,15 @@ const App: React.FC = () => {
   const [conversation, setConversation] = useState([
     { type: 'user' as const, content: 'Hello' },
     { type: 'assistant' as const, content: 'Hi! How can I help you today?' },
+    { 
+      type: 'agent_activity' as const,
+      summary: 'Agent Activity - 2 items',
+      content: [
+        '🤖 orchestrator → delegating to coder agent',
+        '🔨 coder → analyzing auth patterns (active)'
+      ],
+      folded: true
+    },
     { type: 'user' as const, content: 'Can you write a function?' },
     { type: 'assistant' as const, content: 'Sure! Here is a basic function:\n\nfunction hello() {\n  return "Hello World";\n}' }
   ]);
@@ -99,6 +108,16 @@ const App: React.FC = () => {
       } else if (input === 'k' || key.upArrow) {
         // k or up arrow to scroll up
         setScrollPosition(prev => Math.max(prev - 1, 0));
+      } else if (input === ' ') {
+        // Space key to toggle fold state of current message
+        const currentMessage = conversation[scrollPosition];
+        if (currentMessage && currentMessage.type === 'agent_activity') {
+          setConversation(prev => prev.map((msg, index) => 
+            index === scrollPosition 
+              ? { ...msg, folded: !msg.folded }
+              : msg
+          ));
+        }
       }
     }
   });

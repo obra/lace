@@ -16,7 +16,12 @@ const mockConversation = [
 interface ConversationViewProps {
   scrollPosition?: number;
   isNavigationMode?: boolean;
-  messages?: Array<{type: 'user' | 'assistant' | 'loading', content: string}>;
+  messages?: Array<{
+    type: 'user' | 'assistant' | 'loading' | 'agent_activity';
+    content: string | string[];
+    summary?: string;
+    folded?: boolean;
+  }>;
 }
 
 const ConversationView: React.FC<ConversationViewProps> = ({ 
@@ -31,6 +36,8 @@ const ConversationView: React.FC<ConversationViewProps> = ({
           key={`message-${index}-${message.type}`} 
           type={message.type} 
           content={message.content}
+          summary={message.summary}
+          folded={message.folded}
           isHighlighted={isNavigationMode && index === scrollPosition}
         />
       ))}
