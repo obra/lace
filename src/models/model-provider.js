@@ -39,7 +39,8 @@ export class ModelProvider {
       model: options.model,
       tools: options.tools,
       maxTokens: options.maxTokens,
-      temperature: options.temperature
+      temperature: options.temperature,
+      onTokenUpdate: options.onTokenUpdate
     });
   }
 
@@ -89,5 +90,37 @@ export class ModelProvider {
   getProviderInfo(providerName) {
     const provider = this.getProvider(providerName);
     return provider.getInfo();
+  }
+
+  getContextWindow(model, providerName) {
+    const provider = this.getProvider(providerName);
+    if (provider.getContextWindow) {
+      return provider.getContextWindow(model);
+    }
+    return 200000; // Default fallback
+  }
+
+  calculateCost(model, inputTokens, outputTokens, providerName) {
+    const provider = this.getProvider(providerName);
+    if (provider.calculateCost) {
+      return provider.calculateCost(model, inputTokens, outputTokens);
+    }
+    return null;
+  }
+
+  getContextUsage(model, totalTokens, providerName) {
+    const provider = this.getProvider(providerName);
+    if (provider.getContextUsage) {
+      return provider.getContextUsage(model, totalTokens);
+    }
+    
+    // Fallback calculation
+    const contextWindow = this.getContextWindow(model, providerName);
+    return {
+      used: totalTokens,
+      total: contextWindow,
+      percentage: (totalTokens / contextWindow) * 100,
+      remaining: contextWindow - totalTokens
+    };
   }
 }

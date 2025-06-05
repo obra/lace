@@ -22,7 +22,7 @@ export class Agent {
     this.toolApproval = options.toolApproval || null;
     
     this.contextSize = 0;
-    this.maxContextSize = 100000; // TODO: Get from model API
+    this.maxContextSize = this.getModelContextWindow();
     this.handoffThreshold = 0.8; // Handoff at 80% capacity
     
     this.systemPrompt = this.buildSystemPrompt();
@@ -79,12 +79,22 @@ export class Agent {
         // Get available tools for the LLM
         const availableTools = this.buildToolsForLLM();
 
-        // Use assigned model and provider
+        // Track token usage during streaming
+        const onTokenUpdate = (tokenData) => {
+          if (this.verbose && tokenData.streaming) {
+            process.stdout.write(`\r📊 Tokens: ${tokenData.inputTokens} in, ${tokenData.outputTokens} out`);
+          } else if (this.verbose && !tokenData.streaming) {
+            process.stdout.write(`\r📊 Final: ${tokenData.inputTokens} in, ${tokenData.outputTokens} out\n`);
+          }
+        };
+
+        // Use assigned model and provider with streaming
         const response = await this.modelProvider.chat(messages, {
           provider: this.assignedProvider,
           model: this.assignedModel,
           tools: availableTools,
-          maxTokens: 4096
+          maxTokens: 4096,
+          onTokenUpdate: this.verbose ? onTokenUpdate : null
         });
 
         if (!response.success) {
@@ -94,11 +104,12 @@ export class Agent {
           };
         }
 
-        // Accumulate usage stats
+        // Accumulate usage stats and update context size
         if (response.usage) {
-          totalUsage.prompt_tokens += response.usage.prompt_tokens || 0;
-          totalUsage.completion_tokens += response.usage.completion_tokens || 0;
+          totalUsage.prompt_tokens += response.usage.input_tokens || response.usage.prompt_tokens || 0;
+          totalUsage.completion_tokens += response.usage.output_tokens || response.usage.completion_tokens || 0;
           totalUsage.total_tokens += response.usage.total_tokens || 0;
+          this.contextSize = totalUsage.total_tokens;
         }
 
         // Add agent response to conversation
@@ -154,6 +165,18 @@ export class Agent {
 
       if (iteration >= maxIterations) {
         finalContent += `\n\n⚠️ Circuit breaker triggered after ${maxIterations} iterations.`;
+      }
+
+      // Display final token usage if verbose
+      if (this.verbose && totalUsage.total_tokens > 0) {
+        const contextUsage = this.calculateContextUsage(totalUsage.total_tokens);
+        const cost = this.calculateCost(totalUsage.prompt_tokens, totalUsage.completion_tokens);
+        
+        console.log(`\n📈 Session totals: ${totalUsage.prompt_tokens} in, ${totalUsage.completion_tokens} out, ${totalUsage.total_tokens} total tokens`);
+        console.log(`📊 Context usage: ${contextUsage.used}/${contextUsage.total} tokens (${contextUsage.percentage.toFixed(1)}%)`);
+        if (cost) {
+          console.log(`💰 Cost: $${cost.totalCost.toFixed(4)} (in: $${cost.inputCost.toFixed(4)}, out: $${cost.outputCost.toFixed(4)})`);
+        }
       }
 
       return {
@@ -425,13 +448,29 @@ ${responseText}`;
       
       if (result.success) {
         let resultText = '';
+        
+        // Handle different result formats
         if (result.result !== undefined) {
           resultText = typeof result.result === 'object' ? JSON.stringify(result.result) : String(result.result);
+        } else if (result.content !== undefined) {
+          resultText = `Content: ${result.content.substring(0, 100)}${result.content.length > 100 ? '...' : ''}`;
+        } else if (result.bytesWritten !== undefined) {
+          resultText = `File written successfully (${result.bytesWritten} bytes)`;
+        } else if (result.files !== undefined) {
+          resultText = `Found ${result.files.length} files`;
+        } else {
+          // Show relevant non-result fields
+          const details = Object.keys(result)
+            .filter(key => key !== 'success')
+            .map(key => `${key}: ${result[key]}`)
+            .join(', ');
+          resultText = details || 'Completed successfully';
         }
+        
         if (result.output && result.output.length > 0) {
           resultText += result.output.join('\n');
         }
-        return `Tool ${tr.toolCall.name} executed successfully. Result: ${resultText}`;
+        return `Tool ${tr.toolCall.name} executed successfully. ${resultText}`;
       } else {
         return `Tool ${tr.toolCall.name} failed: ${result.error || 'Unknown error'}`;
       }
@@ -444,6 +483,34 @@ ${responseText}`;
     return files.map(file => 
       `${file.isDirectory ? '📁' : '📄'} ${file.name}`
     ).join('\n');
+  }
+
+  getModelContextWindow() {
+    if (this.modelProvider && this.modelProvider.getContextWindow) {
+      return this.modelProvider.getContextWindow(this.assignedModel, this.assignedProvider);
+    }
+    return 200000; // Default fallback
+  }
+
+  calculateContextUsage(totalTokens) {
+    if (this.modelProvider && this.modelProvider.getContextUsage) {
+      return this.modelProvider.getContextUsage(this.assignedModel, totalTokens, this.assignedProvider);
+    }
+    
+    // Fallback calculation
+    return {
+      used: totalTokens,
+      total: this.maxContextSize,
+      percentage: (totalTokens / this.maxContextSize) * 100,
+      remaining: this.maxContextSize - totalTokens
+    };
+  }
+
+  calculateCost(inputTokens, outputTokens) {
+    if (this.modelProvider && this.modelProvider.calculateCost) {
+      return this.modelProvider.calculateCost(this.assignedModel, inputTokens, outputTokens, this.assignedProvider);
+    }
+    return null;
   }
 
   shouldHandoff() {

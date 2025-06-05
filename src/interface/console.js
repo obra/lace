@@ -49,6 +49,11 @@ export class Console {
           continue;
         }
 
+        if (input.trim() === '/status') {
+          this.showAgentStatus(agent);
+          continue;
+        }
+
         if (input.trim().startsWith('/auto-approve ')) {
           const toolName = input.trim().substring('/auto-approve '.length);
           this.manageAutoApproval(agent, toolName, true);
@@ -85,6 +90,7 @@ export class Console {
     console.log('  /help             - Show this help message');
     console.log('  /tools            - List available tools');
     console.log('  /memory           - Show conversation history');
+    console.log('  /status           - Show agent status and context usage');
     console.log('  /approval         - Show tool approval settings');
     console.log('  /auto-approve <tool> - Add tool to auto-approve list');
     console.log('  /deny <tool>      - Add tool to deny list');
@@ -110,6 +116,48 @@ export class Console {
       const roleColor = entry.role === 'user' ? chalk.green : chalk.blue;
       console.log(`${chalk.gray(timestamp)} ${roleColor(entry.role)}: ${entry.content.substring(0, 100)}${entry.content.length > 100 ? '...' : ''}`);
     }
+    console.log();
+  }
+
+  showAgentStatus(agent) {
+    console.log(chalk.cyan('\nAgent Status:'));
+    console.log(`  Role: ${chalk.yellow(agent.role)}`);
+    console.log(`  Model: ${chalk.yellow(agent.assignedModel)}`);
+    console.log(`  Provider: ${chalk.yellow(agent.assignedProvider)}`);
+    console.log(`  Generation: ${chalk.yellow(agent.generation)}`);
+    
+    // Context window information
+    const contextUsage = agent.calculateContextUsage(agent.contextSize);
+    const contextColor = contextUsage.percentage > 80 ? chalk.red : 
+                        contextUsage.percentage > 60 ? chalk.yellow : chalk.green;
+    
+    console.log(chalk.cyan('\nContext Window Usage:'));
+    console.log(`  Used: ${chalk.white(contextUsage.used.toLocaleString())} tokens`);
+    console.log(`  Total: ${chalk.white(contextUsage.total.toLocaleString())} tokens`);
+    console.log(`  Usage: ${contextColor(contextUsage.percentage.toFixed(1) + '%')}`);
+    console.log(`  Remaining: ${chalk.white(contextUsage.remaining.toLocaleString())} tokens`);
+    
+    if (contextUsage.percentage > agent.handoffThreshold * 100) {
+      console.log(chalk.red('  ⚠️ Context approaching handoff threshold!'));
+    }
+
+    // Model pricing info if available
+    if (agent.modelProvider && agent.assignedProvider === 'anthropic') {
+      const provider = agent.modelProvider.getProvider(agent.assignedProvider);
+      const modelInfo = provider.modelInfo[agent.assignedModel];
+      if (modelInfo) {
+        console.log(chalk.cyan('\nModel Pricing:'));
+        console.log(`  Input: $${modelInfo.inputPricePerMillion.toFixed(2)} per million tokens`);
+        console.log(`  Output: $${modelInfo.outputPricePerMillion.toFixed(2)} per million tokens`);
+        
+        // Estimate cost for current context
+        if (agent.contextSize > 0) {
+          const estimatedCost = (agent.contextSize / 1000000) * modelInfo.inputPricePerMillion;
+          console.log(`  Current context cost: ~$${estimatedCost.toFixed(4)}`);
+        }
+      }
+    }
+    
     console.log();
   }
 
