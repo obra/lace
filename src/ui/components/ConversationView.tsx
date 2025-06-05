@@ -13,11 +13,24 @@ const mockConversation = [
   { type: 'assistant' as const, content: 'Sure! Here is a basic function:\n\nfunction hello() {\n  return "Hello World";\n}' }
 ];
 
-const ConversationView: React.FC = () => {
+interface ConversationViewProps {
+  scrollPosition?: number;
+  isNavigationMode?: boolean;
+}
+
+const ConversationView: React.FC<ConversationViewProps> = ({ 
+  scrollPosition = 0, 
+  isNavigationMode = false 
+}) => {
   return (
     <Box flexDirection="column" flexGrow={1} padding={1}>
       {mockConversation.map((message, index) => (
-        <Message key={`message-${index}-${message.type}`} type={message.type} content={message.content} />
+        <Message 
+          key={`message-${index}-${message.type}`} 
+          type={message.type} 
+          content={message.content}
+          isHighlighted={isNavigationMode && index === scrollPosition}
+        />
       ))}
     </Box>
   );

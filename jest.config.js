@@ -6,7 +6,8 @@ export default {
     experimentalVmModules: true
   },
   moduleNameMapper: {
-    '^(\\.{1,2}/.*)\\.js$': '$1'
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^ink/build/hooks/use-input.js$': 'ink/build/hooks/use-input.js'
   },
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {

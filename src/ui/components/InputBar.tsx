@@ -4,11 +4,19 @@
 import React from 'react';
 import { Text, Box } from 'ink';
 
-const InputBar: React.FC = () => {
+interface InputBarProps {
+  isNavigationMode?: boolean;
+}
+
+const InputBar: React.FC<InputBarProps> = ({ isNavigationMode = false }) => {
   return (
     <Box>
       <Text color="cyan">{'> '}</Text>
-      <Text color="dim">Type your message...</Text>
+      {isNavigationMode ? (
+        <Text color="yellow">Navigation mode - Press Escape to exit</Text>
+      ) : (
+        <Text color="dim">Type your message...</Text>
+      )}
     </Box>
   );
 };

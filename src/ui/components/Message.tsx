@@ -7,9 +7,10 @@ import { Text, Box } from 'ink';
 interface MessageProps {
   type: 'user' | 'assistant';
   content: string;
+  isHighlighted?: boolean;
 }
 
-const Message: React.FC<MessageProps> = ({ type, content }) => {
+const Message: React.FC<MessageProps> = ({ type, content, isHighlighted = false }) => {
   const prefix = type === 'user' ? '> ' : '🤖 ';
   const prefixColor = type === 'user' ? 'cyan' : 'green';
 
@@ -17,7 +18,8 @@ const Message: React.FC<MessageProps> = ({ type, content }) => {
     <Box flexDirection="column">
       <Box>
         <Text color={prefixColor}>{prefix}</Text>
-        <Text>{content}</Text>
+        {/* @ts-expect-error - inverse prop exists in runtime but TypeScript is having issues */}
+        <Text inverse={isHighlighted}>{content}</Text>
       </Box>
       <Text>{''}</Text>
     </Box>
