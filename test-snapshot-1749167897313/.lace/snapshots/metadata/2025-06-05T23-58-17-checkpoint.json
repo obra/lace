@@ -1,0 +1,13 @@
+{
+  "snapshotId": "2025-06-05T23-58-17-checkpoint",
+  "timestamp": "2025-06-05T23:58:17.324Z",
+  "type": "checkpoint",
+  "description": "Old checkpoint",
+  "gitCommitSha": "15b9f50df818986e0fe3795d22f8768182951958",
+  "realRepoSha": "unknown",
+  "performance": {
+    "filesChanged": 47,
+    "snapshotSizeBytes": 0,
+    "processingTimeMs": 122
+  }
+}

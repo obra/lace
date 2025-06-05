@@ -1,5 +1,12 @@
 {
-  "snapshots": [],
-  "lastUpdated": "2025-06-05T23:58:17.323Z",
+  "snapshots": [
+    {
+      "snapshotId": "2025-06-05T23-58-17-checkpoint",
+      "timestamp": "2025-06-05T23:58:17.324Z",
+      "type": "checkpoint",
+      "description": "Old checkpoint"
+    }
+  ],
+  "lastUpdated": "2025-06-05T23:58:17.471Z",
   "version": "1.0"
 }
