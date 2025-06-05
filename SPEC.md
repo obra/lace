@@ -53,3 +53,25 @@
 - Persistent conversation storage
 - Basic tool ecosystem functional
 - Demonstration of self-contained task completion with memory retention
+
+## Current Status
+
+### Terminal UI Migration (React + Ink)
+**✅ Step 1 Complete**: Basic Ink App Setup with TypeScript
+- Ink 6.0.0 + React 19 + TypeScript configuration
+- tsx for JSX compilation and development
+- Jest testing framework with ESM support
+- Basic "Hello Lace" app with process lifecycle
+
+**✅ Step 2 Complete**: Basic Layout Structure  
+- 3-component layout: ConversationView, StatusBar, InputBar
+- Full-window terminal UI with no outer frame
+- StatusBar: App name, status indicator, navigation hints with border styling
+- ConversationView: Flexible content area with placeholder content
+- InputBar: Cyan prompt with dim placeholder text
+- Comprehensive functional tests (21 tests) verifying component behavior
+
+**⏳ Step 3 Pending**: Basic Message Display
+- Message list with user/assistant conversation history
+- Proper message formatting and styling
+- Scroll handling for message overflow

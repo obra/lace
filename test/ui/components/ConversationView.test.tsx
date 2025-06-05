@@ -1,9 +1,9 @@
 // ABOUTME: Unit tests for ConversationView component
-// ABOUTME: Tests actual component behavior and layout properties
+// ABOUTME: Tests message display and layout functionality
 
 import React from 'react';
 import ConversationView from '../../../src/ui/components/ConversationView';
-import { Box, Text } from 'ink';
+import { Box } from 'ink';
 
 describe('ConversationView Component', () => {
   test('renders correct JSX structure with layout props', () => {
@@ -17,29 +17,37 @@ describe('ConversationView Component', () => {
     expect(React.isValidElement(element)).toBe(true);
   });
 
-  test('displays placeholder message', () => {
+  test('displays mock conversation messages', () => {
     const element = ConversationView({}) as any;
     const children = element.props.children;
     
-    // Find the placeholder text element
-    const placeholderElement = children.find((child: any) => 
-      child.type === Text && child.props.children.includes('Conversation will appear here')
-    );
+    // Should have 4 message components based on mock data
+    expect(children).toHaveLength(4);
     
-    expect(placeholderElement).toBeTruthy();
-    expect(placeholderElement.props.color).toBe('dim');
+    // All children should be Message components
+    children.forEach((child: any) => {
+      expect(child.type.name).toBe('Message');
+    });
   });
 
-  test('displays ready message', () => {
+  test('displays messages with correct types and content', () => {
     const element = ConversationView({}) as any;
     const children = element.props.children;
     
-    // Find the ready text element
-    const readyElement = children.find((child: any) => 
-      child.type === Text && child.props.children.includes('Ready for messages and responses')
-    );
+    // Check first message is user type with "Hello"
+    expect(children[0].props.type).toBe('user');
+    expect(children[0].props.content).toBe('Hello');
     
-    expect(readyElement).toBeTruthy();
-    expect(readyElement.props.color).toBe('dim');
+    // Check second message is assistant type
+    expect(children[1].props.type).toBe('assistant');
+    expect(children[1].props.content).toBe('Hi! How can I help you today?');
+    
+    // Check third message is user type
+    expect(children[2].props.type).toBe('user');
+    expect(children[2].props.content).toBe('Can you write a function?');
+    
+    // Check fourth message is assistant with multi-line content
+    expect(children[3].props.type).toBe('assistant');
+    expect(children[3].props.content).toContain('function hello()');
   });
 });

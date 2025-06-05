@@ -2,13 +2,23 @@
 // ABOUTME: Fills remaining space between top and StatusBar, scrollable content area
 
 import React from 'react';
-import { Text, Box } from 'ink';
+import { Box } from 'ink';
+import Message from './Message';
+
+// Test data for Step 3 as specified in the build plan
+const mockConversation = [
+  { type: 'user' as const, content: 'Hello' },
+  { type: 'assistant' as const, content: 'Hi! How can I help you today?' },
+  { type: 'user' as const, content: 'Can you write a function?' },
+  { type: 'assistant' as const, content: 'Sure! Here is a basic function:\n\nfunction hello() {\n  return "Hello World";\n}' }
+];
 
 const ConversationView: React.FC = () => {
   return (
     <Box flexDirection="column" flexGrow={1} padding={1}>
-      <Text color="dim">Conversation will appear here...</Text>
-      <Text color="dim">Ready for messages and responses.</Text>
+      {mockConversation.map((message, index) => (
+        <Message key={`message-${index}-${message.type}`} type={message.type} content={message.content} />
+      ))}
     </Box>
   );
 };
