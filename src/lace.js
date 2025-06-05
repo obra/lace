@@ -58,7 +58,8 @@ export class Lace {
         logLevel: options.logLevel || 'off',
         logFile: options.logFile,
         logFileLevel: options.logFileLevel || 'off'
-      }
+      },
+      activityLogger: this.console.activityLogger
     });
 
     await this.console.start(this.primaryAgent);
@@ -83,7 +84,8 @@ export class Lace {
         logLevel: this.options.logLevel || 'off',
         logFile: this.options.logFile,
         logFileLevel: this.options.logFileLevel || 'off'
-      }
+      },
+      activityLogger: this.console.activityLogger
     });
     
     return this.primaryAgent;

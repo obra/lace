@@ -5,6 +5,7 @@ import prompts from 'prompts';
 import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
+import { ActivityLogger } from '../logging/activity-logger.js';
 
 export class Console {
   constructor() {
@@ -13,11 +14,15 @@ export class Console {
     this.isProcessing = false;
     this.abortController = null;
     this.history = [];
+    this.activityLogger = new ActivityLogger();
   }
 
   async start(agent) {
     this.currentAgent = agent;
     this.history = this.loadHistory();
+    
+    // Initialize activity logger
+    await this.activityLogger.initialize();
     
     console.log(chalk.blue(`Starting session: ${this.sessionId}`));
     console.log(chalk.gray('Type /help for commands, /quit to exit'));
@@ -120,9 +125,16 @@ export class Console {
       return;
     }
 
+    // Log user input event
+    await this.activityLogger.logEvent('user_input', this.sessionId, null, {
+      content: input,
+      timestamp: new Date().toISOString()
+    });
+
     // Process user input with agent
     this.isProcessing = true;
     this.abortController = new AbortController();
+    const startTime = Date.now();
     
     try {
       const response = await this.currentAgent.processInput(
@@ -133,6 +145,15 @@ export class Console {
           onToken: this.handleStreamingToken.bind(this)
         }
       );
+      
+      // Log agent response event
+      const duration = Date.now() - startTime;
+      await this.activityLogger.logEvent('agent_response', this.sessionId, null, {
+        content: response.content || '',
+        tokens: response.usage?.total_tokens || response.usage?.output_tokens || 0,
+        duration_ms: duration
+      });
+      
       this.displayResponse(response);
     } catch (error) {
       if (error.name === 'AbortError') {

@@ -1,6 +1,8 @@
 // ABOUTME: Core agent class that handles reasoning, tool calls, and context management
 // ABOUTME: Implements multi-generational memory and subagent coordination
 
+import { ActivityLogger } from '../logging/activity-logger.js';
+
 export class Agent {
   constructor(options = {}) {
     this.generation = options.generation || 0;
@@ -20,6 +22,9 @@ export class Agent {
     
     // Tool approval system
     this.toolApproval = options.toolApproval || null;
+    
+    // Activity logging
+    this.activityLogger = options.activityLogger || null;
     
     this.contextSize = 0;
     this.maxContextSize = this.getModelContextWindow();
@@ -98,7 +103,18 @@ export class Agent {
           throw new Error('Operation was aborted');
         }
 
+        // Log model request event
+        if (this.activityLogger) {
+          await this.activityLogger.logEvent('model_request', sessionId, null, {
+            provider: this.assignedProvider,
+            model: this.assignedModel,
+            prompt: JSON.stringify(messages),
+            timestamp: new Date().toISOString()
+          });
+        }
+
         // Use assigned model and provider with streaming
+        const startTime = Date.now();
         const response = await this.modelProvider.chat(messages, {
           provider: this.assignedProvider,
           model: this.assignedModel,
@@ -107,6 +123,23 @@ export class Agent {
           onTokenUpdate: onTokenUpdate,
           signal: options.signal
         });
+
+        // Log model response event
+        if (this.activityLogger && response.success) {
+          const duration = Date.now() - startTime;
+          const cost = this.calculateCost(
+            response.usage?.input_tokens || response.usage?.prompt_tokens || 0,
+            response.usage?.output_tokens || response.usage?.completion_tokens || 0
+          );
+          
+          await this.activityLogger.logEvent('model_response', sessionId, null, {
+            content: response.content || '',
+            tokens_in: response.usage?.input_tokens || response.usage?.prompt_tokens || 0,
+            tokens_out: response.usage?.output_tokens || response.usage?.completion_tokens || 0,
+            cost: cost ? cost.totalCost : 0,
+            duration_ms: duration
+          });
+        }
 
         if (!response.success) {
           return {

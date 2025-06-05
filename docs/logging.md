@@ -27,7 +27,7 @@ Update the argument parsing and pass these options to the agent initialization.
 
 **Implementation:** Created `DebugLogger` class with configurable dual output, proper level filtering, timestamp formatting, async file writing with directory creation, and comprehensive unit tests in `test/unit/debug-logger.test.js`.
 
-## Task 3: Activity Logging Database Schema
+## Task 3: Activity Logging Database Schema ✅ COMPLETED
 
 **Prompt:** Create `src/logging/activity-logger.js` with SQLite database setup. Schema:
 
@@ -47,7 +47,9 @@ CREATE INDEX idx_event_type ON events(event_type);
 
 Database location: `.lace/activity.db`. Export methods: `logEvent(type, localSessionId, modelSessionId, data)`.
 
-## Task 4: Console Message Activity Logging
+**Implementation:** Created `ActivityLogger` class with SQLite database, events table with indexes, error-safe logging, query capabilities, and comprehensive unit tests in `test/unit/activity-logger.test.js`.
+
+## Task 4: Console Message Activity Logging ✅ COMPLETED
 
 **Prompt:** Integrate activity logging into `src/interface/console.js`:
 - Log `user_input` events when user submits input
@@ -63,7 +65,9 @@ Event data structure:
 }
 ```
 
-## Task 5: Model Call Activity Logging
+**Implementation:** Integrated ActivityLogger into Console class with initialization, user input logging on message submission, agent response logging with timing and token data, and comprehensive tests in `test/unit/console-activity-logging.test.js`.
+
+## Task 5: Model Call Activity Logging ✅ COMPLETED
 
 **Prompt:** Integrate activity logging into `src/agents/agent.js` in the `processInput` method:
 - Log `model_request` events before sending to provider
@@ -78,6 +82,8 @@ Event data structure:
   "model_response": {"content": "...", "tokens_in": 100, "tokens_out": 50, "cost": 0.002, "duration_ms": 800}
 }
 ```
+
+**Implementation:** Integrated ActivityLogger into Agent class with model request/response logging around provider calls, cost calculation, timing data, error-safe logging, and comprehensive tests in `test/unit/agent-activity-logging.test.js`. Updated Lace class to pass ActivityLogger from Console to Agent.
 
 ## Task 6: Tool Call Activity Logging
 
