@@ -55,100 +55,114 @@ export class Agent {
 
   async generateResponse(sessionId, input) {
     try {
-      // Build conversation history for context
-      const messages = [
+      // Agentic loop with circuit breaker
+      const maxIterations = 25;
+      let iteration = 0;
+      let messages = [
         { role: 'system', content: this.systemPrompt },
         { role: 'user', content: input }
       ];
-
-      // Get available tools for the LLM
-      const availableTools = this.buildToolsForLLM();
-
-      // Use assigned model and provider
-      const response = await this.modelProvider.chat(messages, {
-        provider: this.assignedProvider,
-        model: this.assignedModel,
-        tools: availableTools,
-        maxTokens: 4096
-      });
-
-      if (!response.success) {
-        return {
-          content: `Error: ${response.error}`,
-          error: response.error
-        };
-      }
-
-      // Execute any tool calls with approval
-      const toolResults = [];
-      let finalContent = response.content;
+      
+      let allToolCalls = [];
+      let allToolResults = [];
+      let finalContent = '';
       let shouldStop = false;
+      let totalUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
 
-      if (response.toolCalls && response.toolCalls.length > 0) {
-        for (const toolCall of response.toolCalls) {
-          try {
-            // Request approval if approval system is available
-            let approvedCall = toolCall;
-            let postExecutionComment = null;
-            
-            if (this.toolApproval) {
-              const approval = await this.toolApproval.requestApproval(toolCall, {
-                reasoning: response.content,
-                agent: this.role,
-                sessionId: sessionId
-              });
+      while (iteration < maxIterations && !shouldStop) {
+        iteration++;
+        
+        if (this.verbose) {
+          console.log(`🔄 Agentic iteration ${iteration}/${maxIterations}`);
+        }
 
-              if (!approval.approved) {
-                toolResults.push({
-                  toolCall,
-                  error: `Tool execution denied: ${approval.reason}`,
-                  denied: true
-                });
+        // Get available tools for the LLM
+        const availableTools = this.buildToolsForLLM();
 
-                if (approval.shouldStop) {
-                  shouldStop = true;
-                  finalContent += '\n\n⏸️ Execution stopped by user. Please provide further instructions.';
-                  break;
-                }
-                continue;
+        // Use assigned model and provider
+        const response = await this.modelProvider.chat(messages, {
+          provider: this.assignedProvider,
+          model: this.assignedModel,
+          tools: availableTools,
+          maxTokens: 4096
+        });
+
+        if (!response.success) {
+          return {
+            content: `Error: ${response.error}`,
+            error: response.error
+          };
+        }
+
+        // Accumulate usage stats
+        if (response.usage) {
+          totalUsage.prompt_tokens += response.usage.prompt_tokens || 0;
+          totalUsage.completion_tokens += response.usage.completion_tokens || 0;
+          totalUsage.total_tokens += response.usage.total_tokens || 0;
+        }
+
+        // Add agent response to conversation
+        messages.push({
+          role: 'assistant',
+          content: response.content,
+          tool_calls: response.toolCalls
+        });
+
+        finalContent = response.content;
+
+        // Execute tool calls if any
+        const iterationToolResults = [];
+        if (response.toolCalls && response.toolCalls.length > 0) {
+          for (const toolCall of response.toolCalls) {
+            try {
+              const toolResult = await this.executeToolWithApproval(toolCall, sessionId, response.content);
+              iterationToolResults.push(toolResult);
+              allToolResults.push(toolResult);
+              
+              if (toolResult.denied && toolResult.shouldStop) {
+                shouldStop = true;
+                finalContent += '\n\n⏸️ Execution stopped by user. Please provide further instructions.';
+                break;
               }
-
-              approvedCall = approval.modifiedCall || toolCall;
-              postExecutionComment = approval.postExecutionComment;
+            } catch (error) {
+              const errorResult = {
+                toolCall,
+                error: error.message,
+                denied: false,
+                approved: false
+              };
+              iterationToolResults.push(errorResult);
+              allToolResults.push(errorResult);
             }
+          }
 
-            const result = await this.executeTool(approvedCall);
-            toolResults.push({
-              toolCall: approvedCall,
-              result,
-              approved: true
-            });
+          allToolCalls.push(...response.toolCalls);
 
-            // If this was a calculation, append the result to the content
-            if (approvedCall.name.includes('calculate') && result.success) {
-              finalContent += `\n\nResult: ${result.result}`;
-            }
-
-            // Add post-execution comment if provided
-            if (postExecutionComment) {
-              finalContent += `\n\n💭 User note: ${postExecutionComment}`;
-            }
-
-          } catch (error) {
-            toolResults.push({
-              toolCall,
-              error: error.message
+          // Add tool results to conversation for next iteration
+          if (iterationToolResults.length > 0) {
+            const toolResultsMessage = this.formatToolResultsForLLM(iterationToolResults);
+            messages.push({
+              role: 'user',
+              content: toolResultsMessage
             });
           }
+        } else {
+          // No tool calls in this iteration, agent is done
+          break;
         }
+      }
+
+      if (iteration >= maxIterations) {
+        finalContent += `\n\n⚠️ Circuit breaker triggered after ${maxIterations} iterations.`;
       }
 
       return {
         content: finalContent,
-        toolCalls: response.toolCalls,
-        toolResults,
-        usage: response.usage,
-        stopped: shouldStop
+        toolCalls: allToolCalls,
+        toolResults: allToolResults,
+        usage: totalUsage,
+        stopped: shouldStop,
+        iterations: iteration
       };
     } catch (error) {
       return {
@@ -220,6 +234,12 @@ Focus on executing your assigned task efficiently.`;
 - Provide historical context when asked
 - Focus on relevant details from your assigned time period`;
         
+      case 'synthesis':
+        return `- You process and synthesize information as requested
+- Follow the specific synthesis instructions provided in the user prompt
+- Be concise and focus on what the requesting agent needs to know
+- Preserve essential information while reducing verbosity`;
+        
       default:
         return `- You are a general-purpose agent
 - Adapt your approach based on the task at hand
@@ -270,6 +290,48 @@ Focus on executing your assigned task efficiently.`;
     return required;
   }
 
+  async executeToolWithApproval(toolCall, sessionId, reasoning) {
+    // Request approval if approval system is available
+    let approvedCall = toolCall;
+    let postExecutionComment = null;
+    
+    if (this.toolApproval) {
+      const approval = await this.toolApproval.requestApproval(toolCall, {
+        reasoning: reasoning,
+        agent: this.role,
+        sessionId: sessionId
+      });
+
+      if (!approval.approved) {
+        return {
+          toolCall,
+          error: `Tool execution denied: ${approval.reason}`,
+          denied: true,
+          approved: false,
+          shouldStop: approval.shouldStop
+        };
+      }
+
+      approvedCall = approval.modifiedCall || toolCall;
+      postExecutionComment = approval.postExecutionComment;
+    }
+
+    // Execute the tool
+    const result = await this.executeTool(approvedCall);
+    
+    // Check if tool response needs synthesis (over 200 tokens)
+    const synthesisPrompt = `Summarize this ${approvedCall.name} result for continued reasoning. Focus on key findings and next steps.`;
+    const synthesizedResult = await this.synthesizeToolResponse(result, approvedCall, sessionId, synthesisPrompt);
+    
+    return {
+      toolCall: approvedCall,
+      result: synthesizedResult,
+      approved: true,
+      denied: false,
+      postExecutionComment
+    };
+  }
+
   async executeTool(toolCall) {
     // Parse tool name and method from LLM response
     const [toolName, methodName] = toolCall.name.split('_');
@@ -279,6 +341,103 @@ Focus on executing your assigned task efficiently.`;
     }
 
     return await this.tools.callTool(toolName, methodName, toolCall.input);
+  }
+
+  async synthesizeToolResponse(toolResult, toolCall, sessionId, synthesisPrompt) {
+    // Check if response needs synthesis (over 200 tokens approximately)
+    const responseText = this.extractTextFromToolResult(toolResult);
+    const estimatedTokens = Math.ceil(responseText.length / 4); // Rough token estimation
+    
+    if (estimatedTokens <= 200) {
+      return toolResult; // Return as-is for short responses
+    }
+
+    if (this.verbose) {
+      console.log(`🔬 Synthesizing tool response (${estimatedTokens} estimated tokens)`);
+    }
+
+    // Create synthesis agent
+    const synthesisAgent = await this.spawnSubagent({
+      role: 'synthesis',
+      assignedModel: 'claude-3-5-haiku-20241022', // Use faster model for synthesis
+      assignedProvider: 'anthropic',
+      capabilities: ['synthesis', 'summarization'],
+      task: `Synthesize tool response for ${toolCall.name}`
+    });
+
+    const fullPrompt = `${synthesisPrompt}
+
+Tool: ${toolCall.name}
+Arguments: ${JSON.stringify(toolCall.input, null, 2)}
+
+Tool Result:
+${responseText}`;
+
+    try {
+      const synthesisResponse = await synthesisAgent.generateResponse(sessionId, fullPrompt);
+      
+      // Return synthesized result with original data preserved
+      return {
+        ...toolResult,
+        synthesized: true,
+        originalResult: toolResult,
+        summary: synthesisResponse.content
+      };
+    } catch (error) {
+      if (this.verbose) {
+        console.log(`⚠️ Tool synthesis failed: ${error.message}, using original result`);
+      }
+      return toolResult; // Fallback to original result
+    }
+  }
+
+  extractTextFromToolResult(toolResult) {
+    if (typeof toolResult === 'string') {
+      return toolResult;
+    }
+    
+    if (toolResult.result && typeof toolResult.result === 'string') {
+      return toolResult.result;
+    }
+    
+    if (toolResult.output) {
+      return Array.isArray(toolResult.output) ? toolResult.output.join('\n') : toolResult.output;
+    }
+    
+    // Fallback to JSON stringification
+    return JSON.stringify(toolResult, null, 2);
+  }
+
+  formatToolResultsForLLM(toolResults) {
+    const formattedResults = toolResults.map(tr => {
+      if (tr.denied) {
+        return `Tool ${tr.toolCall.name} was denied: ${tr.error}`;
+      }
+      
+      if (tr.error) {
+        return `Tool ${tr.toolCall.name} failed: ${tr.error}`;
+      }
+      
+      const result = tr.result;
+      if (result.synthesized) {
+        return `Tool ${tr.toolCall.name} executed successfully. Summary: ${result.summary}`;
+      }
+      
+      if (result.success) {
+        let resultText = '';
+        if (result.result !== undefined) {
+          resultText = typeof result.result === 'object' ? JSON.stringify(result.result) : String(result.result);
+        }
+        if (result.output && result.output.length > 0) {
+          resultText += result.output.join('\n');
+        }
+        return `Tool ${tr.toolCall.name} executed successfully. Result: ${resultText}`;
+      } else {
+        return `Tool ${tr.toolCall.name} failed: ${result.error || 'Unknown error'}`;
+      }
+    });
+
+    return `Tool execution results:\n${formattedResults.join('\n')}`;
   }
 
   formatFileList(files) {
