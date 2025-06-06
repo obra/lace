@@ -1,10 +1,10 @@
-// ABOUTME: Jest configuration for Lace web companion testing
+// ABOUTME: Jest configuration for Lace testing
 // ABOUTME: Configures ES modules support, test patterns, and environment setup
 
 export default {
-  // Test file patterns - web companion tests only
+  // Test file patterns
   testMatch: [
-    '**/test/web-companion/**/*.test.js'
+    '**/test/**/*.test.js'
   ],
   
   // Test environment

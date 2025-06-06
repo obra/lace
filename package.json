@@ -19,6 +19,7 @@
     "build": "npm run web:build",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
+    "test:node": "node --test test/**/*.test.js",
     "lint": "eslint src test",
     "format": "prettier --write ."
   },

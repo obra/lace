@@ -5,11 +5,13 @@ import { ShellTool } from './shell-tool.js';
 import { FileTool } from './file-tool.js';
 import { JavaScriptTool } from './javascript-tool.js';
 import { SearchTool } from './search-tool.js';
+import { TaskTool } from './task-tool.js';
 
 export class ToolRegistry {
   constructor(options = {}) {
     this.tools = new Map();
     this.activityLogger = options.activityLogger || null;
+    this.progressTracker = options.progressTracker || null;
     this.snapshotManager = options.snapshotManager || null;
     this.conversationDB = options.conversationDB || null;
     
@@ -28,6 +30,7 @@ export class ToolRegistry {
     this.register('file', new FileTool());
     this.register('javascript', new JavaScriptTool());
     this.register('search', new SearchTool());
+    this.register('task', new TaskTool());
 
     // Initialize all tools
     for (const tool of this.tools.values()) {
@@ -45,7 +48,7 @@ export class ToolRegistry {
     return this.tools.get(name);
   }
 
-  async callTool(name, method, params, sessionId = null) {
+  async callTool(name, method, params, sessionId = null, agent = null) {
     const tool = this.tools.get(name);
     if (!tool) {
       throw new Error(`Tool '${name}' not found`);
@@ -53,6 +56,17 @@ export class ToolRegistry {
     
     if (typeof tool[method] !== 'function') {
       throw new Error(`Method '${method}' not found on tool '${name}'`);
+    }
+
+    // Set agent context for TaskTool
+    if (name === 'task' && agent && typeof tool.setAgent === 'function') {
+      tool.setAgent(agent);
+      if (sessionId && typeof tool.setSessionId === 'function') {
+        tool.setSessionId(sessionId);
+      }
+      if (this.progressTracker && typeof tool.setProgressTracker === 'function') {
+        tool.setProgressTracker(this.progressTracker);
+      }
     }
 
     // Log tool execution start
@@ -116,10 +130,10 @@ export class ToolRegistry {
   /**
    * Execute a tool with automatic snapshot creation
    */
-  async callToolWithSnapshots(name, method, params, sessionId = null, generation = null) {
+  async callToolWithSnapshots(name, method, params, sessionId = null, generation = null, agent = null) {
     // If no snapshot manager configured, fall back to regular tool execution
     if (!this.snapshotManager) {
-      return this.callTool(name, method, params, sessionId);
+      return this.callTool(name, method, params, sessionId, agent);
     }
 
     const tool = this.tools.get(name);
@@ -129,6 +143,17 @@ export class ToolRegistry {
     
     if (typeof tool[method] !== 'function') {
       throw new Error(`Method '${method}' not found on tool '${name}'`);
+    }
+
+    // Set agent context for TaskTool
+    if (name === 'task' && agent && typeof tool.setAgent === 'function') {
+      tool.setAgent(agent);
+      if (sessionId && typeof tool.setSessionId === 'function') {
+        tool.setSessionId(sessionId);
+      }
+      if (this.progressTracker && typeof tool.setProgressTracker === 'function') {
+        tool.setProgressTracker(this.progressTracker);
+      }
     }
 
     // Create tool call metadata

@@ -9,6 +9,7 @@ import { WebServer } from './interface/web-server.js';
 import { ModelProvider } from './models/model-provider.js';
 import { ToolApprovalManager } from './safety/tool-approval.js';
 import { ActivityLogger } from './logging/activity-logger.js';
+import { ProgressTracker } from './tools/progress-tracker.js';
 
 export class Lace {
   constructor(options = {}) {
@@ -19,8 +20,14 @@ export class Lace {
     // Initialize activity logger first so it can be passed to other components
     this.activityLogger = new ActivityLogger();
     
+    // Initialize progress tracker for agent coordination
+    this.progressTracker = new ProgressTracker();
+    
     this.db = new ConversationDB(this.memoryPath);
-    this.tools = new ToolRegistry({ activityLogger: this.activityLogger });
+    this.tools = new ToolRegistry({ 
+      activityLogger: this.activityLogger,
+      progressTracker: this.progressTracker 
+    });
     this.modelProvider = new ModelProvider({
       anthropic: {
         // Default to using Anthropic models
@@ -82,6 +89,7 @@ export class Lace {
       assignedModel: 'claude-3-5-sonnet-20241022',
       assignedProvider: 'anthropic',
       capabilities: ['orchestration', 'reasoning', 'planning', 'delegation'],
+      maxConcurrentTools: this.options.maxConcurrentTools || 10,
       debugLogging: {
         logLevel: this.options.logLevel || 'off',
         logFile: this.options.logFile,
@@ -140,6 +148,11 @@ export class Lace {
 
     if (this.activityLogger) {
       await this.activityLogger.close();
+    }
+
+    // Cleanup progress tracker
+    if (this.progressTracker) {
+      this.progressTracker.destroy();
     }
   }
 }

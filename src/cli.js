@@ -21,6 +21,7 @@ program
   .option('--log-file <path>', 'file path for debug log output')
   .option('--log-file-level <level>', 'file debug output level (debug/info/warn/error/off)', 'off')
   .option('--web-port <port>', 'port for web companion interface', '3000')
+  .option('--max-concurrent-tools <number>', 'maximum number of tools to execute concurrently', (value) => parseInt(value, 10), 10)
   .action(async (options) => {
     const lace = new Lace(options);
     
