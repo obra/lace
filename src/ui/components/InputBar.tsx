@@ -32,7 +32,7 @@ const InputBar: React.FC<InputBarProps> = ({
           )}
         </>
       ) : isNavigationMode ? (
-        <Text color="yellow">Navigation mode - Press Escape to exit</Text>
+        <Text color="yellow">Navigation mode - Press Escape or q to exit</Text>
       ) : (
         <>
           {inputText ? (

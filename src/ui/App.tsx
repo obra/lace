@@ -34,6 +34,8 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
   const [tokenUsage, setTokenUsage] = useState({ used: 0, total: 200000 });
   const [modelName, setModelName] = useState('claude-3-5-sonnet');
   const streamingRef = useRef<{ content: string }>({ content: '' });
+  const [ctrlCCount, setCtrlCCount] = useState(0);
+  const ctrlCTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Setup streaming callback for laceUI
   useEffect(() => {
@@ -195,13 +197,32 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
 
   useInput((input, key) => {
     if (key.ctrl && input === 'c') {
-      process.exit(0);
+      setCtrlCCount(prev => prev + 1);
+      
+      if (ctrlCCount === 0) {
+        // First Ctrl+C - show warning and start timeout
+        console.log('\nPress Ctrl+C again to exit...');
+        
+        // Clear any existing timeout
+        if (ctrlCTimeoutRef.current) {
+          clearTimeout(ctrlCTimeoutRef.current);
+        }
+        
+        // Reset count after 2 seconds
+        ctrlCTimeoutRef.current = setTimeout(() => {
+          setCtrlCCount(0);
+        }, 2000);
+      } else {
+        // Second Ctrl+C - exit immediately
+        process.exit(0);
+      }
+      return;
     }
 
     if (isSearchMode) {
       // Search mode: handle search input and navigation
-      if (key.escape) {
-        // Escape to exit search mode
+      if (key.escape || input === 'q') {
+        // Escape or q to exit search mode
         setIsSearchMode(false);
         setSearchTerm('');
         setFilterMode('all');
@@ -259,6 +280,10 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
       // Navigation mode
       if (key.escape) {
         // Escape to exit navigation mode
+        setIsNavigationMode(false);
+        setScrollPosition(0);
+      } else if (input === 'q') {
+        // q key as alternative to escape (vim-style)
         setIsNavigationMode(false);
         setScrollPosition(0);
       } else if (input === 'j' || key.downArrow) {
