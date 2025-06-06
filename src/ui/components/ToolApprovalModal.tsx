@@ -4,7 +4,6 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Select, TextInput } from '@inkjs/ui';
-import { useInputFocus } from '../contexts/InputFocusContext';
 
 interface ToolCall {
   name: string;
@@ -34,7 +33,6 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
   const [mode, setMode] = useState<'select' | 'modify' | 'comment'>('select');
   const [modifiedParams, setModifiedParams] = useState(JSON.stringify(toolCall.input, null, 2));
   const [comment, setComment] = useState('');
-  const { activeInput, setActiveInput, isInputActive } = useInputFocus();
   
   const options = [
     { label: 'Yes, execute as-is', value: 'approve' },
