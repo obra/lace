@@ -47,17 +47,34 @@ describe('Parallel Tool Execution', () => {
           executionTime: delay
         };
       },
-      get: (name) => ({ name })
+      get: (name) => ({ name }),
+      listTools: () => ['tool1', 'tool2', 'tool3', 'slow', 'fast', 'error'],
+      getToolSchema: (name) => ({ name, methods: {} }),
+      getAllSchemas: () => ({})
     };
 
     // Import Agent and create instance with mock tools
     const { Agent } = await import('../../src/agents/agent.js');
+    
+    // Mock minimal dependencies
+    const mockDb = {
+      getCurrentSessionId: () => 'test-session',
+      saveMessage: async () => {},
+      getConversationHistory: async () => []
+    };
+    
+    const mockModelProvider = {
+      generateResponse: async () => ({ content: 'test' }),
+      initialize: async () => {}
+    };
+    
     agent = new Agent({
       generation: 1,
       tools: mockTools,
-      db: { getCurrentSessionId: () => 'test-session' },
-      modelProvider: { generateResponse: async () => ({ content: 'test' }) },
-      maxConcurrentTools: 3 // Test limit
+      db: mockDb,
+      modelProvider: mockModelProvider,
+      maxConcurrentTools: 3, // Test limit
+      debugLogging: null // Disable debug logging to avoid sqlite3 dependency
     });
   });
 
@@ -78,16 +95,8 @@ describe('Parallel Tool Execution', () => {
       const sessionId = 'test-session';
       const startTime = Date.now();
 
-      // Execute tools (currently sequential, should become parallel)
-      const results = [];
-      for (const toolCall of toolCalls) {
-        try {
-          const result = await agent.executeToolWithApproval(toolCall, sessionId, 'test context');
-          results.push(result);
-        } catch (error) {
-          results.push({ error: error.message, toolCall });
-        }
-      }
+      // Execute tools using the new parallel execution method directly
+      const results = await agent.executeToolsInParallel(toolCalls, sessionId, 'test context');
 
       const endTime = Date.now();
       const totalTime = endTime - startTime;
@@ -121,15 +130,7 @@ describe('Parallel Tool Execution', () => {
       const sessionId = 'test-session';
       
       // This should continue executing successful tools even if some fail
-      const results = [];
-      for (const toolCall of toolCalls) {
-        try {
-          const result = await agent.executeToolWithApproval(toolCall, sessionId, 'test context');
-          results.push(result);
-        } catch (error) {
-          results.push({ error: error.message, toolCall });
-        }
-      }
+      const results = await agent.executeToolsInParallel(toolCalls, sessionId, 'test context');
 
       // Should have attempted all tools
       assert.equal(results.length, 3, 'Should process all tools despite failures');
@@ -174,15 +175,7 @@ describe('Parallel Tool Execution', () => {
       const sessionId = 'test-session';
       
       // Execute with concurrency limit
-      const results = [];
-      for (const toolCall of toolCalls) {
-        try {
-          const result = await agent.executeToolWithApproval(toolCall, sessionId, 'test context');
-          results.push(result);
-        } catch (error) {
-          results.push({ error: error.message, toolCall });
-        }
-      }
+      const results = await agent.executeToolsInParallel(toolCalls, sessionId, 'test context');
 
       // Should never exceed the limit of 3 concurrent tools
       assert.ok(maxConcurrent <= 3, `Max concurrent tools ${maxConcurrent} should not exceed limit of 3`);
@@ -227,11 +220,7 @@ describe('Parallel Tool Execution', () => {
       const sessionId = 'test-session';
       
       // Execute tools
-      const results = [];
-      for (const toolCall of toolCalls) {
-        const result = await agent.executeToolWithApproval(toolCall, sessionId, 'test context');
-        results.push(result);
-      }
+      const results = await agent.executeToolsInParallel(toolCalls, sessionId, 'test context');
 
       // Each tool should have requested approval
       assert.equal(approvalRequests.length, 3, 'Should request approval for each tool');
@@ -260,11 +249,7 @@ describe('Parallel Tool Execution', () => {
 
       const sessionId = 'test-session';
       
-      const results = [];
-      for (const toolCall of toolCalls) {
-        const result = await agent.executeToolWithApproval(toolCall, sessionId, 'test context');
-        results.push(result);
-      }
+      const results = await agent.executeToolsInParallel(toolCalls, sessionId, 'test context');
 
       // Should have 2 successful executions and 1 denial
       const deniedResults = results.filter(r => r.denied);
@@ -288,15 +273,7 @@ describe('Parallel Tool Execution', () => {
       const sessionId = 'test-session';
       const startTime = Date.now();
       
-      const results = [];
-      for (const toolCall of toolCalls) {
-        try {
-          const result = await agent.executeToolWithApproval(toolCall, sessionId, 'test context');
-          results.push(result);
-        } catch (error) {
-          results.push({ error: error.message, toolCall });
-        }
-      }
+      const results = await agent.executeToolsInParallel(toolCalls, sessionId, 'test context');
 
       const endTime = Date.now();
 
@@ -326,11 +303,7 @@ describe('Parallel Tool Execution', () => {
       const sessionId = 'test-session';
       const startTime = Date.now();
 
-      const results = [];
-      for (const toolCall of toolCalls) {
-        const result = await agent.executeToolWithApproval(toolCall, sessionId, 'test context');
-        results.push(result);
-      }
+      const results = await agent.executeToolsInParallel(toolCalls, sessionId, 'test context');
 
       const endTime = Date.now();
       const totalTime = endTime - startTime;
@@ -349,11 +322,7 @@ describe('Parallel Tool Execution', () => {
       const sessionId = 'test-session';
       
       // Should handle gracefully without errors
-      const results = [];
-      for (const toolCall of toolCalls) {
-        const result = await agent.executeToolWithApproval(toolCall, sessionId, 'test context');
-        results.push(result);
-      }
+      const results = await agent.executeToolsInParallel(toolCalls, sessionId, 'test context');
 
       assert.equal(results.length, 0, 'Should handle empty array gracefully');
     });
@@ -365,11 +334,7 @@ describe('Parallel Tool Execution', () => {
 
       const sessionId = 'test-session';
       
-      const results = [];
-      for (const toolCall of toolCalls) {
-        const result = await agent.executeToolWithApproval(toolCall, sessionId, 'test context');
-        results.push(result);
-      }
+      const results = await agent.executeToolsInParallel(toolCalls, sessionId, 'test context');
 
       assert.equal(results.length, 1, 'Should handle single tool correctly');
       assert.ok(results[0].success, 'Single tool should succeed');

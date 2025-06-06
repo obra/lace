@@ -4,6 +4,35 @@
 import { ActivityLogger } from '../logging/activity-logger.js';
 import { DebugLogger } from '../logging/debug-logger.js';
 
+// Simple semaphore for concurrency control
+class Semaphore {
+  constructor(maxConcurrent) {
+    this.maxConcurrent = maxConcurrent;
+    this.current = 0;
+    this.queue = [];
+  }
+
+  async acquire() {
+    if (this.current < this.maxConcurrent) {
+      this.current++;
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      this.queue.push(resolve);
+    });
+  }
+
+  release() {
+    this.current--;
+    if (this.queue.length > 0) {
+      const next = this.queue.shift();
+      this.current++;
+      next();
+    }
+  }
+}
+
 export class Agent {
   constructor(options = {}) {
     this.generation = options.generation || 0;
@@ -23,6 +52,9 @@ export class Agent {
     
     // Tool approval system
     this.toolApproval = options.toolApproval || null;
+    
+    // Parallel execution configuration
+    this.maxConcurrentTools = options.maxConcurrentTools || 10;
     
     // Activity logging
     this.activityLogger = options.activityLogger || null;
@@ -186,27 +218,17 @@ export class Agent {
         // Execute tool calls if any
         const iterationToolResults = [];
         if (response.toolCalls && response.toolCalls.length > 0) {
-          for (const toolCall of response.toolCalls) {
-            try {
-              const toolResult = await this.executeToolWithApproval(toolCall, sessionId, response.content);
-              iterationToolResults.push(toolResult);
-              allToolResults.push(toolResult);
-              
-              if (toolResult.denied && toolResult.shouldStop) {
-                shouldStop = true;
-                finalContent += '\n\n⏸️ Execution stopped by user. Please provide further instructions.';
-                break;
-              }
-            } catch (error) {
-              const errorResult = {
-                toolCall,
-                error: error.message,
-                denied: false,
-                approved: false
-              };
-              iterationToolResults.push(errorResult);
-              allToolResults.push(errorResult);
-            }
+          // Execute tools in parallel with concurrency limiting
+          const toolResults = await this.executeToolsInParallel(response.toolCalls, sessionId, response.content);
+          
+          iterationToolResults.push(...toolResults);
+          allToolResults.push(...toolResults);
+          
+          // Check if any tool was denied with shouldStop
+          const stopResult = toolResults.find(result => result.denied && result.shouldStop);
+          if (stopResult) {
+            shouldStop = true;
+            finalContent += '\n\n⏸️ Execution stopped by user. Please provide further instructions.';
           }
 
           allToolCalls.push(...response.toolCalls);
@@ -428,6 +450,44 @@ Focus on executing your assigned task efficiently.`;
     }
 
     return await this.tools.callTool(toolName, methodName, toolCall.input, sessionId, this);
+  }
+
+  async executeToolsInParallel(toolCalls, sessionId, reasoning) {
+    if (!toolCalls || toolCalls.length === 0) {
+      return [];
+    }
+
+    // Create semaphore for concurrency limiting
+    const semaphore = new Semaphore(this.maxConcurrentTools);
+
+    // Create promise for each tool call with concurrency control
+    const toolPromises = toolCalls.map(async (toolCall) => {
+      await semaphore.acquire();
+      
+      try {
+        const result = await this.executeToolWithApproval(toolCall, sessionId, reasoning);
+        return result;
+      } catch (error) {
+        // Return error result instead of throwing
+        return {
+          toolCall,
+          error: error.message,
+          denied: false,
+          approved: false
+        };
+      } finally {
+        semaphore.release();
+      }
+    });
+
+    // Execute all tools in parallel and collect results
+    const results = await Promise.all(toolPromises);
+    
+    if (this.verbose && this.debugLogger) {
+      this.debugLogger.debug(`⚡ Executed ${toolCalls.length} tools in parallel (limit: ${this.maxConcurrentTools})`);
+    }
+
+    return results;
   }
 
   async synthesizeToolResponse(toolResult, toolCall, sessionId, synthesisPrompt) {

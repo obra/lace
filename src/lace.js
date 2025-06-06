@@ -67,10 +67,11 @@ export class Lace {
       assignedModel: 'claude-3-5-sonnet-20241022',
       assignedProvider: 'anthropic',
       capabilities: ['orchestration', 'reasoning', 'planning', 'delegation'],
+      maxConcurrentTools: this.options.maxConcurrentTools || 10,
       debugLogging: {
-        logLevel: options.logLevel || 'off',
-        logFile: options.logFile,
-        logFileLevel: options.logFileLevel || 'off'
+        logLevel: this.options.logLevel || 'off',
+        logFile: this.options.logFile,
+        logFileLevel: this.options.logFileLevel || 'off'
       },
       activityLogger: this.activityLogger
     });
