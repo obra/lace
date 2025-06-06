@@ -1,9 +1,9 @@
 // ABOUTME: Main Ink application component for Lace terminal UI
 // ABOUTME: Implements full-window layout with ConversationView, StatusBar, and InputBar
 
-import React, { useState } from 'react';
-// @ts-expect-error - useInput is available at runtime but TypeScript has module resolution issues
-import { Box, useInput } from 'ink';
+import React, { useState, useEffect, useRef } from 'react';
+// @ts-expect-error - useInput and useStdout are available at runtime but TypeScript has module resolution issues
+import { Box, useInput, useStdout } from 'ink';
 import ConversationView from './components/ConversationView';
 import StatusBar from './components/StatusBar';
 import InputBar from './components/InputBar';
@@ -12,32 +12,52 @@ type ConversationMessage =
   | { type: 'user'; content: string }
   | { type: 'assistant'; content: string }
   | { type: 'loading'; content: string }
+  | { type: 'streaming'; content: string; isStreaming: boolean }
   | { type: 'agent_activity'; summary: string; content: string[]; folded: boolean };
 
-const App: React.FC = () => {
+interface AppProps {
+  laceUI?: any; // LaceUI instance passed from parent
+}
+
+const App: React.FC<AppProps> = ({ laceUI }) => {
+  const { stdout } = useStdout();
   const [isNavigationMode, setIsNavigationMode] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [filterMode, setFilterMode] = useState<'all' | 'conversation' | 'search'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [searchResultIndex, setSearchResultIndex] = useState(0);
-  const [conversation, setConversation] = useState<ConversationMessage[]>([
-    { type: 'user' as const, content: 'Hello' },
-    { type: 'assistant' as const, content: 'Hi! How can I help you today?' },
-    { 
-      type: 'agent_activity' as const,
-      summary: 'Agent Activity - 2 items',
-      content: [
-        '🤖 orchestrator → delegating to coder agent',
-        '🔨 coder → analyzing auth patterns (active)'
-      ],
-      folded: true
-    },
-    { type: 'user' as const, content: 'Can you write a function?' },
-    { type: 'assistant' as const, content: 'Sure! Here is a basic function:\n\n```javascript\nfunction hello() {\n  return "Hello World";\n}\n```' }
-  ]);
+  const [conversation, setConversation] = useState<ConversationMessage[]>([]);
+  const [tokenUsage, setTokenUsage] = useState({ used: 0, total: 200000 });
+  const [modelName, setModelName] = useState('claude-3-5-sonnet');
+  const streamingRef = useRef<{ content: string }>({ content: '' });
+  
+  // Setup streaming callback for laceUI
+  useEffect(() => {
+    if (laceUI) {
+      laceUI.uiRef = {
+        handleStreamingToken: (token: string) => {
+          streamingRef.current.content += token;
+          
+          // Update the streaming message with new content
+          setConversation(prev => {
+            const updated = [...prev];
+            const lastMessage = updated[updated.length - 1];
+            if (lastMessage && lastMessage.type === 'streaming') {
+              updated[updated.length - 1] = {
+                ...lastMessage,
+                content: streamingRef.current.content
+              };
+            }
+            return updated;
+          });
+        }
+      };
+    }
+  }, [laceUI]);
   const filterMessages = (messages: ConversationMessage[]) => {
     switch (filterMode) {
       case 'conversation':
@@ -75,40 +95,101 @@ const App: React.FC = () => {
   const searchResults = isSearchMode ? findSearchResults(conversation, searchTerm) : [];
   const totalMessages = filteredConversation.length;
 
-  const mockResponses = [
-    'Hi! How can I help you today?',
-    'I\'d be happy to assist you with that.',
-    'That\'s an interesting question! Let me think about it.',
-    'Here\'s what I can help you with...',
-    'I understand what you\'re asking. Let me provide some insight.',
-    'Great question! Here\'s my response to that.',
-    'I can definitely help you with this task.',
-    'Let me break this down for you step by step.'
-  ];
-
-  const getRandomResponse = () => {
-    return mockResponses[Math.floor(Math.random() * mockResponses.length)];
-  };
-
-  const submitMessage = () => {
-    if (inputText.trim() && !isLoading) {
+  const submitMessage = async () => {
+    if (inputText.trim() && !isLoading && !isStreaming && laceUI) {
+      const userInput = inputText.trim();
+      
       // Add user message
-      setConversation(prev => [...prev, { type: 'user' as const, content: inputText.trim() }]);
+      setConversation(prev => [...prev, { type: 'user' as const, content: userInput }]);
       setInputText('');
       
       // Start loading state
       setIsLoading(true);
       setConversation(prev => [...prev, { type: 'loading' as const, content: 'Assistant is thinking...' }]);
       
-      // Simulate agent response after delay
-      setTimeout(() => {
-        setConversation(prev => {
-          // Remove loading message and add agent response
-          const withoutLoading = prev.slice(0, -1);
-          return [...withoutLoading, { type: 'assistant' as const, content: getRandomResponse() }];
-        });
+      try {
+        // Clear streaming content
+        streamingRef.current.content = '';
+        
+        // Start streaming after a brief delay
+        setTimeout(() => {
+          setIsLoading(false);
+          setIsStreaming(true);
+          
+          // Remove loading message and start streaming
+          setConversation(prev => {
+            const withoutLoading = prev.slice(0, -1);
+            return [...withoutLoading, { type: 'streaming' as const, content: '', isStreaming: true }];
+          });
+        }, 500);
+        
+        // Get real agent response
+        const response = await laceUI.handleMessage(userInput);
+        
+        if (response.error) {
+          // Handle error
+          setIsLoading(false);
+          setIsStreaming(false);
+          setConversation(prev => {
+            const withoutLoadingOrStreaming = prev.filter(msg => 
+              msg.type !== 'loading' && msg.type !== 'streaming'
+            );
+            return [...withoutLoadingOrStreaming, { 
+              type: 'assistant' as const, 
+              content: `Error: ${response.error}` 
+            }];
+          });
+        } else {
+          // Streaming complete - convert to assistant message and add agent activities
+          setIsStreaming(false);
+          
+          setConversation(prev => {
+            const updated = [...prev];
+            const lastIndex = updated.length - 1;
+            const lastMessage = updated[lastIndex];
+            
+            // Replace streaming message with final assistant response
+            if (lastMessage && lastMessage.type === 'streaming') {
+              updated[lastIndex] = {
+                type: 'assistant' as const,
+                content: response.content || streamingRef.current.content
+              };
+            }
+            
+            // Add agent activities if present
+            if (response.agentActivities && response.agentActivities.length > 0) {
+              updated.push({
+                type: 'agent_activity' as const,
+                summary: `Agent Activity - ${response.agentActivities.length} items`,
+                content: response.agentActivities,
+                folded: true
+              });
+            }
+            
+            return updated;
+          });
+          
+          // Update token usage if available
+          if (response.usage) {
+            setTokenUsage({
+              used: response.usage.total_tokens || response.usage.totalTokens || 0,
+              total: 200000 // Default context window
+            });
+          }
+        }
+      } catch (error) {
         setIsLoading(false);
-      }, 1500); // 1.5 second delay
+        setIsStreaming(false);
+        setConversation(prev => {
+          const withoutLoadingOrStreaming = prev.filter(msg => 
+            msg.type !== 'loading' && msg.type !== 'streaming'
+          );
+          return [...withoutLoadingOrStreaming, { 
+            type: 'assistant' as const, 
+            content: `Error: ${error.message}` 
+          }];
+        });
+      }
     }
   };
 
@@ -150,8 +231,8 @@ const App: React.FC = () => {
         const prevResult = searchResults[(searchResultIndex - 1 + searchResults.length) % searchResults.length];
         setScrollPosition(prevResult.messageIndex);
       }
-    } else if (!isNavigationMode && !isLoading) {
-      // Input mode: handle text input and submission (disabled during loading)
+    } else if (!isNavigationMode && !isLoading && !isStreaming) {
+      // Input mode: handle text input and submission (disabled during loading/streaming)
       if (key.return) {
         if (inputText.trim()) {
           // Submit message if input has content
@@ -168,8 +249,8 @@ const App: React.FC = () => {
         // Handle regular character input
         setInputText(prev => prev + input);
       }
-    } else if (!isNavigationMode && isLoading) {
-      // During loading, only allow entering navigation mode with empty input
+    } else if (!isNavigationMode && (isLoading || isStreaming)) {
+      // During loading/streaming, only allow entering navigation mode with empty input
       if (key.return && !inputText.trim()) {
         setIsNavigationMode(true);
         setScrollPosition(0);
@@ -224,7 +305,7 @@ const App: React.FC = () => {
   });
 
   return (
-    <Box flexDirection="column" height="100%">
+    <Box flexDirection="column" width={stdout.columns} height={stdout.rows}>
       <ConversationView 
         scrollPosition={scrollPosition} 
         isNavigationMode={isNavigationMode} 
@@ -237,11 +318,15 @@ const App: React.FC = () => {
         scrollPosition={scrollPosition} 
         totalMessages={totalMessages} 
         isLoading={isLoading}
+        isStreaming={isStreaming}
         filterMode={filterMode}
         searchTerm={searchTerm}
         isSearchMode={isSearchMode}
         searchResults={searchResults}
         searchResultIndex={searchResultIndex}
+        tokenUsage={tokenUsage}
+        modelName={modelName}
+        terminalWidth={stdout.columns || 100}
       />
       <InputBar 
         isNavigationMode={isNavigationMode} 
