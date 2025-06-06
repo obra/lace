@@ -20,7 +20,7 @@ export class ToolRegistry {
     this.register('file', new FileTool());
     this.register('javascript', new JavaScriptTool());
     this.register('search', new SearchTool());
-    this.register('task', new TaskTool());
+    this.register('task', new TaskTool({ progressTracker: this.progressTracker }));
 
     // Initialize all tools
     for (const tool of this.tools.values()) {

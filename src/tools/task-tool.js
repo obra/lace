@@ -46,11 +46,12 @@ export class TaskTool {
       };
     }
 
+    let timeoutId;
     try {
-      // Create timeout promise
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error(`Task timed out after ${timeout}ms`)), timeout)
-      );
+      // Create timeout promise with clearable timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(`Task timed out after ${timeout}ms`)), timeout);
+      });
 
       // Get current session ID - we'll need to pass this from the agent context
       // For now, we'll use a temporary session ID approach
@@ -70,6 +71,11 @@ export class TaskTool {
 
       // Race timeout vs task completion
       const result = await Promise.race([taskPromise, timeoutPromise]);
+      
+      // Clear timeout if task completed successfully
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
 
       // Report progress if tracker available
       if (this.progressTracker) {
@@ -92,6 +98,11 @@ export class TaskTool {
       };
 
     } catch (error) {
+      // Clear timeout in case of error
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      
       // Report failure if tracker available
       if (this.progressTracker) {
         await this.progressTracker.updateProgress(this.agent.generation, {
