@@ -48,6 +48,12 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
   // Setup streaming callback and tool approval for laceUI
   useEffect(() => {
     if (laceUI) {
+      const uiCallback = (toolCall: any, riskLevel: 'low' | 'medium' | 'high', context?: any) => {
+        return new Promise((resolve) => {
+          setToolApprovalRequest({ toolCall, riskLevel, context, resolve });
+        });
+      };
+
       laceUI.uiRef = {
         handleStreamingToken: (token: string) => {
           streamingRef.current.content += token;
@@ -65,12 +71,11 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
             return updated;
           });
         },
-        requestToolApproval: (toolCall: any, riskLevel: 'low' | 'medium' | 'high', context?: any) => {
-          return new Promise((resolve) => {
-            setToolApprovalRequest({ toolCall, riskLevel, context, resolve });
-          });
-        }
+        requestToolApproval: uiCallback
       };
+
+      // Set the UI callback on the tool approval manager
+      laceUI.setToolApprovalUICallback(uiCallback);
     }
   }, [laceUI]);
   const filterMessages = (messages: ConversationMessage[]) => {
