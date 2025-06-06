@@ -1,22 +1,22 @@
 // ABOUTME: Basic tests for web companion functionality using CommonJS for Jest compatibility
 // ABOUTME: Tests core web companion features without ES module complications
 
-const { describe, test, expect } = require('@jest/globals');
+import { describe, test, expect } from '@jest/globals';
 
 describe('Web Companion Basic Tests', () => {
   describe('Configuration Validation', () => {
-    test('should validate required dependencies are available', () => {
+    test('should validate required dependencies are available', async () => {
       // Test that we can import required packages
-      expect(() => require('express')).not.toThrow();
-      expect(() => require('socket.io')).not.toThrow();
-      expect(() => require('cors')).not.toThrow();
-      expect(() => require('helmet')).not.toThrow();
+      await expect(import('express')).resolves.toBeDefined();
+      await expect(import('socket.io')).resolves.toBeDefined();
+      await expect(import('cors')).resolves.toBeDefined();
+      await expect(import('helmet')).resolves.toBeDefined();
     });
 
-    test('should validate React dependencies for UI', () => {
+    test('should validate React dependencies for UI', async () => {
       // Test that React dependencies are available
-      expect(() => require('react')).not.toThrow();
-      expect(() => require('react-dom')).not.toThrow();
+      await expect(import('react')).resolves.toBeDefined();
+      await expect(import('react-dom')).resolves.toBeDefined();
     });
   });
 

@@ -454,8 +454,8 @@ export class WebServer {
       }
     });
 
-    // Default route serves the React app
-    this.app.get('*', (req, res) => {
+    // Default route serves the React app (use regex instead of wildcard for Express 5.x compatibility)
+    this.app.get(/^(?!\/api).*/, (req, res) => {
       res.sendFile(path.join(webDir, 'index.html'));
     });
   }
@@ -572,9 +572,9 @@ export class WebServer {
       }
     });
 
-    this.app.get('/api/git/diff/:filePath(*)', async (req, res) => {
+    this.app.get('/api/git/diff', async (req, res) => {
       try {
-        const filePath = req.params.filePath;
+        const filePath = req.query.file;
         if (!filePath) {
           return res.status(400).json({ error: 'File path is required' });
         }

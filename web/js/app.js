@@ -15,19 +15,72 @@ function App() {
   const [leftPaneVisible, setLeftPaneVisible] = useState(true);
   const [rightPaneVisible, setRightPaneVisible] = useState(true);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      // Ctrl/Cmd + number keys for tab switching
+      if ((event.ctrlKey || event.metaKey)) {
+        switch (event.key) {
+          case '1':
+            event.preventDefault();
+            setActiveTab('conversation');
+            break;
+          case '2':
+            event.preventDefault();
+            setActiveTab('tools');
+            break;
+          case '3':
+            event.preventDefault();
+            setActiveTab('agents');
+            break;
+          case '4':
+            event.preventDefault();
+            setActiveTab('files');
+            break;
+          case 'r':
+            event.preventDefault();
+            window.location.reload();
+            break;
+          case 'l':
+            event.preventDefault();
+            setLeftPaneVisible(!leftPaneVisible);
+            break;
+          case 'k':
+            event.preventDefault();
+            setRightPaneVisible(!rightPaneVisible);
+            break;
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => document.removeEventListener('keydown', handleKeyPress);
+  }, [leftPaneVisible, rightPaneVisible]);
+
   useEffect(() => {
     // Initialize socket connection
+    setIsLoading(true);
     const newSocket = io();
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
       console.log('Connected to Lace server');
       setConnectionStatus('connected');
+      setIsLoading(false);
+      setError(null);
     });
 
     newSocket.on('disconnect', () => {
       console.log('Disconnected from Lace server');
       setConnectionStatus('disconnected');
+      setError('Connection lost. Attempting to reconnect...');
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('Connection error:', error);
+      setConnectionStatus('disconnected');
+      setError('Failed to connect to server');
+      setIsLoading(false);
     });
 
     newSocket.on('activity', (event) => {
@@ -84,47 +137,8 @@ function App() {
     }
   };
 
-  const renderTabContent = () => {
+  const renderRightPaneContent = () => {
     switch (activeTab) {
-      case 'conversation':
-        return React.createElement(ConversationView, { 
-          socket: socket, 
-          currentSession: currentSession,
-          onSessionChange: handleSessionChange
-        });
-      case 'activity':
-        return React.createElement('div', { style: { padding: '2rem' } },
-          React.createElement('h2', null, 'Activity Stream'),
-          React.createElement('p', null, `Received ${events.length} events`),
-          React.createElement('div', { style: { marginTop: '1rem', maxHeight: '500px', overflow: 'auto' } },
-            events.length === 0 ? 
-              React.createElement('p', { style: { color: '#9ca3af' } }, 'No events received yet...') :
-              events.map((event, index) => 
-                React.createElement('div', { 
-                  key: `${event.timestamp}-${index}`, 
-                  style: { 
-                    padding: '0.75rem', 
-                    marginBottom: '0.5rem', 
-                    backgroundColor: '#2d3748', 
-                    borderRadius: '6px',
-                    fontSize: '0.9rem',
-                    borderLeft: `3px solid ${getEventTypeColor(event.event_type)}`
-                  } 
-                },
-                  React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' } },
-                    React.createElement('strong', { style: { color: getEventTypeColor(event.event_type) } }, event.event_type),
-                    React.createElement('small', { style: { color: '#9ca3af' } }, new Date(event.timestamp).toLocaleTimeString())
-                  ),
-                  React.createElement('div', { style: { fontSize: '0.8rem', color: '#cbd5e0' } },
-                    'Session: ', React.createElement('code', null, event.local_session_id || 'unknown')
-                  ),
-                  event.model_session_id && React.createElement('div', { style: { fontSize: '0.8rem', color: '#cbd5e0' } },
-                    'Model Session: ', React.createElement('code', null, event.model_session_id)
-                  )
-                )
-              )
-          )
-        );
       case 'tools':
         return React.createElement(ToolsTimeline, { 
           socket: socket, 
@@ -140,77 +154,190 @@ function App() {
           socket: socket, 
           currentSession: currentSession 
         });
+      case 'activity':
+        return React.createElement('div', { className: 'activity-stream' },
+          React.createElement('div', { className: 'activity-header' },
+            React.createElement('h2', null, 'Activity Stream'),
+            React.createElement('div', { className: 'activity-stats' },
+              React.createElement('span', { className: 'event-count' }, `${events.length} events`)
+            )
+          ),
+          React.createElement('div', { className: 'activity-content' },
+            events.length === 0 ? 
+              React.createElement('div', { className: 'no-events' }, 'No events received yet...') :
+              events.map((event, index) => 
+                React.createElement('div', { 
+                  key: `${event.timestamp}-${index}`, 
+                  className: 'activity-event',
+                  'data-event-type': event.event_type
+                },
+                  React.createElement('div', { className: 'event-header' },
+                    React.createElement('span', { 
+                      className: 'event-type',
+                      style: { color: getEventTypeColor(event.event_type) }
+                    }, event.event_type),
+                    React.createElement('span', { className: 'event-time' }, 
+                      new Date(event.timestamp).toLocaleTimeString()
+                    )
+                  ),
+                  React.createElement('div', { className: 'event-details' },
+                    React.createElement('div', { className: 'session-info' },
+                      'Session: ', React.createElement('code', null, event.local_session_id || 'unknown')
+                    ),
+                    event.model_session_id && React.createElement('div', { className: 'model-session-info' },
+                      'Model Session: ', React.createElement('code', null, event.model_session_id)
+                    )
+                  )
+                )
+              )
+          )
+        );
       default:
-        return React.createElement('div', null, 'Unknown tab');
+        return React.createElement('div', { className: 'unknown-tab' }, 
+          React.createElement('p', null, 'Unknown tab selected')
+        );
     }
   };
 
+  // Error notification component
+  const renderError = () => {
+    if (!error) return null;
+    return React.createElement('div', { className: 'error-notification' },
+      React.createElement('span', { className: 'error-icon' }, '⚠️'),
+      React.createElement('span', { className: 'error-message' }, error),
+      React.createElement('button', { 
+        className: 'error-dismiss',
+        onClick: () => setError(null)
+      }, '×')
+    );
+  };
+
+  // Loading overlay component
+  const renderLoadingOverlay = () => {
+    if (!isLoading) return null;
+    return React.createElement('div', { className: 'loading-overlay' },
+      React.createElement('div', { className: 'loading-spinner' }),
+      React.createElement('p', null, 'Connecting to Lace server...')
+    );
+  };
+
   return React.createElement('div', { className: 'app' },
+    // Header with connection status and controls
     React.createElement('header', { className: 'app-header' },
-      React.createElement('h1', null, '🧵 Lace Web Companion'),
-      React.createElement('div', { className: getStatusColor() },
-        connectionStatus === 'connected' ? '● Connected' : 
-        connectionStatus === 'disconnected' ? '● Disconnected' : 
-        '● Connecting...'
-      )
-    ),
-    React.createElement('main', { className: 'app-main' },
-      React.createElement('div', { className: 'app-sidebar' },
-        React.createElement('div', { style: { padding: '1rem' } },
-          React.createElement('h3', null, 'Navigation'),
-          React.createElement('div', { className: 'tab-nav' },
-            ['conversation', 'activity', 'tools', 'agents', 'files'].map(tab =>
-              React.createElement('button', {
-                key: tab,
-                className: `tab-button ${activeTab === tab ? 'active' : ''}`,
-                onClick: () => setActiveTab(tab)
-              }, tab.charAt(0).toUpperCase() + tab.slice(1))
-            )
-          ),
-          
-          activeTab === 'activity' && React.createElement('div', { style: { marginTop: '2rem' } },
-            React.createElement('h4', null, 'Activity Filters'),
-            React.createElement('div', { style: { marginBottom: '1rem' } },
-              React.createElement('label', null, 'Event Type:'),
-              React.createElement('select', {
-                value: filters.eventType || '',
-                onChange: (e) => applyFilters({ ...filters, eventType: e.target.value || undefined }),
-                style: { width: '100%', marginTop: '0.25rem', padding: '0.25rem' }
-              },
-                React.createElement('option', { value: '' }, 'All Events'),
-                React.createElement('option', { value: 'user_input' }, 'User Input'),
-                React.createElement('option', { value: 'agent_response' }, 'Agent Response'),
-                React.createElement('option', { value: 'tool_call' }, 'Tool Call'),
-                React.createElement('option', { value: 'model_call' }, 'Model Call')
-              )
-            ),
-            React.createElement('div', { style: { marginBottom: '1rem' } },
-              React.createElement('label', null, 'Session ID:'),
-              React.createElement('input', {
-                type: 'text',
-                value: filters.sessionId || '',
-                onChange: (e) => applyFilters({ ...filters, sessionId: e.target.value || undefined }),
-                placeholder: 'Filter by session...',
-                style: { width: '100%', marginTop: '0.25rem', padding: '0.25rem' }
-              })
-            )
-          ),
-          
-          currentSession && React.createElement('div', { style: { marginTop: '2rem' } },
-            React.createElement('h4', null, 'Current Session'),
-            React.createElement('p', { style: { fontSize: '0.8rem', wordBreak: 'break-all' } }, currentSession),
-            React.createElement('button', {
-              onClick: unsubscribeFromSession,
-              style: { padding: '0.25rem 0.5rem', marginTop: '0.5rem' }
-            }, 'Unsubscribe')
+      React.createElement('div', { className: 'header-left' },
+        React.createElement('h1', null, '🧵 Lace Web Companion'),
+        React.createElement('div', { className: `connection-status ${getStatusColor()}` },
+          React.createElement('span', { className: 'status-indicator' }),
+          React.createElement('span', { className: 'status-text' },
+            connectionStatus === 'connected' ? 'Connected' : 
+            connectionStatus === 'disconnected' ? 'Disconnected' : 
+            'Connecting...'
           )
         )
       ),
-      React.createElement('div', { className: 'app-content' },
-        renderTabContent()
+      React.createElement('div', { className: 'header-right' },
+        // Pane visibility toggles
+        React.createElement('div', { className: 'pane-controls' },
+          React.createElement('button', {
+            className: `pane-toggle ${leftPaneVisible ? 'active' : ''}`,
+            onClick: () => setLeftPaneVisible(!leftPaneVisible),
+            title: 'Toggle conversation pane (Ctrl+L)'
+          }, '📄'),
+          React.createElement('button', {
+            className: `pane-toggle ${rightPaneVisible ? 'active' : ''}`,
+            onClick: () => setRightPaneVisible(!rightPaneVisible),
+            title: 'Toggle activity pane (Ctrl+K)'
+          }, '📊')
+        ),
+        // Keyboard shortcuts help
+        React.createElement('div', { className: 'keyboard-shortcuts' },
+          React.createElement('span', { className: 'shortcuts-text' }, 'Ctrl+1-4: Tabs • Ctrl+R: Refresh • Ctrl+L/K: Toggle Panes')
+        )
+      )
+    ),
+
+    // Error notifications
+    renderError(),
+    
+    // Loading overlay
+    renderLoadingOverlay(),
+
+    // Main split-pane layout
+    React.createElement('main', { className: 'app-main split-pane-layout' },
+      // Left pane - Conversation view
+      leftPaneVisible && React.createElement('div', { className: 'left-pane conversation-pane' },
+        React.createElement('div', { className: 'pane-header' },
+          React.createElement('h2', null, 'Conversation'),
+          currentSession && React.createElement('div', { className: 'current-session-info' },
+            React.createElement('span', { className: 'session-label' }, 'Session:'),
+            React.createElement('code', { className: 'session-id' }, currentSession),
+            React.createElement('button', {
+              className: 'session-clear',
+              onClick: unsubscribeFromSession,
+              title: 'Clear session'
+            }, '×')
+          )
+        ),
+        React.createElement('div', { className: 'pane-content' },
+          React.createElement(ConversationView, { 
+            socket: socket, 
+            currentSession: currentSession,
+            onSessionChange: handleSessionChange
+          })
+        )
+      ),
+
+      // Splitter
+      (leftPaneVisible && rightPaneVisible) && React.createElement('div', { className: 'pane-splitter' }),
+
+      // Right pane - Activity dashboard with tabs
+      rightPaneVisible && React.createElement('div', { className: 'right-pane activity-pane' },
+        React.createElement('div', { className: 'pane-header' },
+          React.createElement('div', { className: 'activity-tabs' },
+            ['tools', 'agents', 'files', 'activity'].map(tab =>
+              React.createElement('button', {
+                key: tab,
+                className: `tab-button ${activeTab === tab ? 'active' : ''}`,
+                onClick: () => setActiveTab(tab),
+                title: `Switch to ${tab} view (Ctrl+${['tools', 'agents', 'files', 'activity'].indexOf(tab) + 1})`
+              }, 
+                React.createElement('span', { className: 'tab-icon' }, getTabIcon(tab)),
+                React.createElement('span', { className: 'tab-label' }, tab.charAt(0).toUpperCase() + tab.slice(1))
+              )
+            )
+          ),
+          // Activity filters for activity tab
+          activeTab === 'activity' && React.createElement('div', { className: 'activity-filters' },
+            React.createElement('select', {
+              value: filters.eventType || '',
+              onChange: (e) => applyFilters({ ...filters, eventType: e.target.value || undefined }),
+              className: 'filter-select'
+            },
+              React.createElement('option', { value: '' }, 'All Events'),
+              React.createElement('option', { value: 'user_input' }, 'User Input'),
+              React.createElement('option', { value: 'agent_response' }, 'Agent Response'),
+              React.createElement('option', { value: 'tool_call' }, 'Tool Call'),
+              React.createElement('option', { value: 'model_call' }, 'Model Call')
+            )
+          )
+        ),
+        React.createElement('div', { className: 'pane-content' },
+          renderRightPaneContent()
+        )
       )
     )
   );
+
+  // Helper function for tab icons
+  function getTabIcon(tab) {
+    switch (tab) {
+      case 'tools': return '🔧';
+      case 'agents': return '🤖';
+      case 'files': return '📁';
+      case 'activity': return '📈';
+      default: return '📄';
+    }
+  }
 
   function getEventTypeColor(eventType) {
     switch (eventType) {

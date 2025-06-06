@@ -18,7 +18,7 @@ npm install
 
 ### 3. Run Lace
 ```bash
-# Interactive mode
+# Interactive mode (console only)
 npm start
 
 # Or directly
@@ -26,6 +26,9 @@ node src/cli.js
 
 # With verbose output
 node src/cli.js --verbose
+
+# With web companion (browser + console)
+node src/cli.js --web --port 3000
 ```
 
 ### 4. Try Some Commands
@@ -49,6 +52,8 @@ Options:
   -V, --version         output the version number
   -v, --verbose         enable verbose output
   --memory-path <path>  path to conversation database (default: "./lace-memory.db")
+  --web                 start web companion interface
+  --port <number>       web server port (default: 3000)
   -h, --help            display help for command
 ```
 
@@ -75,8 +80,18 @@ Options:
 - Never loses context between sessions
 - Query conversation history with `/memory`
 
-## Example Session
+### 🌐 **Web Companion Interface**
+- **Real-time Dashboard**: Live view of AI conversations and tool execution
+- **Project Browser**: Navigate and view project files with syntax highlighting
+- **Activity Timeline**: Visual timeline of all agent activities and tool calls
+- **Agent Orchestration**: Monitor agent handoffs and specialization
+- **WebSocket Streaming**: Real-time updates without page refresh
+- **System Metrics**: Performance monitoring and resource usage
+- **Dual Interface**: Use both console and web interface simultaneously
 
+## Example Sessions
+
+### Console Interface
 ```
 🧵 Lace - Your lightweight agentic coding environment
 Starting session: session-1749094234634
@@ -91,8 +106,6 @@ I'll help you list the files in the current directory.
 📄 README.md
 📄 SPEC.md
 📄 ARCHITECTURE.md
-📄 test-integration.js
-📄 test-live.js
 
 Tool calls executed:
   file_list({"path":"."})
@@ -106,29 +119,31 @@ Here's the sequence up to the 10th position:
 [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55]
 
 Tool calls executed:
-  javascript_evaluate({"code":"function fib(n) { if (n <= 1) return n; let a = 0, b = 1; for (let i = 2; i <= n; i++) { [a, b] = [b, a + b]; } return b; } [fib(10), Array.from({length: 11}, (_, i) => fib(i))]"})
-
-lace> plan a simple web server in Node.js
-I'll create a comprehensive plan for building a simple web server in Node.js.
-
-# Node.js Web Server Implementation Plan
-
-## 1. Project Setup
-- Initialize npm project with `npm init`
-- Install dependencies: `express`, `cors`, `helmet` for security
-- Create basic project structure
-
-## 2. Core Server Architecture
-- **Entry Point**: `server.js` or `index.js`
-- **Routes**: Separate route handlers in `/routes` directory
-- **Middleware**: Authentication, logging, error handling
-- **Static Files**: Serve CSS, JS, images from `/public`
-
-...
+  javascript_evaluate({"code":"..."})
 
 lace> /quit
 Goodbye!
 ```
+
+### Web Companion Interface
+```bash
+# Start with web companion
+node src/cli.js --web --port 3000
+
+🧵 Lace - Your lightweight agentic coding environment
+🌐 Web companion available at http://localhost:3000
+Starting session: session-1749094234634
+Type /help for commands, /quit to exit
+
+lace> analyze this codebase
+```
+
+Then open http://localhost:3000 to see:
+- **Live Dashboard**: Real-time conversation view
+- **File Browser**: Navigate project files with syntax highlighting  
+- **Activity Timeline**: Visual tool execution and agent activity
+- **System Metrics**: Performance and usage statistics
+- **Agent Monitor**: Track agent handoffs and specializations
 
 ## Available Commands
 

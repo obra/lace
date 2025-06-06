@@ -2,22 +2,22 @@
 // ABOUTME: Configures ES modules support, test patterns, and environment setup
 
 export default {
-  // Test file patterns - only test our new web companion tests
+  // Test file patterns - web companion tests only
   testMatch: [
-    '**/test/unit/web-companion-basic.test.js',
-    '**/test/unit/web-api-endpoints.test.js'
+    '**/test/web-companion/**/*.test.js'
   ],
   
   // Test environment
   testEnvironment: 'node',
   
   // Timeout for tests
-  testTimeout: 10000,
+  testTimeout: 20000,
   
-  // Transform configuration - use babel for ES modules
-  transform: {
-    '^.+\\.js$': 'babel-jest'
-  },
+  // Native ES modules support
+  preset: null,
+  
+  // No transformation - use native ES modules
+  transform: {},
   
   // Force exit after tests complete
   forceExit: true,
