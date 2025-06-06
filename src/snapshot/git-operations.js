@@ -197,6 +197,97 @@ export class GitOperations {
   }
 
   /**
+   * Checkout a specific commit
+   */
+  async checkout(commitSha) {
+    try {
+      await this.git.checkout(commitSha);
+      return { success: true, commit: commitSha };
+    } catch (error) {
+      throw new Error(`Failed to checkout commit ${commitSha}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get working tree status
+   */
+  async getWorkingTreeStatus() {
+    try {
+      const status = await this.git.status();
+      
+      return {
+        modified: status.modified,
+        untracked: status.not_added,
+        deleted: status.deleted,
+        hasChanges: status.modified.length > 0 || status.not_added.length > 0 || status.deleted.length > 0
+      };
+    } catch (error) {
+      throw new Error(`Failed to get working tree status: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create a new branch
+   */
+  async createBranch(branchName, startPoint = null) {
+    try {
+      if (startPoint) {
+        await this.git.checkoutBranch(branchName, startPoint);
+      } else {
+        await this.git.checkoutLocalBranch(branchName);
+      }
+      return { branch: branchName, startPoint };
+    } catch (error) {
+      throw new Error(`Failed to create branch ${branchName}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get current commit SHA
+   */
+  async getCurrentCommit() {
+    try {
+      const log = await this.git.log(['-1']);
+      return log.latest?.hash || 'unknown';
+    } catch (error) {
+      throw new Error(`Failed to get current commit: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get diff files between two commits
+   */
+  async getDiffFiles(fromCommit, toCommit) {
+    try {
+      const diffSummary = await this.git.diffSummary([fromCommit, toCommit]);
+      
+      return {
+        modified: diffSummary.files.filter(f => f.changes > 0 && !f.binary).map(f => f.file),
+        added: diffSummary.files.filter(f => f.insertions > 0 && f.deletions === 0).map(f => f.file),
+        deleted: diffSummary.files.filter(f => f.deletions > 0 && f.insertions === 0).map(f => f.file),
+        totalChanges: diffSummary.files.length
+      };
+    } catch (error) {
+      throw new Error(`Failed to get diff between ${fromCommit} and ${toCommit}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Restore specific files from a commit
+   */
+  async restoreFiles(commitSha, filePaths) {
+    try {
+      for (const filePath of filePaths) {
+        await this.git.checkout([commitSha, '--', filePath]);
+      }
+      
+      return { restoredFiles: filePaths, commit: commitSha };
+    } catch (error) {
+      throw new Error(`Failed to restore files from ${commitSha}: ${error.message}`);
+    }
+  }
+
+  /**
    * Check if git is available in the system
    */
   async isGitAvailable() {
