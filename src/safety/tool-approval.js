@@ -9,6 +9,7 @@ export class ToolApprovalManager {
     this.autoApproveTools = new Set(options.autoApproveTools || []);
     this.alwaysDenyTools = new Set(options.alwaysDenyTools || []);
     this.interactive = options.interactive !== false; // Default to interactive
+    this.uiCallback = options.uiCallback || null; // UI callback for modal approval
   }
 
 
@@ -33,7 +34,12 @@ export class ToolApprovalManager {
 
     // Interactive approval if enabled
     if (this.interactive) {
-      return await this.interactiveApproval(toolCall, context);
+      // Use UI modal if available, otherwise fall back to console
+      if (this.uiCallback) {
+        return await this.uiModalApproval(toolCall, context);
+      } else {
+        return await this.interactiveApproval(toolCall, context);
+      }
     }
 
     // Default to deny if no interactive mode
@@ -175,6 +181,16 @@ export class ToolApprovalManager {
     });
 
     return { comment };
+  }
+
+  async uiModalApproval(toolCall, context = {}) {
+    const riskLevel = this.assessRisk(toolCall);
+    const result = await this.uiCallback(toolCall, riskLevel, context);
+    return result;
+  }
+
+  setUICallback(callback) {
+    this.uiCallback = callback;
   }
 
   assessRisk(toolCall) {

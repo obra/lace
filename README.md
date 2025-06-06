@@ -18,14 +18,19 @@ npm install
 
 ### 3. Run Lace
 ```bash
-# Interactive mode
+# Interactive mode (recommended)
 npm start
+# or
+npm run dev
 
-# Or directly
-node src/cli.js
+# Development mode with auto-restart
+npm run dev
 
 # With verbose output
-node src/cli.js --verbose
+npm start -- --verbose
+
+# Direct execution
+npx tsx src/ui/lace-cli.js
 ```
 
 ### 4. Try Some Commands
@@ -46,11 +51,39 @@ Usage: lace [options]
 Your lightweight agentic coding environment
 
 Options:
-  -V, --version         output the version number
-  -v, --verbose         enable verbose output
-  --memory-path <path>  path to conversation database (default: "./lace-memory.db")
-  -h, --help            display help for command
+  -V, --version           output the version number
+  -v, --verbose           enable verbose output
+  --memory-path <path>    path to conversation database (default: "./lace-memory.db")
+  --no-interactive        disable interactive tool approval (auto-deny dangerous tools)
+  --auto-approve <tools>  comma-separated list of tools to auto-approve
+  --deny <tools>          comma-separated list of tools to always deny
+  -h, --help              display help for command
 ```
+
+## Interface Features
+
+### 🖥️ **Rich Terminal Interface**
+- **Navigation Mode**: Use `Enter` to enter navigation, `j/k` or arrow keys to scroll
+- **Search**: Press `/` to search conversation history with real-time highlighting
+- **Filter Views**: Switch between all messages, conversation-only, or search results
+- **Agent Activities**: Collapsible sections showing tool usage and agent reasoning
+- **Status Bar**: Live token usage, model information, and navigation hints
+
+### 🎨 **Visual Enhancements**
+- **Syntax Highlighting**: Automatic code highlighting for JavaScript, Python, JSON, etc.
+- **Diff Highlighting**: File changes displayed with green additions and red deletions
+- **Streaming Text**: Watch AI responses appear character by character
+- **Performance**: Handles thousands of messages smoothly with virtual scrolling
+
+### ⌨️ **Keyboard Controls**
+- `Enter` - Submit message or enter navigation mode
+- `j/k` or `↑/↓` - Navigate messages
+- `/` - Search mode
+- `c` - Conversation filter (user/assistant only)
+- `a` - Show all messages
+- `Space` - Toggle agent activity sections
+- `Escape` - Exit current mode
+- `Ctrl+C` - Quit application
 
 ## What Lace Can Do
 

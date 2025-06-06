@@ -2,6 +2,7 @@
 // ABOUTME: Processes code blocks and applies terminal color highlighting
 
 import { highlight } from 'cli-highlight';
+import { highlightDiff } from './diff-highlight';
 
 interface CodeBlock {
   language: string;
@@ -29,6 +30,11 @@ export function detectCodeBlocks(content: string): CodeBlock[] {
 
 export function highlightCode(code: string, language: string): string {
   try {
+    // Special handling for diff blocks
+    if (language === 'diff') {
+      return highlightDiff(code);
+    }
+    
     // Use cli-highlight to apply syntax highlighting
     return highlight(code, { language, ignoreIllegals: true });
   } catch (error) {

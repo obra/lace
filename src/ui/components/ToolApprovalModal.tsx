@@ -3,7 +3,8 @@
 
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { Select } from '@inkjs/ui';
+import { Select, TextInput } from '@inkjs/ui';
+import { useInputFocus } from '../contexts/InputFocusContext';
 
 interface ToolCall {
   name: string;
@@ -31,10 +32,9 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
   onStop
 }) => {
   const [mode, setMode] = useState<'select' | 'modify' | 'comment'>('select');
-  const [modifiedParams, setModifiedParams] = useState({ ...toolCall.input });
-  const [currentParamIndex, setCurrentParamIndex] = useState(0);
+  const [modifiedParams, setModifiedParams] = useState(JSON.stringify(toolCall.input, null, 2));
   const [comment, setComment] = useState('');
-  const paramKeys = Object.keys(toolCall.input || {});
+  const { activeInput, setActiveInput, isInputActive } = useInputFocus();
   
   const options = [
     { label: 'Yes, execute as-is', value: 'approve' },
@@ -80,49 +80,26 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
     }
   };
 
-  // Handle modify and comment mode inputs
+  // Handle escape key to go back to select mode
   useInput((input, key) => {
-    if (mode === 'modify') {
-      if (key.escape || input === 'q') {
-        setMode('select');
-      } else if (key.return) {
-        const modifiedCall = { ...toolCall, input: modifiedParams };
-        onApprove(modifiedCall);
-      } else if (key.backspace || key.delete) {
-        const currentKey = paramKeys[currentParamIndex];
-        if (currentKey) {
-          const currentValue = String(modifiedParams[currentKey] || '');
-          setModifiedParams(prev => ({
-            ...prev,
-            [currentKey]: currentValue.slice(0, -1)
-          }));
-        }
-      } else if (input && !key.ctrl && !key.meta && input.length === 1) {
-        const currentKey = paramKeys[currentParamIndex];
-        if (currentKey) {
-          const currentValue = String(modifiedParams[currentKey] || '');
-          setModifiedParams(prev => ({
-            ...prev,
-            [currentKey]: currentValue + input
-          }));
-        }
-      } else if (key.tab || input === 'j' || key.downArrow) {
-        setCurrentParamIndex((prev) => (prev + 1) % paramKeys.length);
-      } else if (input === 'k' || key.upArrow) {
-        setCurrentParamIndex((prev) => (prev - 1 + paramKeys.length) % paramKeys.length);
-      }
-    } else if (mode === 'comment') {
-      if (key.escape || input === 'q') {
-        setMode('select');
-      } else if (key.return) {
-        onApprove(toolCall, comment);
-      } else if (key.backspace || key.delete) {
-        setComment(prev => prev.slice(0, -1));
-      } else if (input && !key.ctrl && !key.meta && input.length === 1) {
-        setComment(prev => prev + input);
-      }
+    if (!isInputActive('tool-approval')) return;
+    
+    if (key.escape && mode !== 'select') {
+      setMode('select');
     }
-  });
+  }, [isInputActive, mode]);
+
+  // Handle mode transitions and initial focus
+  React.useEffect(() => {
+    // Activate tool approval input when modal appears
+    setActiveInput('tool-approval');
+  }, [setActiveInput]);
+
+  React.useEffect(() => {
+    if (mode !== 'select') {
+      setActiveInput('tool-approval');
+    }
+  }, [mode, setActiveInput]);
 
   return (
     <Box
@@ -177,26 +154,37 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
       {mode === 'select' && (
         <Box flexDirection="column">
           <Text bold color="blue" marginBottom={1}>Choose an action:</Text>
-          <Select options={options} onChange={handleSelectChange} />
+          <Select 
+            options={options} 
+            onChange={handleSelectChange}
+            isDisabled={!isFocused}
+          />
         </Box>
       )}
 
       {mode === 'modify' && (
         <>
           <Box flexDirection="column">
-            <Text bold color="blue" marginBottom={1}>Modify Parameters:</Text>
-            {paramKeys.map((key, index) => (
-              <Box key={key} marginBottom={1}>
-                <Text color={index === currentParamIndex ? 'yellow' : 'white'}>
-                  {index === currentParamIndex ? '→ ' : '  '}
-                  {key}: {String(modifiedParams[key] || '')}
-                  {index === currentParamIndex ? '|' : ''}
-                </Text>
-              </Box>
-            ))}
+            <Text bold color="blue" marginBottom={1}>Modify Parameters (JSON):</Text>
+            <TextInput
+              value={modifiedParams}
+              onChange={setModifiedParams}
+              onSubmit={(value) => {
+                try {
+                  const parsed = JSON.parse(value);
+                  const modifiedCall = { ...toolCall, input: parsed };
+                  onApprove(modifiedCall);
+                } catch (error) {
+                  // Invalid JSON, just use original
+                  onApprove(toolCall);
+                }
+              }}
+              isDisabled={!isInputActive('tool-approval')}
+              placeholder="Enter JSON parameters..."
+            />
           </Box>
           <Box justifyContent="center" marginTop={1}>
-            <Text color="dim">↑/↓ to navigate, type to edit, Enter to approve, Esc to cancel</Text>
+            <Text color="dim">Edit JSON, Enter to approve, Esc to cancel</Text>
           </Box>
         </>
       )}
@@ -205,9 +193,13 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
         <>
           <Box flexDirection="column">
             <Text bold color="blue" marginBottom={1}>Add Comment:</Text>
-            <Box borderStyle="single" borderColor="yellow" padding={1}>
-              <Text>{comment}|</Text>
-            </Box>
+            <TextInput
+              value={comment}
+              onChange={setComment}
+              onSubmit={(value) => onApprove(toolCall, value)}
+              isDisabled={!isInputActive('tool-approval')}
+              placeholder="Enter your comment..."
+            />
           </Box>
           <Box justifyContent="center" marginTop={1}>
             <Text color="dim">Type your comment, Enter to approve with comment, Esc to cancel</Text>

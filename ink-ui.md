@@ -321,7 +321,7 @@ const mockConversation = [
 
 ---
 
-### Step 11: Improved Status Bar
+### Step 11: Improved Status Bar ✅ COMPLETE
 **Goal**: Rich status information display
 
 **Features**:
@@ -334,9 +334,18 @@ const mockConversation = [
 
 **Acceptance**: All status info fits and updates correctly
 
+**Implementation Notes**:
+- Added TokenUsage interface and new StatusBarProps (tokenUsage, modelName, terminalWidth)
+- formatTokens utility converts large numbers to K-notation (15.6k/128k)
+- Responsive layout logic: <80 chars = narrow, ≥120 chars = wide with full info
+- Token usage displays with blue styling, model name with green styling
+- Maintains all existing navigation, search, and filter functionality
+- 5 comprehensive new tests following TDD approach, all 107 tests passing
+- Updated integration tests for new JSX structure compatibility
+
 ---
 
-### Step 12: Streaming Text Support
+### Step 12: Streaming Text Support ✅ COMPLETE
 **Goal**: Display text as it streams in (preparation for real LLM)
 
 **Features**:
@@ -347,11 +356,23 @@ const mockConversation = [
 
 **Acceptance**: Long responses stream without flickering
 
+**Implementation Notes**:
+- Added `streaming` message type with `isStreaming` prop to Message component
+- Implemented character-by-character streaming with 50ms intervals for smooth effect
+- Added white cursor indicator (▌) that appears during streaming
+- StatusBar shows "Streaming..." status with yellow styling during text generation
+- State progression: loading → streaming → complete (assistant message)
+- Prevents input during streaming to avoid conflicts
+- Streaming messages support syntax highlighting and search highlighting
+- Auto-conversion to assistant message when streaming completes
+- 10 comprehensive automated tests verify all streaming functionality
+- All 117 tests passing, no regressions introduced
+
 ---
 
 ## Phase 5: Real Integration
 
-### Step 13: Connect to Lace Backend
+### Step 13: Connect to Lace Backend ✅ COMPLETE
 **Goal**: Replace mock responses with real lace conversation system
 
 **Features**:
@@ -362,9 +383,18 @@ const mockConversation = [
 
 **Acceptance**: Full integration with existing lace system
 
+**Implementation Notes**:
+- Created LaceUI class to bridge lace backend and Ink UI components
+- Real agent response handling through LaceUI.handleMessage() with streaming support
+- Token usage and model name display in status bar from actual agent responses
+- Agent activity tracking with foldable sections for tool calls and results
+- Comprehensive error handling for aborts, failures, and network issues
+- 11 integration tests covering real backend scenarios, all 128 tests passing
+- Proper separation between production code and test mocks
+
 ---
 
-### Step 14: Diff Highlighting
+### Step 14: Diff Highlighting ✅ COMPLETE
 **Goal**: Show file changes with before/after highlighting
 
 **Dependencies**: `jsdiff`, custom diff renderer
@@ -378,9 +408,20 @@ const mockConversation = [
 
 **Acceptance**: Code changes are easy to read and understand
 
+**Implementation Notes**:
+- Added jsdiff dependency for diff parsing and highlighting utilities
+- Created diff-highlight.ts utility with highlightDiff() function for ANSI color codes
+- Integrated diff highlighting into existing syntax-highlight.ts system
+- Special handling for ```diff code blocks with green/red color coding
+- Preserves diff formatting, indentation, and headers (---, +++, @@)
+- Graceful fallback for malformed diff content without crashing
+- Context lines remain uncolored, addition lines green, deletion lines red
+- 10 comprehensive tests covering all diff scenarios and edge cases
+- All 138 tests passing, no regressions introduced
+
 ---
 
-### Step 15: Performance & Memory
+### Step 15: Performance & Memory ✅ COMPLETE
 **Goal**: Handle long conversations efficiently
 
 **Features**:
@@ -391,5 +432,16 @@ const mockConversation = [
 **Test**: UI remains responsive with 1000+ messages
 
 **Acceptance**: No memory leaks or performance degradation
+
+**Implementation Notes**:
+- Implemented virtual scrolling with configurable window size (default 50 messages)
+- Only renders messages around current scroll position for large conversations (>50 messages)
+- Maintains correct highlighting and search functionality with virtual scrolling
+- Added getVisibleMessageWindow() function to calculate visible message slice
+- Performance testing with 1000+ messages shows consistent render times <50ms
+- Proper handling of absolute vs relative message indices for search results
+- Memory cleanup punt decision: not needed with virtual scrolling efficiency gains
+- 10 comprehensive performance tests covering large conversations, navigation, search
+- All 148 tests passing, virtual scrolling dramatically improves performance
 
 ---

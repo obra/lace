@@ -14,6 +14,7 @@ interface StatusBarProps {
   scrollPosition?: number;
   totalMessages?: number;
   isLoading?: boolean;
+  isStreaming?: boolean;
   filterMode?: 'all' | 'conversation' | 'search';
   searchTerm?: string;
   isSearchMode?: boolean;
@@ -29,6 +30,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   scrollPosition = 0, 
   totalMessages = 0,
   isLoading = false,
+  isStreaming = false,
   filterMode = 'all',
   searchTerm = '',
   isSearchMode = false,
@@ -119,6 +121,12 @@ const StatusBar: React.FC<StatusBarProps> = ({
           <Text color="yellow">Thinking...</Text>
           <Text> | </Text>
           <Text color="dim">Please wait</Text>
+        </>
+      ) : isStreaming ? (
+        <>
+          <Text color="yellow">Streaming...</Text>
+          <Text> | </Text>
+          <Text color="dim">Generating response</Text>
         </>
       ) : (
         <>

@@ -17,13 +17,47 @@ interface ConversationViewProps {
   scrollPosition?: number;
   isNavigationMode?: boolean;
   messages?: Array<{
-    type: 'user' | 'assistant' | 'loading' | 'agent_activity';
+    type: 'user' | 'assistant' | 'loading' | 'agent_activity' | 'streaming';
     content: string | string[];
     summary?: string;
     folded?: boolean;
+    isStreaming?: boolean;
   }>;
   searchTerm?: string;
   searchResults?: { messageIndex: number; message: any }[];
+}
+
+/**
+ * Calculate the visible window of messages for virtual scrolling
+ * Only renders messages around the current scroll position to improve performance
+ */
+function getVisibleMessageWindow(
+  messages: any[], 
+  scrollPosition: number, 
+  windowSize: number = 50
+) {
+  // For small conversations, render all messages
+  if (messages.length <= windowSize) {
+    return {
+      visibleMessages: messages,
+      startIndex: 0,
+      endIndex: messages.length - 1
+    };
+  }
+
+  // Calculate window bounds around scroll position
+  const halfWindow = Math.floor(windowSize / 2);
+  const startIndex = Math.max(0, scrollPosition - halfWindow);
+  const endIndex = Math.min(messages.length - 1, scrollPosition + halfWindow);
+  
+  // Extract visible slice
+  const visibleMessages = messages.slice(startIndex, endIndex + 1);
+  
+  return {
+    visibleMessages,
+    startIndex,
+    endIndex
+  };
 }
 
 const ConversationView: React.FC<ConversationViewProps> = ({ 
@@ -33,20 +67,25 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   searchTerm = '',
   searchResults = []
 }) => {
+  // Use virtual scrolling for large conversations
+  const { visibleMessages, startIndex } = getVisibleMessageWindow(messages, scrollPosition);
+  
   return (
     <Box flexDirection="column" flexGrow={1} padding={1}>
-      {messages.map((message, index) => {
-        const isSearchResult = searchResults.some(result => result.messageIndex === index);
+      {visibleMessages.map((message, relativeIndex) => {
+        const absoluteIndex = startIndex + relativeIndex;
+        const isSearchResult = searchResults.some(result => result.messageIndex === absoluteIndex);
         return (
           <Message 
-            key={`message-${index}-${message.type}`} 
+            key={`message-${absoluteIndex}-${message.type}`} 
             type={message.type} 
             content={message.content}
             summary={message.summary}
             folded={message.folded}
-            isHighlighted={isNavigationMode && index === scrollPosition}
+            isHighlighted={isNavigationMode && absoluteIndex === scrollPosition}
             searchTerm={searchTerm}
             isSearchResult={isSearchResult}
+            isStreaming={message.isStreaming}
           />
         );
       })}

@@ -2,13 +2,14 @@
 // ABOUTME: Implements full-window layout with ConversationView, StatusBar, and InputBar
 
 import React, { useState, useEffect, useRef } from 'react';
-// @ts-expect-error - useInput and useStdout are available at runtime but TypeScript has module resolution issues
-import { Box, useInput, useStdout } from 'ink';
+// @ts-expect-error - useStdout is available at runtime but TypeScript has module resolution issues
+import { Box, useStdout } from 'ink';
 // Remove fullscreen-ink import from here - will be used in lace-ui.ts instead
 import ConversationView from './components/ConversationView';
 import StatusBar from './components/StatusBar';
-import InputBar from './components/InputBar';
+import TextEditorInput from './components/TextEditorInput';
 import ToolApprovalModal from './components/ToolApprovalModal';
+import { useInput, useFocus, useFocusManager } from 'ink';
 
 type ConversationMessage = 
   | { type: 'user'; content: string }
@@ -21,8 +22,9 @@ interface AppProps {
   laceUI?: any; // LaceUI instance passed from parent
 }
 
-const App: React.FC<AppProps> = ({ laceUI }) => {
+const AppInner: React.FC<AppProps> = ({ laceUI }) => {
   const { stdout } = useStdout();
+  const { focus } = useFocusManager();
   const [isNavigationMode, setIsNavigationMode] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [inputText, setInputText] = useState('');
@@ -115,9 +117,9 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
   const searchResults = isSearchMode ? findSearchResults(conversation, searchTerm) : [];
   const totalMessages = filteredConversation.length;
 
-  const submitMessage = async () => {
-    if (inputText.trim() && !isLoading && !isStreaming && laceUI) {
-      const userInput = inputText.trim();
+  const submitMessage = async (inputValue?: string) => {
+    const userInput = (inputValue || inputText).trim();
+    if (userInput && !isLoading && !isStreaming && laceUI) {
       
       // Add user message
       setConversation(prev => [...prev, { type: 'user' as const, content: userInput }]);
@@ -223,6 +225,8 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
       };
       toolApprovalRequest.resolve(result);
       setToolApprovalRequest(null);
+      // Return focus to text editor
+      focus('text-editor');
     }
   };
 
@@ -235,6 +239,8 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
       };
       toolApprovalRequest.resolve(result);
       setToolApprovalRequest(null);
+      // Return focus to text editor
+      focus('text-editor');
     }
   };
 
@@ -248,15 +254,14 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
       };
       toolApprovalRequest.resolve(result);
       setToolApprovalRequest(null);
+      // Return focus to text editor
+      focus('text-editor');
     }
   };
 
+  // Global input handlers using regular useInput hook
   useInput((input, key) => {
-    // If tool approval modal is open, let it handle input
-    if (toolApprovalRequest) {
-      return;
-    }
-
+    // Global Ctrl+C handler (always active)
     if (key.ctrl && input === 'c') {
       setCtrlCCount(prev => prev + 1);
       
@@ -277,84 +282,24 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
         // Second Ctrl+C - exit immediately
         process.exit(0);
       }
-      return;
+      return; // Always handle Ctrl+C
     }
 
-    if (isSearchMode) {
-      // Search mode: handle search input and navigation
+    // Navigation mode handlers (only when navigation is active)
+    if (isNavigationMode && !toolApprovalRequest) {
       if (key.escape || input === 'q') {
-        // Escape or q to exit search mode
-        setIsSearchMode(false);
-        setSearchTerm('');
-        setFilterMode('all');
-        setSearchResultIndex(0);
-      } else if (key.return) {
-        // Enter to execute search
-        if (searchTerm.trim()) {
-          setFilterMode('search');
-          setIsSearchMode(false);
-          setIsNavigationMode(true);
-          setScrollPosition(0);
-        }
-      } else if (key.backspace || key.delete) {
-        // Handle backspace in search
-        setSearchTerm(prev => prev.slice(0, -1));
-      } else if (input && !key.ctrl && !key.meta && input.length === 1) {
-        // Handle character input in search
-        setSearchTerm(prev => prev + input);
-      } else if (input === 'n' && searchResults.length > 0) {
-        // Navigate to next search result
-        setSearchResultIndex(prev => (prev + 1) % searchResults.length);
-        const nextResult = searchResults[(searchResultIndex + 1) % searchResults.length];
-        setScrollPosition(nextResult.messageIndex);
-      } else if (input === 'N' && searchResults.length > 0) {
-        // Navigate to previous search result
-        setSearchResultIndex(prev => (prev - 1 + searchResults.length) % searchResults.length);
-        const prevResult = searchResults[(searchResultIndex - 1 + searchResults.length) % searchResults.length];
-        setScrollPosition(prevResult.messageIndex);
-      }
-    } else if (!isNavigationMode && !isLoading && !isStreaming) {
-      // Input mode: handle text input and submission (disabled during loading/streaming)
-      if (key.return) {
-        if (inputText.trim()) {
-          // Submit message if input has content
-          submitMessage();
-        } else {
-          // Enter navigation mode if input is empty
-          setIsNavigationMode(true);
-          setScrollPosition(0);
-        }
-      } else if (key.backspace || key.delete) {
-        // Handle backspace/delete
-        setInputText(prev => prev.slice(0, -1));
-      } else if (input && !key.ctrl && !key.meta && input.length === 1) {
-        // Handle regular character input
-        setInputText(prev => prev + input);
-      }
-    } else if (!isNavigationMode && (isLoading || isStreaming)) {
-      // During loading/streaming, only allow entering navigation mode with empty input
-      if (key.return && !inputText.trim()) {
-        setIsNavigationMode(true);
-        setScrollPosition(0);
-      }
-    } else {
-      // Navigation mode
-      if (key.escape) {
-        // Escape to exit navigation mode
+        // Exit navigation mode
         setIsNavigationMode(false);
         setScrollPosition(0);
-      } else if (input === 'q') {
-        // q key as alternative to escape (vim-style)
-        setIsNavigationMode(false);
-        setScrollPosition(0);
+        setActiveInput('text-editor');
       } else if (input === 'j' || key.downArrow) {
-        // j or down arrow to scroll down
+        // Scroll down
         setScrollPosition(prev => Math.min(prev + 1, totalMessages - 1));
       } else if (input === 'k' || key.upArrow) {
-        // k or up arrow to scroll up
+        // Scroll up
         setScrollPosition(prev => Math.max(prev - 1, 0));
       } else if (input === ' ') {
-        // Space key to toggle fold state of current message
+        // Toggle fold state
         const currentMessage = filteredConversation[scrollPosition];
         if (currentMessage && currentMessage.type === 'agent_activity') {
           setConversation(prev => prev.map((msg, index) => 
@@ -364,31 +309,45 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
           ));
         }
       } else if (input === 'c') {
-        // c key for conversation-only mode
+        // Conversation filter mode
         setFilterMode('conversation');
         setScrollPosition(0);
       } else if (input === 'a') {
-        // a key for show-all mode
+        // Show all mode
         setFilterMode('all');
         setScrollPosition(0);
       } else if (input === '/') {
-        // / key to enter search mode
+        // Enter search mode
         setIsSearchMode(true);
         setSearchTerm('');
         setIsNavigationMode(false);
+        focus('search-input');
       } else if (input === 'n' && filterMode === 'search' && searchResults.length > 0) {
-        // n key to navigate to next search result
+        // Next search result
         setSearchResultIndex(prev => (prev + 1) % searchResults.length);
         const nextResult = searchResults[(searchResultIndex + 1) % searchResults.length];
         setScrollPosition(nextResult.messageIndex);
       } else if (input === 'N' && filterMode === 'search' && searchResults.length > 0) {
-        // N key to navigate to previous search result  
+        // Previous search result  
         setSearchResultIndex(prev => (prev - 1 + searchResults.length) % searchResults.length);
         const prevResult = searchResults[(searchResultIndex - 1 + searchResults.length) % searchResults.length];
         setScrollPosition(prevResult.messageIndex);
       }
+      return; // Navigation mode consumes all input
     }
   });
+
+  // Handle mode transitions with proper focus coordination
+  useEffect(() => {
+    if (toolApprovalRequest) {
+      // Tool approval has highest priority
+      focus('tool-approval');
+    } else if (isSearchMode) {
+      focus('search-input');
+    } else {
+      focus('text-editor');
+    }
+  }, [isSearchMode, toolApprovalRequest, focus]);
 
   return (
     <Box flexDirection="column" flexGrow={1}>
@@ -414,11 +373,32 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
         modelName={modelName}
         terminalWidth={stdout.columns || 100}
       />
-      <InputBar 
-        isNavigationMode={isNavigationMode} 
-        inputText={isSearchMode ? searchTerm : inputText}
-        showCursor={true}
-        isSearchMode={isSearchMode}
+      <TextEditorInput 
+        value={isSearchMode ? searchTerm : inputText}
+        placeholder={isSearchMode ? 'Search...' : 'Type your message...'}
+        focusId={isSearchMode ? 'search-input' : 'text-editor'}
+        autoFocus={!isSearchMode}
+        onSubmit={isSearchMode ? 
+          (searchValue) => {
+            if (searchValue.trim()) {
+              setFilterMode('search');
+              setIsSearchMode(false);
+              setIsNavigationMode(true);
+              setScrollPosition(0);
+            }
+          } : 
+          submitMessage
+        }
+        onChange={isSearchMode ? setSearchTerm : setInputText}
+        onCommandCompletion={(prefix) => {
+          // Use single source of truth from console command registry
+          return laceUI ? laceUI.getCommandCompletions(prefix) : [];
+        }}
+        onFileCompletion={async (prefix) => {
+          // Use real file system completion via file tool
+          return laceUI ? await laceUI.getFileCompletions(prefix) : [];
+        }}
+        history={conversation.filter(msg => msg.type === 'user').map(msg => msg.content).slice(-10)}
       />
       
       {/* Tool Approval Modal */}
@@ -436,6 +416,11 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
       )}
     </Box>
   );
+};
+
+// Main App component using Ink's built-in focus management
+const App: React.FC<AppProps> = (props) => {
+  return <AppInner {...props} />;
 };
 
 export default App;
