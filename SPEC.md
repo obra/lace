@@ -27,6 +27,45 @@
 4. **Conversation persistence** - Store and query all interactions
 5. **Task tracking** - Persistent todo lists and project state
 6. **Basic text search** - Find content across files
+7. **Snapshot safety net** - Development-time safety with automatic project state capture
+
+### Snapshot Safety Net System ✅ COMPLETE
+**Development-time safety net using separate git repository for automatic project state capture**
+
+#### Core Components (Phase 1) ✅
+- **GitOperations**: Git management with custom separate git-dir (`.lace/history-snapshot-dotgit`)
+- **SnapshotManager**: Coordinates snapshot creation, metadata, and lifecycle management
+- **Automatic Capture**: Pre/post tool execution snapshots with conversation context
+- **Manual Checkpoints**: User-initiated snapshots with descriptions
+- **Metadata System**: Rich metadata including tool context, performance metrics, conversation state
+
+#### Architecture
+```
+.lace/
+├── history-snapshot-dotgit/        # Separate git repository for snapshots
+├── snapshots/
+│   ├── index.json                  # Fast snapshot catalog
+│   └── metadata/                   # Individual snapshot metadata files
+└── snapshot-config.json           # Configuration and retention policies
+```
+
+#### Features ✅
+- **Time-travel Recovery**: Restore project to any previous state without polluting main git
+- **Configurable Retention**: Automatic cleanup based on age, count, and type
+- **Performance Optimized**: Exclusion patterns, compression, background operations
+- **Safety First**: Atomic operations, validation, preview modes
+- **Rich Context**: Captures conversation turns, tool usage, system state
+
+#### Phase 2: Context Integration ✅ COMPLETE
+- **ConversationDB Integration**: ✅ Capture conversation context and history
+- **ActivityLogger Integration**: ✅ Correlate snapshots with logged activities  
+- **ContextCapture System**: ✅ Rich metadata enrichment with conversation and activity data
+- **Semantic Enhancement**: ✅ Tool categorization, search terms, and contextual hints
+- **Graceful Degradation**: ✅ Fallback to legacy context on errors
+
+#### Phase 3: Tool Integration (Next)
+- **ToolRegistry Integration**: Automatic pre/post-tool snapshots
+- **CLI Commands**: User interface for browsing and restoring snapshots
 
 ### Context Management
 - **Tool Output Summarization**: Subagents return insights, not raw output
@@ -39,6 +78,8 @@
 - **Database**: SQLite for conversation persistence
 - **CLI Framework**: Commander.js for command parsing
 - **JavaScript Sandbox**: vm2 for safe evaluation
+- **Git Operations**: simple-git for reliable git management
+- **Testing Framework**: Node.js built-in test runner with comprehensive test harness
 - **Context Limits**: Pulled from model API, not hardcoded
 
 ## Key Principles
