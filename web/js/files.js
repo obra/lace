@@ -1,7 +1,7 @@
 // File Browser Component for Lace Web Companion
 // Displays project directory tree, file content with syntax highlighting, and git status
 
-const { useState, useEffect, useRef } = React;
+import React, { useState, useEffect, useRef } from 'react'
 
 function FileBrowser({ socket, currentSession }) {
   const [currentPath, setCurrentPath] = useState('');
@@ -375,8 +375,4 @@ function FileBrowser({ socket, currentSession }) {
 }
 
 // Export for use in main app
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = FileBrowser;
-} else {
-  window.FileBrowser = FileBrowser;
-}
+export default FileBrowser

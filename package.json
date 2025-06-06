@@ -9,7 +9,14 @@
   },
   "scripts": {
     "start": "node src/cli.js",
-    "dev": "node --watch src/cli.js",
+    "dev": "./scripts/dev.sh",
+    "dev:watch": "npm run web:build && concurrently \"npm run web:watch\" \"node --watch src/cli.js\"",
+    "web:dev": "vite web",
+    "web:build": "vite build web",
+    "web:build:silent": "VITE_SILENT=true node scripts/build-web.js",
+    "web:watch": "vite build web --watch",
+    "web:preview": "vite preview web",
+    "build": "npm run web:build",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
     "lint": "eslint src test",
@@ -35,13 +42,16 @@
   },
   "devDependencies": {
     "@jest/globals": "^30.0.0-beta.3",
+    "@vitejs/plugin-react": "^4.5.1",
+    "concurrently": "^9.1.2",
     "eslint": "^8.0.0",
     "jest": "^29.7.0",
     "node-fetch": "^3.3.2",
     "prettier": "^3.0.0",
     "socket.io-client": "^4.8.1",
     "supertest": "^7.1.1",
-    "ts-jest": "^29.1.1"
+    "ts-jest": "^29.1.1",
+    "vite": "^6.3.5"
   },
   "engines": {
     "node": ">=18.0.0"

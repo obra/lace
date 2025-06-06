@@ -1,7 +1,7 @@
 // Tool Execution Timeline Component for Lace Web Companion
 // Displays real-time tool call execution with status, timing, and results
 
-const { useState, useEffect, useRef } = React;
+import React, { useState, useEffect, useRef } from 'react'
 
 function ToolsTimeline({ socket, currentSession }) {
   const [toolEvents, setToolEvents] = useState([]);
@@ -394,8 +394,4 @@ function ToolsTimeline({ socket, currentSession }) {
 }
 
 // Export for use in main app
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = ToolsTimeline;
-} else {
-  window.ToolsTimeline = ToolsTimeline;
-}
+export default ToolsTimeline

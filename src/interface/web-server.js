@@ -65,9 +65,29 @@ export class WebServer {
   }
 
   setupRoutes() {
-    // Serve static files from web directory
+    // Serve static files from built web directory (or fallback to dev)
+    const webDistDir = path.join(__dirname, '../../web/dist');
     const webDir = path.join(__dirname, '../../web');
-    this.app.use(express.static(webDir));
+    
+    // Try to serve from dist first (production), fallback to source (development)
+    try {
+      if (require('fs').existsSync(webDistDir)) {
+        if (this.verbose) {
+          console.log(`📁 Serving web assets from: ${webDistDir}`);
+        }
+        this.app.use(express.static(webDistDir));
+      } else {
+        if (this.verbose) {
+          console.log(`📁 Serving web assets from: ${webDir} (dist not found)`);
+        }
+        this.app.use(express.static(webDir));
+      }
+    } catch (error) {
+      if (this.verbose) {
+        console.log(`📁 Serving web assets from: ${webDir} (error: ${error.message})`);
+      }
+      this.app.use(express.static(webDir));
+    }
 
     // Request validation middleware
     const validateSessionId = (req, res, next) => {
