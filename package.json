@@ -10,7 +10,8 @@
   "scripts": {
     "start": "node src/cli.js",
     "dev": "node --watch src/cli.js",
-    "test": "node --test test/**/*.test.js",
+    "test": "jest",
+    "test:node": "node --test test/**/*.test.js",
     "lint": "eslint src test",
     "format": "prettier --write ."
   },
@@ -22,7 +23,9 @@
     "sqlite3": "^5.1.0"
   },
   "devDependencies": {
+    "@jest/globals": "^30.0.0-beta.3",
     "eslint": "^8.0.0",
+    "jest": "^29.7.0",
     "prettier": "^3.0.0"
   },
   "engines": {

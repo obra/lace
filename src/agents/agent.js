@@ -3,6 +3,9 @@
 
 import { ActivityLogger } from '../logging/activity-logger.js';
 import { DebugLogger } from '../logging/debug-logger.js';
+import { SynthesisEngine } from '../tools/synthesis-engine.js';
+import { TokenEstimator } from '../tools/token-estimator.js';
+import { ToolResultExtractor } from '../tools/tool-result-extractor.js';
 
 // Simple semaphore for concurrency control
 class Semaphore {
@@ -55,6 +58,11 @@ export class Agent {
     
     // Parallel execution configuration
     this.maxConcurrentTools = options.maxConcurrentTools || 10;
+    
+    // Initialize synthesis utilities
+    this.synthesisEngine = new SynthesisEngine(options.synthesisConfig);
+    this.tokenEstimator = new TokenEstimator();
+    this.resultExtractor = new ToolResultExtractor();
     
     // Activity logging
     this.activityLogger = options.activityLogger || null;
@@ -219,7 +227,10 @@ export class Agent {
         const iterationToolResults = [];
         if (response.toolCalls && response.toolCalls.length > 0) {
           // Execute tools in parallel with concurrency limiting
-          const toolResults = await this.executeToolsInParallel(response.toolCalls, sessionId, response.content);
+          const rawToolResults = await this.executeToolsInParallel(response.toolCalls, sessionId, response.content);
+          
+          // Apply batch synthesis for large results
+          const toolResults = await this.synthesizeToolResultsBatch(rawToolResults, response.toolCalls, sessionId, 'Synthesize and summarize the tool output to preserve essential information while reducing token usage.');
           
           iterationToolResults.push(...toolResults);
           allToolResults.push(...toolResults);
@@ -491,24 +502,25 @@ Focus on executing your assigned task efficiently.`;
   }
 
   async synthesizeToolResponse(toolResult, toolCall, sessionId, synthesisPrompt) {
-    // Check if response needs synthesis (over 200 tokens approximately)
-    const responseText = this.extractTextFromToolResult(toolResult);
-    const estimatedTokens = Math.ceil(responseText.length / 4); // Rough token estimation
+    const responseText = this.resultExtractor.extract(toolResult);
+    const estimatedTokens = this.tokenEstimator.estimate(responseText);
     
-    if (estimatedTokens <= 200) {
+    // Get tool-specific threshold
+    const toolName = toolCall.name.split('_')[0];
+    const threshold = this.synthesisEngine.config.toolThresholds[toolName] || this.synthesisEngine.config.defaultThreshold;
+    
+    if (estimatedTokens <= threshold) {
       return toolResult; // Return as-is for short responses
     }
 
-    if (this.verbose) {
-      if (this.debugLogger) {
-        this.debugLogger.debug(`🔬 Synthesizing tool response (${estimatedTokens} estimated tokens)`);
-      }
+    if (this.verbose && this.debugLogger) {
+      this.debugLogger.debug(`🔬 Synthesizing tool response (${estimatedTokens} estimated tokens)`);
     }
 
     // Create synthesis agent
     const synthesisAgent = await this.spawnSubagent({
       role: 'synthesis',
-      assignedModel: 'claude-3-5-haiku-20241022', // Use faster model for synthesis
+      assignedModel: 'claude-3-5-haiku-20241022',
       assignedProvider: 'anthropic',
       capabilities: ['synthesis', 'summarization'],
       task: `Synthesize tool response for ${toolCall.name}`
@@ -525,7 +537,6 @@ ${responseText}`;
     try {
       const synthesisResponse = await synthesisAgent.generateResponse(sessionId, fullPrompt);
       
-      // Return synthesized result with original data preserved
       return {
         ...toolResult,
         synthesized: true,
@@ -533,30 +544,75 @@ ${responseText}`;
         summary: synthesisResponse.content
       };
     } catch (error) {
-      if (this.verbose) {
-        if (this.debugLogger) {
-          this.debugLogger.warn(`⚠️ Tool synthesis failed: ${error.message}, using original result`);
-        }
+      if (this.verbose && this.debugLogger) {
+        this.debugLogger.warn(`⚠️ Tool synthesis failed: ${error.message}, using original result`);
       }
-      return toolResult; // Fallback to original result
+      return toolResult;
+    }
+  }
+
+  async synthesizeToolResultsBatch(toolResults, toolCalls, sessionId, synthesisPrompt) {
+    return await this.synthesisEngine.processSynthesis(toolResults, toolCalls, {
+      individual: (result, call) => this.synthesizeToolResponse(result, call, sessionId, synthesisPrompt),
+      batch: (batch) => this.synthesizeMultipleToolResults(batch, sessionId, synthesisPrompt)
+    });
+  }
+
+  async synthesizeMultipleToolResults(toolBatch, sessionId, synthesisPrompt) {
+    if (toolBatch.length === 0) return [];
+
+    // Create synthesis agent for batch processing
+    const synthesisAgent = await this.spawnSubagent({
+      role: 'batch_synthesis',
+      assignedModel: 'claude-3-5-haiku-20241022',
+      assignedProvider: 'anthropic', 
+      capabilities: ['synthesis', 'summarization', 'analysis'],
+      task: `Batch synthesize ${toolBatch.length} parallel tool results`
+    });
+
+    // Use synthesis engine to create enhanced batch prompt
+    const batchPrompt = this.synthesisEngine.createBatchPrompt(toolBatch, synthesisPrompt);
+
+    try {
+      const synthesisResponse = await synthesisAgent.generateResponse(sessionId, batchPrompt);
+      
+      // Parse response using synthesis engine
+      const summaries = this.synthesisEngine.parseBatchSynthesis(synthesisResponse.content, toolBatch.length);
+      const totalTokens = toolBatch.reduce((sum, item) => sum + item.tokens, 0);
+
+      // Return synthesized results with enhanced metadata
+      return toolBatch.map((item, index) => ({
+        ...item.result,
+        synthesized: true,
+        batchSynthesized: true,
+        originalResult: item.result,
+        summary: summaries[index] || 'Synthesis failed',
+        batchContext: {
+          batchSize: toolBatch.length,
+          toolIndex: index,
+          totalTokens,
+          relationships: this.synthesisEngine.analyzeRelationships(toolBatch)
+        }
+      }));
+
+    } catch (error) {
+      if (this.verbose && this.debugLogger) {
+        this.debugLogger.warn(`⚠️ Batch synthesis failed: ${error.message}, falling back to individual synthesis`);
+      }
+      
+      // Fallback to individual synthesis
+      const individualResults = [];
+      for (const item of toolBatch) {
+        const synthesized = await this.synthesizeToolResponse(item.result, item.call, sessionId, synthesisPrompt);
+        individualResults.push(synthesized);
+      }
+      return individualResults;
     }
   }
 
   extractTextFromToolResult(toolResult) {
-    if (typeof toolResult === 'string') {
-      return toolResult;
-    }
-    
-    if (toolResult.result && typeof toolResult.result === 'string') {
-      return toolResult.result;
-    }
-    
-    if (toolResult.output) {
-      return Array.isArray(toolResult.output) ? toolResult.output.join('\n') : toolResult.output;
-    }
-    
-    // Fallback to JSON stringification
-    return JSON.stringify(toolResult, null, 2);
+    // Delegate to utility class
+    return this.resultExtractor.extract(toolResult);
   }
 
   formatToolResultsForLLM(toolResults) {

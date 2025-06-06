@@ -6,6 +6,16 @@ export class TaskTool {
     this.agent = null; // Will be set when tool is called by an agent
     this.progressTracker = options.progressTracker || null;
     this.defaultTimeout = options.defaultTimeout || 300000; // 5 minutes
+    
+    // Inter-agent communication
+    this.messageQueue = new Map(); // recipientId -> messages[]
+    this.agentRelationships = new Map(); // agentId -> relationship info
+    this.maxMessageLength = options.maxMessageLength || 1000;
+    this.maxQueueSize = options.maxQueueSize || 100;
+    this.messageCleanupInterval = options.messageCleanupInterval || 3600000; // 1 hour
+    
+    // Valid message types
+    this.validMessageTypes = ['status_update', 'request_help', 'share_result', 'coordination'];
   }
 
   async initialize() {
@@ -130,6 +140,13 @@ export class TaskTool {
         assignedProvider: provider,
         capabilities,
         task
+      });
+
+      // Register the parent-child relationship
+      this.registerAgentRelationship(subagent.generation, {
+        parentId: this.agent.agentId || this.agent.generation.toString(),
+        role,
+        status: 'active'
       });
 
       // Execute the task  
@@ -275,6 +292,201 @@ export class TaskTool {
     this.progressTracker = progressTracker;
   }
 
+  async sendMessage(params) {
+    const {
+      recipientId,
+      messageType,
+      content,
+      priority = 'medium'
+    } = params;
+
+    // Validate required parameters
+    if (!recipientId || !messageType) {
+      return {
+        success: false,
+        error: 'recipientId and messageType are required'
+      };
+    }
+
+    // Validate message type
+    if (!this.validMessageTypes.includes(messageType)) {
+      return {
+        success: false,
+        error: `Invalid message type. Must be one of: ${this.validMessageTypes.join(', ')}`
+      };
+    }
+
+    // Validate agent context
+    if (!this.agent) {
+      return {
+        success: false,
+        error: 'TaskTool must be called from within an agent context'
+      };
+    }
+
+    try {
+      // Truncate content if too long
+      let messageContent = content || '';
+      let contentTruncated = false;
+      let originalLength = messageContent.length;
+
+      if (messageContent.length > this.maxMessageLength) {
+        messageContent = messageContent.substring(0, this.maxMessageLength);
+        contentTruncated = true;
+      }
+
+      // Generate unique message ID
+      const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const timestamp = Date.now();
+
+      // Create message object
+      const message = {
+        messageId,
+        senderId: this.agent.agentId || this.agent.generation.toString(),
+        senderRole: this.agent.role,
+        recipientId,
+        messageType,
+        content: messageContent,
+        priority,
+        timestamp,
+        read: false
+      };
+
+      // Get recipient's message queue
+      if (!this.messageQueue.has(recipientId)) {
+        this.messageQueue.set(recipientId, []);
+      }
+
+      const recipientQueue = this.messageQueue.get(recipientId);
+      
+      // Add message to queue
+      recipientQueue.push(message);
+
+      // Cleanup old messages and enforce size limits
+      this.cleanupMessageQueue(recipientId);
+
+      return {
+        success: true,
+        messageId,
+        senderId: message.senderId,
+        recipientId,
+        messageType,
+        content: messageContent,
+        priority,
+        timestamp,
+        contentTruncated,
+        originalLength: contentTruncated ? originalLength : messageContent.length
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  async receiveMessages(params = {}) {
+    const {
+      messageType = null,
+      limit = 50,
+      markAsRead = false
+    } = params;
+
+    if (!this.agent) {
+      return {
+        success: false,
+        error: 'TaskTool must be called from within an agent context'
+      };
+    }
+
+    try {
+      // Handle corrupted message queue
+      if (!this.messageQueue || !(this.messageQueue instanceof Map)) {
+        this.messageQueue = new Map();
+        return {
+          success: true,
+          messages: [],
+          unreadCount: 0,
+          totalMessages: 0,
+          error: 'Message queue corrupted, reset to empty state'
+        };
+      }
+
+      const agentId = this.agent.agentId || this.agent.generation.toString();
+      
+      // Cleanup old messages for this agent when retrieving
+      this.cleanupMessageQueue(agentId);
+      
+      const messages = this.messageQueue.get(agentId) || [];
+
+      // Filter by message type if specified
+      let filteredMessages = messages;
+      if (messageType) {
+        filteredMessages = messages.filter(msg => msg.messageType === messageType);
+      }
+
+      // Sort by timestamp (newest first)
+      filteredMessages.sort((a, b) => b.timestamp - a.timestamp);
+
+      // Apply limit
+      const limitedMessages = filteredMessages.slice(0, limit);
+
+      // Count unread messages BEFORE marking as read
+      const unreadCount = markAsRead ? limitedMessages.filter(msg => !msg.read).length : filteredMessages.filter(msg => !msg.read).length;
+
+      // Mark as read if requested
+      if (markAsRead) {
+        limitedMessages.forEach(msg => {
+          msg.read = true;
+        });
+      }
+
+      return {
+        success: true,
+        messages: limitedMessages,
+        unreadCount,
+        totalMessages: filteredMessages.length
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        messages: [],
+        unreadCount: 0
+      };
+    }
+  }
+
+  cleanupMessageQueue(recipientId) {
+    const queue = this.messageQueue.get(recipientId);
+    if (!queue) return;
+
+    const now = Date.now();
+    
+    // Remove old messages (older than cleanup interval)
+    const filteredMessages = queue.filter(msg => 
+      (now - msg.timestamp) < this.messageCleanupInterval
+    );
+
+    // Enforce size limit (keep most recent messages)
+    if (filteredMessages.length > this.maxQueueSize) {
+      filteredMessages.sort((a, b) => b.timestamp - a.timestamp);
+      filteredMessages.splice(this.maxQueueSize);
+    }
+
+    this.messageQueue.set(recipientId, filteredMessages);
+  }
+
+  registerAgentRelationship(agentId, relationshipInfo) {
+    this.agentRelationships.set(agentId, relationshipInfo);
+  }
+
+  getAgentRelationships() {
+    return Object.fromEntries(this.agentRelationships);
+  }
+
   getSchema() {
     return {
       name: 'task',
@@ -382,6 +594,51 @@ export class TaskTool {
               type: 'string',
               required: true,
               description: 'Specific type of help or guidance needed'
+            }
+          }
+        },
+        sendMessage: {
+          description: 'Send a message to another agent for coordination without going through coordinator',
+          parameters: {
+            recipientId: {
+              type: 'string',
+              required: true,
+              description: 'ID of the agent to send the message to'
+            },
+            messageType: {
+              type: 'string',
+              required: true,
+              description: 'Type of message: status_update, request_help, share_result, coordination'
+            },
+            content: {
+              type: 'string',
+              required: false,
+              description: 'Message content (max 1000 characters)'
+            },
+            priority: {
+              type: 'string',
+              required: false,
+              description: 'Message priority: low, medium, high (default: medium)'
+            }
+          }
+        },
+        receiveMessages: {
+          description: 'Check for incoming messages from other agents',
+          parameters: {
+            messageType: {
+              type: 'string',
+              required: false,
+              description: 'Filter by message type (optional)'
+            },
+            limit: {
+              type: 'number',
+              required: false,
+              description: 'Maximum number of messages to return (default: 50)'
+            },
+            markAsRead: {
+              type: 'boolean',
+              required: false,
+              description: 'Mark retrieved messages as read (default: false)'
             }
           }
         }
