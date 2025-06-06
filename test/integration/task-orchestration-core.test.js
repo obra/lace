@@ -111,8 +111,7 @@ describe('Task Orchestration Core Integration', () => {
     });
 
     it('should handle progress reporting', async () => {
-      const taskTool = toolRegistry.get('task');
-      taskTool.setAgent(agent);
+      const taskTool = setupTaskTool();
 
       const result = await taskTool.reportProgress({
         status: 'in_progress',
@@ -132,8 +131,7 @@ describe('Task Orchestration Core Integration', () => {
     });
 
     it('should handle help requests', async () => {
-      const taskTool = toolRegistry.get('task');
-      taskTool.setAgent(agent);
+      const taskTool = setupTaskTool();
 
       const result = await taskTool.requestHelp({
         errorDescription: 'Memory limit exceeded during processing',
@@ -338,8 +336,7 @@ describe('Task Orchestration Core Integration', () => {
     });
 
     it('should track agents needing help', async () => {
-      const taskTool = toolRegistry.get('task');
-      taskTool.setAgent(agent);
+      const taskTool = setupTaskTool();
 
       await taskTool.requestHelp({
         errorDescription: 'Database connection failed',
