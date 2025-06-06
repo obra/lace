@@ -37,11 +37,11 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
   const paramKeys = Object.keys(toolCall.input || {});
   
   const options = [
-    { label: '✅ Yes, execute as-is', value: 'approve' },
-    { label: '✏️ Yes, but modify arguments', value: 'modify' },
-    { label: '💬 Yes, with comment after', value: 'comment' },
-    { label: '❌ No, skip this tool', value: 'deny' },
-    { label: '🛑 No, stop and give instructions', value: 'stop' }
+    { label: 'Yes, execute as-is', value: 'approve' },
+    { label: 'Yes, but modify arguments', value: 'modify' },
+    { label: 'Yes, with comment after', value: 'comment' },
+    { label: 'No, skip this tool', value: 'deny' },
+    { label: 'No, stop and give instructions', value: 'stop' }
   ];
 
   const getRiskColor = (risk: string) => {
@@ -135,7 +135,7 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
     >
       {/* Header */}
       <Box justifyContent="center" marginBottom={1}>
-        <Text bold color="yellow">🔧 Tool Execution Request</Text>
+        <Text bold color="yellow">Tool Execution Request</Text>
       </Box>
 
       {/* Tool Information */}
