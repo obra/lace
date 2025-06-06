@@ -22,6 +22,18 @@ export class TaskTool {
     // No async initialization needed currently
   }
 
+  setAgent(agent) {
+    this.agent = agent;
+  }
+
+  setSessionId(sessionId) {
+    this.currentSessionId = sessionId;
+  }
+
+  setProgressTracker(progressTracker) {
+    this.progressTracker = progressTracker;
+  }
+
   async delegateTask(params) {
     const { 
       description, 

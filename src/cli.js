@@ -20,10 +20,28 @@ program
   .option('--log-level <level>', 'stderr debug output level (debug/info/warn/error/off)', 'off')
   .option('--log-file <path>', 'file path for debug log output')
   .option('--log-file-level <level>', 'file debug output level (debug/info/warn/error/off)', 'off')
+  .option('--web-port <port>', 'port for web companion interface', '3000')
   .option('--max-concurrent-tools <number>', 'maximum number of tools to execute concurrently', (value) => parseInt(value, 10), 10)
   .action(async (options) => {
     const lace = new Lace(options);
-    await lace.start();
+    
+    // Handle graceful shutdown
+    const shutdown = async () => {
+      console.log('\nShutting down gracefully...');
+      await lace.shutdown();
+      process.exit(0);
+    };
+    
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+    
+    try {
+      await lace.start();
+    } catch (error) {
+      console.error('Failed to start Lace:', error);
+      await lace.shutdown();
+      process.exit(1);
+    }
   });
 
 program.parse();

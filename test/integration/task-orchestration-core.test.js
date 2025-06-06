@@ -31,8 +31,11 @@ describe('Task Orchestration Core Integration', () => {
       })
     };
 
-    // Initialize progress tracker
-    progressTracker = new ProgressTracker();
+    // Initialize progress tracker with longer cleanup interval for testing
+    progressTracker = new ProgressTracker({ 
+      cleanupInterval: 3600000, // 1 hour - avoid cleanup during tests
+      maxAge: 7200000 // 2 hours
+    });
 
     // Initialize tool registry
     toolRegistry = new ToolRegistry({ progressTracker });
@@ -54,7 +57,7 @@ describe('Task Orchestration Core Integration', () => {
     agent.generation = 1;
   });
 
-  afterEach(() => {
+  afterAll(() => {
     // Clean up progress tracker to prevent open handles
     if (progressTracker) {
       progressTracker.destroy();
@@ -65,6 +68,7 @@ describe('Task Orchestration Core Integration', () => {
     it('should successfully delegate a task to a sub-agent', async () => {
       const taskTool = toolRegistry.get('task');
       taskTool.setAgent(agent);
+      taskTool.setProgressTracker(progressTracker);
       taskTool.setSessionId('test-session');
 
       const result = await taskTool.delegateTask({
