@@ -5,12 +5,14 @@
   "type": "module",
   "main": "src/index.js",
   "bin": {
-    "lace": "./src/cli.js"
+    "lace": "./src/ui/lace-cli.js",
+    "lace-ink": "./src/ui/lace-cli.js"
   },
   "scripts": {
-    "start": "node src/cli.js",
-    "ui": "tsx src/ui/index.tsx",
-    "dev": "node --watch src/cli.js",
+    "start": "tsx src/ui/lace-cli.js",
+    "dev": "tsx --watch src/ui/lace-cli.js",
+    "ui": "tsx src/ui/lace-cli.js",
+    "old-cli": "node src/cli.js",
     "test": "jest",
     "lint": "eslint src test",
     "format": "prettier --write .",
@@ -21,7 +23,10 @@
     "chalk": "^5.3.0",
     "cli-highlight": "^2.1.11",
     "commander": "^12.0.0",
+    "fullscreen-ink": "^0.0.2",
     "ink": "^6.0.0",
+    "ink-spinner": "^5.0.0",
+    "jsdiff": "^1.1.1",
     "prompts": "^2.4.2",
     "react": "^19.0.0",
     "sqlite3": "^5.1.0"

@@ -3,17 +3,20 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
+// @ts-expect-error - ink-spinner types may have module resolution issues  
+import Spinner from 'ink-spinner';
 import { processContentWithHighlighting } from '../utils/syntax-highlight';
 import { highlightSearchTerm } from '../utils/search-highlight';
 
 interface MessageProps {
-  type: 'user' | 'assistant' | 'loading' | 'agent_activity';
+  type: 'user' | 'assistant' | 'loading' | 'agent_activity' | 'streaming';
   content: string | string[];
   summary?: string;
   folded?: boolean;
   isHighlighted?: boolean;
   searchTerm?: string;
   isSearchResult?: boolean;
+  isStreaming?: boolean;
 }
 
 const Message: React.FC<MessageProps> = ({ 
@@ -23,11 +26,13 @@ const Message: React.FC<MessageProps> = ({
   folded = false, 
   isHighlighted = false,
   searchTerm = '',
-  isSearchResult = false
+  isSearchResult = false,
+  isStreaming = false
 }) => {
   const getPrefix = () => {
     if (type === 'user') return '> ';
     if (type === 'assistant') return '🤖 ';
+    if (type === 'streaming') return '🤖 ';
     if (type === 'loading') return '⠋ ';
     if (type === 'agent_activity') return folded ? '▶ ' : '▼ ';
     return '';
@@ -36,6 +41,7 @@ const Message: React.FC<MessageProps> = ({
   const getPrefixColor = () => {
     if (type === 'user') return 'cyan';
     if (type === 'assistant') return 'green';
+    if (type === 'streaming') return 'green';
     if (type === 'loading') return 'yellow';
     if (type === 'agent_activity') return 'blue';
     return 'white';
@@ -77,9 +83,20 @@ const Message: React.FC<MessageProps> = ({
           </Box>
         );
       }
+    } else if (type === 'loading') {
+      // Loading message with spinner
+      return (
+        <Box>
+          <Text color={prefixColor}>{prefix}</Text>
+          {/* @ts-expect-error - inverse prop exists in runtime but TypeScript is having issues */}
+          <Text inverse={isHighlighted}>
+            <Spinner type="hearts" /> {content}
+          </Text>
+        </Box>
+      );
     } else {
-      // Regular message types (user, assistant, loading)
-      let displayContent = type === 'assistant' && typeof content === 'string' 
+      // Regular message types (user, assistant, streaming)
+      let displayContent = (type === 'assistant' || type === 'streaming') && typeof content === 'string' 
         ? processContentWithHighlighting(content)
         : content;
       
@@ -87,12 +104,18 @@ const Message: React.FC<MessageProps> = ({
       if (searchTerm && typeof displayContent === 'string') {
         displayContent = highlightSearchTerm(displayContent, searchTerm);
       }
+      
+      // Add cursor indicator for streaming messages
+      const showCursor = type === 'streaming' && isStreaming;
         
       return (
         <Box>
           <Text color={prefixColor}>{prefix}</Text>
           {/* @ts-expect-error - inverse prop exists in runtime but TypeScript is having issues */}
           <Text inverse={isHighlighted}>{displayContent}</Text>
+          {showCursor && (
+            <Text color="white">▌</Text>
+          )}
         </Box>
       );
     }

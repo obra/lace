@@ -3,6 +3,7 @@
 
 import { render } from 'ink';
 import React from 'react';
+import { withFullScreen } from 'fullscreen-ink';
 import { ConversationDB } from '../database/conversation-db.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { Agent } from '../agents/agent.js';
@@ -109,8 +110,9 @@ export class LaceUI {
       capabilities: ['orchestration', 'reasoning', 'planning', 'delegation']
     });
 
-    // Start the Ink UI and pass this LaceUI instance
-    this.app = render(React.createElement(App, { laceUI: this }));
+    // Start the fullscreen Ink UI and pass this LaceUI instance
+    const fullscreenApp = withFullScreen(React.createElement(App, { laceUI: this }));
+    this.app = await fullscreenApp.start();
 
     return this.app;
   }
@@ -231,6 +233,12 @@ export class LaceUI {
     });
     
     return this.primaryAgent;
+  }
+
+  setToolApprovalUICallback(callback) {
+    if (this.toolApproval && this.toolApproval.setUICallback) {
+      this.toolApproval.setUICallback(callback);
+    }
   }
 
   getStatus() {

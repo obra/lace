@@ -4,9 +4,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 // @ts-expect-error - useInput and useStdout are available at runtime but TypeScript has module resolution issues
 import { Box, useInput, useStdout } from 'ink';
+// Remove fullscreen-ink import from here - will be used in lace-ui.ts instead
 import ConversationView from './components/ConversationView';
 import StatusBar from './components/StatusBar';
 import InputBar from './components/InputBar';
+import ToolApprovalModal from './components/ToolApprovalModal';
 
 type ConversationMessage = 
   | { type: 'user'; content: string }
@@ -36,8 +38,14 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
   const streamingRef = useRef<{ content: string }>({ content: '' });
   const [ctrlCCount, setCtrlCCount] = useState(0);
   const ctrlCTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [toolApprovalRequest, setToolApprovalRequest] = useState<{
+    toolCall: any;
+    riskLevel: 'low' | 'medium' | 'high';
+    context?: any;
+    resolve: (result: any) => void;
+  } | null>(null);
   
-  // Setup streaming callback for laceUI
+  // Setup streaming callback and tool approval for laceUI
   useEffect(() => {
     if (laceUI) {
       laceUI.uiRef = {
@@ -55,6 +63,11 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
               };
             }
             return updated;
+          });
+        },
+        requestToolApproval: (toolCall: any, riskLevel: 'low' | 'medium' | 'high', context?: any) => {
+          return new Promise((resolve) => {
+            setToolApprovalRequest({ toolCall, riskLevel, context, resolve });
           });
         }
       };
@@ -195,7 +208,50 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
     }
   };
 
+  const handleToolApproval = (modifiedCall?: any, comment?: string) => {
+    if (toolApprovalRequest) {
+      const result = {
+        approved: true,
+        reason: comment ? 'User approved with comment' : 'User approved',
+        modifiedCall: modifiedCall || toolApprovalRequest.toolCall,
+        postExecutionComment: comment
+      };
+      toolApprovalRequest.resolve(result);
+      setToolApprovalRequest(null);
+    }
+  };
+
+  const handleToolDeny = (reason?: string) => {
+    if (toolApprovalRequest) {
+      const result = {
+        approved: false,
+        reason: reason || 'User denied',
+        modifiedCall: null
+      };
+      toolApprovalRequest.resolve(result);
+      setToolApprovalRequest(null);
+    }
+  };
+
+  const handleToolStop = () => {
+    if (toolApprovalRequest) {
+      const result = {
+        approved: false,
+        reason: 'User requested stop',
+        modifiedCall: null,
+        shouldStop: true
+      };
+      toolApprovalRequest.resolve(result);
+      setToolApprovalRequest(null);
+    }
+  };
+
   useInput((input, key) => {
+    // If tool approval modal is open, let it handle input
+    if (toolApprovalRequest) {
+      return;
+    }
+
     if (key.ctrl && input === 'c') {
       setCtrlCCount(prev => prev + 1);
       
@@ -330,7 +386,7 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
   });
 
   return (
-    <Box flexDirection="column" width={stdout.columns} height={stdout.rows}>
+    <Box flexDirection="column" flexGrow={1}>
       <ConversationView 
         scrollPosition={scrollPosition} 
         isNavigationMode={isNavigationMode} 
@@ -359,6 +415,20 @@ const App: React.FC<AppProps> = ({ laceUI }) => {
         showCursor={true}
         isSearchMode={isSearchMode}
       />
+      
+      {/* Tool Approval Modal */}
+      {toolApprovalRequest && (
+        <Box position="absolute" top={2} left={0} right={0}>
+          <ToolApprovalModal
+            toolCall={toolApprovalRequest.toolCall}
+            riskLevel={toolApprovalRequest.riskLevel}
+            context={toolApprovalRequest.context}
+            onApprove={handleToolApproval}
+            onDeny={handleToolDeny}
+            onStop={handleToolStop}
+          />
+        </Box>
+      )}
     </Box>
   );
 };
