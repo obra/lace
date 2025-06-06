@@ -266,6 +266,52 @@ export class LaceUI {
     };
   }
 
+  // Command completion using console command registry
+  getCommandCompletions(prefix: string) {
+    // Import Console to use its command registry
+    const { Console } = require('../interface/console.js');
+    const console = new Console();
+    console.currentAgent = this.primaryAgent; // Set agent for completions
+    
+    return console.getCommandCompletions(prefix);
+  }
+
+  // File completion using the file tool
+  async getFileCompletions(prefix: string) {
+    try {
+      const fileTool = this.tools.get('file');
+      if (!fileTool) {
+        return [];
+      }
+
+      // Determine directory and base name
+      const lastSlash = prefix.lastIndexOf('/');
+      const dir = lastSlash === -1 ? '.' : prefix.substring(0, lastSlash + 1);
+      const base = lastSlash === -1 ? prefix : prefix.substring(lastSlash + 1);
+
+      // List directory contents
+      const result = await fileTool.list({ path: dir === './' ? '.' : dir.replace(/\/$/, '') });
+      
+      if (!result.success) {
+        return [];
+      }
+
+      // Filter and format results
+      return result.files
+        .filter(file => file.name.startsWith(base))
+        .map(file => {
+          const fullPath = dir === '.' ? file.name : dir + file.name;
+          return {
+            value: file.isDirectory ? fullPath + '/' : fullPath,
+            description: file.isDirectory ? 'Directory' : 'File',
+            type: file.isDirectory ? 'directory' as const : 'file' as const
+          };
+        });
+    } catch (error) {
+      return [];
+    }
+  }
+
   stop() {
     if (this.app) {
       this.app.unmount();

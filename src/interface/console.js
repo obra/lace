@@ -13,6 +13,64 @@ export class Console {
     this.isProcessing = false;
     this.abortController = null;
     this.history = [];
+    this.initializeCommandRegistry();
+  }
+
+  initializeCommandRegistry() {
+    this.commands = new Map([
+      ['/help', {
+        description: 'Show help information',
+        handler: () => this.showHelp(),
+        requiresAgent: false
+      }],
+      ['/tools', {
+        description: 'List available tools',
+        handler: () => this.showTools(this.currentAgent),
+        requiresAgent: true
+      }],
+      ['/memory', {
+        description: 'Show conversation history',
+        handler: () => this.showMemory(this.currentAgent),
+        requiresAgent: true,
+        async: true
+      }],
+      ['/status', {
+        description: 'Show agent status and context usage',
+        handler: () => this.showAgentStatus(this.currentAgent),
+        requiresAgent: true
+      }],
+      ['/approval', {
+        description: 'Show tool approval settings',
+        handler: () => this.showApprovalStatus(this.currentAgent),
+        requiresAgent: true
+      }],
+      ['/quit', {
+        description: 'Exit lace',
+        handler: () => 'EXIT_REQUESTED',
+        requiresAgent: false
+      }],
+      ['/exit', {
+        description: 'Exit lace',
+        handler: () => 'EXIT_REQUESTED',
+        requiresAgent: false
+      }]
+    ]);
+
+    // Parameterized commands
+    this.parameterizedCommands = new Map([
+      ['/auto-approve', {
+        description: 'Add tool to auto-approve list',
+        handler: (toolName) => this.manageAutoApproval(this.currentAgent, toolName, true),
+        requiresAgent: true,
+        parameterDescription: '<tool_name>'
+      }],
+      ['/deny', {
+        description: 'Add tool to deny list', 
+        handler: (toolName) => this.manageDenyList(this.currentAgent, toolName, true),
+        requiresAgent: true,
+        parameterDescription: '<tool_name>'
+      }]
+    ]);
   }
 
   async start(agent) {
@@ -77,45 +135,44 @@ export class Console {
   }
 
   async handleInput(input) {
-    if (input === '/help') {
-      this.showHelp();
+    // Handle simple commands
+    if (this.commands.has(input)) {
+      const command = this.commands.get(input);
+      if (command.requiresAgent && !this.currentAgent) {
+        console.log(chalk.red('No agent available'));
+        return;
+      }
+      
+      const result = command.async ? await command.handler() : command.handler();
+      
+      if (result === 'EXIT_REQUESTED') {
+        console.log(chalk.yellow('Goodbye!'));
+        process.exit(0);
+      }
       return;
     }
 
-    if (input === '/tools') {
-      this.showTools(this.currentAgent);
-      return;
-    }
-
-    if (input === '/memory') {
-      await this.showMemory(this.currentAgent);
-      return;
-    }
-
-    if (input === '/approval') {
-      this.showApprovalStatus(this.currentAgent);
-      return;
-    }
-
-    if (input === '/status') {
-      this.showAgentStatus(this.currentAgent);
-      return;
-    }
-
-    if (input.startsWith('/auto-approve ')) {
-      const toolName = input.substring('/auto-approve '.length);
-      this.manageAutoApproval(this.currentAgent, toolName, true);
-      return;
-    }
-
-    if (input.startsWith('/deny ')) {
-      const toolName = input.substring('/deny '.length);
-      this.manageDenyList(this.currentAgent, toolName, true);
-      return;
+    // Handle parameterized commands
+    for (const [commandPrefix, command] of this.parameterizedCommands) {
+      if (input.startsWith(commandPrefix + ' ')) {
+        const parameter = input.substring(commandPrefix.length + 1);
+        if (command.requiresAgent && !this.currentAgent) {
+          console.log(chalk.red('No agent available'));
+          return;
+        }
+        
+        if (command.async) {
+          await command.handler(parameter);
+        } else {
+          command.handler(parameter);
+        }
+        return;
+      }
     }
 
     if (input.startsWith('/')) {
       console.log(chalk.red(`Unknown command: ${input}`));
+      console.log(chalk.gray('Type /help for available commands'));
       return;
     }
 
@@ -154,22 +211,52 @@ export class Console {
     process.stdout.write(token);
   }
 
+  // Public methods to expose command registry
+  getAvailableCommands() {
+    const commands = [];
+    
+    // Simple commands
+    for (const [command, details] of this.commands) {
+      commands.push({
+        value: command,
+        description: details.description,
+        type: 'command'
+      });
+    }
+    
+    // Parameterized commands
+    for (const [command, details] of this.parameterizedCommands) {
+      commands.push({
+        value: command,
+        description: details.description,
+        type: 'command',
+        hasParameters: true,
+        parameterDescription: details.parameterDescription
+      });
+    }
+    
+    return commands;
+  }
+
+  getCommandCompletions(prefix) {
+    const allCommands = this.getAvailableCommands();
+    return allCommands.filter(cmd => cmd.value.startsWith('/' + prefix));
+  }
+
   getCompletions(input = '') {
     const completions = [];
-    
-    // Command completions
-    const commands = [
-      '/help', '/tools', '/memory', '/status', '/approval', 
-      '/auto-approve', '/deny', '/quit', '/exit'
-    ];
     
     // Add history items (reversed to show recent first)
     const historyItems = this.history?.slice().reverse().slice(0, 10) || [];
     
     if (input?.startsWith('/')) {
-      // Command completion
-      const matches = commands.filter(cmd => cmd.startsWith(input));
-      completions.push(...matches.map(cmd => ({ title: cmd, value: cmd })));
+      // Command completion using registry
+      const allCommands = this.getAvailableCommands();
+      const matches = allCommands.filter(cmd => cmd.value.startsWith(input));
+      completions.push(...matches.map(cmd => ({ 
+        title: `${cmd.value} - ${cmd.description}`, 
+        value: cmd.value 
+      })));
       
       // Tool name completion for /auto-approve and /deny
       if (input.startsWith('/auto-approve ') || input.startsWith('/deny ')) {
