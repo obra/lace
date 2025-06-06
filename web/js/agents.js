@@ -1,7 +1,7 @@
 // Agent Orchestration Dashboard Component for Lace Web Companion
 // Displays agent hierarchy, status, performance metrics, and lifecycle events
 
-const { useState, useEffect, useRef } = React;
+import React, { useState, useEffect, useRef } from 'react'
 
 function AgentsDashboard({ socket, currentSession }) {
   const [agents, setAgents] = useState([]);
@@ -396,8 +396,4 @@ function AgentsDashboard({ socket, currentSession }) {
 }
 
 // Export for use in main app
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = AgentsDashboard;
-} else {
-  window.AgentsDashboard = AgentsDashboard;
-}
+export default AgentsDashboard

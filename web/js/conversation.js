@@ -1,7 +1,7 @@
 // Conversation View Component for Lace Web Companion
 // Displays real-time conversation log with token usage and cost tracking
 
-const { useState, useEffect, useRef } = React;
+import React, { useState, useEffect, useRef } from 'react'
 
 function ConversationView({ socket, currentSession, onSessionChange }) {
   const [messages, setMessages] = useState([]);
@@ -256,8 +256,4 @@ function ConversationView({ socket, currentSession, onSessionChange }) {
 }
 
 // Export for use in main app
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = ConversationView;
-} else {
-  window.ConversationView = ConversationView;
-}
+export default ConversationView

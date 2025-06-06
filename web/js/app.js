@@ -1,7 +1,12 @@
 // ABOUTME: Main React application for Lace Web Companion
 // ABOUTME: Implements split-pane layout with conversation view and activity dashboard tabs
 
-const { useState, useEffect, useCallback } = React;
+import React, { useState, useEffect, useCallback } from 'react'
+import io from 'socket.io-client'
+import ConversationView from './conversation.js'
+import ToolsTimeline from './tools.js'
+import AgentsDashboard from './agents.js'
+import FileBrowser from './files.js'
 
 function App() {
   const [connectionStatus, setConnectionStatus] = useState('connecting');
@@ -350,6 +355,4 @@ function App() {
   }
 }
 
-// Mount the app
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(React.createElement(App));
+export default App
