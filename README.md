@@ -1,3 +1,9 @@
+# YO. THIS IS A WORK IN PROGRESS. 
+
+# HERE BE DRAGONS
+
+# YOU DON'T WANT TO USE THIS
+
 # Lace - Your lightweight agentic coding environment
 
 ## Quick Start
