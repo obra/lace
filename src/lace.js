@@ -35,14 +35,17 @@ export class Lace {
       activityLogger: this.activityLogger
     });
     
-    this.console = new Console({ activityLogger: this.activityLogger });
-    
     // Web server for companion UI (optional)
     this.webServer = new WebServer({
       port: parseInt(options.webPort) || 3000,
       activityLogger: this.activityLogger,
       db: this.db,
       verbose: this.verbose
+    });
+    
+    this.console = new Console({ 
+      activityLogger: this.activityLogger,
+      webServer: this.webServer
     });
     
     this.primaryAgent = null;

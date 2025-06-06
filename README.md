@@ -157,6 +157,7 @@ Then open http://localhost:3000 to see:
 - `/help` - Show available commands
 - `/tools` - List available tools
 - `/memory` - Show conversation history
+- `/web` - Open web companion in browser (when `--web` is enabled)
 - `/quit` - Exit Lace
 
 ## Architecture

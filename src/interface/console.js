@@ -5,6 +5,7 @@ import prompts from 'prompts';
 import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
+import open from 'open';
 import { ActivityLogger } from '../logging/activity-logger.js';
 
 export class Console {
@@ -15,6 +16,7 @@ export class Console {
     this.abortController = null;
     this.history = [];
     this.activityLogger = options.activityLogger || new ActivityLogger();
+    this.webServer = options.webServer || null;
   }
 
   async start(agent) {
@@ -113,6 +115,11 @@ export class Console {
     if (input.startsWith('/deny ')) {
       const toolName = input.substring('/deny '.length);
       this.manageDenyList(this.currentAgent, toolName, true);
+      return;
+    }
+
+    if (input === '/web') {
+      await this.openWebCompanion();
       return;
     }
 
@@ -276,6 +283,30 @@ export class Console {
     }
   }
 
+  async openWebCompanion() {
+    if (!this.webServer) {
+      console.log(chalk.yellow('Web companion is not enabled. Use --web flag to start with web interface.'));
+      return;
+    }
+
+    const status = this.webServer.getStatus();
+    if (!status.isStarted) {
+      console.log(chalk.yellow('Web server is not running. Cannot open web companion.'));
+      return;
+    }
+
+    const url = status.url;
+    console.log(chalk.blue(`🌐 Opening web companion at ${url}`));
+    
+    try {
+      await open(url);
+      console.log(chalk.green('✅ Web companion opened in your default browser'));
+    } catch (error) {
+      console.log(chalk.red(`❌ Failed to open browser: ${error.message}`));
+      console.log(chalk.gray(`You can manually open: ${url}`));
+    }
+  }
+
   showHelp() {
     console.log(chalk.cyan('\nAvailable commands:'));
     console.log('  /help             - Show this help message');
@@ -285,6 +316,9 @@ export class Console {
     console.log('  /approval         - Show tool approval settings');
     console.log('  /auto-approve <tool> - Add tool to auto-approve list');
     console.log('  /deny <tool>      - Add tool to deny list');
+    if (this.webServer) {
+      console.log('  /web              - Open web companion in browser');
+    }
     console.log('  /quit             - Exit lace\n');
   }
 
