@@ -59,6 +59,30 @@ export class Agent {
     // Parallel execution configuration
     this.maxConcurrentTools = options.maxConcurrentTools || 10;
     
+    // Error recovery and retry configuration
+    this.retryConfig = {
+      maxRetries: 3,
+      baseDelay: 100, // milliseconds
+      maxDelay: 5000,
+      backoffMultiplier: 2,
+      ...options.retryConfig
+    };
+    
+    // Circuit breaker state
+    this.circuitBreaker = new Map(); // toolName -> { state, failures, lastFailure, nextAttempt }
+    this.circuitBreakerConfig = {
+      failureThreshold: 5,
+      openTimeout: 30000, // 30 seconds
+      halfOpenMaxCalls: 1,
+      ...options.circuitBreakerConfig
+    };
+    
+    // Tool-specific retry configurations
+    this.toolRetryConfigs = new Map();
+    
+    // Error tracking
+    this.errorPatterns = new Map(); // toolName -> error pattern stats
+    
     // Initialize synthesis utilities
     this.synthesisEngine = new SynthesisEngine(options.synthesisConfig);
     this.tokenEstimator = new TokenEstimator();
@@ -454,7 +478,24 @@ Focus on executing your assigned task efficiently.`;
 
   async executeTool(toolCall, sessionId) {
     // Parse tool name and method from LLM response
-    const [toolName, methodName] = toolCall.name.split('_');
+    // Try multiple parsing strategies to handle different naming conventions
+    let toolName, methodName;
+    
+    // First try: split by last underscore (preferred for new format)
+    const parts = toolCall.name.split('_');
+    if (parts.length >= 2) {
+      methodName = parts.pop(); // Last part is method
+      toolName = parts.join('_'); // Rest is tool name
+    } else {
+      toolName = toolCall.name;
+      methodName = 'execute'; // Default method
+    }
+    
+    // Fallback: try original parsing if tool not found
+    if (!this.tools.get(toolName) && parts.length > 1) {
+      toolName = parts[0];
+      methodName = parts.slice(1).join('_');
+    }
     
     if (!this.tools.get(toolName)) {
       throw new Error(`Tool '${toolName}' not found`);
@@ -499,6 +540,207 @@ Focus on executing your assigned task efficiently.`;
     }
 
     return results;
+  }
+
+  async executeToolsInParallelWithRetry(toolCalls, sessionId, reasoning) {
+    if (!toolCalls || toolCalls.length === 0) {
+      return [];
+    }
+
+    const results = [];
+    const hasFailures = [];
+
+    try {
+      // First attempt: parallel execution with retry logic
+      const parallelResults = await this.executeToolsWithRetryLogic(toolCalls, sessionId, reasoning);
+      results.push(...parallelResults);
+
+      // Check for systemic failures that might require fallback
+      const failedResults = parallelResults.filter(r => !r.success && !r.circuitBroken);
+      const failureRate = failedResults.length / parallelResults.length;
+
+      // If failure rate is high, consider sequential fallback
+      if (failureRate > 0.5 && failedResults.length > 1) {
+        const sequentialCandidates = failedResults.filter(r => 
+          r.error && (r.error.includes('overload') || r.error.includes('timeout') || r.error.includes('concurrent'))
+        );
+
+        if (sequentialCandidates.length > 0) {
+          const retryToolCalls = sequentialCandidates.map(r => r.toolCall);
+          const sequentialResults = await this.executeToolsSequentiallyWithRetry(retryToolCalls, sessionId, reasoning);
+          
+          // Replace failed results with sequential results
+          sequentialResults.forEach((seqResult, index) => {
+            const originalIndex = results.findIndex(r => r.toolCall === retryToolCalls[index]);
+            if (originalIndex !== -1) {
+              results[originalIndex] = { ...seqResult, sequentialFallback: true };
+            }
+          });
+        }
+      }
+
+
+      // Mark graceful degradation if some tools succeeded
+      const successCount = results.filter(r => r.success).length;
+      if (successCount > 0 && successCount < results.length) {
+        results.forEach(r => {
+          if (!r.success) r.degradedExecution = true;
+          r.gracefulDegradation = true;
+        });
+      }
+
+      return results;
+
+    } catch (error) {
+      // Catastrophic failure - return error results for all tools
+      return toolCalls.map(toolCall => ({
+        toolCall,
+        success: false,
+        error: error.message,
+        catastrophicFailure: true,
+        approved: false,
+        denied: false
+      }));
+    }
+  }
+
+  async executeToolsWithRetryLogic(toolCalls, sessionId, reasoning) {
+    const semaphore = new Semaphore(this.maxConcurrentTools);
+    
+    const toolPromises = toolCalls.map(async (toolCall) => {
+      await semaphore.acquire();
+      
+      try {
+        return await this.executeToolWithRetry(toolCall, sessionId, reasoning);
+      } finally {
+        semaphore.release();
+      }
+    });
+
+    return await Promise.all(toolPromises);
+  }
+
+  async executeToolsSequentiallyWithRetry(toolCalls, sessionId, reasoning) {
+    const results = [];
+    
+    for (const toolCall of toolCalls) {
+      const result = await this.executeToolWithRetry(toolCall, sessionId, reasoning);
+      results.push(result);
+    }
+    
+    return results;
+  }
+
+  async executeToolWithRetry(toolCall, sessionId, reasoning) {
+    // Parse tool name consistently with executeTool
+    const parts = toolCall.name.split('_');
+    let toolName;
+    if (parts.length >= 2) {
+      toolName = parts.slice(0, -1).join('_'); // All but last part
+    } else {
+      toolName = parts[0];
+    }
+    
+    const retryConfig = this.getToolRetryConfig(toolName);
+    
+    // Check if retry is disabled for this tool
+    if (retryConfig.enabled === false) {
+      try {
+        const result = await this.executeToolWithApproval(toolCall, sessionId, reasoning);
+        return { ...result, retryAttempts: 0, retryDisabled: true };
+      } catch (error) {
+        return {
+          toolCall,
+          success: false,
+          error: error.message,
+          retryAttempts: 0,
+          retryDisabled: true,
+          approved: false,
+          denied: false
+        };
+      }
+    }
+
+    // Check circuit breaker
+    const circuitState = this.checkCircuitBreaker(toolName);
+    if (circuitState.blocked) {
+      return {
+        toolCall,
+        success: false,
+        error: `Circuit breaker open for ${toolName}`,
+        circuitBroken: true,
+        approved: false,
+        denied: false
+      };
+    }
+
+    let lastError;
+    let retryAttempts = 0;
+    let totalRetryDelay = 0;
+
+    for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = this.calculateBackoffDelay(attempt - 1, retryConfig);
+          totalRetryDelay += delay;
+          await this.sleep(delay);
+        }
+
+        const result = await this.executeToolWithApproval(toolCall, sessionId, reasoning);
+        
+        // Check if the result indicates an error that should be retried
+        if (result.error && !result.denied) {
+          // Treat tool result errors as exceptions for retry logic
+          throw new Error(result.error);
+        }
+        
+        // Success - reset circuit breaker
+        this.recordToolSuccess(toolName);
+        
+        return {
+          ...result,
+          success: true,
+          retryAttempts: attempt, // Current attempt number is the retry count
+          totalRetryDelay,
+          circuitRecovered: circuitState.recovered,
+          // Track if this was recovered from a parallel overload
+          sequentialFallback: lastError && lastError.message.includes('Parallel overload')
+        };
+
+      } catch (error) {
+        lastError = error;
+
+        // Check if error is retriable
+        if (!this.isRetriableError(error)) {
+          this.recordToolFailure(toolName, error);
+          return {
+            toolCall,
+            success: false,
+            error: error.message,
+            nonRetriable: true,
+            retryAttempts: 0,
+            approved: false,
+            denied: false,
+            actionableError: this.categorizeError(error)
+          };
+        }
+
+        this.recordToolFailure(toolName, error);
+      }
+    }
+
+    // All retries exhausted - return the max retry count
+    return {
+      toolCall,
+      success: false,
+      error: lastError.message,
+      finalFailure: true,
+      retryAttempts: retryConfig.maxRetries,
+      totalRetryDelay,
+      approved: false,
+      denied: false,
+      actionableError: this.categorizeError(lastError)
+    };
   }
 
   async synthesizeToolResponse(toolResult, toolCall, sessionId, synthesisPrompt) {
@@ -804,6 +1046,292 @@ ${responseText}`;
       assignedModel: 'claude-3-5-sonnet-20241022',
       assignedProvider: 'anthropic',
       capabilities: ['reasoning', 'tool_calling']
+    };
+  }
+
+  // ERROR RECOVERY AND RETRY UTILITY METHODS
+
+  getToolRetryConfig(toolName) {
+    const toolConfig = this.toolRetryConfigs.get(toolName) || {};
+    return {
+      ...this.retryConfig,
+      ...toolConfig
+    };
+  }
+
+  setToolRetryConfig(toolName, config) {
+    this.toolRetryConfigs.set(toolName, config);
+  }
+
+  calculateBackoffDelay(attemptNumber, config) {
+    const delay = Math.min(
+      config.baseDelay * Math.pow(config.backoffMultiplier, attemptNumber),
+      config.maxDelay
+    );
+    // Add jitter to prevent thundering herd
+    return delay + Math.random() * (delay * 0.1);
+  }
+
+  async sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  isRetriableError(error) {
+    const message = error.message.toLowerCase();
+    
+    // Non-retriable errors
+    const nonRetriablePatterns = [
+      'authentication',
+      'authorization',
+      'permission denied',
+      'access denied',
+      'invalid credentials',
+      'forbidden',
+      'not found',
+      'bad request',
+      'invalid input',
+      'validation failed'
+    ];
+
+    for (const pattern of nonRetriablePatterns) {
+      if (message.includes(pattern)) {
+        return false;
+      }
+    }
+
+    // Retriable errors
+    const retriablePatterns = [
+      'timeout',
+      'network',
+      'connection',
+      'temporary',
+      'unavailable',
+      'overload',
+      'rate limit',
+      'too many requests',
+      'service degraded',
+      'concurrent'
+    ];
+
+    for (const pattern of retriablePatterns) {
+      if (message.includes(pattern)) {
+        return true;
+      }
+    }
+
+    // Default: retry unknown errors
+    return true;
+  }
+
+  categorizeError(error) {
+    const message = error.message.toLowerCase();
+    
+    if (message.includes('rate limit') || message.includes('too many requests')) {
+      return {
+        category: 'rate_limit',
+        suggestion: 'Reduce request frequency and wait before retrying',
+        retryAfter: 60000 // 1 minute
+      };
+    }
+    
+    if (message.includes('timeout') || message.includes('network')) {
+      return {
+        category: 'network',
+        suggestion: 'Check network connectivity and retry',
+        retryAfter: 5000 // 5 seconds
+      };
+    }
+    
+    if (message.includes('overload') || message.includes('concurrent')) {
+      return {
+        category: 'overload',
+        suggestion: 'Reduce concurrent operations and retry sequentially',
+        retryAfter: 10000 // 10 seconds
+      };
+    }
+    
+    if (message.includes('unavailable') || message.includes('service')) {
+      return {
+        category: 'service_unavailable',
+        suggestion: 'Service may be down, retry after delay',
+        retryAfter: 30000 // 30 seconds
+      };
+    }
+    
+    return {
+      category: 'unknown',
+      suggestion: 'Retry with exponential backoff',
+      retryAfter: 1000 // 1 second
+    };
+  }
+
+  // CIRCUIT BREAKER METHODS
+
+  checkCircuitBreaker(toolName) {
+    const breaker = this.circuitBreaker.get(toolName);
+    
+    if (!breaker) {
+      // Initialize circuit breaker for this tool
+      this.circuitBreaker.set(toolName, {
+        state: 'closed',
+        failures: 0,
+        lastFailure: null,
+        nextAttempt: 0
+      });
+      return { blocked: false, recovered: false };
+    }
+
+    const now = Date.now();
+    
+    switch (breaker.state) {
+      case 'closed':
+        return { blocked: false, recovered: false };
+        
+      case 'open':
+        if (now >= breaker.nextAttempt) {
+          // Transition to half-open
+          breaker.state = 'half-open';
+          return { blocked: false, recovered: true }; // This is recovery attempt
+        }
+        return { blocked: true, recovered: false };
+        
+      case 'half-open':
+        return { blocked: false, recovered: true };
+        
+      default:
+        return { blocked: false, recovered: false };
+    }
+  }
+
+  recordToolSuccess(toolName) {
+    const breaker = this.circuitBreaker.get(toolName);
+    
+    if (breaker) {
+      if (breaker.state === 'half-open') {
+        // Success in half-open state - close the circuit
+        breaker.state = 'closed';
+        breaker.failures = 0;
+        breaker.lastFailure = null;
+      }
+    }
+  }
+
+  recordToolFailure(toolName, error) {
+    let breaker = this.circuitBreaker.get(toolName);
+    
+    if (!breaker) {
+      breaker = {
+        state: 'closed',
+        failures: 0,
+        lastFailure: null,
+        nextAttempt: 0
+      };
+      this.circuitBreaker.set(toolName, breaker);
+    }
+
+    breaker.failures++;
+    breaker.lastFailure = Date.now();
+
+    // Update error patterns
+    this.updateErrorPattern(toolName, error);
+
+    // Check if we should open the circuit
+    if (breaker.failures >= this.circuitBreakerConfig.failureThreshold) {
+      breaker.state = 'open';
+      breaker.nextAttempt = Date.now() + this.circuitBreakerConfig.openTimeout;
+    }
+  }
+
+  updateErrorPattern(toolName, error) {
+    let pattern = this.errorPatterns.get(toolName);
+    
+    if (!pattern) {
+      pattern = {
+        frequency: 0,
+        lastSeen: null,
+        pattern: 'unknown',
+        examples: []
+      };
+      this.errorPatterns.set(toolName, pattern);
+    }
+
+    pattern.frequency++;
+    pattern.lastSeen = Date.now();
+    pattern.examples.push(error.message);
+    
+    // Keep only recent examples
+    if (pattern.examples.length > 10) {
+      pattern.examples = pattern.examples.slice(-10);
+    }
+
+    // Detect patterns
+    const message = error.message.toLowerCase();
+    if (message.includes('degraded') || message.includes('slow')) {
+      pattern.pattern = 'degraded_service';
+    } else if (message.includes('rate') || message.includes('limit')) {
+      pattern.pattern = 'rate_limiting';
+    } else if (message.includes('timeout') || message.includes('network')) {
+      pattern.pattern = 'connectivity_issues';
+    }
+  }
+
+  getCircuitBreakerStats() {
+    const stats = {};
+    
+    for (const [toolName, breaker] of this.circuitBreaker.entries()) {
+      stats[toolName] = {
+        state: breaker.state,
+        failures: breaker.failures,
+        lastFailure: breaker.lastFailure,
+        nextAttempt: breaker.nextAttempt
+      };
+    }
+    
+    return stats;
+  }
+
+  getErrorPatterns() {
+    return Object.fromEntries(this.errorPatterns);
+  }
+
+  analyzeExecutionErrors(results) {
+    const toolSpecificErrors = [];
+    const systemicErrors = [];
+    const recommendations = [];
+
+    for (const result of results) {
+      if (!result.success && result.error) {
+        const error = result.error.toLowerCase();
+        const toolName = result.toolCall?.name?.split('_')[0];
+        
+        if (error.includes('validation') || error.includes('input') || error.includes('parameter')) {
+          toolSpecificErrors.push({
+            tool: toolName,
+            error: result.error,
+            type: 'validation'
+          });
+        } else if (error.includes('network') || error.includes('timeout') || error.includes('infrastructure')) {
+          systemicErrors.push({
+            tool: toolName,
+            error: result.error,
+            type: 'infrastructure'
+          });
+        }
+      }
+    }
+
+    if (toolSpecificErrors.length > 0) {
+      recommendations.push('tool-specific input validation and parameters');
+    }
+    
+    if (systemicErrors.length > 0) {
+      recommendations.push('infrastructure connectivity and service health');
+    }
+
+    return {
+      toolSpecificErrors,
+      systemicErrors,
+      recommendations
     };
   }
 }
