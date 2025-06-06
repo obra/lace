@@ -57,6 +57,16 @@ describe('Task Orchestration Core Integration', () => {
     agent.generation = 1;
   });
 
+  // Helper function to set up TaskTool with all required context
+  const setupTaskTool = (customAgent = null) => {
+    const taskTool = toolRegistry.get('task');
+    const agentToUse = customAgent || agent;
+    taskTool.setAgent(agentToUse);
+    taskTool.setProgressTracker(progressTracker);
+    taskTool.setSessionId('test-session');
+    return taskTool;
+  };
+
   afterAll(() => {
     // Clean up progress tracker to prevent open handles
     if (progressTracker) {
@@ -66,10 +76,7 @@ describe('Task Orchestration Core Integration', () => {
 
   describe('TaskTool Basic Functionality', () => {
     it('should successfully delegate a task to a sub-agent', async () => {
-      const taskTool = toolRegistry.get('task');
-      taskTool.setAgent(agent);
-      taskTool.setProgressTracker(progressTracker);
-      taskTool.setSessionId('test-session');
+      const taskTool = setupTaskTool();
 
       const result = await taskTool.delegateTask({
         description: 'Analyze the data patterns',
@@ -84,9 +91,7 @@ describe('Task Orchestration Core Integration', () => {
     });
 
     it('should spawn an agent and track relationships', async () => {
-      const taskTool = toolRegistry.get('task');
-      taskTool.setAgent(agent);
-      taskTool.setSessionId('test-session');
+      const taskTool = setupTaskTool();
 
       const result = await taskTool.spawnAgent({
         role: 'worker',
@@ -305,8 +310,7 @@ describe('Task Orchestration Core Integration', () => {
 
   describe('Progress Tracking Integration', () => {
     it('should aggregate progress from multiple operations', async () => {
-      const taskTool = toolRegistry.get('task');
-      taskTool.setAgent(agent);
+      const taskTool = setupTaskTool();
 
       // Create multiple progress updates
       await taskTool.reportProgress({
@@ -315,11 +319,11 @@ describe('Task Orchestration Core Integration', () => {
         details: 'Phase 1 complete'
       });
 
-      // Simulate second agent
-      const agent2 = { ...agent, generation: 2, agentId: 'agent-002' };
-      taskTool.setAgent(agent2);
+      // Simulate second agent (create separate TaskTool to avoid interference)
+      const agent2 = { generation: 2, agentId: 'agent-002' };
+      const taskTool2 = setupTaskTool(agent2);
 
-      await taskTool.reportProgress({
+      await taskTool2.reportProgress({
         status: 'in_progress',
         progressPercent: 75,
         details: 'Phase 2 processing'
