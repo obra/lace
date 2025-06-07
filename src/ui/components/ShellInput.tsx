@@ -149,7 +149,8 @@ const ShellInput: React.FC<ShellInputProps> = ({
         setCompletionIndex(Math.min(completions.length - 1, completionIndex + 1));
         return;
       }
-      if (key.tab || key.return) {
+      if (key.tab || (key.return && !key.shift)) {
+        // Apply completion on Tab or Enter (but not Shift+Enter)
         applyCompletion();
         return;
       }

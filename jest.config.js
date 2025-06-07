@@ -17,10 +17,14 @@ export default {
         noImplicitAny: false,
         moduleResolution: 'node'
       }
+    }],
+    '^.+\\.js$': ['ts-jest', {
+      useESM: true
     }]
   },
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
   testMatch: [
-    '**/test/ui/**/*.test.(ts|tsx|js)'
+    '**/test/ui/**/*.test.(ts|tsx|js)',
+    '**/test/unit/**/*.test.(ts|tsx|js)'
   ]
 };

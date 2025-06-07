@@ -4,11 +4,13 @@
 export * from './types.js';
 export { CommandCompletionProvider } from './CommandCompletionProvider.js';
 export { FileCompletionProvider } from './FileCompletionProvider.js';
+export { FilesAndDirectoriesCompletionProvider } from './FilesAndDirectoriesCompletionProvider.js';
 export { CompletionManager } from './CompletionManager.js';
 
 // Import for use in the convenience function
 import { CommandCompletionProvider } from './CommandCompletionProvider.js';
 import { FileCompletionProvider } from './FileCompletionProvider.js';
+import { FilesAndDirectoriesCompletionProvider } from './FilesAndDirectoriesCompletionProvider.js';
 import { CompletionManager } from './CompletionManager.js';
 
 // Convenience function to create a fully configured completion manager
@@ -21,7 +23,7 @@ export function createCompletionManager(options?: { cwd?: string; history?: stri
 
   // Add providers
   manager.addProvider(new CommandCompletionProvider());
-  manager.addProvider(new FileCompletionProvider({ 
+  manager.addProvider(new FilesAndDirectoriesCompletionProvider({ 
     cwd: options?.cwd || process.cwd() 
   }));
 
