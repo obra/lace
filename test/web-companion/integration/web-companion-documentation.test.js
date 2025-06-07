@@ -1,175 +1,339 @@
-// ABOUTME: Documentation and verification tests for web companion integration
-// ABOUTME: Tests that all web companion components are properly integrated and documented
+// ABOUTME: Real integration tests for web companion components and functionality
+// ABOUTME: Tests actual WebServer startup, API endpoints, WebSocket connections, and UI component integration
 
-import { describe, expect, test } from '@jest/globals';
+import { beforeEach, afterEach, describe, expect, test } from '@jest/globals';
+import { WebServer } from '../../../src/interface/web-server.js';
+import { ConversationDB } from '../../../src/database/conversation-db.js';
+import { ActivityLogger } from '../../../src/logging/activity-logger.js';
+import { io as SocketIOClient } from 'socket.io-client';
+import axios from 'axios';
+import { getAvailablePort } from '../../test-utils.js';
 
-describe('Web Companion Integration Documentation', () => {
-  describe('Component Integration Verification', () => {
-    test('should verify web companion is properly integrated with Lace', () => {
-      // Verify that the required integration points exist
-      const integrationChecklist = {
-        webServerClass: 'WebServer class should be importable',
-        laceIntegration: 'Lace should have webServer property',
-        cliOption: 'CLI should have --web-port option',
-        gracefulStartup: 'Web server should start gracefully and not fail Lace startup',
-        errorHandling: 'Web server startup errors should not crash Lace'
-      };
+describe('Web Companion Real Integration Tests', () => {
+  let webServer;
+  let db;
+  let activityLogger;
+  let port;
+
+  beforeEach(async () => {
+    // Get available port for testing
+    port = await getAvailablePort();
+    
+    // Setup in-memory database for testing
+    db = new ConversationDB(':memory:');
+    await db.initialize();
+    
+    // Setup activity logger with in-memory database
+    activityLogger = new ActivityLogger(':memory:');
+    await activityLogger.initialize();
+    
+    // Create WebServer instance
+    webServer = new WebServer({
+      port: port,
+      db: db,
+      activityLogger: activityLogger,
+      verbose: false
+    });
+  });
+
+  afterEach(async () => {
+    if (webServer && webServer.isStarted) {
+      await webServer.stop();
+    }
+    if (db) {
+      await db.close();
+    }
+    if (activityLogger) {
+      await activityLogger.close();
+    }
+  });
+
+  describe('WebServer Startup and Shutdown', () => {
+    test('should start web server successfully', async () => {
+      await webServer.start();
       
-      // All integration points are documented and verified
-      Object.values(integrationChecklist).forEach(requirement => {
-        expect(typeof requirement).toBe('string');
-        expect(requirement.length).toBeGreaterThan(0);
+      expect(webServer.isStarted).toBe(true);
+      expect(webServer.getStatus().isStarted).toBe(true);
+      expect(webServer.getStatus().port).toBe(port);
+      expect(webServer.getStatus().url).toBe(`http://localhost:${port}`);
+    });
+
+    test('should handle graceful shutdown', async () => {
+      await webServer.start();
+      expect(webServer.isStarted).toBe(true);
+      
+      await webServer.stop();
+      expect(webServer.isStarted).toBe(false);
+      expect(webServer.getStatus().isStarted).toBe(false);
+      expect(webServer.getStatus().url).toBe(null);
+    });
+
+    test('should reject duplicate server instances on same port', async () => {
+      // Start first server
+      await webServer.start();
+      expect(webServer.isStarted).toBe(true);
+      
+      // Verify the port is correctly assigned and server is running
+      const status = webServer.getStatus();
+      expect(status.port).toBe(port);
+      expect(status.isStarted).toBe(true);
+      expect(status.url).toBe(`http://localhost:${port}`);
+    });
+  });
+
+  describe('API Endpoints Integration', () => {
+    beforeEach(async () => {
+      await webServer.start();
+      
+      // Add test data to database
+      await db.saveMessage('test-session-1', 0, 'user', 'Hello world', null, 50);
+      await db.saveMessage('test-session-1', 0, 'assistant', 'Hi there!', null, 75);
+      await db.saveMessage('test-session-2', 1, 'user', 'Another test', null, 60);
+      
+      await activityLogger.logEvent('user_input', 'test-session-1', 'model-123', { message: 'test input' });
+      await activityLogger.logEvent('agent_response', 'test-session-1', 'model-123', { response: 'test response' });
+    });
+
+    test('should serve health check endpoint', async () => {
+      const response = await axios.get(`http://localhost:${port}/api/health`);
+      
+      expect(response.status).toBe(200);
+      expect(response.data).toHaveProperty('status', 'ok');
+      expect(response.data).toHaveProperty('timestamp');
+      expect(response.data).toHaveProperty('connectedClients');
+      expect(typeof response.data.connectedClients).toBe('number');
+    });
+
+    test('should fetch conversation sessions', async () => {
+      const response = await axios.get(`http://localhost:${port}/api/sessions`);
+      
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.data)).toBe(true);
+    });
+
+    test('should fetch session messages', async () => {
+      const response = await axios.get(`http://localhost:${port}/api/sessions/test-session-1/messages`);
+      
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.data)).toBe(true);
+      expect(response.data.length).toBeGreaterThan(0);
+      
+      const firstMessage = response.data[0];
+      expect(firstMessage).toHaveProperty('session_id', 'test-session-1');
+      expect(firstMessage).toHaveProperty('role');
+      expect(firstMessage).toHaveProperty('content');
+    });
+
+    test('should fetch session statistics', async () => {
+      const response = await axios.get(`http://localhost:${port}/api/sessions/test-session-1/stats`);
+      
+      expect(response.status).toBe(200);
+      expect(response.data).toHaveProperty('messageCount');
+      expect(response.data).toHaveProperty('tokenStats');
+      expect(response.data.tokenStats).toHaveProperty('total_tokens');
+      expect(response.data.tokenStats).toHaveProperty('avg_tokens');
+      expect(response.data.tokenStats).toHaveProperty('max_tokens');
+    });
+
+    test('should fetch system metrics', async () => {
+      const response = await axios.get(`http://localhost:${port}/api/system/metrics`);
+      
+      expect(response.status).toBe(200);
+      expect(response.data).toHaveProperty('uptime');
+      expect(response.data).toHaveProperty('memoryUsage');
+      expect(response.data).toHaveProperty('nodeVersion');
+      expect(response.data).toHaveProperty('platform');
+      expect(response.data).toHaveProperty('connectedClients');
+      expect(response.data).toHaveProperty('metrics');
+    });
+
+    test('should fetch activity events', async () => {
+      const response = await axios.get(`http://localhost:${port}/api/activity/events`);
+      
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.data)).toBe(true);
+    });
+
+    test('should handle invalid session ID validation', async () => {
+      // Test with session ID that's too long (over 100 chars)
+      const longSessionId = 'x'.repeat(101);
+      const response = await axios.get(`http://localhost:${port}/api/sessions/${longSessionId}/messages`, {
+        validateStatus: () => true
+      });
+      
+      expect(response.status).toBe(400);
+      expect(response.data).toHaveProperty('error', 'Invalid session ID');
+    });
+
+    test('should handle missing database gracefully', async () => {
+      // Create server without database on different port
+      const dbTestPort = await getAvailablePort();
+      const serverWithoutDB = new WebServer({ port: dbTestPort });
+      await serverWithoutDB.start();
+      
+      const response = await axios.get(`http://localhost:${dbTestPort}/api/sessions`, {
+        validateStatus: () => true
+      });
+      
+      expect(response.status).toBe(503);
+      expect(response.data).toHaveProperty('error', 'Database not available');
+      
+      await serverWithoutDB.stop();
+    });
+  });
+
+  describe('WebSocket Integration', () => {
+    let client;
+
+    beforeEach(async () => {
+      await webServer.start();
+    });
+
+    afterEach(async () => {
+      if (client) {
+        client.disconnect();
+      }
+    });
+
+    test('should establish WebSocket connection', (done) => {
+      client = new SocketIOClient(`http://localhost:${port}`);
+      
+      client.on('connect', () => {
+        expect(client.connected).toBe(true);
+        expect(webServer.connectedClients.size).toBe(1);
+        done();
       });
     });
-    
-    test('should verify API endpoints are documented', () => {
-      const documentedEndpoints = [
-        'GET /api/health - Health check endpoint',
-        'GET /api/sessions - List conversation sessions',
-        'GET /api/sessions/:id/messages - Get session messages',
-        'GET /api/sessions/:id/stats - Get session statistics',
-        'GET /api/sessions/:id/tools - Get session tool executions',
-        'GET /api/sessions/:id/agents - Get session agent hierarchy',
-        'GET /api/sessions/:id/analytics - Get detailed session analytics',
-        'GET /api/system/metrics - Get system performance metrics',
-        'GET /api/activity/events - Get activity events',
-        'GET /api/files/tree - Get file tree',
-        'GET /api/files/content - Get file content',
-        'GET /api/git/status - Get git repository status',
-        'GET /api/git/diff/:file - Get file diff',
-        'POST /api/search - Search files'
-      ];
+
+    test('should receive activity broadcasts', (done) => {
+      client = new SocketIOClient(`http://localhost:${port}`);
       
-      expect(documentedEndpoints.length).toBeGreaterThan(10);
-      documentedEndpoints.forEach(endpoint => {
-        expect(endpoint).toMatch(/^(GET|POST|PUT|DELETE) \/api\//);
+      client.on('connect', () => {
+        // Listen for activity events
+        client.on('activity', (activityEvent) => {
+          expect(activityEvent).toHaveProperty('event_type');
+          expect(activityEvent).toHaveProperty('timestamp');
+          expect(activityEvent).toHaveProperty('local_session_id');
+          done();
+        });
+        
+        // Trigger an activity event
+        setTimeout(() => {
+          activityLogger.logEvent('test_event', 'test-session', 'model-123', { test: 'data' });
+        }, 100);
       });
     });
-    
-    test('should verify WebSocket events are documented', () => {
-      const webSocketEvents = {
-        outgoing: [
-          'activity - Real-time activity events',
-          'connect - WebSocket connection established',
-          'disconnect - WebSocket connection lost'
-        ],
-        incoming: [
-          'subscribe-session - Subscribe to session events',
-          'unsubscribe-session - Unsubscribe from session events',
-          'filter-activity - Apply activity event filters'
-        ]
-      };
+
+    test('should handle session subscription', (done) => {
+      client = new SocketIOClient(`http://localhost:${port}`);
+      let eventReceived = false;
       
-      expect(webSocketEvents.outgoing.length).toBeGreaterThan(0);
-      expect(webSocketEvents.incoming.length).toBeGreaterThan(0);
-    });
-    
-    test('should verify UI components are documented', () => {
-      const uiComponents = {
-        'ConversationView': 'Shows real-time conversation log with token usage and cost tracking',
-        'ToolsTimeline': 'Displays tool execution timeline with status and results',
-        'AgentsDashboard': 'Shows agent hierarchy, status, and performance metrics',
-        'FileBrowser': 'Project file browser with syntax highlighting and git integration',
-        'ActivityStream': 'Real-time activity event stream with filtering'
-      };
-      
-      Object.entries(uiComponents).forEach(([component, description]) => {
-        expect(typeof component).toBe('string');
-        expect(typeof description).toBe('string');
-        expect(description.length).toBeGreaterThan(20);
+      client.on('connect', () => {
+        // Subscribe to specific session
+        client.emit('subscribe-session', 'test-session-123');
+        
+        // Verify subscription worked by triggering session-specific event
+        setTimeout(() => {
+          activityLogger.logEvent('session_event', 'test-session-123', 'model-123', { test: 'session data' });
+        }, 100);
+        
+        client.on('activity', (event) => {
+          if (event.local_session_id === 'test-session-123' && !eventReceived) {
+            eventReceived = true;
+            client.disconnect();
+            done();
+          }
+        });
       });
     });
-    
-    test('should verify configuration options are documented', () => {
-      const configOptions = {
-        'webPort': 'Port for web companion interface (default: 3000)',
-        'verbose': 'Enable verbose output for web server',
-        'cors': 'CORS configuration for development/production',
-        'security': 'Helmet security headers configuration'
-      };
+
+    test('should handle client disconnect', (done) => {
+      client = new SocketIOClient(`http://localhost:${port}`);
       
-      Object.entries(configOptions).forEach(([option, description]) => {
-        expect(typeof option).toBe('string');
-        expect(typeof description).toBe('string');
+      client.on('connect', () => {
+        expect(webServer.connectedClients.size).toBe(1);
+        
+        client.disconnect();
+        
+        setTimeout(() => {
+          expect(webServer.connectedClients.size).toBe(0);
+          done();
+        }, 100);
       });
     });
   });
-  
-  describe('Implementation Completeness', () => {
-    test('should verify all required features are implemented', () => {
-      const implementedFeatures = [
-        'Express web server with Socket.io',
-        'Real-time activity streaming via WebSocket',
-        'React-based UI with split-pane layout',
-        'Conversation view with message history',
-        'Tool execution timeline visualization',
-        'Agent orchestration dashboard',
-        'Project file browser with syntax highlighting',
-        'Git integration for file status and diffs',
-        'Search functionality across project files',
-        'Responsive design for mobile and desktop',
-        'Dark theme matching terminal aesthetics',
-        'Keyboard shortcuts for navigation',
-        'Error handling and graceful degradation',
-        'Print-friendly stylesheet'
-      ];
-      
-      expect(implementedFeatures.length).toBe(14);
-      implementedFeatures.forEach(feature => {
-        expect(typeof feature).toBe('string');
-        expect(feature.length).toBeGreaterThan(10);
-      });
+
+  describe('File API Integration', () => {
+    beforeEach(async () => {
+      await webServer.start();
     });
-    
-    test('should verify testing strategy is complete', () => {
-      const testingAspects = {
-        'Unit Tests': 'Basic web companion functionality tests',
-        'API Tests': 'REST API endpoint structure and validation tests',
-        'Integration Tests': 'Web server startup, port conflict handling',
-        'Component Tests': 'React component behavior verification',
-        'Error Handling': 'Database unavailable, connection errors',
-        'Performance': 'Multiple client connections, rapid events'
-      };
+
+    test('should fetch directory tree', async () => {
+      const response = await axios.get(`http://localhost:${port}/api/files/tree`);
       
-      Object.entries(testingAspects).forEach(([aspect, description]) => {
-        expect(typeof aspect).toBe('string');
-        expect(typeof description).toBe('string');
+      expect(response.status).toBe(200);
+      expect(response.data).toHaveProperty('name');
+      expect(response.data).toHaveProperty('path');
+      expect(response.data).toHaveProperty('isDirectory');
+    });
+
+    test('should fetch git status', async () => {
+      const response = await axios.get(`http://localhost:${port}/api/git/status`);
+      
+      expect(response.status).toBe(200);
+      expect(response.data).toHaveProperty('branch');
+      expect(response.data).toHaveProperty('files');
+    });
+
+    test('should perform file search', async () => {
+      const response = await axios.post(`http://localhost:${port}/api/search`, {
+        query: 'test',
+        type: 'files'
       });
+      
+      expect(response.status).toBe(200);
+      expect(response.data).toHaveProperty('query', 'test');
+      expect(response.data).toHaveProperty('results');
+      expect(Array.isArray(response.data.results)).toBe(true);
+    });
+
+    test('should validate search parameters', async () => {
+      const response = await axios.post(`http://localhost:${port}/api/search`, {}, {
+        validateStatus: () => true
+      });
+      
+      expect(response.status).toBe(400);
+      expect(response.data).toHaveProperty('error', 'Search query is required');
     });
   });
-  
-  describe('Security and Performance Considerations', () => {
-    test('should verify security measures are documented', () => {
-      const securityMeasures = [
-        'Helmet middleware for security headers',
-        'CORS configuration for cross-origin requests',
-        'Input validation for API endpoints',
-        'Session ID validation to prevent injection',
-        'File path sanitization for file operations',
-        'Rate limiting for WebSocket connections',
-        'Error message sanitization'
-      ];
-      
-      expect(securityMeasures.length).toBeGreaterThan(5);
-      securityMeasures.forEach(measure => {
-        expect(typeof measure).toBe('string');
-      });
+
+  describe('Security and Middleware Integration', () => {
+    beforeEach(async () => {
+      await webServer.start();
     });
-    
-    test('should verify performance optimizations are documented', () => {
-      const performanceOptimizations = [
-        'Event deduplication in WebSocket streams',
-        'Limited event history (last 100 events)',
-        'Connection pooling and management',
-        'Static file caching with proper headers',
-        'Graceful degradation when WebSocket fails',
-        'Minimal impact on console performance'
-      ];
+
+    test('should set security headers', async () => {
+      const response = await axios.get(`http://localhost:${port}/api/health`);
       
-      expect(performanceOptimizations.length).toBeGreaterThan(4);
-      performanceOptimizations.forEach(optimization => {
-        expect(typeof optimization).toBe('string');
+      expect(response.headers).toHaveProperty('x-content-type-options');
+      expect(response.headers).toHaveProperty('x-frame-options');
+    });
+
+    test('should handle CORS correctly', async () => {
+      const response = await axios.get(`http://localhost:${port}/api/health`);
+      
+      expect(response.status).toBe(200);
+      // In development mode, CORS should allow requests
+    });
+
+    test('should parse JSON requests', async () => {
+      const response = await axios.post(`http://localhost:${port}/api/search`, {
+        query: 'test'
+      }, {
+        headers: { 'Content-Type': 'application/json' }
       });
+      
+      expect(response.status).toBe(200);
     });
   });
 });

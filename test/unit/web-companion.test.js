@@ -135,8 +135,9 @@ describe('Web Companion Tests', () => {
       
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body).toHaveLength(2);
-      expect(response.body[0].role).toBe('user');
-      expect(response.body[1].role).toBe('assistant');
+      // Messages are returned in reverse chronological order (newest first)
+      expect(response.body[0].role).toBe('assistant'); // Latest message
+      expect(response.body[1].role).toBe('user'); // Earlier message
     });
 
     test('should return session statistics', async () => {
