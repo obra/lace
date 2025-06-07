@@ -139,7 +139,7 @@ describe('Web Companion Security and Performance Tests', () => {
   describe('Input Validation and Sanitization', () => {
     test('should validate session ID format and length', async () => {
       const testCases = [
-        { id: '', expectedStatus: 400 },
+        { id: '', expectedStatus: 404 }, // Empty string doesn't match route pattern
         { id: 'x'.repeat(101), expectedStatus: 400 }, // Too long
         { id: 'valid-session-123', expectedStatus: 200 },
         { id: null, expectedStatus: 404 }, // Express will handle as route mismatch

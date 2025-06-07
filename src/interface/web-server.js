@@ -44,6 +44,7 @@ export class WebServer {
   setupMiddleware() {
     // Security headers for local development
     this.app.use(helmet({
+      frameguard: { action: 'deny' }, // Explicitly set X-Frame-Options to DENY
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
@@ -92,7 +93,7 @@ export class WebServer {
     // Request validation middleware
     const validateSessionId = (req, res, next) => {
       const { sessionId } = req.params;
-      if (!sessionId || typeof sessionId !== 'string' || sessionId.length > 100) {
+      if (!sessionId || typeof sessionId !== 'string' || sessionId.length === 0 || sessionId.length > 100 || sessionId.includes('\x00')) {
         return res.status(400).json({ error: 'Invalid session ID' });
       }
       next();
@@ -126,7 +127,12 @@ export class WebServer {
         res.json(sessions);
       } catch (error) {
         console.error('Error fetching sessions:', error);
-        res.status(500).json({ error: 'Failed to fetch sessions' });
+        // Check if it's a database connection error
+        if (error.message && (error.message.includes('SQLITE_MISUSE') || error.message.includes('Database is closed'))) {
+          res.status(503).json({ error: 'Database not available' });
+        } else {
+          res.status(500).json({ error: 'Failed to fetch sessions' });
+        }
       }
     });
 
@@ -402,7 +408,12 @@ export class WebServer {
         res.json(events.reverse()); // Return in chronological order
       } catch (error) {
         console.error('Error fetching activity events:', error);
-        res.status(500).json({ error: 'Failed to fetch activity events' });
+        // Check if it's an activity logger error
+        if (error.message && error.message.includes('Database not initialized')) {
+          res.status(503).json({ error: 'Activity logger not available' });
+        } else {
+          res.status(500).json({ error: 'Failed to fetch activity events' });
+        }
       }
     });
 
