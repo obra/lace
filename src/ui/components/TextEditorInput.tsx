@@ -1,15 +1,8 @@
-// ABOUTME: Advanced text input component combining shell and editor ergonomics
-// ABOUTME: Supports multi-line, completion, history, and modern editing features
+// ABOUTME: Shell-style text input component with cursor navigation and completion
+// ABOUTME: Focused, simple implementation using Ink focus patterns for command line interface
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Box, Text, useInput, useFocus } from 'ink';
-
-interface HistoryManager {
-  entries: string[];
-  position: number;
-  searchTerm: string;
-  searchMode: boolean;
-}
 
 interface CompletionItem {
   value: string;
@@ -17,36 +10,16 @@ interface CompletionItem {
   type: 'command' | 'file' | 'directory';
 }
 
-interface CompletionEngine {
-  active: boolean;
-  items: CompletionItem[];
-  selectedIndex: number;
-  trigger: string;
-}
-
-interface TextBuffer {
-  lines: string[];
-  cursorLine: number;
-  cursorColumn: number;
-  selection: {
-    start: { line: number; column: number } | null;
-    end: { line: number; column: number } | null;
-  };
-}
-
 interface TextEditorInputProps {
   value?: string;
   placeholder?: string;
   focusId?: string;
   autoFocus?: boolean;
-  multiLine?: boolean;
   onSubmit?: (value: string) => void;
   onChange?: (value: string) => void;
   onCommandCompletion?: (prefix: string) => CompletionItem[];
   onFileCompletion?: (prefix: string) => CompletionItem[];
   history?: string[];
-  showLineNumbers?: boolean;
-  maxLines?: number;
 }
 
 const TextEditorInput: React.FC<TextEditorInputProps> = ({
@@ -54,602 +27,397 @@ const TextEditorInput: React.FC<TextEditorInputProps> = ({
   placeholder = 'Type your message...',
   focusId = 'text-editor',
   autoFocus = false,
-  multiLine = true,
   onSubmit,
   onChange,
   onCommandCompletion,
   onFileCompletion,
-  history = [],
-  showLineNumbers = false,
-  maxLines = 10
+  history = []
 }) => {
   const { isFocused } = useFocus({ id: focusId, autoFocus });
   
-  // Core text buffer state
-  const [buffer, setBuffer] = useState<TextBuffer>(() => {
-    const lines = value ? value.split('\n') : [''];
-    return {
-      lines,
-      cursorLine: lines.length - 1,
-      cursorColumn: lines[lines.length - 1]?.length || 0,
-      selection: { start: null, end: null }
-    };
-  });
+  const [cursor, setCursor] = useState({ line: 0, column: 0 });
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [completions, setCompletions] = useState<CompletionItem[]>([]);
+  const [completionIndex, setCompletionIndex] = useState(0);
+  const [showCompletions, setShowCompletions] = useState(false);
+  const [isInternalChange, setIsInternalChange] = useState(false);
 
-  // Mode and state management
-  const [mode, setMode] = useState<'single' | 'multi'>('single');
-  const [insertMode, setInsertMode] = useState<'insert' | 'overwrite'>('insert');
+  // Use value prop directly, split into lines
+  const lines = value.split('\n');
   
-  // History management
-  const [historyManager, setHistoryManager] = useState<HistoryManager>({
-    entries: history,
-    position: -1,
-    searchTerm: '',
-    searchMode: false
-  });
-
-  // Completion system
-  const [completion, setCompletion] = useState<CompletionEngine>({
-    active: false,
-    items: [],
-    selectedIndex: 0,
-    trigger: ''
-  });
-
-  // Undo/redo stacks
-  const [undoStack, setUndoStack] = useState<TextBuffer[]>([]);
-  const [redoStack, setRedoStack] = useState<TextBuffer[]>([]);
-  
-  // Internal refs
-  const lastChangeRef = useRef<number>(0);
-  const debounceRef = useRef<NodeJS.Timeout>();
-
-  // Get current text content
-  const getCurrentText = useCallback(() => {
-    return buffer.lines.join('\n');
-  }, [buffer.lines]);
-
-  // Update external value when buffer changes
-  useEffect(() => {
-    const newText = getCurrentText();
-    if (onChange && newText !== value) {
-      // Debounce onChange calls
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-      debounceRef.current = setTimeout(() => {
-        onChange(newText);
-      }, 100);
+  // Helper to convert line/column to character offset
+  const getCharOffset = useCallback((line: number, column: number) => {
+    let offset = 0;
+    for (let i = 0; i < Math.min(line, lines.length); i++) {
+      offset += lines[i].length + (i < lines.length - 1 ? 1 : 0); // +1 for newline
     }
-  }, [buffer, onChange, value, getCurrentText]);
+    return offset + Math.min(column, lines[line]?.length || 0);
+  }, [lines]);
 
-  // Save state for undo
-  const saveUndo = useCallback(() => {
-    setUndoStack(prev => [...prev.slice(-19), { ...buffer }]); // Keep last 20 states
-    setRedoStack([]); // Clear redo stack on new change
-  }, [buffer]);
-
-  // Move cursor to specific position
-  const moveCursor = useCallback((line: number, column: number) => {
-    setBuffer(prev => ({
-      ...prev,
-      cursorLine: Math.max(0, Math.min(line, prev.lines.length - 1)),
-      cursorColumn: Math.max(0, Math.min(column, prev.lines[line]?.length || 0))
-    }));
-  }, []);
-
-  // Insert text at cursor
-  const insertText = useCallback((text: string) => {
-    saveUndo();
-    
-    setBuffer(prev => {
-      const newLines = [...prev.lines];
-      const currentLine = newLines[prev.cursorLine] || '';
-      
-      if (text.includes('\n')) {
-        // Multi-line insertion
-        const insertLines = text.split('\n');
-        const beforeCursor = currentLine.slice(0, prev.cursorColumn);
-        const afterCursor = currentLine.slice(prev.cursorColumn);
-        
-        // Replace current line with first part + first insert line
-        newLines[prev.cursorLine] = beforeCursor + insertLines[0];
-        
-        // Insert middle lines
-        for (let i = 1; i < insertLines.length - 1; i++) {
-          newLines.splice(prev.cursorLine + i, 0, insertLines[i]);
-        }
-        
-        // Insert last line + remaining text
-        if (insertLines.length > 1) {
-          newLines.splice(prev.cursorLine + insertLines.length - 1, 0, 
-            insertLines[insertLines.length - 1] + afterCursor);
-        }
-        
-        return {
-          ...prev,
-          lines: newLines,
-          cursorLine: prev.cursorLine + insertLines.length - 1,
-          cursorColumn: insertLines[insertLines.length - 1].length
-        };
-      } else {
-        // Single line insertion
-        const newLine = currentLine.slice(0, prev.cursorColumn) + text + currentLine.slice(prev.cursorColumn);
-        newLines[prev.cursorLine] = newLine;
-        
-        return {
-          ...prev,
-          lines: newLines,
-          cursorColumn: prev.cursorColumn + text.length
-        };
+  // Helper to convert character offset to line/column
+  const getLineColumn = useCallback((offset: number) => {
+    let currentOffset = 0;
+    for (let line = 0; line < lines.length; line++) {
+      const lineLength = lines[line].length;
+      if (currentOffset + lineLength >= offset) {
+        return { line, column: offset - currentOffset };
       }
-    });
-  }, [saveUndo]);
+      currentOffset += lineLength + 1; // +1 for newline
+    }
+    // If offset is beyond text, place at end of last line
+    return { line: Math.max(0, lines.length - 1), column: lines[lines.length - 1]?.length || 0 };
+  }, [lines]);
 
-  // Delete text (backspace/delete)
-  const deleteText = useCallback((direction: 'backward' | 'forward', wordMode = false) => {
-    saveUndo();
+  // Only reset cursor position when value changes from external source (like history)
+  React.useEffect(() => {
+    if (!isInternalChange) {
+      const { line, column } = getLineColumn(value.length);
+      setCursor({
+        line: Math.min(Math.max(0, line), lines.length - 1),
+        column: Math.max(0, column)
+      });
+    }
+    setIsInternalChange(false);
+  }, [value, isInternalChange, getLineColumn, lines.length]);
+
+  // Notify parent of changes and update cursor
+  const updateText = useCallback((newText: string, newLine: number, newColumn: number) => {
+    setIsInternalChange(true);
+    setCursor({ line: newLine, column: newColumn });
+    if (onChange) {
+      onChange(newText);
+    }
+  }, [onChange]);
+
+  // Insert text at cursor position
+  const insertText = useCallback((input: string) => {
+    const currentLine = lines[cursor.line] || '';
+    const beforeCursor = currentLine.slice(0, cursor.column);
+    const afterCursor = currentLine.slice(cursor.column);
     
-    setBuffer(prev => {
-      const newLines = [...prev.lines];
-      const currentLine = newLines[prev.cursorLine] || '';
-      
-      if (direction === 'backward') {
-        if (prev.cursorColumn > 0) {
-          // Delete within current line
-          let deleteCount = 1;
-          if (wordMode) {
-            // Delete whole word
-            const beforeCursor = currentLine.slice(0, prev.cursorColumn);
-            const match = beforeCursor.match(/\S*\s*$/);
-            deleteCount = match ? match[0].length : 1;
-          }
-          
-          const newLine = currentLine.slice(0, prev.cursorColumn - deleteCount) + 
-                          currentLine.slice(prev.cursorColumn);
-          newLines[prev.cursorLine] = newLine;
-          
-          return {
-            ...prev,
-            lines: newLines,
-            cursorColumn: prev.cursorColumn - deleteCount
-          };
-        } else if (prev.cursorLine > 0) {
-          // Merge with previous line
-          const prevLine = newLines[prev.cursorLine - 1];
-          const mergedLine = prevLine + currentLine;
-          newLines[prev.cursorLine - 1] = mergedLine;
-          newLines.splice(prev.cursorLine, 1);
-          
-          return {
-            ...prev,
-            lines: newLines,
-            cursorLine: prev.cursorLine - 1,
-            cursorColumn: prevLine.length
-          };
-        }
-      } else {
-        // Forward delete
-        if (prev.cursorColumn < currentLine.length) {
-          let deleteCount = 1;
-          if (wordMode) {
-            const afterCursor = currentLine.slice(prev.cursorColumn);
-            const match = afterCursor.match(/^\s*\S*/);
-            deleteCount = match ? match[0].length : 1;
-          }
-          
-          const newLine = currentLine.slice(0, prev.cursorColumn) + 
-                          currentLine.slice(prev.cursorColumn + deleteCount);
-          newLines[prev.cursorLine] = newLine;
-          
-          return { ...prev, lines: newLines };
-        } else if (prev.cursorLine < prev.lines.length - 1) {
-          // Merge with next line
-          const nextLine = newLines[prev.cursorLine + 1];
-          newLines[prev.cursorLine] = currentLine + nextLine;
-          newLines.splice(prev.cursorLine + 1, 1);
-          
-          return { ...prev, lines: newLines };
-        }
-      }
-      
-      return prev;
-    });
-  }, [saveUndo]);
+    if (input === '\n') {
+      // Handle newline specially
+      const newLines = [...lines];
+      newLines[cursor.line] = beforeCursor;
+      newLines.splice(cursor.line + 1, 0, afterCursor);
+      const newText = newLines.join('\n');
+      updateText(newText, cursor.line + 1, 0);
+    } else {
+      // Regular text insertion
+      const newLine = beforeCursor + input + afterCursor;
+      const newLines = [...lines];
+      newLines[cursor.line] = newLine;
+      const newText = newLines.join('\n');
+      updateText(newText, cursor.line, cursor.column + input.length);
+    }
+  }, [lines, cursor.line, cursor.column, updateText]);
 
-  // Handle new line insertion
-  const insertNewLine = useCallback(() => {
-    if (!multiLine && mode === 'single') {
-      // Submit in single-line mode
-      if (onSubmit) {
-        onSubmit(getCurrentText());
+  // Delete character at cursor
+  const deleteChar = useCallback((direction: 'forward' | 'backward') => {
+    const currentLine = lines[cursor.line] || '';
+    
+    if (direction === 'backward') {
+      if (cursor.column > 0) {
+        // Delete within current line
+        const newLine = currentLine.slice(0, cursor.column - 1) + currentLine.slice(cursor.column);
+        const newLines = [...lines];
+        newLines[cursor.line] = newLine;
+        const newText = newLines.join('\n');
+        updateText(newText, cursor.line, cursor.column - 1);
+      } else if (cursor.line > 0) {
+        // Merge with previous line
+        const prevLine = lines[cursor.line - 1];
+        const mergedLine = prevLine + currentLine;
+        const newLines = [...lines];
+        newLines[cursor.line - 1] = mergedLine;
+        newLines.splice(cursor.line, 1);
+        const newText = newLines.join('\n');
+        updateText(newText, cursor.line - 1, prevLine.length);
+      }
+    } else {
+      // Forward delete
+      if (cursor.column < currentLine.length) {
+        // Delete within current line
+        const newLine = currentLine.slice(0, cursor.column) + currentLine.slice(cursor.column + 1);
+        const newLines = [...lines];
+        newLines[cursor.line] = newLine;
+        const newText = newLines.join('\n');
+        updateText(newText, cursor.line, cursor.column);
+      } else if (cursor.line < lines.length - 1) {
+        // Merge with next line
+        const nextLine = lines[cursor.line + 1];
+        const mergedLine = currentLine + nextLine;
+        const newLines = [...lines];
+        newLines[cursor.line] = mergedLine;
+        newLines.splice(cursor.line + 1, 1);
+        const newText = newLines.join('\n');
+        updateText(newText, cursor.line, cursor.column);
+      }
+    }
+  }, [lines, cursor.line, cursor.column, updateText]);
+
+  // Move cursor
+  const moveCursor = useCallback((direction: 'left' | 'right' | 'home' | 'end' | 'up' | 'down') => {
+    const currentLine = lines[cursor.line] || '';
+    const oldCursor = { ...cursor };
+    
+    switch (direction) {
+      case 'left':
+        if (cursor.column > 0) {
+          setCursor({ line: cursor.line, column: cursor.column - 1 });
+        } else if (cursor.line > 0) {
+          const newLine = cursor.line - 1;
+          const newColumn = lines[newLine].length;
+          setCursor({ line: newLine, column: newColumn });
+        }
+        break;
+      case 'right':
+        if (cursor.column < currentLine.length) {
+          setCursor({ line: cursor.line, column: cursor.column + 1 });
+        } else if (cursor.line < lines.length - 1) {
+          setCursor({ line: cursor.line + 1, column: 0 });
+        }
+        break;
+      case 'up':
+        if (cursor.line > 0) {
+          const newLine = cursor.line - 1;
+          const targetLine = lines[newLine];
+          const newColumn = Math.min(cursor.column, targetLine.length);
+          setCursor({ line: newLine, column: newColumn });
+        }
+        break;
+      case 'down':
+        if (cursor.line < lines.length - 1) {
+          const newLine = cursor.line + 1;
+          const targetLine = lines[newLine];
+          const newColumn = Math.min(cursor.column, targetLine.length);
+          setCursor({ line: newLine, column: newColumn });
+        }
+        break;
+      case 'home':
+        setCursor({ line: cursor.line, column: 0 });
+        break;
+      case 'end':
+        setCursor({ line: cursor.line, column: currentLine.length });
+        break;
+    }
+  }, [cursor.line, cursor.column, lines]);
+
+  // Handle tab completion
+  const triggerCompletion = useCallback(() => {
+    setShowCompletions(false);
+    
+    const currentLine = lines[cursor.line] || '';
+    
+    // Command completion (starts with slash)
+    if (cursor.line === 0 && currentLine.startsWith('/')) {
+      const match = currentLine.match(/^\/(\w*)$/);
+      if (match && onCommandCompletion) {
+        const items = onCommandCompletion(match[1]);
+        if (items.length > 0) {
+          setCompletions(items);
+          setCompletionIndex(0);
+          setShowCompletions(true);
+        }
       }
       return;
     }
 
-    saveUndo();
-    setMode('multi');
-    
-    setBuffer(prev => {
-      const newLines = [...prev.lines];
-      const currentLine = newLines[prev.cursorLine] || '';
-      const beforeCursor = currentLine.slice(0, prev.cursorColumn);
-      const afterCursor = currentLine.slice(prev.cursorColumn);
-      
-      newLines[prev.cursorLine] = beforeCursor;
-      newLines.splice(prev.cursorLine + 1, 0, afterCursor);
-      
-      return {
-        ...prev,
-        lines: newLines,
-        cursorLine: prev.cursorLine + 1,
-        cursorColumn: 0
-      };
-    });
-  }, [multiLine, mode, onSubmit, getCurrentText, saveUndo]);
+    // File completion (word at cursor)
+    const beforeCursor = currentLine.slice(0, cursor.column);
+    const match = beforeCursor.match(/(\S+)$/);
+    if (match && onFileCompletion) {
+      onFileCompletion(match[1]).then((items: CompletionItem[]) => {
+        if (items.length > 0) {
+          setCompletions(items);
+          setCompletionIndex(0);
+          setShowCompletions(true);
+        }
+      });
+    }
+  }, [lines, cursor.line, cursor.column, onCommandCompletion, onFileCompletion]);
 
-  // Trigger completion
-  const triggerCompletion = useCallback((prefix: string, type: 'command' | 'file') => {
-    let items: CompletionItem[] = [];
+  // Apply completion
+  const applyCompletion = useCallback(() => {
+    if (!showCompletions || completions.length === 0) return;
     
-    if (type === 'command' && onCommandCompletion) {
-      items = onCommandCompletion(prefix);
-    } else if (type === 'file' && onFileCompletion) {
-      items = onFileCompletion(prefix);
+    const selectedItem = completions[completionIndex];
+    if (!selectedItem) return;
+
+    const currentLine = lines[cursor.line] || '';
+    
+    if (cursor.line === 0 && currentLine.startsWith('/')) {
+      // Replace entire command
+      const newLines = [...lines];
+      newLines[0] = '/' + selectedItem.value;
+      const newText = newLines.join('\n');
+      updateText(newText, 0, selectedItem.value.length + 1);
+    } else {
+      // Replace word at cursor
+      const beforeCursor = currentLine.slice(0, cursor.column);
+      const match = beforeCursor.match(/(\S+)$/);
+      if (match) {
+        const replaceStart = cursor.column - match[1].length;
+        const newLine = currentLine.slice(0, replaceStart) + selectedItem.value + currentLine.slice(cursor.column);
+        const newLines = [...lines];
+        newLines[cursor.line] = newLine;
+        const newText = newLines.join('\n');
+        updateText(newText, cursor.line, replaceStart + selectedItem.value.length);
+      }
     }
     
-    setCompletion({
-      active: items.length > 0,
-      items,
-      selectedIndex: 0,
-      trigger: prefix
-    });
-  }, [onCommandCompletion, onFileCompletion]);
+    setShowCompletions(false);
+  }, [showCompletions, completions, completionIndex, lines, cursor.line, cursor.column, updateText]);
 
-  // Register input handlers using regular useInput hook
+  // Navigate history
+  const navigateHistory = useCallback((direction: 'up' | 'down') => {
+    if (history.length === 0) return;
+    
+    let newIndex = historyIndex;
+    if (direction === 'up') {
+      newIndex = historyIndex === -1 ? history.length - 1 : Math.max(0, historyIndex - 1);
+    } else {
+      newIndex = historyIndex === -1 ? -1 : Math.min(history.length - 1, historyIndex + 1);
+      if (newIndex === history.length - 1 && historyIndex === history.length - 1) {
+        newIndex = -1; // Back to empty
+      }
+    }
+    
+    setHistoryIndex(newIndex);
+    const historyText = newIndex === -1 ? '' : history[newIndex];
+    const historyLines = historyText.split('\n');
+    const lastLine = historyLines.length - 1;
+    const lastColumn = historyLines[lastLine]?.length || 0;
+    updateText(historyText, lastLine, lastColumn);
+  }, [history, historyIndex, updateText]);
+
+  // Input handler
   useInput((input, key) => {
-
-    // Input handling logic
-    // Handle completion mode
-    if (completion.active) {
+    // Handle completions first
+    if (showCompletions) {
       if (key.escape) {
-        setCompletion(prev => ({ ...prev, active: false }));
+        setShowCompletions(false);
         return;
       }
-      
       if (key.upArrow) {
-        setCompletion(prev => ({
-          ...prev,
-          selectedIndex: Math.max(0, prev.selectedIndex - 1)
-        }));
+        setCompletionIndex(Math.max(0, completionIndex - 1));
         return;
       }
-      
       if (key.downArrow) {
-        setCompletion(prev => ({
-          ...prev,
-          selectedIndex: Math.min(prev.items.length - 1, prev.selectedIndex + 1)
-        }));
+        setCompletionIndex(Math.min(completions.length - 1, completionIndex + 1));
         return;
       }
-      
       if (key.tab || key.return) {
-        const selectedItem = completion.items[completion.selectedIndex];
-        if (selectedItem) {
-          // Replace the trigger with the completion
-          const currentLine = buffer.lines[buffer.cursorLine] || '';
-          const beforeTrigger = currentLine.slice(0, buffer.cursorColumn - completion.trigger.length);
-          const afterCursor = currentLine.slice(buffer.cursorColumn);
-          const newLine = beforeTrigger + selectedItem.value + afterCursor;
-          
-          setBuffer(prev => {
-            const newLines = [...prev.lines];
-            newLines[prev.cursorLine] = newLine;
-            return {
-              ...prev,
-              lines: newLines,
-              cursorColumn: beforeTrigger.length + selectedItem.value.length
-            };
-          });
-        }
-        setCompletion(prev => ({ ...prev, active: false }));
+        applyCompletion();
         return;
       }
+      // Any other key dismisses completions and continues
+      setShowCompletions(false);
     }
 
-        // Handle history search mode
-        if (historyManager.searchMode) {
-          if (key.escape) {
-            setHistoryManager(prev => ({ ...prev, searchMode: false, searchTerm: '' }));
-            return;
-          }
-          
-          if (key.return) {
-            // TODO: Implement history search
-            setHistoryManager(prev => ({ ...prev, searchMode: false }));
-            return;
-          }
-          
-          if (key.backspace) {
-            setHistoryManager(prev => ({ 
-              ...prev, 
-              searchTerm: prev.searchTerm.slice(0, -1) 
-            }));
-            return;
-          }
-          
-          if (input && !key.ctrl && !key.meta) {
-            setHistoryManager(prev => ({ 
-              ...prev, 
-              searchTerm: prev.searchTerm + input 
-            }));
-            return;
-          }
+    // Enter creates newline, Shift+Enter submits
+    if (key.return) {
+      if (key.shift) {
+        // Submit with Shift+Enter
+        if (onSubmit) {
+          onSubmit(value);
         }
+      } else {
+        // Insert newline with Enter
+        insertText('\n');
+      }
+      return;
+    }
 
-        // Multi-line mode detection
-        if (key.shift && key.return) {
-          insertNewLine();
-          return;
-        }
+    // Navigation
+    if (key.leftArrow) {
+      moveCursor('left');
+      return;
+    }
+    if (key.rightArrow) {
+      moveCursor('right');
+      return;
+    }
+    if (key.home || (key.ctrl && input === 'a')) {
+      moveCursor('home');
+      return;
+    }
+    if (key.end || (key.ctrl && input === 'e')) {
+      moveCursor('end');
+      return;
+    }
 
-        // Line continuation with backslash
-        if (input === '\\' && !key.ctrl && !key.meta) {
-          const currentLine = buffer.lines[buffer.cursorLine] || '';
-          if (buffer.cursorColumn === currentLine.length) {
-            insertText('\\');
-            return;
-          }
-        }
+    // Up/Down arrows - history on single line, line navigation on multiline
+    if (key.upArrow) {
+      if (lines.length === 1) {
+        navigateHistory('up');
+      } else {
+        moveCursor('up');
+      }
+      return;
+    }
+    if (key.downArrow) {
+      if (lines.length === 1) {
+        navigateHistory('down');
+      } else {
+        moveCursor('down');
+      }
+      return;
+    }
 
-        // Submit with Ctrl+Enter in multi-line mode
-        if (key.ctrl && key.return && mode === 'multi') {
-          if (onSubmit) {
-            onSubmit(getCurrentText());
-          }
-          return;
-        }
+    // Deletion
+    if (key.backspace) {
+      deleteChar('backward');
+      return;
+    }
+    if (key.delete) {
+      deleteChar('forward');
+      return;
+    }
 
-        // Regular Enter handling
-        if (key.return) {
-          const currentLine = buffer.lines[buffer.cursorLine] || '';
-          
-          // Check for line continuation
-          if (currentLine.endsWith('\\')) {
-            // Remove backslash and continue to next line
-            setBuffer(prev => {
-              const newLines = [...prev.lines];
-              newLines[prev.cursorLine] = currentLine.slice(0, -1);
-              return { ...prev, lines: newLines };
-            });
-            insertNewLine();
-            return;
-          }
-          
-          // Empty line in multi-line mode submits
-          if (mode === 'multi' && currentLine.trim() === '') {
-            if (onSubmit) {
-              onSubmit(getCurrentText());
-            }
-            return;
-          }
-          
-          insertNewLine();
-          return;
-        }
+    // Tab completion
+    if (key.tab) {
+      triggerCompletion();
+      return;
+    }
 
-        // Navigation
-        if (key.leftArrow) {
-          if (key.ctrl) {
-            // Move by word
-            const currentLine = buffer.lines[buffer.cursorLine] || '';
-            const beforeCursor = currentLine.slice(0, buffer.cursorColumn);
-            const match = beforeCursor.match(/\S*\s*$/);
-            const moveDistance = match ? match[0].length : 1;
-            moveCursor(buffer.cursorLine, Math.max(0, buffer.cursorColumn - moveDistance));
-          } else {
-            // Move by character
-            if (buffer.cursorColumn > 0) {
-              moveCursor(buffer.cursorLine, buffer.cursorColumn - 1);
-            } else if (buffer.cursorLine > 0) {
-              const prevLine = buffer.lines[buffer.cursorLine - 1] || '';
-              moveCursor(buffer.cursorLine - 1, prevLine.length);
-            }
-          }
-          return;
-        }
-
-        if (key.rightArrow) {
-          if (key.ctrl) {
-            // Move by word
-            const currentLine = buffer.lines[buffer.cursorLine] || '';
-            const afterCursor = currentLine.slice(buffer.cursorColumn);
-            const match = afterCursor.match(/^\s*\S*/);
-            const moveDistance = match ? match[0].length : 1;
-            moveCursor(buffer.cursorLine, Math.min(currentLine.length, buffer.cursorColumn + moveDistance));
-          } else {
-            // Move by character
-            const currentLine = buffer.lines[buffer.cursorLine] || '';
-            if (buffer.cursorColumn < currentLine.length) {
-              moveCursor(buffer.cursorLine, buffer.cursorColumn + 1);
-            } else if (buffer.cursorLine < buffer.lines.length - 1) {
-              moveCursor(buffer.cursorLine + 1, 0);
-            }
-          }
-          return;
-        }
-
-        // Line navigation in multi-line mode
-        if (mode === 'multi') {
-          if (key.upArrow) {
-            if (buffer.cursorLine > 0) {
-              const targetLine = buffer.lines[buffer.cursorLine - 1] || '';
-              moveCursor(buffer.cursorLine - 1, Math.min(buffer.cursorColumn, targetLine.length));
-            }
-            return;
-          }
-
-          if (key.downArrow) {
-            if (buffer.cursorLine < buffer.lines.length - 1) {
-              const targetLine = buffer.lines[buffer.cursorLine + 1] || '';
-              moveCursor(buffer.cursorLine + 1, Math.min(buffer.cursorColumn, targetLine.length));
-            }
-            return;
-          }
-        } else {
-          // History navigation in single-line mode
-          if (key.upArrow || key.downArrow) {
-            const direction = key.upArrow ? -1 : 1;
-            const newPosition = Math.max(-1, Math.min(historyManager.entries.length - 1, historyManager.position + direction));
-            
-            if (newPosition !== historyManager.position) {
-              const historyText = newPosition === -1 ? '' : historyManager.entries[newPosition];
-              setBuffer({
-                lines: [historyText],
-                cursorLine: 0,
-                cursorColumn: historyText.length,
-                selection: { start: null, end: null }
-              });
-              setHistoryManager(prev => ({ ...prev, position: newPosition }));
-            }
-            return;
-          }
-        }
-
-        // Home/End keys
-        if (key.home || (key.ctrl && input === 'a')) {
-          moveCursor(buffer.cursorLine, 0);
-          return;
-        }
-
-        if (key.end || (key.ctrl && input === 'e')) {
-          const currentLine = buffer.lines[buffer.cursorLine] || '';
-          moveCursor(buffer.cursorLine, currentLine.length);
-          return;
-        }
-
-        // Delete operations
-        if (key.backspace) {
-          deleteText('backward', key.ctrl);
-          return;
-        }
-
-        if (key.delete) {
-          deleteText('forward', key.ctrl);
-          return;
-        }
-
-        // Undo/Redo
-        if (key.ctrl && input === 'z') {
-          if (undoStack.length > 0) {
-            const previousState = undoStack[undoStack.length - 1];
-            setRedoStack(prev => [...prev, { ...buffer }]);
-            setUndoStack(prev => prev.slice(0, -1));
-            setBuffer(previousState);
-          }
-          return;
-        }
-
-        if (key.ctrl && input === 'y') {
-          if (redoStack.length > 0) {
-            const nextState = redoStack[redoStack.length - 1];
-            setUndoStack(prev => [...prev, { ...buffer }]);
-            setRedoStack(prev => prev.slice(0, -1));
-            setBuffer(nextState);
-          }
-          return;
-        }
-
-        // Tab completion
-        if (key.tab) {
-          const currentLine = buffer.lines[buffer.cursorLine] || '';
-          const beforeCursor = currentLine.slice(0, buffer.cursorColumn);
-          
-          // Command completion
-          if (beforeCursor.startsWith('/')) {
-            const commandMatch = beforeCursor.match(/^\/(\w*)$/);
-            if (commandMatch) {
-              triggerCompletion(commandMatch[1], 'command');
-              return;
-            }
-          }
-          
-          // File path completion
-          const pathMatch = beforeCursor.match(/(\S+)$/);
-          if (pathMatch) {
-            triggerCompletion(pathMatch[1], 'file');
-            return;
-          }
-        }
-
-        // History search
-        if (key.ctrl && input === 'r') {
-          setHistoryManager(prev => ({ 
-            ...prev, 
-            searchMode: true, 
-            searchTerm: '' 
-          }));
-          return;
-        }
-
-        // Escape - exit multi-line mode
-        if (key.escape) {
-          if (mode === 'multi') {
-            setMode('single');
-            // Collapse to single line
-            setBuffer(prev => ({
-              lines: [prev.lines.join(' ')],
-              cursorLine: 0,
-              cursorColumn: prev.lines.join(' ').length,
-              selection: { start: null, end: null }
-            }));
-          }
-          return;
-        }
-
-        // Insert mode toggle
-        if (key.insert) {
-          setInsertMode(prev => prev === 'insert' ? 'overwrite' : 'insert');
-          return;
-        }
-
-        // Regular character input
-        if (input && !key.ctrl && !key.meta && input.length === 1) {
-          insertText(input);
-          return;
-        }
-
-    // End of input handling
+    // Regular character input
+    if (input && input.length === 1 && !key.ctrl && !key.meta) {
+      insertText(input);
+      return;
+    }
   }, { isActive: isFocused });
 
-  // Render the component
+  // Render multiple lines with cursor
   const renderLines = () => {
-    const lines = buffer.lines.length === 0 ? [''] : buffer.lines;
-    
-    return lines.map((line, lineIndex) => {
-      const isCurrentLine = lineIndex === buffer.cursorLine;
-      const showLineNumber = showLineNumbers && mode === 'multi';
-      
+    if (!isFocused && value.length === 0) {
       return (
-        <Box key={lineIndex} flexDirection="row">
-          {showLineNumber && (
-            <Text color="dim">{String(lineIndex + 1).padStart(2, ' ')}  </Text>
+        <Box>
+          <Text color="cyan">&gt; </Text>
+          <Text color="dim">{placeholder}</Text>
+        </Box>
+      );
+    }
+
+    return lines.map((line, lineIndex) => {
+      const isCurrentLine = lineIndex === cursor.line;
+      const showPrompt = lineIndex === 0;
+
+      return (
+        <Box key={lineIndex}>
+          {showPrompt && <Text color="cyan">&gt; </Text>}
+          
+          {isCurrentLine && isFocused ? (
+            // Render line with cursor
+            <>
+              <Text>{line.slice(0, cursor.column)}</Text>
+              <Text inverse>{line.slice(cursor.column, cursor.column + 1) || ' '}</Text>
+              <Text>{line.slice(cursor.column + 1)}</Text>
+            </>
+          ) : (
+            // Regular line without cursor
+            <Text>{line || (lineIndex === 0 && line.length === 0 ? <Text color="dim">{placeholder}</Text> : '')}</Text>
           )}
-          
-          <Text color={mode === 'multi' && lineIndex > 0 ? 'cyan' : 'cyan'}>
-            {mode === 'multi' && lineIndex > 0 ? '    > ' : 'lace> '}
-          </Text>
-          
-          <Text>
-            {line || (lineIndex === 0 && !line ? (
-              <Text color="dim">{placeholder}</Text>
-            ) : '')}
-            {isCurrentLine && (
-              <Text color={insertMode === 'insert' ? 'white' : 'yellow'}>
-                {insertMode === 'insert' ? '|' : '█'}
-              </Text>
-            )}
-          </Text>
         </Box>
       );
     });
@@ -657,43 +425,38 @@ const TextEditorInput: React.FC<TextEditorInputProps> = ({
 
   return (
     <Box flexDirection="column">
+      {/* Debug info */}
+      <Box borderStyle="single" borderColor="red" padding={1}>
+        <Text>Debug: line={cursor.line} col={cursor.column} focused={isFocused ? 'Y' : 'N'} lines={lines.length}</Text>
+      </Box>
       {renderLines()}
       
       {/* Completion popup */}
-      {completion.active && (
+      {showCompletions && completions.length > 0 && (
         <Box
           flexDirection="column"
           borderStyle="single"
           borderColor="yellow"
           padding={1}
           marginTop={1}
+          marginLeft={7} // Offset for prompt
         >
           <Text color="yellow" bold>Completions:</Text>
-          {completion.items.map((item, index) => (
+          {completions.slice(0, 8).map((item, index) => (
             <Text
               key={index}
-              color={index === completion.selectedIndex ? 'black' : 'white'}
-              backgroundColor={index === completion.selectedIndex ? 'yellow' : undefined}
+              color={index === completionIndex ? 'black' : 'white'}
+              backgroundColor={index === completionIndex ? 'yellow' : undefined}
             >
-              {item.value} {item.description && <Text color="dim">- {item.description}</Text>}
+              {item.value}
+              {item.description && (
+                <Text color="dim"> - {item.description}</Text>
+              )}
             </Text>
           ))}
-        </Box>
-      )}
-      
-      {/* History search */}
-      {historyManager.searchMode && (
-        <Box>
-          <Text color="yellow">
-            (reverse-i-search)`{historyManager.searchTerm}`: 
-          </Text>
-        </Box>
-      )}
-      
-      {/* Mode indicator */}
-      {mode === 'multi' && (
-        <Box>
-          <Text color="dim">Multi-line mode - Ctrl+Enter to submit, Esc to exit</Text>
+          {completions.length > 8 && (
+            <Text color="dim">... and {completions.length - 8} more</Text>
+          )}
         </Box>
       )}
     </Box>
