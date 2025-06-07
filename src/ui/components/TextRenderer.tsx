@@ -26,10 +26,7 @@ const TextRenderer: React.FC<TextRendererProps> = ({
   // Show placeholder when empty and not focused
   if (!isFocused && lines.length === 1 && lines[0] === '') {
     return (
-      <Box>
-        <Text color="cyan">&gt; </Text>
-        <Text color="dim">{placeholder}</Text>
-      </Box>
+      <Text color="dim">{placeholder}</Text>
     );
   }
 
@@ -49,12 +46,9 @@ const TextRenderer: React.FC<TextRendererProps> = ({
       
       {lines.map((line, lineIndex) => {
         const isCurrentLine = lineIndex === cursorLine;
-        const showPrompt = lineIndex === 0;
 
         return (
           <Box key={lineIndex}>
-            {showPrompt && <Text color="cyan">&gt; </Text>}
-            
             {isCurrentLine && isFocused ? (
               // Render line with cursor
               <>

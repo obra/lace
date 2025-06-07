@@ -2,7 +2,7 @@
 // ABOUTME: Composition of TextBuffer hook, TextRenderer, and input handling
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Box, useInput, useFocus } from 'ink';
+import { Box, Text, useInput, useFocus } from 'ink';
 import { useTextBuffer } from './useTextBuffer';
 import TextRenderer from './TextRenderer';
 
@@ -121,15 +121,20 @@ const ShellInput: React.FC<ShellInputProps> = ({
 
   return (
     <Box flexDirection="column">
-      <TextRenderer
-        lines={bufferState.lines}
-        cursorLine={bufferState.cursorLine}
-        cursorColumn={bufferState.cursorColumn}
-        isFocused={isFocused}
-        placeholder={placeholder}
-        showDebug={showDebug}
-        debugLog={bufferState.debugLog}
-      />
+      <Box>
+        <Text color="cyan">&gt; </Text>
+        <Box flexDirection="column" flexGrow={1}>
+          <TextRenderer
+            lines={bufferState.lines}
+            cursorLine={bufferState.cursorLine}
+            cursorColumn={bufferState.cursorColumn}
+            isFocused={isFocused}
+            placeholder={placeholder}
+            showDebug={showDebug}
+            debugLog={bufferState.debugLog}
+          />
+        </Box>
+      </Box>
     </Box>
   );
 };
