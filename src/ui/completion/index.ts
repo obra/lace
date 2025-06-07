@@ -6,6 +6,11 @@ export { CommandCompletionProvider } from './CommandCompletionProvider.js';
 export { FileCompletionProvider } from './FileCompletionProvider.js';
 export { CompletionManager } from './CompletionManager.js';
 
+// Import for use in the convenience function
+import { CommandCompletionProvider } from './CommandCompletionProvider.js';
+import { FileCompletionProvider } from './FileCompletionProvider.js';
+import { CompletionManager } from './CompletionManager.js';
+
 // Convenience function to create a fully configured completion manager
 export function createCompletionManager(options?: { cwd?: string; history?: string[] }) {
   const manager = new CompletionManager({
