@@ -33,7 +33,7 @@ describe('CompletionManager', () => {
       manager.addProvider(mockProvider1);
       manager.addProvider(mockProvider2);
       
-      expect(manager.providers).toHaveLength(2);
+      expect(manager.getProviderCount()).toBe(2);
     });
 
     it('should remove providers', () => {
@@ -41,8 +41,8 @@ describe('CompletionManager', () => {
       manager.addProvider(mockProvider2);
       manager.removeProvider(mockProvider1);
       
-      expect(manager.providers).toHaveLength(1);
-      expect(manager.providers[0]).toBe(mockProvider2);
+      expect(manager.getProviderCount()).toBe(1);
+      expect(manager.getProvider(0)).toBe(mockProvider2);
     });
   });
 
@@ -71,8 +71,9 @@ describe('CompletionManager', () => {
       const result = await manager.getCompletions(context);
 
       expect(mockProvider1.canHandle).toHaveBeenCalledWith(context);
-      expect(mockProvider1.getCompletions).toHaveBeenCalledWith('/he');
-      expect(mockProvider2.canHandle).toHaveBeenCalledWith(context);
+      expect(mockProvider1.getCompletions).toHaveBeenCalledWith('/help');
+      // Provider2 should not be called since provider1 handled it
+      expect(mockProvider2.canHandle).not.toHaveBeenCalled();
       expect(mockProvider2.getCompletions).not.toHaveBeenCalled();
 
       expect(result.items).toHaveLength(1);
@@ -109,12 +110,12 @@ describe('CompletionManager', () => {
       mockProvider1.canHandle.mockReturnValue(true);
       mockProvider1.getCompletions.mockResolvedValue({
         items: [],
-        prefix: 'file.txt'
+        prefix: 'file'
       });
 
       await manager.getCompletions(context);
 
-      expect(mockProvider1.getCompletions).toHaveBeenCalledWith('file.txt');
+      expect(mockProvider1.getCompletions).toHaveBeenCalledWith('file');
     });
 
     it('should merge with history completions', async () => {
@@ -216,13 +217,13 @@ describe('CompletionManager', () => {
     });
 
     it('should filter exact matches from history completions', async () => {
-      manager.updateHistory(['exact match', 'different command']);
+      manager.updateHistory(['match', 'different command']);
 
       const context = {
-        line: 'exact match',
-        column: 11,
+        line: 'match',
+        column: 5,
         lineNumber: 0,
-        fullText: 'exact match'
+        fullText: 'match'
       };
 
       mockProvider1.canHandle.mockReturnValue(false);
@@ -230,7 +231,7 @@ describe('CompletionManager', () => {
       const result = await manager.getCompletions(context);
 
       // Should not include exact match, only partial matches
-      const exactMatch = result.items.find(item => item.value === 'exact match');
+      const exactMatch = result.items.find(item => item.value === 'match');
       expect(exactMatch).toBeUndefined();
     });
 

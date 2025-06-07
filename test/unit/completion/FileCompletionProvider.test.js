@@ -7,8 +7,13 @@ import * as path from 'path';
 import { FileCompletionProvider } from '../../../src/ui/completion/FileCompletionProvider.js';
 
 // Mock fs module
-jest.mock('fs');
-const mockFs = fs;
+jest.mock('fs', () => ({
+  existsSync: jest.fn(),
+  statSync: jest.fn(),
+  promises: {
+    readdir: jest.fn()
+  }
+}));
 
 describe('FileCompletionProvider', () => {
   let provider;
@@ -20,6 +25,13 @@ describe('FileCompletionProvider', () => {
     
     // Reset mocks
     jest.clearAllMocks();
+    
+    // Set up default mock returns
+    fs.existsSync.mockReturnValue(true);
+    fs.statSync.mockReturnValue({
+      isDirectory: () => false,
+      size: 1024
+    });
   });
 
   describe('canHandle', () => {
@@ -58,17 +70,6 @@ describe('FileCompletionProvider', () => {
   });
 
   describe('getCompletions', () => {
-    beforeEach(() => {
-      // Mock successful directory read
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.promises = {
-        readdir: jest.fn()
-      };
-      mockFs.statSync.mockReturnValue({
-        isDirectory: () => false,
-        size: 1024
-      });
-    });
 
     it('should return file completions', async () => {
       const mockEntries = [
@@ -77,7 +78,7 @@ describe('FileCompletionProvider', () => {
         { name: 'subdir', isDirectory: () => true }
       ];
       
-      mockFs.promises.readdir.mockResolvedValue(mockEntries);
+      fs.promises.readdir.mockResolvedValue(mockEntries);
       
       const result = await provider.getCompletions('file');
       
@@ -96,7 +97,7 @@ describe('FileCompletionProvider', () => {
         { name: 'adir', isDirectory: () => true }
       ];
       
-      mockFs.promises.readdir.mockResolvedValue(mockEntries);
+      fs.promises.readdir.mockResolvedValue(mockEntries);
       
       const result = await provider.getCompletions('a');
       
@@ -110,16 +111,16 @@ describe('FileCompletionProvider', () => {
         { name: 'mydir', isDirectory: () => true }
       ];
       
-      mockFs.promises.readdir.mockResolvedValue(mockEntries);
+      fs.promises.readdir.mockResolvedValue(mockEntries);
       
       const result = await provider.getCompletions('my');
       
       const dir = result.items.find(item => item.type === 'directory');
-      expect(dir.value).toEndWith('/');
+      expect(dir.value).toMatch(/\/$/);  
     });
 
     it('should handle empty directory gracefully', async () => {
-      mockFs.promises.readdir.mockResolvedValue([]);
+      fs.promises.readdir.mockResolvedValue([]);
       
       const result = await provider.getCompletions('nothing');
       
@@ -128,7 +129,7 @@ describe('FileCompletionProvider', () => {
     });
 
     it('should handle filesystem errors gracefully', async () => {
-      mockFs.existsSync.mockReturnValue(false);
+      fs.existsSync.mockReturnValue(false);
       
       const result = await provider.getCompletions('nonexistent');
       
@@ -142,7 +143,7 @@ describe('FileCompletionProvider', () => {
         { name: 'visible.txt', isDirectory: () => false }
       ];
       
-      mockFs.promises.readdir.mockResolvedValue(mockEntries);
+      fs.promises.readdir.mockResolvedValue(mockEntries);
       
       const result = await provider.getCompletions('');
       
@@ -161,7 +162,7 @@ describe('FileCompletionProvider', () => {
         { name: '.gitignore', isDirectory: () => false }
       ];
       
-      mockFs.promises.readdir.mockResolvedValue(mockEntries);
+      fs.promises.readdir.mockResolvedValue(mockEntries);
       
       const result = await provider.getCompletions('.h');
       
@@ -175,7 +176,7 @@ describe('FileCompletionProvider', () => {
         isDirectory: () => false
       }));
       
-      mockFs.promises.readdir.mockResolvedValue(mockEntries);
+      fs.promises.readdir.mockResolvedValue(mockEntries);
       
       const result = await provider.getCompletions('file');
       

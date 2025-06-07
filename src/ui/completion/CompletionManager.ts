@@ -102,10 +102,11 @@ export class CompletionManager {
     }
 
     return this.options.history
-      .filter(item => 
-        item.toLowerCase().includes(prefix.toLowerCase()) &&
-        item !== prefix // Don't complete with exact match
-      )
+      .filter(item => {
+        const lowerItem = item.toLowerCase();
+        const lowerPrefix = prefix.toLowerCase();
+        return lowerItem.includes(lowerPrefix) && lowerItem !== lowerPrefix;
+      })
       .slice(0, 5) // Limit history items
       .map(item => ({
         value: item,
@@ -134,5 +135,19 @@ export class CompletionManager {
    */
   updateOptions(options: Partial<CompletionManagerOptions>) {
     this.options = { ...this.options, ...options };
+  }
+
+  /**
+   * Get the number of registered providers (for testing)
+   */
+  getProviderCount(): number {
+    return this.providers.length;
+  }
+
+  /**
+   * Get provider at index (for testing)
+   */
+  getProvider(index: number): CompletionProvider | undefined {
+    return this.providers[index];
   }
 }
