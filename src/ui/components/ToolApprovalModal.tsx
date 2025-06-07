@@ -2,7 +2,7 @@
 // ABOUTME: Replaces console prompts with visual modal interface for better UX
 
 import React, { useState } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text, useInput, useFocus } from 'ink';
 import { Select, TextInput } from '@inkjs/ui';
 
 interface ToolCall {
@@ -30,6 +30,7 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
   onDeny,
   onStop
 }) => {
+  const { isFocused } = useFocus({ id: 'tool-approval', autoFocus: true });
   const [mode, setMode] = useState<'select' | 'modify' | 'comment'>('select');
   const [modifiedParams, setModifiedParams] = useState(JSON.stringify(toolCall.input, null, 2));
   const [comment, setComment] = useState('');
@@ -80,24 +81,10 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
 
   // Handle escape key to go back to select mode
   useInput((input, key) => {
-    if (!isInputActive('tool-approval')) return;
-    
     if (key.escape && mode !== 'select') {
       setMode('select');
     }
-  }, [isInputActive, mode]);
-
-  // Handle mode transitions and initial focus
-  React.useEffect(() => {
-    // Activate tool approval input when modal appears
-    setActiveInput('tool-approval');
-  }, [setActiveInput]);
-
-  React.useEffect(() => {
-    if (mode !== 'select') {
-      setActiveInput('tool-approval');
-    }
-  }, [mode, setActiveInput]);
+  }, { isActive: isFocused });
 
   return (
     <Box
@@ -151,11 +138,10 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
       {/* Mode-specific content */}
       {mode === 'select' && (
         <Box flexDirection="column">
-          <Text bold color="blue" marginBottom={1}>Choose an action:</Text>
+          <Text bold color="blue">Choose an action:</Text>
           <Select 
             options={options} 
             onChange={handleSelectChange}
-            isDisabled={!isFocused}
           />
         </Box>
       )}
@@ -163,10 +149,9 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
       {mode === 'modify' && (
         <>
           <Box flexDirection="column">
-            <Text bold color="blue" marginBottom={1}>Modify Parameters (JSON):</Text>
+            <Text bold color="blue">Modify Parameters (JSON):</Text>
             <TextInput
-              value={modifiedParams}
-              onChange={setModifiedParams}
+              defaultValue={modifiedParams}
               onSubmit={(value) => {
                 try {
                   const parsed = JSON.parse(value);
@@ -177,11 +162,10 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
                   onApprove(toolCall);
                 }
               }}
-              isDisabled={!isInputActive('tool-approval')}
               placeholder="Enter JSON parameters..."
             />
           </Box>
-          <Box justifyContent="center" marginTop={1}>
+          <Box justifyContent="center">
             <Text color="dim">Edit JSON, Enter to approve, Esc to cancel</Text>
           </Box>
         </>
@@ -190,16 +174,14 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
       {mode === 'comment' && (
         <>
           <Box flexDirection="column">
-            <Text bold color="blue" marginBottom={1}>Add Comment:</Text>
+            <Text bold color="blue">Add Comment:</Text>
             <TextInput
-              value={comment}
-              onChange={setComment}
+              defaultValue={comment}
               onSubmit={(value) => onApprove(toolCall, value)}
-              isDisabled={!isInputActive('tool-approval')}
               placeholder="Enter your comment..."
             />
           </Box>
-          <Box justifyContent="center" marginTop={1}>
+          <Box justifyContent="center">
             <Text color="dim">Type your comment, Enter to approve with comment, Esc to cancel</Text>
           </Box>
         </>

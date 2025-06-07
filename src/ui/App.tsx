@@ -305,7 +305,7 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
         // Exit navigation mode
         setIsNavigationMode(false);
         setScrollPosition(0);
-        setActiveInput('text-editor');
+        focus('text-editor');
       } else if (input === 'j' || key.downArrow) {
         // Scroll down
         setScrollPosition(prev => Math.min(prev + 1, totalMessages - 1));
