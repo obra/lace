@@ -8,10 +8,6 @@ export { CompletionManager } from './CompletionManager.js';
 
 // Convenience function to create a fully configured completion manager
 export function createCompletionManager(options?: { cwd?: string; history?: string[] }) {
-  const { CommandCompletionProvider } = require('./CommandCompletionProvider.js');
-  const { FileCompletionProvider } = require('./FileCompletionProvider.js');
-  const { CompletionManager } = require('./CompletionManager.js');
-  
   const manager = new CompletionManager({
     includeHistory: true,
     maxItems: 20,
