@@ -18,6 +18,8 @@ export interface TextBufferOperations {
   getText: () => string;
   setCursorPosition: (line: number, column: number) => void;
   getCurrentLine: () => string;
+  killLine: () => void;
+  killLineBackward: () => void;
   addDebug: (message: string) => void;
 }
 
@@ -174,6 +176,34 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
     return lines[cursorLine] || '';
   }, [lines, cursorLine]);
 
+  const killLine = useCallback(() => {
+    setDebugLog(prev => [...prev.slice(-4), `KILL LINE at pos ${cursorColumn}`]);
+    
+    const currentLine = lines[cursorLine] || '';
+    if (cursorColumn < currentLine.length) {
+      // Kill from cursor to end of line
+      const newLine = currentLine.slice(0, cursorColumn);
+      const newLines = [...lines];
+      newLines[cursorLine] = newLine;
+      setLines(newLines);
+      // Cursor stays at same position
+    }
+  }, [lines, cursorLine, cursorColumn]);
+
+  const killLineBackward = useCallback(() => {
+    setDebugLog(prev => [...prev.slice(-4), `KILL LINE BACKWARD at pos ${cursorColumn}`]);
+    
+    const currentLine = lines[cursorLine] || '';
+    if (cursorColumn > 0) {
+      // Kill from beginning of line to cursor
+      const newLine = currentLine.slice(cursorColumn);
+      const newLines = [...lines];
+      newLines[cursorLine] = newLine;
+      setLines(newLines);
+      setCursorColumn(0);
+    }
+  }, [lines, cursorLine, cursorColumn]);
+
   const addDebug = useCallback((message: string) => {
     setDebugLog(prev => [...prev.slice(-4), message]);
   }, []);
@@ -186,6 +216,8 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
     getText,
     setCursorPosition,
     getCurrentLine,
+    killLine,
+    killLineBackward,
     addDebug
   };
 

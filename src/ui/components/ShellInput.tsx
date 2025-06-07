@@ -101,6 +101,28 @@ const ShellInput: React.FC<ShellInputProps> = ({
       return;
     }
 
+    // Emacs-style editing commands
+    if (key.ctrl && input === 'k') {
+      // Kill line (delete from cursor to end of line)
+      bufferOps.killLine();
+      return;
+    }
+    if (key.ctrl && input === 'u') {
+      // Kill line backward (delete from beginning of line to cursor)
+      bufferOps.killLineBackward();
+      return;
+    }
+    if (key.ctrl && input === 'd') {
+      // Delete character forward (like Delete key)
+      bufferOps.deleteChar('forward');
+      return;
+    }
+    if (key.ctrl && input === 'h') {
+      // Delete character backward (like Backspace key)
+      bufferOps.deleteChar('backward');
+      return;
+    }
+
     // Deletion
     if (key.delete) {
       bufferOps.addDebug('DELETE/BACKSPACE KEY DETECTED in input handler');
