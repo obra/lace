@@ -275,9 +275,9 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
 
   // Global input handlers using regular useInput hook
   useInput((input, key) => {
-    // Global Ctrl+C handler (always active)
+    // Global Ctrl+C handler - always try to cancel/abort first, exit only on double press
     if (key.ctrl && input === 'c') {
-      // If agent/tools are processing, abort immediately
+      // If agent/tools are processing, abort them and reset UI
       if ((isLoading || isStreaming) && laceUI) {
         const aborted = laceUI.handleAbort();
         if (aborted) {
@@ -293,11 +293,16 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
               content: 'Operation cancelled by user (Ctrl+C)' 
             }];
           });
+          // Reset the exit counter since we successfully aborted something
+          setCtrlCCount(0);
+          if (ctrlCTimeoutRef.current) {
+            clearTimeout(ctrlCTimeoutRef.current);
+          }
           return;
         }
       }
       
-      // If not processing, handle exit logic
+      // If not processing anything, handle exit warning/exit logic
       setCtrlCCount(prev => prev + 1);
       
       if (ctrlCCount === 0) {
