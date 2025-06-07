@@ -277,6 +277,27 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
   useInput((input, key) => {
     // Global Ctrl+C handler (always active)
     if (key.ctrl && input === 'c') {
+      // If agent/tools are processing, abort immediately
+      if ((isLoading || isStreaming) && laceUI) {
+        const aborted = laceUI.handleAbort();
+        if (aborted) {
+          // Update UI state to reflect abortion
+          setIsLoading(false);
+          setIsStreaming(false);
+          setConversation(prev => {
+            const withoutLoadingOrStreaming = prev.filter(msg => 
+              msg.type !== 'loading' && msg.type !== 'streaming'
+            );
+            return [...withoutLoadingOrStreaming, { 
+              type: 'assistant' as const, 
+              content: 'Operation cancelled by user (Ctrl+C)' 
+            }];
+          });
+          return;
+        }
+      }
+      
+      // If not processing, handle exit logic
       setCtrlCCount(prev => prev + 1);
       
       if (ctrlCCount === 0) {
@@ -297,6 +318,26 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
         process.exit(0);
       }
       return; // Always handle Ctrl+C
+    }
+    
+    // Global Escape handler for aborting processing (but not navigation)
+    if (key.escape && (isLoading || isStreaming) && laceUI) {
+      const aborted = laceUI.handleAbort();
+      if (aborted) {
+        // Update UI state to reflect abortion
+        setIsLoading(false);
+        setIsStreaming(false);
+        setConversation(prev => {
+          const withoutLoadingOrStreaming = prev.filter(msg => 
+            msg.type !== 'loading' && msg.type !== 'streaming'
+          );
+          return [...withoutLoadingOrStreaming, { 
+            type: 'assistant' as const, 
+            content: 'Operation cancelled by user (Esc)' 
+          }];
+        });
+        return;
+      }
     }
 
     // Navigation mode handlers (only when navigation is active)

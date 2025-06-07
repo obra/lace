@@ -120,13 +120,13 @@ const StatusBar: React.FC<StatusBarProps> = ({
         <>
           <Text color="yellow">Thinking...</Text>
           <Text> | </Text>
-          <Text color="dim">Please wait</Text>
+          <Text color="dim">Ctrl+C or Esc to abort</Text>
         </>
       ) : isStreaming ? (
         <>
           <Text color="yellow">Streaming...</Text>
           <Text> | </Text>
-          <Text color="dim">Generating response</Text>
+          <Text color="dim">Ctrl+C or Esc to abort</Text>
         </>
       ) : (
         <>
