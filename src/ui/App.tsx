@@ -7,7 +7,7 @@ import { Box, useStdout } from 'ink';
 // Remove fullscreen-ink import from here - will be used in lace-ui.ts instead
 import ConversationView from './components/ConversationView';
 import StatusBar from './components/StatusBar';
-import TextEditorInput from './components/TextEditorInput';
+import ShellInput from './components/ShellInput';
 import ToolApprovalModal from './components/ToolApprovalModal';
 import { useInput, useFocus, useFocusManager } from 'ink';
 
@@ -373,7 +373,7 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
         modelName={modelName}
         terminalWidth={stdout.columns || 100}
       />
-      <TextEditorInput 
+      <ShellInput 
         value={isSearchMode ? searchTerm : inputText}
         placeholder={isSearchMode ? 'Search...' : 'Type your message...'}
         focusId={isSearchMode ? 'search-input' : 'text-editor'}
@@ -390,15 +390,8 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
           submitMessage
         }
         onChange={isSearchMode ? setSearchTerm : setInputText}
-        onCommandCompletion={(prefix) => {
-          // Use single source of truth from console command registry
-          return laceUI ? laceUI.getCommandCompletions(prefix) : [];
-        }}
-        onFileCompletion={async (prefix) => {
-          // Use real file system completion via file tool
-          return laceUI ? await laceUI.getFileCompletions(prefix) : [];
-        }}
         history={conversation.filter(msg => msg.type === 'user').map(msg => msg.content).slice(-10)}
+        showDebug={false}
       />
       
       {/* Tool Approval Modal */}

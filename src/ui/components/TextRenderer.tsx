@@ -1,0 +1,82 @@
+// ABOUTME: Pure component for rendering text with cursor
+// ABOUTME: Takes state and renders, no logic or input handling
+
+import React from 'react';
+import { Box, Text } from 'ink';
+
+interface TextRendererProps {
+  lines: string[];
+  cursorLine: number;
+  cursorColumn: number;
+  isFocused: boolean;
+  placeholder?: string;
+  showDebug?: boolean;
+  debugLog?: string[];
+}
+
+const TextRenderer: React.FC<TextRendererProps> = ({
+  lines,
+  cursorLine,
+  cursorColumn,
+  isFocused,
+  placeholder = 'Type your message...',
+  showDebug = false,
+  debugLog = []
+}) => {
+  // Show placeholder when empty and not focused
+  if (!isFocused && lines.length === 1 && lines[0] === '') {
+    return (
+      <Box>
+        <Text color="cyan">&gt; </Text>
+        <Text color="dim">{placeholder}</Text>
+      </Box>
+    );
+  }
+
+  return (
+    <Box flexDirection="column">
+      {showDebug && (
+        <Box borderStyle="single" borderColor="red" padding={1} flexDirection="column">
+          <Text>Debug: line={cursorLine} col={cursorColumn} focused={isFocused ? 'Y' : 'N'} lines={lines.length}</Text>
+          <Text>Current line: "{lines[cursorLine] || ''}" (len={lines[cursorLine]?.length || 0})</Text>
+          <Text>Char under cursor: "{lines[cursorLine]?.slice(cursorColumn, cursorColumn + 1) || 'EOF'}"</Text>
+          <Text>Backspace would delete: "{cursorColumn > 0 ? lines[cursorLine]?.slice(cursorColumn - 1, cursorColumn) || 'none' : 'none'}"</Text>
+          {debugLog.map((log, i) => (
+            <Text key={i} color="yellow">LOG: {log}</Text>
+          ))}
+        </Box>
+      )}
+      
+      {lines.map((line, lineIndex) => {
+        const isCurrentLine = lineIndex === cursorLine;
+        const showPrompt = lineIndex === 0;
+
+        return (
+          <Box key={lineIndex}>
+            {showPrompt && <Text color="cyan">&gt; </Text>}
+            
+            {isCurrentLine && isFocused ? (
+              // Render line with cursor
+              <>
+                <Text>{line.slice(0, cursorColumn)}</Text>
+                <Text inverse>{line.slice(cursorColumn, cursorColumn + 1) || ' '}</Text>
+                <Text>{line.slice(cursorColumn + 1)}</Text>
+              </>
+            ) : (
+              // Regular line without cursor - show placeholder only on first line if empty
+              lineIndex === 0 && line.length === 0 ? (
+                <Text color="dim">{placeholder}</Text>
+              ) : line.length === 0 ? (
+                <Text> </Text>
+              ) : (
+                <Text>{line}</Text>
+              )
+            )}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+};
+
+export default TextRenderer;
