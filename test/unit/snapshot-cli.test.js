@@ -6,10 +6,19 @@ import { TestHarness, utils } from '../test-harness.js';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
+// Try to import SnapshotCLI, handle case where it doesn't exist yet (TDD)
+let SnapshotCLI;
+try {
+  const module = await import('../../src/snapshot/snapshot-cli.js');
+  SnapshotCLI = module.SnapshotCLI;
+} catch (error) {
+  // Class doesn't exist yet, that's expected in TDD
+  SnapshotCLI = null;
+}
+
 describe('SnapshotCLI', () => {
   let testHarness;
   let testDir;
-  let SnapshotCLI;
   let mockSnapshotManager;
   let mockRestoreOperations;
   let mockOutput;
@@ -161,14 +170,7 @@ describe('SnapshotCLI', () => {
       ]
     };
     
-    // Try to import the class
-    try {
-      const module = await import('../../src/snapshot/snapshot-cli.js');
-      SnapshotCLI = module.SnapshotCLI;
-    } catch (error) {
-      // Class doesn't exist yet, that's expected in TDD
-      SnapshotCLI = null;
-    }
+    // SnapshotCLI is already imported at module level
   });
 
   afterEach(async () => {

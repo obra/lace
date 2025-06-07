@@ -1,10 +1,14 @@
 // ABOUTME: Test harness for Lace agentic coding environment
 // ABOUTME: Provides utilities for unit, integration, and end-to-end testing
 
-import { test, describe, beforeEach, afterEach } from 'node:test';
+import { test, describe, beforeEach, afterEach } from '@jest/globals';
 import assert from 'node:assert';
 import { promises as fs } from 'fs';
 import { join } from 'path';
+import { Agent } from '../src/agents/agent.js';
+import { ToolRegistry } from '../src/tools/tool-registry.js';
+import { ConversationDB } from '../src/database/conversation-db.js';
+import { Lace } from '../src/lace.js';
 
 export class TestHarness {
   constructor() {
@@ -52,10 +56,6 @@ export class TestHarness {
 
   // Create a test agent without API key requirements
   async createTestAgent(options = {}) {
-    const { Agent } = await import('../src/agents/agent.js');
-    const { ToolRegistry } = await import('../src/tools/tool-registry.js');
-    const { ConversationDB } = await import('../src/database/conversation-db.js');
-
     const tools = new ToolRegistry();
     await tools.initialize();
 
@@ -79,8 +79,6 @@ export class TestHarness {
 
   // Create a full Lace instance for integration tests
   async createTestLace(options = {}) {
-    const { Lace } = await import('../src/lace.js');
-    
     const lace = new Lace({
       verbose: false,
       memoryPath: await this.createTestDatabase('-lace'),
@@ -102,7 +100,7 @@ export class TestHarness {
       });
     } else {
       await lace.modelProvider.initialize();
-      lace.primaryAgent = new (await import('../src/agents/agent.js')).Agent({
+      lace.primaryAgent = new Agent({
         generation: 0,
         tools: lace.tools,
         db: lace.db,

@@ -450,6 +450,7 @@ Focus on executing your assigned task efficiently.`;
         return {
           toolCall,
           error: `Tool execution denied: ${approval.reason}`,
+          success: false,
           denied: true,
           approved: false,
           shouldStop: approval.shouldStop
@@ -469,7 +470,7 @@ Focus on executing your assigned task efficiently.`;
     
     return {
       toolCall: approvedCall,
-      result: synthesizedResult,
+      ...synthesizedResult,  // Flatten the result into the response
       approved: true,
       denied: false,
       postExecutionComment
@@ -524,6 +525,7 @@ Focus on executing your assigned task efficiently.`;
         return {
           toolCall,
           error: error.message,
+          success: false,
           denied: false,
           approved: false
         };

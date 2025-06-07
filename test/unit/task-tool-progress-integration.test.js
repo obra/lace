@@ -3,6 +3,8 @@
 
 import { test, describe, beforeEach, afterEach } from '../test-harness.js';
 import { TestHarness, assert, utils } from '../test-harness.js';
+import { TaskTool } from '../../src/tools/task-tool.js';
+import { ProgressTracker } from '../../src/tools/progress-tracker.js';
 
 describe('TaskTool-ProgressTracker Integration', () => {
   let harness;
@@ -13,10 +15,7 @@ describe('TaskTool-ProgressTracker Integration', () => {
   beforeEach(async () => {
     harness = new TestHarness();
     
-    // Import classes
-    const { TaskTool } = await import('../../src/tools/task-tool.js');
-    const { ProgressTracker } = await import('../../src/tools/progress-tracker.js');
-
+    // Create instances
     progressTracker = new ProgressTracker();
     taskTool = new TaskTool();
 

@@ -1,7 +1,7 @@
 // ABOUTME: Integration tests for dual logging system (activity + debug logging)
 // ABOUTME: Verifies both systems work independently without interference
 
-import { test, describe } from 'node:test';
+import { test, describe } from '@jest/globals';
 import assert from 'node:assert';
 import { Agent } from '../../src/agents/agent.js';
 import { ToolRegistry } from '../../src/tools/tool-registry.js';

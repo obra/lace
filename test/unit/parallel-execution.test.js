@@ -53,26 +53,10 @@ describe('Parallel Tool Execution', () => {
       getAllSchemas: () => ({})
     };
 
-    // Import Agent and create instance with mock tools
-    const { Agent } = await import('../../src/agents/agent.js');
-    
-    // Mock minimal dependencies
-    const mockDb = {
-      getCurrentSessionId: () => 'test-session',
-      saveMessage: async () => {},
-      getConversationHistory: async () => []
-    };
-    
-    const mockModelProvider = {
-      generateResponse: async () => ({ content: 'test' }),
-      initialize: async () => {}
-    };
-    
-    agent = new Agent({
+    // Use TestHarness to create agent instead of direct import
+    agent = await harness.createTestAgent({
       generation: 1,
       tools: mockTools,
-      db: mockDb,
-      modelProvider: mockModelProvider,
       maxConcurrentTools: 3, // Test limit
       debugLogging: null // Disable debug logging to avoid sqlite3 dependency
     });
@@ -184,12 +168,9 @@ describe('Parallel Tool Execution', () => {
 
     test('should use default maxConcurrentTools of 10', async () => {
       // Agent without explicit maxConcurrentTools should default to 10
-      const { Agent } = await import('../../src/agents/agent.js');
-      const defaultAgent = new Agent({
+      const defaultAgent = await harness.createTestAgent({
         generation: 1,
-        tools: mockTools,
-        db: { getCurrentSessionId: () => 'test-session' },
-        modelProvider: { generateResponse: async () => ({ content: 'test' }) }
+        tools: mockTools
         // No maxConcurrentTools specified
       });
 
@@ -309,8 +290,8 @@ describe('Parallel Tool Execution', () => {
       const totalTime = endTime - startTime;
 
       // Sequential execution would take ~1200ms (4 * 300ms)
-      // Parallel execution should take ~300ms (max of concurrent executions)
-      assert.ok(totalTime < 600, `Parallel execution (${totalTime}ms) should be much faster than sequential (~1200ms)`);
+      // Parallel execution with limit 3 should take ~600ms (2 batches of 300ms)
+      assert.ok(totalTime < 700, `Parallel execution (${totalTime}ms) should be much faster than sequential (~1200ms)`);
       assert.equal(results.length, 4, 'Should complete all tools');
       assert.ok(results.every(r => r.success), 'All tools should succeed');
     });

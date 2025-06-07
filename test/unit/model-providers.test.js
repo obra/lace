@@ -1,7 +1,7 @@
 // ABOUTME: Unit tests for model provider session ID tracking functionality
 // ABOUTME: Tests conversation ID generation, session tracking, and UUID creation
 
-import { test, describe } from 'node:test';
+import { test, describe } from '@jest/globals';
 import assert from 'node:assert';
 import { AnthropicProvider } from '../../src/models/providers/anthropic-provider.js';
 import { OpenAIProvider } from '../../src/models/providers/openai-provider.js';

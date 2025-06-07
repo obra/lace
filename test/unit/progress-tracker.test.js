@@ -3,6 +3,7 @@
 
 import { test, describe, beforeEach, afterEach } from '../test-harness.js';
 import { TestHarness, assert, utils } from '../test-harness.js';
+import { ProgressTracker } from '../../src/tools/progress-tracker.js';
 
 describe('ProgressTracker', () => {
   let harness;
@@ -12,8 +13,7 @@ describe('ProgressTracker', () => {
   beforeEach(async () => {
     harness = new TestHarness();
     
-    // Import ProgressTracker
-    const { ProgressTracker } = await import('../../src/tools/progress-tracker.js');
+    // Create ProgressTracker instance
     progressTracker = new ProgressTracker({
       cleanupInterval: 100, // Fast cleanup for testing
       maxAge: 1000, // 1 second for testing
@@ -43,7 +43,6 @@ describe('ProgressTracker', () => {
     });
 
     test('should use default options', async () => {
-      const { ProgressTracker } = await import('../../src/tools/progress-tracker.js');
       const defaultTracker = new ProgressTracker();
       
       assert.equal(defaultTracker.cleanupInterval, 300000, 'Should use default cleanup interval');
@@ -389,7 +388,6 @@ describe('ProgressTracker', () => {
 
   describe('Cleanup and Memory Management', () => {
     test('should cleanup old entries', async () => {
-      const { ProgressTracker } = await import('../../src/tools/progress-tracker.js');
       const testTracker = new ProgressTracker({
         cleanupInterval: 50,
         maxAge: 100 // 100ms
