@@ -149,26 +149,44 @@ const ShellInput: React.FC<ShellInputProps> = ({
         setCompletionIndex(Math.min(completions.length - 1, completionIndex + 1));
         return;
       }
-      if (key.tab || (key.return && !key.shift)) {
-        // Apply completion on Tab or Enter (but not Shift+Enter)
+      if (key.tab) {
+        // Apply completion on Tab
+        bufferOps.addDebug('Applying completion');
+        applyCompletion();
+        return;
+      }
+      if (key.return) {
+        // Apply completion on Enter when in completion mode
+        bufferOps.addDebug('Applying completion');
         applyCompletion();
         return;
       }
       // Any other key dismisses completions and continues processing
+      bufferOps.addDebug(`Dismissing completions, continuing with key: shift=${key.shift} return=${key.return}`);
       setShowCompletions(false);
     }
     
-    // Submit with Shift+Enter
-    if (key.return && key.shift) {
-      if (onSubmit) {
-        onSubmit(bufferOps.getText());
-      }
-      return;
-    }
-
-    // Insert newline with Enter
+    // Handle Enter - submit or newline based on line ending
     if (key.return) {
-      bufferOps.insertText('\n');
+      const currentLine = bufferState.lines[bufferState.cursorLine] || '';
+      const trimmedLine = currentLine.trim();
+      
+      if (trimmedLine.endsWith('\\')) {
+        // Line ends with backslash - remove backslash and insert newline
+        bufferOps.addDebug('Line ends with \\, removing backslash and inserting newline');
+        const lineWithoutBackslash = currentLine.replace(/\\(\s*)$/, '$1'); // Remove backslash but keep trailing whitespace
+        const newLines = [...bufferState.lines];
+        newLines[bufferState.cursorLine] = lineWithoutBackslash;
+        newLines.splice(bufferState.cursorLine + 1, 0, ''); // Insert empty line after current
+        bufferOps.setText(newLines.join('\n'));
+        bufferOps.setCursorPosition(bufferState.cursorLine + 1, 0); // Move to start of next line
+      } else {
+        // Submit the message
+        bufferOps.addDebug('ENTER DETECTED - submitting');
+        if (onSubmit) {
+          onSubmit(bufferOps.getText());
+        }
+      }
       return;
     }
 
