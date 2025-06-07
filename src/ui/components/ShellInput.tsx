@@ -5,6 +5,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Box, Text, useInput, useFocus } from 'ink';
 import { useTextBuffer } from './useTextBuffer';
 import TextRenderer from './TextRenderer';
+import { CompletionManager, CompletionItem, CompletionContext } from '../completion/index.js';
 
 interface ShellInputProps {
   value?: string;
@@ -15,6 +16,7 @@ interface ShellInputProps {
   onChange?: (value: string) => void;
   history?: string[];
   showDebug?: boolean;
+  completionManager?: CompletionManager;
 }
 
 const ShellInput: React.FC<ShellInputProps> = ({
@@ -25,10 +27,17 @@ const ShellInput: React.FC<ShellInputProps> = ({
   onSubmit,
   onChange,
   history = [],
-  showDebug = false
+  showDebug = false,
+  completionManager
 }) => {
   const { isFocused } = useFocus({ id: focusId, autoFocus });
   const [bufferState, bufferOps] = useTextBuffer(value);
+
+  // Completion state
+  const [completions, setCompletions] = useState<CompletionItem[]>([]);
+  const [completionIndex, setCompletionIndex] = useState(0);
+  const [showCompletions, setShowCompletions] = useState(false);
+  const [completionPrefix, setCompletionPrefix] = useState('');
 
   // Only sync external value changes on first mount or significant changes (like history)
   const [lastExternalValue, setLastExternalValue] = useState(value);
@@ -55,11 +64,98 @@ const ShellInput: React.FC<ShellInputProps> = ({
     notifyChange(currentText);
   }, [bufferState.lines, notifyChange, bufferOps]);
 
+  // Trigger completion logic
+  const triggerCompletion = useCallback(async () => {
+    setShowCompletions(false);
+    
+    if (!completionManager) {
+      bufferOps.addDebug('No completion manager available');
+      return;
+    }
+
+    const currentLine = bufferState.lines[bufferState.cursorLine] || '';
+    const { cursorLine, cursorColumn } = bufferState;
+    
+    const context: CompletionContext = {
+      line: currentLine,
+      column: cursorColumn,
+      lineNumber: cursorLine,
+      fullText: bufferOps.getText(),
+      cwd: process.cwd()
+    };
+
+    try {
+      const result = await completionManager.getCompletions(context);
+      bufferOps.addDebug(`Completion: found ${result.items.length} items for "${result.prefix}"`);
+      
+      if (result.items.length > 0) {
+        setCompletions(result.items);
+        setCompletionIndex(0);
+        setCompletionPrefix(result.prefix);
+        setShowCompletions(true);
+      }
+    } catch (error) {
+      bufferOps.addDebug(`Completion error: ${error.message}`);
+    }
+  }, [bufferState, bufferOps, completionManager]);
+
+  // Apply selected completion
+  const applyCompletion = useCallback(() => {
+    if (!showCompletions || completions.length === 0) return;
+    
+    const selectedItem = completions[completionIndex];
+    if (!selectedItem) return;
+
+    const currentLine = bufferState.lines[bufferState.cursorLine] || '';
+    const { cursorLine, cursorColumn } = bufferState;
+    
+    if (cursorLine === 0 && currentLine.startsWith('/') && selectedItem.type === 'command') {
+      // Replace entire command (from / to cursor)
+      const newLine = '/' + selectedItem.value;
+      bufferOps.setText(newLine);
+      bufferOps.setCursorPosition(0, newLine.length);
+    } else {
+      // Replace word/path before cursor using the stored prefix
+      const prefixLength = completionPrefix.length;
+      const replaceStart = cursorColumn - prefixLength;
+      const newLine = currentLine.slice(0, replaceStart) + selectedItem.value + currentLine.slice(cursorColumn);
+      const newLines = [...bufferState.lines];
+      newLines[cursorLine] = newLine;
+      bufferOps.setText(newLines.join('\n'));
+      bufferOps.setCursorPosition(cursorLine, replaceStart + selectedItem.value.length);
+    }
+    
+    setShowCompletions(false);
+    bufferOps.addDebug(`Applied completion: ${selectedItem.value}`);
+  }, [showCompletions, completions, completionIndex, completionPrefix, bufferState, bufferOps]);
+
   // Input handler
   useInput((input, key) => {
     // Debug ALL key properties
     const keyProps = Object.keys(key).filter(k => key[k]).join(',');
     bufferOps.addDebug(`KEY: input="${input}" props=[${keyProps}]`);
+    
+    // Handle completion mode
+    if (showCompletions) {
+      if (key.escape) {
+        setShowCompletions(false);
+        return;
+      }
+      if (key.upArrow) {
+        setCompletionIndex(Math.max(0, completionIndex - 1));
+        return;
+      }
+      if (key.downArrow) {
+        setCompletionIndex(Math.min(completions.length - 1, completionIndex + 1));
+        return;
+      }
+      if (key.tab || key.return) {
+        applyCompletion();
+        return;
+      }
+      // Any other key dismisses completions and continues processing
+      setShowCompletions(false);
+    }
     
     // Submit with Shift+Enter
     if (key.return && key.shift) {
@@ -123,6 +219,12 @@ const ShellInput: React.FC<ShellInputProps> = ({
       return;
     }
 
+    // Tab completion
+    if (key.tab) {
+      triggerCompletion();
+      return;
+    }
+
     // Deletion
     if (key.delete) {
       bufferOps.addDebug('DELETE/BACKSPACE KEY DETECTED in input handler');
@@ -157,6 +259,40 @@ const ShellInput: React.FC<ShellInputProps> = ({
           />
         </Box>
       </Box>
+      
+      {/* Completion overlay */}
+      {showCompletions && completions.length > 0 && (
+        <Box
+          flexDirection="column"
+          borderStyle="single"
+          borderColor="yellow"
+          padding={1}
+          marginTop={1}
+          marginLeft={2} // Offset for prompt
+        >
+          <Text color="yellow" bold>Completions ({completions.length}):</Text>
+          {completions.slice(0, 8).map((item, index) => (
+            <Box key={index} flexDirection="row">
+              <Text
+                color={index === completionIndex ? 'black' : 'white'}
+                backgroundColor={index === completionIndex ? 'yellow' : undefined}
+              >
+                {item.value}
+              </Text>
+              {item.description && (
+                <Text color="dim"> - {item.description}</Text>
+              )}
+              <Text color="dim"> [{item.type}]</Text>
+            </Box>
+          ))}
+          {completions.length > 8 && (
+            <Text color="dim">... and {completions.length - 8} more</Text>
+          )}
+          <Text color="dim" marginTop={1}>
+            ↑↓ navigate • Tab/Enter apply • Esc cancel
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 };

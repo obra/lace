@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 // @ts-expect-error - useStdout is available at runtime but TypeScript has module resolution issues
 import { Box, useStdout } from 'ink';
+import { createCompletionManager } from './completion/index.js';
 // Remove fullscreen-ink import from here - will be used in lace-ui.ts instead
 import ConversationView from './components/ConversationView';
 import StatusBar from './components/StatusBar';
@@ -37,6 +38,10 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [tokenUsage, setTokenUsage] = useState({ used: 0, total: 200000 });
   const [modelName, setModelName] = useState('claude-3-5-sonnet');
+  const [completionManager] = useState(() => createCompletionManager({
+    cwd: process.cwd(),
+    history: []
+  }));
   const streamingRef = useRef<{ content: string }>({ content: '' });
   const [ctrlCCount, setCtrlCCount] = useState(0);
   const ctrlCTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -47,6 +52,15 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
     resolve: (result: any) => void;
   } | null>(null);
   
+  // Update completion manager history when conversation changes
+  useEffect(() => {
+    const userMessages = conversation
+      .filter(msg => msg.type === 'user')
+      .map(msg => msg.content)
+      .slice(-10);
+    completionManager.updateHistory(userMessages);
+  }, [conversation, completionManager]);
+
   // Setup streaming callback and tool approval for laceUI
   useEffect(() => {
     if (laceUI) {
@@ -392,6 +406,7 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
         onChange={isSearchMode ? setSearchTerm : setInputText}
         history={conversation.filter(msg => msg.type === 'user').map(msg => msg.content).slice(-10)}
         showDebug={false}
+        completionManager={completionManager}
       />
       
       {/* Tool Approval Modal */}
