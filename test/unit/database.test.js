@@ -57,9 +57,14 @@ describe('Conversation Database', () => {
       const generation = 0;
       
       await db.saveMessage(sessionId, generation, 'user', 'Hello world');
+      // Small delay to ensure different timestamps
+      await new Promise(resolve => setTimeout(resolve, 100));
       await db.saveMessage(sessionId, generation, 'assistant', 'Hi there!');
       
       const history = await db.getConversationHistory(sessionId);
+      
+      // Debug: log the actual order and timestamps
+      console.log('Messages in order:', history.map(h => ({ role: h.role, timestamp: h.timestamp })));
       
       assert.strictEqual(history.length, 2, 'Should have saved both messages');
       assert.strictEqual(history[0].role, 'assistant', 'Should return most recent first');

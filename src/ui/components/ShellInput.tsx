@@ -69,7 +69,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
     setShowCompletions(false);
     
     if (!completionManager) {
-      bufferOps.addDebug('No completion manager available');
+      // bufferOps.addDebug('No completion manager available');
       return;
     }
 
@@ -86,7 +86,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
 
     try {
       const result = await completionManager.getCompletions(context);
-      bufferOps.addDebug(`Completion: found ${result.items.length} items for "${result.prefix}"`);
+      // bufferOps.addDebug(`Completion: found ${result.items.length} items for "${result.prefix}"`);
       
       if (result.items.length > 0) {
         setCompletions(result.items);
@@ -95,7 +95,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
         setShowCompletions(true);
       }
     } catch (error) {
-      bufferOps.addDebug(`Completion error: ${error.message}`);
+      // bufferOps.addDebug(`Completion error: ${error.message}`);
     }
   }, [bufferState, bufferOps, completionManager]);
 
@@ -126,14 +126,14 @@ const ShellInput: React.FC<ShellInputProps> = ({
     }
     
     setShowCompletions(false);
-    bufferOps.addDebug(`Applied completion: ${selectedItem.value}`);
+    // bufferOps.addDebug(`Applied completion: ${selectedItem.value}`);
   }, [showCompletions, completions, completionIndex, completionPrefix, bufferState, bufferOps]);
 
   // Input handler
   useInput((input, key) => {
     // Debug ALL key properties
     const keyProps = Object.keys(key).filter(k => key[k]).join(',');
-    bufferOps.addDebug(`KEY: input="${input}" props=[${keyProps}]`);
+    // bufferOps.addDebug(`KEY: input="${input}" props=[${keyProps}]`);
     
     // Handle completion mode
     if (showCompletions) {
@@ -207,11 +207,11 @@ const ShellInput: React.FC<ShellInputProps> = ({
       bufferOps.moveCursor('down');
       return;
     }
-    if (key.home || (key.ctrl && input === 'a')) {
+    if (key.ctrl && input === 'a') {
       bufferOps.moveCursor('home');
       return;
     }
-    if (key.end || (key.ctrl && input === 'e')) {
+    if (key.ctrl && input === 'e') {
       bufferOps.moveCursor('end');
       return;
     }
@@ -273,8 +273,8 @@ const ShellInput: React.FC<ShellInputProps> = ({
             cursorColumn={bufferState.cursorColumn}
             isFocused={isFocused}
             placeholder={placeholder}
-            showDebug={showDebug}
-            debugLog={bufferState.debugLog}
+            showDebug={false}
+            debugLog={[]}
           />
         </Box>
       </Box>
@@ -291,7 +291,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
         >
           <Text color="yellow" bold>Completions ({completions.length}):</Text>
           {completions.slice(0, 8).map((item, index) => (
-            <Box key={index} flexDirection="row">
+            <Box key={`completion-${index}-${item.value}-${item.type}`} flexDirection="row">
               <Text
                 color={index === completionIndex ? 'black' : 'white'}
                 backgroundColor={index === completionIndex ? 'yellow' : undefined}
@@ -307,9 +307,9 @@ const ShellInput: React.FC<ShellInputProps> = ({
           {completions.length > 8 && (
             <Text color="dim">... and {completions.length - 8} more</Text>
           )}
-          <Text color="dim" marginTop={1}>
-            ↑↓ navigate • Tab/Enter apply • Esc cancel
-          </Text>
+          <Box marginTop={1}>
+            <Text color="dim">↑↓ navigate • Tab/Enter apply • Esc cancel</Text>
+          </Box>
         </Box>
       )}
     </Box>

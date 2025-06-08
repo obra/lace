@@ -3,7 +3,6 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-// @ts-expect-error - ink-spinner types may have module resolution issues  
 import Spinner from 'ink-spinner';
 import { processContentWithHighlighting } from '../utils/syntax-highlight';
 import { highlightSearchTerm } from '../utils/search-highlight';
@@ -59,7 +58,6 @@ const Message: React.FC<MessageProps> = ({
         return (
           <Box>
             <Text color={prefixColor}>{prefix}</Text>
-            {/* @ts-expect-error - inverse prop exists in runtime but TypeScript is having issues */}
             <Text inverse={isHighlighted}>{displaySummary}</Text>
           </Box>
         );
@@ -69,13 +67,12 @@ const Message: React.FC<MessageProps> = ({
           <Box flexDirection="column">
             <Box>
               <Text color={prefixColor}>{prefix}</Text>
-              {/* @ts-expect-error - inverse prop exists in runtime but TypeScript is having issues */}
               <Text inverse={isHighlighted}>{displaySummary}</Text>
             </Box>
             {Array.isArray(content) && content.map((item, index) => {
               const displayItem = searchTerm ? highlightSearchTerm(item, searchTerm) : item;
               return (
-                <Box key={index}>
+                <Box key={`content-item-${index}-${item.slice(0, 20)}`}>
                   <Text>  {displayItem}</Text>
                 </Box>
               );
@@ -88,7 +85,6 @@ const Message: React.FC<MessageProps> = ({
       return (
         <Box>
           <Text color={prefixColor}>{prefix}</Text>
-          {/* @ts-expect-error - inverse prop exists in runtime but TypeScript is having issues */}
           <Text inverse={isHighlighted}>
             <Spinner type="hearts" /> {content}
           </Text>
@@ -111,7 +107,6 @@ const Message: React.FC<MessageProps> = ({
       return (
         <Box>
           <Text color={prefixColor}>{prefix}</Text>
-          {/* @ts-expect-error - inverse prop exists in runtime but TypeScript is having issues */}
           <Text inverse={isHighlighted}>{displayContent}</Text>
           {showCursor && (
             <Text color="white">▌</Text>

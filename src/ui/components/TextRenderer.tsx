@@ -32,6 +32,7 @@ const TextRenderer: React.FC<TextRendererProps> = ({
 
   return (
     <Box flexDirection="column">
+{/* Debugging disabled
       {showDebug && (
         <Box borderStyle="single" borderColor="red" padding={1} flexDirection="column">
           <Text>Debug: line={cursorLine} col={cursorColumn} focused={isFocused ? 'Y' : 'N'} lines={lines.length}</Text>
@@ -39,22 +40,23 @@ const TextRenderer: React.FC<TextRendererProps> = ({
           <Text>Char under cursor: "{lines[cursorLine]?.slice(cursorColumn, cursorColumn + 1) || 'EOF'}"</Text>
           <Text>Backspace would delete: "{cursorColumn > 0 ? lines[cursorLine]?.slice(cursorColumn - 1, cursorColumn) || 'none' : 'none'}"</Text>
           {debugLog.map((log, i) => (
-            <Text key={i} color="yellow">LOG: {log}</Text>
+            <Text key={`debug-${i}-${log.slice(0, 10)}`} color="yellow">LOG: {log}</Text>
           ))}
         </Box>
       )}
+      */}
       
       {lines.map((line, lineIndex) => {
         const isCurrentLine = lineIndex === cursorLine;
 
         return (
-          <Box key={lineIndex}>
+          <Box key={`line-${lineIndex}-${line.slice(0, 15).replace(/[^a-zA-Z0-9]/g, '_')}`}>
             {isCurrentLine && isFocused ? (
               // Render line with cursor
               <>
-                <Text>{line.slice(0, cursorColumn)}</Text>
-                <Text inverse>{line.slice(cursorColumn, cursorColumn + 1) || ' '}</Text>
-                <Text>{line.slice(cursorColumn + 1)}</Text>
+                <Text key={`before-${lineIndex}`}>{line.slice(0, cursorColumn)}</Text>
+                <Text key={`cursor-${lineIndex}`} inverse>{line.slice(cursorColumn, cursorColumn + 1) || ' '}</Text>
+                <Text key={`after-${lineIndex}`}>{line.slice(cursorColumn + 1)}</Text>
               </>
             ) : (
               // Regular line without cursor - show placeholder only on first line if empty

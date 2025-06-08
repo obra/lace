@@ -6,7 +6,7 @@ export default {
     '^(\\.{1,2}/.*)\\.js$': '$1'
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(ink-testing-library|ink-spinner|@inkjs/ui|ink|ansi-escapes|cli-truncate|string-width|strip-ansi|ansi-regex|chalk)/)'
+    'node_modules/(?!(ink-testing-library|ink-spinner|@inkjs/ui|ink|ansi-escapes|cli-truncate|string-width|strip-ansi|ansi-regex|chalk|fullscreen-ink|figures|is-unicode-supported|cli-spinners)/)'
   ],
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
@@ -15,11 +15,8 @@ export default {
         jsx: 'react-jsx',
         skipLibCheck: true,
         noImplicitAny: false,
-        moduleResolution: 'node'
+        moduleResolution: 'bundler'
       }
-    }],
-    '^.+\\.js$': ['ts-jest', {
-      useESM: true
     }]
   },
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],

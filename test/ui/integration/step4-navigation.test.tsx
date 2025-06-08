@@ -38,7 +38,7 @@ describe('Step 4: Navigation Mode Integration', () => {
     
     // Navigation mode shows instruction directly (not in fragment)
     const navText = navElement.props.children[1];
-    expect(navText.props.children).toBe('Navigation mode - Press Escape to exit');
+    expect(navText.props.children).toBe('Navigation mode - Press Escape or q to exit');
     expect(navText.props.color).toBe('yellow');
   });
 

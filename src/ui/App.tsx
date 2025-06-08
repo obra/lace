@@ -2,7 +2,6 @@
 // ABOUTME: Implements full-window layout with ConversationView, StatusBar, and InputBar
 
 import React, { useState, useEffect, useRef } from 'react';
-// @ts-expect-error - useStdout is available at runtime but TypeScript has module resolution issues
 import { Box, useStdout, useStdin } from 'ink';
 import { createCompletionManager } from './completion/index.js';
 // Remove fullscreen-ink import from here - will be used in lace-ui.ts instead
@@ -460,7 +459,7 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
       
       {/* Tool Approval Modal */}
       {toolApprovalRequest && (
-        <Box position="absolute" top={2} left={0} right={0}>
+        <Box position="absolute" marginTop={2}>
           <ToolApprovalModal
             toolCall={toolApprovalRequest.toolCall}
             riskLevel={toolApprovalRequest.riskLevel}
