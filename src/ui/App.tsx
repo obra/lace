@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 // @ts-expect-error - useStdout is available at runtime but TypeScript has module resolution issues
-import { Box, useStdout } from 'ink';
+import { Box, useStdout, useStdin } from 'ink';
 import { createCompletionManager } from './completion/index.js';
 // Remove fullscreen-ink import from here - will be used in lace-ui.ts instead
 import ConversationView from './components/ConversationView';
@@ -25,6 +25,7 @@ interface AppProps {
 
 const AppInner: React.FC<AppProps> = ({ laceUI }) => {
   const { stdout } = useStdout();
+  const { isRawModeSupported, setRawMode } = useStdin();
   const { focus } = useFocusManager();
   const [isNavigationMode, setIsNavigationMode] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -60,6 +61,16 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
       .slice(-10);
     completionManager.updateHistory(userMessages);
   }, [conversation, completionManager]);
+
+  // Setup raw mode to handle Ctrl+C properly
+  useEffect(() => {
+    if (isRawModeSupported) {
+      setRawMode(true);
+      return () => {
+        setRawMode(false);
+      };
+    }
+  }, [isRawModeSupported, setRawMode]);
 
   // Setup streaming callback and tool approval for laceUI
   useEffect(() => {
@@ -275,13 +286,12 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
 
   // Global input handlers using regular useInput hook
   useInput((input, key) => {
-    // Global Ctrl+C handler - always try to cancel/abort first, exit only on double press
+    // Handle Ctrl+C with proper logic
     if (key.ctrl && input === 'c') {
-      // If agent/tools are processing, abort them and reset UI
+      // If processing, abort and reset counter
       if ((isLoading || isStreaming) && laceUI) {
         const aborted = laceUI.handleAbort();
         if (aborted) {
-          // Update UI state to reflect abortion
           setIsLoading(false);
           setIsStreaming(false);
           setConversation(prev => {
@@ -293,7 +303,6 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
               content: 'Operation cancelled by user (Ctrl+C)' 
             }];
           });
-          // Reset the exit counter since we successfully aborted something
           setCtrlCCount(0);
           if (ctrlCTimeoutRef.current) {
             clearTimeout(ctrlCTimeoutRef.current);
@@ -302,27 +311,21 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
         }
       }
       
-      // If not processing anything, handle exit warning/exit logic
+      // Handle exit logic
       setCtrlCCount(prev => prev + 1);
       
       if (ctrlCCount === 0) {
-        // First Ctrl+C - show warning and start timeout
         console.log('\nPress Ctrl+C again to exit...');
-        
-        // Clear any existing timeout
         if (ctrlCTimeoutRef.current) {
           clearTimeout(ctrlCTimeoutRef.current);
         }
-        
-        // Reset count after 2 seconds
         ctrlCTimeoutRef.current = setTimeout(() => {
           setCtrlCCount(0);
         }, 2000);
       } else {
-        // Second Ctrl+C - exit immediately
         process.exit(0);
       }
-      return; // Always handle Ctrl+C
+      return;
     }
     
     // Global Escape handler for aborting processing (but not navigation)

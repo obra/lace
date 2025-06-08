@@ -312,6 +312,7 @@ export class LaceUI {
     }
   }
 
+
   stop() {
     if (this.app) {
       this.app.unmount();
