@@ -269,9 +269,9 @@ export class LaceUI {
   }
 
   // Command completion using console command registry
-  getCommandCompletions(prefix: string) {
+  async getCommandCompletions(prefix: string) {
     // Import Console to use its command registry
-    const { Console } = require('../interface/console.js');
+    const { Console } = await import('../interface/console.js');
     const console = new Console();
     console.currentAgent = this.primaryAgent; // Set agent for completions
     

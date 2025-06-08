@@ -1,7 +1,7 @@
 // ABOUTME: Mock implementation of Ink components for testing
 // ABOUTME: Allows testing component logic without actual terminal rendering
 
-const React = require('react');
+import React from 'react';
 
 const Box = React.forwardRef(({ children, ...props }, ref) => {
   return React.createElement('box', { 'data-testid': 'box', ref, ...props }, children);
@@ -23,7 +23,7 @@ const render = (element) => {
   };
 };
 
-module.exports = {
+export {
   Box,
   Text,
   render

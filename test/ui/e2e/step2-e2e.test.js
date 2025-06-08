@@ -1,8 +1,8 @@
 // ABOUTME: End-to-end tests for Step 2 layout functionality
 // ABOUTME: Documents verification steps and validates file structure
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
 describe('Step 2 E2E: Basic Layout Structure', () => {
   test('all required component files exist', () => {
@@ -10,7 +10,7 @@ describe('Step 2 E2E: Basic Layout Structure', () => {
       'src/ui/App.tsx',
       'src/ui/components/StatusBar.tsx',
       'src/ui/components/ConversationView.tsx',
-      'src/ui/components/InputBar.tsx'
+      'src/ui/components/ShellInput.tsx'
     ];
 
     components.forEach(file => {
@@ -22,12 +22,12 @@ describe('Step 2 E2E: Basic Layout Structure', () => {
   test('component files contain expected exports', () => {
     const statusBar = fs.readFileSync(path.join(process.cwd(), 'src/ui/components/StatusBar.tsx'), 'utf8');
     const conversationView = fs.readFileSync(path.join(process.cwd(), 'src/ui/components/ConversationView.tsx'), 'utf8');
-    const inputBar = fs.readFileSync(path.join(process.cwd(), 'src/ui/components/InputBar.tsx'), 'utf8');
+    const shellInput = fs.readFileSync(path.join(process.cwd(), 'src/ui/components/ShellInput.tsx'), 'utf8');
     const app = fs.readFileSync(path.join(process.cwd(), 'src/ui/App.tsx'), 'utf8');
 
     expect(statusBar).toContain('export default StatusBar');
     expect(conversationView).toContain('export default ConversationView');
-    expect(inputBar).toContain('export default InputBar');
+    expect(shellInput).toContain('export default ShellInput');
     expect(app).toContain('export default App');
   });
 
@@ -36,12 +36,12 @@ describe('Step 2 E2E: Basic Layout Structure', () => {
     
     expect(app).toContain("import ConversationView from './components/ConversationView'");
     expect(app).toContain("import StatusBar from './components/StatusBar'");
-    expect(app).toContain("import InputBar from './components/InputBar'");
+    expect(app).toContain("import ShellInput from './components/ShellInput'");
   });
 
   test('package.json has ui script', () => {
     const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
-    expect(packageJson.scripts.ui).toBe('tsx src/ui/index.tsx');
+    expect(packageJson.scripts.ui).toBe('tsx src/ui/lace-cli.js');
   });
 
   test('manual verification: Step 2 acceptance criteria', () => {

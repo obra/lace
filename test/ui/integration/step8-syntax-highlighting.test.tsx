@@ -172,8 +172,8 @@ describe('Step 8: Code Syntax Highlighting Integration', () => {
     });
   });
 
-  test('syntax highlighting utility functions work correctly', () => {
-    const { detectCodeBlocks, highlightCode, processContentWithHighlighting } = require('../../../src/ui/utils/syntax-highlight');
+  test('syntax highlighting utility functions work correctly', async () => {
+    const { detectCodeBlocks, highlightCode, processContentWithHighlighting } = await import('../../../src/ui/utils/syntax-highlight.js');
     
     // Test code block detection
     const content = 'Text before\n\n```javascript\nconst x = 1;\n```\n\nText after';
