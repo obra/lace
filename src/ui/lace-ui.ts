@@ -110,10 +110,11 @@ export class LaceUI {
       capabilities: ['orchestration', 'reasoning', 'planning', 'delegation']
     });
 
-    // Start the Ink UI directly with exitOnCtrlC disabled
-    this.app = render(React.createElement(App, { laceUI: this }), {
+    // Start the fullscreen Ink UI with exitOnCtrlC disabled  
+    const fullscreenApp = withFullScreen(React.createElement(App, { laceUI: this }), {
       exitOnCtrlC: false
     });
+    this.app = await fullscreenApp.start();
 
     return this.app;
   }
