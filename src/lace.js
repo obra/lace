@@ -3,7 +3,7 @@
 
 import { ConversationDB } from './database/conversation-db.js';
 import { ToolRegistry } from './tools/tool-registry.js';
-import { Agent } from './agents/agent.js';
+import { Agent } from './agents/agent.ts';
 import { Console } from './interface/console.js';
 import { WebServer } from './interface/web-server.js';
 import { ModelProvider } from './models/model-provider.js';
