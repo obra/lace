@@ -155,7 +155,7 @@ export class WebServer {
         const limit = parseInt(req.query.limit) || 100;
         
         const messages = await this.db.getConversationHistory(sessionId, limit);
-        res.json(messages.reverse()); // Return in chronological order
+        res.json(messages); // Return in reverse chronological order (newest first)
       } catch (error) {
         console.error('Error fetching messages:', error);
         res.status(500).json({ error: 'Failed to fetch messages' });

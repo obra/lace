@@ -26,7 +26,7 @@ export class ProgressTracker {
    * @param {Object} [progressUpdate.helpRequest] - Help request data if status is needs_help
    */
   async updateProgress(agentId, progressUpdate) {
-    if (!agentId || !progressUpdate || !progressUpdate.status) {
+    if (agentId == null || !progressUpdate || !progressUpdate.status) {
       throw new Error('Agent ID and status are required for progress updates');
     }
 
