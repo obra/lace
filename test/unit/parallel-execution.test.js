@@ -166,16 +166,27 @@ describe('Parallel Tool Execution', () => {
       assert.equal(results.length, 6, 'Should process all 6 tools');
     });
 
-    test('should use default maxConcurrentTools of 10', async () => {
-      // Agent without explicit maxConcurrentTools should default to 10
+    test('should use role-based default maxConcurrentTools', async () => {
+      // Agent without explicit maxConcurrentTools should use role's default
       const defaultAgent = await harness.createTestAgent({
         generation: 1,
         tools: mockTools
-        // No maxConcurrentTools specified
+        // No maxConcurrentTools specified - should use role default
       });
 
-      // Should have default value
-      assert.equal(defaultAgent.maxConcurrentTools, 10, 'Should default to 10 concurrent tools');
+      // Should use the 'general' role's default value of 8
+      assert.equal(defaultAgent.maxConcurrentTools, 8, 'Should use general role default of 8 concurrent tools');
+      
+      // Test with orchestrator role which has different default
+      const orchestratorAgent = await harness.createTestAgent({
+        generation: 1,
+        tools: mockTools,
+        role: 'orchestrator'
+        // No maxConcurrentTools specified - should use orchestrator role default
+      });
+      
+      // Should use the 'orchestrator' role's default value of 10
+      assert.equal(orchestratorAgent.maxConcurrentTools, 10, 'Should use orchestrator role default of 10 concurrent tools');
     });
   });
 
