@@ -110,14 +110,14 @@ describe('TaskTool', () => {
 
       assert.equal(result.success, true, 'Should succeed');
       assert.ok(result.result, 'Should have result');
-      assert.equal(result.metadata.role, 'specialist', 'Should use default role');
+      assert.equal(result.metadata.role, 'general', 'Should use default role');
       assert.equal(result.metadata.model, 'claude-3-5-sonnet-20241022', 'Should use default model');
     });
 
     test('should delegate task with custom options', async () => {
       const params = {
         description: 'Custom task',
-        role: 'researcher',
+        role: 'reasoning',
         model: 'claude-3-5-haiku-20241022',
         provider: 'anthropic',
         capabilities: ['analysis', 'research'],
@@ -127,7 +127,7 @@ describe('TaskTool', () => {
       const result = await taskTool.delegateTask(params);
 
       assert.equal(result.success, true, 'Should succeed');
-      assert.equal(result.metadata.role, 'researcher', 'Should use custom role');
+      assert.equal(result.metadata.role, 'reasoning', 'Should use custom role');
       assert.equal(result.metadata.model, 'claude-3-5-haiku-20241022', 'Should use custom model');
       assert.equal(result.metadata.provider, 'anthropic', 'Should use custom provider');
     });
@@ -219,7 +219,7 @@ describe('TaskTool', () => {
 
     test('should spawn agent successfully', async () => {
       const params = {
-        role: 'coder',
+        role: 'execution',
         task: 'Write a function',
         model: 'claude-3-5-sonnet-20241022',
         capabilities: ['coding', 'testing']
@@ -230,12 +230,12 @@ describe('TaskTool', () => {
       assert.equal(result.success, true, 'Should succeed');
       assert.equal(result.agentId, 1.2, 'Should return correct agent ID');
       assert.ok(result.result, 'Should have result');
-      assert.equal(result.metadata.role, 'coder', 'Should use specified role');
+      assert.equal(result.metadata.role, 'execution', 'Should use specified role');
     });
 
     test('should use default values', async () => {
       const params = {
-        role: 'analyst',
+        role: 'reasoning',
         task: 'Analyze data'
       };
 
@@ -251,7 +251,7 @@ describe('TaskTool', () => {
       const resultNoRole = await taskTool.spawnAgent(paramsNoRole);
       assert.equal(resultNoRole.success, false, 'Should fail without role');
 
-      const paramsNoTask = { role: 'tester' };
+      const paramsNoTask = { role: 'execution' };
       const resultNoTask = await taskTool.spawnAgent(paramsNoTask);
       assert.equal(resultNoTask.success, false, 'Should fail without task');
     });
@@ -259,7 +259,7 @@ describe('TaskTool', () => {
     test('should fail without agent context', async () => {
       taskTool.setAgent(null);
       const params = {
-        role: 'coder',
+        role: 'execution',
         task: 'Write code'
       };
 
@@ -272,7 +272,7 @@ describe('TaskTool', () => {
     test('should truncate long task descriptions in result', async () => {
       const longTask = 'a'.repeat(200);
       const params = {
-        role: 'worker',
+        role: 'execution',
         task: longTask
       };
 
@@ -500,7 +500,7 @@ describe('TaskTool', () => {
       taskTool.setAgent(errorAgent);
       
       const result = await taskTool.spawnAgent({
-        role: 'test',
+        role: 'execution',
         task: 'test task'
       });
 

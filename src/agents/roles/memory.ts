@@ -1,7 +1,7 @@
 // ABOUTME: Memory role definition for providing historical context from previous conversations
 // ABOUTME: Answers questions about past interactions and provides relevant historical details
 
-import { Role } from './types.js';
+import { Role } from './types.ts';
 
 export const memory: Role = {
   name: 'memory',

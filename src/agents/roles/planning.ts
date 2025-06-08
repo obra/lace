@@ -1,7 +1,7 @@
 // ABOUTME: Planning role definition for breaking down complex tasks into actionable steps
 // ABOUTME: Analyzes requirements, identifies dependencies, creates detailed execution plans
 
-import { Role } from './types.js';
+import { Role } from './types.ts';
 
 export const planning: Role = {
   name: 'planning',

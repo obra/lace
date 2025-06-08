@@ -1,7 +1,7 @@
 // ABOUTME: General role definition for versatile agents that adapt to various tasks
 // ABOUTME: Provides full range of capabilities when no specialized role is needed
 
-import { Role } from './types.js';
+import { Role } from './types.ts';
 
 export const general: Role = {
   name: 'general',

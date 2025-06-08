@@ -1,7 +1,7 @@
 // ABOUTME: Reasoning role definition for analyzing complex problems and providing insights
 // ABOUTME: Considers multiple approaches, provides detailed explanations, helps with architectural decisions
 
-import { Role } from './types.js';
+import { Role } from './types.ts';
 
 export const reasoning: Role = {
   name: 'reasoning',

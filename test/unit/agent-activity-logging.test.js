@@ -55,7 +55,7 @@ describe('Agent Model Call Activity Logging', () => {
       db: await harness.createTestDatabase(),
       modelProvider: mockModelProvider,
       verbose: false,
-      role: 'test',
+      role: 'general',
       assignedModel: 'test-model',
       assignedProvider: 'test-provider',
       activityLogger: activityLogger
@@ -280,7 +280,8 @@ describe('Agent Model Call Activity Logging', () => {
         tools: mockTools,
         db: await harness.createTestDatabase(),
         modelProvider: failingProvider,
-        activityLogger: activityLogger
+        activityLogger: activityLogger,
+        role: 'general'
       });
       
       const messages = [{ role: 'user', content: 'Test input' }];
@@ -314,7 +315,8 @@ describe('Agent Model Call Activity Logging', () => {
         tools: mockTools,
         db: await harness.createTestDatabase(),
         modelProvider: mockModelProvider,
-        activityLogger: null // No logger
+        activityLogger: null, // No logger
+        role: 'general'
       });
       
       // This should not throw when activityLogger is null

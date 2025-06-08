@@ -1,7 +1,7 @@
 // ABOUTME: Execution role definition for carrying out specific tasks efficiently
 // ABOUTME: Follows provided plans and instructions, uses tools to accomplish concrete goals
 
-import { Role } from './types.js';
+import { Role } from './types.ts';
 
 export const execution: Role = {
   name: 'execution',

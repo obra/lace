@@ -1,7 +1,7 @@
 // ABOUTME: Synthesis role definition for processing and synthesizing information as requested
 // ABOUTME: Follows specific synthesis instructions, preserves essential information while reducing verbosity
 
-import { Role } from './types.js';
+import { Role } from './types.ts';
 
 export const synthesis: Role = {
   name: 'synthesis',
