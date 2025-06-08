@@ -101,6 +101,7 @@ describe('Dual Logging System Integration', () => {
           modelProvider,
           toolApproval,
           activityLogger,
+          role: 'general',
           debugLogging: {
             logLevel: 'info',
             logFile: debugLogFile,
@@ -128,7 +129,8 @@ describe('Dual Logging System Integration', () => {
           db,
           modelProvider,
           toolApproval,
-          activityLogger
+          activityLogger,
+          role: 'general'
         });
 
         // Verify debug logger is not initialized
@@ -152,6 +154,7 @@ describe('Dual Logging System Integration', () => {
           modelProvider,
           toolApproval,
           activityLogger,
+          role: 'general',
           verbose: true,
           debugLogging: {
             logLevel: 'debug',
@@ -211,6 +214,7 @@ describe('Dual Logging System Integration', () => {
           modelProvider,
           toolApproval,
           activityLogger, // Closed logger should cause failures
+          role: 'general',
           verbose: true,
           debugLogging: {
             logLevel: 'debug',
@@ -253,6 +257,7 @@ describe('Dual Logging System Integration', () => {
           modelProvider,
           toolApproval,
           activityLogger,
+          role: 'general',
           verbose: true,
           debugLogging: {
             logLevel: 'debug',
@@ -295,6 +300,7 @@ describe('Dual Logging System Integration', () => {
           modelProvider,
           toolApproval,
           activityLogger,
+          role: 'orchestrator',
           debugLogging: {
             logLevel: 'info',
             logFile: debugLogFile,
@@ -304,7 +310,7 @@ describe('Dual Logging System Integration', () => {
 
         // Spawn a subagent
         const subagent = await parentAgent.spawnSubagent({
-          role: 'test',
+          role: 'execution',
           assignedModel: 'claude-3-5-haiku-20241022',
           assignedProvider: 'anthropic'
         });
@@ -340,6 +346,7 @@ describe('Dual Logging System Integration', () => {
           modelProvider,
           toolApproval,
           activityLogger,
+          role: 'general',
           verbose: true,
           debugLogging: {
             logLevel: 'debug',
@@ -356,6 +363,7 @@ describe('Dual Logging System Integration', () => {
           modelProvider,
           toolApproval,
           activityLogger: null,
+          role: 'general',
           verbose: false
         });
 
