@@ -72,7 +72,7 @@ const Message: React.FC<MessageProps> = ({
             {Array.isArray(content) && content.map((item, index) => {
               const displayItem = searchTerm ? highlightSearchTerm(item, searchTerm) : item;
               return (
-                <Box key={`content-item-${index}-${item.slice(0, 20)}`}>
+                <Box key={`content-item-${index}-${item.slice(0, 20).replace(/[^a-zA-Z0-9]/g, '_')}`}>
                   <Text>  {displayItem}</Text>
                 </Box>
               );

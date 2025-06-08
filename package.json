@@ -9,13 +9,13 @@
     "lace-ink": "./src/ui/lace-cli.js"
   },
   "scripts": {
-    "start": "tsx src/ui/lace-cli.js",
-    "dev": "tsx --watch src/ui/lace-cli.js",
-    "ui": "tsx src/ui/lace-cli.js",
-    "old-cli": "node src/cli.js",
+    "start": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules --disable-warning=ExperimentalWarning\" tsx src/ui/lace-cli.js",
+    "dev": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules --disable-warning=ExperimentalWarning\" tsx --watch src/ui/lace-cli.js",
+    "ui": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules --disable-warning=ExperimentalWarning\" tsx src/ui/lace-cli.js",
+    "old-cli": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules --disable-warning=ExperimentalWarning\" node src/cli.js",
     "test": "npm run test:jest && npm run test:node",
-    "test:jest": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" jest",
-    "test:node": "node --test test/unit/*.test.js",
+    "test:jest": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules --disable-warning=ExperimentalWarning\" jest",
+    "test:node": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules --disable-warning=ExperimentalWarning\" node --test test/unit/*.test.js",
     "lint": "eslint src test",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit"

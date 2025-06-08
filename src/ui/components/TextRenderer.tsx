@@ -40,7 +40,7 @@ const TextRenderer: React.FC<TextRendererProps> = ({
           <Text>Char under cursor: "{lines[cursorLine]?.slice(cursorColumn, cursorColumn + 1) || 'EOF'}"</Text>
           <Text>Backspace would delete: "{cursorColumn > 0 ? lines[cursorLine]?.slice(cursorColumn - 1, cursorColumn) || 'none' : 'none'}"</Text>
           {debugLog.map((log, i) => (
-            <Text key={`debug-${i}-${log.slice(0, 10)}`} color="yellow">LOG: {log}</Text>
+            <Text key={`debug-${i}-${log.slice(0, 10).replace(/[^a-zA-Z0-9]/g, '_')}`} color="yellow">LOG: {log}</Text>
           ))}
         </Box>
       )}

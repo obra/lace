@@ -1,7 +1,7 @@
 // ABOUTME: Completion manager that coordinates multiple completion providers
 // ABOUTME: Provides unified API for tab completion in the UI layer
 
-import { CompletionProvider, CompletionResult, CompletionContext, CompletionItem, CompletionManagerOptions } from './types.js';
+import { CompletionProvider, CompletionResult, CompletionContext, CompletionItem, CompletionManagerOptions } from './types';
 
 export class CompletionManager {
   private providers: CompletionProvider[] = [];

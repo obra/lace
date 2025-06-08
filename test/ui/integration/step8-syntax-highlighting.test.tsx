@@ -2,6 +2,7 @@
 // ABOUTME: Tests code block detection and syntax highlighting with cli-highlight
 
 import React from 'react';
+import { jest } from '@jest/globals';
 import ConversationView from '../../../src/ui/components/ConversationView';
 import Message from '../../../src/ui/components/Message';
 
@@ -85,10 +86,26 @@ describe('Step 8: Code Syntax Highlighting Integration', () => {
       content: 'Invalid code:\n\n```unknownlang\nsome invalid syntax here\n```'
     };
     
+    // Suppress console output for this intentional error test
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    
     const element = Message(messageProps) as any;
     
     // Should not crash and fallback to plain text
     expect(element).toBeTruthy();
+    
+    // Verify console methods were called with the expected errors
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Could not find the language \'unknownlang\'')
+    );
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      'Syntax highlighting failed:', 
+      expect.any(Error)
+    );
+    
+    consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   test('Message component handles mixed content with code blocks', () => {

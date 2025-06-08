@@ -2,7 +2,7 @@
 // ABOUTME: Tests provider coordination, history completion, and context routing
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { CompletionManager } from '../../../src/ui/completion/CompletionManager.js';
+import { CompletionManager } from '../../../src/ui/completion/CompletionManager.ts';
 
 describe('CompletionManager', () => {
   let manager;
@@ -180,12 +180,20 @@ describe('CompletionManager', () => {
       mockProvider1.canHandle.mockReturnValue(true);
       mockProvider1.getCompletions.mockRejectedValue(new Error('Provider error'));
 
+      // Suppress console.warn for this intentional error test
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
       const result = await manager.getCompletions(context);
 
       // Should only return history completions
       expect(result.items.length).toBeGreaterThan(0);
       const historyItem = result.items.find(item => item.type === 'history');
       expect(historyItem).toBeDefined();
+
+      // Verify console.warn was called with the error
+      expect(consoleSpy).toHaveBeenCalledWith('Completion error:', expect.any(Error));
+      
+      consoleSpy.mockRestore();
     });
 
     it('should return history when no provider handles context', async () => {

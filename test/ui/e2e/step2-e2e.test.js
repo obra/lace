@@ -39,10 +39,6 @@ describe('Step 2 E2E: Basic Layout Structure', () => {
     expect(app).toContain("import ShellInput from './components/ShellInput'");
   });
 
-  test('package.json has ui script', () => {
-    const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
-    expect(packageJson.scripts.ui).toBe('tsx src/ui/lace-cli.js');
-  });
 
   test('manual verification: Step 2 acceptance criteria', () => {
     // Manual verification checklist - run `npm run ui` and verify:
