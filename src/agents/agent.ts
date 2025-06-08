@@ -6,16 +6,118 @@ import { DebugLogger } from '../logging/debug-logger.js';
 import { SynthesisEngine } from '../tools/synthesis-engine.js';
 import { TokenEstimator } from '../tools/token-estimator.js';
 import { ToolResultExtractor } from '../tools/tool-result-extractor.js';
+import { getRole } from './role-registry.ts';
+import { Role } from './roles/types.ts';
+
+// TypeScript interfaces for Agent
+interface AgentOptions {
+  generation?: number;
+  tools?: any;
+  db?: any;
+  modelProvider?: any;
+  verbose?: boolean;
+  inheritedContext?: any;
+  memoryAgents?: Map<string, any>;
+  role?: string;
+  assignedModel?: string;
+  assignedProvider?: string;
+  task?: string;
+  capabilities?: string[];
+  toolApproval?: any;
+  maxConcurrentTools?: number;
+  retryConfig?: RetryConfig;
+  circuitBreakerConfig?: CircuitBreakerConfig;
+  synthesisConfig?: any;
+  activityLogger?: any;
+  debugLogging?: DebugLoggingConfig;
+}
+
+interface RetryConfig {
+  maxRetries?: number;
+  baseDelay?: number;
+  maxDelay?: number;
+  backoffMultiplier?: number;
+  enabled?: boolean;
+}
+
+interface CircuitBreakerConfig {
+  failureThreshold?: number;
+  openTimeout?: number;
+  halfOpenMaxCalls?: number;
+}
+
+interface DebugLoggingConfig {
+  logLevel?: string;
+  logFile?: string;
+  logFileLevel?: string;
+}
+
+interface ToolCall {
+  name: string;
+  input: any;
+}
+
+interface ToolResult {
+  toolCall: ToolCall;
+  success?: boolean;
+  error?: string;
+  denied?: boolean;
+  approved?: boolean;
+  shouldStop?: boolean;
+  result?: any;
+  content?: any;
+  bytesWritten?: number;
+  files?: any[];
+  output?: string[];
+  synthesized?: boolean;
+  summary?: string;
+  originalResult?: any;
+  [key: string]: any;
+}
+
+interface Usage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
+interface GenerateResponseResult {
+  content: string;
+  toolCalls?: ToolCall[];
+  toolResults?: ToolResult[];
+  usage?: Usage;
+  stopped?: boolean;
+  iterations?: number;
+  error?: string;
+}
+
+interface CircuitBreakerState {
+  state: 'closed' | 'open' | 'half-open';
+  failures: number;
+  lastFailure: number | null;
+  nextAttempt: number;
+}
+
+interface ErrorPattern {
+  frequency: number;
+  lastSeen: number | null;
+  pattern: string;
+  examples: string[];
+}
 
 // Simple semaphore for concurrency control
 class Semaphore {
-  constructor(maxConcurrent) {
+  private maxConcurrent: number;
+  private current: number;
+  private queue: (() => void)[];
+
+  constructor(maxConcurrent: number) {
     this.maxConcurrent = maxConcurrent;
     this.current = 0;
     this.queue = [];
   }
 
-  async acquire() {
+  async acquire(): Promise<void> {
     if (this.current < this.maxConcurrent) {
       this.current++;
       return Promise.resolve();
@@ -26,19 +128,62 @@ class Semaphore {
     });
   }
 
-  release() {
+  release(): void {
     this.current--;
     if (this.queue.length > 0) {
       const next = this.queue.shift();
       this.current++;
-      next();
+      if (next) next();
     }
   }
 }
 
 export class Agent {
-  constructor(options = {}) {
+  // Core properties
+  public generation: number;
+  public subagentCounter: number;
+  public tools: any;
+  public db: any;
+  public modelProvider: any;
+  public verbose: boolean;
+  public inheritedContext: any;
+  public memoryAgents: Map<string, any>;
+  
+  // Role and assignment properties
+  public roleDefinition: Role;
+  public role: string;
+  public assignedModel: string;
+  public assignedProvider: string;
+  public task: string | null;
+  public capabilities: string[];
+  
+  // Tool approval and configuration
+  public toolApproval: any;
+  public maxConcurrentTools: number;
+  public retryConfig: RetryConfig;
+  public circuitBreakerConfig: CircuitBreakerConfig;
+  
+  // State management
+  public circuitBreaker: Map<string, CircuitBreakerState>;
+  public toolRetryConfigs: Map<string, any>;
+  public errorPatterns: Map<string, ErrorPattern>;
+  
+  // Utilities
+  public synthesisEngine: SynthesisEngine;
+  public tokenEstimator: TokenEstimator;
+  public resultExtractor: ToolResultExtractor;
+  public activityLogger: any;
+  public debugLogger: DebugLogger | null;
+  
+  // Context management
+  public contextSize: number;
+  public maxContextSize: number;
+  public handoffThreshold: number;
+  public systemPrompt: string;
+
+  constructor(options: AgentOptions = {}) {
     this.generation = options.generation || 0;
+    this.subagentCounter = 0; // Track number of spawned subagents
     this.tools = options.tools;
     this.db = options.db;
     this.modelProvider = options.modelProvider;
@@ -47,17 +192,18 @@ export class Agent {
     this.memoryAgents = options.memoryAgents || new Map();
     
     // Agent assignment - told by orchestrator
-    this.assignedModel = options.assignedModel || 'claude-3-5-sonnet-20241022';
-    this.assignedProvider = options.assignedProvider || 'anthropic';
-    this.role = options.role || 'general';
+    this.roleDefinition = getRole(options.role || 'general');
+    this.role = this.roleDefinition.name;
+    this.assignedModel = options.assignedModel || this.roleDefinition.defaultModel;
+    this.assignedProvider = options.assignedProvider || this.roleDefinition.defaultProvider;
     this.task = options.task || null;
-    this.capabilities = options.capabilities || ['reasoning', 'tool_calling'];
+    this.capabilities = options.capabilities || this.roleDefinition.capabilities;
     
     // Tool approval system
     this.toolApproval = options.toolApproval || null;
     
     // Parallel execution configuration
-    this.maxConcurrentTools = options.maxConcurrentTools || 10;
+    this.maxConcurrentTools = options.maxConcurrentTools || this.roleDefinition.maxConcurrentTools || 10;
     
     // Error recovery and retry configuration
     this.retryConfig = {
@@ -102,13 +248,13 @@ export class Agent {
     }
     
     this.contextSize = 0;
-    this.maxContextSize = this.getModelContextWindow();
-    this.handoffThreshold = 0.8; // Handoff at 80% capacity
+    this.maxContextSize = this.roleDefinition.contextPreferences?.maxContextSize || this.getModelContextWindow();
+    this.handoffThreshold = this.roleDefinition.contextPreferences?.handoffThreshold || 0.8;
     
     this.systemPrompt = this.buildSystemPrompt();
   }
 
-  async processInput(sessionId, input, options = {}) {
+  async processInput(sessionId: string, input: string, options: any = {}): Promise<GenerateResponseResult> {
     try {
       // Save user message
       await this.db.saveMessage(sessionId, this.generation, 'user', input);
@@ -128,14 +274,15 @@ export class Agent {
       await this.db.saveMessage(sessionId, this.generation, 'assistant', response.content, response.toolCalls, this.contextSize);
       
       return response;
-    } catch (error) {
+    } catch (error: any) {
       return {
+        content: `Error: ${error.message}`,
         error: error.message
       };
     }
   }
 
-  async generateResponse(sessionId, input, options = {}) {
+  async generateResponse(sessionId: string, input: string, options: any = {}): Promise<GenerateResponseResult> {
     try {
       // Agentic loop with circuit breaker
       const maxIterations = 25;
@@ -164,7 +311,7 @@ export class Agent {
         const availableTools = this.buildToolsForLLM();
 
         // Track token usage during streaming
-        const onTokenUpdate = (tokenData) => {
+        const onTokenUpdate = (tokenData: any) => {
           // Forward streaming tokens to user interface if callback provided
           if (options.onToken && tokenData.token) {
             options.onToken(tokenData.token);
@@ -242,7 +389,7 @@ export class Agent {
         messages.push({
           role: 'assistant',
           content: response.content,
-          tool_calls: response.toolCalls
+          ...(response.toolCalls && { tool_calls: response.toolCalls })
         });
 
         finalContent = response.content;
@@ -308,7 +455,7 @@ export class Agent {
         stopped: shouldStop,
         iterations: iteration
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         content: `Error generating response: ${error.message}`,
         error: error.message
@@ -316,7 +463,7 @@ export class Agent {
     }
   }
 
-  buildSystemPrompt() {
+  buildSystemPrompt(): string {
     const basePrompt = `You are a specialized agent in the Lace agentic coding environment.
 
 AGENT CONFIGURATION:
@@ -326,13 +473,13 @@ AGENT CONFIGURATION:
 ${this.task ? `- Current Task: ${this.task}` : ''}
 
 Available tools:
-${this.tools.listTools().map(name => {
+${this.tools.listTools().map((name: string) => {
   const schema = this.tools.getToolSchema(name);
   return `- ${name}: ${schema?.description || 'No description'}`;
 }).join('\n')}
 
-BEHAVIOR GUIDELINES:
-${this.getRoleSpecificGuidelines()}
+ROLE GUIDELINES:
+${this.roleDefinition.systemPrompt.split('\n').slice(2).join('\n')}
 
 You should:
 1. Operate within your assigned role and capabilities
@@ -346,7 +493,11 @@ Focus on executing your assigned task efficiently.`;
     return basePrompt;
   }
 
-  getRoleSpecificGuidelines() {
+  getToolRestrictions(): any {
+    return this.roleDefinition.toolRestrictions || {};
+  }
+
+  getRoleSpecificGuidelines(): string {
     switch (this.role) {
       case 'orchestrator':
         return `- You coordinate and delegate tasks to specialized agents
@@ -391,20 +542,21 @@ Focus on executing your assigned task efficiently.`;
     }
   }
 
-  buildToolsForLLM() {
+  buildToolsForLLM(): any[] {
     const tools = [];
     for (const toolName of this.tools.listTools()) {
       const schema = this.tools.getToolSchema(toolName);
-      if (schema) {
+      if (schema && schema.methods) {
         // Convert our tool schema to Anthropic tool format
         for (const [methodName, methodInfo] of Object.entries(schema.methods)) {
+          const method = methodInfo as any;
           tools.push({
             name: `${toolName}_${methodName}`,
-            description: `${schema.description}: ${methodInfo.description}`,
+            description: `${schema.description}: ${method.description}`,
             input_schema: {
               type: 'object',
-              properties: this.convertParametersToProperties(methodInfo.parameters),
-              required: this.extractRequiredParameters(methodInfo.parameters)
+              properties: this.convertParametersToProperties(method.parameters),
+              required: this.extractRequiredParameters(method.parameters)
             }
           });
         }
@@ -413,28 +565,30 @@ Focus on executing your assigned task efficiently.`;
     return tools;
   }
 
-  convertParametersToProperties(parameters) {
-    const properties = {};
+  convertParametersToProperties(parameters: any): any {
+    const properties: any = {};
     for (const [paramName, paramInfo] of Object.entries(parameters || {})) {
+      const param = paramInfo as any;
       properties[paramName] = {
-        type: paramInfo.type || 'string',
-        description: paramInfo.description || ''
+        type: param.type || 'string',
+        description: param.description || ''
       };
     }
     return properties;
   }
 
-  extractRequiredParameters(parameters) {
-    const required = [];
+  extractRequiredParameters(parameters: any): string[] {
+    const required: string[] = [];
     for (const [paramName, paramInfo] of Object.entries(parameters || {})) {
-      if (paramInfo.required) {
+      const param = paramInfo as any;
+      if (param.required) {
         required.push(paramName);
       }
     }
     return required;
   }
 
-  async executeToolWithApproval(toolCall, sessionId, reasoning) {
+  async executeToolWithApproval(toolCall: ToolCall, sessionId: string, reasoning: string): Promise<ToolResult> {
     // Request approval if approval system is available
     let approvedCall = toolCall;
     let postExecutionComment = null;
@@ -477,7 +631,7 @@ Focus on executing your assigned task efficiently.`;
     };
   }
 
-  async executeTool(toolCall, sessionId) {
+  async executeTool(toolCall: ToolCall, sessionId: string): Promise<any> {
     // Parse tool name and method from LLM response
     // Try multiple parsing strategies to handle different naming conventions
     let toolName, methodName;
@@ -505,7 +659,7 @@ Focus on executing your assigned task efficiently.`;
     return await this.tools.callTool(toolName, methodName, toolCall.input, sessionId, this);
   }
 
-  async executeToolsInParallel(toolCalls, sessionId, reasoning) {
+  async executeToolsInParallel(toolCalls: ToolCall[], sessionId: string, reasoning: string): Promise<ToolResult[]> {
     if (!toolCalls || toolCalls.length === 0) {
       return [];
     }
@@ -520,7 +674,7 @@ Focus on executing your assigned task efficiently.`;
       try {
         const result = await this.executeToolWithApproval(toolCall, sessionId, reasoning);
         return result;
-      } catch (error) {
+      } catch (error: any) {
         // Return error result instead of throwing
         return {
           toolCall,
@@ -544,12 +698,12 @@ Focus on executing your assigned task efficiently.`;
     return results;
   }
 
-  async executeToolsInParallelWithRetry(toolCalls, sessionId, reasoning) {
+  async executeToolsInParallelWithRetry(toolCalls: ToolCall[], sessionId: string, reasoning: string): Promise<ToolResult[]> {
     if (!toolCalls || toolCalls.length === 0) {
       return [];
     }
 
-    const results = [];
+    const results: ToolResult[] = [];
     const hasFailures = [];
 
     try {
@@ -593,9 +747,9 @@ Focus on executing your assigned task efficiently.`;
 
       return results;
 
-    } catch (error) {
+    } catch (error: any) {
       // Catastrophic failure - return error results for all tools
-      return toolCalls.map(toolCall => ({
+      return toolCalls.map((toolCall: ToolCall) => ({
         toolCall,
         success: false,
         error: error.message,
@@ -606,7 +760,7 @@ Focus on executing your assigned task efficiently.`;
     }
   }
 
-  async executeToolsWithRetryLogic(toolCalls, sessionId, reasoning) {
+  async executeToolsWithRetryLogic(toolCalls: ToolCall[], sessionId: string, reasoning: string): Promise<ToolResult[]> {
     const semaphore = new Semaphore(this.maxConcurrentTools);
     
     const toolPromises = toolCalls.map(async (toolCall) => {
@@ -622,8 +776,8 @@ Focus on executing your assigned task efficiently.`;
     return await Promise.all(toolPromises);
   }
 
-  async executeToolsSequentiallyWithRetry(toolCalls, sessionId, reasoning) {
-    const results = [];
+  async executeToolsSequentiallyWithRetry(toolCalls: ToolCall[], sessionId: string, reasoning: string): Promise<ToolResult[]> {
+    const results: ToolResult[] = [];
     
     for (const toolCall of toolCalls) {
       const result = await this.executeToolWithRetry(toolCall, sessionId, reasoning);
@@ -633,7 +787,7 @@ Focus on executing your assigned task efficiently.`;
     return results;
   }
 
-  async executeToolWithRetry(toolCall, sessionId, reasoning) {
+  async executeToolWithRetry(toolCall: ToolCall, sessionId: string, reasoning: string): Promise<ToolResult> {
     // Parse tool name consistently with executeTool
     const parts = toolCall.name.split('_');
     let toolName;
@@ -650,7 +804,7 @@ Focus on executing your assigned task efficiently.`;
       try {
         const result = await this.executeToolWithApproval(toolCall, sessionId, reasoning);
         return { ...result, retryAttempts: 0, retryDisabled: true };
-      } catch (error) {
+      } catch (error: any) {
         return {
           toolCall,
           success: false,
@@ -680,7 +834,7 @@ Focus on executing your assigned task efficiently.`;
     let retryAttempts = 0;
     let totalRetryDelay = 0;
 
-    for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
+    for (let attempt = 0; attempt <= retryConfig.maxRetries!; attempt++) {
       try {
         if (attempt > 0) {
           const delay = this.calculateBackoffDelay(attempt - 1, retryConfig);
@@ -706,10 +860,10 @@ Focus on executing your assigned task efficiently.`;
           totalRetryDelay,
           circuitRecovered: circuitState.recovered,
           // Track if this was recovered from a parallel overload
-          sequentialFallback: lastError && lastError.message.includes('Parallel overload')
+          sequentialFallback: lastError && (lastError as any).message.includes('Parallel overload')
         };
 
-      } catch (error) {
+      } catch (error: any) {
         lastError = error;
 
         // Check if error is retriable
@@ -735,9 +889,9 @@ Focus on executing your assigned task efficiently.`;
     return {
       toolCall,
       success: false,
-      error: lastError.message,
+      error: (lastError as any).message,
       finalFailure: true,
-      retryAttempts: retryConfig.maxRetries,
+      retryAttempts: retryConfig.maxRetries!,
       totalRetryDelay,
       approved: false,
       denied: false,
@@ -745,13 +899,13 @@ Focus on executing your assigned task efficiently.`;
     };
   }
 
-  async synthesizeToolResponse(toolResult, toolCall, sessionId, synthesisPrompt) {
+  async synthesizeToolResponse(toolResult: any, toolCall: ToolCall, sessionId: string, synthesisPrompt: string): Promise<any> {
     const responseText = this.resultExtractor.extract(toolResult);
     const estimatedTokens = this.tokenEstimator.estimate(responseText);
     
     // Get tool-specific threshold
     const toolName = toolCall.name.split('_')[0];
-    const threshold = this.synthesisEngine.config.toolThresholds[toolName] || this.synthesisEngine.config.defaultThreshold;
+    const threshold = (this.synthesisEngine.config as any).toolThresholds[toolName] || (this.synthesisEngine.config as any).defaultThreshold;
     
     if (estimatedTokens <= threshold) {
       return toolResult; // Return as-is for short responses
@@ -787,7 +941,7 @@ ${responseText}`;
         originalResult: toolResult,
         summary: synthesisResponse.content
       };
-    } catch (error) {
+    } catch (error: any) {
       if (this.verbose && this.debugLogger) {
         this.debugLogger.warn(`⚠️ Tool synthesis failed: ${error.message}, using original result`);
       }
@@ -795,14 +949,14 @@ ${responseText}`;
     }
   }
 
-  async synthesizeToolResultsBatch(toolResults, toolCalls, sessionId, synthesisPrompt) {
+  async synthesizeToolResultsBatch(toolResults: any[], toolCalls: ToolCall[], sessionId: string, synthesisPrompt: string): Promise<any[]> {
     return await this.synthesisEngine.processSynthesis(toolResults, toolCalls, {
-      individual: (result, call) => this.synthesizeToolResponse(result, call, sessionId, synthesisPrompt),
-      batch: (batch) => this.synthesizeMultipleToolResults(batch, sessionId, synthesisPrompt)
-    });
+      individual: (result: any, call: any) => this.synthesizeToolResponse(result, call, sessionId, synthesisPrompt),
+      batch: (batch: any) => this.synthesizeMultipleToolResults(batch, sessionId, synthesisPrompt)
+    } as any);
   }
 
-  async synthesizeMultipleToolResults(toolBatch, sessionId, synthesisPrompt) {
+  async synthesizeMultipleToolResults(toolBatch: any[], sessionId: string, synthesisPrompt: string): Promise<any[]> {
     if (toolBatch.length === 0) return [];
 
     // Create synthesis agent for batch processing
@@ -822,10 +976,10 @@ ${responseText}`;
       
       // Parse response using synthesis engine
       const summaries = this.synthesisEngine.parseBatchSynthesis(synthesisResponse.content, toolBatch.length);
-      const totalTokens = toolBatch.reduce((sum, item) => sum + item.tokens, 0);
+      const totalTokens = toolBatch.reduce((sum: number, item: any) => sum + item.tokens, 0);
 
       // Return synthesized results with enhanced metadata
-      return toolBatch.map((item, index) => ({
+      return toolBatch.map((item: any, index: number) => ({
         ...item.result,
         synthesized: true,
         batchSynthesized: true,
@@ -839,7 +993,7 @@ ${responseText}`;
         }
       }));
 
-    } catch (error) {
+    } catch (error: any) {
       if (this.verbose && this.debugLogger) {
         this.debugLogger.warn(`⚠️ Batch synthesis failed: ${error.message}, falling back to individual synthesis`);
       }
@@ -854,12 +1008,12 @@ ${responseText}`;
     }
   }
 
-  extractTextFromToolResult(toolResult) {
+  extractTextFromToolResult(toolResult: any): string {
     // Delegate to utility class
     return this.resultExtractor.extract(toolResult);
   }
 
-  formatToolResultsForLLM(toolResults) {
+  formatToolResultsForLLM(toolResults: ToolResult[]): string {
     const formattedResults = toolResults.map(tr => {
       if (tr.denied) {
         return `Tool ${tr.toolCall.name} was denied: ${tr.error}`;
@@ -869,58 +1023,58 @@ ${responseText}`;
         return `Tool ${tr.toolCall.name} failed: ${tr.error}`;
       }
       
-      const result = tr.result;
-      if (result.synthesized) {
-        return `Tool ${tr.toolCall.name} executed successfully. Summary: ${result.summary}`;
+      // Use flat structure - tool result properties are at top level
+      if (tr.synthesized) {
+        return `Tool ${tr.toolCall.name} executed successfully. Summary: ${tr.summary}`;
       }
       
-      if (result.success) {
+      if (tr.success) {
         let resultText = '';
         
         // Handle different result formats
-        if (result.result !== undefined) {
-          resultText = typeof result.result === 'object' ? JSON.stringify(result.result) : String(result.result);
-        } else if (result.content !== undefined) {
-          resultText = `Content: ${result.content.substring(0, 100)}${result.content.length > 100 ? '...' : ''}`;
-        } else if (result.bytesWritten !== undefined) {
-          resultText = `File written successfully (${result.bytesWritten} bytes)`;
-        } else if (result.files !== undefined) {
-          resultText = `Found ${result.files.length} files`;
+        if (tr.result !== undefined) {
+          resultText = typeof tr.result === 'object' ? JSON.stringify(tr.result) : String(tr.result);
+        } else if (tr.content !== undefined) {
+          resultText = `Content: ${tr.content.substring(0, 100)}${tr.content.length > 100 ? '...' : ''}`;
+        } else if (tr.bytesWritten !== undefined) {
+          resultText = `File written successfully (${tr.bytesWritten} bytes)`;
+        } else if (tr.files !== undefined) {
+          resultText = `Found ${tr.files.length} files`;
         } else {
           // Show relevant non-result fields
-          const details = Object.keys(result)
-            .filter(key => key !== 'success')
-            .map(key => `${key}: ${result[key]}`)
+          const details = Object.keys(tr)
+            .filter(key => !['success', 'toolCall', 'approved', 'denied'].includes(key))
+            .map(key => `${key}: ${tr[key]}`)
             .join(', ');
           resultText = details || 'Completed successfully';
         }
         
-        if (result.output && result.output.length > 0) {
-          resultText += result.output.join('\n');
+        if (tr.output && tr.output.length > 0) {
+          resultText += tr.output.join('\n');
         }
         return `Tool ${tr.toolCall.name} executed successfully. ${resultText}`;
       } else {
-        return `Tool ${tr.toolCall.name} failed: ${result.error || 'Unknown error'}`;
+        return `Tool ${tr.toolCall.name} failed: ${tr.error || 'Unknown error'}`;
       }
     });
 
     return `Tool execution results:\n${formattedResults.join('\n')}`;
   }
 
-  formatFileList(files) {
-    return files.map(file => 
+  formatFileList(files: any[]): string {
+    return files.map((file: any) => 
       `${file.isDirectory ? '📁' : '📄'} ${file.name}`
     ).join('\n');
   }
 
-  getModelContextWindow() {
+  getModelContextWindow(): number {
     if (this.modelProvider && this.modelProvider.getContextWindow) {
       return this.modelProvider.getContextWindow(this.assignedModel, this.assignedProvider);
     }
     return 200000; // Default fallback
   }
 
-  calculateContextUsage(totalTokens) {
+  calculateContextUsage(totalTokens: number): any {
     if (this.modelProvider && this.modelProvider.getContextUsage) {
       return this.modelProvider.getContextUsage(this.assignedModel, totalTokens, this.assignedProvider);
     }
@@ -934,7 +1088,7 @@ ${responseText}`;
     };
   }
 
-  calculateCost(inputTokens, outputTokens) {
+  calculateCost(inputTokens: number, outputTokens: number): any {
     if (this.modelProvider && this.modelProvider.calculateCost) {
       return this.modelProvider.calculateCost(this.assignedModel, inputTokens, outputTokens, this.assignedProvider);
     }
@@ -950,19 +1104,23 @@ ${responseText}`;
     return `Compressed context from generation ${this.generation}`;
   }
 
-  async getConversationHistory(sessionId, limit = 10) {
+  async getConversationHistory(sessionId: string, limit = 10): Promise<any> {
     return await this.db.getConversationHistory(sessionId, limit);
   }
 
   // ORCHESTRATION METHODS - for when this agent spawns subagents
 
-  async spawnSubagent(options) {
+  async spawnSubagent(options: AgentOptions): Promise<Agent> {
+    // Increment counter and create unique generation ID
+    this.subagentCounter++;
+    const subgeneration = this.generation + (this.subagentCounter * 0.1);
+    
     const subagent = new Agent({
       ...options,
       tools: this.tools,
       db: this.db,
       modelProvider: this.modelProvider,
-      generation: this.generation + 0.1, // Sub-generation
+      generation: subgeneration,
       verbose: this.verbose,
       toolApproval: this.toolApproval,
       activityLogger: this.activityLogger,
@@ -970,19 +1128,19 @@ ${responseText}`;
         logLevel: this.debugLogger.stderrLevel,
         logFile: this.debugLogger.filePath,
         logFileLevel: this.debugLogger.fileLevel
-      } : null)
+      } : undefined)
     });
 
     if (this.verbose) {
       if (this.debugLogger) {
-        this.debugLogger.debug(`🤖 Spawned ${options.role} agent with ${options.assignedModel}`);
+        this.debugLogger.debug(`🤖 Spawned ${options.role || 'general'} agent with ${options.assignedModel || 'default'}`);
       }
     }
 
     return subagent;
   }
 
-  async delegateTask(sessionId, task, options = {}) {
+  async delegateTask(sessionId: string, task: string, options: any = {}): Promise<GenerateResponseResult> {
     // Orchestrator decides which model to use based on task complexity
     const agentConfig = this.chooseAgentForTask(task, options);
     
@@ -1003,7 +1161,7 @@ ${responseText}`;
     return result;
   }
 
-  chooseAgentForTask(task, options = {}) {
+  chooseAgentForTask(task: string, options: any = {}): any {
     // Override with explicit options if provided
     if (options.role && options.assignedModel) {
       return options;
@@ -1053,7 +1211,7 @@ ${responseText}`;
 
   // ERROR RECOVERY AND RETRY UTILITY METHODS
 
-  getToolRetryConfig(toolName) {
+  getToolRetryConfig(toolName: string): RetryConfig {
     const toolConfig = this.toolRetryConfigs.get(toolName) || {};
     return {
       ...this.retryConfig,
@@ -1061,24 +1219,24 @@ ${responseText}`;
     };
   }
 
-  setToolRetryConfig(toolName, config) {
+  setToolRetryConfig(toolName: string, config: any): void {
     this.toolRetryConfigs.set(toolName, config);
   }
 
-  calculateBackoffDelay(attemptNumber, config) {
+  calculateBackoffDelay(attemptNumber: number, config: RetryConfig): number {
     const delay = Math.min(
-      config.baseDelay * Math.pow(config.backoffMultiplier, attemptNumber),
-      config.maxDelay
+      config.baseDelay! * Math.pow(config.backoffMultiplier!, attemptNumber),
+      config.maxDelay!
     );
     // Add jitter to prevent thundering herd
     return delay + Math.random() * (delay * 0.1);
   }
 
-  async sleep(ms) {
+  async sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  isRetriableError(error) {
+  isRetriableError(error: any): boolean {
     const message = error.message.toLowerCase();
     
     // Non-retriable errors
@@ -1125,7 +1283,7 @@ ${responseText}`;
     return true;
   }
 
-  categorizeError(error) {
+  categorizeError(error: any): any {
     const message = error.message.toLowerCase();
     
     if (message.includes('rate limit') || message.includes('too many requests')) {
@@ -1169,7 +1327,7 @@ ${responseText}`;
 
   // CIRCUIT BREAKER METHODS
 
-  checkCircuitBreaker(toolName) {
+  checkCircuitBreaker(toolName: string): any {
     const breaker = this.circuitBreaker.get(toolName);
     
     if (!breaker) {
@@ -1205,7 +1363,7 @@ ${responseText}`;
     }
   }
 
-  recordToolSuccess(toolName) {
+  recordToolSuccess(toolName: string): void {
     const breaker = this.circuitBreaker.get(toolName);
     
     if (breaker) {
@@ -1218,7 +1376,7 @@ ${responseText}`;
     }
   }
 
-  recordToolFailure(toolName, error) {
+  recordToolFailure(toolName: string, error: any): void {
     let breaker = this.circuitBreaker.get(toolName);
     
     if (!breaker) {
@@ -1238,13 +1396,13 @@ ${responseText}`;
     this.updateErrorPattern(toolName, error);
 
     // Check if we should open the circuit
-    if (breaker.failures >= this.circuitBreakerConfig.failureThreshold) {
+    if (breaker.failures >= this.circuitBreakerConfig.failureThreshold!) {
       breaker.state = 'open';
-      breaker.nextAttempt = Date.now() + this.circuitBreakerConfig.openTimeout;
+      breaker.nextAttempt = Date.now() + this.circuitBreakerConfig.openTimeout!;
     }
   }
 
-  updateErrorPattern(toolName, error) {
+  updateErrorPattern(toolName: string, error: any): void {
     let pattern = this.errorPatterns.get(toolName);
     
     if (!pattern) {
@@ -1277,17 +1435,17 @@ ${responseText}`;
     }
   }
 
-  getCircuitBreakerStats() {
-    const stats = {};
+  getCircuitBreakerStats(): any {
+    const stats: any = {};
     
-    for (const [toolName, breaker] of this.circuitBreaker.entries()) {
+    this.circuitBreaker.forEach((breaker, toolName) => {
       stats[toolName] = {
         state: breaker.state,
         failures: breaker.failures,
         lastFailure: breaker.lastFailure,
         nextAttempt: breaker.nextAttempt
       };
-    }
+    });
     
     return stats;
   }
@@ -1296,7 +1454,7 @@ ${responseText}`;
     return Object.fromEntries(this.errorPatterns);
   }
 
-  analyzeExecutionErrors(results) {
+  analyzeExecutionErrors(results: any[]): any {
     const toolSpecificErrors = [];
     const systemicErrors = [];
     const recommendations = [];

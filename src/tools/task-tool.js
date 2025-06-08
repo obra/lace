@@ -1,6 +1,7 @@
 // ABOUTME: Task orchestration tool that enables agents to spawn sub-agents and coordinate work
 // ABOUTME: Provides delegation, progress tracking, and help request capabilities for complex workflows
 
+import { getRole } from '../agents/role-registry.ts';
 export class TaskTool {
   constructor(options = {}) {
     this.agent = null; // Will be set when tool is called by an agent
@@ -37,7 +38,7 @@ export class TaskTool {
   async delegateTask(params) {
     const { 
       description, 
-      role = 'specialist',
+      role = 'general',
       model = 'claude-3-5-sonnet-20241022',
       provider = 'anthropic',
       capabilities = ['reasoning', 'tool_calling'],
@@ -48,6 +49,16 @@ export class TaskTool {
       return {
         success: false,
         error: 'Task description is required'
+      };
+    }
+
+    // Validate role name
+    try {
+      getRole(role);
+    } catch (error) {
+      return {
+        success: false,
+        error: `Invalid role '${role}': ${error.message}`
       };
     }
 

@@ -2,7 +2,7 @@
 // ABOUTME: Focused validation of essential functionality without complex mocking scenarios
 
 import { jest } from '@jest/globals';
-import { Agent } from '../../src/agents/agent.js';
+import { Agent } from '../../src/agents/agent.ts';
 import { ToolRegistry } from '../../src/tools/tool-registry.js';
 import { ProgressTracker } from '../../src/tools/progress-tracker.js';
 import { TaskTool } from '../../src/tools/task-tool.js';
@@ -87,13 +87,13 @@ describe('Task Orchestration Core Integration', () => {
 
       const result = await taskTool.delegateTask({
         description: 'Analyze the data patterns',
-        role: 'analyst',
+        role: 'reasoning',
         model: 'claude-3-5-haiku-20241022'
       });
 
       expect(result.success).toBe(true);
       expect(result.result).toBeDefined();
-      expect(result.metadata.role).toBe('analyst');
+      expect(result.metadata.role).toBe('reasoning');
       expect(result.metadata.model).toBe('claude-3-5-haiku-20241022');
     });
 
@@ -101,7 +101,7 @@ describe('Task Orchestration Core Integration', () => {
       const taskTool = setupTaskTool();
 
       const result = await taskTool.spawnAgent({
-        role: 'worker',
+        role: 'execution',
         task: 'Process the dataset',
         model: 'claude-3-5-haiku-20241022'
       });
@@ -114,7 +114,7 @@ describe('Task Orchestration Core Integration', () => {
       const relationships = taskTool.getAgentRelationships();
       expect(Object.keys(relationships)).toHaveLength(1);
       expect(relationships[result.agentId].parentId).toBe('test-agent-001');
-      expect(relationships[result.agentId].role).toBe('worker');
+      expect(relationships[result.agentId].role).toBe('execution');
     });
 
     it('should handle progress reporting', async () => {
@@ -270,7 +270,7 @@ describe('Task Orchestration Core Integration', () => {
       // All operations should complete successfully
       expect(results).toHaveLength(3);
       results.forEach(result => {
-        expect(result.result?.success).toBe(true);
+        expect(result.success).toBe(true);
       });
 
       // Should be faster than sequential execution (3 * 100ms = 300ms)
@@ -304,7 +304,7 @@ describe('Task Orchestration Core Integration', () => {
       expect(results).toHaveLength(3);
       
       // Should have 2 successful and 1 failed
-      const successful = results.filter(r => r.result?.success);
+      const successful = results.filter(r => r.success);
       const failed = results.filter(r => r.error);
 
       expect(successful).toHaveLength(2);

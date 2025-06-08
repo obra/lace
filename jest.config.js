@@ -16,8 +16,21 @@ export default {
   // Native ES modules support
   preset: null,
   
-  // No transformation - use native ES modules
-  transform: {},
+  // TypeScript transformation
+  transform: {
+    '^.+\\.ts$': ['ts-jest', {
+      useESM: true,
+      isolatedModules: true
+    }]
+  },
+  
+  // Module name mapping for TypeScript files
+  moduleNameMapping: {
+    '^(.*)\\.ts$': '$1'
+  },
+  
+  // Treat TypeScript files as ES modules
+  extensionsToTreatAsEsm: ['.ts'],
   
   // Force exit after tests complete
   forceExit: true,
@@ -26,7 +39,7 @@ export default {
   detectOpenHandles: true,
 
   // Module file extensions
-  moduleFileExtensions: ['js', 'json'],
+  moduleFileExtensions: ['js', 'ts', 'json'],
   
   // Clear mocks automatically
   clearMocks: true
