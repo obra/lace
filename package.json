@@ -13,7 +13,9 @@
     "dev": "tsx --watch src/ui/lace-cli.js",
     "ui": "tsx src/ui/lace-cli.js",
     "old-cli": "node src/cli.js",
-    "test": "jest",
+    "test": "npm run test:jest && npm run test:node",
+    "test:jest": "jest",
+    "test:node": "node --test test/unit/*.test.js",
     "lint": "eslint src test",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit"
