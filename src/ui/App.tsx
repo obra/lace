@@ -4,6 +4,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, useStdout, useStdin } from 'ink';
 import { createCompletionManager } from './completion/index.js';
+import { CommandManager } from './commands/CommandManager';
+import { getAllCommands } from './commands/registry';
 // Remove fullscreen-ink import from here - will be used in lace-ui.ts instead
 import ConversationView from './components/ConversationView';
 import StatusBar from './components/StatusBar';
@@ -38,9 +40,15 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [tokenUsage, setTokenUsage] = useState({ used: 0, total: 200000 });
   const [modelName, setModelName] = useState('claude-3-5-sonnet');
+  const [commandManager] = useState(() => {
+    const cm = new CommandManager();
+    cm.registerAll(getAllCommands());
+    return cm;
+  });
   const [completionManager] = useState(() => createCompletionManager({
     cwd: process.cwd(),
-    history: []
+    history: [],
+    commandManager
   }));
   const streamingRef = useRef<{ content: string }>({ content: '' });
   const [ctrlCCount, setCtrlCCount] = useState(0);
@@ -102,8 +110,11 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
 
       // Set the UI callback on the tool approval manager
       laceUI.setToolApprovalUICallback(uiCallback);
+      
+      // Give laceUI access to the command manager
+      laceUI.commandManager = commandManager;
     }
-  }, [laceUI]);
+  }, [laceUI, commandManager]);
   const filterMessages = (messages: ConversationMessage[]) => {
     switch (filterMode) {
       case 'conversation':
@@ -143,11 +154,58 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
 
   const submitMessage = async (inputValue?: string) => {
     const userInput = (inputValue || inputText).trim();
-    if (userInput && !isLoading && !isStreaming && laceUI) {
+    if (userInput && !isLoading && !isStreaming) {
       
       // Add user message
       setConversation(prev => [...prev, { type: 'user' as const, content: userInput }]);
       setInputText('');
+      
+      // Check if it's a command
+      if (commandManager.isCommand(userInput)) {
+        try {
+          const commandContext = {
+            laceUI,
+            agent: laceUI?.primaryAgent,
+            setConversation,
+            addMessage: (msg: ConversationMessage) => setConversation(prev => [...prev, msg])
+          };
+          
+          const result = await commandManager.execute(userInput, commandContext);
+          
+          if (result.shouldExit) {
+            process.exit(0);
+            return;
+          }
+          
+          if (result.shouldShowModal) {
+            // TODO: Handle modal display
+            setConversation(prev => [...prev, { 
+              type: 'assistant' as const, 
+              content: `${result.shouldShowModal.type} modal would show here: ${JSON.stringify(result.shouldShowModal.data, null, 2)}` 
+            }]);
+          } else if (result.message) {
+            setConversation(prev => [...prev, { 
+              type: 'assistant' as const, 
+              content: result.message 
+            }]);
+          }
+        } catch (error) {
+          setConversation(prev => [...prev, { 
+            type: 'assistant' as const, 
+            content: `Command error: ${error instanceof Error ? error.message : String(error)}` 
+          }]);
+        }
+        return;
+      }
+      
+      // Not a command - handle as regular message
+      if (!laceUI) {
+        setConversation(prev => [...prev, { 
+          type: 'assistant' as const, 
+          content: 'Error: LaceUI not available' 
+        }]);
+        return;
+      }
       
       // Start loading state
       setIsLoading(true);
