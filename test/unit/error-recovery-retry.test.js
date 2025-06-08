@@ -2,7 +2,7 @@
 // ABOUTME: Validates automatic retry, exponential backoff, circuit breaker, and fallback strategies
 
 import { jest } from '@jest/globals';
-import { Agent } from '../../src/agents/agent.js';
+import { Agent } from '../../src/agents/agent.ts';
 import { ToolRegistry } from '../../src/tools/tool-registry.js';
 
 describe('Error Recovery and Retry Logic', () => {

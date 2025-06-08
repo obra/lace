@@ -3,7 +3,7 @@
 
 import { test, describe, beforeEach, afterEach } from '../test-harness.js';
 import { TestHarness, assert, utils } from '../test-harness.js';
-import { Agent } from '../../src/agents/agent.js';
+import { Agent } from '../../src/agents/agent.ts';
 import { ActivityLogger } from '../../src/logging/activity-logger.js';
 import { promises as fs } from 'fs';
 import { tmpdir } from 'os';

@@ -3,7 +3,7 @@
 
 import { test, describe } from '@jest/globals';
 import assert from 'node:assert';
-import { Agent } from '../../src/agents/agent.js';
+import { Agent } from '../../src/agents/agent.ts';
 import { ToolRegistry } from '../../src/tools/tool-registry.js';
 import { ConversationDB } from '../../src/database/conversation-db.js';
 import { ActivityLogger } from '../../src/logging/activity-logger.js';

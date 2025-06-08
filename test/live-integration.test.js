@@ -3,7 +3,7 @@
 
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 import { Lace } from '../src/lace.js';
-import { Agent } from '../src/agents/agent.js';
+import { Agent } from '../src/agents/agent.ts';
 
 const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
 

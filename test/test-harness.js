@@ -5,7 +5,7 @@ import { test, describe, beforeEach, afterEach } from '@jest/globals';
 import assert from 'node:assert';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { Agent } from '../src/agents/agent.js';
+import { Agent } from '../src/agents/agent.ts';
 import { ToolRegistry } from '../src/tools/tool-registry.js';
 import { ConversationDB } from '../src/database/conversation-db.js';
 import { Lace } from '../src/lace.js';
