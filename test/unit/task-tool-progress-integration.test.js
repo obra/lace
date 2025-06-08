@@ -88,7 +88,7 @@ describe('TaskTool-ProgressTracker Integration', () => {
       // Delegate task should trigger progress reporting
       const result = await taskTool.delegateTask({
         description: 'Process large dataset',
-        role: 'data_processor',
+        role: 'execution',
         timeout: 30000
       });
 
