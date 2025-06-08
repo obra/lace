@@ -2,18 +2,20 @@
 // ABOUTME: Tests file and directory completion with mocked filesystem
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import * as fs from 'fs';
 import * as path from 'path';
-import { FileCompletionProvider } from '../../../src/ui/completion/FileCompletionProvider.js';
 
-// Mock fs module
-jest.mock('fs', () => ({
+// Mock fs module for ESM
+jest.unstable_mockModule('fs', () => ({
   existsSync: jest.fn(),
   statSync: jest.fn(),
   promises: {
     readdir: jest.fn()
   }
 }));
+
+// Import after mocking
+const { FileCompletionProvider } = await import('../../../src/ui/completion/FileCompletionProvider.js');
+const fs = await import('fs');
 
 describe('FileCompletionProvider', () => {
   let provider;
