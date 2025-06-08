@@ -69,7 +69,7 @@ export class TestHarness {
       db,
       modelProvider: null, // Skip for unit tests
       verbose: false,
-      role: options.role || 'test',
+      role: options.role || 'general',
       assignedModel: options.assignedModel || 'test-model',
       assignedProvider: options.assignedProvider || 'test',
       capabilities: options.capabilities || ['testing'],
