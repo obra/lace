@@ -411,6 +411,7 @@ describe('Agent Orchestration Integration Tests', () => {
       const taskTool = toolRegistry.get('task');
       taskTool.setAgent(orchestratorAgent);
       taskTool.setSessionId('progress-test');
+      taskTool.setProgressTracker(progressTracker);
 
       // Report progress from multiple concurrent tasks
       const progressPromises = [
@@ -451,6 +452,7 @@ describe('Agent Orchestration Integration Tests', () => {
     it('should demonstrate request help functionality', async () => {
       const taskTool = toolRegistry.get('task');
       taskTool.setAgent(orchestratorAgent);
+      taskTool.setProgressTracker(progressTracker);
 
       const helpRequest = await taskTool.requestHelp({
         errorDescription: 'Unable to process large dataset due to memory constraints',
@@ -470,6 +472,7 @@ describe('Agent Orchestration Integration Tests', () => {
 
       // Should be recorded in progress tracker
       const progressData = progressTracker.getProgress(orchestratorAgent.generation);
+      expect(progressData).toBeDefined();
       expect(progressData.status).toBe('needs_help');
       expect(progressData.helpRequest).toBeDefined();
     });
@@ -523,7 +526,8 @@ describe('Agent Orchestration Integration Tests', () => {
             toolCall,
             success: index < 2, // First 2 succeed, rest fail with overload
             error: index >= 2 ? 'Parallel overload detected' : null,
-            result: index < 2 ? { success: true, result: 'Parallel success' } : null
+            result: index < 2 ? { success: true, result: 'Parallel success' } : null,
+            sequentialFallback: index >= 2 // Mark failed ones as needing sequential fallback
           }));
           return results;
         }
