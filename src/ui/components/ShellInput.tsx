@@ -1,7 +1,7 @@
 // ABOUTME: Simple text editor input using modular components
 // ABOUTME: Composition of TextBuffer hook, TextRenderer, and input handling
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Box, Text, useInput, useFocus } from 'ink';
 import { useTextBuffer } from './useTextBuffer';
 import TextRenderer from './TextRenderer';
@@ -45,6 +45,31 @@ const ShellInput: React.FC<ShellInputProps> = ({
   const [completionIndex, setCompletionIndex] = useState(0);
   const [showCompletions, setShowCompletions] = useState(false);
   const [completionPrefix, setCompletionPrefix] = useState('');
+  
+  // Scrolling state for completion modal
+  const [completionViewportStart, setCompletionViewportStart] = useState(0);
+  const maxVisibleCompletions = 8;
+
+  // Calculate viewport scrolling to keep selected item visible
+  const updateCompletionViewport = useCallback((newIndex: number, totalItems: number) => {
+    if (totalItems <= maxVisibleCompletions) {
+      setCompletionViewportStart(0);
+      return;
+    }
+
+    const currentStart = completionViewportStart;
+    const currentEnd = currentStart + maxVisibleCompletions - 1;
+
+    // If selected item is below visible area, scroll down
+    if (newIndex > currentEnd) {
+      setCompletionViewportStart(newIndex - maxVisibleCompletions + 1);
+    }
+    // If selected item is above visible area, scroll up
+    else if (newIndex < currentStart) {
+      setCompletionViewportStart(newIndex);
+    }
+    // Otherwise, keep current viewport
+  }, [completionViewportStart, maxVisibleCompletions]);
 
   // Only sync external value changes on first mount or significant changes (like history)
   const [lastExternalValue, setLastExternalValue] = useState(value);
@@ -98,6 +123,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
       if (result.items.length > 0) {
         setCompletions(result.items);
         setCompletionIndex(0);
+        setCompletionViewportStart(0); // Reset viewport to top
         setCompletionPrefix(result.prefix);
         setShowCompletions(true);
       }
@@ -149,11 +175,15 @@ const ShellInput: React.FC<ShellInputProps> = ({
         return;
       }
       if (key.upArrow) {
-        setCompletionIndex(Math.max(0, completionIndex - 1));
+        const newIndex = Math.max(0, completionIndex - 1);
+        setCompletionIndex(newIndex);
+        updateCompletionViewport(newIndex, completions.length);
         return;
       }
       if (key.downArrow) {
-        setCompletionIndex(Math.min(completions.length - 1, completionIndex + 1));
+        const newIndex = Math.min(completions.length - 1, completionIndex + 1);
+        setCompletionIndex(newIndex);
+        updateCompletionViewport(newIndex, completions.length);
         return;
       }
       if (key.tab) {
@@ -286,38 +316,57 @@ const ShellInput: React.FC<ShellInputProps> = ({
         </Box>
       </Box>
       
-      {showCompletions && completions.length > 0 && (
-        <Box
-          flexDirection="column"
-          borderStyle="single"
-          borderColor="yellow"
-          padding={1}
-          marginTop={1}
-          marginLeft={2} // Offset for prompt
-        >
-          <Text color="yellow" bold>Completions ({completions.length}):</Text>
-          {completions.slice(0, 8).map((item, index) => (
-            <Box key={`completion-${index}-${item.value.slice(0, 50).replace(/[^a-zA-Z0-9]/g, '_')}-${item.type}`} flexDirection="row">
-              <Text
-                color={index === completionIndex ? 'black' : 'white'}
-                backgroundColor={index === completionIndex ? 'yellow' : undefined}
-              >
-                {item.value}
-              </Text>
-              {item.description && (
-                <Text color="dim"> - {item.description}</Text>
-              )}
-              <Text color="dim"> [{item.type}]</Text>
+      {showCompletions && completions.length > 0 && (() => {
+        const viewportEnd = Math.min(completionViewportStart + maxVisibleCompletions, completions.length);
+        const visibleCompletions = completions.slice(completionViewportStart, viewportEnd);
+        const hasItemsAbove = completionViewportStart > 0;
+        const hasItemsBelow = viewportEnd < completions.length;
+        
+        return (
+          <Box
+            flexDirection="column"
+            borderStyle="single"
+            borderColor="yellow"
+            padding={1}
+            marginTop={1}
+            marginLeft={2} // Offset for prompt
+          >
+            <Text color="yellow" bold>
+              Completions ({completionIndex + 1}/{completions.length}):
+            </Text>
+            
+            {hasItemsAbove && (
+              <Text color="dim">▲ {completionViewportStart} more above</Text>
+            )}
+            
+            {visibleCompletions.map((item, viewportIndex) => {
+              const actualIndex = completionViewportStart + viewportIndex;
+              return (
+                <Box key={`completion-${completionViewportStart}-${viewportIndex}`} flexDirection="row">
+                  <Text
+                    color={actualIndex === completionIndex ? 'black' : 'white'}
+                    backgroundColor={actualIndex === completionIndex ? 'yellow' : undefined}
+                  >
+                    {item.value}
+                  </Text>
+                  {item.description && (
+                    <Text color="dim"> - {item.description}</Text>
+                  )}
+                  <Text color="dim"> [{item.type}]</Text>
+                </Box>
+              );
+            })}
+            
+            {hasItemsBelow && (
+              <Text color="dim">▼ {completions.length - viewportEnd} more below</Text>
+            )}
+            
+            <Box marginTop={1}>
+              <Text color="dim">↑↓ navigate • Tab/Enter apply • Esc cancel</Text>
             </Box>
-          ))}
-          {completions.length > 8 && (
-            <Text color="dim">... and {completions.length - 8} more</Text>
-          )}
-          <Box marginTop={1}>
-            <Text color="dim">↑↓ navigate • Tab/Enter apply • Esc cancel</Text>
           </Box>
-        </Box>
-      )}
+        );
+      })()}
     </Box>
   );
 };

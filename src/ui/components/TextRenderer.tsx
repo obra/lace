@@ -1,7 +1,7 @@
 // ABOUTME: Pure component for rendering text with cursor
 // ABOUTME: Takes state and renders, no logic or input handling
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { Box, Text } from 'ink';
 
 interface TextRendererProps {
@@ -23,6 +23,8 @@ const TextRenderer: React.FC<TextRendererProps> = ({
   showDebug = false,
   debugLog = []
 }) => {
+  // Generate unique instance ID to prevent key collisions
+  const instanceId = useRef(Math.random().toString(36).substring(7));
   // Show placeholder when empty and not focused
   if (!isFocused && lines.length === 1 && lines[0] === '') {
     return (
@@ -50,14 +52,14 @@ const TextRenderer: React.FC<TextRendererProps> = ({
         const isCurrentLine = lineIndex === cursorLine;
 
         return (
-          <Box key={`line-${lineIndex}-${line.slice(0, 15).replace(/[^a-zA-Z0-9]/g, '_')}`}>
+          <Box key={`${instanceId.current}-line-${lineIndex}`}>
             {isCurrentLine && isFocused ? (
               // Render line with cursor
-              <>
-                <Text key={`before-${lineIndex}`}>{line.slice(0, cursorColumn)}</Text>
-                <Text key={`cursor-${lineIndex}`} inverse>{line.slice(cursorColumn, cursorColumn + 1) || ' '}</Text>
-                <Text key={`after-${lineIndex}`}>{line.slice(cursorColumn + 1)}</Text>
-              </>
+              <Box key={`${instanceId.current}-cursor-line-${lineIndex}`} flexDirection="row">
+                <Text>{line.slice(0, cursorColumn)}</Text>
+                <Text inverse>{line.slice(cursorColumn, cursorColumn + 1) || ' '}</Text>
+                <Text>{line.slice(cursorColumn + 1)}</Text>
+              </Box>
             ) : (
               // Regular line without cursor - show placeholder only on first line if empty
               lineIndex === 0 && line.length === 0 ? (
