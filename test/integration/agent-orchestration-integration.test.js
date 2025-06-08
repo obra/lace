@@ -118,6 +118,13 @@ describe('Agent Orchestration Integration Tests', () => {
     orchestratorAgent.generation = 0;
   });
 
+  afterEach(async () => {
+    // Clean up ProgressTracker timer to prevent memory leaks
+    if (progressTracker) {
+      progressTracker.destroy();
+    }
+  });
+
   describe('Parallel Tool Execution with TaskTool', () => {
     it('should execute multiple TaskTool methods in parallel', async () => {
       const startTime = Date.now();

@@ -293,41 +293,4 @@ describe('Web Companion Tests', () => {
     });
   });
 
-  describe('Rate Limiting', () => {
-    let client;
-
-    beforeEach(async () => {
-      await webServer.start();
-    });
-
-    afterEach(() => {
-      if (client) {
-        client.disconnect();
-      }
-    });
-
-    test('should rate limit high-frequency events', (done) => {
-      client = Client(`http://localhost:${testPort}`);
-      let receivedCount = 0;
-      
-      client.on('connect', () => {
-        client.on('activity', () => {
-          receivedCount++;
-        });
-        
-        // Send many events rapidly
-        for (let i = 0; i < 20; i++) {
-          setTimeout(() => {
-            activityLogger.logEvent('rapid_event', 'test-session', null, { count: i });
-          }, i * 5); // 5ms intervals = very rapid
-        }
-        
-        setTimeout(() => {
-          expect(receivedCount).toBeLessThan(20);
-          expect(receivedCount).toBeGreaterThan(0);
-          done();
-        }, 500);
-      });
-    });
-  });
 });

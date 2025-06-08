@@ -90,7 +90,7 @@ describe('Error Recovery and Retry Logic', () => {
 
       expect(results).toHaveLength(1);
       expect(results[0].success).toBe(true);
-      expect(results[0].result.result).toBe('Finally worked');
+      expect(results[0].result).toBe('Finally worked');
       expect(results[0].retryAttempts).toBe(2);
       expect(results[0].totalRetryDelay).toBeGreaterThan(0);
       

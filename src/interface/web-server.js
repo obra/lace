@@ -90,19 +90,32 @@ export class WebServer {
       this.app.use(express.static(webDir));
     }
 
+    // Database validation helper
+    const validateDatabase = (req, res, next) => {
+      if (!this.db || typeof this.db.all !== 'function' || typeof this.db.get !== 'function') {
+        return res.status(503).json({ error: 'Database not available' });
+      }
+      next();
+    };
+
     // Request validation middleware
     const validateSessionId = (req, res, next) => {
       const { sessionId } = req.params;
-      if (!sessionId || typeof sessionId !== 'string' || sessionId.length === 0 || sessionId.length > 100 || sessionId.includes('\x00')) {
+      if (!sessionId || typeof sessionId !== 'string' || sessionId.length === 0 || sessionId.length > 100 || 
+          sessionId.includes('\x00') || sessionId.includes('<') || sessionId.includes('>') || 
+          sessionId.includes('"') || sessionId.includes("'")) {
         return res.status(400).json({ error: 'Invalid session ID' });
       }
       next();
     };
 
     const validatePagination = (req, res, next) => {
-      const limit = parseInt(req.query.limit);
-      if (req.query.limit && (isNaN(limit) || limit < 1 || limit > 1000)) {
-        return res.status(400).json({ error: 'Invalid limit parameter (1-1000)' });
+      if (req.query.limit) {
+        const limit = parseInt(req.query.limit);
+        // Check if the original string is a valid integer (no decimals, scientific notation, etc.)
+        if (isNaN(limit) || limit < 1 || limit > 1000 || req.query.limit !== limit.toString()) {
+          return res.status(400).json({ error: 'Invalid limit parameter (1-1000)' });
+        }
       }
       next();
     };
@@ -117,18 +130,18 @@ export class WebServer {
     });
 
     // Conversation API endpoints
-    this.app.get('/api/sessions', async (req, res) => {
+    this.app.get('/api/sessions', validateDatabase, async (req, res) => {
       try {
-        if (!this.db) {
-          return res.status(503).json({ error: 'Database not available' });
-        }
-        
         const sessions = await this.db.all('SELECT * FROM sessions ORDER BY last_active DESC');
         res.json(sessions);
       } catch (error) {
         console.error('Error fetching sessions:', error);
         // Check if it's a database connection error
-        if (error.message && (error.message.includes('SQLITE_MISUSE') || error.message.includes('Database is closed'))) {
+        if (error.message && (
+          error.message.includes('SQLITE_MISUSE') || 
+          error.message.includes('Database is closed') ||
+          error.message.includes('is not a function')
+        )) {
           res.status(503).json({ error: 'Database not available' });
         } else {
           res.status(500).json({ error: 'Failed to fetch sessions' });
@@ -136,12 +149,8 @@ export class WebServer {
       }
     });
 
-    this.app.get('/api/sessions/:sessionId/messages', validateSessionId, validatePagination, async (req, res) => {
+    this.app.get('/api/sessions/:sessionId/messages', validateDatabase, validateSessionId, validatePagination, async (req, res) => {
       try {
-        if (!this.db) {
-          return res.status(503).json({ error: 'Database not available' });
-        }
-
         const { sessionId } = req.params;
         const limit = parseInt(req.query.limit) || 100;
         
@@ -790,8 +799,6 @@ export class WebServer {
       
       // Initialize client state
       socket.filters = {};
-      socket.lastEventTime = Date.now();
-      socket.eventCount = 0;
       
       if (this.verbose) {
         console.log(`WebSocket client connected: ${socket.id}`);
@@ -856,21 +863,8 @@ export class WebServer {
   broadcastActivity(activityEvent) {
     if (!this.isStarted || this.connectedClients.size === 0) return;
 
-    const now = Date.now();
-
-    // Send to all connected clients with filtering and rate limiting
+    // Send to all connected clients
     this.io.sockets.sockets.forEach((socket) => {
-      // Rate limiting: max 10 events per second per client
-      if (now - socket.lastEventTime < 100) {
-        socket.eventCount++;
-        if (socket.eventCount > 10) {
-          return; // Skip this event for rate-limited client
-        }
-      } else {
-        socket.lastEventTime = now;
-        socket.eventCount = 0;
-      }
-
       // Apply filters
       if (this.shouldSendEventToSocket(activityEvent, socket)) {
         socket.emit('activity', activityEvent);

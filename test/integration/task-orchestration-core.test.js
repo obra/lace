@@ -57,6 +57,13 @@ describe('Task Orchestration Core Integration', () => {
     agent.generation = 1;
   });
 
+  afterEach(async () => {
+    // Clean up ProgressTracker timer to prevent memory leaks
+    if (progressTracker) {
+      progressTracker.destroy();
+    }
+  });
+
   // Helper function to set up TaskTool with all required context
   const setupTaskTool = (customAgent = null) => {
     const taskTool = toolRegistry.get('task');
