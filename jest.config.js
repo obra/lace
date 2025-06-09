@@ -1,46 +1,26 @@
-// ABOUTME: Jest configuration for Lace testing
-// ABOUTME: Configures ES modules support, test patterns, and environment setup
-
 export default {
-  // Test file patterns
-  testMatch: [
-    '**/test/**/*.test.js'
-  ],
-  
-  // Test environment
+  preset: 'ts-jest/presets/default-esm',
+  extensionsToTreatAsEsm: ['.ts', '.tsx'],
   testEnvironment: 'node',
-  
-  // Timeout for tests
-  testTimeout: 20000,
-  
-  // Native ES modules support
-  preset: null,
-  
-  // TypeScript transformation
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1'
+  },
+  transformIgnorePatterns: [
+    'node_modules/(?!(ink-testing-library|ink-spinner|@inkjs/ui|ink|ansi-escapes|cli-truncate|string-width|strip-ansi|ansi-regex|chalk|fullscreen-ink|figures|is-unicode-supported|cli-spinners)/)'
+  ],
   transform: {
-    '^.+\\.ts$': ['ts-jest', {
+    '^.+\\.(ts|tsx)$': ['ts-jest', {
       useESM: true,
-      isolatedModules: true
+      tsconfig: {
+        jsx: 'react-jsx',
+        skipLibCheck: true,
+        noImplicitAny: false,
+        moduleResolution: 'bundler'
+      }
     }]
   },
-  
-  // Module name mapping for TypeScript files
-  moduleNameMapping: {
-    '^(.*)\\.ts$': '$1'
-  },
-  
-  // Treat TypeScript files as ES modules
-  extensionsToTreatAsEsm: ['.ts'],
-  
-  // Force exit after tests complete
-  forceExit: true,
-  
-  // Detect open handles
-  detectOpenHandles: true,
-
-  // Module file extensions
-  moduleFileExtensions: ['js', 'ts', 'json'],
-  
-  // Clear mocks automatically
-  clearMocks: true
+  setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
+  testMatch: [
+    '**/test/**/*.test.(ts|tsx|js)',
+  ]
 };

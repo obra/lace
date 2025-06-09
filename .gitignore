@@ -13,6 +13,11 @@ debug-tool.js
 *.swp
 *.tmp
 
+# Test artifacts
+test-db-*.db
+test-snapshot-*/
+*.backup
+
 # Environment files
 .env
 .env.local

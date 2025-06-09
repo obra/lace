@@ -28,7 +28,7 @@ describe('Web Companion Integration Tests', () => {
 
   beforeAll(async () => {
     // Start Lace with web companion
-    laceProcess = spawn('node', ['src/cli.js', '--web-port', testPort.toString(), '--verbose'], {
+    laceProcess = spawn('npx', ['tsx', 'src/cli.js', '--web-port', testPort.toString(), '--verbose'], {
       cwd: process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, NODE_ENV: 'test' }

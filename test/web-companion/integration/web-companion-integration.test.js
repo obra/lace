@@ -276,12 +276,14 @@ describe('Web Companion Integration Tests', () => {
       
       const handleActivity = (event) => {
         try {
-          expect(event.event_type).toBe('user_input');
-          receivedCount++;
-          
-          if (receivedCount === 2) {
-            cleanup();
-            done();
+          // Only count user_input events, ignore others (like backfilled events)
+          if (event.event_type === 'user_input') {
+            receivedCount++;
+            
+            if (receivedCount === 2) {
+              cleanup();
+              done();
+            }
           }
         } catch (error) {
           cleanup();
