@@ -74,24 +74,29 @@ export class LaceUI {
     this.memoryPath = options.memoryPath || './lace-memory.db';
     this.activityLogPath = options.activityLogPath || '.lace/activity.db';
     
+    // Initialize debug logger first
+    this.debugLogger = new DebugLogger({
+      logLevel: options.logLevel || 'off',
+      logFile: options.logFile,
+      logFileLevel: options.logFileLevel || 'debug'
+    });
+    
+    // Test debug logging immediately
+    this.debugLogger.info('🚀 LaceUI initializing with debug logging enabled');
+    this.debugLogger.debug(`Debug logging configuration: level=${options.logLevel || 'off'}, file=${options.logFile || 'none'}, fileLevel=${options.logFileLevel || 'debug'}`);
+    
     // Initialize lace backend components
     this.db = new ConversationDB(this.memoryPath);
     this.tools = new ToolRegistry();
     this.modelProvider = new ModelProvider({
       anthropic: {
         // Default to using Anthropic models
-      }
+      },
+      debugLogger: this.debugLogger
     });
     
     // Initialize activity logger
     this.activityLogger = new ActivityLogger(this.activityLogPath);
-    
-    // Initialize debug logger
-    this.debugLogger = new DebugLogger({
-      logLevel: options.logLevel || 'off',
-      logFile: options.logFile,
-      logFileLevel: options.logFileLevel || 'debug'
-    });
     
     // Tool approval system - can be configured
     this.toolApproval = new ApprovalEngine({

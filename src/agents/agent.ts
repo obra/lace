@@ -289,10 +289,8 @@ export class Agent {
       while (iteration < maxIterations && !shouldStop) {
         iteration++;
         
-        if (this.verbose) {
-          if (this.debugLogger) {
-            this.debugLogger.debug(`🔄 Agentic iteration ${iteration}/${maxIterations}`);
-          }
+        if (this.debugLogger) {
+          this.debugLogger.debug(`🔄 Agentic iteration ${iteration}/${maxIterations}`);
         }
 
         // Get available tools for the LLM
@@ -682,7 +680,7 @@ Focus on executing your assigned task efficiently.`;
     // Execute all tools in parallel and collect results
     const results = await Promise.all(toolPromises);
     
-    if (this.verbose && this.debugLogger) {
+    if (this.debugLogger) {
       this.debugLogger.debug(`⚡ Executed ${toolCalls.length} tools in parallel (limit: ${this.maxConcurrentTools})`);
     }
 
@@ -902,7 +900,7 @@ Focus on executing your assigned task efficiently.`;
       return toolResult; // Return as-is for short responses
     }
 
-    if (this.verbose && this.debugLogger) {
+    if (this.debugLogger) {
       this.debugLogger.debug(`🔬 Synthesizing tool response (${estimatedTokens} estimated tokens)`);
     }
 
@@ -933,7 +931,7 @@ ${responseText}`;
         summary: synthesisResponse.content
       };
     } catch (error: any) {
-      if (this.verbose && this.debugLogger) {
+      if (this.debugLogger) {
         this.debugLogger.warn(`⚠️ Tool synthesis failed: ${error.message}, using original result`);
       }
       return toolResult;
@@ -985,7 +983,7 @@ ${responseText}`;
       }));
 
     } catch (error: any) {
-      if (this.verbose && this.debugLogger) {
+      if (this.debugLogger) {
         this.debugLogger.warn(`⚠️ Batch synthesis failed: ${error.message}, falling back to individual synthesis`);
       }
       
@@ -1118,10 +1116,8 @@ ${responseText}`;
       debugLogger: this.debugLogger
     });
 
-    if (this.verbose) {
-      if (this.debugLogger) {
-        this.debugLogger.debug(`🤖 Spawned ${options.role || 'general'} agent with ${options.assignedModel || 'default'}`);
-      }
+    if (this.debugLogger) {
+      this.debugLogger.debug(`🤖 Spawned ${options.role || 'general'} agent with ${options.assignedModel || 'default'}`);
     }
 
     return subagent;
@@ -1139,10 +1135,8 @@ ${responseText}`;
     // Execute the task with the specialized agent
     const result = await subagent.generateResponse(sessionId, task);
     
-    if (this.verbose) {
-      if (this.debugLogger) {
-        this.debugLogger.info(`✅ Task completed by ${agentConfig.role} agent`);
-      }
+    if (this.debugLogger) {
+      this.debugLogger.info(`✅ Task completed by ${agentConfig.role} agent`);
     }
 
     return result;

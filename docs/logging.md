@@ -327,7 +327,7 @@ For development and troubleshooting information:
 export class MyFeature {
   constructor(options = {}) {
     this.activityLogger = options.activityLogger || null;
-    this.debugLogger = options.debugLogger || null;
+    this.debugLogger = options.debugLogger || null; // Always pass instance, not config
   }
 }
 ```
@@ -357,10 +357,10 @@ async executeFeature(sessionId, params) {
 
 #### Pass Loggers Through Constructor Options
 ```javascript
-// In parent component
+// In parent component - ALWAYS pass logger instances, never config
 const myFeature = new MyFeature({
-  activityLogger: this.activityLogger,
-  debugLogger: this.debugLogger,
+  activityLogger: this.activityLogger,  // ✅ Pass instance
+  debugLogger: this.debugLogger,       // ✅ Pass instance
   // ... other options
 });
 ```

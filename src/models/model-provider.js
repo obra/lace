@@ -10,6 +10,7 @@ export class ModelProvider {
     this.providers = new Map();
     this.config = config;
     this.defaultProvider = null;
+    this.debugLogger = config.debugLogger || null;
   }
 
   async initialize() {
@@ -35,13 +36,37 @@ export class ModelProvider {
 
   async chat(messages, options = {}) {
     const provider = this.getProvider(options.provider);
-    return await provider.chat(messages, {
+    const startTime = Date.now();
+    
+    // Log request
+    if (this.debugLogger) {
+      const requestInfo = `provider=${options.provider || this.defaultProvider}, model=${options.model || 'default'}, messages=${messages.length}, tools=${!!(options.tools && options.tools.length > 0)}, temp=${options.temperature}`;
+      this.debugLogger.debug(`🤖 LLM Request: ${requestInfo}`);
+      
+      const messageInfo = messages.map(msg => `${msg.role}:${typeof msg.content === 'string' ? msg.content.length : JSON.stringify(msg.content).length}chars`).join(', ');
+      this.debugLogger.debug(`📨 Messages: [${messageInfo}]`);
+    }
+    
+    const result = await provider.chat(messages, {
       model: options.model,
       tools: options.tools,
       maxTokens: options.maxTokens,
       temperature: options.temperature,
       onTokenUpdate: options.onTokenUpdate
     });
+    
+    // Log response
+    if (this.debugLogger) {
+      const duration = Date.now() - startTime;
+      const responseInfo = `success=${result.success}, duration=${duration}ms, tokens=${result.usage?.total_tokens || 'unknown'} (in:${result.usage?.input_tokens || '?'} out:${result.usage?.output_tokens || '?'}), tools=${!!(result.toolCalls && result.toolCalls.length > 0)}, content=${result.content ? result.content.length : 0}chars`;
+      this.debugLogger.debug(`🤖 LLM Response: ${responseInfo}`);
+      
+      if (!result.success) {
+        this.debugLogger.warn(`❌ LLM Error: ${result.error}`);
+      }
+    }
+    
+    return result;
   }
 
   async planningChat(messages, options = {}) {
