@@ -1,7 +1,7 @@
 // ABOUTME: Unit tests for activity logger functionality  
 // ABOUTME: Tests database setup, event logging, and query capabilities
 
-import { test, describe, beforeEach, afterEach } from '../test-harness.js';
+import { test, describe, beforeEach, afterEach, expect, jest } from '@jest/globals';
 import { TestHarness, assert, utils } from '../test-harness.js';
 import { ActivityLogger } from '../../src/logging/activity-logger.js';
 import { promises as fs } from 'fs';
@@ -99,17 +99,20 @@ describe('ActivityLogger', () => {
     });
 
     test('should not throw on logging errors', async () => {
+      // Mock console.error
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      
       // Close the database to simulate an error
       await logger.close();
-      
-      // Clear any previous calls to console.error
-      console.error.mockClear();
       
       // This should not throw, just log an error
       await logger.logEvent('test_event', 'session-123', null, { data: 'test' });
       
       // Verify error was logged
-      expect(console.error).toHaveBeenCalledWith('ActivityLogger: Database not initialized');
+      expect(consoleSpy).toHaveBeenCalledWith('ActivityLogger: Database not initialized');
+      
+      // Restore console.error
+      consoleSpy.mockRestore();
     });
   });
 
