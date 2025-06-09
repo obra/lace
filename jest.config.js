@@ -22,6 +22,7 @@ export default {
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
   testMatch: [
     '**/test/ui/**/*.test.(ts|tsx|js)',
-    '**/test/unit/completion/**/*.test.(ts|tsx|js)'
+    '**/test/unit/completion/**/*.test.(ts|tsx|js)',
+    '**/test/unit/safety/**/*.test.(ts|tsx|js)'
   ]
 };

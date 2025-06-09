@@ -27,8 +27,8 @@ jest.mock('../src/models/model-provider', () => ({
   }))
 }));
 
-jest.mock('../src/safety/tool-approval', () => ({
-  ToolApprovalManager: jest.fn().mockImplementation(() => ({}))
+jest.mock('../src/safety/index', () => ({
+  ApprovalEngine: jest.fn().mockImplementation(() => ({}))
 }));
 
 jest.mock('../src/agents/agent', () => ({

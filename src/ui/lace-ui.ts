@@ -8,7 +8,7 @@ import { ConversationDB } from '../database/conversation-db.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { Agent } from '../agents/agent.js';
 import { ModelProvider } from '../models/model-provider.js';
-import { ToolApprovalManager } from '../safety/tool-approval.js';
+import { ApprovalEngine } from '../safety/index.js';
 import App from './App';
 
 interface LaceUIOptions {
@@ -74,7 +74,7 @@ export class LaceUI {
     });
     
     // Tool approval system - can be configured
-    this.toolApproval = new ToolApprovalManager({
+    this.toolApproval = new ApprovalEngine({
       interactive: options.interactive !== false,
       autoApproveTools: options.autoApprove || options.autoApproveTools || [],
       alwaysDenyTools: options.deny || options.alwaysDenyTools || []
