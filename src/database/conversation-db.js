@@ -84,7 +84,7 @@ export class ConversationDB {
     return await this.all(`
       SELECT * FROM conversations 
       WHERE session_id = ? 
-      ORDER BY timestamp DESC 
+      ORDER BY id DESC 
       LIMIT ?
     `, [sessionId, limit]);
   }

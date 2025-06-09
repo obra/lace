@@ -5,14 +5,18 @@ import prompts from 'prompts';
 import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
+import open from 'open';
+import { ActivityLogger } from '../logging/activity-logger.js';
 
 export class Console {
-  constructor() {
+  constructor(options = {}) {
     this.sessionId = `session-${Date.now()}`;
     this.currentAgent = null;
     this.isProcessing = false;
     this.abortController = null;
     this.history = [];
+    this.activityLogger = options.activityLogger || new ActivityLogger();
+    this.webServer = options.webServer || null;
     this.initializeCommandRegistry();
   }
 
@@ -43,6 +47,12 @@ export class Console {
         description: 'Show tool approval settings',
         handler: () => this.showApprovalStatus(this.currentAgent),
         requiresAgent: true
+      }],
+      ['/web', {
+        description: 'Open web companion in browser',
+        handler: () => this.openWebCompanion(),
+        requiresAgent: false,
+        async: true
       }],
       ['/quit', {
         description: 'Exit lace',
@@ -77,6 +87,9 @@ export class Console {
     this.currentAgent = agent;
     this.history = this.loadHistory();
     
+    // Initialize activity logger
+    await this.activityLogger.initialize();
+    
     console.log(chalk.blue(`Starting session: ${this.sessionId}`));
     console.log(chalk.gray('Type /help for commands, /quit to exit'));
     console.log(chalk.gray('Use Tab for completion, Ctrl+C to interrupt, Up/Down for history\n'));
@@ -100,12 +113,9 @@ export class Console {
     while (true) {
       try {
         const response = await prompts({
-          type: 'autocomplete',
+          type: 'text',
           name: 'input',
-          message: chalk.green('lace>'),
-          choices: this.getCompletions.bind(this),
-          suggest: this.suggest.bind(this),
-          fallback: { title: 'Continue typing...', value: null }
+          message: chalk.green('lace>')
         });
 
         // Handle Ctrl+C or empty input
@@ -170,6 +180,11 @@ export class Console {
       }
     }
 
+    if (input === '/web') {
+      await this.openWebCompanion();
+      return;
+    }
+
     if (input.startsWith('/')) {
       console.log(chalk.red(`Unknown command: ${input}`));
       console.log(chalk.gray('Type /help for available commands'));
@@ -180,9 +195,16 @@ export class Console {
       return;
     }
 
+    // Log user input event
+    await this.activityLogger.logEvent('user_input', this.sessionId, null, {
+      content: input,
+      timestamp: new Date().toISOString()
+    });
+
     // Process user input with agent
     this.isProcessing = true;
     this.abortController = new AbortController();
+    const startTime = Date.now();
     
     try {
       const response = await this.currentAgent.processInput(
@@ -193,6 +215,15 @@ export class Console {
           onToken: this.handleStreamingToken.bind(this)
         }
       );
+      
+      // Log agent response event
+      const duration = Date.now() - startTime;
+      await this.activityLogger.logEvent('agent_response', this.sessionId, null, {
+        content: response.content || '',
+        tokens: response.usage?.total_tokens || response.usage?.output_tokens || 0,
+        duration_ms: duration
+      });
+      
       this.displayResponse(response);
     } catch (error) {
       if (error.name === 'AbortError') {
@@ -345,6 +376,30 @@ export class Console {
     }
   }
 
+  async openWebCompanion() {
+    if (!this.webServer) {
+      console.log(chalk.yellow('Web companion is not enabled. Use --web flag to start with web interface.'));
+      return;
+    }
+
+    const status = this.webServer.getStatus();
+    if (!status.isStarted) {
+      console.log(chalk.yellow('Web server is not running. Cannot open web companion.'));
+      return;
+    }
+
+    const url = status.url;
+    console.log(chalk.blue(`🌐 Opening web companion at ${url}`));
+    
+    try {
+      await open(url);
+      console.log(chalk.green('✅ Web companion opened in your default browser'));
+    } catch (error) {
+      console.log(chalk.red(`❌ Failed to open browser: ${error.message}`));
+      console.log(chalk.gray(`You can manually open: ${url}`));
+    }
+  }
+
   showHelp() {
     console.log(chalk.cyan('\nAvailable commands:'));
     console.log('  /help             - Show this help message');
@@ -354,6 +409,9 @@ export class Console {
     console.log('  /approval         - Show tool approval settings');
     console.log('  /auto-approve <tool> - Add tool to auto-approve list');
     console.log('  /deny <tool>      - Add tool to deny list');
+    if (this.webServer) {
+      console.log('  /web              - Open web companion in browser');
+    }
     console.log('  /quit             - Exit lace\n');
   }
 

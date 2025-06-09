@@ -11,6 +11,7 @@ export interface ApprovalRequest {
   toolCall: ToolCall;
   context?: {
     reasoning?: string;
+    sessionId?: string;
   };
 }
 
@@ -36,6 +37,7 @@ export interface ApprovalEngineConfig {
   autoApproveTools?: string[];
   alwaysDenyTools?: string[];
   interactive?: boolean;
+  activityLogger?: any;
 }
 
 export interface ApprovalStatus {
