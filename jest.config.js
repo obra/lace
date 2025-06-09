@@ -5,8 +5,7 @@ export default {
   
   // Handle module path mapping for ESM
   moduleNameMapper: {
-    '^(\\.+/.*)\\.js$': '$1',
-    '^(\\.+/.*)\\.ts$': '$1',
+    '^(\\.+/.*)\\.(js|ts)$': '$1',
     // Add explicit mappings for problematic modules
     '^sqlite3$': '<rootDir>/test/__mocks__/sqlite3.js',
     '^fullscreen-ink$': '<rootDir>/test/__mocks__/fullscreen-ink.js',

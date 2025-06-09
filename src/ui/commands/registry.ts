@@ -43,43 +43,6 @@ export const basicCommands: Command[] = [
     }
   },
   
-  {
-    name: 'web',
-    description: 'Open web companion in browser',
-    handler: async (args, context) => {
-      if (!context.laceUI?.webServer) {
-        return {
-          success: false,
-          message: 'Web companion is not enabled. Use --web flag to start with web interface.'
-        };
-      }
-
-      const status = context.laceUI.webServer.getStatus();
-      if (!status.isStarted) {
-        return {
-          success: false,
-          message: 'Web server is not running. Cannot open web companion.'
-        };
-      }
-
-      const url = status.url;
-      
-      try {
-        // Import open dynamically since it's ESM
-        const { default: open } = await import('open');
-        await open(url);
-        return {
-          success: true,
-          message: `🌐 Web companion opened in your default browser at ${url}`
-        };
-      } catch (error) {
-        return {
-          success: false,
-          message: `❌ Failed to open browser: ${error instanceof Error ? error.message : String(error)}\nYou can manually open: ${url}`
-        };
-      }
-    }
-  }
 ];
 
 /**

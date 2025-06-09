@@ -20,7 +20,6 @@ describeConditional('Live Anthropic API Integration Tests', () => {
     lace = new LaceUI({ 
       verbose: false,
       memoryPath: ':memory:', // Use in-memory DB for tests
-      enableWeb: false // Disable web server in tests
     });
     
     await lace.initialize();

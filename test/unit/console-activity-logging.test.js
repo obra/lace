@@ -21,7 +21,6 @@ describe('LaceUI Activity Logging', () => {
       verbose: false,
       memoryPath: ':memory:', // Use in-memory DB for tests
       activityLogPath: testDbPath,
-      enableWeb: false // Disable web server in tests
     });
     
     await laceUI.initialize();

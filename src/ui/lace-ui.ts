@@ -10,7 +10,6 @@ import { Agent } from '../agents/agent.js';
 import { ModelProvider } from '../models/model-provider.js';
 import { ApprovalEngine } from '../safety/index.js';
 import { ActivityLogger } from '../logging/activity-logger.js';
-import { WebServer } from './web-server.js';
 import App from './App';
 
 interface LaceUIOptions {
@@ -22,8 +21,6 @@ interface LaceUIOptions {
   autoApproveTools?: string[];
   deny?: string[];
   alwaysDenyTools?: string[];
-  webPort?: number;
-  enableWeb?: boolean;
 }
 
 interface AgentResponse {
@@ -57,7 +54,6 @@ export class LaceUI {
   private modelProvider: any;
   private toolApproval: any;
   private activityLogger: ActivityLogger;
-  public webServer: WebServer | null;
   private primaryAgent: any;
   private memoryAgents: Map<string, any>;
   private currentGeneration: number;
@@ -93,18 +89,6 @@ export class LaceUI {
       activityLogger: this.activityLogger
     });
     
-    // Initialize web server if enabled
-    if (options.enableWeb !== false) {
-      this.webServer = new WebServer({
-        port: options.webPort || 3000,
-        activityLogger: this.activityLogger,
-        db: this.db,
-        verbose: this.verbose
-      });
-    } else {
-      this.webServer = null;
-    }
-    
     this.primaryAgent = null;
     this.memoryAgents = new Map(); // generationId -> agent
     this.currentGeneration = 0;
@@ -128,28 +112,6 @@ export class LaceUI {
     } catch (error) {
       console.error('ActivityLogger initialization failed:', error);
       // Continue without activity logging
-    }
-    
-    // Don't start web server in tests, just initialize it
-    if (this.webServer && process.env.NODE_ENV !== 'test') {
-      try {
-        await this.webServer.start();
-        
-        // Connect activity logger events to web server broadcasting
-        this.activityLogger.on('activity', (event: any) => {
-          if (this.webServer) {
-            this.webServer.broadcastActivity(event);
-          }
-        });
-        
-        if (this.verbose) {
-          const status = this.webServer.getStatus();
-          console.log(`🌐 Web companion available at ${status.url}`);
-        }
-      } catch (error) {
-        console.error('Failed to start web server:', error);
-        // Continue without web companion
-      }
     }
     
     this.primaryAgent = new Agent({
@@ -505,15 +467,6 @@ export class LaceUI {
   }
 
   async stop() {
-    // Stop web server if running
-    if (this.webServer) {
-      try {
-        await this.webServer.stop();
-      } catch (error) {
-        console.error('WebServer stop failed:', error);
-      }
-    }
-
     // Close activity logger
     try {
       this.activityLogger.close();

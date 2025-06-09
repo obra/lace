@@ -17,18 +17,9 @@ program
   .option('--no-interactive', 'disable interactive tool approval (auto-deny dangerous tools)')
   .option('--auto-approve <tools>', 'comma-separated list of tools to auto-approve', (value) => value.split(','))
   .option('--deny <tools>', 'comma-separated list of tools to always deny', (value) => value.split(','))
-  .option('--web', 'enable web companion interface (default: enabled)')
-  .option('--no-web', 'disable web companion interface')
-  .option('--web-port <port>', 'port for web companion interface', '3000')
   .action(async (options) => {
-    // Process web options
-    const webEnabled = options.web !== false && !options.noWeb;
-    const webPort = parseInt(options.webPort) || 3000;
-    
     const laceUIOptions = {
       ...options,
-      enableWeb: webEnabled,
-      webPort: webPort
     };
     
     const laceUI = new LaceUI(laceUIOptions);
