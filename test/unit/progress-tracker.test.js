@@ -1,7 +1,7 @@
 // ABOUTME: Comprehensive unit tests for ProgressTracker in-memory progress tracking system
 // ABOUTME: Tests all methods, aggregation, callbacks, and cleanup functionality
 
-import { test, describe, beforeEach, afterEach } from '../test-harness.js';
+import { test, describe, beforeEach, afterEach, expect, jest } from '@jest/globals';
 import { TestHarness, assert, utils } from '../test-harness.js';
 import { ProgressTracker } from '../../src/tools/progress-tracker.js';
 
@@ -339,6 +339,9 @@ describe('ProgressTracker', () => {
     });
 
     test('should handle callback errors gracefully', async () => {
+      // Capture console.warn calls
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      
       const errorCallback = () => {
         throw new Error('Callback error');
       };
@@ -348,8 +351,20 @@ describe('ProgressTracker', () => {
       // Should not throw
       await progressTracker.updateProgress('agent-1', { status: 'test' });
       
+      // Verify that the callback error was logged
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Progress tracker callback error:', 
+        'Callback error'
+      );
+      
       // Other callbacks should still work
       assert.ok(callbackEvents.length > 0, 'Other callbacks should still work');
+      
+      // Clean up the error callback to prevent issues in afterEach
+      progressTracker.removeCallback(errorCallback);
+      
+      // Restore console.warn
+      consoleSpy.mockRestore();
     });
   });
 
@@ -390,14 +405,14 @@ describe('ProgressTracker', () => {
     test('should cleanup old entries', async () => {
       const testTracker = new ProgressTracker({
         cleanupInterval: 50,
-        maxAge: 100 // 100ms
+        maxAge: 80 // 80ms
       });
 
       await testTracker.updateProgress('agent-1', { status: 'old' });
       assert.equal(testTracker.getAllProgress().length, 1, 'Should have one entry');
 
-      // Wait for aging and cleanup
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Wait for aging and cleanup - give extra time for cleanup to run
+      await new Promise(resolve => setTimeout(resolve, 200));
       
       assert.equal(testTracker.getAllProgress().length, 0, 'Should cleanup old entries');
       

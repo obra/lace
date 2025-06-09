@@ -1,7 +1,7 @@
 // ABOUTME: Real security and performance tests for web companion components
 // ABOUTME: Tests actual security headers, rate limiting, input validation, and performance under load
 
-import { beforeEach, afterEach, describe, expect, test } from '@jest/globals';
+import { beforeEach, afterEach, describe, expect, test, jest } from '@jest/globals';
 import { WebServer } from '../../../src/interface/web-server.js';
 import { ConversationDB } from '../../../src/database/conversation-db.js';
 import { ActivityLogger } from '../../../src/logging/activity-logger.js';
@@ -358,6 +358,9 @@ describe('Web Companion Security and Performance Tests', () => {
 
   describe('Error Handling and Resilience', () => {
     test('should handle database connection failures gracefully', async () => {
+      // Capture console.error calls
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      
       // Close the database to simulate failure
       await db.close();
       
@@ -368,12 +371,26 @@ describe('Web Companion Security and Performance Tests', () => {
       expect(response.status).toBe(503);
       expect(response.data.error).toBe('Database not available');
       
+      // Verify that the error was logged
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Error fetching sessions:', 
+        expect.objectContaining({
+          code: 'SQLITE_MISUSE'
+        })
+      );
+      
       // Should not crash the server
       const healthResponse = await axios.get(`${baseUrl}/api/health`);
       expect(healthResponse.status).toBe(200);
+      
+      // Restore console.error
+      consoleSpy.mockRestore();
     });
 
     test('should handle activity logger failures gracefully', async () => {
+      // Capture console.error calls
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      
       // Close activity logger to simulate failure
       await activityLogger.close();
       
@@ -384,12 +401,26 @@ describe('Web Companion Security and Performance Tests', () => {
       expect(response.status).toBe(503);
       expect(response.data.error).toBe('Activity logger not available');
       
+      // Verify that the error was logged
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Error fetching activity events:', 
+        expect.objectContaining({
+          message: 'ActivityLogger: Database not initialized'
+        })
+      );
+      
       // Server should still be responsive
       const healthResponse = await axios.get(`${baseUrl}/api/health`);
       expect(healthResponse.status).toBe(200);
+      
+      // Restore console.error
+      consoleSpy.mockRestore();
     });
 
     test('should handle file system errors safely', async () => {
+      // Capture console.error calls
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      
       // Try to access non-existent file
       const response = await axios.get(`${baseUrl}/api/files/content?path=non-existent-file.txt`, {
         validateStatus: () => true
@@ -398,9 +429,21 @@ describe('Web Companion Security and Performance Tests', () => {
       expect(response.status).toBe(500);
       expect(response.data.error).toBe('Failed to read file');
       
+      // Verify that the error was logged
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Error reading file:', 
+        expect.objectContaining({
+          code: 'ENOENT',
+          path: expect.stringContaining('non-existent-file.txt')
+        })
+      );
+      
       // Should not expose internal file system details
       expect(response.data.error).not.toContain('ENOENT');
       expect(response.data.error).not.toContain('no such file');
+      
+      // Restore console.error
+      consoleSpy.mockRestore();
     });
 
     test('should handle git command failures gracefully', async () => {
