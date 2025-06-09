@@ -43,9 +43,61 @@ export class FilesAndDirectoriesCompletionProvider implements CompletionProvider
     const results: CompletionItem[] = [];
     
     try {
+      // If partial contains "/" try path-based completion first
+      if (partial.includes('/')) {
+        const pathResults = await this.getPathBasedCompletions(partial);
+        results.push(...pathResults);
+      }
+      
+      // Always do fuzzy search across entire directory tree
+      const fuzzyResults = await this.getFuzzyCompletions(partial);
+      results.push(...fuzzyResults);
+
+      // Remove duplicates (prefer path-based results)
+      const seen = new Set<string>();
+      const uniqueResults = results.filter(item => {
+        if (seen.has(item.value)) {
+          return false;
+        }
+        seen.add(item.value);
+        return true;
+      });
+
+      // Sort results: directories first, then by priority, then alphabetically
+      uniqueResults.sort((a, b) => {
+        // Directories before files
+        if (a.type !== b.type) {
+          return a.type === 'directory' ? -1 : 1;
+        }
+        
+        // Then by priority (higher first)
+        const priorityDiff = (b.priority || 0) - (a.priority || 0);
+        if (priorityDiff !== 0) return priorityDiff;
+        
+        // Finally alphabetically (case insensitive)
+        return a.value.toLowerCase().localeCompare(b.value.toLowerCase());
+      });
+
+      return uniqueResults.slice(0, this.maxItems);
+      
+    } catch (error) {
+      console.warn('Files and directories completion error:', error.message);
+      return results;
+    }
+  }
+
+  private async getPathBasedCompletions(partial: string): Promise<CompletionItem[]> {
+    const results: CompletionItem[] = [];
+    
+    try {
       // Determine directory and filename to match
       const dir = this.resolveDirectory(partial);
-      const base = path.basename(partial);
+      let base = path.basename(partial);
+      
+      // If partial ends with '/', user wants to complete all files in that directory
+      if (partial.endsWith('/')) {
+        base = '';
+      }
       
       if (!fs.existsSync(dir)) {
         return results;
@@ -74,37 +126,201 @@ export class FilesAndDirectoriesCompletionProvider implements CompletionProvider
             value: displayValue,
             description: this.getItemDescription(fullPath, entry, isDirectory),
             type: completionType,
-            priority: this.getItemPriority(entry.name, completionType)
+            priority: this.getItemPriority(entry.name, completionType) + 5 // Boost path-based results
           });
         }
       }
 
-      // Sort results: directories first, then by priority, then alphabetically
-      results.sort((a, b) => {
-        // Directories before files
-        if (a.type !== b.type) {
-          return a.type === 'directory' ? -1 : 1;
-        }
-        
-        // Then by priority (higher first)
-        const priorityDiff = (b.priority || 0) - (a.priority || 0);
-        if (priorityDiff !== 0) return priorityDiff;
-        
-        // Finally alphabetically (case insensitive)
-        return a.value.toLowerCase().localeCompare(b.value.toLowerCase());
-      });
-
-      return results.slice(0, this.maxItems);
+      return results;
       
     } catch (error) {
-      console.warn('Files and directories completion error:', error.message);
+      console.warn('Path-based completion error:', error.message);
       return results;
+    }
+  }
+
+  private async getFuzzyCompletions(partial: string): Promise<CompletionItem[]> {
+    if (!partial.trim()) {
+      return [];
+    }
+
+    const results: CompletionItem[] = [];
+    const searchTerm = partial.toLowerCase();
+    const isExplicitPath = partial.includes('/');
+    
+    try {
+      await this.walkDirectory(this.cwd, (filePath, stats, relativeFromCwd) => {
+        const fileName = path.basename(filePath);
+        const fileNameLower = fileName.toLowerCase();
+        const relativeLower = relativeFromCwd.toLowerCase();
+        
+        // Fuzzy match: filename starts with term, contains term, or path contains term
+        const nameMatch = fileNameLower.startsWith(searchTerm) || fileNameLower.includes(searchTerm);
+        const pathMatch = relativeLower.includes(searchTerm);
+        
+        if (nameMatch || pathMatch) {
+          let displayValue = relativeFromCwd;
+          const isDirectory = stats.isDirectory();
+          const completionType: 'file' | 'directory' = isDirectory ? 'directory' : 'file';
+          
+          // Add trailing slash for directories
+          if (isDirectory) {
+            displayValue += '/';
+          }
+
+          // Calculate fuzzy match priority
+          let fuzzyPriority = 0;
+          if (fileNameLower.startsWith(searchTerm)) {
+            fuzzyPriority = 20; // Highest for prefix match on filename
+          } else if (fileNameLower.includes(searchTerm)) {
+            fuzzyPriority = 10; // Medium for substring match on filename
+          } else if (pathMatch) {
+            fuzzyPriority = 5; // Lower for path match
+          }
+
+          results.push({
+            value: displayValue,
+            description: this.getItemDescriptionFromStats(filePath, fileName, isDirectory, stats),
+            type: completionType,
+            priority: this.getItemPriority(fileName, completionType) + fuzzyPriority
+          });
+        }
+      }, isExplicitPath ? partial : '');
+
+      return results;
+      
+    } catch (error) {
+      console.warn('Fuzzy completion error:', error.message);
+      return results;
+    }
+  }
+
+  private async walkDirectory(
+    dir: string, 
+    callback: (filePath: string, stats: fs.Stats, relativeFromCwd: string) => void,
+    explicitPath: string = '',
+    maxDepth: number = 10,
+    currentDepth: number = 0
+  ): Promise<void> {
+    if (currentDepth >= maxDepth) {
+      return;
+    }
+
+    try {
+      const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        // Skip hidden files unless explicitly enabled
+        if (entry.name.startsWith('.') && !this.showHidden && !explicitPath.startsWith('.')) {
+          continue;
+        }
+
+        const fullPath = path.join(dir, entry.name);
+        const relativeFromCwd = path.relative(this.cwd, fullPath);
+        
+        // Check if this path should be included based on gitignore and explicit path
+        if (!this.shouldIncludePath(relativeFromCwd, explicitPath)) {
+          continue;
+        }
+        
+        try {
+          const stats = await fs.promises.stat(fullPath);
+          callback(fullPath, stats, relativeFromCwd);
+          
+          // Recurse into directories
+          if (entry.isDirectory()) {
+            await this.walkDirectory(fullPath, callback, explicitPath, maxDepth, currentDepth + 1);
+          }
+        } catch (statError) {
+          // Skip files we can't stat (permissions, broken symlinks, etc)
+          continue;
+        }
+      }
+    } catch (error) {
+      // Skip directories we can't read
+      return;
+    }
+  }
+
+  private shouldIncludePath(relativePath: string, explicitPath: string): boolean {
+    // If user typed an explicit path that matches or contains this path, always include
+    if (explicitPath && (relativePath.startsWith(explicitPath) || explicitPath.startsWith(relativePath))) {
+      return true;
+    }
+    
+    // Otherwise, check against gitignore patterns
+    return !this.isIgnoredByGitignore(relativePath);
+  }
+
+  private isIgnoredByGitignore(relativePath: string): boolean {
+    // Simple gitignore-like patterns (could be enhanced to read actual .gitignore)
+    const gitignorePatterns = [
+      'node_modules',
+      '.git',
+      '.svn', 
+      '.hg',
+      'dist',
+      'build',
+      'target',
+      '.next',
+      '.nuxt',
+      'vendor',
+      '*.log',
+      '.DS_Store',
+      'Thumbs.db'
+    ];
+    
+    const pathParts = relativePath.split(path.sep);
+    
+    for (const pattern of gitignorePatterns) {
+      if (pattern.includes('*')) {
+        // Simple glob pattern matching
+        const regex = new RegExp(pattern.replace(/\*/g, '.*'));
+        if (pathParts.some(part => regex.test(part))) {
+          return true;
+        }
+      } else {
+        // Direct directory/file name matching
+        if (pathParts.includes(pattern)) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  private getItemDescriptionFromStats(fullPath: string, fileName: string, isDirectory: boolean, stats: fs.Stats): string {
+    try {
+      if (isDirectory) {
+        return 'directory';
+      }
+      
+      // For files, show size and type
+      const size = this.formatFileSize(stats.size);
+      const ext = path.extname(fileName).slice(1);
+      
+      if (ext) {
+        return `${ext} file (${size})`;
+      } else {
+        return `file (${size})`;
+      }
+      
+    } catch {
+      return isDirectory ? 'directory' : 'file';
     }
   }
 
   private resolveDirectory(partial: string): string {
     if (partial.includes('/')) {
-      const dir = path.dirname(partial);
+      let dir: string;
+      if (partial.endsWith('/')) {
+        // If partial ends with '/', use the directory itself (remove trailing slash)
+        dir = partial.slice(0, -1);
+      } else {
+        // Otherwise use the directory part of the path
+        dir = path.dirname(partial);
+      }
       return path.resolve(this.cwd, dir);
     }
     return this.cwd;
