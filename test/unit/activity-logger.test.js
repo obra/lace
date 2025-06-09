@@ -102,8 +102,14 @@ describe('ActivityLogger', () => {
       // Close the database to simulate an error
       await logger.close();
       
+      // Clear any previous calls to console.error
+      console.error.mockClear();
+      
       // This should not throw, just log an error
       await logger.logEvent('test_event', 'session-123', null, { data: 'test' });
+      
+      // Verify error was logged
+      expect(console.error).toHaveBeenCalledWith('ActivityLogger: Database not initialized');
     });
   });
 

@@ -279,6 +279,17 @@ describe('Web Companion Security and Performance Tests', () => {
       const maxClients = 50;
       const clients = [];
       let connectionsEstablished = 0;
+      let testCompleted = false;
+      
+      // Timeout protection
+      const timeoutId = setTimeout(() => {
+        if (!testCompleted) {
+          testCompleted = true;
+          clients.forEach(client => client.disconnect());
+          expect(connectionsEstablished).toBeGreaterThan(0);
+          done();
+        }
+      }, 5000);
       
       // Try to establish many connections
       for (let i = 0; i < maxClients; i++) {
@@ -289,7 +300,10 @@ describe('Web Companion Security and Performance Tests', () => {
           connectionsEstablished++;
           
           // When we've tried to connect all clients
-          if (connectionsEstablished >= maxClients - 5) {
+          if (connectionsEstablished >= maxClients - 5 && !testCompleted) {
+            testCompleted = true;
+            clearTimeout(timeoutId);
+            
             // Check that server is tracking connections
             expect(webServer.connectedClients.size).toBeGreaterThan(10);
             expect(webServer.connectedClients.size).toBeLessThanOrEqual(maxClients);
@@ -304,13 +318,6 @@ describe('Web Companion Security and Performance Tests', () => {
           // Some connections might fail, which is expected under load
         });
       }
-      
-      // Timeout protection
-      setTimeout(() => {
-        clients.forEach(client => client.disconnect());
-        expect(connectionsEstablished).toBeGreaterThan(0);
-        done();
-      }, 5000);
     }, 10000);
 
     test('should handle large result sets efficiently', async () => {

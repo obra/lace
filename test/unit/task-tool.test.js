@@ -4,6 +4,7 @@
 import { test, describe, beforeEach, afterEach } from '../test-harness.js';
 import { TestHarness, assert, utils } from '../test-harness.js';
 import { TaskTool } from '../../src/tools/task-tool.js';
+import { jest } from '@jest/globals';
 
 describe('TaskTool', () => {
   let harness;

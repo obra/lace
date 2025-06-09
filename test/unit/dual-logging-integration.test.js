@@ -1,7 +1,7 @@
 // ABOUTME: Integration tests for dual logging system (activity + debug logging)
 // ABOUTME: Verifies both systems work independently without interference
 
-import { test, describe } from '@jest/globals';
+import { test, describe, jest, beforeAll, afterAll } from '@jest/globals';
 import assert from 'node:assert';
 import { Agent } from '../../src/agents/agent.ts';
 import { ToolRegistry } from '../../src/tools/tool-registry.js';
@@ -48,6 +48,18 @@ describe('Dual Logging System Integration', () => {
   let db;
   let toolApproval;
   let modelProvider;
+  let originalConsoleError;
+
+  beforeAll(() => {
+    // Mock console.error to prevent stderr pollution in these logging tests
+    originalConsoleError = console.error;
+    console.error = jest.fn();
+  });
+
+  afterAll(() => {
+    // Restore original console.error
+    console.error = originalConsoleError;
+  });
 
   // Setup before each test
   async function setup() {
@@ -103,7 +115,7 @@ describe('Dual Logging System Integration', () => {
           activityLogger,
           role: 'general',
           debugLogging: {
-            logLevel: 'info',
+            logLevel: 'off', // Don't log to stderr in tests
             logFile: debugLogFile,
             logFileLevel: 'debug'
           }
@@ -111,7 +123,7 @@ describe('Dual Logging System Integration', () => {
 
         // Verify debug logger is initialized
         assert.ok(agent.debugLogger);
-        assert.strictEqual(agent.debugLogger.stderrLevel, 'info');
+        assert.strictEqual(agent.debugLogger.stderrLevel, 'off');
         assert.strictEqual(agent.debugLogger.filePath, debugLogFile);
         assert.strictEqual(agent.debugLogger.fileLevel, 'debug');
       } finally {
@@ -157,7 +169,7 @@ describe('Dual Logging System Integration', () => {
           role: 'general',
           verbose: true,
           debugLogging: {
-            logLevel: 'debug',
+            logLevel: 'off', // Don't log to stderr in tests
             logFile: debugLogFile,
             logFileLevel: 'debug'
           }
@@ -302,7 +314,7 @@ describe('Dual Logging System Integration', () => {
           activityLogger,
           role: 'orchestrator',
           debugLogging: {
-            logLevel: 'info',
+            logLevel: 'off', // Don't log to stderr in tests
             logFile: debugLogFile,
             logFileLevel: 'debug'
           }
@@ -321,7 +333,7 @@ describe('Dual Logging System Integration', () => {
         assert.strictEqual(subagent.activityLogger, parentAgent.activityLogger, 'Should share same activity logger');
         
         // Verify debug logger configuration is inherited
-        assert.strictEqual(subagent.debugLogger.stderrLevel, 'info');
+        assert.strictEqual(subagent.debugLogger.stderrLevel, 'off');
         assert.strictEqual(subagent.debugLogger.filePath, debugLogFile);
         assert.strictEqual(subagent.debugLogger.fileLevel, 'debug');
         

@@ -944,6 +944,12 @@ export class WebServer {
     if (!this.isStarted) return;
 
     return new Promise((resolve) => {
+      // First, close all WebSocket connections
+      if (this.io) {
+        this.io.close();
+      }
+      
+      // Then close the HTTP server
       this.server.close(() => {
         this.isStarted = false;
         this.connectedClients.clear();

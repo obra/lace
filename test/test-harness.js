@@ -14,6 +14,7 @@ export class TestHarness {
   constructor() {
     this.testDatabases = new Set();
     this.tempFiles = new Set();
+    this.laceInstances = new Set();
   }
 
   // Create a temporary test database
@@ -33,6 +34,16 @@ export class TestHarness {
 
   // Clean up test resources
   async cleanup() {
+    // Shutdown Lace instances first
+    for (const lace of this.laceInstances) {
+      try {
+        await lace.shutdown();
+      } catch (error) {
+        // Ignore cleanup errors
+      }
+    }
+    this.laceInstances.clear();
+
     // Remove test databases
     for (const dbPath of this.testDatabases) {
       try {
@@ -85,6 +96,7 @@ export class TestHarness {
       ...options
     });
 
+    await lace.activityLogger.initialize();
     await lace.db.initialize();
     await lace.tools.initialize();
 
@@ -113,6 +125,8 @@ export class TestHarness {
       });
     }
 
+    // Track the Lace instance for cleanup
+    this.laceInstances.add(lace);
     return lace;
   }
 
