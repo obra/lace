@@ -96,7 +96,6 @@
 ## Acceptance Criteria
 
 **Memory Fixed**: Agent remembers within single session
-**Performance**: 90% token cost reduction via caching
 **Accuracy**: Precise token counting, not estimation
 **Maintainable**: Clean, simple implementation
 **Tested**: Each feature has passing tests

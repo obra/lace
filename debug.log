@@ -1,0 +1,9 @@
+2025-06-09T20:34:10.559Z [INFO ] 🚀 LaceUI initializing with debug logging enabled
+2025-06-09T20:34:10.560Z [DEBUG] Debug logging configuration:
+2025-06-09T20:34:32.435Z [DEBUG] 🔄 Agentic iteration 1/25
+2025-06-09T20:34:51.658Z [DEBUG] ⚡ Executed 1 tools in parallel (limit: 10)
+2025-06-09T20:34:51.659Z [DEBUG] 🔄 Agentic iteration 2/25
+2025-06-09T20:34:56.193Z [INFO ] 
+📈 Session totals: 3381 in, 344 out, 3725 total tokens
+2025-06-09T20:34:56.194Z [INFO ] 📊 Context usage: 3725/200000 tokens (1.9%)
+2025-06-09T20:34:56.194Z [INFO ] 💰 Cost: $0.0153 (in: $0.0101, out: $0.0052)

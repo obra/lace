@@ -3,20 +3,14 @@ export default {
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
   testEnvironment: 'node',
   
-  // Handle module path mapping for ESM  
+  // NO module name mapping for integration tests - use real implementations
+  // But add path mapping for cleaner imports
   moduleNameMapper: {
-     //  '^(\\.{1,2}/.*)\\.js$': '$1',
-    // Add explicit mappings for problematic modules  
-    '^fullscreen-ink$': '<rootDir>/test/with-mocks/__mocks__/fullscreen-ink.js',
-    '^../database/conversation-db.js$': '<rootDir>/test/with-mocks/__mocks__/conversation-db.js',
-    '^../tools/tool-registry.js$': '<rootDir>/test/with-mocks/__mocks__/tool-registry.js', 
-    '^../models/model-provider.js$': '<rootDir>/test/with-mocks/__mocks__/model-provider.js',
-    '^../agents/agent.js$': '<rootDir>/test/with-mocks/__mocks__/agent.js',
-    // Add path mappings for cleaner imports
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@test/(.*)$': '<rootDir>/test/$1'
   },
- resolver: 'jest-ts-webcompat-resolver',
+  
+  resolver: 'jest-ts-webcompat-resolver',
  
   // Transform all ESM modules in node_modules
   transformIgnorePatterns: [
@@ -39,7 +33,7 @@ export default {
   
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
   testMatch: [
-    '**/test/with-mocks/**/*.test.(ts|tsx|js)'
+    '**/test/no-mocks/**/*.test.(ts|tsx|js)'
   ],
   
   // Better error reporting
