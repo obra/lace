@@ -2,7 +2,7 @@
 // ABOUTME: Tests actual security headers, rate limiting, input validation, and performance under load
 
 import { beforeEach, afterEach, describe, expect, test, jest } from '@jest/globals';
-import { WebServer } from '../../../src/interface/web-server.js';
+import { WebServer } from '../../../src/ui/web-server.js';
 import { ConversationDB } from '../../../src/database/conversation-db.js';
 import { ActivityLogger } from '../../../src/logging/activity-logger.js';
 import { io as SocketIOClient } from 'socket.io-client';

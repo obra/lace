@@ -24,6 +24,155 @@ interface AppProps {
   laceUI?: any; // LaceUI instance passed from parent
 }
 
+function formatModalContent(type: string, data: any): string {
+  switch (type) {
+    case 'status':
+      return formatStatusModal(data);
+    case 'activity':
+      return formatActivityModal(data);
+    case 'tools':
+      return formatToolsModal(data);
+    case 'memory':
+      return formatMemoryModal(data);
+    case 'approval':
+      return formatApprovalModal(data);
+    case 'help':
+      return formatHelpModal(data);
+    default:
+      return `${type} information:\n${JSON.stringify(data, null, 2)}`;
+  }
+}
+
+function formatStatusModal(data: any): string {
+  const { agentInfo, contextUsage, pricingInfo } = data;
+  
+  let content = '🤖 Agent Status:\n';
+  content += `  Role: ${agentInfo.role}\n`;
+  content += `  Model: ${agentInfo.model}\n`;
+  content += `  Provider: ${agentInfo.provider}\n`;
+  content += `  Generation: ${agentInfo.generation}\n`;
+  
+  if (contextUsage) {
+    content += '\n📊 Context Window Usage:\n';
+    content += `  Used: ${contextUsage.used.toLocaleString()} tokens\n`;
+    content += `  Total: ${contextUsage.total.toLocaleString()} tokens\n`;
+    content += `  Usage: ${contextUsage.percentage.toFixed(1)}%\n`;
+    content += `  Remaining: ${contextUsage.remaining.toLocaleString()} tokens\n`;
+    
+    if (contextUsage.approachingHandoff) {
+      content += '  ⚠️ Context approaching handoff threshold!\n';
+    }
+  }
+  
+  if (pricingInfo) {
+    content += '\n💰 Model Pricing:\n';
+    content += `  Input: $${pricingInfo.inputPricePerMillion.toFixed(2)} per million tokens\n`;
+    content += `  Output: $${pricingInfo.outputPricePerMillion.toFixed(2)} per million tokens\n`;
+    
+    if (pricingInfo.currentContextCost !== null) {
+      content += `  Current context cost: ~$${pricingInfo.currentContextCost.toFixed(4)}\n`;
+    }
+  }
+  
+  return content;
+}
+
+function formatActivityModal(data: any): string {
+  const { activities } = data;
+  
+  if (!activities || activities.length === 0) {
+    return '📝 No recent activity found.';
+  }
+  
+  let content = `📝 Activity Log (${activities.length} events):\n\n`;
+  
+  activities.forEach((activity: any, index: number) => {
+    const timestamp = new Date(activity.timestamp).toLocaleString();
+    content += `${index + 1}. [${timestamp}] ${activity.event_type}\n`;
+    
+    if (activity.data) {
+      try {
+        const eventData = typeof activity.data === 'string' ? JSON.parse(activity.data) : activity.data;
+        if (eventData.input) {
+          content += `   Input: ${eventData.input.substring(0, 100)}${eventData.input.length > 100 ? '...' : ''}\n`;
+        }
+        if (eventData.content) {
+          content += `   Content: ${eventData.content.substring(0, 100)}${eventData.content.length > 100 ? '...' : ''}\n`;
+        }
+      } catch {
+        // Ignore parsing errors
+      }
+    }
+    content += '\n';
+  });
+  
+  return content;
+}
+
+function formatToolsModal(data: any): string {
+  const { tools } = data;
+  
+  if (!tools || tools.length === 0) {
+    return '🛠️ No tools available.';
+  }
+  
+  let content = `🛠️ Available Tools (${tools.length}):\n\n`;
+  
+  tools.forEach((tool: any, index: number) => {
+    content += `${index + 1}. ${tool.name}\n`;
+    content += `   ${tool.description}\n\n`;
+  });
+  
+  return content;
+}
+
+function formatMemoryModal(data: any): string {
+  const { history } = data;
+  
+  if (!history || history.length === 0) {
+    return '🧠 No conversation history found.';
+  }
+  
+  let content = `🧠 Conversation History (${history.length} messages):\n\n`;
+  
+  history.forEach((msg: any, index: number) => {
+    const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleString() : 'Unknown time';
+    content += `${index + 1}. [${timestamp}] ${msg.role}: ${msg.content.substring(0, 150)}${msg.content.length > 150 ? '...' : ''}\n\n`;
+  });
+  
+  return content;
+}
+
+function formatApprovalModal(data: any): string {
+  let content = '🔒 Tool Approval Settings:\n\n';
+  
+  content += `Interactive Mode: ${data.interactiveMode ? 'Enabled' : 'Disabled'}\n`;
+  
+  if (data.autoApproveList && data.autoApproveList.length > 0) {
+    content += `\n✅ Auto-approve List:\n`;
+    data.autoApproveList.forEach((tool: string) => {
+      content += `  - ${tool}\n`;
+    });
+  } else {
+    content += '\n✅ Auto-approve List: Empty\n';
+  }
+  
+  if (data.denyList && data.denyList.length > 0) {
+    content += `\n🚫 Deny List:\n`;
+    data.denyList.forEach((tool: string) => {
+      content += `  - ${tool}\n`;
+    });
+  } else {
+    content += '\n🚫 Deny List: Empty\n';
+  }
+  
+  return content;
+}
+
+function formatHelpModal(data: any): string {
+  return data.helpText || 'Help information not available.';
+}
+
 const AppInner: React.FC<AppProps> = ({ laceUI }) => {
   const { stdout } = useStdout();
   const { isRawModeSupported, setRawMode } = useStdin();
@@ -178,10 +327,10 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
           }
           
           if (result.shouldShowModal) {
-            // TODO: Handle modal display
+            const content = formatModalContent(result.shouldShowModal.type, result.shouldShowModal.data);
             setConversation(prev => [...prev, { 
               type: 'assistant' as const, 
-              content: `${result.shouldShowModal.type} modal would show here: ${JSON.stringify(result.shouldShowModal.data, null, 2)}` 
+              content 
             }]);
           } else if (result.message) {
             setConversation(prev => [...prev, { 

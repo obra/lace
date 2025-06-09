@@ -9,16 +9,21 @@ import { ToolRegistry } from '../tools/tool-registry.js';
 import { Agent } from '../agents/agent.js';
 import { ModelProvider } from '../models/model-provider.js';
 import { ApprovalEngine } from '../safety/index.js';
+import { ActivityLogger } from '../logging/activity-logger.js';
+import { WebServer } from './web-server.js';
 import App from './App';
 
 interface LaceUIOptions {
   verbose?: boolean;
   memoryPath?: string;
+  activityLogPath?: string;
   interactive?: boolean;
   autoApprove?: string[];
   autoApproveTools?: string[];
   deny?: string[];
   alwaysDenyTools?: string[];
+  webPort?: number;
+  enableWeb?: boolean;
 }
 
 interface AgentResponse {
@@ -46,12 +51,15 @@ export class LaceUI {
   private options: LaceUIOptions;
   private verbose: boolean;
   private memoryPath: string;
+  private activityLogPath: string;
   private db: any;
   private tools: any;
   private modelProvider: any;
   private toolApproval: any;
+  private activityLogger: ActivityLogger;
+  public webServer: WebServer | null;
   private primaryAgent: any;
-  private memoryAgents: Map<number, any>;
+  private memoryAgents: Map<string, any>;
   private currentGeneration: number;
   public sessionId: string;
   private app: any;
@@ -63,6 +71,7 @@ export class LaceUI {
     this.options = options;
     this.verbose = options.verbose || false;
     this.memoryPath = options.memoryPath || './lace-memory.db';
+    this.activityLogPath = options.activityLogPath || '.lace/activity.db';
     
     // Initialize lace backend components
     this.db = new ConversationDB(this.memoryPath);
@@ -73,12 +82,28 @@ export class LaceUI {
       }
     });
     
+    // Initialize activity logger
+    this.activityLogger = new ActivityLogger(this.activityLogPath);
+    
     // Tool approval system - can be configured
     this.toolApproval = new ApprovalEngine({
       interactive: options.interactive !== false,
       autoApproveTools: options.autoApprove || options.autoApproveTools || [],
-      alwaysDenyTools: options.deny || options.alwaysDenyTools || []
+      alwaysDenyTools: options.deny || options.alwaysDenyTools || [],
+      activityLogger: this.activityLogger
     });
+    
+    // Initialize web server if enabled
+    if (options.enableWeb !== false) {
+      this.webServer = new WebServer({
+        port: options.webPort || 3000,
+        activityLogger: this.activityLogger,
+        db: this.db,
+        verbose: this.verbose
+      });
+    } else {
+      this.webServer = null;
+    }
     
     this.primaryAgent = null;
     this.memoryAgents = new Map(); // generationId -> agent
@@ -92,10 +117,40 @@ export class LaceUI {
     this.abortController = null;
   }
 
-  async start() {
+  async initialize() {
     await this.db.initialize();
     await this.tools.initialize();
     await this.modelProvider.initialize();
+    
+    // Initialize activity logger
+    try {
+      await this.activityLogger.initialize();
+    } catch (error) {
+      console.error('ActivityLogger initialization failed:', error);
+      // Continue without activity logging
+    }
+    
+    // Don't start web server in tests, just initialize it
+    if (this.webServer && process.env.NODE_ENV !== 'test') {
+      try {
+        await this.webServer.start();
+        
+        // Connect activity logger events to web server broadcasting
+        this.activityLogger.on('activity', (event: any) => {
+          if (this.webServer) {
+            this.webServer.broadcastActivity(event);
+          }
+        });
+        
+        if (this.verbose) {
+          const status = this.webServer.getStatus();
+          console.log(`🌐 Web companion available at ${status.url}`);
+        }
+      } catch (error) {
+        console.error('Failed to start web server:', error);
+        // Continue without web companion
+      }
+    }
     
     this.primaryAgent = new Agent({
       generation: this.currentGeneration,
@@ -109,6 +164,10 @@ export class LaceUI {
       assignedProvider: 'anthropic',
       capabilities: ['orchestration', 'reasoning', 'planning', 'delegation']
     });
+  }
+
+  async start() {
+    await this.initialize();
 
     // Start the fullscreen Ink UI with exitOnCtrlC disabled  
     const fullscreenApp = withFullScreen(React.createElement(App, { laceUI: this }), {
@@ -128,10 +187,19 @@ export class LaceUI {
 
     this.isProcessing = true;
     this.abortController = new AbortController();
+    const startTime = Date.now();
+
+    // Log user input
+    await this.logUserInput(input);
 
     try {
-      // Setup streaming callback that sends tokens to UI
-      const onToken = (token) => {
+      // Setup streaming callback that sends tokens to UI and logs tokens
+      let tokenPosition = 0;
+      const onToken = (token: string) => {
+        // Log streaming token
+        this.logStreamingToken(token, tokenPosition++);
+        
+        // Send to UI
         if (this.uiRef && this.uiRef.handleStreamingToken) {
           this.uiRef.handleStreamingToken(token);
         }
@@ -145,6 +213,15 @@ export class LaceUI {
           onToken: onToken
         }
       );
+
+      // Log agent response
+      const duration = Date.now() - startTime;
+      await this.logAgentResponse(response, duration);
+
+      // Log tool executions
+      if (response.toolCalls && response.toolResults) {
+        await this.logToolExecutions(response.toolCalls, response.toolResults);
+      }
 
       return {
         success: true,
@@ -219,7 +296,7 @@ export class LaceUI {
 
   async handoffContext() {
     // Move current agent to memory agents
-    this.memoryAgents.set(this.currentGeneration, this.primaryAgent);
+    this.memoryAgents.set(this.currentGeneration.toString(), this.primaryAgent);
     this.currentGeneration++;
     
     // Create new primary agent with compressed context
@@ -268,15 +345,7 @@ export class LaceUI {
     };
   }
 
-  // Command completion using console command registry
-  async getCommandCompletions(prefix: string) {
-    // Import Console to use its command registry
-    const { Console } = await import('../interface/console.js');
-    const console = new Console();
-    console.currentAgent = this.primaryAgent; // Set agent for completions
-    
-    return console.getCommandCompletions(prefix);
-  }
+  // Command completion is now handled by CommandManager in the UI layer
 
   // File completion using the file tool
   async getFileCompletions(prefix: string) {
@@ -315,7 +384,143 @@ export class LaceUI {
   }
 
 
-  stop() {
+  // Activity logging methods
+  private async logUserInput(input: string): Promise<void> {
+    try {
+      await this.activityLogger.logEvent('user_input', this.sessionId, null, {
+        content: input,
+        timestamp: new Date().toISOString(),
+        input_length: input.length,
+        session_id: this.sessionId
+      });
+    } catch (error) {
+      // Activity logging errors should not break the application
+      if (this.verbose) {
+        console.error('Failed to log user input:', error);
+      }
+    }
+  }
+
+  private async logAgentResponse(response: AgentResponse, duration: number): Promise<void> {
+    try {
+      const tokens = response.usage?.total_tokens || response.usage?.output_tokens || 0;
+      const inputTokens = response.usage?.input_tokens || 0;
+      const outputTokens = response.usage?.output_tokens || 0;
+
+      await this.activityLogger.logEvent('agent_response', this.sessionId, null, {
+        content: response.content || '',
+        tokens: tokens,
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        duration_ms: duration,
+        iterations: response.iterations || 1,
+        error: response.error || null
+      });
+    } catch (error) {
+      if (this.verbose) {
+        console.error('Failed to log agent response:', error);
+      }
+    }
+  }
+
+  private async logStreamingToken(token: string, position: number): Promise<void> {
+    try {
+      await this.activityLogger.logEvent('streaming_token', this.sessionId, null, {
+        token: token,
+        timestamp: new Date().toISOString(),
+        position: position
+      });
+    } catch (error) {
+      // Silent fail for streaming tokens to avoid spam
+    }
+  }
+
+  private async logToolExecutions(toolCalls: any[], toolResults: any[]): Promise<void> {
+    try {
+      for (let i = 0; i < toolCalls.length; i++) {
+        const toolCall = toolCalls[i];
+        const toolResult = toolResults[i];
+        
+        await this.activityLogger.logEvent('tool_execution', this.sessionId, null, {
+          tool_name: toolCall.name,
+          input: toolCall.input || {},
+          result: toolResult || {},
+          duration_ms: Date.now() // This would be more accurate with start/end timing
+        });
+      }
+    } catch (error) {
+      if (this.verbose) {
+        console.error('Failed to log tool executions:', error);
+      }
+    }
+  }
+
+  // Activity retrieval methods
+  async getRecentActivity(limit: number = 20): Promise<any[]> {
+    try {
+      return await this.activityLogger.getRecentEvents(limit);
+    } catch (error) {
+      if (this.verbose) {
+        console.error('Failed to retrieve recent activity:', error);
+      }
+      return [];
+    }
+  }
+
+  async getSessionActivity(sessionId: string): Promise<any[]> {
+    try {
+      return await this.activityLogger.getEvents({ sessionId });
+    } catch (error) {
+      if (this.verbose) {
+        console.error('Failed to retrieve session activity:', error);
+      }
+      return [];
+    }
+  }
+
+  async getActivityByType(eventType: string): Promise<any[]> {
+    try {
+      return await this.activityLogger.getEvents({ eventType });
+    } catch (error) {
+      if (this.verbose) {
+        console.error('Failed to retrieve activity by type:', error);
+      }
+      return [];
+    }
+  }
+
+  // Activity command handler for UI commands
+  async handleActivityCommand(subcommand: string, options: any = {}): Promise<any[]> {
+    switch (subcommand) {
+      case 'recent':
+        return await this.getRecentActivity(options.limit || 20);
+      case 'session':
+        const sessionId = options.sessionId || this.sessionId;
+        return await this.getSessionActivity(sessionId);
+      case 'type':
+        return await this.getActivityByType(options.eventType);
+      default:
+        return await this.getRecentActivity(options.limit || 20);
+    }
+  }
+
+  async stop() {
+    // Stop web server if running
+    if (this.webServer) {
+      try {
+        await this.webServer.stop();
+      } catch (error) {
+        console.error('WebServer stop failed:', error);
+      }
+    }
+
+    // Close activity logger
+    try {
+      this.activityLogger.close();
+    } catch (error) {
+      console.error('ActivityLogger close failed:', error);
+    }
+
     if (this.app) {
       this.app.unmount();
     }

@@ -8,7 +8,7 @@ import { ToolRegistry } from '../../src/tools/tool-registry.js';
 import { ConversationDB } from '../../src/database/conversation-db.js';
 import { ActivityLogger } from '../../src/logging/activity-logger.js';
 import { DebugLogger } from '../../src/logging/debug-logger.js';
-import { ToolApprovalManager } from '../../src/safety/tool-approval.js';
+import { ApprovalEngine } from '../../src/safety/index.js';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
@@ -76,10 +76,9 @@ describe('Dual Logging System Integration', () => {
     db = new ConversationDB(path.join(tempDir, 'conversation-test.db'));
     await db.initialize();
     
-    toolApproval = new ToolApprovalManager({ 
+    toolApproval = new ApprovalEngine({ 
       interactive: false,
-      autoApproveTools: ['javascript_evaluate'],
-      activityLogger 
+      autoApproveTools: ['javascript_evaluate']
     });
     
     modelProvider = new MockModelProvider();

@@ -14,7 +14,7 @@ export interface CommandResult {
   data?: any;
   shouldExit?: boolean;
   shouldShowModal?: {
-    type: 'status' | 'tools' | 'memory' | 'approval' | 'help';
+    type: 'status' | 'tools' | 'memory' | 'approval' | 'help' | 'activity';
     data: any;
   };
 }

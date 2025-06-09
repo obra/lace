@@ -2,7 +2,7 @@
 // ABOUTME: Tests all WebServer REST API endpoints with actual server instances and database integration
 
 import { beforeEach, afterEach, describe, expect, test } from '@jest/globals';
-import { WebServer } from '../../../src/interface/web-server.js';
+import { WebServer } from '../../../src/ui/web-server.js';
 import { ConversationDB } from '../../../src/database/conversation-db.js';
 import { ActivityLogger } from '../../../src/logging/activity-logger.js';
 import axios from 'axios';

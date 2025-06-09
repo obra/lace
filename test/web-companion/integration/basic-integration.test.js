@@ -2,7 +2,7 @@
 // ABOUTME: Tests that web server can start, serve files, and handle basic requests
 
 import { describe, expect, test, beforeEach, afterEach } from '@jest/globals';
-import { WebServer } from '../../../src/interface/web-server.js';
+import { WebServer } from '../../../src/ui/web-server.js';
 import { ActivityLogger } from '../../../src/logging/activity-logger.js';
 import { ConversationDB } from '../../../src/database/conversation-db.js';
 

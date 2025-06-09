@@ -33,14 +33,14 @@ describe('ApprovalEngine', () => {
   });
 
   describe('checkAutoApproval', () => {
-    it('should auto-deny tools on deny list', () => {
+    it('should auto-deny tools on deny list', async () => {
       engine.addDenyList('dangerous_tool');
       
       const request: ApprovalRequest = {
         toolCall: { name: 'dangerous_tool', input: {} }
       };
       
-      const result = engine.checkAutoApproval(request);
+      const result = await engine.checkAutoApproval(request);
       expect(result).toEqual({
         approved: false,
         reason: 'Tool is on deny list',
@@ -48,14 +48,14 @@ describe('ApprovalEngine', () => {
       });
     });
 
-    it('should auto-approve tools on approve list', () => {
+    it('should auto-approve tools on approve list', async () => {
       engine.addAutoApprove('safe_tool');
       
       const request: ApprovalRequest = {
         toolCall: { name: 'safe_tool', input: { param: 'value' } }
       };
       
-      const result = engine.checkAutoApproval(request);
+      const result = await engine.checkAutoApproval(request);
       expect(result).toEqual({
         approved: true,
         reason: 'Tool is on auto-approve list',
@@ -63,16 +63,16 @@ describe('ApprovalEngine', () => {
       });
     });
 
-    it('should return null for tools requiring manual approval', () => {
+    it('should return null for tools requiring manual approval', async () => {
       const request: ApprovalRequest = {
         toolCall: { name: 'unknown_tool', input: {} }
       };
       
-      const result = engine.checkAutoApproval(request);
+      const result = await engine.checkAutoApproval(request);
       expect(result).toBeNull();
     });
 
-    it('should prioritize deny list over approve list', () => {
+    it('should prioritize deny list over approve list', async () => {
       engine.addAutoApprove('conflicted_tool');
       engine.addDenyList('conflicted_tool');
       
@@ -80,7 +80,7 @@ describe('ApprovalEngine', () => {
         toolCall: { name: 'conflicted_tool', input: {} }
       };
       
-      const result = engine.checkAutoApproval(request);
+      const result = await engine.checkAutoApproval(request);
       expect(result?.approved).toBe(false);
       expect(result?.reason).toBe('Tool is on deny list');
     });
@@ -177,14 +177,14 @@ describe('ApprovalEngine', () => {
   });
 
   describe('non-interactive mode behavior', () => {
-    it('should deny unknown tools when interactive mode disabled', () => {
+    it('should deny unknown tools when interactive mode disabled', async () => {
       const engine = new ApprovalEngine({ interactive: false });
       
       const request: ApprovalRequest = {
         toolCall: { name: 'unknown_tool', input: {} }
       };
       
-      const result = engine.checkAutoApproval(request);
+      const result = await engine.checkAutoApproval(request);
       expect(result).toBeNull(); // Should return null, requiring manual approval
       
       // Since interactive is disabled, this would be handled at a higher level
@@ -192,7 +192,7 @@ describe('ApprovalEngine', () => {
       expect(engine.getStatus().interactive).toBe(false);
     });
     
-    it('should still auto-approve when interactive disabled but tool is whitelisted', () => {
+    it('should still auto-approve when interactive disabled but tool is whitelisted', async () => {
       const engine = new ApprovalEngine({ 
         interactive: false,
         autoApproveTools: ['safe_tool']
@@ -202,12 +202,12 @@ describe('ApprovalEngine', () => {
         toolCall: { name: 'safe_tool', input: { param: 'value' } }
       };
       
-      const result = engine.checkAutoApproval(request);
+      const result = await engine.checkAutoApproval(request);
       expect(result?.approved).toBe(true);
       expect(result?.reason).toBe('Tool is on auto-approve list');
     });
 
-    it('should provide default denial when no auto-approval and interactive disabled', () => {
+    it('should provide default denial when no auto-approval and interactive disabled', async () => {
       // This test documents the expected workflow for non-interactive mode
       const engine = new ApprovalEngine({ interactive: false });
       
@@ -216,7 +216,7 @@ describe('ApprovalEngine', () => {
       };
       
       // Step 1: Check for auto-approval
-      const autoResult = engine.checkAutoApproval(request);
+      const autoResult = await engine.checkAutoApproval(request);
       expect(autoResult).toBeNull();
       
       // Step 2: Since interactive is disabled and no auto-approval, 

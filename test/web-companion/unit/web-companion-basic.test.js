@@ -2,7 +2,7 @@
 // ABOUTME: Tests actual WebServer components, React rendering, and real-time functionality with jsdom
 
 import { beforeEach, afterEach, describe, expect, test } from '@jest/globals';
-import { WebServer } from '../../../src/interface/web-server.js';
+import { WebServer } from '../../../src/ui/web-server.js';
 import { ConversationDB } from '../../../src/database/conversation-db.js';
 import { ActivityLogger } from '../../../src/logging/activity-logger.js';
 import { io as SocketIOClient } from 'socket.io-client';

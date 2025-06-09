@@ -1,8 +1,8 @@
 // ABOUTME: Integration tests for core Lace functionality without API dependencies
 // ABOUTME: Tests system integration, tool coordination, and agent workflows
 
-import { test, describe, beforeEach, afterEach } from './test-harness.js';
-import { TestHarness, assert } from './test-harness.js';
+import { test, describe, beforeEach, afterEach } from './test-harness.ts';
+import { TestHarness, assert } from './test-harness.ts';
 
 describe('Lace Integration Tests', () => {
   let harness;
@@ -17,7 +17,7 @@ describe('Lace Integration Tests', () => {
 
   describe('System Initialization', () => {
     test('should initialize all core systems', async () => {
-      const lace = await harness.createTestLace();
+      const lace = await harness.createTestLaceUI();
       
       assert.ok(lace.db, 'Should have database');
       assert.ok(lace.tools, 'Should have tool registry');
@@ -26,7 +26,7 @@ describe('Lace Integration Tests', () => {
     });
 
     test('should have all required tools available', async () => {
-      const lace = await harness.createTestLace();
+      const lace = await harness.createTestLaceUI();
       
       const tools = lace.tools.listTools();
       const requiredTools = ['shell', 'file', 'javascript', 'search'];
@@ -37,7 +37,7 @@ describe('Lace Integration Tests', () => {
     });
 
     test('should prepare tools for LLM format', async () => {
-      const lace = await harness.createTestLace();
+      const lace = await harness.createTestLaceUI();
       
       const toolsForLLM = lace.primaryAgent.buildToolsForLLM();
       
@@ -54,7 +54,7 @@ describe('Lace Integration Tests', () => {
 
   describe('Agent Coordination', () => {
     test('should spawn subagents with correct configuration', async () => {
-      const lace = await harness.createTestLace();
+      const lace = await harness.createTestLaceUI();
       
       const subagent = await lace.primaryAgent.spawnSubagent({
         role: 'execution',
@@ -69,7 +69,7 @@ describe('Lace Integration Tests', () => {
     });
 
     test('should analyze tasks and choose appropriate agents', async () => {
-      const lace = await harness.createTestLace();
+      const lace = await harness.createTestLaceUI();
       
       const testCases = [
         { task: 'plan authentication system', expectedRole: 'planning' },
@@ -88,7 +88,7 @@ describe('Lace Integration Tests', () => {
 
   describe('Tool Integration', () => {
     test('should execute file operations through agent', async () => {
-      const lace = await harness.createTestLace();
+      const lace = await harness.createTestLaceUI();
       
       // Create a temp file to test with
       const tempFile = await harness.createTempFile('test content');
@@ -104,7 +104,7 @@ describe('Lace Integration Tests', () => {
     });
 
     test('should execute JavaScript calculations', async () => {
-      const lace = await harness.createTestLace();
+      const lace = await harness.createTestLaceUI();
       
       const result = await lace.primaryAgent.executeTool({
         name: 'javascript_calculate',
@@ -116,7 +116,7 @@ describe('Lace Integration Tests', () => {
     });
 
     test('should handle shell commands', async () => {
-      const lace = await harness.createTestLace();
+      const lace = await harness.createTestLaceUI();
       
       const result = await lace.primaryAgent.executeTool({
         name: 'shell_execute',
@@ -130,7 +130,7 @@ describe('Lace Integration Tests', () => {
 
   describe('Conversation Persistence', () => {
     test('should save and retrieve conversation history', async () => {
-      const lace = await harness.createTestLace();
+      const lace = await harness.createTestLaceUI();
       
       const sessionId = 'integration-test-session';
       
@@ -147,7 +147,7 @@ describe('Lace Integration Tests', () => {
     });
 
     test('should maintain session isolation', async () => {
-      const lace = await harness.createTestLace();
+      const lace = await harness.createTestLaceUI();
       
       await lace.db.saveMessage('session-1', 0, 'user', 'Message 1');
       await lace.db.saveMessage('session-2', 0, 'user', 'Message 2');
@@ -163,7 +163,7 @@ describe('Lace Integration Tests', () => {
 
   describe('Error Handling', () => {
     test('should handle tool execution errors gracefully', async () => {
-      const lace = await harness.createTestLace();
+      const lace = await harness.createTestLaceUI();
       
       try {
         await lace.primaryAgent.executeTool({
@@ -177,7 +177,7 @@ describe('Lace Integration Tests', () => {
     });
 
     test('should handle file operation errors', async () => {
-      const lace = await harness.createTestLace();
+      const lace = await harness.createTestLaceUI();
       
       const result = await lace.primaryAgent.executeTool({
         name: 'file_read',
@@ -191,7 +191,7 @@ describe('Lace Integration Tests', () => {
 
   describe('Context Management', () => {
     test('should track context size and handoff conditions', async () => {
-      const lace = await harness.createTestLace();
+      const lace = await harness.createTestLaceUI();
       
       const agent = lace.primaryAgent;
       

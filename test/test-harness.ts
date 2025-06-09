@@ -5,16 +5,20 @@ import { test, describe, beforeEach, afterEach } from '@jest/globals';
 import assert from 'node:assert';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { Agent } from '../src/agents/agent.ts';
+import { Agent } from '../src/agents/agent.js';
 import { ToolRegistry } from '../src/tools/tool-registry.js';
 import { ConversationDB } from '../src/database/conversation-db.js';
-import { Lace } from '../src/lace.js';
+import { LaceUI } from '../src/ui/lace-ui.ts';
 
 export class TestHarness {
+  private testDatabases: Set<string>;
+  private tempFiles: Set<string>;
+  private laceUIInstances: Set<any>;
+
   constructor() {
     this.testDatabases = new Set();
     this.tempFiles = new Set();
-    this.laceInstances = new Set();
+    this.laceUIInstances = new Set();
   }
 
   // Create a temporary test database
@@ -34,15 +38,15 @@ export class TestHarness {
 
   // Clean up test resources
   async cleanup() {
-    // Shutdown Lace instances first
-    for (const lace of this.laceInstances) {
+    // Shutdown LaceUI instances first
+    for (const laceUI of this.laceUIInstances) {
       try {
-        await lace.shutdown();
+        await laceUI.stop();
       } catch (error) {
         // Ignore cleanup errors
       }
     }
-    this.laceInstances.clear();
+    this.laceUIInstances.clear();
 
     // Remove test databases
     for (const dbPath of this.testDatabases) {
@@ -66,12 +70,12 @@ export class TestHarness {
   }
 
   // Create a test agent without API key requirements
-  async createTestAgent(options = {}) {
+  async createTestAgent(options: any = {}) {
     const tools = new ToolRegistry();
     await tools.initialize();
 
-    const dbPath = await this.createTestDatabase();
-    const db = new ConversationDB(dbPath);
+    // Use in-memory database for faster, more reliable tests
+    const db = new ConversationDB(':memory:');
     await db.initialize();
 
     return new Agent({
@@ -88,50 +92,25 @@ export class TestHarness {
     });
   }
 
-  // Create a full Lace instance for integration tests
-  async createTestLace(options = {}) {
-    const lace = new Lace({
+  // Create a full LaceUI instance for integration tests
+  async createTestLaceUI(options: any = {}) {
+    const laceUI = new LaceUI({
       verbose: false,
-      memoryPath: await this.createTestDatabase('-lace'),
+      memoryPath: ':memory:',
       ...options
     });
 
-    await lace.activityLogger.initialize();
-    await lace.db.initialize();
-    await lace.tools.initialize();
+    // For integration tests, don't start the full UI
+    // Just initialize the backend components manually
+    await laceUI.initialize();
 
-    // Skip model provider for offline tests
-    if (!options.requireAPI) {
-      lace.primaryAgent = await this.createTestAgent({
-        role: 'orchestrator',
-        assignedModel: 'claude-3-5-sonnet-20241022',
-        assignedProvider: 'anthropic',
-        capabilities: ['orchestration', 'reasoning', 'planning', 'delegation'],
-        tools: lace.tools,
-        db: lace.db
-      });
-    } else {
-      await lace.modelProvider.initialize();
-      lace.primaryAgent = new Agent({
-        generation: 0,
-        tools: lace.tools,
-        db: lace.db,
-        modelProvider: lace.modelProvider,
-        verbose: false,
-        role: 'orchestrator',
-        assignedModel: 'claude-3-5-sonnet-20241022',
-        assignedProvider: 'anthropic',
-        capabilities: ['orchestration', 'reasoning', 'planning', 'delegation']
-      });
-    }
-
-    // Track the Lace instance for cleanup
-    this.laceInstances.add(lace);
-    return lace;
+    // Track the LaceUI instance for cleanup
+    this.laceUIInstances.add(laceUI);
+    return laceUI;
   }
 
   // Assert that a response contains expected content
-  assertResponse(response, expectations = {}) {
+  assertResponse(response: any, expectations: any = {}) {
     if (expectations.hasContent !== false) {
       assert.ok(response.content, 'Response should have content');
     }

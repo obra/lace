@@ -13,6 +13,6 @@
     "typeRoots": ["./types", "./node_modules/@types"],
     "allowImportingTsExtensions": true
   },
-  "include": ["src/**/*", "types/**/*"],
+  "include": ["src/**/*", "test/**/*", "types/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -2,7 +2,7 @@
 // ABOUTME: Tests actual LLM reasoning and tool calling (skipped if no API key)
 
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
-import { Lace } from '../src/lace.js';
+import { LaceUI } from '../src/ui/lace-ui.ts';
 import { Agent } from '../src/agents/agent.ts';
 
 const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
@@ -17,43 +17,30 @@ describeConditional('Live Anthropic API Integration Tests', () => {
     // Increase timeout for real API calls
     jest.setTimeout(30000);
     
-    lace = new Lace({ 
+    lace = new LaceUI({ 
       verbose: false,
-      memoryPath: ':memory:' // Use in-memory DB for tests
+      memoryPath: ':memory:', // Use in-memory DB for tests
+      enableWeb: false // Disable web server in tests
     });
     
-    await lace.db.initialize();
-    await lace.tools.initialize();
-    await lace.modelProvider.initialize();
-    
-    lace.primaryAgent = new Agent({
-      generation: 0,
-      tools: lace.tools,
-      db: lace.db,
-      modelProvider: lace.modelProvider,
-      verbose: false,
-      role: 'orchestrator',
-      assignedModel: 'claude-3-5-sonnet-20241022',
-      assignedProvider: 'anthropic',
-      capabilities: ['orchestration', 'reasoning', 'planning', 'delegation']
-    });
+    await lace.initialize();
   });
   
   afterAll(async () => {
     if (lace) {
-      await lace.shutdown();
+      await lace.stop();
     }
   });
 
   test('should execute shell commands through real API', async () => {
-    const response = await lace.primaryAgent.processInput(
-      'live-test-session', 
+    const response = await lace.handleMessage(
       'list files in current directory and tell me how many there are'
     );
     
     expect(response).toBeDefined();
     expect(response.content).toBeTruthy();
     expect(typeof response.content).toBe('string');
+    expect(response.success).toBe(true);
     
     // Should have made tool calls
     expect(response.toolCalls).toBeTruthy();
@@ -65,14 +52,14 @@ describeConditional('Live Anthropic API Integration Tests', () => {
   }, 30000);
 
   test('should perform calculations through real API', async () => {
-    const response = await lace.primaryAgent.processInput(
-      'live-test-session',
+    const response = await lace.handleMessage(
       'calculate the square root of 144'
     );
     
     expect(response).toBeDefined();
     expect(response.content).toBeTruthy();
     expect(response.content.toLowerCase()).toContain('12');
+    expect(response.success).toBe(true);
     
     // Should have made tool calls for calculation
     expect(response.toolCalls).toBeTruthy();
@@ -80,14 +67,14 @@ describeConditional('Live Anthropic API Integration Tests', () => {
   }, 30000);
 
   test('should handle complex reasoning tasks through real API', async () => {
-    const response = await lace.primaryAgent.processInput(
-      'live-test-session',
+    const response = await lace.handleMessage(
       'briefly explain the key components needed for user authentication in a web app'
     );
     
     expect(response).toBeDefined();
     expect(response.content).toBeTruthy();
     expect(response.content.length).toBeGreaterThan(100);
+    expect(response.success).toBe(true);
     
     // Response should mention authentication concepts
     const content = response.content.toLowerCase();
@@ -100,21 +87,19 @@ describeConditional('Live Anthropic API Integration Tests', () => {
   }, 30000);
 
   test('should maintain conversation context across multiple interactions', async () => {
-    const sessionId = 'context-test-session';
-    
     // First interaction
-    const response1 = await lace.primaryAgent.processInput(
-      sessionId,
+    const response1 = await lace.handleMessage(
       'Remember that my favorite programming language is JavaScript'
     );
     expect(response1.content).toBeTruthy();
+    expect(response1.success).toBe(true);
     
     // Second interaction referencing previous context
-    const response2 = await lace.primaryAgent.processInput(
-      sessionId,
+    const response2 = await lace.handleMessage(
       'What is my favorite programming language?'
     );
     expect(response2.content).toBeTruthy();
+    expect(response2.success).toBe(true);
     expect(response2.content.toLowerCase()).toContain('javascript');
   }, 45000);
 });

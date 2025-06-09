@@ -4,7 +4,7 @@
 import { describe, test, beforeEach, afterEach, expect, jest } from '@jest/globals';
 import request from 'supertest';
 import { io as Client } from 'socket.io-client';
-import { WebServer } from '../../src/interface/web-server.js';
+import { WebServer } from '../../src/ui/web-server.js';
 import { ActivityLogger } from '../../src/logging/activity-logger.js';
 import { ConversationDB } from '../../src/database/conversation-db.js';
 import { promises as fs } from 'fs';

@@ -1,11 +1,12 @@
 // ABOUTME: Unit tests for agent system components
 // ABOUTME: Tests agent behavior, role assignment, and task delegation
 
-import { test, describe, beforeEach, afterEach } from '../test-harness.js';
-import { TestHarness, assert } from '../test-harness.js';
+import { test, describe, beforeEach, afterEach } from '@jest/globals';
+import { TestHarness } from '../test-harness.js';
+import assert from 'node:assert';
 
 describe('Agent System', () => {
-  let harness;
+  let harness: TestHarness;
 
   beforeEach(async () => {
     harness = new TestHarness();
@@ -149,7 +150,7 @@ describe('Agent System', () => {
       const toolCall = { name: 'nonexistent_tool', input: {} };
       
       try {
-        await agent.executeTool(toolCall);
+        await agent.executeTool(toolCall, 'test-session');
         assert.fail('Should throw error for nonexistent tool');
       } catch (error) {
         assert.ok(error.message.includes('not found'), 'Should provide meaningful error message');

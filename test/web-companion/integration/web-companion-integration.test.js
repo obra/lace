@@ -2,8 +2,8 @@
 // ABOUTME: Tests WebSocket connectivity, API endpoints, and real-time features
 
 import { beforeEach, afterEach, describe, expect, test } from '@jest/globals';
-import { Lace } from '../../../src/lace.js';
-import { WebServer } from '../../../src/interface/web-server.js';
+import { LaceUI } from '../../../src/ui/lace-ui.js';
+import { WebServer } from '../../../src/ui/web-server.js';
 import { ActivityLogger } from '../../../src/logging/activity-logger.js';
 import { ConversationDB } from '../../../src/database/conversation-db.js';
 import io from 'socket.io-client';

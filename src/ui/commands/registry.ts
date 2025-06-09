@@ -41,6 +41,44 @@ export const basicCommands: Command[] = [
         shouldExit: true
       };
     }
+  },
+  
+  {
+    name: 'web',
+    description: 'Open web companion in browser',
+    handler: async (args, context) => {
+      if (!context.laceUI?.webServer) {
+        return {
+          success: false,
+          message: 'Web companion is not enabled. Use --web flag to start with web interface.'
+        };
+      }
+
+      const status = context.laceUI.webServer.getStatus();
+      if (!status.isStarted) {
+        return {
+          success: false,
+          message: 'Web server is not running. Cannot open web companion.'
+        };
+      }
+
+      const url = status.url;
+      
+      try {
+        // Import open dynamically since it's ESM
+        const { default: open } = await import('open');
+        await open(url);
+        return {
+          success: true,
+          message: `🌐 Web companion opened in your default browser at ${url}`
+        };
+      } catch (error) {
+        return {
+          success: false,
+          message: `❌ Failed to open browser: ${error instanceof Error ? error.message : String(error)}\nYou can manually open: ${url}`
+        };
+      }
+    }
   }
 ];
 
@@ -53,14 +91,21 @@ export const agentCommands: Command[] = [
     description: 'Show agent status and context usage',
     requiresAgent: true,
     handler: (args, context) => {
-      const status = context.laceUI?.getStatus();
+      if (!context.laceUI) {
+        return {
+          success: false,
+          message: 'LaceUI not available'
+        };
+      }
+
+      const status = context.laceUI.getStatus();
       if (!status) {
         return {
           success: false,
-          message: 'Unable to get agent status'
+          message: 'No agent available'
         };
       }
-      
+
       return {
         success: true,
         shouldShowModal: {
@@ -154,6 +199,57 @@ export const agentCommands: Command[] = [
           data: status
         }
       };
+    }
+  },
+  
+  {
+    name: 'activity',
+    description: 'Show recent activity logs',
+    parameterDescription: '[recent|session|type=<event_type>] [limit=<number>]',
+    requiresAgent: true,
+    handler: async (args, context) => {
+      if (!context.laceUI?.getRecentActivity) {
+        return {
+          success: false,
+          message: 'Activity logging not available'
+        };
+      }
+      
+      try {
+        let result;
+        const limit = 50; // Default limit
+        
+        if (args.length === 0 || args[0] === 'recent') {
+          // Show recent activity across all types
+          result = await context.laceUI.getRecentActivity(limit);
+        } else if (args[0] === 'session') {
+          // Show activity for current session
+          const sessionId = context.laceUI.sessionId || 'current';
+          result = await context.laceUI.getSessionActivity(sessionId, limit);
+        } else if (args[0].startsWith('type=')) {
+          // Filter by specific event type
+          const eventType = args[0].substring(5);
+          result = await context.laceUI.getActivityByType(eventType, limit);
+        } else {
+          return {
+            success: false,
+            message: 'Usage: /activity [recent|session|type=<event_type>]'
+          };
+        }
+        
+        return {
+          success: true,
+          shouldShowModal: {
+            type: 'activity',
+            data: { activities: result }
+          }
+        };
+      } catch (error) {
+        return {
+          success: false,
+          message: `Failed to get activity logs: ${error instanceof Error ? error.message : String(error)}`
+        };
+      }
     }
   }
 ];

@@ -8,8 +8,8 @@ global.IS_REACT_ACT_ENVIRONMENT = true;
 
 // Configure React for testing environment
 if (typeof window !== 'undefined') {
-  // Only set this in browser-like environments
-  global.jest = jest;
+  // Only set this in browser-like environments  
+  (global as any).jest = jest;
 }
 
 // Don't use fake timers globally - it breaks real timeout/async behavior

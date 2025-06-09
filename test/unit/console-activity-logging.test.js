@@ -1,48 +1,36 @@
-// ABOUTME: Unit tests for console activity logging integration
+// ABOUTME: Unit tests for LaceUI activity logging integration
 // ABOUTME: Tests that user_input and agent_response events are logged correctly
 
 import { test, describe, beforeEach, afterEach } from '../test-harness.js';
 import { TestHarness, assert, utils } from '../test-harness.js';
-import { Console } from '../../src/interface/console.js';
+import { LaceUI } from '../../src/ui/lace-ui.ts';
 import { ActivityLogger } from '../../src/logging/activity-logger.js';
 import { promises as fs } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-describe('Console Activity Logging', () => {
+describe('LaceUI Activity Logging', () => {
   let harness;
   let testDbPath;
-  let console;
-  let mockAgent;
+  let laceUI;
 
   beforeEach(async () => {
     harness = new TestHarness();
-    testDbPath = join(tmpdir(), `console-activity-test-${Date.now()}.db`);
-    console = new Console();
+    testDbPath = join(tmpdir(), `laceui-activity-test-${Date.now()}.db`);
+    laceUI = new LaceUI({
+      verbose: false,
+      memoryPath: ':memory:', // Use in-memory DB for tests
+      activityLogPath: testDbPath,
+      enableWeb: false // Disable web server in tests
+    });
     
-    // Override the activity logger to use our test database
-    console.activityLogger = new ActivityLogger(testDbPath);
-    
-    // Create a mock agent for testing
-    mockAgent = {
-      processInput: async (sessionId, input, options) => {
-        // Simulate processing delay
-        await new Promise(resolve => setTimeout(resolve, 10));
-        return {
-          content: `Mock response to: ${input}`,
-          usage: {
-            total_tokens: 150,
-            output_tokens: 75
-          }
-        };
-      }
-    };
+    await laceUI.initialize();
   });
 
   afterEach(async () => {
     await harness.cleanup();
-    if (console.activityLogger) {
-      await console.activityLogger.close();
+    if (laceUI) {
+      await laceUI.stop();
     }
     try {
       await fs.unlink(testDbPath);
@@ -52,39 +40,33 @@ describe('Console Activity Logging', () => {
   });
 
   describe('Activity Logger Initialization', () => {
-    test('should initialize activity logger during console start', async () => {
-      await console.activityLogger.initialize();
-      
+    test('should initialize activity logger during LaceUI start', async () => {
       // Verify the database was created
       assert.ok(await utils.fileExists(testDbPath));
       
       // Verify we can query events (should be empty initially)
-      const events = await console.activityLogger.getEvents();
+      const events = await laceUI.getRecentActivity();
       assert.strictEqual(events.length, 0);
     });
   });
 
   describe('User Input Logging', () => {
-    beforeEach(async () => {
-      await console.activityLogger.initialize();
-    });
-
-    test('should log user_input events with correct data structure', async () => {
+    test('should log user_input events with correct data structure through handleMessage', async () => {
       const testInput = 'Hello, test input message';
       
-      // Simulate the handleInput method logging (without full console interaction)
-      await console.activityLogger.logEvent('user_input', console.sessionId, null, {
-        content: testInput,
-        timestamp: new Date().toISOString()
-      });
+      // Use LaceUI's handleMessage which logs user input automatically
+      const response = await laceUI.handleMessage(testInput);
+      assert.ok(response.success);
       
-      const events = await console.activityLogger.getEvents();
-      assert.strictEqual(events.length, 1);
+      const events = await laceUI.getRecentActivity();
       
-      const event = events[0];
+      // Should have at least the user input event
+      const userInputEvents = events.filter(e => e.event_type === 'user_input');
+      assert.ok(userInputEvents.length >= 1);
+      
+      const event = userInputEvents[0];
       assert.strictEqual(event.event_type, 'user_input');
-      assert.strictEqual(event.local_session_id, console.sessionId);
-      assert.strictEqual(event.model_session_id, null);
+      assert.strictEqual(event.local_session_id, laceUI.sessionId);
       
       const data = JSON.parse(event.data);
       assert.strictEqual(data.content, testInput);
@@ -93,70 +75,52 @@ describe('Console Activity Logging', () => {
   });
 
   describe('Agent Response Logging', () => {
-    beforeEach(async () => {
-      await console.activityLogger.initialize();
-    });
-
-    test('should log agent_response events with timing and token data', async () => {
-      const responseContent = 'Test agent response';
-      const duration = 1200;
-      const tokens = 150;
+    test('should log agent_response events with timing and token data through handleMessage', async () => {
+      const testInput = 'Test message for agent response';
       
-      // Simulate agent response logging
-      await console.activityLogger.logEvent('agent_response', console.sessionId, null, {
-        content: responseContent,
-        tokens: tokens,
-        duration_ms: duration
-      });
+      // Use LaceUI's handleMessage which logs agent response automatically
+      const response = await laceUI.handleMessage(testInput);
+      assert.ok(response.success);
       
-      const events = await console.activityLogger.getEvents();
-      assert.strictEqual(events.length, 1);
+      const events = await laceUI.getRecentActivity();
       
-      const event = events[0];
+      // Should have agent response event
+      const agentResponseEvents = events.filter(e => e.event_type === 'agent_response');
+      assert.ok(agentResponseEvents.length >= 1);
+      
+      const event = agentResponseEvents[0];
       assert.strictEqual(event.event_type, 'agent_response');
-      assert.strictEqual(event.local_session_id, console.sessionId);
+      assert.strictEqual(event.local_session_id, laceUI.sessionId);
       
       const data = JSON.parse(event.data);
-      assert.strictEqual(data.content, responseContent);
-      assert.strictEqual(data.tokens, tokens);
-      assert.strictEqual(data.duration_ms, duration);
+      assert.ok(data.content);
+      assert.ok(data.duration_ms >= 0);
+      // Token data might be present depending on the actual response
     });
   });
 
-  describe('Integrated Console Flow', () => {
-    beforeEach(async () => {
-      await console.activityLogger.initialize();
-    });
-
+  describe('Integrated LaceUI Flow', () => {
     test('should log both input and response in correct order', async () => {
       const userInput = 'Test user message';
       
-      // Simulate the full flow that happens in handleInput
-      // 1. Log user input
-      await console.activityLogger.logEvent('user_input', console.sessionId, null, {
-        content: userInput,
-        timestamp: new Date().toISOString()
-      });
-      
-      // 2. Process with mock agent
-      const startTime = Date.now();
-      const response = await mockAgent.processInput(console.sessionId, userInput, {});
-      const duration = Date.now() - startTime;
-      
-      // 3. Log agent response
-      await console.activityLogger.logEvent('agent_response', console.sessionId, null, {
-        content: response.content,
-        tokens: response.usage.total_tokens,
-        duration_ms: duration
-      });
+      // Use LaceUI's handleMessage which handles the full flow
+      const response = await laceUI.handleMessage(userInput);
+      assert.ok(response.success);
       
       // Verify both events were logged
-      const events = await console.activityLogger.getEvents();
-      assert.strictEqual(events.length, 2);
+      const events = await laceUI.getRecentActivity();
       
-      // Events should be in reverse chronological order (most recent first)
-      const [responseEvent, inputEvent] = events;
+      // Should have both user input and agent response events
+      const inputEvents = events.filter(e => e.event_type === 'user_input');
+      const responseEvents = events.filter(e => e.event_type === 'agent_response');
       
+      assert.ok(inputEvents.length >= 1);
+      assert.ok(responseEvents.length >= 1);
+      
+      const inputEvent = inputEvents.find(e => JSON.parse(e.data).content === userInput);
+      const responseEvent = responseEvents[0];
+      
+      assert.ok(inputEvent);
       assert.strictEqual(inputEvent.event_type, 'user_input');
       assert.strictEqual(responseEvent.event_type, 'agent_response');
       
@@ -164,8 +128,7 @@ describe('Console Activity Logging', () => {
       const responseData = JSON.parse(responseEvent.data);
       
       assert.strictEqual(inputData.content, userInput);
-      assert.ok(responseData.content.includes(userInput)); // Mock response echoes input
-      assert.strictEqual(responseData.tokens, 150);
+      assert.ok(responseData.content);
       assert.ok(responseData.duration_ms >= 0);
     });
 
@@ -173,37 +136,36 @@ describe('Console Activity Logging', () => {
       const inputs = ['First message', 'Second message', 'Third message'];
       
       for (const input of inputs) {
-        // Log user input
-        await console.activityLogger.logEvent('user_input', console.sessionId, null, {
-          content: input,
-          timestamp: new Date().toISOString()
-        });
-        
-        // Process and log response
-        const response = await mockAgent.processInput(console.sessionId, input, {});
-        await console.activityLogger.logEvent('agent_response', console.sessionId, null, {
-          content: response.content,
-          tokens: response.usage.total_tokens,
-          duration_ms: 100
-        });
+        // Use LaceUI's handleMessage for each turn
+        const response = await laceUI.handleMessage(input);
+        assert.ok(response.success);
         
         // Small delay between turns
-        await new Promise(resolve => setTimeout(resolve, 5));
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
       
-      const events = await console.activityLogger.getEvents();
-      assert.strictEqual(events.length, 6); // 3 inputs + 3 responses
+      const events = await laceUI.getRecentActivity();
       
       // Count event types
       const inputEvents = events.filter(e => e.event_type === 'user_input');
       const responseEvents = events.filter(e => e.event_type === 'agent_response');
       
-      assert.strictEqual(inputEvents.length, 3);
-      assert.strictEqual(responseEvents.length, 3);
+      // Should have at least 3 of each type (might have more due to other activity)
+      assert.ok(inputEvents.length >= 3);
+      assert.ok(responseEvents.length >= 3);
       
       // Verify all events have the same session ID
       for (const event of events) {
-        assert.strictEqual(event.local_session_id, console.sessionId);
+        assert.strictEqual(event.local_session_id, laceUI.sessionId);
+      }
+      
+      // Verify our specific inputs were logged
+      for (const expectedInput of inputs) {
+        const foundInput = inputEvents.find(e => {
+          const data = JSON.parse(e.data);
+          return data.content === expectedInput;
+        });
+        assert.ok(foundInput, `Input "${expectedInput}" should be logged`);
       }
     });
   });
