@@ -83,8 +83,16 @@ global.io = jest.fn(() => mockSocket);
 describe('Web Companion UI Components Real Tests', () => {
   let container;
   let root;
+  let consoleSpy;
 
   beforeEach(() => {
+    // Mock console methods to prevent app.js logging during tests
+    consoleSpy = {
+      log: jest.spyOn(console, 'log').mockImplementation(() => {}),
+      error: jest.spyOn(console, 'error').mockImplementation(() => {}),
+      warn: jest.spyOn(console, 'warn').mockImplementation(() => {})
+    };
+    
     container = document.getElementById('root');
     root = createRoot(container);
     
@@ -130,6 +138,11 @@ describe('Web Companion UI Components Real Tests', () => {
       act(() => {
         root.unmount();
       });
+    }
+    
+    // Restore console methods
+    if (consoleSpy) {
+      Object.values(consoleSpy).forEach(spy => spy.mockRestore());
     }
     
     // Clean up any event listeners

@@ -668,7 +668,9 @@ export class WebServer {
             }
           } catch (findError) {
             // If find fails, fall back to simple directory listing
-            console.warn('Find command failed, using fallback search');
+            if (this.verbose) {
+              console.warn('Find command failed, using fallback search');
+            }
           }
           
           // Also search file contents using grep if query is substantial
@@ -777,7 +779,10 @@ export class WebServer {
         };
       }
     } catch (error) {
-      console.error(`Error building tree for ${rootPath}:`, error);
+      // Skip logging permission errors and missing files during tree building
+      if (this.verbose && error.code !== 'ENOENT' && error.code !== 'EACCES') {
+        console.error(`Error building tree for ${rootPath}:`, error);
+      }
       return null;
     }
   }

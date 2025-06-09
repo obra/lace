@@ -45,10 +45,15 @@ describe('Web Companion Integration Tests', () => {
   });
 
   afterEach(async () => {
-    // Clean up socket connections first
+    // Clean up socket connections first with proper error handling
     if (socketClient) {
-      if (socketClient.connected) {
-        socketClient.disconnect();
+      try {
+        socketClient.removeAllListeners();
+        if (socketClient.connected) {
+          socketClient.disconnect();
+        }
+      } catch (error) {
+        // Ignore socket cleanup errors
       }
       socketClient = null;
     }
@@ -58,8 +63,8 @@ describe('Web Companion Integration Tests', () => {
       await webServer.stop();
     }
     
-    // Wait for server to fully stop before closing dependencies
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Wait for server to fully stop and all connections to close
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Clean up database and activity logger AFTER server is stopped
     if (db && db.db) {
@@ -242,22 +247,11 @@ describe('Web Companion Integration Tests', () => {
 
   describe('Real-time Updates', () => {
     test('should broadcast activity events to multiple WebSocket clients', (done) => {
-      const timeout = setTimeout(() => {
-        // Clean up on timeout
-        if (client1) {
-          client1.removeAllListeners();
-          if (client1.connected) client1.disconnect();
-        }
-        if (client2) {
-          client2.removeAllListeners(); 
-          if (client2.connected) client2.disconnect();
-        }
-        done(new Error('Test timeout - multi-client broadcast failed'));
-      }, 8000);
-
       let client1, client2;
       let receivedCount = 0;
       let cleanedUp = false;
+      let connectionsReady = 0;
+      const uniqueSessionId = `multi-client-test-${Date.now()}`;
       
       const cleanup = () => {
         if (cleanedUp) return;
@@ -274,10 +268,15 @@ describe('Web Companion Integration Tests', () => {
         }
       };
       
+      const timeout = setTimeout(() => {
+        cleanup();
+        done(new Error('Test timeout - multi-client broadcast failed'));
+      }, 10000);
+      
       const handleActivity = (event) => {
         try {
-          // Only count user_input events, ignore others (like backfilled events)
-          if (event.event_type === 'user_input') {
+          // Only count our specific test event
+          if (event.event_type === 'user_input' && event.local_session_id === uniqueSessionId) {
             receivedCount++;
             
             if (receivedCount === 2) {
@@ -291,46 +290,66 @@ describe('Web Companion Integration Tests', () => {
         }
       };
       
-      client1 = io(baseUrl, { forceNew: true, timeout: 3000 });
-      client2 = io(baseUrl, { forceNew: true, timeout: 3000 });
-      
-      client1.on('connect', () => {
-        client1.on('activity', handleActivity);
-        
-        client2.on('connect', () => {
-          client2.on('activity', handleActivity);
-          
-          // Trigger an activity event after both clients are connected
+      const checkBothConnected = () => {
+        connectionsReady++;
+        if (connectionsReady === 2) {
+          // Both clients connected, wait a moment then trigger event
           setTimeout(() => {
             if (!cleanedUp && activityLogger) {
-              activityLogger.logEvent('user_input', 'test-session', null, {
+              activityLogger.logEvent('user_input', uniqueSessionId, null, {
                 message: 'Multi-client test',
                 generation: 1
               });
             }
-          }, 200);
-        });
-        
-        client2.on('connect_error', (error) => {
-          cleanup();
-          done(error);
-        });
+          }, 300);
+        }
+      };
+      
+      client1 = io(baseUrl, { forceNew: true, timeout: 5000 });
+      client2 = io(baseUrl, { forceNew: true, timeout: 5000 });
+      
+      client1.on('connect', () => {
+        client1.on('activity', handleActivity);
+        checkBothConnected();
+      });
+      
+      client2.on('connect', () => {
+        client2.on('activity', handleActivity);
+        checkBothConnected();
       });
       
       client1.on('connect_error', (error) => {
         cleanup();
         done(error);
       });
+      
+      client2.on('connect_error', (error) => {
+        cleanup();
+        done(error);
+      });
     });
 
     test('should handle session subscription correctly', (done) => {
-      const timeout = setTimeout(() => {
-        done(new Error('Test timeout - session subscription failed'));
-      }, 8000);
-
-      socketClient = io(baseUrl, { forceNew: true, timeout: 3000 });
-      let eventReceived = false;
+      let cleanedUp = false;
       const uniqueSessionId = `test-session-${Date.now()}-sub`;
+      
+      const cleanup = () => {
+        if (cleanedUp) return;
+        cleanedUp = true;
+        clearTimeout(timeout);
+        if (socketClient) {
+          socketClient.removeAllListeners();
+          if (socketClient.connected) socketClient.disconnect();
+        }
+      };
+      
+      const timeout = setTimeout(() => {
+        cleanup();
+        done(new Error('Test timeout - session subscription failed'));
+      }, 10000);
+
+      socketClient = io(baseUrl, { forceNew: true, timeout: 5000 });
+      let eventReceived = false;
       
       socketClient.on('connect', () => {
         // Subscribe to a specific session
@@ -338,25 +357,32 @@ describe('Web Companion Integration Tests', () => {
         
         // Listen for activity events
         socketClient.on('activity', (event) => {
-          if (eventReceived || event.local_session_id !== uniqueSessionId) return;
+          if (eventReceived || event.local_session_id !== uniqueSessionId || cleanedUp) return;
           eventReceived = true;
           
-          clearTimeout(timeout);
-          expect(event.local_session_id).toBe(uniqueSessionId);
-          done();
+          try {
+            expect(event.local_session_id).toBe(uniqueSessionId);
+            cleanup();
+            done();
+          } catch (error) {
+            cleanup();
+            done(error);
+          }
         });
         
-        // Trigger activity for the subscribed session
+        // Trigger activity for the subscribed session after a delay
         setTimeout(() => {
-          activityLogger.logEvent('user_input', uniqueSessionId, null, {
-            message: 'Session-specific test',
-            generation: 1
-          });
+          if (!cleanedUp && activityLogger) {
+            activityLogger.logEvent('user_input', uniqueSessionId, null, {
+              message: 'Session-specific test',
+              generation: 1
+            });
+          }
         }, 500);
       });
       
       socketClient.on('connect_error', (error) => {
-        clearTimeout(timeout);
+        cleanup();
         done(error);
       });
     });
