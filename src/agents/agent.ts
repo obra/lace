@@ -29,7 +29,7 @@ interface AgentOptions {
   circuitBreakerConfig?: CircuitBreakerConfig;
   synthesisConfig?: any;
   activityLogger?: any;
-  debugLogging?: DebugLoggingConfig;
+  debugLogger?: DebugLogger;
 }
 
 interface RetryConfig {
@@ -46,11 +46,6 @@ interface CircuitBreakerConfig {
   halfOpenMaxCalls?: number;
 }
 
-interface DebugLoggingConfig {
-  logLevel?: string;
-  logFile?: string;
-  logFileLevel?: string;
-}
 
 interface ToolCall {
   name: string;
@@ -238,14 +233,7 @@ export class Agent {
     this.activityLogger = options.activityLogger || null;
     
     // Debug logging
-    this.debugLogger = null;
-    if (options.debugLogging) {
-      this.debugLogger = new DebugLogger({
-        logLevel: options.debugLogging.logLevel || 'off',
-        logFile: options.debugLogging.logFile,
-        logFileLevel: options.debugLogging.logFileLevel || 'off'
-      });
-    }
+    this.debugLogger = options.debugLogger || null;
     
     this.contextSize = 0;
     this.maxContextSize = this.roleDefinition.contextPreferences?.maxContextSize || this.getModelContextWindow();
@@ -594,10 +582,13 @@ Focus on executing your assigned task efficiently.`;
     let postExecutionComment = null;
     
     if (this.toolApproval) {
-      const approval = await this.toolApproval.requestApproval(toolCall, {
-        reasoning: reasoning,
-        agent: this.role,
-        sessionId: sessionId
+      const approval = await this.toolApproval.requestApproval({
+        toolCall,
+        context: {
+          reasoning: reasoning,
+          agent: this.role,
+          sessionId: sessionId
+        }
       });
 
       if (!approval.approved) {
@@ -1124,11 +1115,7 @@ ${responseText}`;
       verbose: this.verbose,
       toolApproval: this.toolApproval,
       activityLogger: this.activityLogger,
-      debugLogging: options.debugLogging || (this.debugLogger ? {
-        logLevel: this.debugLogger.stderrLevel,
-        logFile: this.debugLogger.filePath,
-        logFileLevel: this.debugLogger.fileLevel
-      } : undefined)
+      debugLogger: this.debugLogger
     });
 
     if (this.verbose) {

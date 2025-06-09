@@ -14,12 +14,14 @@ export class ApprovalEngine {
   private alwaysDenyTools: Set<string>;
   private interactive: boolean;
   private activityLogger: any; // ActivityLogger from main
+  private uiCallback: ((toolCall: any, riskLevel: string, context?: any) => Promise<any>) | null;
 
   constructor(config: ApprovalEngineConfig = {}) {
     this.autoApproveTools = new Set(config.autoApproveTools || []);
     this.alwaysDenyTools = new Set(config.alwaysDenyTools || []);
     this.interactive = config.interactive !== false; // Default to true
     this.activityLogger = config.activityLogger || null;
+    this.uiCallback = null;
   }
 
   async checkAutoApproval(request: ApprovalRequest): Promise<ApprovalResult | null> {
@@ -207,6 +209,68 @@ export class ApprovalEngine {
       interactive: this.interactive,
       autoApprove: Array.from(this.autoApproveTools),
       denyList: Array.from(this.alwaysDenyTools)
+    };
+  }
+
+  // UI Callback Management
+  setUICallback(callback: (toolCall: any, riskLevel: string, context?: any) => Promise<any>): void {
+    this.uiCallback = callback;
+  }
+
+  // Request approval from UI or console
+  async requestApproval(request: ApprovalRequest): Promise<ApprovalResult> {
+    // First check for auto-approval
+    const autoResult = await this.checkAutoApproval(request);
+    if (autoResult) {
+      return autoResult;
+    }
+
+    // If not interactive, deny by default
+    if (!this.interactive) {
+      return {
+        approved: false,
+        reason: 'Interactive mode disabled',
+        modifiedCall: null
+      };
+    }
+
+    // Use UI callback if available
+    if (this.uiCallback) {
+      try {
+        const riskLevel = this.assessRisk(request.toolCall);
+        const userDecision = await this.uiCallback(request.toolCall, riskLevel, request.context);
+        
+        // Log the user decision
+        if (this.activityLogger && request.context?.sessionId) {
+          await this.activityLogger.logEvent('tool_approval_decision', request.context.sessionId, null, {
+            approved: userDecision.approved,
+            modified_params: userDecision.modifiedCall?.input || null,
+            user_decision: userDecision.approved ? 'user_approved' : 'user_denied',
+            reason: userDecision.reason || null
+          });
+        }
+
+        return {
+          approved: userDecision.approved,
+          reason: userDecision.reason || (userDecision.approved ? 'User approved' : 'User denied'),
+          modifiedCall: userDecision.modifiedCall || request.toolCall,
+          postExecutionComment: userDecision.postExecutionComment,
+          shouldStop: userDecision.shouldStop
+        };
+      } catch (error) {
+        return {
+          approved: false,
+          reason: `UI approval failed: ${error.message}`,
+          modifiedCall: null
+        };
+      }
+    }
+
+    // Fallback to deny if no UI callback
+    return {
+      approved: false,
+      reason: 'No approval mechanism available',
+      modifiedCall: null
     };
   }
 }

@@ -1,8 +1,7 @@
 // Mock sqlite3 module for Jest tests
 import { jest } from '@jest/globals';
 
-export default {
-  Database: jest.fn().mockImplementation((path, callback) => {
+function Database(path, callback) {
     // Mock database instance with all required methods
     const db = {
       run: jest.fn((sql, params, callback) => {
@@ -30,7 +29,9 @@ export default {
         return db;
       }),
       close: jest.fn((callback) => {
-        if (callback) callback(null);
+        if (callback) {
+          process.nextTick(() => callback(null));
+        }
         return db;
       }),
       prepare: jest.fn((sql) => {
@@ -74,9 +75,10 @@ export default {
     
     // Call the constructor callback with no error
     if (callback) {
-      setTimeout(() => callback(null), 0);
+      process.nextTick(() => callback(null));
     }
     
     return db;
-  })
-};
+}
+
+export default { Database };

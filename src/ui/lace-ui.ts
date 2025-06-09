@@ -10,12 +10,16 @@ import { Agent } from '../agents/agent.js';
 import { ModelProvider } from '../models/model-provider.js';
 import { ApprovalEngine } from '../safety/index.js';
 import { ActivityLogger } from '../logging/activity-logger.js';
+import { DebugLogger } from '../logging/debug-logger.js';
 import App from './App';
 
 interface LaceUIOptions {
   verbose?: boolean;
   memoryPath?: string;
   activityLogPath?: string;
+  logLevel?: string;
+  logFile?: string;
+  logFileLevel?: string;
   interactive?: boolean;
   autoApprove?: string[];
   autoApproveTools?: string[];
@@ -54,6 +58,7 @@ export class LaceUI {
   private modelProvider: any;
   private toolApproval: any;
   private activityLogger: ActivityLogger;
+  private debugLogger: DebugLogger;
   private primaryAgent: any;
   private memoryAgents: Map<string, any>;
   private currentGeneration: number;
@@ -80,6 +85,13 @@ export class LaceUI {
     
     // Initialize activity logger
     this.activityLogger = new ActivityLogger(this.activityLogPath);
+    
+    // Initialize debug logger
+    this.debugLogger = new DebugLogger({
+      logLevel: options.logLevel || 'off',
+      logFile: options.logFile,
+      logFileLevel: options.logFileLevel || 'debug'
+    });
     
     // Tool approval system - can be configured
     this.toolApproval = new ApprovalEngine({
@@ -124,7 +136,9 @@ export class LaceUI {
       role: 'orchestrator',
       assignedModel: 'claude-3-5-sonnet-20241022',
       assignedProvider: 'anthropic',
-      capabilities: ['orchestration', 'reasoning', 'planning', 'delegation']
+      capabilities: ['orchestration', 'reasoning', 'planning', 'delegation'],
+      activityLogger: this.activityLogger,
+      debugLogger: this.debugLogger
     });
   }
 

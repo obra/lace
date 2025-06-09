@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { render } from 'ink-testing-library';
+import { act } from 'react';
 import ConversationView from '../../../src/ui/components/ConversationView';
 import StatusBar from '../../../src/ui/components/StatusBar';
 import ShellInput from '../../../src/ui/components/ShellInput';
@@ -15,8 +16,13 @@ describe('Step 2: Basic Layout Structure', () => {
     expect(React.isValidElement(element)).toBe(true);
     
     // Should render without errors
-    const { unmount } = render(element);
-    unmount();
+    let unmount;
+    act(() => {
+      ({ unmount } = render(element));
+    });
+    act(() => {
+      unmount();
+    });
   });
 
   test('StatusBar renders as valid React element', () => {
@@ -26,8 +32,13 @@ describe('Step 2: Basic Layout Structure', () => {
     expect(React.isValidElement(element)).toBe(true);
     
     // Should render without errors
-    const { unmount } = render(element);
-    unmount();
+    let unmount;
+    act(() => {
+      ({ unmount } = render(element));
+    });
+    act(() => {
+      unmount();
+    });
   });
 
   test('ShellInput renders as valid React element', () => {
@@ -37,8 +48,13 @@ describe('Step 2: Basic Layout Structure', () => {
     expect(React.isValidElement(element)).toBe(true);
     
     // Should render without errors
-    const { unmount } = render(element);
-    unmount();
+    let unmount;
+    act(() => {
+      ({ unmount } = render(element));
+    });
+    act(() => {
+      unmount();
+    });
   });
 
   test('all components render without errors', () => {
@@ -56,13 +72,18 @@ describe('Step 2: Basic Layout Structure', () => {
     expect(React.isValidElement(shellInputElement)).toBe(true);
     
     // Test that they render without throwing errors
-    const { unmount: unmount1 } = render(conversationElement);
-    const { unmount: unmount2 } = render(statusElement);
-    const { unmount: unmount3 } = render(shellInputElement);
+    let unmount1, unmount2, unmount3;
+    act(() => {
+      ({ unmount: unmount1 } = render(conversationElement));
+      ({ unmount: unmount2 } = render(statusElement));
+      ({ unmount: unmount3 } = render(shellInputElement));
+    });
     
-    unmount1();
-    unmount2();
-    unmount3();
+    act(() => {
+      unmount1();
+      unmount2();
+      unmount3();
+    });
   });
 
   test('components accept their expected props', () => {
@@ -100,13 +121,18 @@ describe('Step 2: Basic Layout Structure', () => {
     expect(React.isValidElement(inputElement)).toBe(true);
     
     // Test that they render without throwing errors
-    const { unmount: unmount1 } = render(conversationElement);
-    const { unmount: unmount2 } = render(statusElement);
-    const { unmount: unmount3 } = render(inputElement);
+    let unmount1, unmount2, unmount3;
+    act(() => {
+      ({ unmount: unmount1 } = render(conversationElement));
+      ({ unmount: unmount2 } = render(statusElement));
+      ({ unmount: unmount3 } = render(inputElement));
+    });
     
-    unmount1();
-    unmount2();
-    unmount3();
+    act(() => {
+      unmount1();
+      unmount2();
+      unmount3();
+    });
   });
 
   test('component composition maintains proper hierarchy', () => {
@@ -133,12 +159,17 @@ describe('Step 2: Basic Layout Structure', () => {
     expect(React.isValidElement(appStructure.shellInput)).toBe(true);
     
     // Test that they render without throwing errors
-    const { unmount: unmount1 } = render(appStructure.conversationView);
-    const { unmount: unmount2 } = render(appStructure.statusBar);
-    const { unmount: unmount3 } = render(appStructure.shellInput);
+    let unmount1, unmount2, unmount3;
+    act(() => {
+      ({ unmount: unmount1 } = render(appStructure.conversationView));
+      ({ unmount: unmount2 } = render(appStructure.statusBar));
+      ({ unmount: unmount3 } = render(appStructure.shellInput));
+    });
     
-    unmount1();
-    unmount2();
-    unmount3();
+    act(() => {
+      unmount1();
+      unmount2();
+      unmount3();
+    });
   });
 });
