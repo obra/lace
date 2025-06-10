@@ -297,11 +297,15 @@ export class Agent {
     options: any = {},
   ): Promise<GenerateResponseResult> {
     try {
+      // Retrieve conversation history before building messages
+      const conversationHistory = await this.getConversationHistory(sessionId, 10);
+      
       // Agentic loop with circuit breaker
       const maxIterations = 25;
       let iteration = 0;
       let messages = [
         { role: "system", content: this.systemPrompt },
+        ...this.convertHistoryToMessages(conversationHistory),
         { role: "user", content: input },
       ];
 
@@ -1307,6 +1311,35 @@ ${responseText}`;
 
   async getConversationHistory(sessionId: string, limit = 10): Promise<any> {
     return await this.db.getConversationHistory(sessionId, limit);
+  }
+
+  convertHistoryToMessages(conversationHistory: any[], excludeLatest = true): any[] {
+    // Database returns in DESC order (newest first), so reverse for chronological order
+    const messages = [];
+    
+    // Skip the most recent message if excludeLatest is true (to avoid including current user message)
+    const startIndex = excludeLatest ? Math.min(1, conversationHistory.length) : 0;
+    
+    for (let i = conversationHistory.length - 1; i >= startIndex; i--) {
+      const dbMessage = conversationHistory[i];
+      const message: any = {
+        role: dbMessage.role,
+        content: dbMessage.content,
+      };
+      
+      // Add tool_calls if present
+      if (dbMessage.tool_calls && dbMessage.tool_calls !== 'null') {
+        try {
+          message.tool_calls = JSON.parse(dbMessage.tool_calls);
+        } catch (error) {
+          // Skip malformed tool_calls
+        }
+      }
+      
+      messages.push(message);
+    }
+    
+    return messages;
   }
 
   // ORCHESTRATION METHODS - for when this agent spawns subagents

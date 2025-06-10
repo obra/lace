@@ -2,28 +2,27 @@
 
 ## Phase 1: Fix Basic Conversation Memory (Critical)
 
-### Task 1.1: Write failing test for conversation memory
+### Task 1.1: Write failing test for conversation memory ✅
 
-- [ ] Create `test/unit/conversation-memory.test.js`
-- [ ] Test: Agent remembers previous message in same session
-- [ ] Verify test fails (confirms current bug)
-- [ ] ~5 lines of test code
+- [x] Create `test/no-mocks/integration/conversation-memory.test.js`
+- [x] Test: Agent remembers previous message in same session
+- [x] Verify test fails (confirms current bug)
+- [x] Integration test with real database
 
-### Task 1.2: Add conversation history retrieval to Agent
+### Task 1.2: Add conversation history retrieval to Agent ✅
 
-- [ ] Modify `Agent.generateResponse()` in `src/agents/agent.ts`
-- [ ] Add `getConversationHistory(sessionId, 10)` call before building messages
-- [ ] Convert DB format to LLM message format
-- [ ] Run test - should pass
-- [ ] ~10 lines of code
+- [x] Modify `Agent.generateResponse()` in `src/agents/agent.ts`
+- [x] Add `getConversationHistory(sessionId, 10)` call before building messages
+- [x] Convert DB format to LLM message format with `convertHistoryToMessages()`
+- [x] Exclude current user message to avoid duplication
+- [x] Run test - passes ✅
 
-### Task 1.3: Handle tool calls in conversation history
+### Task 1.3: Handle tool calls in conversation history ✅
 
-- [ ] Update conversation history conversion to include tool_calls
-- [ ] Parse `tool_calls` JSON from database
-- [ ] Format for LLM message structure
-- [ ] Test with tool call memory
-- [ ] ~8 lines of code
+- [x] Update conversation history conversion to include tool_calls
+- [x] Parse `tool_calls` JSON from database
+- [x] Format for LLM message structure
+- [x] Handle malformed JSON gracefully
 
 ## Phase 2: Add Accurate Token Counting
 
