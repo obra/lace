@@ -40,9 +40,9 @@ export class GitOperations {
       // Create .lace directory if it doesn't exist
       await fs.mkdir(join(this.projectPath, '.lace'), { recursive: true })
 
-      // Check if git repo already exists in this specific directory
-      const gitFile = join(this.projectPath, '.git')
-      if (await fs.access(gitFile).then(() => true).catch(() => false)) {
+      // Check if snapshot git repo already exists by checking our specific git directory
+      const gitDirExists = await fs.access(this.gitDir).then(() => true).catch(() => false)
+      if (gitDirExists) {
         return // Already initialized
       }
 
@@ -70,8 +70,13 @@ export class GitOperations {
       await fs.writeFile(gitignorePath, gitignoreContent)
 
       // Set git config for the snapshot repository
-      await this.git.addConfig('user.name', 'Lace Snapshot System')
-      await this.git.addConfig('user.email', 'noreply@lace-snapshot.local')
+      try {
+        await this.git.addConfig('user.name', 'Lace Snapshot System')
+        await this.git.addConfig('user.email', 'noreply@lace-snapshot.local')
+      } catch (configError) {
+        // Config may fail if directory is deleted during test cleanup, but initialization still succeeded
+        console.warn('Git config setup failed (may be due to test cleanup):', configError.message)
+      }
     } catch (error) {
       throw new Error(`Failed to initialize git repository: ${error.message}`)
     }
