@@ -116,16 +116,21 @@ describe('Activity Logging Integration', () => {
     test('should handle streaming token events', async () => {
       const tokens = ['Hello', ' ', 'world'];
       
-      for (const token of tokens) {
+      // Add small delays to ensure distinct timestamps
+      for (let i = 0; i < tokens.length; i++) {
         await activityLogger.logEvent(
           'streaming_token',
           'session-123',
           null,
           {
-            token,
+            token: tokens[i],
             timestamp: new Date().toISOString()
           }
         );
+        // Small delay to ensure different timestamps
+        if (i < tokens.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 5));
+        }
       }
 
       const events = await activityLogger.getEvents({ eventType: 'streaming_token' });
