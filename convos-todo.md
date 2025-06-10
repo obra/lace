@@ -50,29 +50,29 @@
 - [x] Test with long conversations and verify truncation behavior
 - [x] ~60 lines of code + comprehensive test
 
-## Phase 3: Implement Prompt Caching
+## Phase 3: Implement Prompt Caching ✅
 
-### Task 3.1: Add cache control to system prompts
+### Task 3.1: Add cache control to system prompts ✅
 
-- [ ] Update `anthropic-provider.js` to support `cache_control` parameter
-- [ ] Add cache control to system message formatting
-- [ ] Write test for cache control parameter presence
-- [ ] ~8 lines of code
+- [x] Update `anthropic-provider.js` to support `cache_control` parameter
+- [x] Add cache control to system message formatting with `"prompt-caching-2024-07-31"` beta
+- [x] Write test for cache control parameter presence
+- [x] Support caching in both `chat()` and `countTokens()` methods
 
-### Task 3.2: Implement conversation history caching
+### Task 3.2: Implement conversation history caching ✅
 
-- [ ] Add caching strategy to conversation history in `Agent.generateResponse()`
-- [ ] Cache system prompt (always)
-- [ ] Cache stable conversation history (older messages)
-- [ ] Fresh content for recent messages
-- [ ] ~15 lines of code
+- [x] Add caching strategy to conversation history in `Agent.generateResponse()`
+- [x] Cache system prompt (always)
+- [x] Cache stable conversation history (older messages)
+- [x] Fresh content for recent messages (last 2 messages kept fresh)
+- [x] Add `applyCachingStrategy()` method to Agent
 
-### Task 3.3: Add cache performance tracking
+### Task 3.3: Add cache performance tracking ✅
 
-- [ ] Track `cache_creation_input_tokens` and `cache_read_input_tokens`
-- [ ] Add to usage statistics
-- [ ] Log cache hit rates in debug mode
-- [ ] ~10 lines of code
+- [x] Track `cache_creation_input_tokens` and `cache_read_input_tokens`
+- [x] Add to usage statistics in agent response
+- [x] Log cache hit rates in debug mode
+- [x] Update Usage interface to include cache metrics
 
 ## Phase 4: Enhanced Streaming (Optional)
 

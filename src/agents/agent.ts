@@ -73,6 +73,8 @@ interface Usage {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
 }
 
 interface GenerateResponseResult {
@@ -311,6 +313,9 @@ export class Agent {
       const maxContextTokens = Math.floor(this.maxContextSize * 0.7); // Use 70% for input, leave room for output
       messages = await this.truncateConversationHistory(messages, maxContextTokens);
 
+      // Apply caching strategy to conversation history
+      messages = this.applyCachingStrategy(messages);
+
       // Count tokens accurately after truncation
       let initialTokenCount = 0;
       if (this.modelProvider && this.modelProvider.countTokens) {
@@ -318,6 +323,7 @@ export class Agent {
         const tokenCountResult = await this.modelProvider.countTokens(messages, {
           model: this.assignedModel,
           tools: availableTools,
+          enableCaching: true,
         });
         if (tokenCountResult.success) {
           initialTokenCount = tokenCountResult.inputTokens;
@@ -346,6 +352,8 @@ export class Agent {
         prompt_tokens: initialTokenCount,
         completion_tokens: 0,
         total_tokens: initialTokenCount,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
       };
 
       while (iteration < maxIterations && !shouldStop) {
@@ -402,6 +410,7 @@ export class Agent {
           maxTokens: 4096,
           onTokenUpdate: onTokenUpdate,
           signal: options.signal,
+          enableCaching: true,
         });
 
         // Log model response event
@@ -453,6 +462,13 @@ export class Agent {
             response.usage.completion_tokens ||
             0;
           totalUsage.total_tokens += response.usage.total_tokens || 0;
+          
+          // Accumulate cache metrics if available
+          totalUsage.cache_creation_input_tokens +=
+            response.usage.cache_creation_input_tokens || 0;
+          totalUsage.cache_read_input_tokens +=
+            response.usage.cache_read_input_tokens || 0;
+            
           this.contextSize = totalUsage.total_tokens;
         }
 
@@ -534,6 +550,18 @@ export class Agent {
           this.debugLogger.info(
             `📊 Context usage: ${contextUsage.used}/${contextUsage.total} tokens (${contextUsage.percentage.toFixed(1)}%)`,
           );
+          
+          // Log cache performance if cache metrics are available
+          if (totalUsage.cache_creation_input_tokens > 0 || totalUsage.cache_read_input_tokens > 0) {
+            const totalCacheTokens = totalUsage.cache_creation_input_tokens + totalUsage.cache_read_input_tokens;
+            const cacheHitRate = totalCacheTokens > 0 ? 
+              (totalUsage.cache_read_input_tokens / totalCacheTokens * 100).toFixed(1) : '0.0';
+            
+            this.debugLogger.info(
+              `💾 Cache performance: ${totalUsage.cache_read_input_tokens} hits, ${totalUsage.cache_creation_input_tokens} creations (${cacheHitRate}% hit rate)`,
+            );
+          }
+          
           if (cost) {
             this.debugLogger.info(
               `💰 Cost: $${cost.totalCost.toFixed(4)} (in: $${cost.inputCost.toFixed(4)}, out: $${cost.outputCost.toFixed(4)})`,
@@ -1430,6 +1458,65 @@ ${responseText}`;
     }
 
     return truncatedMessages;
+  }
+
+  applyCachingStrategy(messages: any[]): any[] {
+    // Don't modify messages if there aren't enough to benefit from caching
+    if (messages.length <= 2) {
+      return messages;
+    }
+
+    const cachedMessages = [...messages];
+    
+    // Cache strategy: 
+    // 1. System prompt is already cached by the provider
+    // 2. Cache stable conversation history (all but the last 2 messages)
+    // 3. Keep recent messages fresh for dynamic responses
+    
+    const cacheableHistoryEnd = Math.max(1, cachedMessages.length - 2); // Keep last 2 messages fresh
+    
+    for (let i = 1; i < cacheableHistoryEnd; i++) { // Skip system message (index 0)
+      const message = cachedMessages[i];
+      
+      // Add cache control to older conversation messages
+      if (message.role === "user" || message.role === "assistant") {
+        // Convert content to array format for caching if it's a string
+        if (typeof message.content === "string") {
+          cachedMessages[i] = {
+            ...message,
+            content: [
+              {
+                type: "text",
+                text: message.content,
+                cache_control: { type: "ephemeral" },
+              },
+            ],
+          };
+        } else if (Array.isArray(message.content)) {
+          // If already an array, add cache control to the last text block
+          const contentBlocks = [...message.content];
+          const lastTextBlock = contentBlocks[contentBlocks.length - 1];
+          if (lastTextBlock && lastTextBlock.type === "text") {
+            contentBlocks[contentBlocks.length - 1] = {
+              ...lastTextBlock,
+              cache_control: { type: "ephemeral" },
+            };
+            cachedMessages[i] = {
+              ...message,
+              content: contentBlocks,
+            };
+          }
+        }
+      }
+    }
+
+    if (this.debugLogger && cacheableHistoryEnd > 1) {
+      this.debugLogger.debug(
+        `💾 Applied caching to ${cacheableHistoryEnd - 1} older messages, keeping ${messages.length - cacheableHistoryEnd} recent messages fresh`,
+      );
+    }
+
+    return cachedMessages;
   }
 
   // ORCHESTRATION METHODS - for when this agent spawns subagents

@@ -127,6 +127,7 @@ export class AnthropicProvider {
       temperature = 0.7,
       onTokenUpdate = null,
       conversationId = null,
+      enableCaching = false,
     } = options;
 
     // Get or create conversation session ID
@@ -144,9 +145,27 @@ export class AnthropicProvider {
         stream: true,
       };
 
+      // Add prompt caching beta header if enabled
+      if (enableCaching) {
+        params.extra_headers = {
+          "anthropic-beta": "prompt-caching-2024-07-31",
+        };
+      }
+
       // Add system message if present
       if (systemMessage) {
-        params.system = systemMessage;
+        if (enableCaching) {
+          // Format system message for caching
+          params.system = [
+            {
+              type: "text",
+              text: systemMessage,
+              cache_control: { type: "ephemeral" },
+            },
+          ];
+        } else {
+          params.system = systemMessage;
+        }
       }
 
       // Add tools if provided
@@ -247,11 +266,15 @@ export class AnthropicProvider {
     let toolCallInput = "";
     let inputTokens = 0;
     let outputTokens = 0;
+    let cacheCreationInputTokens = 0;
+    let cacheReadInputTokens = 0;
 
     try {
       for await (const chunk of stream) {
         if (chunk.type === "message_start") {
           inputTokens = chunk.message.usage.input_tokens;
+          cacheCreationInputTokens = chunk.message.usage.cache_creation_input_tokens || 0;
+          cacheReadInputTokens = chunk.message.usage.cache_read_input_tokens || 0;
           if (onTokenUpdate) {
             onTokenUpdate({ inputTokens, outputTokens: 0, streaming: true });
           }
@@ -297,6 +320,8 @@ export class AnthropicProvider {
             input_tokens: inputTokens,
             output_tokens: outputTokens,
             total_tokens: inputTokens + outputTokens,
+            cache_creation_input_tokens: cacheCreationInputTokens,
+            cache_read_input_tokens: cacheReadInputTokens,
           };
           if (onTokenUpdate) {
             onTokenUpdate({ inputTokens, outputTokens, streaming: false });
@@ -319,7 +344,7 @@ export class AnthropicProvider {
   }
 
   async countTokens(messages, options = {}) {
-    const { model = "claude-3-5-sonnet-20241022", tools = [] } = options;
+    const { model = "claude-3-5-sonnet-20241022", tools = [], enableCaching = false } = options;
 
     try {
       const { systemMessage, userMessages } = this.separateSystemMessage(messages);
@@ -330,9 +355,25 @@ export class AnthropicProvider {
         messages: userMessages,
       };
 
+      // Add prompt caching beta if enabled
+      if (enableCaching) {
+        params.betas.push("prompt-caching-2024-07-31");
+      }
+
       // Add system message if present
       if (systemMessage) {
-        params.system = systemMessage;
+        if (enableCaching) {
+          // Format system message for caching in token counting
+          params.system = [
+            {
+              type: "text",
+              text: systemMessage,
+              cache_control: { type: "ephemeral" },
+            },
+          ];
+        } else {
+          params.system = systemMessage;
+        }
       }
 
       // Add tools if provided

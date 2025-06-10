@@ -52,7 +52,10 @@ describe("Conversation Memory Integration", () => {
     const hasHistory = secondCallMessages.length > 2;
     
     assert.ok(hasHistory, 
-      `Second call should include conversation history. Got ${secondCallMessages.length} messages: ${JSON.stringify(secondCallMessages.map(m => ({role: m.role, content: m.content?.substring(0, 50)})))}`);
+      `Second call should include conversation history. Got ${secondCallMessages.length} messages: ${JSON.stringify(secondCallMessages.map(m => ({
+        role: m.role, 
+        content: typeof m.content === 'string' ? m.content.substring(0, 50) : '[array]'
+      })))}`);
     
     assert.strictEqual(secondResponse.content, "I remember our conversation", 
       "Agent should remember previous messages when history is provided");
@@ -134,5 +137,75 @@ describe("Conversation Memory Integration", () => {
     // Should have fewer messages than the full conversation
     assert.ok(finalCall.messageCount < 32, // 15*2 + system + user = 32 total
       `Should truncate to fewer than 32 messages, got ${finalCall.messageCount}`);
+  });
+
+  test("agent applies caching strategy to conversation history", async () => {
+    const agent = await harness.createTestAgent();
+    const mockProvider = harness.createMockModelProvider();
+    
+    // Track what messages are sent to the provider
+    let sentMessages = null;
+    let cachingEnabled = false;
+    
+    mockProvider.chat = async (messages, options) => {
+      sentMessages = messages;
+      cachingEnabled = options.enableCaching;
+      
+      return {
+        success: true,
+        content: "Response with caching",
+        toolCalls: [],
+        usage: { input_tokens: 100, output_tokens: 20 },
+      };
+    };
+
+    mockProvider.countTokens = async (messages, options) => {
+      return {
+        success: true,
+        inputTokens: messages.length * 30, // Mock calculation
+        totalTokens: messages.length * 30,
+      };
+    };
+    
+    agent.modelProvider = mockProvider;
+    const sessionId = "test-session-caching";
+
+    // Add some conversation history to the database
+    await agent.db.saveMessage(sessionId, agent.generation, "user", "First message");
+    await agent.db.saveMessage(sessionId, agent.generation, "assistant", "First response");
+    await agent.db.saveMessage(sessionId, agent.generation, "user", "Second message");
+    await agent.db.saveMessage(sessionId, agent.generation, "assistant", "Second response");
+
+    // Process a new input - should apply caching strategy
+    const response = await agent.processInput(sessionId, "New message with caching");
+    
+    // Verify caching is enabled
+    assert.ok(cachingEnabled, "Caching should be enabled for conversation history");
+    
+    // Verify message structure - should have system + history + current
+    assert.ok(sentMessages.length >= 5, `Should have multiple messages, got ${sentMessages.length}`);
+    
+    // Check that older messages have cache control
+    let cachedMessageCount = 0;
+    for (let i = 1; i < sentMessages.length - 2; i++) { // Skip system and keep last 2 fresh
+      const message = sentMessages[i];
+      if (Array.isArray(message.content)) {
+        const lastContent = message.content[message.content.length - 1];
+        if (lastContent && lastContent.cache_control) {
+          cachedMessageCount++;
+        }
+      }
+    }
+    
+    // Should have cached some older messages
+    assert.ok(cachedMessageCount > 0, 
+      `Should have cached some older messages, found ${cachedMessageCount} cached messages`);
+    
+    // Recent messages should not have cache control
+    const lastMessage = sentMessages[sentMessages.length - 1];
+    if (Array.isArray(lastMessage.content)) {
+      const hasRecentCache = lastMessage.content.some(block => block.cache_control);
+      assert.ok(!hasRecentCache, "Recent messages should not have cache control");
+    }
   });
 });

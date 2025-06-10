@@ -232,6 +232,106 @@ describe("Model Provider Session ID Tracking", () => {
         assert.ok(capturedParams.tools);
       });
     });
+
+    describe("Prompt Caching", () => {
+      test("should add cache control to system prompts when caching enabled", async () => {
+        const provider = new AnthropicProvider();
+        let capturedParams = null;
+        
+        // Mock the client to capture parameters
+        provider.client = {
+          messages: {
+            create: async (params) => {
+              capturedParams = params;
+              return { 
+                content: [{ text: "response" }],
+                usage: { input_tokens: 10, output_tokens: 5 }
+              };
+            },
+          },
+        };
+
+        const messages = [
+          { role: "system", content: "You are a helpful assistant." },
+          { role: "user", content: "Hello" },
+        ];
+
+        await provider.chat(messages, { enableCaching: true });
+
+        // Verify cache control was added
+        assert.ok(capturedParams.extra_headers, "Should include extra headers for caching");
+        assert.strictEqual(
+          capturedParams.extra_headers["anthropic-beta"], 
+          "prompt-caching-2024-07-31",
+          "Should include prompt caching beta header"
+        );
+        
+        // Verify system message formatting
+        assert.ok(Array.isArray(capturedParams.system), "System should be formatted as array for caching");
+        assert.strictEqual(capturedParams.system[0].type, "text");
+        assert.strictEqual(capturedParams.system[0].text, "You are a helpful assistant.");
+        assert.deepStrictEqual(capturedParams.system[0].cache_control, { type: "ephemeral" });
+      });
+
+      test("should not add cache control when caching disabled", async () => {
+        const provider = new AnthropicProvider();
+        let capturedParams = null;
+        
+        // Mock the client to capture parameters
+        provider.client = {
+          messages: {
+            create: async (params) => {
+              capturedParams = params;
+              return { 
+                content: [{ text: "response" }],
+                usage: { input_tokens: 10, output_tokens: 5 }
+              };
+            },
+          },
+        };
+
+        const messages = [
+          { role: "system", content: "You are a helpful assistant." },
+          { role: "user", content: "Hello" },
+        ];
+
+        await provider.chat(messages, { enableCaching: false });
+
+        // Verify no cache control
+        assert.ok(!capturedParams.extra_headers, "Should not include extra headers when caching disabled");
+        assert.strictEqual(typeof capturedParams.system, "string", "System should be string when caching disabled");
+        assert.strictEqual(capturedParams.system, "You are a helpful assistant.");
+      });
+
+      test("should include caching beta in countTokens when enabled", async () => {
+        const provider = new AnthropicProvider();
+        let capturedParams = null;
+        
+        // Mock the client for token counting
+        provider.client = {
+          beta: {
+            messages: {
+              countTokens: async (params) => {
+                capturedParams = params;
+                return { input_tokens: 42 };
+              },
+            },
+          },
+        };
+
+        const messages = [
+          { role: "system", content: "System prompt" },
+          { role: "user", content: "User message" },
+        ];
+
+        await provider.countTokens(messages, { enableCaching: true });
+
+        assert.ok(capturedParams.betas.includes("prompt-caching-2024-07-31"), 
+          "Should include prompt caching beta in token counting");
+        assert.ok(Array.isArray(capturedParams.system), "System should be array for caching");
+        assert.deepStrictEqual(capturedParams.system[0].cache_control, { type: "ephemeral" });
+      });
+    });
   });
 
   describe("OpenAIProvider", () => {
