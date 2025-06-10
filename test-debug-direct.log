@@ -1,0 +1,5 @@
+2025-06-10T03:18:27.620Z [INFO ] 🚀 LaceUI initializing with debug logging enabled
+2025-06-10T03:18:27.617Z [INFO ] 🚀 LaceUI initializing with debug logging enabled
+2025-06-10T03:18:27.620Z [INFO ] 🚀 LaceUI initializing with debug logging enabled
+2025-06-10T03:18:27.620Z [DEBUG] Debug logging configuration: level=off, file=./test-debug-direct.log, fileLevel=debug
+2025-06-10T03:18:27.620Z [DEBUG] Debug logging configuration: level=warn, file=./test-debug-direct.log, fileLevel=debug

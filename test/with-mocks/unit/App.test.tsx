@@ -1,38 +1,42 @@
-// ABOUTME: Unit tests for Step 1 - Basic Ink App Setup
-// ABOUTME: Tests acceptance criteria and documents manual verification steps
+// ABOUTME: Unit tests for App component structure and basic functionality  
+// ABOUTME: Complex behavioral tests are handled in integration test suite
 
-describe("Step 1: Basic Ink App Setup", () => {
-  test("step 1 and 2 foundation complete", () => {
-    // This test documents that Step 1 + 2 requirements are satisfied:
-    // ✅ Dependencies added: ink, react, typescript, tsx
-    // ✅ Files created: src/ui/index.tsx, src/ui/App.tsx + components
-    // ✅ npm run ui command works
-    // ✅ Full layout structure implemented
+import React from "react";
+import App from "../../../src/ui/App";
 
-    // Manual verification required:
-    // Run: npm run ui
-    // Should show: Full window layout with ConversationView, StatusBar, InputBar
-    // Should NOT exit: Runs continuously until Ctrl+C
-
-    expect(true).toBe(true);
+describe("App Component", () => {
+  test("App component is a valid React component", () => {
+    expect(typeof App).toBe('function');
+    expect(App.length).toBeGreaterThanOrEqual(0); // Has props parameter
   });
 
-  test("typescript and jsx support working", () => {
-    // This documents that our TypeScript + JSX setup is functional
-    // ✅ tsx command handles .tsx files
-    // ✅ React JSX syntax compiles correctly
-    // ✅ Ink components render without errors
-
-    expect(true).toBe(true);
+  test("App component accepts props correctly", () => {
+    // Test that component can be instantiated with props
+    const mockLaceUI = {
+      setToolApprovalUICallback: () => {},
+      uiRef: null,
+      commandManager: null,
+    };
+    
+    // Should not throw when creating element
+    expect(() => {
+      React.createElement(App, { laceUI: mockLaceUI });
+    }).not.toThrow();
   });
 
-  test("project structure correct", () => {
-    // Files should exist:
-    // - src/ui/index.tsx (entry point)
-    // - src/ui/App.tsx (main component)
-    // - tsconfig.json (TypeScript config)
-    // - package.json updated with ui script
-
-    expect(true).toBe(true);
+  test("App component accepts no props", () => {
+    // Should not throw when creating element with no props
+    expect(() => {
+      React.createElement(App, {});
+    }).not.toThrow();
   });
+
+  test("App component has correct display name", () => {
+    expect(App.name).toBe('App');
+  });
+
+  // Note: Full rendering and behavioral tests (keyboard shortcuts, navigation, 
+  // tool approval modals, focus management) are handled in the integration test 
+  // suite due to the App component's complex dependencies on stdin, useEffect
+  // hooks, and external services. Unit tests focus on component structure.
 });

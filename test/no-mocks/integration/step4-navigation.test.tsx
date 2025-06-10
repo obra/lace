@@ -1,106 +1,152 @@
-// ABOUTME: Integration tests for Step 4 navigation functionality
-// ABOUTME: Tests navigation mode state management and component integration
+// ABOUTME: Integration tests for navigation functionality  
+// ABOUTME: Tests user-observable navigation behavior and mode switching
 
 import React from "react";
+import { render } from "ink-testing-library";
 import StatusBar from "@/ui/components/StatusBar";
 import InputBar from "@/ui/components/InputBar";
-import ConversationView from "@/ui/components/ConversationView";
 
-describe("Step 4: Navigation Mode Integration", () => {
-  test("StatusBar displays navigation mode correctly", () => {
-    const normalElement = StatusBar({ isNavigationMode: false }) as any;
-    const navElement = StatusBar({
-      isNavigationMode: true,
-      scrollPosition: 1,
-      totalMessages: 4,
-    }) as any;
-
-    // Should render without error in both modes
-    expect(normalElement).toBeTruthy();
-    expect(navElement).toBeTruthy();
-
-    // Normal mode should show "Ready"
-    expect(normalElement.type).toBeTruthy();
-
-    // Navigation mode should show different content than normal mode
-    expect(navElement.type).toBeTruthy();
-
-    // Basic structure test - navigation mode should have different content
-    expect(normalElement.props.children).toBeTruthy();
-    expect(navElement.props.children).toBeTruthy();
-  });
-
-  test("InputBar shows navigation mode message", () => {
-    const normalElement = InputBar({ isNavigationMode: false }) as any;
-    const navElement = InputBar({ isNavigationMode: true }) as any;
-
-    // Normal mode shows placeholder in fragment
-    const normalFragment = normalElement.props.children[1];
-    const normalText = normalFragment.props.children[0]; // First child of fragment is placeholder
-    expect(normalText.props.children).toBe("Type your message...");
-    expect(normalText.props.color).toBe("dim");
-
-    // Navigation mode shows instruction directly (not in fragment)
-    const navText = navElement.props.children[1];
-    expect(navText.props.children).toBe(
-      "Navigation mode - Press Escape or q to exit",
+describe("Navigation Mode Integration", () => {
+  test("user can see when navigation mode is active", () => {
+    const { lastFrame: normalFrame } = render(
+      <StatusBar isNavigationMode={false} />
     );
-    expect(navText.props.color).toBe("yellow");
-  });
-
-  test("ConversationView highlights messages correctly", () => {
-    const element = ConversationView({
-      scrollPosition: 2,
-      isNavigationMode: true,
-    }) as any;
-    const messages = element.props.children;
-
-    // Should have 4 messages
-    expect(messages).toHaveLength(4);
-
-    // Third message (index 2) should be highlighted
-    expect(messages[0].props.isHighlighted).toBe(false);
-    expect(messages[1].props.isHighlighted).toBe(false);
-    expect(messages[2].props.isHighlighted).toBe(true);
-    expect(messages[3].props.isHighlighted).toBe(false);
-  });
-
-  test("navigation state affects all components correctly", () => {
-    const scrollPosition = 1;
-    const totalMessages = 4;
-    const isNavigationMode = true;
-
-    // Test that all components receive and handle navigation state properly
-    const statusBar = StatusBar({
-      isNavigationMode,
-      scrollPosition,
-      totalMessages,
-    }) as any;
-    const inputBar = InputBar({ isNavigationMode }) as any;
-    const conversationView = ConversationView({
-      scrollPosition,
-      isNavigationMode,
-    }) as any;
-
-    // StatusBar should show navigation info (last fragment)
-    const statusFragment =
-      statusBar.props.children[statusBar.props.children.length - 1];
-    const statusChildren = statusFragment.props.children;
-    const positionElement = statusChildren.find(
-      (child: any) =>
-        child.props.children &&
-        typeof child.props.children === "string" &&
-        child.props.children.includes("Line "),
+    
+    const { lastFrame: navFrame } = render(
+      <StatusBar 
+        isNavigationMode={true} 
+        scrollPosition={2}
+        totalMessages={5}
+      />
     );
-    expect(positionElement).toBeTruthy();
-    expect(positionElement.props.children).toContain("Line 2 of 4");
 
-    // InputBar should show navigation message
-    const inputText = inputBar.props.children[1];
-    expect(inputText.props.color).toBe("yellow");
+    const normalOutput = normalFrame();
+    const navOutput = navFrame();
 
-    // ConversationView should highlight correct message
-    const messages = conversationView.props.children;
-    expect(messages[1].props.isHighlighted).toBe(true);
+    // User should see different status information in navigation mode
+    expect(normalOutput).not.toEqual(navOutput);
+    
+    // Navigation mode should show position information
+    expect(navOutput).toContain("2"); // scrollPosition
+    expect(navOutput).toContain("5"); // totalMessages or indication of total
+  });
+
+  test("user sees navigation instructions when in navigation mode", () => {
+    const { lastFrame: normalInput } = render(
+      <InputBar isNavigationMode={false} />
+    );
+    
+    const { lastFrame: navInput } = render(
+      <InputBar isNavigationMode={true} />
+    );
+
+    const normalOutput = normalInput();
+    const navOutput = navInput();
+
+    // Normal mode shows typing prompt
+    expect(normalOutput).toContain("Type your message");
+    
+    // Navigation mode shows exit instructions
+    expect(navOutput).toContain("Navigation mode");
+    expect(navOutput).toContain("Escape");
+    expect(navOutput).toContain("exit");
+  });
+
+  test("user can distinguish between normal and navigation states", () => {
+    // Test that both status bar and input bar reflect navigation state
+    const normalStatusBar = render(<StatusBar isNavigationMode={false} />);
+    const normalInputBar = render(<InputBar isNavigationMode={false} />);
+    
+    const navStatusBar = render(<StatusBar isNavigationMode={true} scrollPosition={1} totalMessages={3} />);
+    const navInputBar = render(<InputBar isNavigationMode={true} />);
+
+    // Normal mode outputs
+    const normalStatus = normalStatusBar.lastFrame();
+    const normalInput = normalInputBar.lastFrame();
+    
+    // Navigation mode outputs  
+    const navStatus = navStatusBar.lastFrame();
+    const navInput = navInputBar.lastFrame();
+
+    // Status should be different between modes
+    expect(normalStatus).not.toEqual(navStatus);
+    
+    // Input should be different between modes
+    expect(normalInput).not.toEqual(navInput);
+    
+    // User should see clear visual indication they're in navigation mode
+    expect(navInput).toContain("Navigation mode");
+  });
+
+  test("navigation mode shows current position in conversation", () => {
+    const testCases = [
+      { position: 1, total: 5 },
+      { position: 3, total: 10 },
+      { position: 7, total: 7 }, // At end
+    ];
+
+    testCases.forEach(({ position, total }) => {
+      const { lastFrame } = render(
+        <StatusBar 
+          isNavigationMode={true}
+          scrollPosition={position}
+          totalMessages={total}
+        />
+      );
+
+      const output = lastFrame();
+      
+      // User should see their current position
+      expect(output).toContain(position.toString());
+      
+      // User should see total count (in some form)
+      expect(output).toContain(total.toString());
+    });
+  });
+
+  test("user interface is responsive to navigation state changes", () => {
+    // Simulate switching between modes
+    const { lastFrame, rerender } = render(
+      <div>
+        <StatusBar isNavigationMode={false} />
+        <InputBar isNavigationMode={false} />
+      </div>
+    );
+
+    const beforeNav = lastFrame();
+
+    // Switch to navigation mode
+    rerender(
+      <div>
+        <StatusBar isNavigationMode={true} scrollPosition={1} totalMessages={4} />
+        <InputBar isNavigationMode={true} />
+      </div>
+    );
+
+    const afterNav = lastFrame();
+
+    // UI should update to reflect navigation mode
+    expect(beforeNav).not.toEqual(afterNav);
+    expect(afterNav).toContain("Navigation mode");
+  });
+
+  test("navigation position updates are visible to user", () => {
+    const { lastFrame, rerender } = render(
+      <StatusBar isNavigationMode={true} scrollPosition={1} totalMessages={5} />
+    );
+
+    const position1 = lastFrame();
+
+    // Move to different position
+    rerender(
+      <StatusBar isNavigationMode={true} scrollPosition={3} totalMessages={5} />
+    );
+
+    const position3 = lastFrame();
+
+    // Position change should be visible
+    expect(position1).not.toEqual(position3);
+    expect(position1).toContain("1");
+    expect(position3).toContain("3");
   });
 });

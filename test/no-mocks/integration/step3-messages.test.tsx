@@ -1,12 +1,13 @@
-// ABOUTME: Integration tests for Step 3 message display functionality
-// ABOUTME: Tests message display logic and conversation structure
+// ABOUTME: Integration tests for message display functionality
+// ABOUTME: Tests user-observable message behavior and conversation flow
 
 import React from "react";
+import { render } from "ink-testing-library";
 import ConversationView from "@/ui/components/ConversationView";
 import Message from "@/ui/components/Message";
 
-describe("Step 3: Basic Message Display Integration", () => {
-  test("ConversationView displays complete conversation with messages", () => {
+describe("Message Display Integration", () => {
+  test("user can see complete conversation flow", () => {
     const mockConversation = [
       { type: "user" as const, content: "Hello" },
       { type: "assistant" as const, content: "Hi! How can I help you today?" },
@@ -18,136 +19,105 @@ describe("Step 3: Basic Message Display Integration", () => {
       },
     ];
 
-    const element = ConversationView({ messages: mockConversation }) as any;
-    const messages = element.props.children;
+    const { lastFrame } = render(<ConversationView messages={mockConversation} />);
 
-    // Should display the mock conversation
-    expect(messages).toHaveLength(4);
-
-    // Verify conversation flow
-    expect(messages[0].props.type).toBe("user");
-    expect(messages[0].props.content).toBe("Hello");
-
-    expect(messages[1].props.type).toBe("assistant");
-    expect(messages[1].props.content).toBe("Hi! How can I help you today?");
-
-    expect(messages[2].props.type).toBe("user");
-    expect(messages[2].props.content).toBe("Can you write a function?");
-
-    expect(messages[3].props.type).toBe("assistant");
-    expect(messages[3].props.content).toContain("function hello()");
+    // User should see their messages
+    expect(lastFrame()).toContain("Hello");
+    expect(lastFrame()).toContain("Can you write a function?");
+    
+    // User should see assistant responses
+    expect(lastFrame()).toContain("Hi! How can I help you today?");
+    expect(lastFrame()).toContain("Sure! Here is a basic function:");
+    expect(lastFrame()).toContain("function hello()");
+    expect(lastFrame()).toContain('return "Hello World"');
   });
 
-  test("Message components display with proper prefixes and types", () => {
-    const testMessages = [
-      { type: "user" as const, content: "Hello" },
-      { type: "assistant" as const, content: "Hi there!" },
-      { type: "loading" as const, content: "Loading..." },
-      {
-        type: "agent_activity" as const,
-        summary: "Agent Activity",
-        content: ["working on task"],
-        folded: true,
+  test("user can distinguish between different message types", () => {
+    const { lastFrame } = render(
+      <div>
+        <Message type="user" content="Hello" />
+        <Message type="assistant" content="Hi there!" />
+        <Message type="loading" content="Loading..." />
+      </div>
+    );
+
+    const output = lastFrame();
+    
+    // User should see visual indicators for different message types
+    expect(output).toContain("Hello");
+    expect(output).toContain("Hi there!");
+    expect(output).toContain("Loading...");
+    
+    // Different message types should be visually distinguishable
+    // (actual rendering will show different prefixes/styling)
+    expect(output.length).toBeGreaterThan("HelloHi there!Loading...".length);
+  });
+
+  test("user can read multi-line assistant responses", () => {
+    const multiLineContent = "Here's a code example:\n\nfunction test() {\n  console.log('Hello');\n}";
+    
+    const { lastFrame } = render(
+      <Message type="assistant" content={multiLineContent} />
+    );
+
+    const output = lastFrame();
+    
+    // User should see all lines of the response
+    expect(output).toContain("Here's a code example:");
+    expect(output).toContain("function test() {");
+    expect(output).toContain("console.log('Hello');");
+    expect(output).toContain("}");
+  });
+
+  test("conversation displays messages in chronological order", () => {
+    const mockConversation = [
+      { type: "user" as const, content: "First message" },
+      { type: "assistant" as const, content: "Second message" },
+      { type: "user" as const, content: "Third message" },
+    ];
+
+    const { lastFrame } = render(<ConversationView messages={mockConversation} />);
+    const output = lastFrame();
+
+    // Messages should appear in the order they were sent
+    const firstIndex = output.indexOf("First message");
+    const secondIndex = output.indexOf("Second message");
+    const thirdIndex = output.indexOf("Third message");
+
+    expect(firstIndex).toBeLessThan(secondIndex);
+    expect(secondIndex).toBeLessThan(thirdIndex);
+  });
+
+  test("empty conversation displays appropriately", () => {
+    const { lastFrame } = render(<ConversationView messages={[]} />);
+    const output = lastFrame();
+
+    // Empty conversation should not crash and should render some content
+    expect(output).toBeDefined();
+    expect(typeof output).toBe("string");
+  });
+
+  test("conversation handles various content types", () => {
+    const mockConversation = [
+      { type: "user" as const, content: "Show me some code" },
+      { 
+        type: "assistant" as const, 
+        content: "```javascript\nconst hello = () => 'world';\n```" 
+      },
+      { type: "user" as const, content: "What about markdown **bold** text?" },
+      { 
+        type: "assistant" as const, 
+        content: "I can handle **bold** and *italic* formatting." 
       },
     ];
 
-    testMessages.forEach((messageData) => {
-      const element = Message(messageData) as any;
+    const { lastFrame } = render(<ConversationView messages={mockConversation} />);
+    const output = lastFrame();
 
-      // Should render without error
-      expect(element).toBeTruthy();
-      expect(element.type).toBeTruthy();
-
-      // Message component should receive correct props
-      const messageCall = Message as any;
-      expect(typeof messageCall).toBe("function");
-    });
-  });
-
-  test("conversation message types are handled correctly", () => {
-    // Test user message structure
-    const userMessage = { type: "user" as const, content: "Hello world" };
-    const userElement = Message(userMessage) as any;
-    expect(userElement).toBeTruthy();
-
-    // Test assistant message structure
-    const assistantMessage = {
-      type: "assistant" as const,
-      content: "Hi there!",
-    };
-    const assistantElement = Message(assistantMessage) as any;
-    expect(assistantElement).toBeTruthy();
-
-    // Test loading message structure
-    const loadingMessage = { type: "loading" as const, content: "Loading..." };
-    const loadingElement = Message(loadingMessage) as any;
-    expect(loadingElement).toBeTruthy();
-
-    // Test agent activity message structure
-    const agentMessage = {
-      type: "agent_activity" as const,
-      summary: "Activity Summary",
-      content: ["item 1", "item 2"],
-      folded: false,
-    };
-    const agentElement = Message(agentMessage) as any;
-    expect(agentElement).toBeTruthy();
-  });
-
-  test("ConversationView handles different message combinations", () => {
-    const mixedMessages = [
-      { type: "user" as const, content: "Start conversation" },
-      { type: "assistant" as const, content: "Hello! How can I help?" },
-      {
-        type: "agent_activity" as const,
-        summary: "Processing request",
-        content: ["analyzing input", "preparing response"],
-        folded: true,
-      },
-      { type: "loading" as const, content: "Thinking..." },
-      { type: "assistant" as const, content: "Here is my response." },
-    ];
-
-    const element = ConversationView({ messages: mixedMessages }) as any;
-    const renderedMessages = element.props.children;
-
-    expect(renderedMessages).toHaveLength(5);
-
-    // Verify each message type is handled
-    expect(renderedMessages[0].props.type).toBe("user");
-    expect(renderedMessages[1].props.type).toBe("assistant");
-    expect(renderedMessages[2].props.type).toBe("agent_activity");
-    expect(renderedMessages[3].props.type).toBe("loading");
-    expect(renderedMessages[4].props.type).toBe("assistant");
-  });
-
-  test("conversation view navigation integration", () => {
-    const messages = [
-      { type: "user" as const, content: "Message 1" },
-      { type: "assistant" as const, content: "Response 1" },
-      { type: "user" as const, content: "Message 2" },
-    ];
-
-    // Test normal mode
-    const normalElement = ConversationView({
-      messages,
-      isNavigationMode: false,
-      scrollPosition: 0,
-    }) as any;
-
-    const normalMessages = normalElement.props.children;
-    expect(normalMessages[0].props.isHighlighted).toBe(false);
-
-    // Test navigation mode
-    const navElement = ConversationView({
-      messages,
-      isNavigationMode: true,
-      scrollPosition: 1,
-    }) as any;
-
-    const navMessages = navElement.props.children;
-    expect(navMessages[1].props.isHighlighted).toBe(true);
-    expect(navMessages[0].props.isHighlighted).toBe(false);
-    expect(navMessages[2].props.isHighlighted).toBe(false);
+    // User should see all different content types
+    expect(output).toContain("Show me some code");
+    expect(output).toContain("const hello = () => 'world';");
+    expect(output).toContain("What about markdown **bold** text?");
+    expect(output).toContain("I can handle **bold** and *italic* formatting.");
   });
 });

@@ -70,81 +70,81 @@ const StatusBar: React.FC<StatusBarProps> = ({
       borderLeft={false}
       borderRight={false}
     >
-      <Text color="cyan">lace-ink</Text>
-      <Text> | </Text>
+      <Text key="app-name" color="cyan">lace-ink</Text>
+      <Text key="sep1"> | </Text>
 
       {/* Token usage display */}
       {tokenUsage && (
-        <>
+        <React.Fragment key="token-usage">
           <Text color="blue">
             Tokens: {formatTokens(tokenUsage.used)}/
             {formatTokens(tokenUsage.total)}
           </Text>
-          <Text> | </Text>
-        </>
+          <Text key="sep2"> | </Text>
+        </React.Fragment>
       )}
 
       {/* Model name display */}
       {modelName && showFullInfo && (
-        <>
+        <React.Fragment key="model-full">
           <Text color="green">{modelName}</Text>
-          <Text> | </Text>
-        </>
+          <Text key="sep3"> | </Text>
+        </React.Fragment>
       )}
       {modelName && isNarrowTerminal && (
-        <>
+        <React.Fragment key="model-narrow">
           <Text color="green">{modelName.split("-")[0] + "-3.5"}</Text>
-          <Text> | </Text>
-        </>
+          <Text key="sep4"> | </Text>
+        </React.Fragment>
       )}
       {modelName && !showFullInfo && !isNarrowTerminal && (
-        <>
+        <React.Fragment key="model-default">
           <Text color="green">{modelName}</Text>
-          <Text> | </Text>
-        </>
+          <Text key="sep5"> | </Text>
+        </React.Fragment>
       )}
 
-      <Text color="magenta">Filter: {getFilterText()}</Text>
-      <Text> | </Text>
+      <Text key="filter-label" color="magenta">Filter: {getFilterText()}</Text>
+      <Text key="sep6"> | </Text>
       {isSearchMode ? (
-        <>
+        <React.Fragment key="search-mode">
           <Text color="blue">Search</Text>
-          <Text> | </Text>
+          <Text key="sep7"> | </Text>
           <Text color="dim">
             Type to search, Enter to execute, Esc to cancel
           </Text>
-        </>
+        </React.Fragment>
       ) : isNavigationMode ? (
-        <>
+        <React.Fragment key="nav-mode">
           <Text color="yellow">
             Nav: j/k/c/a
             {filterMode === "search" && searchResults.length > 0 ? "/n/N" : ""}
           </Text>
-          <Text> | </Text>
+          <Text key="sep8"> | </Text>
           <Text color="dim">
             {filterMode === "search" && searchResults.length > 0
               ? `Result ${searchResultIndex + 1} of ${searchResults.length} | Line ${scrollPosition + 1} of ${totalMessages}`
               : `Line ${scrollPosition + 1} of ${totalMessages}`}
           </Text>
-        </>
+        </React.Fragment>
       ) : isLoading ? (
-        <>
+        <React.Fragment key="loading-mode">
           <Text color="yellow">Thinking...</Text>
-          <Text> | </Text>
+          <Text key="sep9"> | </Text>
           <Text color="dim">Ctrl+C or Esc to cancel</Text>
-        </>
+        </React.Fragment>
       ) : isStreaming ? (
-        <>
+        <React.Fragment key="streaming-mode">
           <Text color="yellow">Streaming...</Text>
-          <Text> | </Text>
+          <Text key="sep10"> | </Text>
           <Text color="dim">Ctrl+C or Esc to cancel</Text>
-        </>
+        </React.Fragment>
       ) : (
-        <>
+        <React.Fragment key="ready-mode">
           <Text color="green">Ready</Text>
-          <Text> | </Text>
+          <Text key="sep11"> | </Text>
           <Text color="dim">↑/↓ to navigate, / to search</Text>
-        </>
+        </React.Fragment>
       )}
     </Box>
   );

@@ -4,14 +4,29 @@
 
 This project uses comprehensive testing to ensure quality and prevent regressions. We follow Test-Driven Development (TDD) principles and maintain multiple types of test coverage.
 
+## CRITICAL: Bad Test Cleanup in Progress
+
+**BEFORE WRITING NEW TESTS**: Check `bad-tests.md` for current cleanup status. The test suite contains many fake tests and anti-patterns that need removal/rewrite.
+
+**Priority**: Delete fake tests first (they harm CI reliability), then implement proper tests.
+
 ## Testing Philosophy
 
-### Why We Test Everything
+### Test Behavior, Not Implementation
 
-1. **Confidence in Changes**: Tests allow us to refactor and add features without fear of breaking existing functionality
-2. **Documentation**: Tests serve as executable documentation of how components should behave
-3. **Quality Assurance**: Comprehensive testing catches bugs early in development
-4. **Regression Prevention**: Automated tests prevent old bugs from reappearing
+**GOOD TESTS**:
+- Test what users experience
+- Test component behavior and outcomes
+- Use React Testing Library user events
+- Mock external dependencies, not internal logic
+- Fail when functionality breaks
+
+**BAD TESTS** (being removed):
+- `expect(true).toBe(true)` with manual verification comments
+- String matching against source code (`expect(code).toContain("import...")`)
+- File existence checks (`fs.existsSync()` for components)
+- JSX structure assertions
+- Testing internal implementation details
 
 ### Test-Driven Development (TDD)
 
@@ -145,7 +160,30 @@ export default {
 
 ## Test Patterns
 
-### Component Testing Pattern
+### React Component Testing (PREFERRED)
+
+```typescript
+import { render, screen, fireEvent } from '@testing-library/react';
+import Component from "../../../src/ui/components/Component";
+
+describe("Component Name", () => {
+  test("renders with correct content", () => {
+    render(<Component prop="value" />);
+    
+    expect(screen.getByText("expected content")).toBeInTheDocument();
+  });
+
+  test("handles user interaction", () => {
+    const onSubmit = jest.fn();
+    render(<Component onSubmit={onSubmit} />);
+    
+    fireEvent.click(screen.getByRole('button'));
+    expect(onSubmit).toHaveBeenCalled();
+  });
+});
+```
+
+### Legacy Ink Component Testing (EXISTING)
 
 ```typescript
 import Component from "../../../src/ui/components/Component";
@@ -163,12 +201,39 @@ describe("Component Name", () => {
 ### Integration Testing Pattern
 
 ```typescript
+import { render, screen, fireEvent } from '@testing-library/react';
 import App from "../../../src/ui/App";
 
 describe("Feature Integration", () => {
-  test("complete workflow works", () => {
-    // Test multiple components working together
-    // Verify state changes and interactions
+  test("user can complete full workflow", () => {
+    render(<App />);
+    
+    // Simulate user actions
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'test message' } });
+    fireEvent.click(screen.getByRole('button', { name: /send/i }));
+    
+    // Verify outcomes user would see
+    expect(screen.getByText("Message sent")).toBeInTheDocument();
+  });
+});
+```
+
+### Backend Testing Pattern
+
+```typescript
+import { AgentOrchestrator } from '../../../src/agents/orchestrator';
+
+describe('Agent System', () => {
+  test('routes message to correct agent', async () => {
+    const orchestrator = new AgentOrchestrator();
+    const mockAgent = { processMessage: jest.fn().mockResolvedValue('response') };
+    
+    orchestrator.registerAgent('test', mockAgent);
+    
+    const result = await orchestrator.processMessage('test message', 'test');
+    
+    expect(mockAgent.processMessage).toHaveBeenCalledWith('test message');
+    expect(result).toBe('response');
   });
 });
 ```
@@ -192,6 +257,57 @@ beforeEach(() => {
 afterEach(() => {
   jest.restoreAllMocks();
 });
+```
+
+## Anti-Patterns to Avoid
+
+### ❌ Fake Tests
+```typescript
+// DON'T DO THIS
+test("manual verification", () => {
+  // ✅ Check this manually
+  // ✅ Verify that manually
+  expect(true).toBe(true);
+});
+```
+
+### ❌ Implementation Detail Testing
+```typescript
+// DON'T DO THIS
+test("component has correct internal structure", () => {
+  const element = Component();
+  expect(element.props.children[0].type).toBe('div');
+});
+
+// DO THIS INSTEAD
+test("component displays expected content", () => {
+  render(<Component />);
+  expect(screen.getByText("Expected content")).toBeInTheDocument();
+});
+```
+
+### ❌ String Matching Source Code
+```typescript
+// DON'T DO THIS
+test("file contains expected exports", () => {
+  const source = fs.readFileSync('Component.tsx', 'utf8');
+  expect(source).toContain('export default Component');
+});
+
+// DO THIS INSTEAD
+test("component exports correctly", () => {
+  expect(typeof Component).toBe('function');
+});
+```
+
+### ❌ File Existence Testing
+```typescript
+// DON'T DO THIS
+test("component files exist", () => {
+  expect(fs.existsSync('Component.tsx')).toBe(true);
+});
+
+// The import system already validates this
 ```
 
 ## Running Tests
@@ -243,10 +359,11 @@ Every feature must have:
 2. **Single Responsibility**: Each test should verify one specific behavior
 3. **Arrange-Act-Assert**: Structure tests with clear setup, action, and verification
 4. **No Flaky Tests**: Tests should be deterministic and reliable
+5. **No Fake Tests**: Every test must actually verify functionality
 
 ### Coverage Goals
 
-- **Components**: 100% of public methods and properties
+- **Components**: 100% of user-observable behavior
 - **Features**: All user-facing functionality
 - **Edge Cases**: Error conditions and boundary cases
 - **Regressions**: All bug fixes should include tests
@@ -256,17 +373,38 @@ Every feature must have:
 ### Do's
 
 - Write tests before implementing features (TDD)
+- Test what users experience, not internal code structure
+- Use React Testing Library for UI component testing
+- Mock external dependencies, not internal logic
+- Write descriptive test names that explain the behavior
+- Test error conditions and edge cases
 - Keep tests simple and focused
-- Use descriptive test and variable names
-- Test behavior, not implementation details
-- Mock external dependencies appropriately
 
 ### Don'ts
 
+- **NEVER** write `expect(true).toBe(true)` fake tests
+- **NEVER** test file existence with `fs.existsSync()`
+- **NEVER** string match against source code
+- **NEVER** test JSX structure instead of behavior
 - Don't test implementation details
-- Don't write tests that are tightly coupled to code structure
+- Don't write tests tightly coupled to code structure
 - Don't skip testing error conditions
 - Don't commit failing tests (except as part of TDD red phase)
+
+## Current Test Suite Issues
+
+See `bad-tests.md` for:
+- Files that need deletion (fake tests, unimplemented features)
+- Files that need complete rewrite (testing wrong things)
+- Missing test coverage that needs implementation
+- Specific prompts for fixing each issue
+
+**Action Items**:
+1. Delete fake tests immediately (they harm CI)
+2. Delete tests for unimplemented features
+3. Rewrite completion provider tests to test behavior
+4. Rewrite integration tests to test user workflows
+5. Add missing component and core module tests
 
 ## Debugging Test Issues
 
