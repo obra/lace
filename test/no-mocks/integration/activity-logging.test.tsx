@@ -132,7 +132,8 @@ describe('Activity Logging Integration', () => {
       expect(events).toHaveLength(3);
       
       const tokenValues = events.map(e => JSON.parse(e.data).token);
-      expect(tokenValues).toEqual(['Hello', ' ', 'world']); // Actually in insertion order for our mock
+      // Events are returned in timestamp DESC order (newest first)
+      expect(tokenValues).toEqual(['world', ' ', 'Hello']);
     });
   });
 
