@@ -1,5 +1,5 @@
-// ABOUTME: Unit tests for FileCompletionProvider
-// ABOUTME: Tests file and directory completion with mocked filesystem
+// ABOUTME: Unit tests for FileCompletionProvider completion behavior
+// ABOUTME: Tests completion logic, filtering, and context handling with mock filesystem data
 
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import * as path from "path";
@@ -23,6 +23,18 @@ describe("FileCompletionProvider", () => {
   let provider;
   let mockCwd;
 
+  // Mock completion data representing common files
+  const mockEntries = [
+    { name: "file1.txt", isDirectory: () => false },
+    { name: "file2.js", isDirectory: () => false },
+    { name: "subdir", isDirectory: () => true },
+    { name: ".hidden", isDirectory: () => false },
+    { name: ".gitignore", isDirectory: () => false },
+    { name: "afile.txt", isDirectory: () => false },
+    { name: "adir", isDirectory: () => true },
+    { name: "mydir", isDirectory: () => true },
+  ];
+
   beforeEach(() => {
     mockCwd = "/test/dir";
     provider = new FileCompletionProvider({ cwd: mockCwd, maxItems: 10 });
@@ -30,8 +42,9 @@ describe("FileCompletionProvider", () => {
     // Reset mocks
     jest.clearAllMocks();
 
-    // Set up default mock returns
+    // Set up default mock behavior
     fs.existsSync.mockReturnValue(true);
+    fs.promises.readdir.mockResolvedValue(mockEntries);
     fs.statSync.mockReturnValue({
       isDirectory: () => false,
       size: 1024,
@@ -74,15 +87,7 @@ describe("FileCompletionProvider", () => {
   });
 
   describe("getCompletions", () => {
-    it("should return file completions", async () => {
-      const mockEntries = [
-        { name: "file1.txt", isDirectory: () => false },
-        { name: "file2.js", isDirectory: () => false },
-        { name: "subdir", isDirectory: () => true },
-      ];
-
-      fs.promises.readdir.mockResolvedValue(mockEntries);
-
+    it("should return completions for matching files", async () => {
       const result = await provider.getCompletions("file");
 
       expect(result.items.length).toBeGreaterThan(0);
@@ -94,107 +99,131 @@ describe("FileCompletionProvider", () => {
       );
       expect(file1).toBeDefined();
       expect(file1.type).toBe("file");
+
+      const file2 = result.items.find((item) =>
+        item.value.includes("file2.js"),
+      );
+      expect(file2).toBeDefined();
+      expect(file2.type).toBe("file");
     });
 
     it("should prioritize directories over files", async () => {
-      const mockEntries = [
-        { name: "afile.txt", isDirectory: () => false },
-        { name: "adir", isDirectory: () => true },
-      ];
-
-      fs.promises.readdir.mockResolvedValue(mockEntries);
-
       const result = await provider.getCompletions("a");
 
-      // Directory should come first
-      expect(result.items[0].type).toBe("directory");
-      expect(result.items[0].value).toContain("adir");
+      // Should find both afile.txt and adir
+      const dirItem = result.items.find(item => item.value.includes("adir"));
+      const fileItem = result.items.find(item => item.value.includes("afile.txt"));
+      
+      expect(dirItem).toBeDefined();
+      expect(fileItem).toBeDefined();
+      expect(dirItem.type).toBe("directory");
+      expect(fileItem.type).toBe("file");
+
+      // Directory should come first in results
+      const dirIndex = result.items.findIndex(item => item.value.includes("adir"));
+      const fileIndex = result.items.findIndex(item => item.value.includes("afile.txt"));
+      expect(dirIndex).toBeLessThan(fileIndex);
     });
 
     it("should add trailing slash to directories", async () => {
-      const mockEntries = [{ name: "mydir", isDirectory: () => true }];
-
-      fs.promises.readdir.mockResolvedValue(mockEntries);
-
       const result = await provider.getCompletions("my");
 
       const dir = result.items.find((item) => item.type === "directory");
+      expect(dir).toBeDefined();
       expect(dir.value).toMatch(/\/$/);
+      expect(dir.value).toContain("mydir/");
     });
 
-    it("should handle empty directory gracefully", async () => {
-      fs.promises.readdir.mockResolvedValue([]);
+    it("should handle no matches gracefully", async () => {
+      // Mock no matching entries
+      const noMatchEntries = [
+        { name: "other.txt", isDirectory: () => false },
+      ];
+      fs.promises.readdir.mockResolvedValue(noMatchEntries);
 
-      const result = await provider.getCompletions("nothing");
+      const result = await provider.getCompletions("nomatch");
 
       expect(result.items).toHaveLength(0);
-      expect(result.prefix).toBe("nothing");
+      expect(result.prefix).toBe("nomatch");
+      expect(result.hasMore).toBe(false);
     });
 
     it("should handle filesystem errors gracefully", async () => {
-      fs.existsSync.mockReturnValue(false);
+      // Mock filesystem error
+      fs.promises.readdir.mockRejectedValue(new Error("Access denied"));
 
-      const result = await provider.getCompletions("nonexistent");
+      const result = await provider.getCompletions("test");
 
       expect(result.items).toHaveLength(0);
-      expect(result.prefix).toBe("nonexistent");
+      expect(result.prefix).toBe("test");
+      expect(result.hasMore).toBe(false);
     });
 
-    it("should filter hidden files unless requested", async () => {
-      const mockEntries = [
-        { name: ".hidden", isDirectory: () => false },
-        { name: "visible.txt", isDirectory: () => false },
-      ];
-
-      fs.promises.readdir.mockResolvedValue(mockEntries);
-
+    it("should filter hidden files unless prefix starts with dot", async () => {
       const result = await provider.getCompletions("");
 
-      // Should not include hidden file
+      // Should not include hidden files for empty prefix
       const hiddenFile = result.items.find((item) =>
-        item.value.includes(".hidden"),
+        item.value.startsWith("."),
       );
       expect(hiddenFile).toBeUndefined();
 
-      // Should include visible file
-      const visibleFile = result.items.find((item) =>
-        item.value.includes("visible.txt"),
+      // Should include visible files
+      const visibleFiles = result.items.filter((item) =>
+        !item.value.startsWith("."),
       );
-      expect(visibleFile).toBeDefined();
+      expect(visibleFiles.length).toBeGreaterThan(0);
     });
 
     it("should include hidden files when prefix starts with dot", async () => {
-      const mockEntries = [
-        { name: ".hidden", isDirectory: () => false },
-        { name: ".gitignore", isDirectory: () => false },
-      ];
-
-      fs.promises.readdir.mockResolvedValue(mockEntries);
-
       const result = await provider.getCompletions(".h");
 
       const hiddenFile = result.items.find((item) =>
         item.value.includes(".hidden"),
       );
       expect(hiddenFile).toBeDefined();
+      expect(hiddenFile.type).toBe("file");
     });
 
     it("should respect maxItems limit", async () => {
-      const mockEntries = Array.from({ length: 20 }, (_, i) => ({
+      // Mock many files to test limit
+      const manyEntries = Array.from({ length: 20 }, (_, i) => ({
         name: `file${i}.txt`,
         isDirectory: () => false,
       }));
-
-      fs.promises.readdir.mockResolvedValue(mockEntries);
+      
+      fs.promises.readdir.mockResolvedValue(manyEntries);
 
       const result = await provider.getCompletions("file");
 
       expect(result.items.length).toBeLessThanOrEqual(10); // maxItems = 10
       expect(result.hasMore).toBe(true);
     });
+
+    it("should handle empty directory gracefully", async () => {
+      fs.promises.readdir.mockResolvedValue([]);
+
+      const result = await provider.getCompletions("empty");
+
+      expect(result.items).toHaveLength(0);
+      expect(result.prefix).toBe("empty");
+      expect(result.hasMore).toBe(false);
+    });
+
+    it("should provide prefix correctly for partial matches", async () => {
+      const result = await provider.getCompletions("fil");
+
+      expect(result.prefix).toBe("fil");
+      
+      // Should find files that match the prefix
+      const matchingItems = result.items.filter(item => 
+        item.value.toLowerCase().includes("fil")
+      );
+      expect(matchingItems.length).toBeGreaterThan(0);
+    });
   });
 
-  describe("directory management", () => {
+  describe("Configuration management", () => {
     it("should update current working directory", () => {
       const newCwd = "/new/path";
       provider.setCwd(newCwd);
@@ -206,6 +235,15 @@ describe("FileCompletionProvider", () => {
       provider.setCwd("relative/path");
 
       expect(path.isAbsolute(provider.getCwd())).toBe(true);
+    });
+
+    it("should maintain completion behavior after cwd change", async () => {
+      provider.setCwd("/different/path");
+
+      const result = await provider.getCompletions("file");
+      
+      expect(result.items.length).toBeGreaterThan(0);
+      expect(result.prefix).toBe("file");
     });
   });
 });
