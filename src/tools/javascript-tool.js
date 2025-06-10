@@ -1,17 +1,17 @@
 // ABOUTME: JavaScript evaluation tool for computational capabilities
 // ABOUTME: Provides safe sandboxed execution of JavaScript code
 
-import vm from 'vm';
+import vm from 'vm'
 
 export class JavaScriptTool {
-  constructor() {
-    this.output = [];
+  constructor () {
+    this.output = []
   }
 
-  async evaluate(params) {
-    const { code, context = {} } = params;
-    this.output = [];
-    
+  async evaluate (params) {
+    const { code, context = {} } = params
+    this.output = []
+
     try {
       const sandbox = {
         console: {
@@ -20,43 +20,43 @@ export class JavaScriptTool {
           warn: (...args) => this.output.push(['warn', ...args])
         },
         ...context
-      };
+      }
 
-      const result = vm.runInNewContext(code, sandbox, { 
+      const result = vm.runInNewContext(code, sandbox, {
         timeout: 10000,
         displayErrors: true
-      });
-      
+      })
+
       return {
         success: true,
         result,
         output: this.output,
         type: typeof result
-      };
+      }
     } catch (error) {
       return {
         success: false,
         error: error.message,
         output: this.output
-      };
+      }
     }
   }
 
-  async calculate(params) {
-    const { expression } = params;
-    return this.evaluate({ code: `(${expression})` });
+  async calculate (params) {
+    const { expression } = params
+    return this.evaluate({ code: `(${expression})` })
   }
 
-  async processData(params) {
-    const { data, operation } = params;
+  async processData (params) {
+    const { data, operation } = params
     const code = `
       const data = ${JSON.stringify(data)};
       ${operation}
-    `;
-    return this.evaluate({ code });
+    `
+    return this.evaluate({ code })
   }
 
-  getSchema() {
+  getSchema () {
     return {
       name: 'javascript',
       description: 'Execute JavaScript code in a sandboxed environment',
@@ -82,6 +82,6 @@ export class JavaScriptTool {
           }
         }
       }
-    };
+    }
   }
 }

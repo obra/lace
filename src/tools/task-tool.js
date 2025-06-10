@@ -1,85 +1,85 @@
 // ABOUTME: Task orchestration tool that enables agents to spawn sub-agents and coordinate work
 // ABOUTME: Provides delegation, progress tracking, and help request capabilities for complex workflows
 
-import { getRole } from '../agents/role-registry.ts';
+import { getRole } from '../agents/role-registry.ts'
 export class TaskTool {
-  constructor(options = {}) {
-    this.agent = null; // Will be set when tool is called by an agent
-    this.progressTracker = options.progressTracker || null;
-    this.defaultTimeout = options.defaultTimeout || 300000; // 5 minutes
-    
+  constructor (options = {}) {
+    this.agent = null // Will be set when tool is called by an agent
+    this.progressTracker = options.progressTracker || null
+    this.defaultTimeout = options.defaultTimeout || 300000 // 5 minutes
+
     // Inter-agent communication
-    this.messageQueue = new Map(); // recipientId -> messages[]
-    this.agentRelationships = new Map(); // agentId -> relationship info
-    this.maxMessageLength = options.maxMessageLength || 1000;
-    this.maxQueueSize = options.maxQueueSize || 100;
-    this.messageCleanupInterval = options.messageCleanupInterval || 3600000; // 1 hour
-    
+    this.messageQueue = new Map() // recipientId -> messages[]
+    this.agentRelationships = new Map() // agentId -> relationship info
+    this.maxMessageLength = options.maxMessageLength || 1000
+    this.maxQueueSize = options.maxQueueSize || 100
+    this.messageCleanupInterval = options.messageCleanupInterval || 3600000 // 1 hour
+
     // Valid message types
-    this.validMessageTypes = ['status_update', 'request_help', 'share_result', 'coordination'];
+    this.validMessageTypes = ['status_update', 'request_help', 'share_result', 'coordination']
   }
 
-  async initialize() {
+  async initialize () {
     // No async initialization needed currently
   }
 
-  setAgent(agent) {
-    this.agent = agent;
+  setAgent (agent) {
+    this.agent = agent
   }
 
-  setSessionId(sessionId) {
-    this.currentSessionId = sessionId;
+  setSessionId (sessionId) {
+    this.currentSessionId = sessionId
   }
 
-  setProgressTracker(progressTracker) {
-    this.progressTracker = progressTracker;
+  setProgressTracker (progressTracker) {
+    this.progressTracker = progressTracker
   }
 
-  async delegateTask(params) {
-    const { 
-      description, 
+  async delegateTask (params) {
+    const {
+      description,
       role = 'general',
       model = 'claude-3-5-sonnet-20241022',
       provider = 'anthropic',
       capabilities = ['reasoning', 'tool_calling'],
       timeout = this.defaultTimeout
-    } = params;
+    } = params
 
     if (!description) {
       return {
         success: false,
         error: 'Task description is required'
-      };
+      }
     }
 
     // Validate role name
     try {
-      getRole(role);
+      getRole(role)
     } catch (error) {
       return {
         success: false,
         error: `Invalid role '${role}': ${error.message}`
-      };
+      }
     }
 
     if (!this.agent) {
       return {
         success: false,
         error: 'TaskTool must be called from within an agent context'
-      };
+      }
     }
 
-    let timeoutId;
+    let timeoutId
     try {
       // Create timeout promise with clearable timeout
       const timeoutPromise = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error(`Task timed out after ${timeout}ms`)), timeout);
-      });
+        timeoutId = setTimeout(() => reject(new Error(`Task timed out after ${timeout}ms`)), timeout)
+      })
 
       // Get current session ID - we'll need to pass this from the agent context
       // For now, we'll use a temporary session ID approach
-      const sessionId = this.currentSessionId || `task-session-${Date.now()}`;
-      
+      const sessionId = this.currentSessionId || `task-session-${Date.now()}`
+
       // Delegate to sub-agent using existing infrastructure
       const taskPromise = this.agent.delegateTask(
         sessionId,
@@ -90,14 +90,14 @@ export class TaskTool {
           assignedProvider: provider,
           capabilities
         }
-      );
+      )
 
       // Race timeout vs task completion
-      const result = await Promise.race([taskPromise, timeoutPromise]);
-      
+      const result = await Promise.race([taskPromise, timeoutPromise])
+
       // Clear timeout if task completed successfully
       if (timeoutId) {
-        clearTimeout(timeoutId);
+        clearTimeout(timeoutId)
       }
 
       // Report progress if tracker available
@@ -106,7 +106,7 @@ export class TaskTool {
           status: 'completed',
           progressPercent: 100,
           details: `Task delegation completed: ${description.substring(0, 50)}...`
-        });
+        })
       }
 
       return {
@@ -118,52 +118,51 @@ export class TaskTool {
           provider,
           taskDescription: description
         }
-      };
-
+      }
     } catch (error) {
       // Clear timeout in case of error
       if (timeoutId) {
-        clearTimeout(timeoutId);
+        clearTimeout(timeoutId)
       }
-      
+
       // Report failure if tracker available
       if (this.progressTracker) {
         await this.progressTracker.updateProgress(this.agent.generation, {
           status: 'failed',
           progressPercent: 0,
           details: `Task delegation failed: ${error.message}`
-        });
+        })
       }
 
       return {
         success: false,
         error: error.message,
         taskDescription: description
-      };
+      }
     }
   }
 
-  async spawnAgent(params) {
+  async spawnAgent (params) {
     const {
       role,
-      model = 'claude-3-5-sonnet-20241022', 
+      model = 'claude-3-5-sonnet-20241022',
       capabilities = ['reasoning', 'tool_calling'],
       task,
       provider = 'anthropic'
-    } = params;
+    } = params
 
     if (!role || !task) {
       return {
         success: false,
         error: 'Role and task are required parameters'
-      };
+      }
     }
 
     if (!this.agent) {
       return {
         success: false,
         error: 'TaskTool must be called from within an agent context'
-      };
+      }
     }
 
     try {
@@ -174,18 +173,18 @@ export class TaskTool {
         assignedProvider: provider,
         capabilities,
         task
-      });
+      })
 
       // Register the parent-child relationship
       this.registerAgentRelationship(subagent.generation, {
         parentId: this.agent.agentId || this.agent.generation.toString(),
         role,
         status: 'active'
-      });
+      })
 
-      // Execute the task  
-      const sessionId = this.currentSessionId || `task-session-${Date.now()}`;
-      const result = await subagent.generateResponse(sessionId, task);
+      // Execute the task
+      const sessionId = this.currentSessionId || `task-session-${Date.now()}`
+      const result = await subagent.generateResponse(sessionId, task)
 
       return {
         success: true,
@@ -198,37 +197,36 @@ export class TaskTool {
           capabilities,
           task: task.substring(0, 100) + (task.length > 100 ? '...' : '')
         }
-      };
-
+      }
     } catch (error) {
       return {
         success: false,
         error: error.message,
         role,
         task: task.substring(0, 100) + (task.length > 100 ? '...' : '')
-      };
+      }
     }
   }
 
-  async reportProgress(params) {
+  async reportProgress (params) {
     const {
       status,
       progressPercent = null,
       details = ''
-    } = params;
+    } = params
 
     if (!status) {
       return {
         success: false,
         error: 'Status is required for progress reporting'
-      };
+      }
     }
 
     if (!this.agent) {
       return {
         success: false,
         error: 'TaskTool must be called from within an agent context'
-      };
+      }
     }
 
     try {
@@ -238,7 +236,7 @@ export class TaskTool {
           progressPercent,
           details: details.substring(0, 200), // Keep details concise
           timestamp: Date.now()
-        });
+        })
       }
 
       return {
@@ -247,35 +245,34 @@ export class TaskTool {
         status,
         progressPercent,
         details
-      };
-
+      }
     } catch (error) {
       return {
         success: false,
         error: error.message
-      };
+      }
     }
   }
 
-  async requestHelp(params) {
+  async requestHelp (params) {
     const {
       errorDescription,
       attemptedSolutions = [],
       helpNeeded
-    } = params;
+    } = params
 
     if (!errorDescription || !helpNeeded) {
       return {
         success: false,
         error: 'Error description and help needed are required'
-      };
+      }
     }
 
     if (!this.agent) {
       return {
         success: false,
         error: 'TaskTool must be called from within an agent context'
-      };
+      }
     }
 
     try {
@@ -291,7 +288,7 @@ export class TaskTool {
             attemptedSolutions: attemptedSolutions.map(s => s.substring(0, 100)),
             helpNeeded: helpNeeded.substring(0, 200)
           }
-        });
+        })
       }
 
       return {
@@ -301,45 +298,44 @@ export class TaskTool {
         errorDescription,
         attemptedSolutions,
         helpNeeded
-      };
-
+      }
     } catch (error) {
       return {
         success: false,
         error: error.message
-      };
+      }
     }
   }
 
   // Set the agent context when tool is used
-  setAgent(agent) {
-    this.agent = agent;
+  setAgent (agent) {
+    this.agent = agent
   }
 
   // Set current session ID
-  setSessionId(sessionId) {
-    this.currentSessionId = sessionId;
+  setSessionId (sessionId) {
+    this.currentSessionId = sessionId
   }
 
   // Set progress tracker
-  setProgressTracker(progressTracker) {
-    this.progressTracker = progressTracker;
+  setProgressTracker (progressTracker) {
+    this.progressTracker = progressTracker
   }
 
-  async sendMessage(params) {
+  async sendMessage (params) {
     const {
       recipientId,
       messageType,
       content,
       priority = 'medium'
-    } = params;
+    } = params
 
     // Validate required parameters
     if (!recipientId || !messageType) {
       return {
         success: false,
         error: 'recipientId and messageType are required'
-      };
+      }
     }
 
     // Validate message type
@@ -347,7 +343,7 @@ export class TaskTool {
       return {
         success: false,
         error: `Invalid message type. Must be one of: ${this.validMessageTypes.join(', ')}`
-      };
+      }
     }
 
     // Validate agent context
@@ -355,23 +351,23 @@ export class TaskTool {
       return {
         success: false,
         error: 'TaskTool must be called from within an agent context'
-      };
+      }
     }
 
     try {
       // Truncate content if too long
-      let messageContent = content || '';
-      let contentTruncated = false;
-      let originalLength = messageContent.length;
+      let messageContent = content || ''
+      let contentTruncated = false
+      const originalLength = messageContent.length
 
       if (messageContent.length > this.maxMessageLength) {
-        messageContent = messageContent.substring(0, this.maxMessageLength);
-        contentTruncated = true;
+        messageContent = messageContent.substring(0, this.maxMessageLength)
+        contentTruncated = true
       }
 
       // Generate unique message ID
-      const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const timestamp = Date.now();
+      const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const timestamp = Date.now()
 
       // Create message object
       const message = {
@@ -384,20 +380,20 @@ export class TaskTool {
         priority,
         timestamp,
         read: false
-      };
+      }
 
       // Get recipient's message queue
       if (!this.messageQueue.has(recipientId)) {
-        this.messageQueue.set(recipientId, []);
+        this.messageQueue.set(recipientId, [])
       }
 
-      const recipientQueue = this.messageQueue.get(recipientId);
-      
+      const recipientQueue = this.messageQueue.get(recipientId)
+
       // Add message to queue
-      recipientQueue.push(message);
+      recipientQueue.push(message)
 
       // Cleanup old messages and enforce size limits
-      this.cleanupMessageQueue(recipientId);
+      this.cleanupMessageQueue(recipientId)
 
       return {
         success: true,
@@ -410,70 +406,69 @@ export class TaskTool {
         timestamp,
         contentTruncated,
         originalLength: contentTruncated ? originalLength : messageContent.length
-      };
-
+      }
     } catch (error) {
       return {
         success: false,
         error: error.message
-      };
+      }
     }
   }
 
-  async receiveMessages(params = {}) {
+  async receiveMessages (params = {}) {
     const {
       messageType = null,
       limit = 50,
       markAsRead = false
-    } = params;
+    } = params
 
     if (!this.agent) {
       return {
         success: false,
         error: 'TaskTool must be called from within an agent context'
-      };
+      }
     }
 
     try {
       // Handle corrupted message queue
       if (!this.messageQueue || !(this.messageQueue instanceof Map)) {
-        this.messageQueue = new Map();
+        this.messageQueue = new Map()
         return {
           success: true,
           messages: [],
           unreadCount: 0,
           totalMessages: 0,
           error: 'Message queue corrupted, reset to empty state'
-        };
+        }
       }
 
-      const agentId = this.agent.agentId || this.agent.generation.toString();
-      
+      const agentId = this.agent.agentId || this.agent.generation.toString()
+
       // Cleanup old messages for this agent when retrieving
-      this.cleanupMessageQueue(agentId);
-      
-      const messages = this.messageQueue.get(agentId) || [];
+      this.cleanupMessageQueue(agentId)
+
+      const messages = this.messageQueue.get(agentId) || []
 
       // Filter by message type if specified
-      let filteredMessages = messages;
+      let filteredMessages = messages
       if (messageType) {
-        filteredMessages = messages.filter(msg => msg.messageType === messageType);
+        filteredMessages = messages.filter(msg => msg.messageType === messageType)
       }
 
       // Sort by timestamp (newest first)
-      filteredMessages.sort((a, b) => b.timestamp - a.timestamp);
+      filteredMessages.sort((a, b) => b.timestamp - a.timestamp)
 
       // Apply limit
-      const limitedMessages = filteredMessages.slice(0, limit);
+      const limitedMessages = filteredMessages.slice(0, limit)
 
       // Count unread messages BEFORE marking as read
-      const unreadCount = markAsRead ? limitedMessages.filter(msg => !msg.read).length : filteredMessages.filter(msg => !msg.read).length;
+      const unreadCount = markAsRead ? limitedMessages.filter(msg => !msg.read).length : filteredMessages.filter(msg => !msg.read).length
 
       // Mark as read if requested
       if (markAsRead) {
         limitedMessages.forEach(msg => {
-          msg.read = true;
-        });
+          msg.read = true
+        })
       }
 
       return {
@@ -481,47 +476,46 @@ export class TaskTool {
         messages: limitedMessages,
         unreadCount,
         totalMessages: filteredMessages.length
-      };
-
+      }
     } catch (error) {
       return {
         success: false,
         error: error.message,
         messages: [],
         unreadCount: 0
-      };
+      }
     }
   }
 
-  cleanupMessageQueue(recipientId) {
-    const queue = this.messageQueue.get(recipientId);
-    if (!queue) return;
+  cleanupMessageQueue (recipientId) {
+    const queue = this.messageQueue.get(recipientId)
+    if (!queue) return
 
-    const now = Date.now();
-    
+    const now = Date.now()
+
     // Remove old messages (older than cleanup interval)
-    const filteredMessages = queue.filter(msg => 
+    const filteredMessages = queue.filter(msg =>
       (now - msg.timestamp) < this.messageCleanupInterval
-    );
+    )
 
     // Enforce size limit (keep most recent messages)
     if (filteredMessages.length > this.maxQueueSize) {
-      filteredMessages.sort((a, b) => b.timestamp - a.timestamp);
-      filteredMessages.splice(this.maxQueueSize);
+      filteredMessages.sort((a, b) => b.timestamp - a.timestamp)
+      filteredMessages.splice(this.maxQueueSize)
     }
 
-    this.messageQueue.set(recipientId, filteredMessages);
+    this.messageQueue.set(recipientId, filteredMessages)
   }
 
-  registerAgentRelationship(agentId, relationshipInfo) {
-    this.agentRelationships.set(agentId, relationshipInfo);
+  registerAgentRelationship (agentId, relationshipInfo) {
+    this.agentRelationships.set(agentId, relationshipInfo)
   }
 
-  getAgentRelationships() {
-    return Object.fromEntries(this.agentRelationships);
+  getAgentRelationships () {
+    return Object.fromEntries(this.agentRelationships)
   }
 
-  getSchema() {
+  getSchema () {
     return {
       name: 'task',
       description: 'Agent orchestration tool for delegating tasks, spawning sub-agents, and coordinating complex workflows',
@@ -540,7 +534,7 @@ export class TaskTool {
               description: 'Role for the sub-agent (e.g., "specialist", "researcher", "coder")'
             },
             model: {
-              type: 'string', 
+              type: 'string',
               required: false,
               description: 'Model to use for the sub-agent (e.g., "claude-3-5-sonnet-20241022")'
             },
@@ -677,6 +671,6 @@ export class TaskTool {
           }
         }
       }
-    };
+    }
   }
 }

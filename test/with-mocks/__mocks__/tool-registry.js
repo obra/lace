@@ -1,12 +1,12 @@
 // Mock ToolRegistry for Jest tests
-import { jest } from '@jest/globals';
+import { jest } from '@jest/globals'
 
 export class ToolRegistry {
-  constructor() {}
-  
-  initialize = jest.fn().mockResolvedValue(undefined);
-  listTools = jest.fn().mockReturnValue(['file', 'shell', 'javascript', 'search', 'task']);
-  get = jest.fn().mockReturnValue(null);
+  constructor () {}
+
+  initialize = jest.fn().mockResolvedValue(undefined)
+  listTools = jest.fn().mockReturnValue(['file', 'shell', 'javascript', 'search', 'task'])
+  get = jest.fn().mockReturnValue(null)
   getToolSchema = jest.fn((toolName) => ({
     description: `Mock ${toolName} tool description`,
     methods: {
@@ -23,5 +23,5 @@ export class ToolRegistry {
         }
       }
     }
-  }));
+  }))
 }

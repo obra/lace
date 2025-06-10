@@ -3,10 +3,10 @@
 // ABOUTME: CLI entry point for lace with Ink UI instead of console interface
 // ABOUTME: Connects existing lace backend to the new Ink-based UI
 
-import { Command } from 'commander';
-import { LaceUI } from './lace-ui.ts';
+import { Command } from 'commander'
+import { LaceUI } from './lace-ui.ts'
 
-const program = new Command();
+const program = new Command()
 
 program
   .name('lace-ink')
@@ -23,11 +23,11 @@ program
   .option('--deny <tools>', 'comma-separated list of tools to always deny', (value) => value.split(','))
   .action(async (options) => {
     const laceUIOptions = {
-      ...options,
-    };
-    
-    const laceUI = new LaceUI(laceUIOptions);
-    await laceUI.start();
-  });
+      ...options
+    }
 
-program.parse();
+    const laceUI = new LaceUI(laceUIOptions)
+    await laceUI.start()
+  })
+
+program.parse()
