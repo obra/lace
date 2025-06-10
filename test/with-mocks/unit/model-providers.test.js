@@ -332,6 +332,117 @@ describe("Model Provider Session ID Tracking", () => {
         assert.deepStrictEqual(capturedParams.system[0].cache_control, { type: "ephemeral" });
       });
     });
+
+    describe("Enhanced Streaming", () => {
+      test("should handle thinking content blocks in streaming", async () => {
+        const provider = new AnthropicProvider();
+        const streamEvents = [];
+        
+        // Mock the stream with thinking events
+        const mockStream = {
+          async *[Symbol.asyncIterator]() {
+            yield { type: "message_start", message: { usage: { input_tokens: 10 } } };
+            yield { type: "content_block_start", index: 0, content_block: { type: "thinking" } };
+            yield { type: "content_block_delta", delta: { type: "thinking_delta", text: "Let me think..." } };
+            yield { type: "content_block_stop", index: 0 };
+            yield { type: "content_block_start", index: 1, content_block: { type: "text" } };
+            yield { type: "content_block_delta", delta: { type: "text_delta", text: "Here's my response" } };
+            yield { type: "content_block_stop", index: 1 };
+            yield { type: "message_stop", usage: { output_tokens: 5 } };
+          }
+        };
+        
+        const onTokenUpdate = (data) => streamEvents.push(data);
+        const result = await provider.handleStreamResponse(mockStream, onTokenUpdate);
+        
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(result.content, "Here's my response");
+        
+        // Check for thinking events
+        const thinkingStartEvents = streamEvents.filter(e => e.thinkingStart);
+        const thinkingTokenEvents = streamEvents.filter(e => e.thinkingToken);
+        
+        assert.strictEqual(thinkingStartEvents.length, 1, "Should have one thinking start event");
+        assert.strictEqual(thinkingTokenEvents.length, 1, "Should have one thinking token event");
+        assert.strictEqual(thinkingTokenEvents[0].thinkingToken, "Let me think...");
+      });
+
+      test("should handle enhanced tool use streaming events", async () => {
+        const provider = new AnthropicProvider();
+        const streamEvents = [];
+        
+        // Mock the stream with tool use events
+        const mockStream = {
+          async *[Symbol.asyncIterator]() {
+            yield { type: "message_start", message: { usage: { input_tokens: 10 } } };
+            yield { 
+              type: "content_block_start", 
+              index: 0, 
+              content_block: { type: "tool_use", id: "tool_123", name: "test_tool" } 
+            };
+            yield { 
+              type: "content_block_delta", 
+              delta: { type: "input_json_delta", partial_json: '{"param": "' } 
+            };
+            yield { 
+              type: "content_block_delta", 
+              delta: { type: "input_json_delta", partial_json: 'value"}' } 
+            };
+            yield { type: "content_block_stop", index: 0 };
+            yield { type: "message_stop", usage: { output_tokens: 5 } };
+          }
+        };
+        
+        const onTokenUpdate = (data) => streamEvents.push(data);
+        const result = await provider.handleStreamResponse(mockStream, onTokenUpdate);
+        
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(result.toolCalls.length, 1);
+        assert.strictEqual(result.toolCalls[0].name, "test_tool");
+        assert.deepStrictEqual(result.toolCalls[0].input, { param: "value" });
+        
+        // Check for tool events
+        const toolStartEvents = streamEvents.filter(e => e.toolUseStart);
+        const toolInputEvents = streamEvents.filter(e => e.toolInputDelta);
+        const toolCompleteEvents = streamEvents.filter(e => e.toolUseComplete);
+        
+        assert.strictEqual(toolStartEvents.length, 1, "Should have one tool start event");
+        assert.strictEqual(toolInputEvents.length, 2, "Should have two tool input delta events");
+        assert.strictEqual(toolCompleteEvents.length, 1, "Should have one tool complete event");
+        
+        assert.strictEqual(toolStartEvents[0].toolUseStart.name, "test_tool");
+        assert.strictEqual(toolCompleteEvents[0].toolUseComplete.name, "test_tool");
+      });
+
+      test("should forward regular text tokens", async () => {
+        const provider = new AnthropicProvider();
+        const streamEvents = [];
+        
+        // Mock the stream with regular text
+        const mockStream = {
+          async *[Symbol.asyncIterator]() {
+            yield { type: "message_start", message: { usage: { input_tokens: 10 } } };
+            yield { type: "content_block_start", index: 0, content_block: { type: "text" } };
+            yield { type: "content_block_delta", delta: { type: "text_delta", text: "Hello " } };
+            yield { type: "content_block_delta", delta: { type: "text_delta", text: "world!" } };
+            yield { type: "content_block_stop", index: 0 };
+            yield { type: "message_stop", usage: { output_tokens: 5 } };
+          }
+        };
+        
+        const onTokenUpdate = (data) => streamEvents.push(data);
+        const result = await provider.handleStreamResponse(mockStream, onTokenUpdate);
+        
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(result.content, "Hello world!");
+        
+        // Check for text token events
+        const textTokenEvents = streamEvents.filter(e => e.token);
+        assert.strictEqual(textTokenEvents.length, 2, "Should have two text token events");
+        assert.strictEqual(textTokenEvents[0].token, "Hello ");
+        assert.strictEqual(textTokenEvents[1].token, "world!");
+      });
+    });
   });
 
   describe("OpenAIProvider", () => {

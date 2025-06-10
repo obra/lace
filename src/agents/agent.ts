@@ -374,11 +374,48 @@ export class Agent {
           if (options.onToken && tokenData.token) {
             options.onToken(tokenData.token);
           }
+          
+          // Forward thinking tokens separately if callback provided
+          if (options.onThinkingToken && tokenData.thinkingToken) {
+            options.onThinkingToken(tokenData.thinkingToken);
+          }
+          
+          // Forward thinking state changes
+          if (options.onThinkingState) {
+            if (tokenData.thinkingStart) {
+              options.onThinkingState({ state: 'start' });
+            } else if (tokenData.contentBlockStop && tokenData.thinkingToken !== undefined) {
+              options.onThinkingState({ state: 'stop' });
+            }
+          }
+          
+          // Forward tool use events
+          if (options.onToolEvent) {
+            if (tokenData.toolUseStart) {
+              options.onToolEvent({ type: 'start', ...tokenData.toolUseStart });
+            } else if (tokenData.toolUseComplete) {
+              options.onToolEvent({ type: 'complete', ...tokenData.toolUseComplete });
+            } else if (tokenData.toolUseError) {
+              options.onToolEvent({ type: 'error', ...tokenData.toolUseError });
+            } else if (tokenData.toolInputDelta) {
+              options.onToolEvent({ type: 'input_delta', ...tokenData.toolInputDelta });
+            }
+          }
 
           if (this.verbose && tokenData.streaming) {
-            process.stdout.write(
-              `\r📊 Tokens: ${tokenData.inputTokens} in, ${tokenData.outputTokens} out`,
-            );
+            let statusLine = `\r📊 Tokens: ${tokenData.inputTokens} in, ${tokenData.outputTokens} out`;
+            
+            // Add thinking indicator
+            if (tokenData.thinkingToken) {
+              statusLine += " 🤔";
+            }
+            
+            // Add tool indicator
+            if (tokenData.toolUseStart) {
+              statusLine += ` 🔧 ${tokenData.toolUseStart.name}`;
+            }
+            
+            process.stdout.write(statusLine);
           } else if (this.verbose && !tokenData.streaming) {
             process.stdout.write(
               `\r📊 Final: ${tokenData.inputTokens} in, ${tokenData.outputTokens} out\n`,

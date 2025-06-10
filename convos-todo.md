@@ -74,21 +74,24 @@
 - [x] Log cache hit rates in debug mode
 - [x] Update Usage interface to include cache metrics
 
-## Phase 4: Enhanced Streaming (Optional)
+## Phase 4: Enhanced Streaming ✅
 
-### Task 4.1: Handle additional streaming events
+### Task 4.1: Handle additional streaming events ✅
 
-- [ ] Update `handleStreamResponse()` in anthropic-provider
-- [ ] Handle `message_delta`, `content_block_start`, `content_block_stop`
-- [ ] Better tool use streaming
-- [ ] ~12 lines of code
+- [x] Update `handleStreamResponse()` in anthropic-provider
+- [x] Handle `message_delta`, `content_block_start`, `content_block_stop`
+- [x] Better tool use streaming with progress notifications
+- [x] Add content block index tracking
+- [x] Enhanced error handling for tool parsing
 
-### Task 4.2: Add "extended thinking" support
+### Task 4.2: Add "extended thinking" support ✅
 
-- [ ] Support thinking content blocks in streaming
-- [ ] Forward thinking tokens to UI separately
-- [ ] Add thinking display to UI components
-- [ ] ~15 lines of code
+- [x] Support thinking content blocks in streaming
+- [x] Forward thinking tokens to UI separately via `onThinkingToken` callback
+- [x] Add thinking state change notifications via `onThinkingState` callback
+- [x] Add tool event notifications via `onToolEvent` callback
+- [x] Enhanced verbose mode with thinking and tool indicators
+- [x] Comprehensive test coverage for all streaming enhancements
 
 ## Phase 5: Polish & Optimization
 

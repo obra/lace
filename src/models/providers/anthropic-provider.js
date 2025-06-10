@@ -268,6 +268,7 @@ export class AnthropicProvider {
     let outputTokens = 0;
     let cacheCreationInputTokens = 0;
     let cacheReadInputTokens = 0;
+    let currentContentBlockIndex = 0;
 
     try {
       for await (const chunk of stream) {
@@ -279,6 +280,8 @@ export class AnthropicProvider {
             onTokenUpdate({ inputTokens, outputTokens: 0, streaming: true });
           }
         } else if (chunk.type === "content_block_start") {
+          currentContentBlockIndex = chunk.index;
+          
           if (chunk.content_block.type === "tool_use") {
             currentToolCall = {
               id: chunk.content_block.id,
@@ -286,27 +289,118 @@ export class AnthropicProvider {
               input: {},
             };
             toolCallInput = "";
+            
+            // Notify about tool use start if callback available
+            if (onTokenUpdate) {
+              onTokenUpdate({ 
+                inputTokens, 
+                outputTokens, 
+                streaming: true,
+                toolUseStart: {
+                  id: chunk.content_block.id,
+                  name: chunk.content_block.name
+                }
+              });
+            }
+          } else if (chunk.content_block.type === "thinking") {
+            // Support for thinking content blocks
+            if (onTokenUpdate) {
+              onTokenUpdate({ 
+                inputTokens, 
+                outputTokens, 
+                streaming: true,
+                thinkingStart: true
+              });
+            }
           }
         } else if (chunk.type === "content_block_delta") {
           if (chunk.delta.type === "text_delta") {
             result.content += chunk.delta.text;
             if (onTokenUpdate) {
               outputTokens += this.estimateTokens(chunk.delta.text);
-              onTokenUpdate({ inputTokens, outputTokens, streaming: true });
+              onTokenUpdate({ 
+                inputTokens, 
+                outputTokens, 
+                streaming: true,
+                token: chunk.delta.text
+              });
             }
           } else if (chunk.delta.type === "input_json_delta") {
             toolCallInput += chunk.delta.partial_json;
+            
+            // Notify about tool input progress
+            if (onTokenUpdate && currentToolCall) {
+              onTokenUpdate({ 
+                inputTokens, 
+                outputTokens, 
+                streaming: true,
+                toolInputDelta: {
+                  id: currentToolCall.id,
+                  partialJson: chunk.delta.partial_json
+                }
+              });
+            }
+          } else if (chunk.delta.type === "thinking_delta") {
+            // Handle thinking content separately from main content
+            if (onTokenUpdate) {
+              outputTokens += this.estimateTokens(chunk.delta.text);
+              onTokenUpdate({ 
+                inputTokens, 
+                outputTokens, 
+                streaming: true,
+                thinkingToken: chunk.delta.text
+              });
+            }
           }
         } else if (chunk.type === "content_block_stop") {
           if (currentToolCall) {
             try {
               currentToolCall.input = JSON.parse(toolCallInput);
               result.toolCalls.push(currentToolCall);
+              
+              // Notify about tool use completion
+              if (onTokenUpdate) {
+                onTokenUpdate({ 
+                  inputTokens, 
+                  outputTokens, 
+                  streaming: true,
+                  toolUseComplete: {
+                    id: currentToolCall.id,
+                    name: currentToolCall.name,
+                    input: currentToolCall.input
+                  }
+                });
+              }
             } catch (error) {
               console.warn("Failed to parse tool call input:", toolCallInput);
+              
+              // Notify about tool parsing error
+              if (onTokenUpdate) {
+                onTokenUpdate({ 
+                  inputTokens, 
+                  outputTokens, 
+                  streaming: true,
+                  toolUseError: {
+                    id: currentToolCall.id,
+                    error: "Failed to parse tool input"
+                  }
+                });
+              }
             }
             currentToolCall = null;
             toolCallInput = "";
+          } else {
+            // Handle other content block types (e.g., thinking blocks)
+            if (onTokenUpdate) {
+              onTokenUpdate({ 
+                inputTokens, 
+                outputTokens, 
+                streaming: true,
+                contentBlockStop: {
+                  index: currentContentBlockIndex
+                }
+              });
+            }
           }
         } else if (chunk.type === "message_delta") {
           if (chunk.usage) {
