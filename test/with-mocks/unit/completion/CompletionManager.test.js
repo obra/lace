@@ -1,287 +1,301 @@
 // ABOUTME: Unit tests for CompletionManager
 // ABOUTME: Tests provider coordination, history completion, and context routing
 
-import { describe, it, expect, beforeEach, jest } from '@jest/globals'
-import { CompletionManager } from '@/ui/completion/CompletionManager.ts'
+import { describe, it, expect, beforeEach, jest } from "@jest/globals";
+import { CompletionManager } from "@/ui/completion/CompletionManager.ts";
 
-describe('CompletionManager', () => {
-  let manager
-  let mockProvider1
-  let mockProvider2
+describe("CompletionManager", () => {
+  let manager;
+  let mockProvider1;
+  let mockProvider2;
 
   beforeEach(() => {
     manager = new CompletionManager({
       maxItems: 5,
       includeHistory: true,
-      history: ['previous command', 'another command']
-    })
+      history: ["previous command", "another command"],
+    });
 
     // Create mock providers
     mockProvider1 = {
       canHandle: jest.fn(),
-      getCompletions: jest.fn()
-    }
+      getCompletions: jest.fn(),
+    };
 
     mockProvider2 = {
       canHandle: jest.fn(),
-      getCompletions: jest.fn()
-    }
-  })
+      getCompletions: jest.fn(),
+    };
+  });
 
-  describe('provider management', () => {
-    it('should add providers', () => {
-      manager.addProvider(mockProvider1)
-      manager.addProvider(mockProvider2)
+  describe("provider management", () => {
+    it("should add providers", () => {
+      manager.addProvider(mockProvider1);
+      manager.addProvider(mockProvider2);
 
-      expect(manager.getProviderCount()).toBe(2)
-    })
+      expect(manager.getProviderCount()).toBe(2);
+    });
 
-    it('should remove providers', () => {
-      manager.addProvider(mockProvider1)
-      manager.addProvider(mockProvider2)
-      manager.removeProvider(mockProvider1)
+    it("should remove providers", () => {
+      manager.addProvider(mockProvider1);
+      manager.addProvider(mockProvider2);
+      manager.removeProvider(mockProvider1);
 
-      expect(manager.getProviderCount()).toBe(1)
-      expect(manager.getProvider(0)).toBe(mockProvider2)
-    })
-  })
+      expect(manager.getProviderCount()).toBe(1);
+      expect(manager.getProvider(0)).toBe(mockProvider2);
+    });
+  });
 
-  describe('getCompletions', () => {
+  describe("getCompletions", () => {
     beforeEach(() => {
-      manager.addProvider(mockProvider1)
-      manager.addProvider(mockProvider2)
-    })
+      manager.addProvider(mockProvider1);
+      manager.addProvider(mockProvider2);
+    });
 
-    it('should route to appropriate provider', async () => {
+    it("should route to appropriate provider", async () => {
       const context = {
-        line: '/help',
+        line: "/help",
         column: 5,
         lineNumber: 0,
-        fullText: '/help'
-      }
+        fullText: "/help",
+      };
 
-      mockProvider1.canHandle.mockReturnValue(true)
+      mockProvider1.canHandle.mockReturnValue(true);
       mockProvider1.getCompletions.mockResolvedValue({
-        items: [{ value: 'help', type: 'command', description: 'Help command' }],
-        prefix: 'he'
-      })
+        items: [
+          { value: "help", type: "command", description: "Help command" },
+        ],
+        prefix: "he",
+      });
 
-      mockProvider2.canHandle.mockReturnValue(false)
+      mockProvider2.canHandle.mockReturnValue(false);
 
-      const result = await manager.getCompletions(context)
+      const result = await manager.getCompletions(context);
 
-      expect(mockProvider1.canHandle).toHaveBeenCalledWith(context)
-      expect(mockProvider1.getCompletions).toHaveBeenCalledWith('/help')
+      expect(mockProvider1.canHandle).toHaveBeenCalledWith(context);
+      expect(mockProvider1.getCompletions).toHaveBeenCalledWith("/help");
       // Provider2 should not be called since provider1 handled it
-      expect(mockProvider2.canHandle).not.toHaveBeenCalled()
-      expect(mockProvider2.getCompletions).not.toHaveBeenCalled()
+      expect(mockProvider2.canHandle).not.toHaveBeenCalled();
+      expect(mockProvider2.getCompletions).not.toHaveBeenCalled();
 
-      expect(result.items).toHaveLength(1)
-      expect(result.items[0].value).toBe('help')
-    })
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].value).toBe("help");
+    });
 
-    it('should extract slash command prefix correctly', async () => {
+    it("should extract slash command prefix correctly", async () => {
       const context = {
-        line: '/help',
+        line: "/help",
         column: 5,
         lineNumber: 0,
-        fullText: '/help'
-      }
+        fullText: "/help",
+      };
 
-      mockProvider1.canHandle.mockReturnValue(true)
+      mockProvider1.canHandle.mockReturnValue(true);
       mockProvider1.getCompletions.mockResolvedValue({
         items: [],
-        prefix: '/help'
-      })
+        prefix: "/help",
+      });
 
-      await manager.getCompletions(context)
+      await manager.getCompletions(context);
 
-      expect(mockProvider1.getCompletions).toHaveBeenCalledWith('/help')
-    })
+      expect(mockProvider1.getCompletions).toHaveBeenCalledWith("/help");
+    });
 
-    it('should extract word prefix for non-commands', async () => {
+    it("should extract word prefix for non-commands", async () => {
       const context = {
-        line: 'some file.txt',
+        line: "some file.txt",
         column: 9,
         lineNumber: 0,
-        fullText: 'some file.txt'
-      }
+        fullText: "some file.txt",
+      };
 
-      mockProvider1.canHandle.mockReturnValue(true)
+      mockProvider1.canHandle.mockReturnValue(true);
       mockProvider1.getCompletions.mockResolvedValue({
         items: [],
-        prefix: 'file'
-      })
+        prefix: "file",
+      });
 
-      await manager.getCompletions(context)
+      await manager.getCompletions(context);
 
-      expect(mockProvider1.getCompletions).toHaveBeenCalledWith('file')
-    })
+      expect(mockProvider1.getCompletions).toHaveBeenCalledWith("file");
+    });
 
-    it('should merge with history completions', async () => {
+    it("should merge with history completions", async () => {
       const context = {
-        line: 'previous',
+        line: "previous",
         column: 8,
         lineNumber: 0,
-        fullText: 'previous'
-      }
+        fullText: "previous",
+      };
 
-      mockProvider1.canHandle.mockReturnValue(true)
+      mockProvider1.canHandle.mockReturnValue(true);
       mockProvider1.getCompletions.mockResolvedValue({
-        items: [{ value: 'file.txt', type: 'file', description: 'Text file' }],
-        prefix: 'previous'
-      })
+        items: [{ value: "file.txt", type: "file", description: "Text file" }],
+        prefix: "previous",
+      });
 
-      const result = await manager.getCompletions(context)
+      const result = await manager.getCompletions(context);
 
       // Should include both provider result and history
-      expect(result.items.length).toBeGreaterThan(1)
+      expect(result.items.length).toBeGreaterThan(1);
 
-      const historyItem = result.items.find(item => item.type === 'history')
-      expect(historyItem).toBeDefined()
-      expect(historyItem.value).toBe('previous command')
-    })
+      const historyItem = result.items.find((item) => item.type === "history");
+      expect(historyItem).toBeDefined();
+      expect(historyItem.value).toBe("previous command");
+    });
 
-    it('should limit total items', async () => {
+    it("should limit total items", async () => {
       const context = {
-        line: 'test',
+        line: "test",
         column: 4,
         lineNumber: 0,
-        fullText: 'test'
-      }
+        fullText: "test",
+      };
 
       // Return more items than maxItems (5)
       const manyItems = Array.from({ length: 10 }, (_, i) => ({
         value: `item${i}`,
-        type: 'file',
-        description: `Item ${i}`
-      }))
+        type: "file",
+        description: `Item ${i}`,
+      }));
 
-      mockProvider1.canHandle.mockReturnValue(true)
+      mockProvider1.canHandle.mockReturnValue(true);
       mockProvider1.getCompletions.mockResolvedValue({
         items: manyItems,
-        prefix: 'test'
-      })
+        prefix: "test",
+      });
 
-      const result = await manager.getCompletions(context)
+      const result = await manager.getCompletions(context);
 
-      expect(result.items.length).toBeLessThanOrEqual(5)
-      expect(result.hasMore).toBe(true)
-    })
+      expect(result.items.length).toBeLessThanOrEqual(5);
+      expect(result.hasMore).toBe(true);
+    });
 
-    it('should fallback to history on provider error', async () => {
+    it("should fallback to history on provider error", async () => {
       const context = {
-        line: 'previous',
+        line: "previous",
         column: 8,
         lineNumber: 0,
-        fullText: 'previous'
-      }
+        fullText: "previous",
+      };
 
-      mockProvider1.canHandle.mockReturnValue(true)
-      mockProvider1.getCompletions.mockRejectedValue(new Error('Provider error'))
+      mockProvider1.canHandle.mockReturnValue(true);
+      mockProvider1.getCompletions.mockRejectedValue(
+        new Error("Provider error"),
+      );
 
       // Suppress console.warn for this intentional error test
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+      const consoleSpy = jest
+        .spyOn(console, "warn")
+        .mockImplementation(() => {});
 
-      const result = await manager.getCompletions(context)
+      const result = await manager.getCompletions(context);
 
       // Should only return history completions
-      expect(result.items.length).toBeGreaterThan(0)
-      const historyItem = result.items.find(item => item.type === 'history')
-      expect(historyItem).toBeDefined()
+      expect(result.items.length).toBeGreaterThan(0);
+      const historyItem = result.items.find((item) => item.type === "history");
+      expect(historyItem).toBeDefined();
 
       // Verify console.warn was called with the error
-      expect(consoleSpy).toHaveBeenCalledWith('Completion error:', expect.any(Error))
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Completion error:",
+        expect.any(Error),
+      );
 
-      consoleSpy.mockRestore()
-    })
+      consoleSpy.mockRestore();
+    });
 
-    it('should return history when no provider handles context', async () => {
+    it("should return history when no provider handles context", async () => {
       const context = {
-        line: 'previous',
+        line: "previous",
         column: 8,
         lineNumber: 0,
-        fullText: 'previous'
-      }
+        fullText: "previous",
+      };
 
-      mockProvider1.canHandle.mockReturnValue(false)
-      mockProvider2.canHandle.mockReturnValue(false)
+      mockProvider1.canHandle.mockReturnValue(false);
+      mockProvider2.canHandle.mockReturnValue(false);
 
-      const result = await manager.getCompletions(context)
+      const result = await manager.getCompletions(context);
 
-      const historyItem = result.items.find(item => item.type === 'history')
-      expect(historyItem).toBeDefined()
-      expect(historyItem.value).toBe('previous command')
-    })
-  })
+      const historyItem = result.items.find((item) => item.type === "history");
+      expect(historyItem).toBeDefined();
+      expect(historyItem.value).toBe("previous command");
+    });
+  });
 
-  describe('history management', () => {
-    it('should update history', () => {
-      const newHistory = ['new command 1', 'new command 2']
-      manager.updateHistory(newHistory)
+  describe("history management", () => {
+    it("should update history", () => {
+      const newHistory = ["new command 1", "new command 2"];
+      manager.updateHistory(newHistory);
 
-      const options = manager.getOptions()
-      expect(options.history).toEqual(newHistory)
-    })
+      const options = manager.getOptions();
+      expect(options.history).toEqual(newHistory);
+    });
 
-    it('should filter exact matches from history completions', async () => {
-      manager.updateHistory(['match', 'different command'])
+    it("should filter exact matches from history completions", async () => {
+      manager.updateHistory(["match", "different command"]);
 
       const context = {
-        line: 'match',
+        line: "match",
         column: 5,
         lineNumber: 0,
-        fullText: 'match'
-      }
+        fullText: "match",
+      };
 
-      mockProvider1.canHandle.mockReturnValue(false)
+      mockProvider1.canHandle.mockReturnValue(false);
 
-      const result = await manager.getCompletions(context)
+      const result = await manager.getCompletions(context);
 
       // Should not include exact match, only partial matches
-      const exactMatch = result.items.find(item => item.value === 'match')
-      expect(exactMatch).toBeUndefined()
-    })
+      const exactMatch = result.items.find((item) => item.value === "match");
+      expect(exactMatch).toBeUndefined();
+    });
 
-    it('should limit history items', async () => {
-      const longHistory = Array.from({ length: 20 }, (_, i) => `command${i} test`)
-      manager.updateHistory(longHistory)
+    it("should limit history items", async () => {
+      const longHistory = Array.from(
+        { length: 20 },
+        (_, i) => `command${i} test`,
+      );
+      manager.updateHistory(longHistory);
 
       const context = {
-        line: 'test',
+        line: "test",
         column: 4,
         lineNumber: 0,
-        fullText: 'test'
-      }
+        fullText: "test",
+      };
 
-      mockProvider1.canHandle.mockReturnValue(false)
+      mockProvider1.canHandle.mockReturnValue(false);
 
-      const result = await manager.getCompletions(context)
+      const result = await manager.getCompletions(context);
 
-      const historyItems = result.items.filter(item => item.type === 'history')
-      expect(historyItems.length).toBeLessThanOrEqual(5) // Limited to 5
-    })
-  })
+      const historyItems = result.items.filter(
+        (item) => item.type === "history",
+      );
+      expect(historyItems.length).toBeLessThanOrEqual(5); // Limited to 5
+    });
+  });
 
-  describe('options management', () => {
-    it('should get current options', () => {
-      const options = manager.getOptions()
+  describe("options management", () => {
+    it("should get current options", () => {
+      const options = manager.getOptions();
 
-      expect(options.maxItems).toBe(5)
-      expect(options.includeHistory).toBe(true)
-      expect(options.history).toEqual(['previous command', 'another command'])
-    })
+      expect(options.maxItems).toBe(5);
+      expect(options.includeHistory).toBe(true);
+      expect(options.history).toEqual(["previous command", "another command"]);
+    });
 
-    it('should update options', () => {
+    it("should update options", () => {
       manager.updateOptions({
         maxItems: 10,
-        includeHistory: false
-      })
+        includeHistory: false,
+      });
 
-      const options = manager.getOptions()
-      expect(options.maxItems).toBe(10)
-      expect(options.includeHistory).toBe(false)
-      expect(options.history).toEqual(['previous command', 'another command']) // Unchanged
-    })
-  })
-})
+      const options = manager.getOptions();
+      expect(options.maxItems).toBe(10);
+      expect(options.includeHistory).toBe(false);
+      expect(options.history).toEqual(["previous command", "another command"]); // Unchanged
+    });
+  });
+});

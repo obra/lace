@@ -1,7 +1,13 @@
 // ABOUTME: Completion manager that coordinates multiple completion providers
 // ABOUTME: Provides unified API for tab completion in the UI layer
 
-import { CompletionProvider, CompletionResult, CompletionContext, CompletionItem, CompletionManagerOptions } from './types';
+import {
+  CompletionProvider,
+  CompletionResult,
+  CompletionContext,
+  CompletionItem,
+  CompletionManagerOptions,
+} from "./types";
 
 export class CompletionManager {
   private providers: CompletionProvider[] = [];
@@ -11,7 +17,7 @@ export class CompletionManager {
     this.options = {
       maxItems: options.maxItems || 20,
       includeHistory: options.includeHistory ?? true,
-      history: options.history || []
+      history: options.history || [],
     };
   }
 
@@ -37,20 +43,20 @@ export class CompletionManager {
    */
   async getCompletions(context: CompletionContext): Promise<CompletionResult> {
     const prefix = this.extractPrefix(context);
-    
+
     // Find the appropriate provider
-    const provider = this.providers.find(p => p.canHandle(context));
-    
+    const provider = this.providers.find((p) => p.canHandle(context));
+
     if (!provider) {
       return {
         items: this.getHistoryCompletions(prefix),
-        prefix
+        prefix,
       };
     }
 
     try {
       const result = await provider.getCompletions(prefix);
-      
+
       // Merge with history completions if enabled
       if (this.options.includeHistory) {
         const historyItems = this.getHistoryCompletions(prefix);
@@ -64,14 +70,13 @@ export class CompletionManager {
       }
 
       return result;
-      
     } catch (error) {
-      console.warn('Completion error:', error);
-      
+      console.warn("Completion error:", error);
+
       // Fallback to history completions
       return {
         items: this.getHistoryCompletions(prefix),
-        prefix
+        prefix,
       };
     }
   }
@@ -81,16 +86,16 @@ export class CompletionManager {
    */
   private extractPrefix(context: CompletionContext): string {
     const { line, column } = context;
-    
-    if (context.lineNumber === 0 && line.startsWith('/')) {
+
+    if (context.lineNumber === 0 && line.startsWith("/")) {
       // Command completion: everything from / to cursor
       return line.slice(0, column);
     }
-    
+
     // File completion: word before cursor
     const beforeCursor = line.slice(0, column);
     const match = beforeCursor.match(/(\S+)$/);
-    return match ? match[1] : '';
+    return match ? match[1] : "";
   }
 
   /**
@@ -102,17 +107,17 @@ export class CompletionManager {
     }
 
     return this.options.history
-      .filter(item => {
+      .filter((item) => {
         const lowerItem = item.toLowerCase();
         const lowerPrefix = prefix.toLowerCase();
         return lowerItem.includes(lowerPrefix) && lowerItem !== lowerPrefix;
       })
       .slice(0, 5) // Limit history items
-      .map(item => ({
+      .map((item) => ({
         value: item,
-        description: 'from history',
-        type: 'history' as const,
-        priority: -1 // Lower priority than other completions
+        description: "from history",
+        type: "history" as const,
+        priority: -1, // Lower priority than other completions
       }));
   }
 

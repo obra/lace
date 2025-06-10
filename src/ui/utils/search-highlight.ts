@@ -9,11 +9,11 @@
  */
 export function highlightSearchTerm(text: string, searchTerm: string): string {
   if (!searchTerm.trim()) return text;
-  
-  const regex = new RegExp(`(${escapeRegex(searchTerm)})`, 'gi');
-  
+
+  const regex = new RegExp(`(${escapeRegex(searchTerm)})`, "gi");
+
   // Use ANSI escape codes for yellow background highlighting
-  return text.replace(regex, '\x1b[43m\x1b[30m$1\x1b[0m');
+  return text.replace(regex, "\x1b[43m\x1b[30m$1\x1b[0m");
 }
 
 /**
@@ -22,7 +22,7 @@ export function highlightSearchTerm(text: string, searchTerm: string): string {
  * @returns Escaped text safe for regex
  */
 function escapeRegex(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**

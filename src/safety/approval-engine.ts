@@ -1,20 +1,22 @@
 // ABOUTME: Core approval engine for tool execution safety decisions
 // ABOUTME: Manages auto-approve/deny rules and processes user decisions into approval results
 
-import type { 
-  ApprovalRequest, 
-  ApprovalResult, 
-  UserDecision, 
+import type {
+  ApprovalRequest,
+  ApprovalResult,
+  UserDecision,
   ApprovalEngineConfig,
-  ApprovalStatus 
-} from './types.js';
+  ApprovalStatus,
+} from "./types.js";
 
 export class ApprovalEngine {
   private autoApproveTools: Set<string>;
   private alwaysDenyTools: Set<string>;
   private interactive: boolean;
   private activityLogger: any; // ActivityLogger from main
-  private uiCallback: ((toolCall: any, riskLevel: string, context?: any) => Promise<any>) | null;
+  private uiCallback:
+    | ((toolCall: any, riskLevel: string, context?: any) => Promise<any>)
+    | null;
 
   constructor(config: ApprovalEngineConfig = {}) {
     this.autoApproveTools = new Set(config.autoApproveTools || []);
@@ -24,39 +26,51 @@ export class ApprovalEngine {
     this.uiCallback = null;
   }
 
-  async checkAutoApproval(request: ApprovalRequest): Promise<ApprovalResult | null> {
+  async checkAutoApproval(
+    request: ApprovalRequest,
+  ): Promise<ApprovalResult | null> {
     const toolCall = request.toolCall;
     // Parse tool name and method from LLM response
-    const [toolName, methodName] = toolCall.name.split('_');
+    const [toolName, methodName] = toolCall.name.split("_");
     const riskLevel = this.assessRisk(toolCall);
-    
+
     // Log tool approval request
     if (this.activityLogger && request.context?.sessionId) {
-      await this.activityLogger.logEvent('tool_approval_request', request.context.sessionId, null, {
-        tool: toolName,
-        method: methodName,
-        params: toolCall.input,
-        risk_level: riskLevel
-      });
+      await this.activityLogger.logEvent(
+        "tool_approval_request",
+        request.context.sessionId,
+        null,
+        {
+          tool: toolName,
+          method: methodName,
+          params: toolCall.input,
+          risk_level: riskLevel,
+        },
+      );
     }
 
     // Check deny list first (takes precedence)
     if (this.alwaysDenyTools.has(toolCall.name)) {
       const decision = {
         approved: false,
-        reason: 'Tool is on deny list',
-        modifiedCall: null
+        reason: "Tool is on deny list",
+        modifiedCall: null,
       };
-      
+
       // Log approval decision
       if (this.activityLogger && request.context?.sessionId) {
-        await this.activityLogger.logEvent('tool_approval_decision', request.context.sessionId, null, {
-          approved: false,
-          modified_params: null,
-          user_decision: 'denied_by_policy'
-        });
+        await this.activityLogger.logEvent(
+          "tool_approval_decision",
+          request.context.sessionId,
+          null,
+          {
+            approved: false,
+            modified_params: null,
+            user_decision: "denied_by_policy",
+          },
+        );
       }
-      
+
       return decision;
     }
 
@@ -64,19 +78,24 @@ export class ApprovalEngine {
     if (this.autoApproveTools.has(toolCall.name)) {
       const decision = {
         approved: true,
-        reason: 'Tool is on auto-approve list',
-        modifiedCall: toolCall
+        reason: "Tool is on auto-approve list",
+        modifiedCall: toolCall,
       };
-      
+
       // Log approval decision
       if (this.activityLogger && request.context?.sessionId) {
-        await this.activityLogger.logEvent('tool_approval_decision', request.context.sessionId, null, {
-          approved: true,
-          modified_params: toolCall.input,
-          user_decision: 'auto_approved'
-        });
+        await this.activityLogger.logEvent(
+          "tool_approval_decision",
+          request.context.sessionId,
+          null,
+          {
+            approved: true,
+            modified_params: toolCall.input,
+            user_decision: "auto_approved",
+          },
+        );
       }
-      
+
       return decision;
     }
 
@@ -86,52 +105,54 @@ export class ApprovalEngine {
 
   finalizeApproval(decision: UserDecision): ApprovalResult {
     switch (decision.action) {
-      case 'approve':
+      case "approve":
         return this.handleApprove(decision);
-      
-      case 'deny':
+
+      case "deny":
         return {
           approved: false,
-          reason: decision.reason || 'User denied',
-          modifiedCall: null
-        };
-      
-      case 'stop':
-        return {
-          approved: false,
-          reason: 'User requested stop',
+          reason: decision.reason || "User denied",
           modifiedCall: null,
-          shouldStop: true
         };
-      
+
+      case "stop":
+        return {
+          approved: false,
+          reason: "User requested stop",
+          modifiedCall: null,
+          shouldStop: true,
+        };
+
       default:
         return {
           approved: false,
-          reason: 'Unknown action',
-          modifiedCall: null
+          reason: "Unknown action",
+          modifiedCall: null,
         };
     }
   }
 
   private handleApprove(decision: UserDecision): ApprovalResult {
-    const hasModifications = decision.modifiedCall && 
-      JSON.stringify(decision.modifiedCall.input) !== JSON.stringify(decision.toolCall.input);
-    
+    const hasModifications =
+      decision.modifiedCall &&
+      JSON.stringify(decision.modifiedCall.input) !==
+        JSON.stringify(decision.toolCall.input);
+
     const hasComment = decision.comment && decision.comment.trim().length > 0;
 
-    let reason = 'User approved';
+    let reason = "User approved";
     if (hasModifications && hasComment) {
-      reason = 'User approved with modifications and comment';
+      reason = "User approved with modifications and comment";
     } else if (hasModifications) {
-      reason = 'User approved with modifications';
+      reason = "User approved with modifications";
     } else if (hasComment) {
-      reason = 'User approved with comment';
+      reason = "User approved with comment";
     }
 
     const result: ApprovalResult = {
       approved: true,
       reason,
-      modifiedCall: decision.modifiedCall || decision.toolCall
+      modifiedCall: decision.modifiedCall || decision.toolCall,
     };
 
     if (hasComment) {
@@ -167,53 +188,68 @@ export class ApprovalEngine {
     const input = toolCall.input || {};
 
     // High risk operations
-    if (toolName.includes('shell') || toolName.includes('execute')) {
-      const command = input.command || '';
-      if (command.includes('rm ') || command.includes('delete') || 
-          command.includes('sudo') || command.includes('chmod') ||
-          command.includes('curl') || command.includes('wget')) {
-        return 'high';
+    if (toolName.includes("shell") || toolName.includes("execute")) {
+      const command = input.command || "";
+      if (
+        command.includes("rm ") ||
+        command.includes("delete") ||
+        command.includes("sudo") ||
+        command.includes("chmod") ||
+        command.includes("curl") ||
+        command.includes("wget")
+      ) {
+        return "high";
       }
-      return 'medium';
+      return "medium";
     }
 
     // File operations
-    if (toolName.includes('file')) {
-      if (toolName.includes('write') || toolName.includes('edit')) {
-        const path = input.path || '';
-        if (path.includes('/etc/') || path.includes('config') || 
-            path.includes('.env') || path.includes('package.json')) {
-          return 'high';
+    if (toolName.includes("file")) {
+      if (toolName.includes("write") || toolName.includes("edit")) {
+        const path = input.path || "";
+        if (
+          path.includes("/etc/") ||
+          path.includes("config") ||
+          path.includes(".env") ||
+          path.includes("package.json")
+        ) {
+          return "high";
         }
-        return 'medium';
+        return "medium";
       }
-      return 'low'; // Read operations are generally safe
+      return "low"; // Read operations are generally safe
     }
 
     // JavaScript execution
-    if (toolName.includes('javascript')) {
-      const code = input.code || input.expression || '';
-      if (code.includes('require') || code.includes('import') || 
-          code.includes('process') || code.includes('eval')) {
-        return 'high';
+    if (toolName.includes("javascript")) {
+      const code = input.code || input.expression || "";
+      if (
+        code.includes("require") ||
+        code.includes("import") ||
+        code.includes("process") ||
+        code.includes("eval")
+      ) {
+        return "high";
       }
-      return 'low'; // Simple calculations are safe
+      return "low"; // Simple calculations are safe
     }
 
     // Default to low risk
-    return 'low';
+    return "low";
   }
 
   getStatus(): ApprovalStatus {
     return {
       interactive: this.interactive,
       autoApprove: Array.from(this.autoApproveTools),
-      denyList: Array.from(this.alwaysDenyTools)
+      denyList: Array.from(this.alwaysDenyTools),
     };
   }
 
   // UI Callback Management
-  setUICallback(callback: (toolCall: any, riskLevel: string, context?: any) => Promise<any>): void {
+  setUICallback(
+    callback: (toolCall: any, riskLevel: string, context?: any) => Promise<any>,
+  ): void {
     this.uiCallback = callback;
   }
 
@@ -229,8 +265,8 @@ export class ApprovalEngine {
     if (!this.interactive) {
       return {
         approved: false,
-        reason: 'Interactive mode disabled',
-        modifiedCall: null
+        reason: "Interactive mode disabled",
+        modifiedCall: null,
       };
     }
 
@@ -238,30 +274,43 @@ export class ApprovalEngine {
     if (this.uiCallback) {
       try {
         const riskLevel = this.assessRisk(request.toolCall);
-        const userDecision = await this.uiCallback(request.toolCall, riskLevel, request.context);
-        
+        const userDecision = await this.uiCallback(
+          request.toolCall,
+          riskLevel,
+          request.context,
+        );
+
         // Log the user decision
         if (this.activityLogger && request.context?.sessionId) {
-          await this.activityLogger.logEvent('tool_approval_decision', request.context.sessionId, null, {
-            approved: userDecision.approved,
-            modified_params: userDecision.modifiedCall?.input || null,
-            user_decision: userDecision.approved ? 'user_approved' : 'user_denied',
-            reason: userDecision.reason || null
-          });
+          await this.activityLogger.logEvent(
+            "tool_approval_decision",
+            request.context.sessionId,
+            null,
+            {
+              approved: userDecision.approved,
+              modified_params: userDecision.modifiedCall?.input || null,
+              user_decision: userDecision.approved
+                ? "user_approved"
+                : "user_denied",
+              reason: userDecision.reason || null,
+            },
+          );
         }
 
         return {
           approved: userDecision.approved,
-          reason: userDecision.reason || (userDecision.approved ? 'User approved' : 'User denied'),
+          reason:
+            userDecision.reason ||
+            (userDecision.approved ? "User approved" : "User denied"),
           modifiedCall: userDecision.modifiedCall || request.toolCall,
           postExecutionComment: userDecision.postExecutionComment,
-          shouldStop: userDecision.shouldStop
+          shouldStop: userDecision.shouldStop,
         };
       } catch (error) {
         return {
           approved: false,
           reason: `UI approval failed: ${error.message}`,
-          modifiedCall: null
+          modifiedCall: null,
         };
       }
     }
@@ -269,8 +318,8 @@ export class ApprovalEngine {
     // Fallback to deny if no UI callback
     return {
       approved: false,
-      reason: 'No approval mechanism available',
-      modifiedCall: null
+      reason: "No approval mechanism available",
+      modifiedCall: null,
     };
   }
 }

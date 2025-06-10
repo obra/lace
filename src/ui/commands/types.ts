@@ -14,7 +14,7 @@ export interface CommandResult {
   data?: any;
   shouldExit?: boolean;
   shouldShowModal?: {
-    type: 'status' | 'tools' | 'memory' | 'approval' | 'help' | 'activity';
+    type: "status" | "tools" | "memory" | "approval" | "help" | "activity";
     data: any;
   };
 }
@@ -22,7 +22,10 @@ export interface CommandResult {
 export interface Command {
   name: string;
   description: string;
-  handler: (args: string[], context: CommandContext) => Promise<CommandResult> | CommandResult;
+  handler: (
+    args: string[],
+    context: CommandContext,
+  ) => Promise<CommandResult> | CommandResult;
   requiresAgent?: boolean;
   hidden?: boolean;
   parameterDescription?: string;
@@ -36,7 +39,7 @@ export interface CommandRegistry {
 export interface CommandCompletion {
   value: string;
   description: string;
-  type: 'command';
+  type: "command";
   hasParameters?: boolean;
   parameterDescription?: string;
 }

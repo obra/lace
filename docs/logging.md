@@ -7,12 +7,13 @@ Lace implements a comprehensive dual logging system designed for both operationa
 ### Two Independent Logging Systems
 
 1. **Activity Logging**: Always-on SQLite-based forensic audit trail
+
    - Captures all user interactions, model calls, and tool executions
-   - Stored in `.lace/activity.db` 
+   - Stored in `.lace/activity.db`
    - Never fails silently - designed for reliability
    - Used for debugging, auditing, and understanding system behavior
 
-2. **Debug Logging**: Configurable development logging  
+2. **Debug Logging**: Configurable development logging
    - Traditional leveled logging (debug/info/warn/error)
    - Dual output: stderr and optional file
    - Controlled via CLI arguments
@@ -45,14 +46,17 @@ CREATE INDEX idx_event_type ON events(event_type);
 The system logs the following event types:
 
 #### User Interaction Events
+
 - **`user_input`**: User submits input to the system
 - **`agent_response`**: Agent completes a response to user
 
-#### Model Provider Events  
+#### Model Provider Events
+
 - **`model_request`**: Request sent to model provider (Anthropic, OpenAI, etc.)
 - **`model_response`**: Response received from model provider
 
 #### Tool Execution Events
+
 - **`tool_approval_request`**: Tool requires user approval
 - **`tool_approval_decision`**: User approves/denies tool execution
 - **`tool_execution_start`**: Tool execution begins
@@ -65,53 +69,53 @@ Each event type has a specific JSON data structure:
 ```json
 {
   "user_input": {
-    "content": "user message", 
+    "content": "user message",
     "timestamp": "2025-01-01T12:00:00Z"
   },
-  
+
   "agent_response": {
-    "content": "agent response", 
-    "tokens": 150, 
+    "content": "agent response",
+    "tokens": 150,
     "duration_ms": 1200
   },
-  
+
   "model_request": {
-    "provider": "anthropic", 
-    "model": "claude-3-5-sonnet", 
-    "prompt": "...", 
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet",
+    "prompt": "...",
     "timestamp": "2025-01-01T12:00:00Z"
   },
-  
+
   "model_response": {
-    "content": "...", 
-    "tokens_in": 100, 
-    "tokens_out": 50, 
-    "cost": 0.002, 
+    "content": "...",
+    "tokens_in": 100,
+    "tokens_out": 50,
+    "cost": 0.002,
     "duration_ms": 800
   },
-  
+
   "tool_approval_request": {
-    "tool": "file-tool", 
-    "method": "read", 
-    "params": {...}, 
+    "tool": "file-tool",
+    "method": "read",
+    "params": {...},
     "risk_level": "medium"
   },
-  
+
   "tool_approval_decision": {
-    "approved": true, 
-    "modified_params": {...}, 
+    "approved": true,
+    "modified_params": {...},
     "user_decision": "approved"
   },
-  
+
   "tool_execution_start": {
-    "tool": "file-tool", 
-    "method": "read", 
+    "tool": "file-tool",
+    "method": "read",
     "params": {...}
   },
-  
+
   "tool_execution_complete": {
-    "success": true, 
-    "result": {...}, 
+    "success": true,
+    "result": {...},
     "duration_ms": 50
   }
 }
@@ -120,22 +124,22 @@ Each event type has a specific JSON data structure:
 ### Usage
 
 ```javascript
-import { ActivityLogger } from './src/logging/activity-logger.js';
+import { ActivityLogger } from "./src/logging/activity-logger.js";
 
 const logger = new ActivityLogger(); // Uses default .lace/activity.db
 await logger.initialize();
 
 // Log an event
-await logger.logEvent('user_input', sessionId, null, {
-  content: 'Hello, world!',
-  timestamp: new Date().toISOString()
+await logger.logEvent("user_input", sessionId, null, {
+  content: "Hello, world!",
+  timestamp: new Date().toISOString(),
 });
 
 // Query events
 const events = await logger.getEvents({
-  sessionId: 'session-123',
-  eventType: 'model_request',
-  limit: 50
+  sessionId: "session-123",
+  eventType: "model_request",
+  limit: 50,
 });
 
 await logger.close();
@@ -156,7 +160,7 @@ lace --log-level=info --log-file=./debug.log --log-file-level=debug
 
 # Common configurations
 lace --log-level=off                    # No debug output
-lace --log-level=info                   # Important messages only  
+lace --log-level=info                   # Important messages only
 lace --log-level=debug                  # Verbose development output
 lace --log-file=./lace-debug.log        # File logging
 ```
@@ -172,19 +176,19 @@ lace --log-file=./lace-debug.log        # File logging
 ### Usage
 
 ```javascript
-import { DebugLogger } from './src/logging/debug-logger.js';
+import { DebugLogger } from "./src/logging/debug-logger.js";
 
 const logger = new DebugLogger({
-  logLevel: 'info',              // stderr level
-  logFile: './debug.log',        // optional file path
-  logFileLevel: 'debug'          // optional file level
+  logLevel: "info", // stderr level
+  logFile: "./debug.log", // optional file path
+  logFileLevel: "debug", // optional file level
 });
 
 // Log at different levels
-logger.debug('Verbose development info');
-logger.info('Important status update');
-logger.warn('Warning condition occurred');
-logger.error('Error that doesn\'t stop execution');
+logger.debug("Verbose development info");
+logger.info("Important status update");
+logger.warn("Warning condition occurred");
+logger.error("Error that doesn't stop execution");
 ```
 
 ## Session ID Correlation
@@ -192,11 +196,13 @@ logger.error('Error that doesn\'t stop execution');
 The dual logging system uses two types of session identifiers for correlation:
 
 ### Local Session ID
+
 - Generated by Lace Console: `session-${Date.now()}`
 - Used to correlate all events within a single Lace session
 - Consistent across all activity events
 
-### Model Session ID  
+### Model Session ID
+
 - Generated by model providers for conversation tracking
 - UUIDs created per conversation context
 - Used to correlate related model calls across sessions
@@ -209,7 +215,7 @@ The dual logging system uses two types of session identifiers for correlation:
 The logging system is integrated throughout the Lace architecture:
 
 ```
-Lace (main) 
+Lace (main)
 ├── ActivityLogger (shared instance)
 ├── Console (logs user_input/agent_response)
 ├── Agent (logs model_request/model_response, has DebugLogger)
@@ -224,7 +230,7 @@ Lace (main)
 Both logging systems are designed to fail gracefully:
 
 - **Activity logging failures** don't affect debug logging or core functionality
-- **Debug logging failures** don't affect activity logging or core functionality  
+- **Debug logging failures** don't affect activity logging or core functionality
 - **Both systems failing** doesn't break Lace operation
 
 ### Performance
@@ -242,16 +248,18 @@ When implementing new features in Lace, follow these patterns for consistent log
 For any new user-facing feature or significant system operation:
 
 #### Step 1: Define Event Types
+
 ```javascript
 // Add new event types to your feature
 const EVENT_TYPES = {
-  FEATURE_START: 'feature_start',
-  FEATURE_COMPLETE: 'feature_complete',
-  FEATURE_ERROR: 'feature_error'
+  FEATURE_START: "feature_start",
+  FEATURE_COMPLETE: "feature_complete",
+  FEATURE_ERROR: "feature_error",
 };
 ```
 
 #### Step 2: Design Event Data Structure
+
 ```javascript
 // Define consistent data structures
 const eventData = {
@@ -269,6 +277,7 @@ const eventData = {
 ```
 
 #### Step 3: Add Logging Calls
+
 ```javascript
 export class MyFeature {
   constructor(options = {}) {
@@ -278,10 +287,10 @@ export class MyFeature {
   async executeFeature(sessionId, params) {
     // Log feature start
     if (this.activityLogger) {
-      await this.activityLogger.logEvent('feature_start', sessionId, null, {
-        feature_name: 'my-feature',
+      await this.activityLogger.logEvent("feature_start", sessionId, null, {
+        feature_name: "my-feature",
         parameters: params,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
@@ -293,12 +302,12 @@ export class MyFeature {
       result = await this.doWork(params);
     } catch (error) {
       success = false;
-      
+
       // Log feature error
       if (this.activityLogger) {
-        await this.activityLogger.logEvent('feature_error', sessionId, null, {
+        await this.activityLogger.logEvent("feature_error", sessionId, null, {
           error: error.message,
-          duration_ms: Date.now() - startTime
+          duration_ms: Date.now() - startTime,
         });
       }
       throw error;
@@ -306,10 +315,10 @@ export class MyFeature {
 
     // Log feature completion
     if (this.activityLogger) {
-      await this.activityLogger.logEvent('feature_complete', sessionId, null, {
+      await this.activityLogger.logEvent("feature_complete", sessionId, null, {
         success: success,
         result: result,
-        duration_ms: Date.now() - startTime
+        duration_ms: Date.now() - startTime,
       });
     }
 
@@ -323,6 +332,7 @@ export class MyFeature {
 For development and troubleshooting information:
 
 #### Step 1: Accept Debug Logger in Constructor
+
 ```javascript
 export class MyFeature {
   constructor(options = {}) {
@@ -333,6 +343,7 @@ export class MyFeature {
 ```
 
 #### Step 2: Add Debug Logging Calls
+
 ```javascript
 async executeFeature(sessionId, params) {
   if (this.debugLogger) {
@@ -348,6 +359,7 @@ async executeFeature(sessionId, params) {
 ```
 
 #### Step 3: Use Appropriate Log Levels
+
 - **`debug`**: Detailed flow, parameters, internal state
 - **`info`**: Important milestones, completion status
 - **`warn`**: Recoverable errors, fallback behavior
@@ -356,25 +368,28 @@ async executeFeature(sessionId, params) {
 ### 3. Integration Patterns
 
 #### Pass Loggers Through Constructor Options
+
 ```javascript
 // In parent component - ALWAYS pass logger instances, never config
 const myFeature = new MyFeature({
-  activityLogger: this.activityLogger,  // ✅ Pass instance
-  debugLogger: this.debugLogger,       // ✅ Pass instance
+  activityLogger: this.activityLogger, // ✅ Pass instance
+  debugLogger: this.debugLogger, // ✅ Pass instance
   // ... other options
 });
 ```
 
 #### Pass Loggers to Subcomponents
+
 ```javascript
 // When spawning subcomponents
 const subcomponent = new SubComponent({
   activityLogger: this.activityLogger,
-  debugLogger: this.debugLogger
+  debugLogger: this.debugLogger,
 });
 ```
 
 #### Handle Missing Loggers Gracefully
+
 ```javascript
 // Always check for logger existence
 if (this.activityLogger) {
@@ -389,57 +404,61 @@ if (this.debugLogger) {
 ### 4. Testing Your Logging
 
 #### Write Unit Tests
-```javascript
-import { test, describe } from 'node:test';
-import assert from 'node:assert';
-import { ActivityLogger } from '../src/logging/activity-logger.js';
-import { MyFeature } from '../src/my-feature.js';
 
-describe('MyFeature Logging', () => {
-  test('should log feature execution events', async () => {
-    const activityLogger = new ActivityLogger(':memory:');
+```javascript
+import { test, describe } from "node:test";
+import assert from "node:assert";
+import { ActivityLogger } from "../src/logging/activity-logger.js";
+import { MyFeature } from "../src/my-feature.js";
+
+describe("MyFeature Logging", () => {
+  test("should log feature execution events", async () => {
+    const activityLogger = new ActivityLogger(":memory:");
     await activityLogger.initialize();
-    
+
     const feature = new MyFeature({ activityLogger });
-    const sessionId = 'test-session';
-    
+    const sessionId = "test-session";
+
     await feature.executeFeature(sessionId, { test: true });
-    
+
     const events = await activityLogger.getEvents({ sessionId });
-    
-    const startEvent = events.find(e => e.event_type === 'feature_start');
-    const completeEvent = events.find(e => e.event_type === 'feature_complete');
-    
-    assert.ok(startEvent, 'Should log feature start event');
-    assert.ok(completeEvent, 'Should log feature complete event');
-    
+
+    const startEvent = events.find((e) => e.event_type === "feature_start");
+    const completeEvent = events.find(
+      (e) => e.event_type === "feature_complete",
+    );
+
+    assert.ok(startEvent, "Should log feature start event");
+    assert.ok(completeEvent, "Should log feature complete event");
+
     await activityLogger.close();
   });
 });
 ```
 
 #### Integration Tests
+
 ```javascript
-test('should work with both logging systems', async () => {
-  const debugLogger = new DebugLogger({ logLevel: 'debug' });
-  const activityLogger = new ActivityLogger(':memory:');
+test("should work with both logging systems", async () => {
+  const debugLogger = new DebugLogger({ logLevel: "debug" });
+  const activityLogger = new ActivityLogger(":memory:");
   await activityLogger.initialize();
-  
-  const feature = new MyFeature({ 
-    activityLogger, 
-    debugLogger 
+
+  const feature = new MyFeature({
+    activityLogger,
+    debugLogger,
   });
-  
+
   // Test that both systems log independently
-  const result = await feature.executeFeature('test-session', {});
-  
+  const result = await feature.executeFeature("test-session", {});
+
   // Verify activity logging
   const events = await activityLogger.getEvents({});
   assert.ok(events.length > 0);
-  
+
   // Verify debug logging doesn't interfere
   assert.ok(result);
-  
+
   await activityLogger.close();
 });
 ```
@@ -451,17 +470,17 @@ Always document your logging:
 ```javascript
 /**
  * MyFeature performs X operation with comprehensive logging
- * 
+ *
  * Activity Events Logged:
  * - feature_start: When feature execution begins
- * - feature_complete: When feature execution completes successfully  
+ * - feature_complete: When feature execution completes successfully
  * - feature_error: When feature execution fails
- * 
+ *
  * Debug Logging:
  * - debug: Parameter details, internal flow
  * - info: Completion status, important milestones
  * - warn: Recoverable errors, fallbacks
- * 
+ *
  * @param {Object} options
  * @param {ActivityLogger} options.activityLogger - For forensic logging
  * @param {DebugLogger} options.debugLogger - For development logging

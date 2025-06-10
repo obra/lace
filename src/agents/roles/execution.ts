@@ -1,11 +1,11 @@
 // ABOUTME: Execution role definition for carrying out specific tasks efficiently
 // ABOUTME: Follows provided plans and instructions, uses tools to accomplish concrete goals
 
-import { Role } from './types.ts';
+import { Role } from "./types.ts";
 
 export const execution: Role = {
-  name: 'execution',
-  
+  name: "execution",
+
   systemPrompt: `You are a specialized execution agent in the Lace agentic coding environment.
 
 ROLE: Execution
@@ -22,20 +22,20 @@ EXECUTION GUIDELINES:
 - Ask for clarification when instructions are ambiguous
 - Optimize for speed and accuracy in task completion`,
 
-  defaultModel: 'claude-3-5-haiku-20241022',
-  defaultProvider: 'anthropic',
-  
+  defaultModel: "claude-3-5-haiku-20241022",
+  defaultProvider: "anthropic",
+
   capabilities: [
-    'execution',
-    'tool_calling',
-    'implementation',
-    'task_completion'
+    "execution",
+    "tool_calling",
+    "implementation",
+    "task_completion",
   ],
-  
+
   maxConcurrentTools: 5,
-  
+
   contextPreferences: {
     handoffThreshold: 0.7,
-    maxContextSize: 100000
-  }
+    maxContextSize: 100000,
+  },
 };

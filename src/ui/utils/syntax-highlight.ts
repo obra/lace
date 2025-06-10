@@ -1,8 +1,8 @@
 // ABOUTME: Syntax highlighting utility using cli-highlight
 // ABOUTME: Processes code blocks and applies terminal color highlighting
 
-import { highlight } from 'cli-highlight';
-import { highlightDiff } from './diff-highlight';
+import { highlight } from "cli-highlight";
+import { highlightDiff } from "./diff-highlight";
 
 interface CodeBlock {
   language: string;
@@ -18,10 +18,10 @@ export function detectCodeBlocks(content: string): CodeBlock[] {
 
   while ((match = codeBlockRegex.exec(content)) !== null) {
     codeBlocks.push({
-      language: match[1] || 'text',
+      language: match[1] || "text",
       code: match[2],
       startIndex: match.index,
-      endIndex: match.index + match[0].length
+      endIndex: match.index + match[0].length,
     });
   }
 
@@ -31,22 +31,22 @@ export function detectCodeBlocks(content: string): CodeBlock[] {
 export function highlightCode(code: string, language: string): string {
   try {
     // Special handling for diff blocks
-    if (language === 'diff') {
+    if (language === "diff") {
       return highlightDiff(code);
     }
-    
+
     // Use cli-highlight to apply syntax highlighting
     return highlight(code, { language, ignoreIllegals: true });
   } catch (error) {
     // Fallback to plain text if highlighting fails
-    console.warn('Syntax highlighting failed:', error);
+    console.warn("Syntax highlighting failed:", error);
     return code;
   }
 }
 
 export function processContentWithHighlighting(content: string): string {
   const codeBlocks = detectCodeBlocks(content);
-  
+
   if (codeBlocks.length === 0) {
     return content;
   }
@@ -59,13 +59,14 @@ export function processContentWithHighlighting(content: string): string {
     const block = codeBlocks[i];
     const originalBlock = content.substring(block.startIndex, block.endIndex);
     const highlightedCode = highlightCode(block.code, block.language);
-    
+
     // Replace the code block with highlighted version
     const highlightedBlock = `\`\`\`${block.language}\n${highlightedCode}\`\`\``;
-    
-    result = result.substring(0, block.startIndex) + 
-             highlightedBlock + 
-             result.substring(block.endIndex);
+
+    result =
+      result.substring(0, block.startIndex) +
+      highlightedBlock +
+      result.substring(block.endIndex);
   }
 
   return result;

@@ -1,11 +1,11 @@
 // ABOUTME: Memory role definition for providing historical context from previous conversations
 // ABOUTME: Answers questions about past interactions and provides relevant historical details
 
-import { Role } from './types.ts';
+import { Role } from "./types.ts";
 
 export const memory: Role = {
-  name: 'memory',
-  
+  name: "memory",
+
   systemPrompt: `You are a specialized memory agent in the Lace agentic coding environment.
 
 ROLE: Memory
@@ -22,24 +22,24 @@ MEMORY GUIDELINES:
 - Help maintain continuity across conversation boundaries
 - Provide concise but complete historical context`,
 
-  defaultModel: 'claude-3-5-haiku-20241022',
-  defaultProvider: 'anthropic',
-  
+  defaultModel: "claude-3-5-haiku-20241022",
+  defaultProvider: "anthropic",
+
   capabilities: [
-    'memory_retrieval',
-    'historical_context',
-    'conversation_continuity',
-    'context_provision'
+    "memory_retrieval",
+    "historical_context",
+    "conversation_continuity",
+    "context_provision",
   ],
-  
+
   maxConcurrentTools: 3,
-  
+
   contextPreferences: {
     handoffThreshold: 0.6,
-    maxContextSize: 80000
+    maxContextSize: 80000,
   },
-  
+
   toolRestrictions: {
-    allowed: ['search', 'retrieval', 'database']
-  }
+    allowed: ["search", "retrieval", "database"],
+  },
 };

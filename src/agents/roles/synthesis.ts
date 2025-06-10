@@ -1,11 +1,11 @@
 // ABOUTME: Synthesis role definition for processing and synthesizing information as requested
 // ABOUTME: Follows specific synthesis instructions, preserves essential information while reducing verbosity
 
-import { Role } from './types.ts';
+import { Role } from "./types.ts";
 
 export const synthesis: Role = {
-  name: 'synthesis',
-  
+  name: "synthesis",
+
   systemPrompt: `You are a specialized synthesis agent in the Lace agentic coding environment.
 
 ROLE: Synthesis
@@ -22,24 +22,24 @@ SYNTHESIS GUIDELINES:
 - Preserve critical technical information
 - Adapt synthesis style to the requesting agent's needs`,
 
-  defaultModel: 'claude-3-5-haiku-20241022',
-  defaultProvider: 'anthropic',
-  
+  defaultModel: "claude-3-5-haiku-20241022",
+  defaultProvider: "anthropic",
+
   capabilities: [
-    'synthesis',
-    'summarization',
-    'information_processing',
-    'content_reduction'
+    "synthesis",
+    "summarization",
+    "information_processing",
+    "content_reduction",
   ],
-  
+
   maxConcurrentTools: 2,
-  
+
   contextPreferences: {
     handoffThreshold: 0.6,
-    maxContextSize: 60000
+    maxContextSize: 60000,
   },
-  
+
   toolRestrictions: {
-    denied: ['file_modification', 'system_commands']
-  }
+    denied: ["file_modification", "system_commands"],
+  },
 };

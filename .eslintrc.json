@@ -4,9 +4,7 @@
     "node": true,
     "jest": true
   },
-  "extends": [
-    "standard"
-  ],
+  "extends": ["standard"],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaVersion": "latest",
@@ -15,27 +13,28 @@
       "jsx": true
     }
   },
-  "plugins": [
-    "@typescript-eslint"
-  ],
+  "plugins": ["@typescript-eslint"],
   "rules": {
     // TypeScript-specific overrides
-    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      { "argsIgnorePattern": "^_" }
+    ],
     "@typescript-eslint/explicit-function-return-type": "off",
     "@typescript-eslint/explicit-module-boundary-types": "off",
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/no-non-null-assertion": "warn",
-    
+
     // Standard overrides for mixed JS/TS project
     "no-unused-vars": "off", // Handled by TypeScript rule above
-    
+
     // React/JSX rules (for when you add React support)
     "react/prop-types": "off", // TypeScript handles this
-    
+
     // Relaxed rules for development velocity
     "no-console": "off",
     "@typescript-eslint/ban-ts-comment": "warn",
-    
+
     // Enforce good practices
     "prefer-const": "error",
     "no-var": "error",
@@ -57,10 +56,5 @@
       }
     }
   ],
-  "ignorePatterns": [
-    "node_modules/",
-    "dist/",
-    "build/",
-    "*.d.ts"
-  ]
+  "ignorePatterns": ["node_modules/", "dist/", "build/", "*.d.ts"]
 }

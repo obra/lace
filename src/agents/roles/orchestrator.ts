@@ -1,11 +1,11 @@
 // ABOUTME: Orchestrator role definition for coordinating and delegating tasks to specialized agents
 // ABOUTME: Manages workflow, context, and spawns subagents when needed for focused work
 
-import { Role } from './types.ts';
+import { Role } from "./types.ts";
 
 export const orchestrator: Role = {
-  name: 'orchestrator',
-  
+  name: "orchestrator",
+
   systemPrompt: `You are a specialized orchestrator agent in the Lace agentic coding environment.
 
 ROLE: Orchestrator
@@ -22,22 +22,22 @@ ORCHESTRATION GUIDELINES:
 - Handle escalation when specialist agents need help
 - Maintain overall project coherence and quality`,
 
-  defaultModel: 'claude-3-5-sonnet-20241022',
-  defaultProvider: 'anthropic',
-  
+  defaultModel: "claude-3-5-sonnet-20241022",
+  defaultProvider: "anthropic",
+
   capabilities: [
-    'orchestration',
-    'planning', 
-    'coordination',
-    'task_delegation',
-    'resource_management',
-    'quality_control'
+    "orchestration",
+    "planning",
+    "coordination",
+    "task_delegation",
+    "resource_management",
+    "quality_control",
   ],
-  
+
   maxConcurrentTools: 10,
-  
+
   contextPreferences: {
     handoffThreshold: 0.8,
-    maxContextSize: 200000
-  }
+    maxContextSize: 200000,
+  },
 };

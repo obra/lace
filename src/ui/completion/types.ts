@@ -7,7 +7,7 @@ export interface CompletionItem {
   /** Optional human-readable description */
   description?: string;
   /** Type of completion for UI styling and filtering */
-  type: 'command' | 'file' | 'directory' | 'history';
+  type: "command" | "file" | "directory" | "history";
   /** Optional sorting priority (higher = more important) */
   priority?: number;
 }

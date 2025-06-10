@@ -1,9 +1,9 @@
 // ABOUTME: Modal component for tool execution approval in Ink UI
 // ABOUTME: Replaces console prompts with visual modal interface for better UX
 
-import React, { useState } from 'react';
-import { Box, Text, useInput, useFocus } from 'ink';
-import { Select, TextInput } from '@inkjs/ui';
+import React, { useState } from "react";
+import { Box, Text, useInput, useFocus } from "ink";
+import { Select, TextInput } from "@inkjs/ui";
 
 interface ToolCall {
   name: string;
@@ -13,7 +13,7 @@ interface ToolCall {
 
 interface ToolApprovalModalProps {
   toolCall: ToolCall;
-  riskLevel: 'low' | 'medium' | 'high';
+  riskLevel: "low" | "medium" | "high";
   context?: {
     reasoning?: string;
   };
@@ -28,63 +28,75 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
   context,
   onApprove,
   onDeny,
-  onStop
+  onStop,
 }) => {
-  const { isFocused } = useFocus({ id: 'tool-approval', autoFocus: true });
-  const [mode, setMode] = useState<'select' | 'modify' | 'comment'>('select');
-  const [modifiedParams, setModifiedParams] = useState(JSON.stringify(toolCall.input, null, 2));
-  const [comment, setComment] = useState('');
-  
+  const { isFocused } = useFocus({ id: "tool-approval", autoFocus: true });
+  const [mode, setMode] = useState<"select" | "modify" | "comment">("select");
+  const [modifiedParams, setModifiedParams] = useState(
+    JSON.stringify(toolCall.input, null, 2),
+  );
+  const [comment, setComment] = useState("");
+
   const options = [
-    { label: 'Yes, execute as-is', value: 'approve' },
-    { label: 'Yes, but modify arguments', value: 'modify' },
-    { label: 'Yes, with comment after', value: 'comment' },
-    { label: 'No, skip this tool', value: 'deny' },
-    { label: 'No, stop and give instructions', value: 'stop' }
+    { label: "Yes, execute as-is", value: "approve" },
+    { label: "Yes, but modify arguments", value: "modify" },
+    { label: "Yes, with comment after", value: "comment" },
+    { label: "No, skip this tool", value: "deny" },
+    { label: "No, stop and give instructions", value: "stop" },
   ];
 
   const getRiskColor = (risk: string) => {
     switch (risk) {
-      case 'high': return 'red';
-      case 'medium': return 'yellow';
-      case 'low': return 'green';
-      default: return 'white';
+      case "high":
+        return "red";
+      case "medium":
+        return "yellow";
+      case "low":
+        return "green";
+      default:
+        return "white";
     }
   };
 
   const formatParameters = (params: Record<string, any>) => {
-    return Object.entries(params).map(([key, value]) => {
-      const stringValue = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-      return `${key}: ${stringValue}`;
-    }).join('\n');
+    return Object.entries(params)
+      .map(([key, value]) => {
+        const stringValue =
+          typeof value === "string" ? value : JSON.stringify(value, null, 2);
+        return `${key}: ${stringValue}`;
+      })
+      .join("\n");
   };
 
   const handleSelectChange = (value: string) => {
     switch (value) {
-      case 'approve':
+      case "approve":
         onApprove(toolCall);
         break;
-      case 'modify':
-        setMode('modify');
+      case "modify":
+        setMode("modify");
         break;
-      case 'comment':
-        setMode('comment');
+      case "comment":
+        setMode("comment");
         break;
-      case 'deny':
-        onDeny('User denied tool execution');
+      case "deny":
+        onDeny("User denied tool execution");
         break;
-      case 'stop':
+      case "stop":
         onStop();
         break;
     }
   };
 
   // Handle escape key to go back to select mode
-  useInput((input, key) => {
-    if (key.escape && mode !== 'select') {
-      setMode('select');
-    }
-  }, { isActive: isFocused });
+  useInput(
+    (input, key) => {
+      if (key.escape && mode !== "select") {
+        setMode("select");
+      }
+    },
+    { isActive: isFocused },
+  );
 
   return (
     <Box
@@ -97,31 +109,41 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
     >
       {/* Header */}
       <Box justifyContent="center" marginBottom={1}>
-        <Text bold color="yellow">Tool Execution Request</Text>
+        <Text bold color="yellow">
+          Tool Execution Request
+        </Text>
       </Box>
 
       {/* Tool Information */}
       <Box flexDirection="column" marginBottom={1}>
         <Box marginBottom={1}>
-          <Text bold color="blue">Tool: </Text>
+          <Text bold color="blue">
+            Tool:{" "}
+          </Text>
           <Text>{toolCall.name}</Text>
         </Box>
-        
+
         {toolCall.description && (
           <Box marginBottom={1}>
-            <Text bold color="blue">Description: </Text>
+            <Text bold color="blue">
+              Description:{" "}
+            </Text>
             <Text>{toolCall.description}</Text>
           </Box>
         )}
 
         <Box marginBottom={1}>
-          <Text bold color="blue">Risk Level: </Text>
+          <Text bold color="blue">
+            Risk Level:{" "}
+          </Text>
           <Text color={getRiskColor(riskLevel)}>{riskLevel.toUpperCase()}</Text>
         </Box>
 
         {context?.reasoning && (
           <Box marginBottom={1}>
-            <Text bold color="blue">Agent Reasoning: </Text>
+            <Text bold color="blue">
+              Agent Reasoning:{" "}
+            </Text>
             <Text color="dim">{context.reasoning}</Text>
           </Box>
         )}
@@ -129,27 +151,30 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
 
       {/* Parameters */}
       <Box flexDirection="column" marginBottom={1}>
-        <Text bold color="blue">Parameters:</Text>
+        <Text bold color="blue">
+          Parameters:
+        </Text>
         <Box borderStyle="single" borderColor="gray" padding={1} marginTop={1}>
           <Text color="gray">{formatParameters(toolCall.input)}</Text>
         </Box>
       </Box>
 
       {/* Mode-specific content */}
-      {mode === 'select' && (
+      {mode === "select" && (
         <Box flexDirection="column">
-          <Text bold color="blue">Choose an action:</Text>
-          <Select 
-            options={options} 
-            onChange={handleSelectChange}
-          />
+          <Text bold color="blue">
+            Choose an action:
+          </Text>
+          <Select options={options} onChange={handleSelectChange} />
         </Box>
       )}
 
-      {mode === 'modify' && (
+      {mode === "modify" && (
         <>
           <Box flexDirection="column">
-            <Text bold color="blue">Modify Parameters (JSON):</Text>
+            <Text bold color="blue">
+              Modify Parameters (JSON):
+            </Text>
             <TextInput
               defaultValue={modifiedParams}
               onSubmit={(value) => {
@@ -171,10 +196,12 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
         </>
       )}
 
-      {mode === 'comment' && (
+      {mode === "comment" && (
         <>
           <Box flexDirection="column">
-            <Text bold color="blue">Add Comment:</Text>
+            <Text bold color="blue">
+              Add Comment:
+            </Text>
             <TextInput
               defaultValue={comment}
               onSubmit={(value) => onApprove(toolCall, value)}
@@ -182,7 +209,9 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
             />
           </Box>
           <Box justifyContent="center">
-            <Text color="dim">Type your comment, Enter to approve with comment, Esc to cancel</Text>
+            <Text color="dim">
+              Type your comment, Enter to approve with comment, Esc to cancel
+            </Text>
           </Box>
         </>
       )}

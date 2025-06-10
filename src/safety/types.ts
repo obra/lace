@@ -23,10 +23,10 @@ export interface ApprovalResult {
   postExecutionComment?: string;
 }
 
-export type RiskLevel = 'low' | 'medium' | 'high';
+export type RiskLevel = "low" | "medium" | "high";
 
 export interface UserDecision {
-  action: 'approve' | 'deny' | 'stop';
+  action: "approve" | "deny" | "stop";
   toolCall: ToolCall;
   modifiedCall?: ToolCall;
   comment?: string;

@@ -1,11 +1,11 @@
 // ABOUTME: General role definition for versatile agents that adapt to various tasks
 // ABOUTME: Provides full range of capabilities when no specialized role is needed
 
-import { Role } from './types.ts';
+import { Role } from "./types.ts";
 
 export const general: Role = {
-  name: 'general',
-  
+  name: "general",
+
   systemPrompt: `You are a general-purpose agent in the Lace agentic coding environment.
 
 ROLE: General
@@ -22,22 +22,22 @@ GENERAL GUIDELINES:
 - Balance different concerns (speed, accuracy, completeness) based on context
 - Ask for clarification when task requirements are unclear`,
 
-  defaultModel: 'claude-3-5-sonnet-20241022',
-  defaultProvider: 'anthropic',
-  
+  defaultModel: "claude-3-5-sonnet-20241022",
+  defaultProvider: "anthropic",
+
   capabilities: [
-    'reasoning',
-    'tool_calling',
-    'analysis',
-    'execution',
-    'planning',
-    'problem_solving'
+    "reasoning",
+    "tool_calling",
+    "analysis",
+    "execution",
+    "planning",
+    "problem_solving",
   ],
-  
+
   maxConcurrentTools: 8,
-  
+
   contextPreferences: {
     handoffThreshold: 0.8,
-    maxContextSize: 150000
-  }
+    maxContextSize: 150000,
+  },
 };

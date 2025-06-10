@@ -1,11 +1,11 @@
 // ABOUTME: Planning role definition for breaking down complex tasks into actionable steps
 // ABOUTME: Analyzes requirements, identifies dependencies, creates detailed execution plans
 
-import { Role } from './types.ts';
+import { Role } from "./types.ts";
 
 export const planning: Role = {
-  name: 'planning',
-  
+  name: "planning",
+
   systemPrompt: `You are a specialized planning agent in the Lace agentic coding environment.
 
 ROLE: Planning
@@ -22,22 +22,22 @@ PLANNING GUIDELINES:
 - Provide time estimates and resource requirements
 - Ensure plans are comprehensive yet practical`,
 
-  defaultModel: 'claude-3-5-sonnet-20241022',
-  defaultProvider: 'anthropic',
-  
+  defaultModel: "claude-3-5-sonnet-20241022",
+  defaultProvider: "anthropic",
+
   capabilities: [
-    'planning',
-    'reasoning',
-    'analysis',
-    'task_decomposition',
-    'dependency_analysis',
-    'risk_assessment'
+    "planning",
+    "reasoning",
+    "analysis",
+    "task_decomposition",
+    "dependency_analysis",
+    "risk_assessment",
   ],
-  
+
   maxConcurrentTools: 6,
-  
+
   contextPreferences: {
     handoffThreshold: 0.8,
-    maxContextSize: 160000
-  }
+    maxContextSize: 160000,
+  },
 };

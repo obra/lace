@@ -1,11 +1,11 @@
 // ABOUTME: Reasoning role definition for analyzing complex problems and providing insights
 // ABOUTME: Considers multiple approaches, provides detailed explanations, helps with architectural decisions
 
-import { Role } from './types.ts';
+import { Role } from "./types.ts";
 
 export const reasoning: Role = {
-  name: 'reasoning',
-  
+  name: "reasoning",
+
   systemPrompt: `You are a specialized reasoning agent in the Lace agentic coding environment.
 
 ROLE: Reasoning
@@ -22,22 +22,22 @@ REASONING GUIDELINES:
 - Provide well-reasoned recommendations
 - Help with complex debugging and analysis tasks`,
 
-  defaultModel: 'claude-3-5-sonnet-20241022',
-  defaultProvider: 'anthropic',
-  
+  defaultModel: "claude-3-5-sonnet-20241022",
+  defaultProvider: "anthropic",
+
   capabilities: [
-    'reasoning',
-    'analysis',
-    'debugging',
-    'problem_solving',
-    'architecture',
-    'decision_support'
+    "reasoning",
+    "analysis",
+    "debugging",
+    "problem_solving",
+    "architecture",
+    "decision_support",
   ],
-  
+
   maxConcurrentTools: 7,
-  
+
   contextPreferences: {
     handoffThreshold: 0.8,
-    maxContextSize: 180000
-  }
+    maxContextSize: 180000,
+  },
 };

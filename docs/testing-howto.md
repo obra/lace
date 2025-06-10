@@ -30,22 +30,26 @@ This ensures we only write necessary code and that all code is tested.
 We maintain four types of tests:
 
 #### 1. Unit Tests (`test/ui/components/`)
+
 - Test individual components in isolation
 - Mock external dependencies
 - Fast execution
 - Example: `StatusBar.test.tsx`, `Message.test.tsx`
 
 #### 2. Integration Tests (`test/ui/integration/`)
+
 - Test component interactions and workflows
 - Test complete features end-to-end
 - Example: `step4-navigation.test.tsx`, `step12-streaming.test.tsx`
 
 #### 3. End-to-End Tests (`test/ui/e2e/`)
+
 - Test complete user workflows
 - Use real or minimal mocks
 - Example: `step2-e2e.test.js`
 
 #### 4. Backend Tests (`test/unit/`)
+
 - Test backend components (agents, tools, database)
 - Example: `agents.test.js`, `tools.test.js`
 
@@ -71,6 +75,7 @@ This project uses ES modules (`"type": "module"`) with TypeScript, which require
 #### Key Configuration Files
 
 **`package.json`**:
+
 ```json
 {
   "type": "module",
@@ -82,22 +87,27 @@ This project uses ES modules (`"type": "module"`) with TypeScript, which require
 ```
 
 **`jest.config.js`**:
+
 ```javascript
 export default {
-  preset: 'ts-jest/presets/default-esm',
-  extensionsToTreatAsEsm: ['.ts', '.tsx'],
+  preset: "ts-jest/presets/default-esm",
+  extensionsToTreatAsEsm: [".ts", ".tsx"],
   moduleNameMapping: {
-    '^(\\.{1,2}/.*)\\.js$': '$1'
+    "^(\\.{1,2}/.*)\\.js$": "$1",
   },
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', {
-      useESM: true
-    }]
-  }
+    "^.+\\.tsx?$": [
+      "ts-jest",
+      {
+        useESM: true,
+      },
+    ],
+  },
 };
 ```
 
 **`tsconfig.json`**:
+
 ```json
 {
   "compilerOptions": {
@@ -119,14 +129,17 @@ export default {
 ### Common Issues and Solutions
 
 #### Import/Export Errors
+
 - **Problem**: `SyntaxError: Cannot use import statement outside a module`
 - **Solution**: Ensure `"type": "module"` in package.json and proper Jest ESM config
 
 #### Mock Issues
+
 - **Problem**: Jest mocks don't work with ESM
 - **Solution**: Use `jest.unstable_mockModule()` for ESM mocks or convert to `.cjs`
 
 #### Path Resolution
+
 - **Problem**: TypeScript imports ending in `.js` don't resolve
 - **Solution**: Use `moduleNameMapping` in Jest config to resolve `.js` to `.ts`
 
@@ -135,14 +148,14 @@ export default {
 ### Component Testing Pattern
 
 ```typescript
-import Component from '../../../src/ui/components/Component';
+import Component from "../../../src/ui/components/Component";
 
-describe('Component Name', () => {
-  test('renders with correct props', () => {
-    const element = Component({ prop: 'value' }) as any;
-    
+describe("Component Name", () => {
+  test("renders with correct props", () => {
+    const element = Component({ prop: "value" }) as any;
+
     expect(element.type).toBeTruthy();
-    expect(element.props.children).toContain('expected content');
+    expect(element.props.children).toContain("expected content");
   });
 });
 ```
@@ -150,10 +163,10 @@ describe('Component Name', () => {
 ### Integration Testing Pattern
 
 ```typescript
-import App from '../../../src/ui/App';
+import App from "../../../src/ui/App";
 
-describe('Feature Integration', () => {
-  test('complete workflow works', () => {
+describe("Feature Integration", () => {
+  test("complete workflow works", () => {
     // Test multiple components working together
     // Verify state changes and interactions
   });
@@ -163,9 +176,9 @@ describe('Feature Integration', () => {
 ### Async Testing Pattern
 
 ```typescript
-test('async operation completes', async () => {
+test("async operation completes", async () => {
   const result = await asyncFunction();
-  expect(result).toBe('expected');
+  expect(result).toBe("expected");
 });
 ```
 
@@ -173,7 +186,7 @@ test('async operation completes', async () => {
 
 ```typescript
 beforeEach(() => {
-  jest.spyOn(object, 'method').mockReturnValue('mocked value');
+  jest.spyOn(object, "method").mockReturnValue("mocked value");
 });
 
 afterEach(() => {
@@ -184,26 +197,31 @@ afterEach(() => {
 ## Running Tests
 
 ### All Tests
+
 ```bash
 npm test
 ```
 
 ### Specific Test File
+
 ```bash
 npm test -- StatusBar.test.tsx
 ```
 
 ### Watch Mode
+
 ```bash
 npm test -- --watch
 ```
 
 ### Type Checking
+
 ```bash
 npm run typecheck
 ```
 
 ### Coverage Report
+
 ```bash
 npm test -- --coverage
 ```
@@ -236,6 +254,7 @@ Every feature must have:
 ## Best Practices
 
 ### Do's
+
 - Write tests before implementing features (TDD)
 - Keep tests simple and focused
 - Use descriptive test and variable names
@@ -243,6 +262,7 @@ Every feature must have:
 - Mock external dependencies appropriately
 
 ### Don'ts
+
 - Don't test implementation details
 - Don't write tests that are tightly coupled to code structure
 - Don't skip testing error conditions
@@ -276,6 +296,7 @@ npx jest --showConfig
 ### Migration to Vitest
 
 If Jest ESM complexity becomes unmanageable, consider migrating to Vitest:
+
 - Native ESM support
 - Vite-based (faster)
 - Better TypeScript integration
@@ -284,6 +305,7 @@ If Jest ESM complexity becomes unmanageable, consider migrating to Vitest:
 ### Testing Library Integration
 
 Consider adding React Testing Library for more realistic component testing:
+
 - Better accessibility testing
 - User-focused assertions
 - Less brittle tests

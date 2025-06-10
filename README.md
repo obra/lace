@@ -1,4 +1,4 @@
-# YO. THIS IS A WORK IN PROGRESS. 
+# YO. THIS IS A WORK IN PROGRESS.
 
 # HERE BE DRAGONS
 
@@ -9,6 +9,7 @@
 ## Quick Start
 
 ### 1. Setup API Key
+
 ```bash
 # Create the API key directory
 mkdir -p ~/.lace/api-keys
@@ -18,11 +19,13 @@ echo "your-actual-anthropic-api-key-here" > ~/.lace/api-keys/anthropic
 ```
 
 ### 2. Install Dependencies
+
 ```bash
 npm install
 ```
 
 ### 3. Run Lace
+
 ```bash
 # Interactive mode (recommended)
 npm start
@@ -43,6 +46,7 @@ node src/cli.js --web --port 3000
 ```
 
 ### 4. Try Some Commands
+
 ```
 lace> list files
 lace> calculate 2 + 2 * 5
@@ -74,6 +78,7 @@ Options:
 ## Interface Features
 
 ### 🖥️ **Rich Terminal Interface**
+
 - **Navigation Mode**: Use `Enter` to enter navigation, `j/k` or arrow keys to scroll
 - **Search**: Press `/` to search conversation history with real-time highlighting
 - **Filter Views**: Switch between all messages, conversation-only, or search results
@@ -81,12 +86,14 @@ Options:
 - **Status Bar**: Live token usage, model information, and navigation hints
 
 ### 🎨 **Visual Enhancements**
+
 - **Syntax Highlighting**: Automatic code highlighting for JavaScript, Python, JSON, etc.
 - **Diff Highlighting**: File changes displayed with green additions and red deletions
 - **Streaming Text**: Watch AI responses appear character by character
 - **Performance**: Handles thousands of messages smoothly with virtual scrolling
 
 ### ⌨️ **Keyboard Controls**
+
 - `Enter` - Submit message or enter navigation mode
 - `j/k` or `↑/↓` - Navigate messages
 - `/` - Search mode
@@ -99,27 +106,32 @@ Options:
 ## What Lace Can Do
 
 ### 🤖 **AI-Powered Assistance**
+
 - Natural language interaction with Claude AI
 - Context-aware responses that remember your conversation
 - Intelligent task analysis and execution
 
 ### 🛠️ **Tool Integration**
+
 - **File Operations**: Read, write, edit, and search files
 - **Shell Commands**: Execute system commands safely
 - **JavaScript Evaluation**: Calculate expressions and process data
 - **Text Search**: Find content across your codebase
 
 ### 🎭 **Smart Agent System**
+
 - **Orchestrator**: Analyzes tasks and chooses optimal approaches
 - **Specialized Agents**: Different AI models for different task types
 - **Cost Optimization**: Uses faster models for simple tasks, powerful models for complex ones
 
 ### 💾 **Persistent Memory**
+
 - Remembers all conversations in SQLite database
 - Never loses context between sessions
 - Query conversation history with `/memory`
 
 ### 🌐 **Web Companion Interface**
+
 - **Real-time Dashboard**: Live view of AI conversations and tool execution
 - **Project Browser**: Navigate and view project files with syntax highlighting
 - **Activity Timeline**: Visual timeline of all agent activities and tool calls
@@ -131,6 +143,7 @@ Options:
 ## Example Sessions
 
 ### Console Interface
+
 ```
 🧵 Lace - Your lightweight agentic coding environment
 Starting session: session-1749094234634
@@ -140,7 +153,7 @@ lace> list files in this directory
 I'll help you list the files in the current directory.
 
 📁 src
-📁 test  
+📁 test
 📄 package.json
 📄 README.md
 📄 SPEC.md
@@ -165,6 +178,7 @@ Goodbye!
 ```
 
 ### Web Companion Interface
+
 ```bash
 # Start with web companion
 node src/cli.js --web --port 3000
@@ -178,8 +192,9 @@ lace> analyze this codebase
 ```
 
 Then open http://localhost:3000 to see:
+
 - **Live Dashboard**: Real-time conversation view
-- **File Browser**: Navigate project files with syntax highlighting  
+- **File Browser**: Navigate project files with syntax highlighting
 - **Activity Timeline**: Visual tool execution and agent activity
 - **System Metrics**: Performance and usage statistics
 - **Agent Monitor**: Track agent handoffs and specializations
@@ -187,12 +202,14 @@ Then open http://localhost:3000 to see:
 ## Available Commands
 
 ### **Interactive Commands**
+
 - `list files` - Show directory contents
-- `calculate <expression>` - Evaluate mathematical expressions  
+- `calculate <expression>` - Evaluate mathematical expressions
 - `run <command>` - Execute shell commands
 - `plan <task>` - Get AI-powered planning assistance
 
 ### **Console Commands**
+
 - `/help` - Show available commands
 - `/tools` - List available tools
 - `/memory` - Show conversation history
@@ -218,6 +235,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed system design.
 ## Troubleshooting
 
 ### API Key Issues
+
 ```bash
 # Check if API key file exists
 cat ~/.lace/api-keys/anthropic
@@ -226,12 +244,14 @@ cat ~/.lace/api-keys/anthropic
 ```
 
 ### Permission Issues
+
 ```bash
 # Make sure the CLI is executable
 chmod +x src/cli.js
 ```
 
 ### Database Issues
+
 ```bash
 # Remove the database file to start fresh
 rm lace-memory.db

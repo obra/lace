@@ -11,30 +11,35 @@ The Lace Snapshot Safety Net is a development-time safety system that automatica
 The snapshot system consists of five main components working together:
 
 #### 1. GitOperations (`src/snapshot/git-operations.js`)
+
 - Manages git operations using a separate git directory (`.lace/history-snapshot-dotgit`)
 - Handles repository initialization, commits, and restoration operations
 - Uses `simple-git` library for reliable git command execution
 - Provides atomic operations with comprehensive error handling
 
 #### 2. SnapshotManager (`src/snapshot/snapshot-manager.js`)
+
 - Orchestrates snapshot creation and management
 - Integrates with context capture for rich metadata
 - Handles configuration, retention policies, and performance optimization
 - Provides APIs for manual checkpoints and automatic tool snapshots
 
 #### 3. ContextCapture (`src/snapshot/context-capture.js`)
+
 - Enriches snapshots with conversation and activity context
 - Integrates with ConversationDB and ActivityLogger
 - Provides semantic analysis and search term generation
 - Gracefully degrades when context services are unavailable
 
 #### 4. RestoreOperations (`src/snapshot/restore-operations.js`)
+
 - Handles comprehensive restoration and recovery functionality
 - Provides preview capabilities and safety validations
 - Supports both full project and selective file restoration
 - Includes smart recommendations and related snapshot discovery
 
 #### 5. SnapshotCLI (`src/snapshot/snapshot-cli.js`)
+
 - User-friendly command-line interface for snapshot management
 - Interactive features with colored output and confirmations
 - Comprehensive browsing, inspection, and restoration commands
@@ -54,16 +59,19 @@ The snapshot system consists of five main components working together:
 ### Integration Points
 
 #### Tool Registry Integration
+
 The system integrates with Lace's ToolRegistry (`src/tools/tool-registry.js`) through the `callToolWithSnapshots()` method:
 
 ```javascript
 // Automatic snapshot creation around tool execution
-const result = await toolRegistry.callToolWithSnapshots(
-  'file-tool', 'write', { path: 'file.js', content: 'code' }
-);
+const result = await toolRegistry.callToolWithSnapshots("file-tool", "write", {
+  path: "file.js",
+  content: "code",
+});
 ```
 
 This creates:
+
 1. **Pre-tool snapshot**: Captures state before tool execution
 2. **Tool execution**: Runs the actual tool operation
 3. **Post-tool snapshot**: Captures state after successful execution
@@ -93,6 +101,7 @@ await snapshotManager.createCheckpoint("Before implementing new feature");
 ### CLI Commands
 
 #### Listing Snapshots
+
 ```bash
 # List all snapshots
 lace snapshot list
@@ -106,6 +115,7 @@ lace snapshot stats
 ```
 
 #### Inspecting Snapshots
+
 ```bash
 # View detailed snapshot information
 lace snapshot inspect 2025-06-05T15-30-00-checkpoint
@@ -115,6 +125,7 @@ lace snapshot inspect abc123 --related
 ```
 
 #### Restoration Preview
+
 ```bash
 # Preview changes before restoring
 lace snapshot preview 2025-06-05T15-30-00-checkpoint
@@ -124,6 +135,7 @@ lace snapshot preview-files abc123 src/main.js package.json
 ```
 
 #### Restoration
+
 ```bash
 # Restore complete project state
 lace snapshot restore 2025-06-05T15-30-00-checkpoint
@@ -136,6 +148,7 @@ lace snapshot restore-files abc123 src/main.js package.json
 ```
 
 #### Getting Help
+
 ```bash
 # Show restoration recommendations
 lace snapshot recommendations
@@ -148,18 +161,21 @@ lace snapshot examples
 ## Snapshot Types
 
 ### Checkpoint
+
 - **Purpose**: Manual snapshots created by developers
 - **When**: Before major changes, at development milestones
 - **Naming**: `YYYY-MM-DDTHH-mm-ss-checkpoint`
 - **Retention**: Longest retention, typically kept indefinitely
 
 ### Pre-tool
+
 - **Purpose**: Automatic snapshots before tool execution
 - **When**: Before any tool modifies project state
 - **Naming**: `YYYY-MM-DDTHH-mm-ss-pre-tool-{executionId}`
 - **Retention**: Medium retention, paired with post-tool snapshots
 
 ### Post-tool
+
 - **Purpose**: Automatic snapshots after successful tool execution
 - **When**: After tool completes successfully
 - **Naming**: `YYYY-MM-DDTHH-mm-ss-post-tool-{executionId}`
@@ -176,7 +192,7 @@ Each snapshot includes comprehensive metadata:
   timestamp: "2025-06-05T15:30:00Z",
   gitCommitSha: "abc123def456",
   description: "Before implementing new feature",
-  
+
   // Tool execution context (for tool snapshots)
   toolCall: {
     toolName: "file-tool",
@@ -184,21 +200,21 @@ Each snapshot includes comprehensive metadata:
     parameters: { path: "src/main.js" },
     executionId: "exec-123"
   },
-  
+
   // Execution results (for post-tool snapshots)
   executionResult: {
     success: true,
     duration: 150,
     error: null
   },
-  
+
   // Performance metrics
   performance: {
     filesChanged: 3,
     snapshotSizeBytes: 2048,
     processingTimeMs: 45
   },
-  
+
   // Rich context (when available)
   context: {
     conversationTurn: 42,
@@ -211,6 +227,7 @@ Each snapshot includes comprehensive metadata:
 ## Configuration
 
 ### Snapshot Configuration
+
 Configure behavior in `.lace/snapshot-config.json`:
 
 ```javascript
@@ -236,6 +253,7 @@ Configure behavior in `.lace/snapshot-config.json`:
 ```
 
 ### Performance Optimization
+
 - **Exclusion patterns**: Skip large directories and temporary files
 - **Compression**: Automatic git compression for storage efficiency
 - **Background operations**: Non-blocking snapshot creation
@@ -244,19 +262,25 @@ Configure behavior in `.lace/snapshot-config.json`:
 ## Safety Features
 
 ### Working Tree Validation
+
 Before restoration, the system checks:
+
 - Uncommitted changes in working tree
 - Untracked files that might be overwritten
 - Conflicting operations in progress
 
 ### Safety Recommendations
+
 When unsafe conditions are detected:
+
 - Suggests committing or stashing changes
 - Offers to create backup branches
 - Provides force mode for override when necessary
 
 ### Atomic Operations
+
 All operations are atomic:
+
 - Snapshots either complete fully or fail cleanly
 - Restoration operations can be rolled back
 - No partial states that could corrupt the project
@@ -266,6 +290,7 @@ All operations are atomic:
 ### Common Recovery Patterns
 
 #### Undo Last Tool Execution
+
 ```bash
 # Find the pre-tool snapshot before the problematic operation
 lace snapshot list --type=pre-tool
@@ -276,6 +301,7 @@ lace snapshot restore 2025-06-05T15-35-00-pre-tool-file123
 ```
 
 #### Restore to Last Known Good State
+
 ```bash
 # Get AI recommendations for best restoration points
 lace snapshot recommendations
@@ -285,6 +311,7 @@ lace snapshot restore 2025-06-05T15-30-00-checkpoint
 ```
 
 #### Selective File Recovery
+
 ```bash
 # Restore just the files you need
 lace snapshot restore-files abc123 src/main.js package.json
@@ -296,6 +323,7 @@ lace snapshot preview-files abc123 src/main.js
 ## Integration with Development Workflow
 
 ### Typical Development Session
+
 1. **Start development**: System automatically initializes snapshot tracking
 2. **Tool execution**: Each tool operation creates pre/post snapshots
 3. **Manual checkpoints**: Developer creates checkpoints at key milestones
@@ -303,6 +331,7 @@ lace snapshot preview-files abc123 src/main.js
 5. **Cleanup**: Automatic retention policies keep system performant
 
 ### Best Practices
+
 - Create checkpoints before major refactoring
 - Use descriptive messages for manual checkpoints
 - Preview changes before restoration
@@ -314,13 +343,17 @@ lace snapshot preview-files abc123 src/main.js
 ### Common Issues
 
 #### Git Repository Conflicts
+
 If the main project has git issues, the snapshot system operates independently:
+
 - Uses separate git directory (`.lace/history-snapshot-dotgit`)
 - No interference with main project git operations
 - Can restore even when main git is corrupted
 
 #### Storage Space
+
 Monitor and manage snapshot storage:
+
 ```bash
 # Check storage usage
 lace snapshot stats
@@ -330,13 +363,17 @@ lace snapshot cleanup --older-than=7d
 ```
 
 #### Performance
+
 Optimize for large projects:
+
 - Configure exclusion patterns for large directories
 - Adjust retention policies for your usage patterns
 - Use selective restoration instead of full project restoration
 
 ### Error Recovery
+
 The system is designed for graceful degradation:
+
 - Context capture failures don't prevent snapshots
 - Git operation failures are logged but don't stop tool execution
 - Metadata corruption is isolated to individual snapshots
@@ -344,6 +381,7 @@ The system is designed for graceful degradation:
 ## API Reference
 
 ### SnapshotManager
+
 ```javascript
 // Initialize
 const manager = new SnapshotManager(projectPath, options);
@@ -360,6 +398,7 @@ const metadata = await manager.loadSnapshotMetadata(snapshotId);
 ```
 
 ### RestoreOperations
+
 ```javascript
 // Initialize
 const restore = new RestoreOperations(snapshotManager, gitOps, projectPath);
@@ -374,6 +413,7 @@ const fileResult = await restore.restoreFiles(snapshotId, filePaths);
 ```
 
 ### CLI Integration
+
 ```javascript
 // Initialize CLI
 const cli = new SnapshotCLI(snapshotManager, restoreOps, options);
@@ -394,6 +434,7 @@ The snapshot system includes comprehensive test coverage:
 - **Safety tests**: Validate error handling and recovery
 
 Run tests with:
+
 ```bash
 npm test
 ```
@@ -401,6 +442,7 @@ npm test
 ## Future Enhancements
 
 Potential future improvements:
+
 - Snapshot compression and deduplication
 - Remote snapshot storage and sharing
 - Integration with external backup systems

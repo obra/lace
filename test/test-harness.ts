@@ -1,14 +1,14 @@
 // ABOUTME: Test harness for Lace agentic coding environment
 // ABOUTME: Provides utilities for unit, integration, and end-to-end testing
 
-import { test, describe, beforeEach, afterEach } from '@jest/globals';
-import assert from 'node:assert';
-import { promises as fs } from 'fs';
-import { join } from 'path';
-import { Agent } from '../src/agents/agent.js';
-import { ToolRegistry } from '../src/tools/tool-registry.js';
-import { ConversationDB } from '../src/database/conversation-db.js';
-import { LaceUI } from '../src/ui/lace-ui.ts';
+import { test, describe, beforeEach, afterEach } from "@jest/globals";
+import assert from "node:assert";
+import { promises as fs } from "fs";
+import { join } from "path";
+import { Agent } from "../src/agents/agent.js";
+import { ToolRegistry } from "../src/tools/tool-registry.js";
+import { ConversationDB } from "../src/database/conversation-db.js";
+import { LaceUI } from "../src/ui/lace-ui.ts";
 
 export class TestHarness {
   private testDatabases: Set<string>;
@@ -22,14 +22,14 @@ export class TestHarness {
   }
 
   // Create a temporary test database
-  async createTestDatabase(suffix = '') {
+  async createTestDatabase(suffix = "") {
     const dbPath = `./test-db-${Date.now()}${suffix}.db`;
     this.testDatabases.add(dbPath);
     return dbPath;
   }
 
   // Create a temporary test file
-  async createTempFile(content = '', extension = '.txt') {
+  async createTempFile(content = "", extension = ".txt") {
     const filePath = `./temp-test-${Date.now()}${extension}`;
     await fs.writeFile(filePath, content);
     this.tempFiles.add(filePath);
@@ -75,7 +75,7 @@ export class TestHarness {
     await tools.initialize();
 
     // Use in-memory database for faster, more reliable tests
-    const db = new ConversationDB(':memory:');
+    const db = new ConversationDB(":memory:");
     await db.initialize();
 
     return new Agent({
@@ -84,11 +84,11 @@ export class TestHarness {
       db,
       modelProvider: null, // Skip for unit tests
       verbose: false,
-      role: options.role || 'general',
-      assignedModel: options.assignedModel || 'test-model',
-      assignedProvider: options.assignedProvider || 'test',
-      capabilities: options.capabilities || ['testing'],
-      ...options
+      role: options.role || "general",
+      assignedModel: options.assignedModel || "test-model",
+      assignedProvider: options.assignedProvider || "test",
+      capabilities: options.capabilities || ["testing"],
+      ...options,
     });
   }
 
@@ -96,8 +96,8 @@ export class TestHarness {
   async createTestLaceUI(options: any = {}) {
     const laceUI = new LaceUI({
       verbose: false,
-      memoryPath: ':memory:',
-      ...options
+      memoryPath: ":memory:",
+      ...options,
     });
 
     // For integration tests, don't start the full UI
@@ -112,29 +112,43 @@ export class TestHarness {
   // Assert that a response contains expected content
   assertResponse(response: any, expectations: any = {}) {
     if (expectations.hasContent !== false) {
-      assert.ok(response.content, 'Response should have content');
+      assert.ok(response.content, "Response should have content");
     }
 
     if (expectations.noError) {
-      assert.ok(!response.error, `Response should not have error: ${response.error}`);
+      assert.ok(
+        !response.error,
+        `Response should not have error: ${response.error}`,
+      );
     }
 
     if (expectations.toolCalls) {
-      assert.ok(response.toolCalls && response.toolCalls.length > 0, 'Response should have tool calls');
-      
-      if (typeof expectations.toolCalls === 'number') {
-        assert.strictEqual(response.toolCalls.length, expectations.toolCalls, 
-          `Expected ${expectations.toolCalls} tool calls, got ${response.toolCalls.length}`);
+      assert.ok(
+        response.toolCalls && response.toolCalls.length > 0,
+        "Response should have tool calls",
+      );
+
+      if (typeof expectations.toolCalls === "number") {
+        assert.strictEqual(
+          response.toolCalls.length,
+          expectations.toolCalls,
+          `Expected ${expectations.toolCalls} tool calls, got ${response.toolCalls.length}`,
+        );
       }
     }
 
     if (expectations.containsText) {
-      assert.ok(response.content.includes(expectations.containsText), 
-        `Response should contain "${expectations.containsText}"`);
+      assert.ok(
+        response.content.includes(expectations.containsText),
+        `Response should contain "${expectations.containsText}"`,
+      );
     }
 
     if (expectations.toolResults) {
-      assert.ok(response.toolResults && response.toolResults.length > 0, 'Response should have tool results');
+      assert.ok(
+        response.toolResults && response.toolResults.length > 0,
+        "Response should have tool results",
+      );
     }
 
     return response;
@@ -147,7 +161,7 @@ export class TestHarness {
       if (await condition()) {
         return true;
       }
-      await new Promise(resolve => setTimeout(resolve, interval));
+      await new Promise((resolve) => setTimeout(resolve, interval));
     }
     throw new Error(`Condition not met within ${timeout}ms`);
   }
@@ -159,12 +173,12 @@ export class TestHarness {
         success: true,
         content: `Mock response for: ${messages[messages.length - 1]?.content}`,
         toolCalls: [],
-        usage: { input_tokens: 10, output_tokens: 20 }
+        usage: { input_tokens: 10, output_tokens: 20 },
       }),
       initialize: async () => {},
       getProvider: () => ({
-        getInfo: () => ({ name: 'mock', models: ['mock-model'] })
-      })
+        getInfo: () => ({ name: "mock", models: ["mock-model"] }),
+      }),
     };
   }
 }
@@ -181,7 +195,7 @@ export const utils = {
   },
 
   async readFile(path) {
-    return await fs.readFile(path, 'utf8');
+    return await fs.readFile(path, "utf8");
   },
 
   async writeFile(path, content) {
@@ -189,8 +203,8 @@ export const utils = {
   },
 
   sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  },
 };
 
 // Export test framework

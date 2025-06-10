@@ -1,7 +1,13 @@
 // ABOUTME: Core command management system for Ink UI
 // ABOUTME: Handles command registration, parsing, execution and completion
 
-import type { Command, CommandContext, CommandResult, CommandRegistry, CommandCompletion } from './types';
+import type {
+  Command,
+  CommandContext,
+  CommandResult,
+  CommandRegistry,
+  CommandCompletion,
+} from "./types";
 
 export class CommandManager {
   private commands: CommandRegistry = {};
@@ -12,7 +18,7 @@ export class CommandManager {
    */
   register(command: Command): void {
     this.commands[command.name] = command;
-    
+
     // Register aliases if present
     if (command.aliases) {
       for (const alias of command.aliases) {
@@ -49,7 +55,7 @@ export class CommandManager {
    * Check if input string is a command
    */
   isCommand(input: string): boolean {
-    return input.startsWith('/') && input.length > 1;
+    return input.startsWith("/") && input.length > 1;
   }
 
   /**
@@ -57,11 +63,11 @@ export class CommandManager {
    */
   parseCommand(input: string): { command: string; args: string[] } {
     if (!this.isCommand(input)) {
-      return { command: '', args: [] };
+      return { command: "", args: [] };
     }
 
     const parts = input.slice(1).trim().split(/\s+/);
-    const command = parts[0] || '';
+    const command = parts[0] || "";
     const args = parts.slice(1);
 
     return { command, args };
@@ -70,13 +76,16 @@ export class CommandManager {
   /**
    * Execute a command with given context
    */
-  async execute(input: string, context: CommandContext): Promise<CommandResult> {
+  async execute(
+    input: string,
+    context: CommandContext,
+  ): Promise<CommandResult> {
     const { command: commandName, args } = this.parseCommand(input);
 
     if (!commandName) {
       return {
         success: false,
-        message: 'Empty command. Type /help for available commands.'
+        message: "Empty command. Type /help for available commands.",
       };
     }
 
@@ -84,7 +93,7 @@ export class CommandManager {
     if (!command) {
       return {
         success: false,
-        message: `Unknown command: ${commandName}. Type /help for available commands.`
+        message: `Unknown command: ${commandName}. Type /help for available commands.`,
       };
     }
 
@@ -92,7 +101,7 @@ export class CommandManager {
     if (command.requiresAgent && !context.agent) {
       return {
         success: false,
-        message: 'No agent available. This command requires an active agent.'
+        message: "No agent available. This command requires an active agent.",
       };
     }
 
@@ -102,7 +111,7 @@ export class CommandManager {
     } catch (error) {
       return {
         success: false,
-        message: `Command execution failed: ${error instanceof Error ? error.message : String(error)}`
+        message: `Command execution failed: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }
@@ -111,8 +120,8 @@ export class CommandManager {
    * List all registered commands
    */
   listCommands(includeHidden: boolean = false): Command[] {
-    return Object.values(this.commands).filter(cmd => 
-      includeHidden || !cmd.hidden
+    return Object.values(this.commands).filter(
+      (cmd) => includeHidden || !cmd.hidden,
     );
   }
 
@@ -122,13 +131,13 @@ export class CommandManager {
   getCompletions(prefix: string): CommandCompletion[] {
     const commands = this.listCommands(false);
     return commands
-      .filter(cmd => cmd.name.startsWith(prefix))
-      .map(cmd => ({
+      .filter((cmd) => cmd.name.startsWith(prefix))
+      .map((cmd) => ({
         value: cmd.name,
         description: cmd.description,
-        type: 'command' as const,
+        type: "command" as const,
         hasParameters: !!cmd.parameterDescription,
-        parameterDescription: cmd.parameterDescription
+        parameterDescription: cmd.parameterDescription,
       }));
   }
 
@@ -137,14 +146,18 @@ export class CommandManager {
    */
   getHelpText(): string {
     const commands = this.listCommands(false);
-    const lines = ['Available commands:'];
-    
+    const lines = ["Available commands:"];
+
     for (const cmd of commands) {
-      const paramStr = cmd.parameterDescription ? ` ${cmd.parameterDescription}` : '';
-      const aliasStr = cmd.aliases ? ` (aliases: ${cmd.aliases.join(', ')})` : '';
+      const paramStr = cmd.parameterDescription
+        ? ` ${cmd.parameterDescription}`
+        : "";
+      const aliasStr = cmd.aliases
+        ? ` (aliases: ${cmd.aliases.join(", ")})`
+        : "";
       lines.push(`  /${cmd.name}${paramStr} - ${cmd.description}${aliasStr}`);
     }
 
-    return lines.join('\n');
+    return lines.join("\n");
   }
 }
