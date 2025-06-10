@@ -93,21 +93,24 @@
 - [x] Enhanced verbose mode with thinking and tool indicators
 - [x] Comprehensive test coverage for all streaming enhancements
 
-## Phase 5: Polish & Optimization
+## Phase 5: Polish & Optimization ✅
 
-### Task 5.1: Add conversation metrics
+### Task 5.1: Add conversation metrics ✅
 
-- [ ] Track conversation length, token usage, cache hits per session
-- [ ] Add to status display
-- [ ] Expose via `getStatus()` in LaceUI
-- [ ] ~8 lines of code
+- [x] Track conversation length, token usage, cache hits per session
+- [x] Add to status display via enhanced `getStatus()` method
+- [x] Expose via `getStatus()` in LaceUI
+- [x] Include session uptime, cache hit rates, and activity tracking
+- [x] Comprehensive test coverage
 
-### Task 5.2: Add configuration options
+### Task 5.2: Add configuration options ✅
 
-- [ ] Make conversation history limit configurable
-- [ ] Add cache strategy options
-- [ ] Document in CLAUDE.md
-- [ ] ~5 lines of code
+- [x] Make conversation history limit configurable
+- [x] Add cache strategy options: 'aggressive', 'conservative', 'disabled'
+- [x] Add context utilization and fresh message count configuration
+- [x] Document in CLAUDE.md with usage examples
+- [x] Add `updateConversationConfig()` method for runtime updates
+- [x] Test coverage for configuration functionality
 
 ## Acceptance Criteria
 

@@ -208,4 +208,79 @@ describe("Conversation Memory Integration", () => {
       assert.ok(!hasRecentCache, "Recent messages should not have cache control");
     }
   });
+
+  test("agent tracks conversation metrics correctly", async () => {
+    const agent = await harness.createTestAgent();
+    const mockProvider = harness.createMockModelProvider();
+    
+    mockProvider.chat = async (messages, options) => {
+      return {
+        success: true,
+        content: "Test response",
+        toolCalls: [],
+        usage: { 
+          input_tokens: 50, 
+          output_tokens: 20, 
+          total_tokens: 70,
+          cache_creation_input_tokens: 10,
+          cache_read_input_tokens: 5
+        },
+      };
+    };
+
+    mockProvider.countTokens = async (messages, options) => {
+      return {
+        success: true,
+        inputTokens: 50,
+        totalTokens: 50,
+      };
+    };
+    
+    agent.modelProvider = mockProvider;
+    const sessionId = "test-session-metrics";
+
+    // Process two messages
+    await agent.processInput(sessionId, "First message");
+    await agent.processInput(sessionId, "Second message");
+    
+    // Check conversation metrics
+    const metrics = agent.getConversationMetrics();
+    
+    assert.strictEqual(metrics.totalMessages, 2, "Should track message count");
+    assert.strictEqual(metrics.totalTokensUsed, 140, "Should track total tokens used (70 * 2)");
+    assert.strictEqual(metrics.cacheHits, 10, "Should track cache hits (5 * 2)");
+    assert.strictEqual(metrics.cacheCreations, 20, "Should track cache creations (10 * 2)");
+    assert.strictEqual(metrics.cacheHitRate, "33.3%", "Should calculate cache hit rate");
+    assert.ok(metrics.sessionUptime >= 0, "Should track session uptime");
+    assert.ok(metrics.lastActivity > 0, "Should track last activity");
+  });
+
+  test("agent supports configurable conversation settings", async () => {
+    const agent = await harness.createTestAgent({
+      conversationConfig: {
+        historyLimit: 5,
+        contextUtilization: 0.8,
+        cachingStrategy: 'conservative',
+        freshMessageCount: 3
+      }
+    });
+
+    // Check initial configuration
+    const config = agent.getConversationConfig();
+    assert.strictEqual(config.historyLimit, 5, "Should use custom history limit");
+    assert.strictEqual(config.contextUtilization, 0.8, "Should use custom context utilization");
+    assert.strictEqual(config.cachingStrategy, 'conservative', "Should use custom caching strategy");
+    assert.strictEqual(config.freshMessageCount, 3, "Should use custom fresh message count");
+
+    // Update configuration
+    agent.updateConversationConfig({
+      cachingStrategy: 'disabled',
+      historyLimit: 15
+    });
+
+    const updatedConfig = agent.getConversationConfig();
+    assert.strictEqual(updatedConfig.cachingStrategy, 'disabled', "Should update caching strategy");
+    assert.strictEqual(updatedConfig.historyLimit, 15, "Should update history limit");
+    assert.strictEqual(updatedConfig.contextUtilization, 0.8, "Should preserve unchanged settings");
+  });
 });

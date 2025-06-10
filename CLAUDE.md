@@ -1,5 +1,49 @@
 # Lace Project Guidelines
 
+## Conversation Configuration
+
+The Lace agent system supports configurable conversation memory and caching behavior:
+
+### Configuration Options
+
+```typescript
+interface ConversationConfig {
+  historyLimit?: number;        // Max messages to retrieve from history (default: 10)
+  contextUtilization?: number;  // Fraction of context window to use (default: 0.7)
+  cachingStrategy?: 'aggressive' | 'conservative' | 'disabled'; // Cache strategy (default: 'aggressive')
+  freshMessageCount?: number;   // Number of recent messages to keep fresh (default: 2)
+}
+```
+
+### Caching Strategies
+
+- **aggressive**: Cache all but the last 2 messages for maximum performance
+- **conservative**: Cache all but the last 3 messages for balanced performance/freshness  
+- **disabled**: No prompt caching applied to conversation history
+
+### Usage
+
+```javascript
+// Configure during agent creation
+const agent = new Agent({
+  conversationConfig: {
+    historyLimit: 15,
+    contextUtilization: 0.8,
+    cachingStrategy: 'conservative',
+    freshMessageCount: 3
+  }
+});
+
+// Update configuration at runtime
+agent.updateConversationConfig({
+  cachingStrategy: 'disabled',
+  historyLimit: 5
+});
+
+// Get current configuration
+const config = agent.getConversationConfig();
+```
+
 ## TypeScript Migration Strategy
 
 This project is progressively migrating from JavaScript to TypeScript while maintaining ESM modules.

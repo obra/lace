@@ -30,6 +30,14 @@ interface AgentOptions {
   synthesisConfig?: any;
   activityLogger?: any;
   debugLogger?: DebugLogger;
+  conversationConfig?: ConversationConfig;
+}
+
+interface ConversationConfig {
+  historyLimit?: number;
+  contextUtilization?: number;
+  cachingStrategy?: 'aggressive' | 'conservative' | 'disabled';
+  freshMessageCount?: number;
 }
 
 interface RetryConfig {
@@ -177,6 +185,19 @@ export class Agent {
   public handoffThreshold: number;
   public systemPrompt: string;
 
+  // Conversation metrics
+  public conversationMetrics: {
+    totalMessages: number;
+    totalTokensUsed: number;
+    totalCacheHits: number;
+    totalCacheCreations: number;
+    sessionStartTime: number;
+    lastActivity: number;
+  };
+
+  // Conversation configuration
+  public conversationConfig: ConversationConfig;
+
   constructor(options: AgentOptions = {}) {
     this.generation = options.generation || 0;
     this.subagentCounter = 0; // Track number of spawned subagents
@@ -250,6 +271,25 @@ export class Agent {
       this.roleDefinition.contextPreferences?.handoffThreshold || 0.8;
 
     this.systemPrompt = this.buildSystemPrompt();
+
+    // Initialize conversation metrics
+    this.conversationMetrics = {
+      totalMessages: 0,
+      totalTokensUsed: 0,
+      totalCacheHits: 0,
+      totalCacheCreations: 0,
+      sessionStartTime: Date.now(),
+      lastActivity: Date.now(),
+    };
+
+    // Initialize conversation configuration
+    this.conversationConfig = {
+      historyLimit: 10,
+      contextUtilization: 0.7, // Use 70% of context for input
+      cachingStrategy: 'aggressive',
+      freshMessageCount: 2,
+      ...options.conversationConfig,
+    };
   }
 
   async processInput(
@@ -258,6 +298,10 @@ export class Agent {
     options: any = {},
   ): Promise<GenerateResponseResult> {
     try {
+      // Update conversation metrics
+      this.conversationMetrics.totalMessages++;
+      this.conversationMetrics.lastActivity = Date.now();
+
       // Save user message
       await this.db.saveMessage(sessionId, this.generation, "user", input);
 
@@ -300,7 +344,7 @@ export class Agent {
   ): Promise<GenerateResponseResult> {
     try {
       // Retrieve conversation history before building messages
-      const conversationHistory = await this.getConversationHistory(sessionId, 10);
+      const conversationHistory = await this.getConversationHistory(sessionId, this.conversationConfig.historyLimit);
       
       // Build initial messages for token counting
       let messages = [
@@ -310,7 +354,7 @@ export class Agent {
       ];
 
       // Apply smart truncation if conversation is too long
-      const maxContextTokens = Math.floor(this.maxContextSize * 0.7); // Use 70% for input, leave room for output
+      const maxContextTokens = Math.floor(this.maxContextSize * this.conversationConfig.contextUtilization);
       messages = await this.truncateConversationHistory(messages, maxContextTokens);
 
       // Apply caching strategy to conversation history
@@ -505,6 +549,11 @@ export class Agent {
             response.usage.cache_creation_input_tokens || 0;
           totalUsage.cache_read_input_tokens +=
             response.usage.cache_read_input_tokens || 0;
+            
+          // Update conversation metrics
+          this.conversationMetrics.totalTokensUsed += response.usage.total_tokens || 0;
+          this.conversationMetrics.totalCacheHits += response.usage.cache_read_input_tokens || 0;
+          this.conversationMetrics.totalCacheCreations += response.usage.cache_creation_input_tokens || 0;
             
           this.contextSize = totalUsage.total_tokens;
         }
@@ -1407,6 +1456,40 @@ ${responseText}`;
     return await this.db.getConversationHistory(sessionId, limit);
   }
 
+  getConversationMetrics(): any {
+    const uptime = Date.now() - this.conversationMetrics.sessionStartTime;
+    const cacheHitRate = this.conversationMetrics.totalCacheHits + this.conversationMetrics.totalCacheCreations > 0 ?
+      (this.conversationMetrics.totalCacheHits / (this.conversationMetrics.totalCacheHits + this.conversationMetrics.totalCacheCreations) * 100).toFixed(1) : 
+      '0.0';
+
+    return {
+      totalMessages: this.conversationMetrics.totalMessages,
+      totalTokensUsed: this.conversationMetrics.totalTokensUsed,
+      cacheHits: this.conversationMetrics.totalCacheHits,
+      cacheCreations: this.conversationMetrics.totalCacheCreations,
+      cacheHitRate: `${cacheHitRate}%`,
+      sessionUptime: uptime,
+      lastActivity: this.conversationMetrics.lastActivity,
+    };
+  }
+
+  getConversationConfig(): ConversationConfig {
+    return { ...this.conversationConfig };
+  }
+
+  updateConversationConfig(updates: Partial<ConversationConfig>): void {
+    this.conversationConfig = {
+      ...this.conversationConfig,
+      ...updates,
+    };
+    
+    if (this.debugLogger) {
+      this.debugLogger.debug(
+        `⚙️ Updated conversation config: ${JSON.stringify(updates)}`,
+      );
+    }
+  }
+
   convertHistoryToMessages(conversationHistory: any[], excludeLatest = true): any[] {
     // Database returns in DESC order (newest first), so reverse for chronological order
     const messages = [];
@@ -1498,8 +1581,13 @@ ${responseText}`;
   }
 
   applyCachingStrategy(messages: any[]): any[] {
+    // Check if caching is disabled
+    if (this.conversationConfig.cachingStrategy === 'disabled') {
+      return messages;
+    }
+
     // Don't modify messages if there aren't enough to benefit from caching
-    if (messages.length <= 2) {
+    if (messages.length <= this.conversationConfig.freshMessageCount) {
       return messages;
     }
 
@@ -1507,10 +1595,14 @@ ${responseText}`;
     
     // Cache strategy: 
     // 1. System prompt is already cached by the provider
-    // 2. Cache stable conversation history (all but the last 2 messages)
+    // 2. Cache stable conversation history based on strategy
     // 3. Keep recent messages fresh for dynamic responses
     
-    const cacheableHistoryEnd = Math.max(1, cachedMessages.length - 2); // Keep last 2 messages fresh
+    const freshCount = this.conversationConfig.cachingStrategy === 'conservative' ? 
+      this.conversationConfig.freshMessageCount + 1 : 
+      this.conversationConfig.freshMessageCount;
+    
+    const cacheableHistoryEnd = Math.max(1, cachedMessages.length - freshCount);
     
     for (let i = 1; i < cacheableHistoryEnd; i++) { // Skip system message (index 0)
       const message = cachedMessages[i];
@@ -1549,7 +1641,7 @@ ${responseText}`;
 
     if (this.debugLogger && cacheableHistoryEnd > 1) {
       this.debugLogger.debug(
-        `💾 Applied caching to ${cacheableHistoryEnd - 1} older messages, keeping ${messages.length - cacheableHistoryEnd} recent messages fresh`,
+        `💾 Applied ${this.conversationConfig.cachingStrategy} caching to ${cacheableHistoryEnd - 1} older messages, keeping ${messages.length - cacheableHistoryEnd} recent messages fresh`,
       );
     }
 
