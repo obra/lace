@@ -24,30 +24,31 @@
 - [x] Format for LLM message structure
 - [x] Handle malformed JSON gracefully
 
-## Phase 2: Add Accurate Token Counting
+## Phase 2: Add Accurate Token Counting ✅
 
-### Task 2.1: Add token counting method to AnthropicProvider
+### Task 2.1: Add token counting method to AnthropicProvider ✅
 
-- [ ] Add `countTokens(messages)` method to `src/models/providers/anthropic-provider.js`
-- [ ] Use Anthropic's token counting API
-- [ ] Return precise token count
-- [ ] Write unit test
-- [ ] ~15 lines of code
+- [x] Add `countTokens(messages)` method to `src/models/providers/anthropic-provider.js`
+- [x] Use Anthropic's beta token counting API with `"token-counting-2024-11-01"`
+- [x] Return precise token count with error handling
+- [x] Write comprehensive unit tests with mocking
+- [x] ~30 lines of code + tests
 
-### Task 2.2: Replace token estimation with accurate counting
+### Task 2.2: Replace token estimation with accurate counting ✅
 
-- [ ] Update `Agent.generateResponse()` to use real token counts
-- [ ] Remove rough `estimateTokens()` calls
-- [ ] Add token count to context usage calculations
-- [ ] ~5 lines changed
+- [x] Update `Agent.generateResponse()` to use real token counts
+- [x] Count tokens before agentic loop starts
+- [x] Initialize context size with accurate count
+- [x] Add debug logging for token counting
+- [x] Add integration test to verify functionality
 
-### Task 2.3: Add smart conversation truncation
+### Task 2.3: Add smart conversation truncation ✅
 
-- [ ] Implement `truncateConversationHistory()` helper in Agent
-- [ ] Keep recent messages, truncate older ones based on token limits
-- [ ] Preserve important context (system prompt, recent tools)
-- [ ] Test with long conversations
-- [ ] ~20 lines of code
+- [x] Implement `truncateConversationHistory()` helper in Agent
+- [x] Keep recent messages, truncate older ones based on token limits (70% of context)
+- [x] Preserve system prompt and recent conversation flow
+- [x] Test with long conversations and verify truncation behavior
+- [x] ~60 lines of code + comprehensive test
 
 ## Phase 3: Implement Prompt Caching
 

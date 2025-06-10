@@ -300,23 +300,52 @@ export class Agent {
       // Retrieve conversation history before building messages
       const conversationHistory = await this.getConversationHistory(sessionId, 10);
       
-      // Agentic loop with circuit breaker
-      const maxIterations = 25;
-      let iteration = 0;
+      // Build initial messages for token counting
       let messages = [
         { role: "system", content: this.systemPrompt },
         ...this.convertHistoryToMessages(conversationHistory),
         { role: "user", content: input },
       ];
 
+      // Apply smart truncation if conversation is too long
+      const maxContextTokens = Math.floor(this.maxContextSize * 0.7); // Use 70% for input, leave room for output
+      messages = await this.truncateConversationHistory(messages, maxContextTokens);
+
+      // Count tokens accurately after truncation
+      let initialTokenCount = 0;
+      if (this.modelProvider && this.modelProvider.countTokens) {
+        const availableTools = this.buildToolsForLLM();
+        const tokenCountResult = await this.modelProvider.countTokens(messages, {
+          model: this.assignedModel,
+          tools: availableTools,
+        });
+        if (tokenCountResult.success) {
+          initialTokenCount = tokenCountResult.inputTokens;
+          if (this.debugLogger) {
+            this.debugLogger.debug(
+              `📊 Accurate token count: ${initialTokenCount} input tokens (max: ${maxContextTokens})`,
+            );
+          }
+        }
+      } else if (this.debugLogger) {
+        this.debugLogger.debug("⚠️ Using token estimation - no accurate counting available");
+      }
+
+      // Update context size with accurate count
+      this.contextSize = initialTokenCount;
+      
+      // Agentic loop with circuit breaker
+      const maxIterations = 25;
+      let iteration = 0;
+
       let allToolCalls = [];
       let allToolResults = [];
       let finalContent = "";
       let shouldStop = false;
       let totalUsage = {
-        prompt_tokens: 0,
+        prompt_tokens: initialTokenCount,
         completion_tokens: 0,
-        total_tokens: 0,
+        total_tokens: initialTokenCount,
       };
 
       while (iteration < maxIterations && !shouldStop) {
@@ -1340,6 +1369,67 @@ ${responseText}`;
     }
     
     return messages;
+  }
+
+  async truncateConversationHistory(messages: any[], targetTokenLimit: number): Promise<any[]> {
+    // Always preserve system prompt (first message)
+    if (messages.length <= 1) {
+      return messages;
+    }
+
+    const systemMessage = messages[0];
+    const conversationMessages = messages.slice(1);
+    
+    // If we don't have a model provider with token counting, return all messages
+    if (!this.modelProvider || !this.modelProvider.countTokens) {
+      return messages;
+    }
+
+    // Count tokens for current messages
+    const currentTokenCount = await this.modelProvider.countTokens(messages, {
+      model: this.assignedModel,
+      tools: this.buildToolsForLLM(),
+    });
+    
+    if (!currentTokenCount.success || currentTokenCount.inputTokens <= targetTokenLimit) {
+      return messages; // Already within limit
+    }
+
+    if (this.debugLogger) {
+      this.debugLogger.debug(
+        `🔧 Truncating conversation: ${currentTokenCount.inputTokens} tokens > ${targetTokenLimit} limit`,
+      );
+    }
+
+    // Start with just system message and progressively add recent messages
+    let truncatedMessages = [systemMessage];
+    const availableTools = this.buildToolsForLLM();
+    
+    // Add messages from most recent backwards until we hit the token limit
+    for (let i = conversationMessages.length - 1; i >= 0; i--) {
+      const candidateMessages = [systemMessage, ...conversationMessages.slice(i)];
+      
+      const tokenCount = await this.modelProvider.countTokens(candidateMessages, {
+        model: this.assignedModel,
+        tools: availableTools,
+      });
+      
+      if (tokenCount.success && tokenCount.inputTokens <= targetTokenLimit) {
+        truncatedMessages = candidateMessages;
+        break;
+      }
+    }
+
+    const finalTokenCount = truncatedMessages.length;
+    const removedCount = messages.length - finalTokenCount;
+    
+    if (this.debugLogger && removedCount > 0) {
+      this.debugLogger.debug(
+        `✂️ Removed ${removedCount} older messages, kept ${finalTokenCount} recent messages`,
+      );
+    }
+
+    return truncatedMessages;
   }
 
   // ORCHESTRATION METHODS - for when this agent spawns subagents

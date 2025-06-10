@@ -318,6 +318,44 @@ export class AnthropicProvider {
     return Math.ceil(text.length / 4);
   }
 
+  async countTokens(messages, options = {}) {
+    const { model = "claude-3-5-sonnet-20241022", tools = [] } = options;
+
+    try {
+      const { systemMessage, userMessages } = this.separateSystemMessage(messages);
+
+      const params = {
+        betas: ["token-counting-2024-11-01"],
+        model,
+        messages: userMessages,
+      };
+
+      // Add system message if present
+      if (systemMessage) {
+        params.system = systemMessage;
+      }
+
+      // Add tools if provided
+      if (tools.length > 0) {
+        params.tools = this.convertTools(tools);
+      }
+
+      const response = await this.client.beta.messages.countTokens(params);
+      return {
+        success: true,
+        inputTokens: response.input_tokens,
+        totalTokens: response.input_tokens, // Only input tokens for pre-call counting
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        inputTokens: 0,
+        totalTokens: 0,
+      };
+    }
+  }
+
   convertResponse(response) {
     const result = {
       success: true,

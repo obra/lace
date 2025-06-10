@@ -140,6 +140,98 @@ describe("Model Provider Session ID Tracking", () => {
         assert.strictEqual(session1, session3); // Should reuse session for same conversation
       });
     });
+
+    describe("Token Counting", () => {
+      test("should have countTokens method", () => {
+        const provider = new AnthropicProvider();
+        assert.strictEqual(typeof provider.countTokens, "function");
+      });
+
+      test("should return proper structure from countTokens with mock", async () => {
+        const provider = new AnthropicProvider();
+        
+        // Mock the client to avoid actual API calls
+        provider.client = {
+          beta: {
+            messages: {
+              countTokens: async (params) => ({
+                input_tokens: 42,
+              }),
+            },
+          },
+        };
+
+        const messages = [
+          { role: "system", content: "You are a helpful assistant." },
+          { role: "user", content: "Hello, how are you?" },
+        ];
+
+        const result = await provider.countTokens(messages);
+
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(result.inputTokens, 42);
+        assert.strictEqual(result.totalTokens, 42);
+        assert.ok(!result.error);
+      });
+
+      test("should handle countTokens errors gracefully", async () => {
+        const provider = new AnthropicProvider();
+        
+        // Mock the client to simulate an error
+        provider.client = {
+          beta: {
+            messages: {
+              countTokens: async () => {
+                throw new Error("API error");
+              },
+            },
+          },
+        };
+
+        const messages = [{ role: "user", content: "test" }];
+        const result = await provider.countTokens(messages);
+
+        assert.strictEqual(result.success, false);
+        assert.strictEqual(result.error, "API error");
+        assert.strictEqual(result.inputTokens, 0);
+        assert.strictEqual(result.totalTokens, 0);
+      });
+
+      test("should pass correct parameters to countTokens API", async () => {
+        const provider = new AnthropicProvider();
+        let capturedParams = null;
+        
+        // Mock the client to capture parameters
+        provider.client = {
+          beta: {
+            messages: {
+              countTokens: async (params) => {
+                capturedParams = params;
+                return { input_tokens: 10 };
+              },
+            },
+          },
+        };
+
+        const messages = [
+          { role: "system", content: "System prompt" },
+          { role: "user", content: "User message" },
+        ];
+        const tools = [{ name: "test_tool", description: "Test tool" }];
+
+        await provider.countTokens(messages, { 
+          model: "claude-3-5-haiku-20241022", 
+          tools 
+        });
+
+        assert.strictEqual(capturedParams.betas[0], "token-counting-2024-11-01");
+        assert.strictEqual(capturedParams.model, "claude-3-5-haiku-20241022");
+        assert.strictEqual(capturedParams.system, "System prompt");
+        assert.strictEqual(capturedParams.messages.length, 1);
+        assert.strictEqual(capturedParams.messages[0].content, "User message");
+        assert.ok(capturedParams.tools);
+      });
+    });
   });
 
   describe("OpenAIProvider", () => {

@@ -57,4 +57,82 @@ describe("Conversation Memory Integration", () => {
     assert.strictEqual(secondResponse.content, "I remember our conversation", 
       "Agent should remember previous messages when history is provided");
   });
+
+  test("agent uses accurate token counting instead of estimation", async () => {
+    const agent = await harness.createTestAgent();
+    const mockProvider = harness.createMockModelProvider();
+    
+    // Track token counting calls
+    let tokenCountCalled = false;
+    let countTokensParams = null;
+    
+    mockProvider.countTokens = async (messages, options) => {
+      tokenCountCalled = true;
+      countTokensParams = { messages, options };
+      return {
+        success: true,
+        inputTokens: 150,
+        totalTokens: 150,
+      };
+    };
+    
+    agent.modelProvider = mockProvider;
+    const sessionId = "test-session-456";
+
+    // Process input should trigger token counting
+    const response = await agent.processInput(sessionId, "Count my tokens");
+    
+    // Verify token counting was called
+    assert.ok(tokenCountCalled, "countTokens should be called for accurate counting");
+    assert.ok(countTokensParams, "countTokens should receive parameters");
+    assert.ok(countTokensParams.messages.length > 0, "countTokens should receive messages");
+    assert.strictEqual(countTokensParams.options.model, agent.assignedModel, "Should use agent's assigned model");
+    
+    // Verify context size is updated with accurate count
+    assert.strictEqual(agent.contextSize, 150, "Agent context size should use accurate token count");
+  });
+
+  test("agent truncates long conversations to stay within token limits", async () => {
+    const agent = await harness.createTestAgent();
+    const mockProvider = harness.createMockModelProvider();
+    
+    // Track truncation calls
+    let truncationCalls = [];
+    
+    mockProvider.countTokens = async (messages, options) => {
+      const tokenCount = messages.length * 50; // Mock: 50 tokens per message
+      truncationCalls.push({ messageCount: messages.length, tokenCount });
+      
+      return {
+        success: true,
+        inputTokens: tokenCount,
+        totalTokens: tokenCount,
+      };
+    };
+    
+    agent.modelProvider = mockProvider;
+    agent.maxContextSize = 1000; // Small context window for testing
+    const sessionId = "test-session-truncation";
+
+    // Simulate a long conversation by adding multiple messages to the database
+    for (let i = 0; i < 15; i++) {
+      await agent.db.saveMessage(sessionId, agent.generation, "user", `Message ${i}`);
+      await agent.db.saveMessage(sessionId, agent.generation, "assistant", `Response ${i}`);
+    }
+
+    // Process a new input - should trigger truncation
+    const response = await agent.processInput(sessionId, "This should trigger truncation");
+    
+    // Verify truncation was called and messages were reduced
+    assert.ok(truncationCalls.length > 0, "Token counting should be called during truncation");
+    
+    // The final token count should be within limits (70% of 1000 = 700)
+    const finalCall = truncationCalls[truncationCalls.length - 1];
+    assert.ok(finalCall.tokenCount <= 700, 
+      `Final token count (${finalCall.tokenCount}) should be within 70% limit (700)`);
+    
+    // Should have fewer messages than the full conversation
+    assert.ok(finalCall.messageCount < 32, // 15*2 + system + user = 32 total
+      `Should truncate to fewer than 32 messages, got ${finalCall.messageCount}`);
+  });
 });
