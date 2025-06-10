@@ -337,13 +337,18 @@ describe('Step 13: Connect to Lace Backend', () => {
     // Start first message (don't await)
     const promise1 = laceUI.handleMessage('First message');
     
+    // Wait a bit to ensure the Promise constructor has run and resolveFirst is assigned
+    await new Promise(resolve => setTimeout(resolve, 10));
+    
     // Try to start second message immediately
     const result2 = await laceUI.handleMessage('Second message');
     
     expect(result2.error).toContain('Already processing a message');
     
     // Complete first message
-    resolveFirst({ content: 'Delayed response' });
+    if (resolveFirst) {
+      resolveFirst({ content: 'Delayed response' });
+    }
     const result1 = await promise1;
     expect(result1.success).toBe(true);
   });

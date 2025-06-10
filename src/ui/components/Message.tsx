@@ -3,7 +3,6 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import Spinner from 'ink-spinner';
 import { processContentWithHighlighting } from '../utils/syntax-highlight';
 import { highlightSearchTerm } from '../utils/search-highlight';
 
@@ -86,7 +85,7 @@ const Message: React.FC<MessageProps> = ({
         <Box>
           <Text color={prefixColor}>{prefix}</Text>
           <Text inverse={isHighlighted}>
-            <Spinner type="hearts" /> {content}
+            ⠋ {content}
           </Text>
         </Box>
       );

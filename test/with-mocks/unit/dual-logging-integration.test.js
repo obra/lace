@@ -105,6 +105,11 @@ describe('Dual Logging System Integration', () => {
       
       try {
         const debugLogFile = path.join(tempDir, 'debug.log');
+        const debugLogger = new DebugLogger({
+          logLevel: 'off', // Don't log to stderr in tests
+          logFile: debugLogFile,
+          logFileLevel: 'debug'
+        });
         const agent = new Agent({
           generation: 0,
           tools,
@@ -113,11 +118,7 @@ describe('Dual Logging System Integration', () => {
           toolApproval,
           activityLogger,
           role: 'general',
-          debugLogging: {
-            logLevel: 'off', // Don't log to stderr in tests
-            logFile: debugLogFile,
-            logFileLevel: 'debug'
-          }
+          debugLogger: debugLogger
         });
 
         // Verify debug logger is initialized
@@ -158,6 +159,11 @@ describe('Dual Logging System Integration', () => {
       
       try {
         const debugLogFile = path.join(tempDir, 'debug.log');
+        const debugLogger = new DebugLogger({
+          logLevel: 'off', // Don't log to stderr in tests
+          logFile: debugLogFile,
+          logFileLevel: 'debug'
+        });
         const agent = new Agent({
           generation: 0,
           tools,
@@ -167,11 +173,7 @@ describe('Dual Logging System Integration', () => {
           activityLogger,
           role: 'general',
           verbose: true,
-          debugLogging: {
-            logLevel: 'off', // Don't log to stderr in tests
-            logFile: debugLogFile,
-            logFileLevel: 'debug'
-          }
+          debugLogger: debugLogger
         });
 
         const sessionId = 'test-session-dual-logging';
@@ -218,6 +220,11 @@ describe('Dual Logging System Integration', () => {
         // Close activity logger to simulate failure
         await activityLogger.close();
         
+        const debugLogger = new DebugLogger({
+          logLevel: 'debug',
+          logFile: debugLogFile,
+          logFileLevel: 'debug'
+        });
         const agent = new Agent({
           generation: 0,
           tools,
@@ -227,11 +234,7 @@ describe('Dual Logging System Integration', () => {
           activityLogger, // Closed logger should cause failures
           role: 'general',
           verbose: true,
-          debugLogging: {
-            logLevel: 'debug',
-            logFile: debugLogFile,
-            logFileLevel: 'debug'
-          }
+          debugLogger: debugLogger
         });
 
         const sessionId = 'test-session-activity-failure';
@@ -261,6 +264,11 @@ describe('Dual Logging System Integration', () => {
         // Use invalid path to cause debug logging failure
         const invalidDebugPath = '/invalid/path/debug.log';
         
+        const debugLogger = new DebugLogger({
+          logLevel: 'debug',
+          logFile: invalidDebugPath,
+          logFileLevel: 'debug'
+        });
         const agent = new Agent({
           generation: 0,
           tools,
@@ -270,11 +278,7 @@ describe('Dual Logging System Integration', () => {
           activityLogger,
           role: 'general',
           verbose: true,
-          debugLogging: {
-            logLevel: 'debug',
-            logFile: invalidDebugPath,
-            logFileLevel: 'debug'
-          }
+          debugLogger: debugLogger
         });
 
         const sessionId = 'test-session-debug-failure';
@@ -304,6 +308,11 @@ describe('Dual Logging System Integration', () => {
       
       try {
         const debugLogFile = path.join(tempDir, 'debug.log');
+        const debugLogger = new DebugLogger({
+          logLevel: 'off', // Don't log to stderr in tests
+          logFile: debugLogFile,
+          logFileLevel: 'debug'
+        });
         const parentAgent = new Agent({
           generation: 0,
           tools,
@@ -312,11 +321,7 @@ describe('Dual Logging System Integration', () => {
           toolApproval,
           activityLogger,
           role: 'orchestrator',
-          debugLogging: {
-            logLevel: 'off', // Don't log to stderr in tests
-            logFile: debugLogFile,
-            logFileLevel: 'debug'
-          }
+          debugLogger: debugLogger
         });
 
         // Spawn a subagent
@@ -350,6 +355,11 @@ describe('Dual Logging System Integration', () => {
         const debugLogFile = path.join(tempDir, 'debug.log');
         
         // Agent with both logging systems
+        const debugLogger = new DebugLogger({
+          logLevel: 'debug',
+          logFile: debugLogFile,
+          logFileLevel: 'debug'
+        });
         const agentWithLogging = new Agent({
           generation: 0,
           tools,
@@ -359,11 +369,7 @@ describe('Dual Logging System Integration', () => {
           activityLogger,
           role: 'general',
           verbose: true,
-          debugLogging: {
-            logLevel: 'debug',
-            logFile: debugLogFile,
-            logFileLevel: 'debug'
-          }
+          debugLogger: debugLogger
         });
 
         // Agent with no logging
