@@ -19,6 +19,7 @@ describe("Log Extraction", () => {
         summary: string;
         content: string[];
         folded: boolean;
+        timing?: { durationMs: number; };
       };
 
   interface DetailedLogEntry {
@@ -27,6 +28,7 @@ describe("Log Extraction", () => {
     type: string;
     content: string;
     usage?: { inputTokens: number; outputTokens: number; totalTokens: number; };
+    timing?: { durationMs: number; };
   }
 
   function extractLogEntries(conversation: ConversationMessage[]): DetailedLogEntry[] {
@@ -44,12 +46,24 @@ describe("Log Extraction", () => {
         content = message.content as string;
       }
       
-      entries.push({
+      const entry: DetailedLogEntry = {
         id: `log-${entryIndex++}-${baseTimestamp}`,
         timestamp: baseTimestamp,
         type: message.type as string,
         content,
-      });
+      };
+
+      // Copy usage data from assistant messages
+      if (message.type === "assistant" && message.usage) {
+        entry.usage = message.usage;
+      }
+
+      // Copy timing data from agent_activity messages
+      if (message.type === "agent_activity" && message.timing) {
+        entry.timing = message.timing;
+      }
+
+      entries.push(entry);
 
       // If this is an assistant message with tool calls, add separate tool call entries
       if (message.type === "assistant" && message.tool_calls && message.tool_calls.length > 0) {
@@ -61,6 +75,7 @@ describe("Log Extraction", () => {
             timestamp: toolCallTimestamp,
             type: "tool_call",
             content: `Tool: ${toolCall.name}\nInput: ${JSON.stringify(toolCall.input, null, 2)}`,
+            timing: { durationMs: Math.floor(Math.random() * 1000) + 100 } // Mock timing for tool calls
           });
         });
       }

@@ -1,6 +1,7 @@
 // ABOUTME: Integration tests for command system functionality
 // ABOUTME: Tests user command experience, execution, and feedback
 
+import { jest, describe, test, expect, beforeEach } from "@jest/globals";
 import React from "react";
 import { render } from "ink-testing-library";
 import { CommandManager } from "@/ui/commands/CommandManager";
@@ -33,7 +34,7 @@ describe("Command System Integration", () => {
     
     // Check that help message was added
     const helpCall = mockContext.laceUI.addMessage.mock.calls.find(call => 
-      call[0].includes("Available commands") || call[0].includes("help")
+      typeof call[0] === 'string' && (call[0].includes("Available commands") || call[0].includes("help"))
     );
     expect(helpCall).toBeDefined();
   });
@@ -183,11 +184,12 @@ describe("Command System Integration", () => {
   test("user can access command completion", () => {
     // Test that commands are available for completion
     const allCommands = commandManager.listCommands();
+    const commandNames = allCommands.map(cmd => cmd.name);
     
     // User should have access to essential commands
-    expect(allCommands).toContain("help");
-    expect(allCommands).toContain("quit");
-    expect(allCommands).toContain("status");
+    expect(commandNames).toContain("help");
+    expect(commandNames).toContain("quit");
+    expect(commandNames).toContain("status");
     
     // Commands should be easily discoverable
     expect(allCommands.length).toBeGreaterThan(3);

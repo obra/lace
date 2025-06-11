@@ -3,6 +3,7 @@
 
 import React from "react";
 import { render } from "ink-testing-library";
+import { Box } from "ink";
 import ConversationView from "@/ui/components/ConversationView";
 import Message from "@/ui/components/Message";
 
@@ -34,11 +35,11 @@ describe("Message Display Integration", () => {
 
   test("user can distinguish between different message types", () => {
     const { lastFrame } = render(
-      <div>
+      <Box flexDirection="column">
         <Message type="user" content="Hello" />
         <Message type="assistant" content="Hi there!" />
         <Message type="loading" content="Loading..." />
-      </div>
+      </Box>
     );
 
     const output = lastFrame();

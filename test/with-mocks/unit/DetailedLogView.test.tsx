@@ -108,7 +108,7 @@ describe("DetailedLogView Component", () => {
 
     const output = lastFrame();
     
-    expect(output).toContain("AGENT_ACTIVITY:");
+    expect(output).toContain("[AGENT]:");
     expect(output).toContain("Multiple operations:");
     expect(output).toContain("Step 1: Initialize");
     expect(output).toContain("Step 3: Complete");
