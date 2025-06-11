@@ -358,8 +358,8 @@ describe("ToolRegistry", () => {
         sessionId: "test-session"
       };
 
-      await registry.callTool("task", "delegate", {
-        task: "Run tests",
+      await registry.callTool("task", "delegateTask", {
+        description: "Run tests",
         role: "execution"
       }, "test-session", mockAgent);
 

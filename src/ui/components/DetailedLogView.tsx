@@ -50,6 +50,52 @@ function getVisibleEntryWindow(
   };
 }
 
+/**
+ * Get color for entry type based on the spec
+ */
+function getEntryTypeColor(type: string): string {
+  switch (type) {
+    case "user":
+      return "blue";
+    case "assistant":
+    case "streaming":
+      return "green";
+    case "tool_call":
+      return "magenta";
+    case "tool_result":
+      return "yellow";
+    case "loading":
+      return "cyan";
+    case "agent_activity":
+      return "gray";
+    default:
+      return "white";
+  }
+}
+
+/**
+ * Get visual prefix for entry type
+ */
+function getEntryTypePrefix(type: string): string {
+  switch (type) {
+    case "user":
+      return "[USER]";
+    case "assistant":
+    case "streaming":
+      return "[MODEL]";
+    case "tool_call":
+      return "[TOOL→]";
+    case "tool_result":
+      return "[TOOL←]";
+    case "loading":
+      return "[LOAD]";
+    case "agent_activity":
+      return "[AGENT]";
+    default:
+      return `[${type.toUpperCase()}]`;
+  }
+}
+
 const DetailedLogView: React.FC<DetailedLogViewProps> = ({
   scrollPosition = 0,
   isNavigationMode = false,
@@ -66,6 +112,8 @@ const DetailedLogView: React.FC<DetailedLogViewProps> = ({
       {visibleEntries.map((entry, relativeIndex) => {
         const absoluteIndex = startIndex + relativeIndex;
         const isHighlighted = isNavigationMode && absoluteIndex === scrollPosition;
+        const typeColor = getEntryTypeColor(entry.type);
+        const typePrefix = getEntryTypePrefix(entry.type);
         
         return (
           <Box 
@@ -79,10 +127,10 @@ const DetailedLogView: React.FC<DetailedLogViewProps> = ({
                 [{new Date(entry.timestamp).toLocaleTimeString()}]
               </Text>
               <Text 
-                color="yellow" 
+                color={typeColor} 
                 bold
               >
-                {" "}{entry.type.toUpperCase()}: 
+                {" "}{typePrefix}: 
               </Text>
             </Box>
             <Text 

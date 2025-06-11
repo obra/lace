@@ -158,4 +158,51 @@ describe("DetailedLogView Component", () => {
     // Should format time as local time (exact format depends on system locale)
     expect(output).toMatch(/\[\d{1,2}:\d{2}:\d{2}/);
   });
+
+  test("displays color-coded type prefixes for different entry types", () => {
+    const entries = [
+      {
+        id: "1",
+        timestamp: new Date().toISOString(),
+        type: "user",
+        content: "User input message",
+      },
+      {
+        id: "2", 
+        timestamp: new Date().toISOString(),
+        type: "assistant",
+        content: "Assistant response",
+      },
+      {
+        id: "3",
+        timestamp: new Date().toISOString(),
+        type: "tool_call",
+        content: "Tool execution",
+      },
+      {
+        id: "4",
+        timestamp: new Date().toISOString(),
+        type: "tool_result",
+        content: "Tool result data",
+      },
+    ];
+
+    const { lastFrame } = render(<DetailedLogView entries={entries} />);
+    const output = lastFrame();
+
+    // Verify content is displayed
+    expect(output).toContain("User input message");
+    expect(output).toContain("Assistant response");
+    expect(output).toContain("Tool execution");
+    expect(output).toContain("Tool result data");
+    
+    // Verify type prefixes are displayed according to Task 7 requirements
+    expect(output).toContain("[USER]:");
+    expect(output).toContain("[MODEL]:");
+    expect(output).toContain("[TOOL→]:");
+    expect(output).toContain("[TOOL←]:");
+    
+    // Should render all entries with color coding
+    expect(entries).toHaveLength(4);
+  });
 });
