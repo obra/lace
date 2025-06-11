@@ -2,8 +2,7 @@
 // ABOUTME: Tests component composition and layout properties
 
 import React from "react";
-import { render } from "ink-testing-library";
-import { act } from "react";
+import { renderInkComponent } from "../../with-mocks/helpers/ink-test-utils";
 import ConversationView from "@/ui/components/ConversationView";
 import StatusBar from "@/ui/components/StatusBar";
 import ShellInput from "@/ui/components/ShellInput";
@@ -16,13 +15,8 @@ describe("Step 2: Basic Layout Structure", () => {
     expect(React.isValidElement(element)).toBe(true);
 
     // Should render without errors
-    let unmount;
-    act(() => {
-      ({ unmount } = render(element));
-    });
-    act(() => {
-      unmount();
-    });
+    const { unmount } = renderInkComponent(element);
+    unmount();
   });
 
   test("StatusBar renders as valid React element", () => {
@@ -32,13 +26,8 @@ describe("Step 2: Basic Layout Structure", () => {
     expect(React.isValidElement(element)).toBe(true);
 
     // Should render without errors
-    let unmount;
-    act(() => {
-      ({ unmount } = render(element));
-    });
-    act(() => {
-      unmount();
-    });
+    const { unmount } = renderInkComponent(element);
+    unmount();
   });
 
   test("ShellInput renders as valid React element", () => {
@@ -48,13 +37,8 @@ describe("Step 2: Basic Layout Structure", () => {
     expect(React.isValidElement(element)).toBe(true);
 
     // Should render without errors
-    let unmount;
-    act(() => {
-      ({ unmount } = render(element));
-    });
-    act(() => {
-      unmount();
-    });
+    const { unmount } = renderInkComponent(element);
+    unmount();
   });
 
   test("all components render without errors", () => {
@@ -72,18 +56,13 @@ describe("Step 2: Basic Layout Structure", () => {
     expect(React.isValidElement(shellInputElement)).toBe(true);
 
     // Test that they render without throwing errors
-    let unmount1, unmount2, unmount3;
-    act(() => {
-      ({ unmount: unmount1 } = render(conversationElement));
-      ({ unmount: unmount2 } = render(statusElement));
-      ({ unmount: unmount3 } = render(shellInputElement));
-    });
+    const { unmount: unmount1 } = renderInkComponent(conversationElement);
+    const { unmount: unmount2 } = renderInkComponent(statusElement);
+    const { unmount: unmount3 } = renderInkComponent(shellInputElement);
 
-    act(() => {
-      unmount1();
-      unmount2();
-      unmount3();
-    });
+    unmount1();
+    unmount2();
+    unmount3();
   });
 
   test("components accept their expected props", () => {
@@ -119,18 +98,13 @@ describe("Step 2: Basic Layout Structure", () => {
     expect(React.isValidElement(inputElement)).toBe(true);
 
     // Test that they render without throwing errors
-    let unmount1, unmount2, unmount3;
-    act(() => {
-      ({ unmount: unmount1 } = render(conversationElement));
-      ({ unmount: unmount2 } = render(statusElement));
-      ({ unmount: unmount3 } = render(inputElement));
-    });
+    const { unmount: unmount1 } = renderInkComponent(conversationElement);
+    const { unmount: unmount2 } = renderInkComponent(statusElement);
+    const { unmount: unmount3 } = renderInkComponent(inputElement);
 
-    act(() => {
-      unmount1();
-      unmount2();
-      unmount3();
-    });
+    unmount1();
+    unmount2();
+    unmount3();
   });
 
   test("component composition maintains proper hierarchy", () => {
@@ -157,17 +131,12 @@ describe("Step 2: Basic Layout Structure", () => {
     expect(React.isValidElement(appStructure.shellInput)).toBe(true);
 
     // Test that they render without throwing errors
-    let unmount1, unmount2, unmount3;
-    act(() => {
-      ({ unmount: unmount1 } = render(appStructure.conversationView));
-      ({ unmount: unmount2 } = render(appStructure.statusBar));
-      ({ unmount: unmount3 } = render(appStructure.shellInput));
-    });
+    const { unmount: unmount1 } = renderInkComponent(appStructure.conversationView);
+    const { unmount: unmount2 } = renderInkComponent(appStructure.statusBar);
+    const { unmount: unmount3 } = renderInkComponent(appStructure.shellInput);
 
-    act(() => {
-      unmount1();
-      unmount2();
-      unmount3();
-    });
+    unmount1();
+    unmount2();
+    unmount3();
   });
 });

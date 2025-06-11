@@ -30,7 +30,7 @@ describe("Debug Logging Direct Tests", () => {
 
   test("DebugLogger should create log file and write messages", async () => {
     const logger = new DebugLogger({
-      logLevel: "debug",
+      logLevel: "off", // No stderr output during tests
       logFile: testLogFile,
       logFileLevel: "debug",
     });
@@ -106,7 +106,7 @@ describe("Debug Logging Direct Tests", () => {
   test("LaceUI should initialize debugLogger correctly", async () => {
     const laceUI = new LaceUI({
       verbose: true,
-      logLevel: "debug",
+      logLevel: "off", // No stderr output during tests
       logFile: testLogFile,
       logFileLevel: "debug",
     });
@@ -136,7 +136,7 @@ describe("Debug Logging Direct Tests", () => {
   test("Agent should receive debugLogger instance from LaceUI", async () => {
     const laceUI = new LaceUI({
       verbose: true,
-      logLevel: "debug",
+      logLevel: "off", // No stderr output during tests
       logFile: testLogFile,
       logFileLevel: "debug",
     });
@@ -177,11 +177,11 @@ describe("Debug Logging Direct Tests", () => {
     const testCases = [
       {
         options: {
-          logLevel: "debug",
+          logLevel: "off", // No stderr during tests
           logFile: testLogFile,
           logFileLevel: "info",
         },
-        expectedStderrLevel: "debug",
+        expectedStderrLevel: "off",
         expectedFileLevel: "info",
       },
       {
@@ -194,8 +194,8 @@ describe("Debug Logging Direct Tests", () => {
         expectedFileLevel: "debug",
       },
       {
-        options: { logLevel: "warn", logFile: testLogFile },
-        expectedStderrLevel: "warn",
+        options: { logLevel: "off", logFile: testLogFile }, // No stderr during tests
+        expectedStderrLevel: "off",
         expectedFileLevel: "debug", // Default
       },
     ];

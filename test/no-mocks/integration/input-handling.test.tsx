@@ -2,13 +2,13 @@
 // ABOUTME: Tests user text input, submission, and real-time input feedback
 
 import React from "react";
-import { render } from "ink-testing-library";
+import { renderInkComponent } from "../../with-mocks/helpers/ink-test-utils";
 import InputBar from "@/ui/components/InputBar";
 import ConversationView from "@/ui/components/ConversationView";
 
 describe("Input Handling Integration", () => {
   test("user can see their text as they type", () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <InputBar 
         isNavigationMode={false}
         inputText="hello world"
@@ -22,7 +22,7 @@ describe("Input Handling Integration", () => {
   });
 
   test("user can see cursor while typing", () => {
-    const { lastFrame: withCursor } = render(
+    const { lastFrame: withCursor } = renderInkComponent(
       <InputBar 
         isNavigationMode={false}
         inputText="hello"
@@ -30,7 +30,7 @@ describe("Input Handling Integration", () => {
       />
     );
 
-    const { lastFrame: withoutCursor } = render(
+    const { lastFrame: withoutCursor } = renderInkComponent(
       <InputBar 
         isNavigationMode={false}
         inputText="hello"
@@ -54,7 +54,7 @@ describe("Input Handling Integration", () => {
       { type: "user" as const, content: "How are you?" },
     ];
 
-    const { lastFrame } = render(<ConversationView messages={messages} />);
+    const { lastFrame } = renderInkComponent(<ConversationView messages={messages} />);
     const output = lastFrame();
 
     // User should see their submitted messages in conversation
@@ -66,7 +66,7 @@ describe("Input Handling Integration", () => {
   });
 
   test("input prompt guides user on what to do", () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <InputBar isNavigationMode={false} />
     );
 
@@ -82,8 +82,8 @@ describe("Input Handling Integration", () => {
       { type: "assistant" as const, content: "Assistant response" },
     ];
 
-    const conversationOutput = render(<ConversationView messages={messages} />).lastFrame();
-    const inputOutput = render(<InputBar isNavigationMode={false} inputText="Current typing" />).lastFrame();
+    const conversationOutput = renderInkComponent(<ConversationView messages={messages} />).lastFrame();
+    const inputOutput = renderInkComponent(<InputBar isNavigationMode={false} inputText="Current typing" />).lastFrame();
 
     // Conversation and input should be visually distinct
     expect(conversationOutput).not.toEqual(inputOutput);
@@ -94,7 +94,7 @@ describe("Input Handling Integration", () => {
   test("long input text is handled appropriately", () => {
     const longText = "This is a very long message that the user is typing and it should be displayed properly without breaking the interface";
     
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <InputBar 
         isNavigationMode={false}
         inputText={longText}
@@ -108,7 +108,7 @@ describe("Input Handling Integration", () => {
   });
 
   test("empty input shows placeholder correctly", () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <InputBar 
         isNavigationMode={false}
         inputText=""
@@ -122,7 +122,7 @@ describe("Input Handling Integration", () => {
   });
 
   test("input state updates are immediately visible", () => {
-    const { lastFrame, rerender } = render(
+    const { lastFrame, rerender } = renderInkComponent(
       <InputBar 
         isNavigationMode={false}
         inputText=""
@@ -149,7 +149,7 @@ describe("Input Handling Integration", () => {
   test("special characters in input are displayed correctly", () => {
     const specialText = "console.log('Hello, world!'); // Special chars: @#$%^&*()";
     
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <InputBar 
         isNavigationMode={false}
         inputText={specialText}

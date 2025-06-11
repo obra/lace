@@ -2,18 +2,18 @@
 // ABOUTME: Tests user-observable navigation behavior and mode switching
 
 import React from "react";
-import { render } from "ink-testing-library";
+import { renderInkComponent } from "../../with-mocks/helpers/ink-test-utils";
 import { Box } from "ink";
 import StatusBar from "@/ui/components/StatusBar";
 import InputBar from "@/ui/components/InputBar";
 
 describe("Navigation Mode Integration", () => {
   test("user can see when navigation mode is active", () => {
-    const { lastFrame: normalFrame } = render(
+    const { lastFrame: normalFrame } = renderInkComponent(
       <StatusBar isNavigationMode={false} />
     );
     
-    const { lastFrame: navFrame } = render(
+    const { lastFrame: navFrame } = renderInkComponent(
       <StatusBar 
         isNavigationMode={true} 
         scrollPosition={2}
@@ -32,11 +32,11 @@ describe("Navigation Mode Integration", () => {
   });
 
   test("user sees navigation instructions when in navigation mode", () => {
-    const { lastFrame: normalInput } = render(
+    const { lastFrame: normalInput } = renderInkComponent(
       <InputBar isNavigationMode={false} />
     );
     
-    const { lastFrame: navInput } = render(
+    const { lastFrame: navInput } = renderInkComponent(
       <InputBar isNavigationMode={true} />
     );
 
@@ -52,11 +52,11 @@ describe("Navigation Mode Integration", () => {
 
   test("user can distinguish between normal and navigation states", () => {
     // Test that both status bar and input bar reflect navigation state
-    const normalStatusBar = render(<StatusBar isNavigationMode={false} />);
-    const normalInputBar = render(<InputBar isNavigationMode={false} />);
+    const normalStatusBar = renderInkComponent(<StatusBar isNavigationMode={false} />);
+    const normalInputBar = renderInkComponent(<InputBar isNavigationMode={false} />);
     
-    const navStatusBar = render(<StatusBar isNavigationMode={true} scrollPosition={1} totalMessages={3} />);
-    const navInputBar = render(<InputBar isNavigationMode={true} />);
+    const navStatusBar = renderInkComponent(<StatusBar isNavigationMode={true} scrollPosition={1} totalMessages={3} />);
+    const navInputBar = renderInkComponent(<InputBar isNavigationMode={true} />);
 
     // Normal mode outputs
     const normalStatus = normalStatusBar.lastFrame();
@@ -84,7 +84,7 @@ describe("Navigation Mode Integration", () => {
     ];
 
     testCases.forEach(({ position, total }) => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderInkComponent(
         <StatusBar 
           isNavigationMode={true}
           scrollPosition={position}
@@ -101,7 +101,7 @@ describe("Navigation Mode Integration", () => {
 
   test("user interface is responsive to navigation state changes", () => {
     // Simulate switching between modes
-    const { lastFrame, rerender } = render(
+    const { lastFrame, rerender } = renderInkComponent(
       <Box flexDirection="column">
         <StatusBar isNavigationMode={false} />
         <InputBar isNavigationMode={false} />
@@ -126,7 +126,7 @@ describe("Navigation Mode Integration", () => {
   });
 
   test("navigation position updates are visible to user", () => {
-    const { lastFrame, rerender } = render(
+    const { lastFrame, rerender } = renderInkComponent(
       <StatusBar isNavigationMode={true} scrollPosition={1} totalMessages={5} />
     );
 

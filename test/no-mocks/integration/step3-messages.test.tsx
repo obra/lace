@@ -2,7 +2,7 @@
 // ABOUTME: Tests user-observable message behavior and conversation flow
 
 import React from "react";
-import { render } from "ink-testing-library";
+import { renderInkComponent, stripAnsi } from "../../with-mocks/helpers/ink-test-utils";
 import { Box } from "ink";
 import ConversationView from "@/ui/components/ConversationView";
 import Message from "@/ui/components/Message";
@@ -20,7 +20,7 @@ describe("Message Display Integration", () => {
       },
     ];
 
-    const { lastFrame } = render(<ConversationView messages={mockConversation} />);
+    const { lastFrame } = renderInkComponent(<ConversationView messages={mockConversation} />);
 
     // User should see their messages
     expect(lastFrame()).toContain("Hello");
@@ -34,7 +34,7 @@ describe("Message Display Integration", () => {
   });
 
   test("user can distinguish between different message types", () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <Box flexDirection="column">
         <Message type="user" content="Hello" />
         <Message type="assistant" content="Hi there!" />
@@ -57,7 +57,7 @@ describe("Message Display Integration", () => {
   test("user can read multi-line assistant responses", () => {
     const multiLineContent = "Here's a code example:\n\nfunction test() {\n  console.log('Hello');\n}";
     
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <Message type="assistant" content={multiLineContent} />
     );
 
@@ -77,7 +77,7 @@ describe("Message Display Integration", () => {
       { type: "user" as const, content: "Third message" },
     ];
 
-    const { lastFrame } = render(<ConversationView messages={mockConversation} />);
+    const { lastFrame } = renderInkComponent(<ConversationView messages={mockConversation} />);
     const output = lastFrame();
 
     // Messages should appear in the order they were sent
@@ -90,7 +90,7 @@ describe("Message Display Integration", () => {
   });
 
   test("empty conversation displays appropriately", () => {
-    const { lastFrame } = render(<ConversationView messages={[]} />);
+    const { lastFrame } = renderInkComponent(<ConversationView messages={[]} />);
     const output = lastFrame();
 
     // Empty conversation should not crash and should render some content
@@ -112,12 +112,12 @@ describe("Message Display Integration", () => {
       },
     ];
 
-    const { lastFrame } = render(<ConversationView messages={mockConversation} />);
+    const { lastFrame } = renderInkComponent(<ConversationView messages={mockConversation} />);
     const output = lastFrame();
 
     // User should see all different content types
     expect(output).toContain("Show me some code");
-    expect(output).toContain("const hello = () => 'world';");
+    expect(stripAnsi(output)).toContain("const hello = () => 'world';");
     expect(output).toContain("What about markdown **bold** text?");
     expect(output).toContain("I can handle **bold** and *italic* formatting.");
   });

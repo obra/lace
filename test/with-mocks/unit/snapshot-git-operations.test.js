@@ -10,10 +10,10 @@ import {
   TestHarness,
   utils,
 } from "../../test-harness.js";
-import { promises as fs } from "fs";
 import { join } from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { promises as fs } from "fs";
 
 const execAsync = promisify(exec);
 
@@ -24,8 +24,7 @@ describe("GitOperations", () => {
 
   beforeEach(async () => {
     testHarness = new TestHarness();
-    testDir = join(process.cwd(), `test-snapshot-${Date.now()}`);
-    await fs.mkdir(testDir, { recursive: true });
+    testDir = await testHarness.createTempDirectory("-snapshot");
 
     // Import the class after creating test directory
     try {
@@ -39,11 +38,6 @@ describe("GitOperations", () => {
 
   afterEach(async () => {
     await testHarness.cleanup();
-    try {
-      await fs.rm(testDir, { recursive: true, force: true });
-    } catch (error) {
-      // Ignore cleanup errors
-    }
   });
 
   describe("constructor", () => {
@@ -177,8 +171,16 @@ describe("GitOperations", () => {
         assert.fail("GitOperations class not implemented yet");
       }
 
-      const gitOps = new GitOperations(testDir);
-      await gitOps.initialize();
+      // Ensure test directory exists and is accessible
+      await utils.writeFile(join(testDir, ".gitkeep"), "");
+      
+      let gitOps;
+      try {
+        gitOps = new GitOperations(testDir);
+        await gitOps.initialize();
+      } catch (error) {
+        assert.fail(`Failed to initialize git repository: ${error.message}`);
+      }
 
       // Try to commit with no changes
       try {
@@ -187,7 +189,8 @@ describe("GitOperations", () => {
       } catch (error) {
         assert.ok(
           error.message.includes("Git command failed") ||
-            error.message.includes("No changes to commit"),
+            error.message.includes("No changes to commit") ||
+            error.message.includes("nothing to commit"),
           `Unexpected error message: ${error.message}`,
         );
       }

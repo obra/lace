@@ -288,6 +288,40 @@ describe("Component Name", () => {
 
 **Note**: This approach is deprecated due to testing implementation details instead of user behavior. Use `renderInkComponent` instead.
 
+#### Testing Styled Output (ANSI Codes)
+
+When testing components that use ANSI escape codes for styling (like search highlighting), use the `stripAnsi` utility from ink-test-utils:
+
+```typescript
+import { renderInkComponent, stripAnsi } from "../helpers/ink-test-utils";
+import ConversationView from "@/ui/components/ConversationView";
+
+describe("Search Highlighting", () => {
+  test("user can see search results with highlighting", () => {
+    const { lastFrame } = renderInkComponent(
+      <ConversationView 
+        messages={[{type: "user", content: "Hello world"}]} 
+        searchTerm="hello"
+      />
+    );
+    
+    const output = lastFrame();
+    const cleanOutput = stripAnsi(output);
+    
+    // Test underlying content without ANSI codes
+    expect(cleanOutput.toLowerCase()).toContain("hello world");
+    
+    // Test that highlighting is applied
+    expect(output).toMatch(/\[43m\[30mhello\[39m\[49m/i);
+  });
+});
+```
+
+**Key points:**
+- Use `stripAnsi()` to test content without styling codes
+- Test both content and styling separately for robust verification
+- ANSI codes: `[43m[30m` = yellow background, black text; `[39m[49m` = reset
+
 ### Integration Testing Pattern
 
 ```typescript

@@ -13,11 +13,13 @@ import { LaceUI } from "../src/ui/lace-ui.ts";
 export class TestHarness {
   private testDatabases: Set<string>;
   private tempFiles: Set<string>;
+  private tempDirectories: Set<string>;
   private laceUIInstances: Set<any>;
 
   constructor() {
     this.testDatabases = new Set();
     this.tempFiles = new Set();
+    this.tempDirectories = new Set();
     this.laceUIInstances = new Set();
   }
 
@@ -34,6 +36,14 @@ export class TestHarness {
     await fs.writeFile(filePath, content);
     this.tempFiles.add(filePath);
     return filePath;
+  }
+
+  // Create a temporary test directory  
+  async createTempDirectory(suffix = "") {
+    const dirPath = join(process.cwd(), `temp-dir-${Date.now()}${suffix}`);
+    await fs.mkdir(dirPath, { recursive: true });
+    this.tempDirectories.add(dirPath);
+    return dirPath;
   }
 
   // Clean up test resources
@@ -67,6 +77,16 @@ export class TestHarness {
       }
     }
     this.tempFiles.clear();
+
+    // Remove temp directories
+    for (const dirPath of this.tempDirectories) {
+      try {
+        await fs.rm(dirPath, { recursive: true, force: true });
+      } catch (error) {
+        // Ignore if directory doesn't exist
+      }
+    }
+    this.tempDirectories.clear();
   }
 
   // Create a test agent without API key requirements

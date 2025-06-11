@@ -2,7 +2,7 @@
 // ABOUTME: Tests user-observable code formatting and display behavior
 
 import React from "react";
-import { render } from "ink-testing-library";
+import { renderInkComponent, stripAnsi } from "../../with-mocks/helpers/ink-test-utils";
 import ConversationView from "@/ui/components/ConversationView";
 import Message from "@/ui/components/Message";
 
@@ -10,11 +10,11 @@ describe("Code Highlighting Integration", () => {
   test("user can read JavaScript code with proper formatting", () => {
     const codeContent = 'Here is a function:\n\n```javascript\nfunction hello() {\n  return "Hello World";\n}\n```';
     
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <Message type="assistant" content={codeContent} />
     );
 
-    const output = lastFrame();
+    const output = stripAnsi(lastFrame());
     
     // User should see the code content
     expect(output).toContain("function hello()");
@@ -25,26 +25,26 @@ describe("Code Highlighting Integration", () => {
   test("user can read Python code with proper formatting", () => {
     const pythonContent = 'Here is a Python function:\n\n```python\ndef greet(name):\n    return f"Hello {name}!"\n```';
     
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <Message type="assistant" content={pythonContent} />
     );
 
     const output = lastFrame();
     
     // User should see the Python code content
-    expect(output).toContain("def greet(name):");
-    expect(output).toContain('return f"Hello {name}!"');
-    expect(output).toContain("Here is a Python function:");
+    expect(stripAnsi(output)).toContain("def greet(name):");
+    expect(stripAnsi(output)).toContain('return f"Hello {name}!"');
+    expect(stripAnsi(output)).toContain("Here is a Python function:");
   });
 
   test("user can read JSON data with proper formatting", () => {
     const jsonContent = 'Here is some JSON:\n\n```json\n{\n  "name": "John",\n  "age": 30\n}\n```';
     
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <Message type="assistant" content={jsonContent} />
     );
 
-    const output = lastFrame();
+    const output = stripAnsi(lastFrame());
     
     // User should see the JSON content
     expect(output).toContain('"name": "John"');
@@ -55,7 +55,7 @@ describe("Code Highlighting Integration", () => {
   test("user can read code without language specification", () => {
     const genericCodeContent = 'Here is some code:\n\n```\nif (condition) {\n  doSomething();\n}\n```';
     
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <Message type="assistant" content={genericCodeContent} />
     );
 
@@ -87,11 +87,11 @@ console.log(result); // 15
 
 This approach is efficient because it separates concerns.`;
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <Message type="assistant" content={mixedContent} />
     );
 
-    const output = lastFrame();
+    const output = stripAnsi(lastFrame());
     
     // User should see all parts of the mixed content
     expect(output).toContain("Let me explain the solution:");
@@ -118,19 +118,19 @@ This approach is efficient because it separates concerns.`;
       }
     ];
 
-    const { lastFrame } = render(<ConversationView messages={messages} />);
+    const { lastFrame } = renderInkComponent(<ConversationView messages={messages} />);
     const output = lastFrame();
 
     // User should see both code examples
-    expect(output).toContain("function greet(name)");
-    expect(output).toContain("def greet(name):");
+    expect(stripAnsi(output)).toContain("function greet(name)");
+    expect(stripAnsi(output)).toContain("def greet(name):");
     expect(output).toContain("Show me how to write a function");
   });
 
   test("user can read inline code snippets", () => {
     const inlineCodeContent = "You can use the `console.log()` function to debug, or try `JSON.stringify()` for objects.";
     
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <Message type="assistant" content={inlineCodeContent} />
     );
 
@@ -164,16 +164,16 @@ Database (SQL):
 SELECT * FROM users WHERE active = 1;
 \`\`\``;
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <Message type="assistant" content={complexContent} />
     );
 
     const output = lastFrame();
     
     // User should see all three code blocks
-    expect(output).toContain("fetch('/api/users')");
-    expect(output).toContain("@app.route('/api/users')");
-    expect(output).toContain("SELECT * FROM users");
-    expect(output).toContain("Here's a full stack example:");
+    expect(stripAnsi(output)).toContain("fetch('/api/users')");
+    expect(stripAnsi(output)).toContain("@app.route('/api/users')");
+    expect(stripAnsi(output)).toContain("SELECT * FROM users");
+    expect(stripAnsi(output)).toContain("Here's a full stack example:");
   });
 });

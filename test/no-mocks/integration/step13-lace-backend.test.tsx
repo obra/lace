@@ -4,49 +4,19 @@
 import React from "react";
 import { jest } from "@jest/globals";
 
-// Mock the lace backend modules before importing LaceUI
-jest.mock("../src/database/conversation-db", () => ({
-  ConversationDB: jest.fn().mockImplementation(() => ({
-    // @ts-ignore
-    initialize: jest.fn().mockResolvedValue(undefined),
-  })),
-}));
+// Mock only the essential modules needed for test environment
 
-jest.mock("../src/tools/tool-registry", () => ({
-  ToolRegistry: jest.fn().mockImplementation(() => ({
-    // @ts-ignore
-    initialize: jest.fn().mockResolvedValue(undefined),
-    listTools: jest
-      .fn()
-      .mockReturnValue(["file-tool", "shell-tool", "search-tool"]),
-  })),
-}));
-
+// Mock ModelProvider to avoid API costs and network dependencies
 jest.mock("../src/models/model-provider", () => ({
   ModelProvider: jest.fn().mockImplementation(() => ({
     // @ts-ignore
     initialize: jest.fn().mockResolvedValue(undefined),
+    // @ts-ignore - Add any other methods the real tests might need
+    chat: jest.fn().mockResolvedValue({ content: "Mocked response" }),
   })),
 }));
 
-jest.mock("../src/safety/index", () => ({
-  ApprovalEngine: jest.fn().mockImplementation(() => ({})),
-}));
-
-jest.mock("../src/agents/agent", () => ({
-  Agent: jest.fn().mockImplementation(() => ({
-    role: "orchestrator",
-    assignedModel: "claude-3-5-sonnet-20241022",
-    assignedProvider: "anthropic",
-    capabilities: ["orchestration", "reasoning", "planning", "delegation"],
-    contextSize: 0,
-    processInput: jest.fn(),
-    calculateContextUsage: jest.fn(),
-    calculateCost: jest.fn(),
-  })),
-}));
-
-// Mock Ink's render function
+// Mock Ink's render function to avoid UI issues in test environment
 jest.mock("ink", () => ({
   render: jest.fn().mockReturnValue({ unmount: jest.fn() }),
 }));
@@ -67,26 +37,8 @@ describe("Step 13: Connect to Lace Backend", () => {
 
     // Override the start method to avoid fullscreen-ink issues
     laceUI.start = jest.fn().mockImplementation(async () => {
-      // Initialize backend components like the real start() but skip UI
-      await laceUI.db.initialize();
-      await laceUI.tools.initialize();
-      await laceUI.modelProvider.initialize();
-
-      // Use the mocked Agent constructor - it's already mocked above
-      const { Agent } = await import("@/agents/agent.js");
-      laceUI.primaryAgent = new Agent({
-        generation: laceUI.currentGeneration,
-        tools: laceUI.tools,
-        db: laceUI.db,
-        modelProvider: laceUI.modelProvider,
-        toolApproval: laceUI.toolApproval,
-        verbose: laceUI.verbose,
-        role: "orchestrator",
-        assignedModel: "claude-3-5-sonnet-20241022",
-        assignedProvider: "anthropic",
-        capabilities: ["orchestration", "reasoning", "planning", "delegation"],
-      });
-
+      // Initialize all backend components like the real start() but skip UI
+      await laceUI.initialize();
       return { unmount: jest.fn() };
     });
   });

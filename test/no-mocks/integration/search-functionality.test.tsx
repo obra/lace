@@ -2,7 +2,7 @@
 // ABOUTME: Tests user search experience, highlighting, and navigation
 
 import React from "react";
-import { render } from "ink-testing-library";
+import { renderInkComponent, stripAnsi } from "../../with-mocks/helpers/ink-test-utils";
 import StatusBar from "@/ui/components/StatusBar";
 import InputBar from "@/ui/components/InputBar";
 import ConversationView from "@/ui/components/ConversationView";
@@ -10,11 +10,11 @@ import Message from "@/ui/components/Message";
 
 describe("Search Functionality Integration", () => {
   test("user can see when search mode is active", () => {
-    const { lastFrame: normalMode } = render(
+    const { lastFrame: normalMode } = renderInkComponent(
       <StatusBar isSearchMode={false} />
     );
     
-    const { lastFrame: searchMode } = render(
+    const { lastFrame: searchMode } = renderInkComponent(
       <StatusBar isSearchMode={true} searchTerm="hello" />
     );
 
@@ -29,7 +29,7 @@ describe("Search Functionality Integration", () => {
   });
 
   test("user can see search instructions in input bar", () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <InputBar isSearchMode={true} />
     );
 
@@ -46,7 +46,7 @@ describe("Search Functionality Integration", () => {
       { type: "user" as const, content: "Can you write some code?" },
     ];
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <ConversationView 
         messages={messages} 
         searchTerm="hello"
@@ -58,19 +58,21 @@ describe("Search Functionality Integration", () => {
     );
 
     const output = lastFrame();
+    const cleanOutput = stripAnsi(output);
     
     // User should see messages containing search term
-    expect(output).toContain("Hello world");
-    expect(output).toContain("Hello there!");
+    expect(cleanOutput.toLowerCase()).toContain("hello world");
+    expect(cleanOutput.toLowerCase()).toContain("hello there");
     
-    // Search highlighting should be visible (text should contain the search term)
-    expect(output.toLowerCase()).toContain("hello");
+    // Search highlighting should be applied (check for ANSI codes around search term)
+    expect(output).toMatch(/\x1b\[43m\x1b\[30m[Hh]ello\x1b\[39m\x1b\[49m/);
   });
 
   test("user can see search navigation status", () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <StatusBar 
-        isSearchMode={true}
+        isNavigationMode={true}
+        filterMode="search"
         searchTerm="test"
         searchResultIndex={2}
         searchResults={[
@@ -95,7 +97,7 @@ describe("Search Functionality Integration", () => {
       { type: "assistant" as const, content: "Hi there!" },
     ];
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <StatusBar 
         isSearchMode={true}
         searchTerm="nonexistent"
@@ -121,7 +123,7 @@ describe("Search Functionality Integration", () => {
       },
     ];
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <ConversationView 
         messages={messages} 
         searchTerm="function"
@@ -133,10 +135,14 @@ describe("Search Functionality Integration", () => {
     );
 
     const output = lastFrame();
+    const cleanOutput = stripAnsi(output);
     
     // User should see the code with search term highlighted
-    expect(output).toContain("function hello()");
-    expect(output).toContain("explain the function");
+    expect(cleanOutput.toLowerCase()).toContain("function hello()");
+    expect(cleanOutput.toLowerCase()).toContain("explain the function");
+    
+    // Verify highlighting is applied to the search term
+    expect(output).toMatch(/\x1b\[43m\x1b\[30mfunction\x1b\[39m\x1b\[49m/);
   });
 
   test("user can search case-insensitively", () => {
@@ -145,7 +151,7 @@ describe("Search Functionality Integration", () => {
       { type: "user" as const, content: "I love javascript!" },
     ];
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <ConversationView 
         messages={messages} 
         searchTerm="JAVASCRIPT"
@@ -157,10 +163,14 @@ describe("Search Functionality Integration", () => {
     );
 
     const output = lastFrame();
+    const cleanOutput = stripAnsi(output);
     
     // User should see both uppercase and lowercase matches
-    expect(output).toContain("JavaScript is powerful");
-    expect(output).toContain("I love javascript!");
+    expect(cleanOutput.toLowerCase()).toContain("javascript is powerful");
+    expect(cleanOutput.toLowerCase()).toContain("i love javascript!");
+    
+    // Case-insensitive search should highlight both variations (searching for "JAVASCRIPT")
+    expect(output).toMatch(/\x1b\[43m\x1b\[30m[Jj]ava[Ss]cript\x1b\[39m\x1b\[49m/);
   });
 
   test("user can search with special characters", () => {
@@ -169,7 +179,7 @@ describe("Search Functionality Integration", () => {
       { type: "user" as const, content: "Where is the config file?" },
     ];
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <ConversationView 
         messages={messages} 
         searchTerm="/home"
@@ -180,16 +190,21 @@ describe("Search Functionality Integration", () => {
     );
 
     const output = lastFrame();
+    const cleanOutput = stripAnsi(output);
     
     // User should see special characters in search results
-    expect(output).toContain("/home/user/.config");
+    expect(cleanOutput.toLowerCase()).toContain("/home/user/.config");
+    
+    // Verify highlighting is applied to the search term (escaping the forward slash)
+    expect(output).toMatch(/\x1b\[43m\x1b\[30m\/home\x1b\[39m\x1b\[49m/);
   });
 
   test("user sees search progress through multiple results", () => {
-    // Test progression through search results
-    const { lastFrame: result1 } = render(
+    // Test progression through search results in navigation mode
+    const { lastFrame: result1 } = renderInkComponent(
       <StatusBar 
-        isSearchMode={true}
+        isNavigationMode={true}
+        filterMode="search"
         searchTerm="test"
         searchResultIndex={1}
         searchResults={[
@@ -200,9 +215,10 @@ describe("Search Functionality Integration", () => {
       />
     );
 
-    const { lastFrame: result2 } = render(
+    const { lastFrame: result2 } = renderInkComponent(
       <StatusBar 
-        isSearchMode={true}
+        isNavigationMode={true}
+        filterMode="search"
         searchTerm="test"
         searchResultIndex={2}
         searchResults={[
@@ -216,18 +232,18 @@ describe("Search Functionality Integration", () => {
     const output1 = result1();
     const output2 = result2();
 
-    // User should see position change
+    // User should see position change in navigation mode
     expect(output1).not.toEqual(output2);
     expect(output1).toContain("Result 2 of 3"); // searchResultIndex 1 displays as "Result 2"
     expect(output2).toContain("Result 3 of 3"); // searchResultIndex 2 displays as "Result 3"
   });
 
   test("user can exit search mode", () => {
-    const { lastFrame: searchMode } = render(
+    const { lastFrame: searchMode } = renderInkComponent(
       <InputBar isSearchMode={true} />
     );
 
-    const { lastFrame: normalMode } = render(
+    const { lastFrame: normalMode } = renderInkComponent(
       <InputBar isSearchMode={false} />
     );
 
@@ -254,7 +270,7 @@ describe("Search Functionality Integration", () => {
       }
     });
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderInkComponent(
       <ConversationView 
         messages={longConversation} 
         searchTerm="test"
@@ -262,9 +278,13 @@ describe("Search Functionality Integration", () => {
     );
 
     const output = lastFrame();
+    const cleanOutput = stripAnsi(output);
     
     // User should see multiple search matches
-    expect(output).toContain("Message 1 with some test content");
-    expect(output).toContain("Message 2 with some test content");
+    expect(cleanOutput.toLowerCase()).toContain("message 1 with some test content");
+    expect(cleanOutput.toLowerCase()).toContain("message 2 with some test content");
+    
+    // Verify highlighting is applied to search terms
+    expect(output).toMatch(/\x1b\[43m\x1b\[30mtest\x1b\[39m\x1b\[49m/);
   });
 });
