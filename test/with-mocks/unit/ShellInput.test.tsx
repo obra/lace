@@ -51,7 +51,7 @@ describe("ShellInput Component", () => {
 
   test("user can see input with initial value", () => {
     // Mock the useTextBuffer to return initial value
-    const { useTextBuffer: mockUseTextBuffer } = jest.requireMock("@/ui/components/useTextBuffer");
+    const mockUseTextBuffer = jest.mocked(jest.requireMock("@/ui/components/useTextBuffer").useTextBuffer);
     mockUseTextBuffer.mockReturnValue([
       {
         lines: ["Hello world"],
@@ -85,7 +85,7 @@ describe("ShellInput Component", () => {
 
   test("user can see multi-line input structure", () => {
     // Mock multi-line content
-    const { useTextBuffer: mockUseTextBuffer } = jest.requireMock("@/ui/components/useTextBuffer");
+    const mockUseTextBuffer = jest.mocked(jest.requireMock("@/ui/components/useTextBuffer").useTextBuffer);
     mockUseTextBuffer.mockReturnValue([
       {
         lines: ["Line 1", "Line 2", "Line 3"],

@@ -112,7 +112,7 @@ describe("StatusBar Component", () => {
       <StatusBar
         isSearchMode={true}
         searchResultIndex={2}
-        searchResultCount={5}
+        searchResults={5}
       />
     );
     const output = lastFrame();
