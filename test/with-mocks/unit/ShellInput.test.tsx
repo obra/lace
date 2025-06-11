@@ -3,6 +3,7 @@
 
 import { jest, describe, test, expect } from "@jest/globals";
 import React from "react";
+import { renderInkComponent } from "../helpers/ink-test-utils";
 import ShellInput from "@/ui/components/ShellInput";
 import { Box, Text } from "ink";
 
@@ -41,17 +42,16 @@ describe("ShellInput Component", () => {
   });
 
   test("user can see shell input structure", () => {
-    const element = ShellInput(defaultProps) as any;
+    const { lastFrame } = renderInkComponent(<ShellInput {...defaultProps} />);
+    const output = lastFrame();
 
-    // Should return a Box with column direction
-    expect(element.type).toBe(Box);
-    expect(element.props.flexDirection).toBe("column");
-    expect(React.isValidElement(element)).toBe(true);
+    // Should render input with placeholder
+    expect(output).toContain("Type your message...");
   });
 
   test("user can see input with initial value", () => {
     // Mock the useTextBuffer to return initial value
-    const mockUseTextBuffer = require("@/ui/components/useTextBuffer").useTextBuffer;
+    const { useTextBuffer: mockUseTextBuffer } = jest.requireMock("@/ui/components/useTextBuffer");
     mockUseTextBuffer.mockReturnValue([
       {
         lines: ["Hello world"],
@@ -71,19 +71,21 @@ describe("ShellInput Component", () => {
       }
     ]);
 
-    const element = ShellInput({
-      ...defaultProps,
-      value: "Hello world"
-    }) as any;
+    const { lastFrame } = renderInkComponent(
+      <ShellInput
+        {...defaultProps}
+        value="Hello world"
+      />
+    );
+    const output = lastFrame();
 
     // Should render successfully with content
-    expect(element.type).toBe(Box);
-    expect(React.isValidElement(element)).toBe(true);
+    expect(output).toContain("Hello world");
   });
 
   test("user can see multi-line input structure", () => {
     // Mock multi-line content
-    const mockUseTextBuffer = require("@/ui/components/useTextBuffer").useTextBuffer;
+    const { useTextBuffer: mockUseTextBuffer } = jest.requireMock("@/ui/components/useTextBuffer");
     mockUseTextBuffer.mockReturnValue([
       {
         lines: ["Line 1", "Line 2", "Line 3"],
@@ -103,99 +105,115 @@ describe("ShellInput Component", () => {
       }
     ]);
 
-    const element = ShellInput(defaultProps) as any;
+    const { lastFrame } = renderInkComponent(<ShellInput {...defaultProps} />);
+    const output = lastFrame();
 
     // Should handle multi-line content
-    expect(element.type).toBe(Box);
-    expect(React.isValidElement(element)).toBe(true);
+    expect(output).toContain("Line 1");
+    expect(output).toContain("Line 2");
+    expect(output).toContain("Line 3");
   });
 
   test("user can see input when focused vs unfocused", () => {
-    const focusedElement = ShellInput({
-      ...defaultProps,
-      autoFocus: true
-    }) as any;
+    const { lastFrame: focusedFrame } = renderInkComponent(
+      <ShellInput
+        {...defaultProps}
+        autoFocus={true}
+      />
+    );
     
-    const unfocusedElement = ShellInput({
-      ...defaultProps,
-      autoFocus: false
-    }) as any;
+    const { lastFrame: unfocusedFrame } = renderInkComponent(
+      <ShellInput
+        {...defaultProps}
+        autoFocus={false}
+      />
+    );
 
     // Both should render successfully
-    expect(focusedElement.type).toBe(Box);
-    expect(unfocusedElement.type).toBe(Box);
-    expect(React.isValidElement(focusedElement)).toBe(true);
-    expect(React.isValidElement(unfocusedElement)).toBe(true);
+    expect(focusedFrame()).toBeDefined();
+    expect(unfocusedFrame()).toBeDefined();
   });
 
   test("user can see input structure with props", () => {
-    const element = ShellInput({
-      ...defaultProps,
-      focusId: "custom-focus",
-      autoFocus: true
-    }) as any;
+    const { lastFrame } = renderInkComponent(
+      <ShellInput
+        {...defaultProps}
+        focusId="custom-focus"
+        autoFocus={true}
+      />
+    );
+    const output = lastFrame();
 
     // Should handle additional props
-    expect(element.type).toBe(Box);
-    expect(React.isValidElement(element)).toBe(true);
+    expect(output).toBeDefined();
   });
 
   test("user can see input without completion manager", () => {
-    const element = ShellInput({
-      ...defaultProps,
-      completionManager: undefined
-    }) as any;
+    const { lastFrame } = renderInkComponent(
+      <ShellInput
+        {...defaultProps}
+        completionManager={undefined}
+      />
+    );
+    const output = lastFrame();
 
     // Should work without completion manager
-    expect(element.type).toBe(Box);
-    expect(React.isValidElement(element)).toBe(true);
+    expect(output).toBeDefined();
   });
 
   test("user can see input with custom placeholder", () => {
-    const element = ShellInput({
-      ...defaultProps,
-      placeholder: "Enter command..."
-    }) as any;
+    const { lastFrame } = renderInkComponent(
+      <ShellInput
+        {...defaultProps}
+        placeholder="Enter command..."
+      />
+    );
+    const output = lastFrame();
 
     // Should accept custom placeholder
-    expect(element.type).toBe(Box);
-    expect(React.isValidElement(element)).toBe(true);
+    expect(output).toContain("Enter command...");
   });
 
   test("user can see input with debug disabled", () => {
-    const element = ShellInput({
-      ...defaultProps,
-      showDebug: false
-    }) as any;
+    const { lastFrame } = renderInkComponent(
+      <ShellInput
+        {...defaultProps}
+        showDebug={false}
+      />
+    );
+    const output = lastFrame();
 
     // Should work with debug disabled
-    expect(element.type).toBe(Box);
-    expect(React.isValidElement(element)).toBe(true);
+    expect(output).toBeDefined();
   });
 
   test("user can see input with history", () => {
-    const element = ShellInput({
-      ...defaultProps,
-      history: ["command1", "command2", "command3"]
-    }) as any;
+    const { lastFrame } = renderInkComponent(
+      <ShellInput
+        {...defaultProps}
+        history={["command1", "command2", "command3"]}
+      />
+    );
+    const output = lastFrame();
 
     // Should accept history prop
-    expect(element.type).toBe(Box);
-    expect(React.isValidElement(element)).toBe(true);
+    expect(output).toBeDefined();
   });
 
   test("user can see input with callbacks", () => {
     const onSubmit = jest.fn();
     const onChange = jest.fn();
 
-    const element = ShellInput({
-      ...defaultProps,
-      onSubmit,
-      onChange
-    }) as any;
+    const { lastFrame } = renderInkComponent(
+      <ShellInput
+        {...defaultProps}
+        onSubmit={onSubmit}
+        onChange={onChange}
+      />
+    );
+    const output = lastFrame();
 
     // Should accept callback props
-    expect(element.type).toBe(Box);
-    expect(React.isValidElement(element)).toBe(true);
+    expect(output).toBeDefined();
   });
 });

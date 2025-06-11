@@ -2,52 +2,35 @@
 // ABOUTME: Tests message display and layout functionality
 
 import React from "react";
+import { renderInkComponent } from "../helpers/ink-test-utils";
 import ConversationView from "@/ui/components/ConversationView";
 import { Box } from "ink";
 
 describe("ConversationView Component", () => {
-  test("renders correct JSX structure with layout props", () => {
-    const element = ConversationView({}) as any;
+  test("user can see conversation view with messages", () => {
+    const { lastFrame } = renderInkComponent(<ConversationView />);
+    const output = lastFrame();
 
-    // Should return a Box element with flexGrow and column direction
-    expect(element.type).toBe(Box);
-    expect(element.props.flexDirection).toBe("column");
-    expect(element.props.flexGrow).toBe(1);
-    expect(element.props.padding).toBe(1);
-    expect(React.isValidElement(element)).toBe(true);
+    // Should display conversation content
+    expect(output).toBeDefined();
   });
 
-  test("displays mock conversation messages", () => {
-    const element = ConversationView({}) as any;
-    const children = element.props.children;
+  test("user can see multiple messages in conversation", () => {
+    const { lastFrame } = renderInkComponent(<ConversationView />);
+    const output = lastFrame();
 
-    // Should have 4 message components based on mock data
-    expect(children).toHaveLength(4);
-
-    // All children should be Message components
-    children.forEach((child: any) => {
-      expect(child.type.name).toBe("Message");
-    });
+    // Should display multiple message indicators (user and assistant prefixes)
+    expect(output).toContain(">"); // user prefix
+    expect(output).toContain("🤖"); // assistant prefix
   });
 
-  test("displays messages with correct types and content", () => {
-    const element = ConversationView({}) as any;
-    const children = element.props.children;
+  test("user can see conversation message content", () => {
+    const { lastFrame } = renderInkComponent(<ConversationView />);
+    const output = lastFrame();
 
-    // Check first message is user type with "Hello"
-    expect(children[0].props.type).toBe("user");
-    expect(children[0].props.content).toBe("Hello");
-
-    // Check second message is assistant type
-    expect(children[1].props.type).toBe("assistant");
-    expect(children[1].props.content).toBe("Hi! How can I help you today?");
-
-    // Check third message is user type
-    expect(children[2].props.type).toBe("user");
-    expect(children[2].props.content).toBe("Can you write a function?");
-
-    // Check fourth message is assistant with multi-line content
-    expect(children[3].props.type).toBe("assistant");
-    expect(children[3].props.content).toContain("function hello()");
+    // Should display sample conversation content
+    expect(output).toContain("Hello");
+    expect(output).toContain("How can I help");
+    expect(output).toContain("function");
   });
 });

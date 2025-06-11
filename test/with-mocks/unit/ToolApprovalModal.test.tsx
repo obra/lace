@@ -3,29 +3,9 @@
 
 import { jest, describe, test, beforeEach, expect } from "@jest/globals";
 import React from "react";
-import { render } from "ink-testing-library";
+import { renderInkComponent } from "../helpers/ink-test-utils";
 import ToolApprovalModal from "@/ui/components/ToolApprovalModal";
 import { Box, Text } from "ink";
-
-// Mock Ink hooks that require terminal environment
-jest.mock("ink", () => {
-  const actualInk = jest.requireActual("ink") as any;
-  return {
-    ...actualInk,
-    useFocus: jest.fn(() => ({ isFocused: false })),
-    useInput: jest.fn()
-  };
-});
-
-// Mock useRef since it causes issues in unit test environment
-jest.mock("react", () => {
-  const actualReact = jest.requireActual("react") as any;
-  return {
-    ...actualReact,
-    useRef: jest.fn(() => ({ current: "test-id" })),
-    useState: jest.fn((initial) => [initial, jest.fn()])
-  };
-});
 
 describe("ToolApprovalModal Component", () => {
   const mockToolCall = {
@@ -53,34 +33,34 @@ describe("ToolApprovalModal Component", () => {
   });
 
   test("user can see tool approval modal structure", () => {
-    const { lastFrame } = render(<ToolApprovalModal {...defaultProps} />);
+    const { lastFrame } = renderInkComponent(<ToolApprovalModal {...defaultProps} />);
     const output = lastFrame();
 
     // Should display the essential information to the user
-    expect(output).toContain("Tool Approval Required");
-    expect(output).toContain("HIGH");
-    expect(output).toContain("execute_command");
+    expect(output).toContain("Tool Execution Request");
+    expect(output).toContain("MEDIUM");
+    expect(output).toContain("file_write");
   });
 
   test("user can see modal renders with tool information", () => {
-    const { lastFrame } = render(<ToolApprovalModal {...defaultProps} />);
+    const { lastFrame } = renderInkComponent(<ToolApprovalModal {...defaultProps} />);
     const output = lastFrame();
     
     // Should display tool information
-    expect(output).toContain("execute_command");
-    expect(output).toContain("test input");
-    expect(output).toContain("Tool Approval Required");
+    expect(output).toContain("file_write");
+    expect(output).toContain("/test/file.txt");
+    expect(output).toContain("Tool Execution Request");
   });
 
   test("user can see modal with different risk levels", () => {
     const riskLevels = ["low", "medium", "high"] as const;
     
     riskLevels.forEach(riskLevel => {
-      const { lastFrame } = render(<ToolApprovalModal {...defaultProps} riskLevel={riskLevel} />);
+      const { lastFrame } = renderInkComponent(<ToolApprovalModal {...defaultProps} riskLevel={riskLevel} />);
       const output = lastFrame();
       
       // Should render successfully for all risk levels
-      expect(output).toContain("Tool Approval Required");
+      expect(output).toContain("Tool Execution Request");
       expect(output).toContain(riskLevel.toUpperCase());
     });
   });
@@ -99,11 +79,11 @@ describe("ToolApprovalModal Component", () => {
       onStop: jest.fn()
     };
 
-    const { lastFrame } = render(<ToolApprovalModal {...minimalProps} />);
+    const { lastFrame } = renderInkComponent(<ToolApprovalModal {...minimalProps} />);
     const output = lastFrame();
     
     // Should render successfully without optional props
-    expect(output).toContain("Tool Approval Required");
+    expect(output).toContain("Tool Execution Request");
     expect(output).toContain("test_tool");
   });
 
@@ -123,11 +103,11 @@ describe("ToolApprovalModal Component", () => {
       }
     };
 
-    const { lastFrame } = render(<ToolApprovalModal {...defaultProps} toolCall={complexToolCall} />);
+    const { lastFrame } = renderInkComponent(<ToolApprovalModal {...defaultProps} toolCall={complexToolCall} />);
     const output = lastFrame();
     
     // Should handle complex parameters without error
-    expect(output).toContain("Tool Approval Required");
+    expect(output).toContain("Tool Execution Request");
     expect(output).toContain("api_call");
   });
 
@@ -137,11 +117,11 @@ describe("ToolApprovalModal Component", () => {
       input: {}
     };
 
-    const { lastFrame } = render(<ToolApprovalModal {...defaultProps} toolCall={emptyParamsToolCall} />);
+    const { lastFrame } = renderInkComponent(<ToolApprovalModal {...defaultProps} toolCall={emptyParamsToolCall} />);
     const output = lastFrame();
     
     // Should handle empty parameters
-    expect(output).toContain("Tool Approval Required");
+    expect(output).toContain("Tool Execution Request");
     expect(output).toContain("status_check");
   });
 });

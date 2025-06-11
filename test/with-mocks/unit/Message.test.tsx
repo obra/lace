@@ -2,59 +2,43 @@
 // ABOUTME: Tests message display with user/assistant types and content
 
 import React from "react";
+import { renderInkComponent } from "../helpers/ink-test-utils";
 import Message from "@/ui/components/Message";
 import { Box, Text } from "ink";
 
 describe("Message Component", () => {
-  test("renders user message with correct prefix and styling", () => {
-    const element = Message({ type: "user", content: "Hello world" }) as any;
+  test("user can see user message with prefix", () => {
+    const { lastFrame } = renderInkComponent(
+      <Message type="user" content="Hello world" />
+    );
+    const output = lastFrame();
 
-    // Should return a Box with column direction
-    expect(element.type).toBe(Box);
-    expect(element.props.flexDirection).toBe("column");
-
-    // Check the message content box
-    const messageBox = element.props.children[0];
-    expect(messageBox.type).toBe(Box);
-
-    const [prefixElement, contentElement] = messageBox.props.children;
-
-    // Prefix should be cyan ">" for user
-    expect(prefixElement.type).toBe(Text);
-    expect(prefixElement.props.color).toBe("cyan");
-    expect(prefixElement.props.children).toBe("> ");
-
-    // Content should be the message text
-    expect(contentElement.type).toBe(Text);
-    expect(contentElement.props.children).toBe("Hello world");
+    // Should display user prefix and content
+    expect(output).toContain(">");
+    expect(output).toContain("Hello world");
   });
 
-  test("renders assistant message with correct prefix and styling", () => {
-    const element = Message({ type: "assistant", content: "Hi there!" }) as any;
+  test("user can see assistant message with robot prefix", () => {
+    const { lastFrame } = renderInkComponent(
+      <Message type="assistant" content="Hi there!" />
+    );
+    const output = lastFrame();
 
-    const messageBox = element.props.children[0];
-    const [prefixElement, contentElement] = messageBox.props.children;
-
-    // Prefix should be green robot emoji for assistant
-    expect(prefixElement.type).toBe(Text);
-    expect(prefixElement.props.color).toBe("green");
-    expect(prefixElement.props.children).toBe("🤖 ");
-
-    // Content should be the message text
-    expect(contentElement.type).toBe(Text);
-    expect(contentElement.props.children).toBe("Hi there!");
+    // Should display robot prefix and content
+    expect(output).toContain("🤖");
+    expect(output).toContain("Hi there!");
   });
 
-  test("handles multi-line content correctly", () => {
+  test("user can see multi-line content", () => {
     const multiLineContent = "Line 1\nLine 2\nLine 3";
-    const element = Message({
-      type: "assistant",
-      content: multiLineContent,
-    }) as any;
+    const { lastFrame } = renderInkComponent(
+      <Message type="assistant" content={multiLineContent} />
+    );
+    const output = lastFrame();
 
-    const messageBox = element.props.children[0];
-    const [, contentElement] = messageBox.props.children;
-
-    expect(contentElement.props.children).toBe(multiLineContent);
+    // Should display all lines
+    expect(output).toContain("Line 1");
+    expect(output).toContain("Line 2");
+    expect(output).toContain("Line 3");
   });
 });

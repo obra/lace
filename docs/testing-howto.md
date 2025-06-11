@@ -183,7 +183,95 @@ describe("Component Name", () => {
 });
 ```
 
-### Legacy Ink Component Testing (EXISTING)
+### Ink Component Testing (RECOMMENDED)
+
+Ink components (React for terminal UIs) require special testing infrastructure because they interact with Node.js streams.
+
+#### The Problem
+
+Standard testing approaches fail with Ink components due to missing stream methods:
+
+```
+TypeError: stdin.ref is not a function
+```
+
+This occurs because Ink's App component calls `stdin.ref()` and `stdin.unref()` for raw mode management, but standard test mocks don't provide these Node.js stream methods.
+
+#### The Solution: Custom renderInkComponent
+
+Use our custom `renderInkComponent` function from `test/with-mocks/helpers/ink-test-utils.ts`:
+
+```typescript
+import { renderInkComponent } from "../helpers/ink-test-utils";
+import ToolApprovalModal from "@/ui/components/ToolApprovalModal";
+
+describe("ToolApprovalModal Component", () => {
+  test("user can see tool approval modal structure", () => {
+    const { lastFrame } = renderInkComponent(
+      <ToolApprovalModal 
+        toolCall={{name: "file_write", input: {path: "/test"}}}
+        riskLevel="medium"
+        onApprove={jest.fn()}
+        onDeny={jest.fn()}
+        onStop={jest.fn()}
+      />
+    );
+    
+    const output = lastFrame();
+    
+    // Test behavior - what users see
+    expect(output).toContain("Tool Execution Request");
+    expect(output).toContain("MEDIUM");
+    expect(output).toContain("file_write");
+  });
+});
+```
+
+#### Key Implementation Details
+
+The custom `renderInkComponent` extends ink-testing-library with missing Node.js stream methods:
+
+```typescript
+class EnhancedStdin extends EventEmitter {
+  public isTTY = true;
+  
+  // Missing methods that Ink's App component needs
+  public ref() { /* Do nothing - mock implementation */ }
+  public unref() { /* Do nothing - mock implementation */ }
+  public read() { return null; }
+  public setRawMode() { /* Do nothing - mock implementation */ }
+  // ... other required stream methods
+}
+```
+
+#### Testing Philosophy: Behavior vs Implementation
+
+**✅ GOOD - Test User-Visible Behavior:**
+```typescript
+test("user can see modal displays risk level", () => {
+  const { lastFrame } = renderInkComponent(<ToolApprovalModal riskLevel="high" {...props} />);
+  expect(lastFrame()).toContain("HIGH");
+});
+```
+
+**❌ BAD - Test Implementation Details:**
+```typescript
+test("modal has correct JSX structure", () => {
+  const element = ToolApprovalModal(props);
+  expect(element.props.children[0].type).toBe(Box);
+});
+```
+
+#### Applying to Other Ink Components
+
+Use this pattern for all Ink components that fail with stream-related errors:
+
+1. Import `renderInkComponent` from ink-test-utils
+2. Replace direct component instantiation with `renderInkComponent(<Component />)`
+3. Test the rendered output string instead of JSX structure
+4. Focus on user-visible behavior rather than implementation details
+
+### Legacy Ink Component Testing (DEPRECATED)
 
 ```typescript
 import Component from "../../../src/ui/components/Component";
@@ -197,6 +285,8 @@ describe("Component Name", () => {
   });
 });
 ```
+
+**Note**: This approach is deprecated due to testing implementation details instead of user behavior. Use `renderInkComponent` instead.
 
 ### Integration Testing Pattern
 
