@@ -56,7 +56,7 @@ class MockFileTool {
   }
   
   async write(params) {
-    return { bytesWritten: params.content.length, path: params.path };
+    return { bytesWritten: params.content.length, success: true };
   }
 }
 
@@ -416,7 +416,7 @@ describe("ToolRegistry", () => {
         }),
         expect.objectContaining({
           success: true,
-          result: { bytesWritten: 5, path: "test.txt" }
+          result: { bytesWritten: 5, success: true }
         }),
         "test-session",
         1
@@ -473,7 +473,9 @@ describe("ToolRegistry", () => {
       );
 
       expect(result).toEqual({
-        content: "File content from test.txt"
+        content: "hello",
+        size: 5,
+        success: true
       });
 
       expect(mockActivityLogger.logEvent).toHaveBeenCalledWith(
