@@ -377,5 +377,71 @@ describe("Log Extraction", () => {
       expect(logEntries[0].type).toBe("assistant");
       expect(logEntries[0].content).toBe("Simple response without tools.");
     });
+
+    test("extracts usage data from assistant messages", () => {
+      const conversation: ConversationMessage[] = [
+        {
+          type: "assistant",
+          content: "Response with usage data",
+          usage: {
+            inputTokens: 1200,
+            outputTokens: 456,
+            totalTokens: 1656,
+          },
+        },
+      ];
+
+      const logEntries = extractLogEntries(conversation);
+
+      expect(logEntries).toHaveLength(1);
+      expect(logEntries[0].usage).toEqual({
+        inputTokens: 1200,
+        outputTokens: 456,
+        totalTokens: 1656,
+      });
+    });
+
+    test("extracts timing data from tool calls", () => {
+      const conversation: ConversationMessage[] = [
+        {
+          type: "assistant",
+          content: "Here are the results",
+          tool_calls: [
+            {
+              name: "shell",
+              input: { command: "ls -la" },
+            },
+          ],
+        },
+      ];
+
+      const logEntries = extractLogEntries(conversation);
+
+      expect(logEntries).toHaveLength(2); // assistant + tool_call
+      expect(logEntries[1].type).toBe("tool_call");
+      expect(logEntries[1].timing).toBeDefined();
+      expect(logEntries[1].timing?.durationMs).toBeGreaterThan(0);
+    });
+
+    test("extracts timing data from agent activity", () => {
+      const conversation: ConversationMessage[] = [
+        {
+          type: "agent_activity",
+          summary: "Processing request",
+          content: ["Step 1", "Step 2"],
+          folded: false,
+          timing: {
+            durationMs: 1500,
+          },
+        },
+      ];
+
+      const logEntries = extractLogEntries(conversation);
+
+      expect(logEntries).toHaveLength(1);
+      expect(logEntries[0].timing).toEqual({
+        durationMs: 1500,
+      });
+    });
   });
 });

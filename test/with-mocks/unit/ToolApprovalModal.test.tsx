@@ -3,8 +3,29 @@
 
 import { jest, describe, test, beforeEach, expect } from "@jest/globals";
 import React from "react";
+import { render } from "ink-testing-library";
 import ToolApprovalModal from "@/ui/components/ToolApprovalModal";
 import { Box, Text } from "ink";
+
+// Mock Ink hooks that require terminal environment
+jest.mock("ink", () => {
+  const actualInk = jest.requireActual("ink") as any;
+  return {
+    ...actualInk,
+    useFocus: jest.fn(() => ({ isFocused: false })),
+    useInput: jest.fn()
+  };
+});
+
+// Mock useRef since it causes issues in unit test environment
+jest.mock("react", () => {
+  const actualReact = jest.requireActual("react") as any;
+  return {
+    ...actualReact,
+    useRef: jest.fn(() => ({ current: "test-id" })),
+    useState: jest.fn((initial) => [initial, jest.fn()])
+  };
+});
 
 describe("ToolApprovalModal Component", () => {
   const mockToolCall = {
@@ -32,40 +53,35 @@ describe("ToolApprovalModal Component", () => {
   });
 
   test("user can see tool approval modal structure", () => {
-    const element = ToolApprovalModal(defaultProps) as any;
+    const { lastFrame } = render(<ToolApprovalModal {...defaultProps} />);
+    const output = lastFrame();
 
-    // Should return a Box with proper structure
-    expect(element.type).toBe(Box);
-    expect(element.props.flexDirection).toBe("column");
-    expect(element.props.borderStyle).toBe("round");
-    expect(element.props.borderColor).toBe("yellow");
-    expect(element.props.padding).toBe(1);
+    // Should display the essential information to the user
+    expect(output).toContain("Tool Approval Required");
+    expect(output).toContain("HIGH");
+    expect(output).toContain("execute_command");
   });
 
   test("user can see modal renders with tool information", () => {
-    const element = ToolApprovalModal(defaultProps) as any;
+    const { lastFrame } = render(<ToolApprovalModal {...defaultProps} />);
+    const output = lastFrame();
     
-    // Should have main container structure
-    expect(element.type).toBe(Box);
-    expect(React.isValidElement(element)).toBe(true);
-    
-    // Should have children representing the content sections
-    expect(element.props.children).toBeDefined();
-    expect(Array.isArray(element.props.children)).toBe(true);
+    // Should display tool information
+    expect(output).toContain("execute_command");
+    expect(output).toContain("test input");
+    expect(output).toContain("Tool Approval Required");
   });
 
   test("user can see modal with different risk levels", () => {
     const riskLevels = ["low", "medium", "high"] as const;
     
     riskLevels.forEach(riskLevel => {
-      const element = ToolApprovalModal({
-        ...defaultProps,
-        riskLevel
-      }) as any;
+      const { lastFrame } = render(<ToolApprovalModal {...defaultProps} riskLevel={riskLevel} />);
+      const output = lastFrame();
       
       // Should render successfully for all risk levels
-      expect(element.type).toBe(Box);
-      expect(React.isValidElement(element)).toBe(true);
+      expect(output).toContain("Tool Approval Required");
+      expect(output).toContain(riskLevel.toUpperCase());
     });
   });
 
@@ -83,11 +99,12 @@ describe("ToolApprovalModal Component", () => {
       onStop: jest.fn()
     };
 
-    const element = ToolApprovalModal(minimalProps) as any;
+    const { lastFrame } = render(<ToolApprovalModal {...minimalProps} />);
+    const output = lastFrame();
     
     // Should render successfully without optional props
-    expect(element.type).toBe(Box);
-    expect(React.isValidElement(element)).toBe(true);
+    expect(output).toContain("Tool Approval Required");
+    expect(output).toContain("test_tool");
   });
 
   test("user can see modal with complex tool parameters", () => {
@@ -106,14 +123,12 @@ describe("ToolApprovalModal Component", () => {
       }
     };
 
-    const element = ToolApprovalModal({
-      ...defaultProps,
-      toolCall: complexToolCall
-    }) as any;
+    const { lastFrame } = render(<ToolApprovalModal {...defaultProps} toolCall={complexToolCall} />);
+    const output = lastFrame();
     
     // Should handle complex parameters without error
-    expect(element.type).toBe(Box);
-    expect(React.isValidElement(element)).toBe(true);
+    expect(output).toContain("Tool Approval Required");
+    expect(output).toContain("api_call");
   });
 
   test("user can see modal with empty parameters", () => {
@@ -122,13 +137,11 @@ describe("ToolApprovalModal Component", () => {
       input: {}
     };
 
-    const element = ToolApprovalModal({
-      ...defaultProps,
-      toolCall: emptyParamsToolCall
-    }) as any;
+    const { lastFrame } = render(<ToolApprovalModal {...defaultProps} toolCall={emptyParamsToolCall} />);
+    const output = lastFrame();
     
     // Should handle empty parameters
-    expect(element.type).toBe(Box);
-    expect(React.isValidElement(element)).toBe(true);
+    expect(output).toContain("Tool Approval Required");
+    expect(output).toContain("status_check");
   });
 });

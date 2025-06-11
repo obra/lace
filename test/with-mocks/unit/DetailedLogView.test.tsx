@@ -205,4 +205,68 @@ describe("DetailedLogView Component", () => {
     // Should render all entries with color coding
     expect(entries).toHaveLength(4);
   });
+
+  test("displays usage and performance data for entries with metadata", () => {
+    const entries = [
+      {
+        id: "1",
+        timestamp: new Date().toISOString(),
+        type: "assistant",
+        content: "Model response with token usage",
+        usage: {
+          inputTokens: 1250,
+          outputTokens: 456,
+          totalTokens: 1706,
+        },
+      },
+      {
+        id: "2",
+        timestamp: new Date().toISOString(),
+        type: "tool_call",
+        content: "Tool execution with timing",
+        timing: {
+          durationMs: 234,
+        },
+      },
+      {
+        id: "3",
+        timestamp: new Date().toISOString(),
+        type: "tool_call",
+        content: "Long running tool",
+        timing: {
+          durationMs: 1500,
+        },
+      },
+      {
+        id: "4",
+        timestamp: new Date().toISOString(),
+        type: "streaming",
+        content: "Streaming response",
+        usage: {
+          inputTokens: 500,
+          outputTokens: 123,
+        },
+      },
+    ];
+
+    const { lastFrame } = render(<DetailedLogView entries={entries} />);
+    const output = lastFrame();
+
+    // Verify content is displayed
+    expect(output).toContain("Model response with token usage");
+    expect(output).toContain("Tool execution with timing");
+    expect(output).toContain("Long running tool");
+    expect(output).toContain("Streaming response");
+
+    // Verify usage data is formatted correctly according to Task 8 requirements
+    expect(output).toContain("(1.3K→456 tokens)"); // 1250 input → 456 output formatted
+    expect(output).toContain("(500→123 tokens)"); // Streaming response usage
+
+    // Verify timing data is formatted correctly
+    expect(output).toContain("(234ms)"); // Short duration in ms
+    expect(output).toContain("(1.5s)"); // Long duration in seconds
+
+    // Should render all entries
+    expect(entries).toHaveLength(4);
+  });
 });

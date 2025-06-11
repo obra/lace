@@ -20,16 +20,27 @@ interface ToolCall {
   input: any;
 }
 
+interface UsageData {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+}
+
+interface TimingData {
+  durationMs?: number;
+}
+
 type ConversationMessage =
   | { type: "user"; content: string }
-  | { type: "assistant"; content: string; tool_calls?: ToolCall[] }
+  | { type: "assistant"; content: string; tool_calls?: ToolCall[]; usage?: UsageData }
   | { type: "loading"; content: string }
-  | { type: "streaming"; content: string; isStreaming: boolean }
+  | { type: "streaming"; content: string; isStreaming: boolean; usage?: UsageData }
   | {
       type: "agent_activity";
       summary: string;
       content: string[];
       folded: boolean;
+      timing?: TimingData;
     };
 
 // DetailedLogEntry imported from DetailedLogView component
@@ -53,23 +64,57 @@ function extractLogEntries(conversation: ConversationMessage[]): DetailedLogEntr
       content = message.content as string;
     }
     
+    // Extract usage and timing data based on message type
+    let usage: DetailedLogEntry['usage'] = undefined;
+    let timing: DetailedLogEntry['timing'] = undefined;
+
+    if (message.type === "assistant" && message.usage) {
+      usage = {
+        inputTokens: message.usage.inputTokens,
+        outputTokens: message.usage.outputTokens,
+        totalTokens: message.usage.totalTokens,
+      };
+    } else if (message.type === "streaming" && message.usage) {
+      usage = {
+        inputTokens: message.usage.inputTokens,
+        outputTokens: message.usage.outputTokens,
+        totalTokens: message.usage.totalTokens,
+      };
+    } else if (message.type === "agent_activity" && message.timing) {
+      timing = {
+        durationMs: message.timing.durationMs,
+      };
+    }
+
     entries.push({
       id: `log-${entryIndex++}-${baseTimestamp}`,
       timestamp: baseTimestamp,
       type: message.type as string,
       content,
+      usage,
+      timing,
     });
 
     // If this is an assistant message with tool calls, add separate tool call entries
     if (message.type === "assistant" && message.tool_calls && message.tool_calls.length > 0) {
       message.tool_calls.forEach((toolCall, toolIndex) => {
-        // Add tool call entry
+        // Add tool call entry with mock timing data for demonstration
         const toolCallTimestamp = new Date(Date.parse(baseTimestamp) + toolIndex + 1).toISOString();
+        
+        // Mock timing data based on tool type (in real implementation, this would come from activity logger)
+        const mockDuration = toolCall.name === "file" ? 50 + Math.random() * 100 : 
+                           toolCall.name === "shell" ? 200 + Math.random() * 800 :
+                           toolCall.name === "javascript" ? 100 + Math.random() * 500 :
+                           75 + Math.random() * 150;
+        
         entries.push({
           id: `log-${entryIndex++}-${toolCallTimestamp}`,
           timestamp: toolCallTimestamp,
           type: "tool_call",
           content: `Tool: ${toolCall.name}\nInput: ${JSON.stringify(toolCall.input, null, 2)}`,
+          timing: {
+            durationMs: Math.round(mockDuration),
+          },
         });
 
         // For now, we don't have tool results in the conversation history

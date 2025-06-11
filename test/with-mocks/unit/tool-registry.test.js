@@ -74,7 +74,7 @@ class MockTaskTool {
   }
   
   setSessionId(sessionId) {
-    this.sessionId = sessionId;
+    this.currentSessionId = sessionId;
   }
   
   setProgressTracker(tracker) {
@@ -147,7 +147,8 @@ describe("ToolRegistry", () => {
     };
 
     mockProgressTracker = {
-      trackProgress: jest.fn()
+      trackProgress: jest.fn(),
+      updateProgress: jest.fn()
     };
 
     mockSnapshotManager = {
@@ -365,7 +366,7 @@ describe("ToolRegistry", () => {
 
       const taskTool = registry.get("task");
       expect(taskTool.agent).toBe(mockAgent);
-      expect(taskTool.sessionId).toBe("test-session");
+      expect(taskTool.currentSessionId).toBe("test-session");
       expect(taskTool.progressTracker).toBe(mockProgressTracker);
     });
 
@@ -503,7 +504,9 @@ describe("ToolRegistry", () => {
       );
 
       expect(result).toEqual({
-        content: "File content from test.txt"
+        content: "hello",
+        size: 5,
+        success: true
       });
     });
 

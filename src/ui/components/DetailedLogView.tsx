@@ -9,6 +9,14 @@ export interface DetailedLogEntry {
   timestamp: string;
   type: string;
   content: string;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+  };
+  timing?: {
+    durationMs?: number;
+  };
 }
 
 interface DetailedLogViewProps {
@@ -96,6 +104,52 @@ function getEntryTypePrefix(type: string): string {
   }
 }
 
+/**
+ * Format token count with K/M suffixes for readability
+ */
+function formatTokenCount(count: number): string {
+  if (count >= 1000000) {
+    return `${(count / 1000000).toFixed(1)}M`;
+  } else if (count >= 1000) {
+    return `${(count / 1000).toFixed(1)}K`;
+  }
+  return count.toString();
+}
+
+/**
+ * Format token usage display: (1.2K→456 tokens)
+ */
+function formatTokenUsage(usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number }): string {
+  const { inputTokens, outputTokens, totalTokens } = usage;
+  
+  if (inputTokens !== undefined && outputTokens !== undefined) {
+    const inputStr = formatTokenCount(inputTokens);
+    const outputStr = formatTokenCount(outputTokens);
+    return `(${inputStr}→${outputStr} tokens)`;
+  } else if (totalTokens !== undefined) {
+    return `(${formatTokenCount(totalTokens)} tokens)`;
+  }
+  
+  return "";
+}
+
+/**
+ * Format timing display: (123ms) or (1.2s)
+ */
+function formatTiming(timing: { durationMs?: number }): string {
+  const { durationMs } = timing;
+  
+  if (durationMs === undefined) {
+    return "";
+  }
+  
+  if (durationMs >= 1000) {
+    return `(${(durationMs / 1000).toFixed(1)}s)`;
+  }
+  
+  return `(${Math.round(durationMs)}ms)`;
+}
+
 const DetailedLogView: React.FC<DetailedLogViewProps> = ({
   scrollPosition = 0,
   isNavigationMode = false,
@@ -132,6 +186,17 @@ const DetailedLogView: React.FC<DetailedLogViewProps> = ({
               >
                 {" "}{typePrefix}: 
               </Text>
+              {/* Display usage and timing data inline */}
+              {entry.usage && (
+                <Text color="cyan">
+                  {formatTokenUsage(entry.usage)}{" "}
+                </Text>
+              )}
+              {entry.timing && (
+                <Text color="yellow">
+                  {formatTiming(entry.timing)}{" "}
+                </Text>
+              )}
             </Box>
             <Text 
               color={isHighlighted ? "white" : undefined}
