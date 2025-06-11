@@ -8,6 +8,7 @@ import { CommandManager } from "./commands/CommandManager";
 import { getAllCommands } from "./commands/registry";
 // Remove fullscreen-ink import from here - will be used in lace-ui.ts instead
 import ConversationView from "./components/ConversationView";
+import DetailedLogView from "./components/DetailedLogView";
 import StatusBar from "./components/StatusBar";
 import ShellInput from "./components/ShellInput";
 import ToolApprovalModal from "./components/ToolApprovalModal";
@@ -713,15 +714,26 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
     }
   }, [isSearchMode, toolApprovalRequest, focus]);
 
+  // Mock log entries for testing
+  const mockLogEntries = ['Mock log entry 1', 'Mock log entry 2'];
+
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <ConversationView
-        scrollPosition={scrollPosition}
-        isNavigationMode={isNavigationMode}
-        messages={filteredConversation}
-        searchTerm={filterMode === "search" || isSearchMode ? searchTerm : ""}
-        searchResults={searchResults}
-      />
+      {viewMode === 'conversation' ? (
+        <ConversationView
+          scrollPosition={scrollPosition}
+          isNavigationMode={isNavigationMode}
+          messages={filteredConversation}
+          searchTerm={filterMode === "search" || isSearchMode ? searchTerm : ""}
+          searchResults={searchResults}
+        />
+      ) : (
+        <DetailedLogView
+          scrollPosition={scrollPosition}
+          isNavigationMode={isNavigationMode}
+          entries={mockLogEntries}
+        />
+      )}
       <StatusBar
         isNavigationMode={isNavigationMode}
         scrollPosition={scrollPosition}
