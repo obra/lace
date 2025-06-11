@@ -198,6 +198,7 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [searchResultIndex, setSearchResultIndex] = useState(0);
+  const [viewMode, setViewMode] = useState<'conversation' | 'log'>('conversation');
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [tokenUsage, setTokenUsage] = useState({ used: 0, total: 200000 });
   const [modelName, setModelName] = useState("claude-3-5-sonnet");
@@ -601,6 +602,12 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
       return;
     }
 
+    // Global Ctrl+L handler for toggling view mode
+    if (key.ctrl && input === "l") {
+      setViewMode((prev) => prev === 'conversation' ? 'log' : 'conversation');
+      return;
+    }
+
     // Global Escape handler for aborting processing (but not navigation)
     if (key.escape && (isLoading || isStreaming) && laceUI) {
       const aborted = laceUI.handleAbort();
@@ -729,6 +736,7 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
         tokenUsage={tokenUsage}
         modelName={modelName}
         terminalWidth={stdout.columns || 100}
+        viewMode={viewMode}
       />
       <ShellInput
         value={isSearchMode ? searchTerm : inputText}
