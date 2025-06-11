@@ -26,8 +26,37 @@ type ConversationMessage =
       folded: boolean;
     };
 
+interface DetailedLogEntry {
+  id: string;
+  timestamp: string;
+  type: ConversationMessage["type"];
+  content: string;
+}
+
 interface AppProps {
   laceUI?: any; // LaceUI instance passed from parent
+}
+
+function extractLogEntries(conversation: ConversationMessage[]): DetailedLogEntry[] {
+  return conversation.map((message, index) => {
+    const timestamp = new Date().toISOString(); // For now, use current time - would be better with actual message timestamps
+    const id = `log-${index}-${timestamp}`;
+    
+    // Extract content based on message type
+    let content: string;
+    if (message.type === "agent_activity") {
+      content = `${message.summary}\n${message.content.join('\n')}`;
+    } else {
+      content = message.content as string;
+    }
+    
+    return {
+      id,
+      timestamp,
+      type: message.type,
+      content,
+    };
+  });
 }
 
 function formatModalContent(type: string, data: any): string {
