@@ -743,8 +743,8 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
     }
   }, [isSearchMode, toolApprovalRequest, focus]);
 
-  // Mock log entries for testing
-  const mockLogEntries = ['Mock log entry 1', 'Mock log entry 2'];
+  // Extract real log entries from conversation
+  const logEntries = extractLogEntries(conversation);
 
   return (
     <Box flexDirection="column" flexGrow={1}>
@@ -760,7 +760,7 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
         <DetailedLogView
           scrollPosition={scrollPosition}
           isNavigationMode={isNavigationMode}
-          entries={mockLogEntries}
+          entries={logEntries}
         />
       )}
       <StatusBar

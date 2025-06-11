@@ -4,10 +4,17 @@
 import React from "react";
 import { Box, Text } from "ink";
 
+interface DetailedLogEntry {
+  id: string;
+  timestamp: string;
+  type: string;
+  content: string;
+}
+
 interface DetailedLogViewProps {
   scrollPosition?: number;
   isNavigationMode?: boolean;
-  entries?: string[];
+  entries?: DetailedLogEntry[];
 }
 
 /**
@@ -15,7 +22,7 @@ interface DetailedLogViewProps {
  * Only renders entries around the current scroll position to improve performance
  */
 function getVisibleEntryWindow(
-  entries: string[],
+  entries: DetailedLogEntry[],
   scrollPosition: number,
   windowSize: number = 50,
 ) {
@@ -61,12 +68,31 @@ const DetailedLogView: React.FC<DetailedLogViewProps> = ({
         const isHighlighted = isNavigationMode && absoluteIndex === scrollPosition;
         
         return (
-          <Box key={`log-entry-${absoluteIndex}`}>
-            <Text
-              backgroundColor={isHighlighted ? "blue" : undefined}
+          <Box 
+            key={entry.id}
+            flexDirection="column"
+            marginBottom={1}
+          >
+            <Box>
+              <Text 
+                color="dim"
+                backgroundColor={isHighlighted ? "blue" : undefined}
+              >
+                [{new Date(entry.timestamp).toLocaleTimeString()}]
+              </Text>
+              <Text 
+                color="yellow" 
+                bold
+                backgroundColor={isHighlighted ? "blue" : undefined}
+              >
+                {" "}{entry.type.toUpperCase()}: 
+              </Text>
+            </Box>
+            <Text 
               color={isHighlighted ? "white" : undefined}
+              backgroundColor={isHighlighted ? "blue" : undefined}
             >
-              {entry}
+              {entry.content}
             </Text>
           </Box>
         );
