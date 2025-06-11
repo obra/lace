@@ -36,7 +36,7 @@ describe("Search Functionality Integration", () => {
     const output = lastFrame();
     
     // User should see search-specific instructions
-    expect(output).toContain("Search") || expect(output).toContain("search");
+    expect(output).toMatch(/search/i);
   });
 
   test("user can see search results highlighted in conversation", () => {
@@ -69,15 +69,22 @@ describe("Search Functionality Integration", () => {
       <StatusBar 
         isSearchMode={true}
         searchTerm="test"
-        currentSearchResult={2}
-        totalSearchResults={5}
+        searchResultIndex={2}
+        searchResults={[
+          {messageIndex: 0, message: {}},
+          {messageIndex: 1, message: {}},
+          {messageIndex: 2, message: {}},
+          {messageIndex: 3, message: {}},
+          {messageIndex: 4, message: {}}
+        ]}
       />
     );
 
     const output = lastFrame();
     
     // User should see their position in search results
-    expect(output).toContain("2") && expect(output).toContain("5");
+    expect(output).toContain("2");
+    expect(output).toContain("5");
     expect(output).toContain("test");
   });
 
@@ -91,14 +98,14 @@ describe("Search Functionality Integration", () => {
       <StatusBar 
         isSearchMode={true}
         searchTerm="nonexistent"
-        totalSearchResults={0}
+        searchResults={[]}
       />
     );
 
     const output = lastFrame();
     
     // User should see indication of no results
-    expect(output).toContain("0") || expect(output).toContain("No") || expect(output).toContain("not found");
+    expect(output).toMatch(/0|no|not found/i);
   });
 
   test("user can search for code snippets", () => {
@@ -172,8 +179,12 @@ describe("Search Functionality Integration", () => {
       <StatusBar 
         isSearchMode={true}
         searchTerm="test"
-        currentSearchResult={1}
-        totalSearchResults={3}
+        searchResultIndex={1}
+        searchResults={[
+          {messageIndex: 0, message: {}},
+          {messageIndex: 1, message: {}},
+          {messageIndex: 2, message: {}}
+        ]}
       />
     );
 
@@ -181,8 +192,12 @@ describe("Search Functionality Integration", () => {
       <StatusBar 
         isSearchMode={true}
         searchTerm="test"
-        currentSearchResult={2}
-        totalSearchResults={3}
+        searchResultIndex={2}
+        searchResults={[
+          {messageIndex: 0, message: {}},
+          {messageIndex: 1, message: {}},
+          {messageIndex: 2, message: {}}
+        ]}
       />
     );
 
@@ -213,10 +228,19 @@ describe("Search Functionality Integration", () => {
   });
 
   test("user can search in long conversations", () => {
-    const longConversation = Array.from({ length: 10 }, (_, i) => ({
-      type: (i % 2 === 0 ? "user" : "assistant") as const,
-      content: `Message ${i + 1} with some test content`,
-    }));
+    const longConversation = Array.from({ length: 10 }, (_, i) => {
+      if (i % 2 === 0) {
+        return {
+          type: "user" as const,
+          content: `Message ${i + 1} with some test content`,
+        };
+      } else {
+        return {
+          type: "assistant" as const,
+          content: `Message ${i + 1} with some test content`,
+        };
+      }
+    });
 
     const { lastFrame } = render(
       <ConversationView 

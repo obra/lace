@@ -4,7 +4,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 
-interface DetailedLogEntry {
+export interface DetailedLogEntry {
   id: string;
   timestamp: string;
   type: string;
@@ -72,25 +72,21 @@ const DetailedLogView: React.FC<DetailedLogViewProps> = ({
             key={entry.id}
             flexDirection="column"
             marginBottom={1}
+            {...(isHighlighted && { backgroundColor: "blue" })}
           >
             <Box>
-              <Text 
-                color="dim"
-                backgroundColor={isHighlighted ? "blue" : undefined}
-              >
+              <Text color="dim">
                 [{new Date(entry.timestamp).toLocaleTimeString()}]
               </Text>
               <Text 
                 color="yellow" 
                 bold
-                backgroundColor={isHighlighted ? "blue" : undefined}
               >
                 {" "}{entry.type.toUpperCase()}: 
               </Text>
             </Box>
             <Text 
               color={isHighlighted ? "white" : undefined}
-              backgroundColor={isHighlighted ? "blue" : undefined}
             >
               {entry.content}
             </Text>

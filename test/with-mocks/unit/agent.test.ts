@@ -6,14 +6,16 @@ import { Agent } from "@/agents/agent.ts";
 import { getRole } from "@/agents/role-registry.ts";
 
 // Mock dependencies
-jest.mock("@/agents/role-registry.ts");
+jest.mock("@/agents/role-registry.ts", () => ({
+  getRole: jest.fn()
+}));
 jest.mock("@/logging/activity-logger.js");
 jest.mock("@/logging/debug-logger.js");
 jest.mock("@/tools/synthesis-engine.js");
 jest.mock("@/tools/token-estimator.js");
 jest.mock("@/tools/tool-result-extractor.js");
 
-const mockGetRole = jest.mocked(getRole);
+const mockGetRole = getRole as jest.MockedFunction<typeof getRole>;
 
 describe("Agent", () => {
   let mockTools: any;

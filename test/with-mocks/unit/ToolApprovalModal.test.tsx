@@ -1,6 +1,7 @@
 // ABOUTME: Unit tests for ToolApprovalModal component
 // ABOUTME: Tests tool approval component structure and behavior
 
+import { jest, describe, test, beforeEach, expect } from "@jest/globals";
 import React from "react";
 import ToolApprovalModal from "@/ui/components/ToolApprovalModal";
 import { Box, Text } from "ink";

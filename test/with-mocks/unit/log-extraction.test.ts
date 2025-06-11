@@ -3,9 +3,15 @@
 
 describe("Log Extraction", () => {
   // Define types locally since they're not exported
+  interface ToolCall {
+    id?: string;
+    name: string;
+    input: any;
+  }
+
   type ConversationMessage =
     | { type: "user"; content: string }
-    | { type: "assistant"; content: string }
+    | { type: "assistant"; content: string; tool_calls?: ToolCall[] }
     | { type: "loading"; content: string }
     | { type: "streaming"; content: string; isStreaming: boolean }
     | {

@@ -139,6 +139,24 @@ describe("ActivityLogger", () => {
       // Restore console.error
       consoleSpy.mockRestore();
     });
+
+    test("should emit activity events for real-time streaming", async () => {
+      let emittedEvent = null;
+      logger.on("activity", (event) => {
+        emittedEvent = event;
+      });
+
+      const testData = { message: "test streaming" };
+      await logger.logEvent("streaming_test", "session-123", "model-456", testData);
+
+      assert.ok(emittedEvent);
+      assert.strictEqual(emittedEvent.event_type, "streaming_test");
+      assert.strictEqual(emittedEvent.local_session_id, "session-123");
+      assert.strictEqual(emittedEvent.model_session_id, "model-456");
+      
+      const parsedData = JSON.parse(emittedEvent.data);
+      assert.strictEqual(parsedData.message, "test streaming");
+    });
   });
 
   describe("Event Querying", () => {

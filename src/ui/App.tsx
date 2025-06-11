@@ -8,15 +8,21 @@ import { CommandManager } from "./commands/CommandManager";
 import { getAllCommands } from "./commands/registry";
 // Remove fullscreen-ink import from here - will be used in lace-ui.ts instead
 import ConversationView from "./components/ConversationView";
-import DetailedLogView from "./components/DetailedLogView";
+import DetailedLogView, { DetailedLogEntry } from "./components/DetailedLogView";
 import StatusBar from "./components/StatusBar";
 import ShellInput from "./components/ShellInput";
 import ToolApprovalModal from "./components/ToolApprovalModal";
 import { useInput, useFocus, useFocusManager } from "ink";
 
+interface ToolCall {
+  id?: string;
+  name: string;
+  input: any;
+}
+
 type ConversationMessage =
   | { type: "user"; content: string }
-  | { type: "assistant"; content: string }
+  | { type: "assistant"; content: string; tool_calls?: ToolCall[] }
   | { type: "loading"; content: string }
   | { type: "streaming"; content: string; isStreaming: boolean }
   | {
@@ -26,23 +32,20 @@ type ConversationMessage =
       folded: boolean;
     };
 
-interface DetailedLogEntry {
-  id: string;
-  timestamp: string;
-  type: ConversationMessage["type"];
-  content: string;
-}
+// DetailedLogEntry imported from DetailedLogView component
 
 interface AppProps {
   laceUI?: any; // LaceUI instance passed from parent
 }
 
 function extractLogEntries(conversation: ConversationMessage[]): DetailedLogEntry[] {
-  return conversation.map((message, index) => {
-    const timestamp = new Date().toISOString(); // For now, use current time - would be better with actual message timestamps
-    const id = `log-${index}-${timestamp}`;
+  const entries: DetailedLogEntry[] = [];
+  let entryIndex = 0;
+
+  conversation.forEach((message, messageIndex) => {
+    const baseTimestamp = new Date().toISOString();
     
-    // Extract content based on message type
+    // Add the main message entry
     let content: string;
     if (message.type === "agent_activity") {
       content = `${message.summary}\n${message.content.join('\n')}`;
@@ -50,13 +53,34 @@ function extractLogEntries(conversation: ConversationMessage[]): DetailedLogEntr
       content = message.content as string;
     }
     
-    return {
-      id,
-      timestamp,
-      type: message.type,
+    entries.push({
+      id: `log-${entryIndex++}-${baseTimestamp}`,
+      timestamp: baseTimestamp,
+      type: message.type as string,
       content,
-    };
+    });
+
+    // If this is an assistant message with tool calls, add separate tool call entries
+    if (message.type === "assistant" && message.tool_calls && message.tool_calls.length > 0) {
+      message.tool_calls.forEach((toolCall, toolIndex) => {
+        // Add tool call entry
+        const toolCallTimestamp = new Date(Date.parse(baseTimestamp) + toolIndex + 1).toISOString();
+        entries.push({
+          id: `log-${entryIndex++}-${toolCallTimestamp}`,
+          timestamp: toolCallTimestamp,
+          type: "tool_call",
+          content: `Tool: ${toolCall.name}\nInput: ${JSON.stringify(toolCall.input, null, 2)}`,
+        });
+
+        // For now, we don't have tool results in the conversation history
+        // Tool results would need to be extracted from the agent response or activity logger
+        // This is a placeholder for when tool results are available in conversation data
+        // TODO: Extract tool results when they become available in conversation data
+      });
+    }
   });
+
+  return entries;
 }
 
 function formatModalContent(type: string, data: any): string {

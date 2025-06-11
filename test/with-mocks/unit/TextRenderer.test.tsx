@@ -1,15 +1,19 @@
 // ABOUTME: Unit tests for TextRenderer component
 // ABOUTME: Tests text display and cursor positioning behavior
 
+import { jest, describe, test, expect } from "@jest/globals";
 import React from "react";
 import TextRenderer from "@/ui/components/TextRenderer";
 import { Box, Text } from "ink";
 
 // Mock useRef since it causes issues in unit test environment
-jest.mock("react", () => ({
-  ...jest.requireActual("react"),
-  useRef: jest.fn(() => ({ current: "test-id" }))
-}));
+jest.mock("react", () => {
+  const actualReact = jest.requireActual("react") as any;
+  return {
+    ...actualReact,
+    useRef: jest.fn(() => ({ current: "test-id" }))
+  };
+});
 
 describe("TextRenderer Component", () => {
   const defaultProps = {

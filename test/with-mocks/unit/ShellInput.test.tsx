@@ -1,6 +1,7 @@
 // ABOUTME: Unit tests for ShellInput component
 // ABOUTME: Tests shell input component structure and basic behavior
 
+import { jest, describe, test, expect } from "@jest/globals";
 import React from "react";
 import ShellInput from "@/ui/components/ShellInput";
 import { Box, Text } from "ink";
