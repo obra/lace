@@ -11,7 +11,7 @@ describe("Log Extraction", () => {
 
   type ConversationMessage =
     | { type: "user"; content: string }
-    | { type: "assistant"; content: string; tool_calls?: ToolCall[] }
+    | { type: "assistant"; content: string; tool_calls?: ToolCall[]; usage?: { inputTokens: number; outputTokens: number; totalTokens: number; } }
     | { type: "loading"; content: string }
     | { type: "streaming"; content: string; isStreaming: boolean }
     | {
@@ -26,6 +26,7 @@ describe("Log Extraction", () => {
     timestamp: string;
     type: string;
     content: string;
+    usage?: { inputTokens: number; outputTokens: number; totalTokens: number; };
   }
 
   function extractLogEntries(conversation: ConversationMessage[]): DetailedLogEntry[] {

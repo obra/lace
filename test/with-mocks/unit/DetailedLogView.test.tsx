@@ -248,7 +248,7 @@ describe("DetailedLogView Component", () => {
       },
     ];
 
-    const { lastFrame } = render(<DetailedLogView entries={entries} />);
+    const { lastFrame } = renderInkComponent(<DetailedLogView entries={entries} />);
     const output = lastFrame();
 
     // Verify content is displayed
