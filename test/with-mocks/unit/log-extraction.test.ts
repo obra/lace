@@ -24,15 +24,18 @@ describe("Log Extraction", () => {
   interface DetailedLogEntry {
     id: string;
     timestamp: string;
-    type: ConversationMessage["type"];
+    type: string;
     content: string;
   }
 
   function extractLogEntries(conversation: ConversationMessage[]): DetailedLogEntry[] {
-    return conversation.map((message, index) => {
-      const timestamp = new Date().toISOString();
-      const id = `log-${index}-${timestamp}`;
+    const entries: DetailedLogEntry[] = [];
+    let entryIndex = 0;
+
+    conversation.forEach((message, messageIndex) => {
+      const baseTimestamp = new Date().toISOString();
       
+      // Add the main message entry
       let content: string;
       if (message.type === "agent_activity") {
         content = `${message.summary}\n${message.content.join('\n')}`;
@@ -40,13 +43,29 @@ describe("Log Extraction", () => {
         content = message.content as string;
       }
       
-      return {
-        id,
-        timestamp,
-        type: message.type,
+      entries.push({
+        id: `log-${entryIndex++}-${baseTimestamp}`,
+        timestamp: baseTimestamp,
+        type: message.type as string,
         content,
-      };
+      });
+
+      // If this is an assistant message with tool calls, add separate tool call entries
+      if (message.type === "assistant" && message.tool_calls && message.tool_calls.length > 0) {
+        message.tool_calls.forEach((toolCall, toolIndex) => {
+          // Add tool call entry
+          const toolCallTimestamp = new Date(Date.parse(baseTimestamp) + toolIndex + 1).toISOString();
+          entries.push({
+            id: `log-${entryIndex++}-${toolCallTimestamp}`,
+            timestamp: toolCallTimestamp,
+            type: "tool_call",
+            content: `Tool: ${toolCall.name}\nInput: ${JSON.stringify(toolCall.input, null, 2)}`,
+          });
+        });
+      }
     });
+
+    return entries;
   }
 
   describe("extractLogEntries", () => {
@@ -192,6 +211,171 @@ describe("Log Extraction", () => {
 
       expect(logEntries[0].content).toBe(longContent);
       expect(logEntries[0].content.length).toBeGreaterThan(500);
+    });
+
+    test("extracts tool calls into separate log entries", () => {
+      const conversation: ConversationMessage[] = [
+        {
+          type: "assistant",
+          content: "I'll help you read that file.",
+          tool_calls: [
+            {
+              id: "call_123",
+              name: "file_read",
+              input: { path: "/path/to/file.txt" }
+            }
+          ]
+        }
+      ];
+
+      const logEntries = extractLogEntries(conversation);
+
+      expect(logEntries).toHaveLength(2); // assistant message + tool call
+      expect(logEntries[0].type).toBe("assistant");
+      expect(logEntries[0].content).toBe("I'll help you read that file.");
+      
+      expect(logEntries[1].type).toBe("tool_call");
+      expect(logEntries[1].content).toContain("Tool: file_read");
+      expect(logEntries[1].content).toContain('"path": "/path/to/file.txt"');
+    });
+
+    test("handles multiple tool calls in one message", () => {
+      const conversation: ConversationMessage[] = [
+        {
+          type: "assistant",
+          content: "I'll read the file and then search for patterns.",
+          tool_calls: [
+            {
+              name: "file_read",
+              input: { path: "data.txt" }
+            },
+            {
+              name: "search",
+              input: { query: "error", file: "data.txt" }
+            }
+          ]
+        }
+      ];
+
+      const logEntries = extractLogEntries(conversation);
+
+      expect(logEntries).toHaveLength(3); // assistant + 2 tool calls
+      expect(logEntries[0].type).toBe("assistant");
+      expect(logEntries[1].type).toBe("tool_call");
+      expect(logEntries[2].type).toBe("tool_call");
+      
+      expect(logEntries[1].content).toContain("Tool: file_read");
+      expect(logEntries[2].content).toContain("Tool: search");
+    });
+
+    test("formats tool call input as JSON", () => {
+      const conversation: ConversationMessage[] = [
+        {
+          type: "assistant",
+          content: "Running complex operation.",
+          tool_calls: [
+            {
+              name: "complex_tool",
+              input: {
+                options: { recursive: true, depth: 3 },
+                filters: ["*.js", "*.ts"],
+                metadata: { author: "test", version: "1.0" }
+              }
+            }
+          ]
+        }
+      ];
+
+      const logEntries = extractLogEntries(conversation);
+
+      expect(logEntries[1].type).toBe("tool_call");
+      expect(logEntries[1].content).toContain("Tool: complex_tool");
+      expect(logEntries[1].content).toContain('"recursive": true');
+      expect(logEntries[1].content).toContain('"filters"');
+      expect(logEntries[1].content).toContain('"*.js"');
+      expect(logEntries[1].content).toContain('"author": "test"');
+    });
+
+    test("handles tool calls with no input", () => {
+      const conversation: ConversationMessage[] = [
+        {
+          type: "assistant",
+          content: "Getting status.",
+          tool_calls: [
+            {
+              name: "status_check",
+              input: {}
+            }
+          ]
+        }
+      ];
+
+      const logEntries = extractLogEntries(conversation);
+
+      expect(logEntries[1].type).toBe("tool_call");
+      expect(logEntries[1].content).toContain("Tool: status_check");
+      expect(logEntries[1].content).toContain("Input: {}");
+    });
+
+    test("preserves chronological order with tool calls", () => {
+      const conversation: ConversationMessage[] = [
+        { type: "user", content: "Please read file.txt" },
+        {
+          type: "assistant",
+          content: "I'll read the file for you.",
+          tool_calls: [
+            { name: "file_read", input: { path: "file.txt" } }
+          ]
+        },
+        { type: "user", content: "Thanks!" }
+      ];
+
+      const logEntries = extractLogEntries(conversation);
+
+      expect(logEntries).toHaveLength(4); // user + assistant + tool_call + user
+      expect(logEntries[0].type).toBe("user");
+      expect(logEntries[0].content).toBe("Please read file.txt");
+      expect(logEntries[1].type).toBe("assistant");
+      expect(logEntries[1].content).toBe("I'll read the file for you.");
+      expect(logEntries[2].type).toBe("tool_call");
+      expect(logEntries[2].content).toContain("Tool: file_read");
+      expect(logEntries[3].type).toBe("user");
+      expect(logEntries[3].content).toBe("Thanks!");
+    });
+
+    test("generates unique timestamps for tool calls", () => {
+      const conversation: ConversationMessage[] = [
+        {
+          type: "assistant",
+          content: "Running tools.",
+          tool_calls: [
+            { name: "tool1", input: {} },
+            { name: "tool2", input: {} }
+          ]
+        }
+      ];
+
+      const logEntries = extractLogEntries(conversation);
+
+      expect(logEntries).toHaveLength(3);
+      expect(logEntries[0].timestamp).not.toBe(logEntries[1].timestamp);
+      expect(logEntries[1].timestamp).not.toBe(logEntries[2].timestamp);
+      
+      // Tool call timestamps should be after the assistant message timestamp
+      expect(Date.parse(logEntries[1].timestamp)).toBeGreaterThan(Date.parse(logEntries[0].timestamp));
+      expect(Date.parse(logEntries[2].timestamp)).toBeGreaterThan(Date.parse(logEntries[1].timestamp));
+    });
+
+    test("handles assistant messages without tool calls normally", () => {
+      const conversation: ConversationMessage[] = [
+        { type: "assistant", content: "Simple response without tools." }
+      ];
+
+      const logEntries = extractLogEntries(conversation);
+
+      expect(logEntries).toHaveLength(1);
+      expect(logEntries[0].type).toBe("assistant");
+      expect(logEntries[0].content).toBe("Simple response without tools.");
     });
   });
 });
