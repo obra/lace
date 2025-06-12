@@ -46,16 +46,17 @@ Make the three plugin systems (Tools, Agents, Models) feel like they were design
 - Kept underlying agent spawning infrastructure unchanged
 - Updated usage guidance examples to use new interface
 
-### Step 3: Create Agent Registry
+### ✅ Step 3: Create Agent Registry - COMPLETED
 
-**Prompt:**
-> Create `src/agents/agent-registry.ts` that mirrors the tool registry pattern:
-> - Export an `AgentRegistry` class with methods: `registerRole()`, `getRole()`, `hasRole()`, `listRoles()`
-> - Add `getMetadata()` method to role objects that returns `{name, description, usage_guidance, systemPrompt, defaultModel, capabilities, ...}`
-> - Add `usage_guidance` to each role explaining when to use that role vs others
-> - Maintain backward compatibility with existing `role-registry.ts` functions
-> - Convert to TypeScript if not already
-> - Update tests
+**Implementation:**
+- Created `src/agents/agent-registry.ts` with `AgentRegistry` class mirroring tool registry pattern
+- Added methods: `registerRole()`, `getRole()`, `hasRole()`, `listRoles()`, `getAllRoles()`, `getAllRoleMetadata()`
+- Added `getMetadata()` method to enhanced role objects returning comprehensive metadata
+- Added detailed `usage_guidance` to each role explaining when to use vs other roles
+- REPLACED `role-registry.ts` completely - deleted old file and updated all imports
+- Enhanced roles with `EnhancedRole` wrapper providing metadata capabilities
+- Updated all imports in: `agent-delegate.ts`, `agent.ts`, `agent.test.ts`
+- Role-specific usage guidance helps agents choose appropriate roles for tasks
 
 ### Step 4: Create Model Registry
 
@@ -88,7 +89,7 @@ After completing these steps, all three plugin systems should:
 3. **Use TypeScript** - Consistent typing throughout all three systems
 4. **Have simple, clear APIs** - Easy to understand and use, especially delegation
 5. **Work reliably** - Comprehensive test coverage for all changes
-6. **Maintain backward compatibility** - Existing code continues to work
+6. **No backward compatibility** - All code updated to sue new apis
 
 ## Design Principles Applied
 
@@ -106,7 +107,6 @@ After completing these steps, all three plugin systems should:
 ## Notes
 
 - Each step should be implemented and tested before moving to the next
-- Maintain backward compatibility throughout the migration
 - Document all changes as they are made
 - Add comprehensive JSDoc comments to all new interfaces and methods
 - Test each change thoroughly before proceeding

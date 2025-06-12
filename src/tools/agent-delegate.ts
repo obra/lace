@@ -2,7 +2,7 @@
 // ABOUTME: Provides focused task delegation capabilities with timeout and role management
 
 import { BaseTool, ToolSchema, ToolContext } from './base-tool.js';
-import { getRole } from "../agents/role-registry.ts";
+import { getRole } from "../agents/agent-registry.ts";
 
 export interface DelegateTaskParams {
   purpose: string;

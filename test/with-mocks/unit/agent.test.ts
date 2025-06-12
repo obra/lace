@@ -7,12 +7,12 @@ import { jest, describe, test, beforeEach, expect } from "@jest/globals";
 const mockGetRole = jest.fn();
 
 // Mock dependencies BEFORE importing the modules that use them
-jest.mock("@/agents/role-registry.ts", () => ({
+jest.mock("@/agents/agent-registry.ts", () => ({
   getRole: mockGetRole
 }));
 
 import { Agent } from "@/agents/agent.ts";
-import { getRole } from "@/agents/role-registry.ts";
+import { getRole } from "@/agents/agent-registry.ts";
 jest.mock("@/logging/activity-logger.js");
 jest.mock("@/logging/debug-logger.js");
 jest.mock("@/utilities/synthesis-engine.js");

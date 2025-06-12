@@ -6,8 +6,7 @@ import { DebugLogger } from "../logging/debug-logger.js";
 import { SynthesisEngine } from "../utilities/synthesis-engine.js";
 import { TokenEstimator } from "../utilities/token-estimator.js";
 import { ToolResultExtractor } from "../utilities/tool-result-extractor.js";
-import { getRole } from "./role-registry.ts";
-import { Role } from "./roles/types.ts";
+import { getRole, AgentRole } from "./agent-registry.ts";
 
 // TypeScript interfaces for Agent
 interface AgentOptions {
@@ -154,7 +153,7 @@ export class Agent {
   public memoryAgents: Map<string, any>;
 
   // Role and assignment properties
-  public roleDefinition: Role;
+  public roleDefinition: AgentRole;
   public role: string;
   public assignedModel: string;
   public assignedProvider: string;
