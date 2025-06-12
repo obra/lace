@@ -35,4 +35,52 @@ export class OpenAIProvider {
       capabilities: ["chat", "tool_calling", "reasoning", "planning"],
     };
   }
+
+  getMetadata() {
+    return {
+      name: "openai",
+      description: "OpenAI's GPT models with strong general capabilities and planning",
+      usage_guidance: `Use OpenAI models when you need:
+- General conversation and assistance
+- Creative writing and content generation
+- Code generation with different approach than Anthropic
+- Advanced planning tasks (with o3)
+- Broad knowledge base access
+
+STRENGTHS:
+- Strong general knowledge
+- Good creative capabilities
+- Wide language support
+- Established ecosystem
+- Advanced planning (o3 models)
+
+MODELS:
+- gpt-4o: Latest and most capable general model
+- gpt-4o-mini: Efficient for simpler tasks
+- o3-mini: Advanced reasoning and planning (future)
+
+Best for: General AI tasks, creative work, planning, alternative to Anthropic.`,
+      supportedModels: {
+        "gpt-4o": { contextWindow: 128000, capabilities: ["chat", "tool_calling", "reasoning"] },
+        "gpt-4o-mini": { contextWindow: 128000, capabilities: ["chat", "tool_calling"] },
+        "o3-mini": { contextWindow: 128000, capabilities: ["chat", "reasoning", "planning"] }
+      },
+      capabilities: [
+        "chat",
+        "tool_calling", 
+        "reasoning",
+        "planning",
+        "creative_writing",
+        "general_knowledge"
+      ],
+      defaultModel: "gpt-4o",
+      strengths: [
+        "general_knowledge",
+        "creative_capabilities", 
+        "planning",
+        "broad_language_support"
+      ],
+      contextWindow: 128000
+    };
+  }
 }

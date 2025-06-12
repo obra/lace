@@ -31,4 +31,54 @@ export class LocalProvider {
       capabilities: ["chat", "local_inference", "privacy"],
     };
   }
+
+  getMetadata() {
+    return {
+      name: "local",
+      description: "Self-hosted models for privacy and cost control",
+      usage_guidance: `Use local models when you need:
+- Complete data privacy and control
+- Cost-effective inference at scale
+- Custom fine-tuned models
+- Offline capabilities
+- No API rate limits
+
+STRENGTHS:
+- Full privacy control
+- No API costs after setup
+- Custom model support
+- Offline operation
+- No rate limiting
+- Data never leaves your infrastructure
+
+MODELS:
+- deepseek-v3: Excellent for coding tasks and technical analysis
+- llama-3.3: Strong general purpose reasoning and conversation
+- qwen-2.5: Good balance of capability and efficiency
+
+Best for: Privacy-sensitive tasks, high-volume usage, custom models, offline work.`,
+      supportedModels: {
+        "deepseek-v3": { contextWindow: 64000, capabilities: ["chat", "code_generation", "reasoning"] },
+        "llama-3.3": { contextWindow: 128000, capabilities: ["chat", "reasoning", "general"] },
+        "qwen-2.5": { contextWindow: 32000, capabilities: ["chat", "reasoning", "efficiency"] }
+      },
+      capabilities: [
+        "chat",
+        "local_inference", 
+        "privacy",
+        "offline_operation",
+        "custom_models",
+        "cost_effective"
+      ],
+      defaultModel: "deepseek-v3",
+      strengths: [
+        "privacy_control",
+        "cost_effectiveness", 
+        "offline_capability",
+        "custom_model_support",
+        "no_rate_limits"
+      ],
+      contextWindow: 64000
+    };
+  }
 }

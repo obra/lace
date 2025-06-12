@@ -529,4 +529,51 @@ export class AnthropicProvider {
       ],
     };
   }
+
+  getMetadata() {
+    return {
+      name: "anthropic",
+      description: "High-quality language models from Anthropic with strong reasoning capabilities",
+      usage_guidance: `Use Anthropic models when you need:
+- High-quality reasoning and analysis
+- Complex problem-solving tasks  
+- Code generation and review
+- Detailed explanations and documentation
+- Tool calling and function execution
+
+STRENGTHS:
+- Excellent reasoning capabilities
+- Strong code understanding
+- Reliable tool calling
+- Good instruction following
+- Advanced prompt caching
+
+MODELS:
+- claude-3-5-sonnet: Best balance of speed and capability (200K context, $3/$15 per million tokens)
+- claude-3-5-haiku: Fast and efficient for simple tasks (200K context, $0.8/$4 per million tokens) 
+- claude-3-opus: Most capable for complex reasoning (200K context, $15/$75 per million tokens)
+
+Best for: Most general-purpose AI tasks, reasoning, coding, analysis.`,
+      supportedModels: this.modelInfo,
+      capabilities: [
+        "streaming",
+        "tool_calling", 
+        "system_messages",
+        "prompt_caching",
+        "thinking",
+        "reasoning",
+        "code_generation",
+        "analysis"
+      ],
+      defaultModel: "claude-3-5-sonnet-20241022",
+      strengths: [
+        "reasoning",
+        "code_understanding", 
+        "tool_calling",
+        "instruction_following",
+        "analysis"
+      ],
+      contextWindow: this.getContextWindow()
+    };
+  }
 }

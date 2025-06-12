@@ -1,40 +1,50 @@
 // ABOUTME: Flexible model provider system supporting multiple LLM APIs and specialized roles
-// ABOUTME: Allows different models for planning, execution, and specialized tasks
+// ABOUTME: Uses ModelRegistry for provider management and provides specialized chat methods
 
 import { createHash } from "crypto";
+import { ModelRegistry, modelRegistry } from "./model-registry.js";
 import { AnthropicProvider } from "./providers/anthropic-provider.js";
 import { OpenAIProvider } from "./providers/openai-provider.js";
 import { LocalProvider } from "./providers/local-provider.js";
 
 export class ModelProvider {
-  constructor(config = {}) {
-    this.providers = new Map();
+  private registry: ModelRegistry;
+  private config: any;
+  private defaultProvider: string | null;
+  private debugLogger: any;
+  private sessionId: string | null;
+  private messageContentCache: Map<string, any>;
+
+  constructor(config: any = {}) {
+    this.registry = config.registry || modelRegistry;
     this.config = config;
     this.defaultProvider = null;
     this.debugLogger = config.debugLogger || null;
-    this.sessionId = null; // Set by agent or caller
-    this.messageContentCache = new Map(); // For deduplicating message content in logs
+    this.sessionId = null;
+    this.messageContentCache = new Map();
   }
 
-  async initialize() {
+  async initialize(): Promise<void> {
     // Initialize Anthropic provider (our default for now)
     if (!this.config.skipAnthropic) {
       const anthropicProvider = new AnthropicProvider(this.config.anthropic);
       await anthropicProvider.initialize();
-      this.providers.set("anthropic", anthropicProvider);
+      this.registry.registerProvider("anthropic", anthropicProvider);
       this.defaultProvider = "anthropic";
     }
 
-    // TODO: Initialize other providers as needed
-    // if (this.config.openai) {
-    //   const openaiProvider = new OpenAIProvider(this.config.openai);
-    //   this.providers.set('openai', openaiProvider);
-    // }
+    // Initialize other providers as needed
+    if (this.config.openai) {
+      const openaiProvider = new OpenAIProvider(this.config.openai);
+      await openaiProvider.initialize();
+      this.registry.registerProvider("openai", openaiProvider);
+    }
 
-    // if (this.config.local) {
-    //   const localProvider = new LocalProvider(this.config.local);
-    //   this.providers.set('local', localProvider);
-    // }
+    if (this.config.local) {
+      const localProvider = new LocalProvider(this.config.local);
+      await localProvider.initialize();
+      this.registry.registerProvider("local", localProvider);
+    }
   }
 
   setSessionId(sessionId) {
@@ -189,17 +199,21 @@ export class ModelProvider {
     });
   }
 
-  getProvider(providerName) {
+  getProvider(providerName?: string) {
     const name = providerName || this.defaultProvider;
-    const provider = this.providers.get(name);
+    if (!name) {
+      throw new Error("No provider specified and no default provider set");
+    }
+    
+    const provider = this.registry.getProvider(name);
     if (!provider) {
       throw new Error(`Provider '${name}' not found or not initialized`);
     }
     return provider;
   }
 
-  listProviders() {
-    return Array.from(this.providers.keys());
+  listProviders(): string[] {
+    return this.registry.listProviders();
   }
 
   getProviderInfo(providerName) {
