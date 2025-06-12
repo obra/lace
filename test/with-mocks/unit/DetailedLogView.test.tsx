@@ -28,11 +28,11 @@ describe("DetailedLogView Component", () => {
   ];
 
   test("renders log entries with timestamps and types", () => {
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <DetailedLogView entries={mockLogEntries} />
     );
 
-    const output = lastFrame();
+    const output = frames.join('');
     
     // Should show timestamps (actual format shows AM/PM)
     expect(output).toContain("[5:00:00 AM]");
@@ -51,7 +51,7 @@ describe("DetailedLogView Component", () => {
   });
 
   test("highlights current scroll position in navigation mode", () => {
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <DetailedLogView 
         entries={mockLogEntries}
         isNavigationMode={true}
@@ -59,7 +59,7 @@ describe("DetailedLogView Component", () => {
       />
     );
 
-    const output = lastFrame();
+    const output = frames.join('');
     
     // Check that highlighting is applied (uses [MODEL] format)
     expect(output).toContain("[MODEL]:");
@@ -67,11 +67,11 @@ describe("DetailedLogView Component", () => {
   });
 
   test("handles empty entries array", () => {
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <DetailedLogView entries={[]} />
     );
 
-    const output = lastFrame();
+    const output = frames.join('');
     expect(output.trim()).toBe("");
   });
 
@@ -83,11 +83,11 @@ describe("DetailedLogView Component", () => {
       content: "This is a very long message that should be displayed in full without any truncation because the log view is designed to show complete content for detailed analysis and debugging purposes."
     };
 
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <DetailedLogView entries={[longEntry]} />
     );
 
-    const output = lastFrame();
+    const output = frames.join('');
     
     // Should contain the full content
     expect(output).toContain("This is a very long message");
@@ -102,11 +102,11 @@ describe("DetailedLogView Component", () => {
       content: "Multiple operations:\nStep 1: Initialize\nStep 2: Process\nStep 3: Complete"
     };
 
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <DetailedLogView entries={[activityEntry]} />
     );
 
-    const output = lastFrame();
+    const output = frames.join('');
     
     expect(output).toContain("[AGENT]:");
     expect(output).toContain("Multiple operations:");
@@ -123,7 +123,7 @@ describe("DetailedLogView Component", () => {
       content: `Message ${i}`
     }));
 
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <DetailedLogView 
         entries={largeEntryList}
         scrollPosition={50}
@@ -131,7 +131,7 @@ describe("DetailedLogView Component", () => {
       />
     );
 
-    const output = lastFrame();
+    const output = frames.join('');
     
     // Should render entries around position 50
     expect(output).toContain("Message 50");
@@ -148,11 +148,11 @@ describe("DetailedLogView Component", () => {
       content: "Test message"
     };
 
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <DetailedLogView entries={[entry]} />
     );
 
-    const output = lastFrame();
+    const output = frames.join('');
     
     // Should format time as local time (exact format depends on system locale)
     expect(output).toMatch(/\[\d{1,2}:\d{2}:\d{2}/);
@@ -186,8 +186,8 @@ describe("DetailedLogView Component", () => {
       },
     ];
 
-    const { lastFrame } = renderInkComponent(<DetailedLogView entries={entries} />);
-    const output = lastFrame();
+    const { frames } = renderInkComponent(<DetailedLogView entries={entries} />);
+    const output = frames.join('');
 
     // Verify content is displayed
     expect(output).toContain("User input message");
@@ -248,8 +248,8 @@ describe("DetailedLogView Component", () => {
       },
     ];
 
-    const { lastFrame } = renderInkComponent(<DetailedLogView entries={entries} />);
-    const output = lastFrame();
+    const { frames } = renderInkComponent(<DetailedLogView entries={entries} />);
+    const output = frames.join('');
 
     // Verify content is displayed
     expect(output).toContain("Model response with token usage");
