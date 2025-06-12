@@ -12,7 +12,7 @@ class MockShellTool {
     return {
       description: "Shell command execution",
       methods: {
-        execute: {
+        shell_exec: {
           description: "Execute shell command",
           parameters: {
             command: { type: "string", required: true }
@@ -22,26 +22,58 @@ class MockShellTool {
     };
   }
   
-  async execute(params) {
-    return { output: `Executed: ${params.command}`, success: true };
+  async shell_exec(params) {
+    return { stdout: "hello\n", stderr: "", exitCode: 0 };
+  }
+  
+  // BaseTool compatibility
+  async execute(methodName, params) {
+    if (methodName === "shell_exec") {
+      return this.shell_exec(params);
+    }
+    throw new Error(`Method '${methodName}' not found`);
   }
 }
 
-class MockFileTool {
+class MockReadFileTool {
   async initialize() {}
   
   getMetadata() {
     return {
-      description: "File system operations",
+      description: "Read file operations",
       methods: {
-        read: {
+        file_read: {
           description: "Read file",
           parameters: {
             path: { type: "string", required: true }
           }
-        },
-        write: {
-          description: "Write file", 
+        }
+      }
+    };
+  }
+  
+  async file_read(params) {
+    return { content: "hello", size: 5, path: params.path };
+  }
+  
+  // BaseTool compatibility
+  async execute(methodName, params) {
+    if (methodName === "file_read") {
+      return this.file_read(params);
+    }
+    throw new Error(`Method '${methodName}' not found`);
+  }
+}
+
+class MockWriteFileTool {
+  async initialize() {}
+  
+  getMetadata() {
+    return {
+      description: "Write file operations", 
+      methods: {
+        file_write: {
+          description: "Write file",
           parameters: {
             path: { type: "string", required: true },
             content: { type: "string", required: true }
@@ -51,12 +83,76 @@ class MockFileTool {
     };
   }
   
-  async read(params) {
-    return { content: `File content from ${params.path}` };
+  async file_write(params) {
+    return { bytes_written: params.content.length, path: params.path };
   }
   
-  async write(params) {
-    return { bytesWritten: params.content.length, success: true };
+  // BaseTool compatibility
+  async execute(methodName, params) {
+    if (methodName === "file_write") {
+      return this.file_write(params);
+    }
+    throw new Error(`Method '${methodName}' not found`);
+  }
+}
+
+class MockListFilesTool {
+  async initialize() {}
+  
+  getMetadata() {
+    return {
+      description: "List files operations",
+      methods: {
+        file_list: {
+          description: "List files",
+          parameters: {
+            path: { type: "string", required: true }
+          }
+        }
+      }
+    };
+  }
+  
+  async file_list(params) {
+    return { entries: [], count: 0, path: params.path };
+  }
+  
+  // BaseTool compatibility
+  async execute(methodName, params) {
+    if (methodName === "file_list") {
+      return this.file_list(params);
+    }
+    throw new Error(`Method '${methodName}' not found`);
+  }
+}
+
+class MockFileSearchTool {
+  async initialize() {}
+  
+  getMetadata() {
+    return {
+      description: "Search files operations",
+      methods: {
+        search_files: {
+          description: "Search files",
+          parameters: {
+            pattern: { type: "string", required: true }
+          }
+        }
+      }
+    };
+  }
+  
+  async search_files(params) {
+    return { matches: [], count: 0 };
+  }
+  
+  // BaseTool compatibility
+  async execute(methodName, params) {
+    if (methodName === "search_files") {
+      return this.search_files(params);
+    }
+    throw new Error(`Method '${methodName}' not found`);
   }
 }
 
@@ -87,31 +183,33 @@ jest.mock("@/tools/shell.js", () => ({
 }));
 
 jest.mock("@/tools/read-file.js", () => ({
-  ReadFileTool: MockFileTool
+  ReadFileTool: MockReadFileTool
 }));
 
 jest.mock("@/tools/write-file.js", () => ({
-  WriteFileTool: MockFileTool
+  WriteFileTool: MockWriteFileTool
 }));
 
 jest.mock("@/tools/list-files.js", () => ({
-  ListFilesTool: MockFileTool
+  ListFilesTool: MockListFilesTool
 }));
 
 jest.mock("@/tools/javascript.js", () => ({
   JavaScriptTool: class {
     async initialize() {}
     getMetadata() { return { description: "JavaScript execution" }; }
-    async evaluate() { return { result: 42 }; }
+    async js_eval() { return { result: 42 }; }
+    async execute(methodName, params) {
+      if (methodName === "js_eval") {
+        return this.js_eval(params);
+      }
+      throw new Error(`Method '${methodName}' not found`);
+    }
   }
 }));
 
 jest.mock("@/tools/file-search.js", () => ({
-  FileSearchTool: class {
-    async initialize() {}
-    getMetadata() { return { description: "Search operations" }; }
-    async find() { return { matches: [] }; }
-  }
+  FileSearchTool: MockFileSearchTool
 }));
 
 jest.mock("@/tools/agent-delegate.js", () => ({
@@ -162,10 +260,12 @@ describe("ToolRegistry", () => {
       const tools = registry.listTools();
       
       expect(tools).toContain("shell");
-      expect(tools).toContain("file");
+      expect(tools).toContain("read_file");
+      expect(tools).toContain("write_file");
+      expect(tools).toContain("list_files");
+      expect(tools).toContain("file_search");
       expect(tools).toContain("javascript");
-      expect(tools).toContain("search");
-      expect(tools).toContain("task");
+      expect(tools).toContain("agent_delegate");
     });
 
     test("should register custom tools", () => {
@@ -176,7 +276,7 @@ describe("ToolRegistry", () => {
 
       registry.register("custom", customTool);
 
-      expect(registry.get("custom")).toBe(customTool);
+      expect(registry.getTool("custom")).toBe(customTool);
       expect(registry.listTools()).toContain("custom");
     });
 
@@ -196,13 +296,12 @@ describe("ToolRegistry", () => {
 
   describe("Tool Schema Management", () => {
     test("should get schema for individual tool", () => {
-      const schema = registry.getToolSchema("file");
+      const schema = registry.getToolSchema("read_file");
       
       expect(schema).toBeDefined();
-      expect(schema.description).toBe("File system operations");
+      expect(schema.description).toBe("Read the contents of a file");
       expect(schema.methods).toBeDefined();
-      expect(schema.methods.read).toBeDefined();
-      expect(schema.methods.write).toBeDefined();
+      expect(schema.methods.file_read).toBeDefined();
     });
 
     test("should return null for non-existent tool schema", () => {
@@ -214,8 +313,10 @@ describe("ToolRegistry", () => {
       const schemas = registry.getAllSchemas();
       
       expect(schemas).toHaveProperty("shell");
-      expect(schemas).toHaveProperty("file");
-      expect(schemas.file.description).toBe("File system operations");
+      expect(schemas).toHaveProperty("read_file");
+      expect(schemas).toHaveProperty("write_file");
+      expect(schemas).toHaveProperty("list_files");
+      expect(schemas).toHaveProperty("file_search");
     });
 
     test("should handle tools without schema method", () => {
@@ -235,13 +336,14 @@ describe("ToolRegistry", () => {
   describe("Tool Execution", () => {
     test("should execute tool method successfully", async () => {
       // Use shell tool which has simpler output
-      const result = await registry.callTool("shell", "execute", {
+      const result = await registry.callTool("shell", "shell_exec", {
         command: "echo hello"
       });
 
       // Check that we got a result with expected structure
-      expect(result).toHaveProperty("success");
-      expect(result.success).toBe(true);
+      expect(result).toHaveProperty("stdout");
+      expect(result).toHaveProperty("exitCode");
+      expect(result.exitCode).toBe(0);
     });
 
     test("should throw error for non-existent tool", async () => {
@@ -252,17 +354,34 @@ describe("ToolRegistry", () => {
 
     test("should throw error for non-existent method", async () => {
       await expect(
-        registry.callTool("file", "nonexistent", {})
-      ).rejects.toThrow("Method 'nonexistent' not found on tool 'file'");
+        registry.callTool("shell", "nonexistent", {})
+      ).rejects.toThrow("Method 'nonexistent' not found in tool 'shell'");
     });
 
     test("should handle tool execution errors", async () => {
-      const errorTool = {
-        failingMethod: async () => {
+      // Import BaseTool for proper inheritance
+      const { BaseTool } = await import("@/tools/base-tool.js");
+      
+      class ErrorTool extends BaseTool {
+        getMetadata() {
+          return {
+            name: 'error',
+            description: 'Test error tool',
+            methods: {
+              failingMethod: {
+                description: 'A method that always fails',
+                parameters: {}
+              }
+            }
+          };
+        }
+        
+        async failingMethod() {
           throw new Error("Tool execution failed");
         }
-      };
+      }
 
+      const errorTool = new ErrorTool();
       registry.register("error", errorTool);
 
       await expect(
@@ -273,7 +392,7 @@ describe("ToolRegistry", () => {
 
   describe("Activity Logging", () => {
     test("should log tool execution start and complete", async () => {
-      await registry.callTool("shell", "execute", {
+      await registry.callTool("shell", "shell_exec", {
         command: "echo hello"
       }, "test-session");
 
@@ -283,7 +402,7 @@ describe("ToolRegistry", () => {
         null,
         expect.objectContaining({
           tool: "shell",
-          method: "execute",
+          method: "shell_exec",
           params: { command: "echo hello" }
         })
       );
@@ -294,7 +413,10 @@ describe("ToolRegistry", () => {
         null,
         expect.objectContaining({
           success: true,
-          result: expect.objectContaining({ success: true }),
+          result: expect.objectContaining({ 
+            stdout: expect.any(String),
+            exitCode: 0
+          }),
           error: null,
           duration_ms: expect.any(Number)
         })
@@ -302,12 +424,29 @@ describe("ToolRegistry", () => {
     });
 
     test("should log tool execution errors", async () => {
-      const errorTool = {
-        failingMethod: async () => {
+      // Import BaseTool for proper inheritance
+      const { BaseTool } = await import("@/tools/base-tool.js");
+      
+      class ErrorTool extends BaseTool {
+        getMetadata() {
+          return {
+            name: 'error',
+            description: 'Test error tool',
+            methods: {
+              failingMethod: {
+                description: 'A method that always fails',
+                parameters: {}
+              }
+            }
+          };
+        }
+        
+        async failingMethod() {
           throw new Error("Execution failed");
         }
-      };
+      }
 
+      const errorTool = new ErrorTool();
       registry.register("error", errorTool);
 
       try {
@@ -330,7 +469,7 @@ describe("ToolRegistry", () => {
     });
 
     test("should not log when no session ID provided", async () => {
-      await registry.callTool("file", "read", { path: "test.txt" });
+      await registry.callTool("read_file", "file_read", { path: "test.txt" });
 
       expect(mockActivityLogger.logEvent).not.toHaveBeenCalled();
     });
@@ -353,8 +492,8 @@ describe("ToolRegistry", () => {
   describe("Snapshot Integration", () => {
     test("should create pre and post snapshots for tool execution", async () => {
       await registry.callToolWithSnapshots(
-        "file",
-        "write",
+        "write_file",
+        "file_write",
         { path: "test.txt", content: "hello" },
         "test-session",
         1
@@ -362,8 +501,8 @@ describe("ToolRegistry", () => {
 
       expect(mockSnapshotManager.createPreToolSnapshot).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: "file",
-          operation: "write",
+          toolName: "write_file",
+          operation: "file_write",
           parameters: { path: "test.txt", content: "hello" },
           executionId: expect.any(String)
         }),
@@ -377,15 +516,15 @@ describe("ToolRegistry", () => {
 
       expect(mockSnapshotManager.createPostToolSnapshot).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: "file",
-          operation: "write"
+          toolName: "write_file",
+          operation: "file_write"
         }),
         expect.objectContaining({
           sessionId: "test-session"
         }),
         expect.objectContaining({
           success: true,
-          result: { bytesWritten: 5, success: true }
+          result: { bytes_written: 5, path: "test.txt" }
         }),
         "test-session",
         1
@@ -393,12 +532,29 @@ describe("ToolRegistry", () => {
     });
 
     test("should create error snapshots when tool fails", async () => {
-      const errorTool = {
-        failingMethod: async () => {
+      // Import BaseTool for proper inheritance
+      const { BaseTool } = await import("@/tools/base-tool.js");
+      
+      class ErrorTool extends BaseTool {
+        getMetadata() {
+          return {
+            name: 'error',
+            description: 'Test error tool',
+            methods: {
+              failingMethod: {
+                description: 'A method that always fails',
+                parameters: {}
+              }
+            }
+          };
+        }
+        
+        async failingMethod() {
           throw new Error("Tool failed");
         }
-      };
+      }
 
+      const errorTool = new ErrorTool();
       registry.register("error", errorTool);
 
       try {
@@ -435,8 +591,8 @@ describe("ToolRegistry", () => {
 
       // Should still execute tool despite snapshot error
       const result = await registry.callToolWithSnapshots(
-        "file",
-        "read",
+        "read_file",
+        "file_read",
         { path: "test.txt" },
         "test-session"
       );
@@ -444,7 +600,7 @@ describe("ToolRegistry", () => {
       expect(result).toEqual({
         content: "hello",
         size: 5,
-        success: true
+        path: "test.txt"
       });
 
       expect(mockActivityLogger.logEvent).toHaveBeenCalledWith(
@@ -465,8 +621,8 @@ describe("ToolRegistry", () => {
       await registryWithoutSnapshots.initialize();
 
       const result = await registryWithoutSnapshots.callToolWithSnapshots(
-        "file",
-        "read",
+        "read_file",
+        "file_read",
         { path: "test.txt" },
         "test-session"
       );
@@ -474,7 +630,7 @@ describe("ToolRegistry", () => {
       expect(result).toEqual({
         content: "hello",
         size: 5,
-        success: true
+        path: "test.txt"
       });
     });
 
@@ -490,8 +646,8 @@ describe("ToolRegistry", () => {
       await registryWithDisabledSnapshots.initialize();
 
       await registryWithDisabledSnapshots.callToolWithSnapshots(
-        "file",
-        "read",
+        "read_file",
+        "file_read",
         { path: "test.txt" },
         "test-session"
       );
