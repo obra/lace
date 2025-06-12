@@ -145,7 +145,7 @@ describe("ToolRegistry Snapshot Integration", () => {
         simpleOperation: async (params) => {
           return { success: true, data: params.input };
         },
-        getSchema: () => ({
+        getMetadata: () => ({
           name: "test-tool",
           description: "Test tool for snapshot integration",
           methods: {
@@ -241,7 +241,7 @@ describe("ToolRegistry Snapshot Integration", () => {
 
       const testTool = {
         complexOperation: async (params) => ({ result: "complex result" }),
-        getSchema: () => ({ name: "complex-tool" }),
+        getMetadata: () => ({ name: "complex-tool" }),
       };
 
       registry.register("complex-tool", testTool);
@@ -283,7 +283,7 @@ describe("ToolRegistry Snapshot Integration", () => {
         failingOperation: async () => {
           throw new Error("Tool execution failed");
         },
-        getSchema: () => ({ name: "failing-tool" }),
+        getMetadata: () => ({ name: "failing-tool" }),
       };
 
       registry.register("failing-tool", failingTool);
@@ -315,7 +315,7 @@ describe("ToolRegistry Snapshot Integration", () => {
 
       const regularTool = {
         regularOperation: async (params) => ({ output: params.input }),
-        getSchema: () => ({ name: "regular-tool" }),
+        getMetadata: () => ({ name: "regular-tool" }),
       };
 
       registry.register("regular-tool", regularTool);
@@ -341,7 +341,7 @@ describe("ToolRegistry Snapshot Integration", () => {
 
       const testTool = {
         operation: async () => ({ success: true }),
-        getSchema: () => ({ name: "no-snapshot-tool" }),
+        getMetadata: () => ({ name: "no-snapshot-tool" }),
       };
 
       registry.register("no-snapshot-tool", testTool);
@@ -385,7 +385,7 @@ describe("ToolRegistry Snapshot Integration", () => {
 
       const metadataTool = {
         annotatedOperation: async (params) => ({ processed: params }),
-        getSchema: () => ({
+        getMetadata: () => ({
           name: "metadata-tool",
           description: "Tool with rich metadata",
         }),

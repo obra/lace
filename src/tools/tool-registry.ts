@@ -72,12 +72,16 @@ export class ToolRegistry {
     this.tools.set(name, tool);
   }
 
-  get(name: string): BaseTool | undefined {
+  getTool(name: string): BaseTool | undefined {
     return this.tools.get(name);
   }
 
+  hasTool(name: string): boolean {
+    return this.tools.has(name);
+  }
+
   async callTool(name: string, method: string, params: Record<string, any> = {}, sessionId: string | null = null, agent: any = null): Promise<any> {
-    const tool = this.tools.get(name);
+    const tool = this.getTool(name);
     if (!tool) {
       throw new Error(`Tool '${name}' not found`);
     }
@@ -144,18 +148,18 @@ export class ToolRegistry {
   }
 
   getToolSchema(name: string): any {
-    const tool = this.tools.get(name);
-    if (!tool || !tool.getSchema) {
+    const tool = this.getTool(name);
+    if (!tool || !tool.getMetadata) {
       return null;
     }
-    return tool.getSchema();
+    return tool.getMetadata();
   }
 
   getAllSchemas(): Record<string, any> {
     const schemas: Record<string, any> = {};
     for (const [name, tool] of this.tools) {
-      if (tool.getSchema) {
-        schemas[name] = tool.getSchema();
+      if (tool.getMetadata) {
+        schemas[name] = tool.getMetadata();
       }
     }
     return schemas;

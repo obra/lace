@@ -50,10 +50,27 @@ export interface SpawnAgentResult {
 export class AgentDelegateTool extends BaseTool {
   private defaultTimeout = 300000; // 5 minutes
 
-  getSchema(): ToolSchema {
+  getMetadata(): ToolSchema {
     return {
       name: 'agent_delegate',
       description: 'Delegate tasks to specialized sub-agents with configurable roles and models',
+      usage_guidance: `Use this tool when you need focused work on complex tasks:
+
+DELEGATE WHEN:
+- Complex analysis requiring deep focus (security audits, architecture reviews)  
+- Implementation tasks needing efficient execution (fixing tests, updating configs)
+- Multi-step planning requiring coordination (migrations, feature breakdown)
+
+DON'T DELEGATE WHEN:
+- Simple file operations (reading, basic text processing)
+- Single commands or API calls
+- Small modifications to current work
+
+EXAMPLES:
+- delegate_task({ description: "Review auth code for vulnerabilities..." })
+- delegate_task({ description: "Run tests, identify issues, implement fixes...", role: "execution" })
+
+Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → execution, 'plan' → orchestrator`,
       methods: {
         delegate_task: {
           description: 'Delegate a task to a specialized sub-agent',

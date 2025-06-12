@@ -47,6 +47,7 @@ export interface MethodDefinition {
 export interface ToolSchema {
   name: string;
   description: string;
+  usage_guidance?: string;
   methods: Record<string, MethodDefinition>;
 }
 
@@ -288,15 +289,15 @@ export abstract class BaseTool {
   }
 
   /**
-   * Get tool schema (must be implemented by subclasses)
+   * Get tool metadata (must be implemented by subclasses)
    */
-  abstract getSchema(): ToolSchema;
+  abstract getMetadata(): ToolSchema;
 
   /**
    * Validate parameters against schema
    */
   protected validateParameters(methodName: string, params: Record<string, any>): Record<string, any> {
-    const schema = this.getSchema();
+    const schema = this.getMetadata();
     const methodSchema = schema.methods?.[methodName];
     
     if (!methodSchema) {

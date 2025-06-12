@@ -16,7 +16,7 @@ describe("Error Recovery and Retry Logic", () => {
     mockTools = {
       flaky_tool: {
         callTool: jest.fn(),
-        getSchema: () => ({
+        getMetadata: () => ({
           name: "flaky_tool",
           description: "A tool that sometimes fails",
           methods: {
@@ -32,7 +32,7 @@ describe("Error Recovery and Retry Logic", () => {
           success: true,
           result: "Always works",
         }),
-        getSchema: () => ({
+        getMetadata: () => ({
           name: "reliable_tool",
           description: "A tool that always works",
           methods: {
@@ -56,7 +56,7 @@ describe("Error Recovery and Retry Logic", () => {
           agent,
         );
       },
-      getToolSchema: (name) => mockTools[name]?.getSchema(),
+      getToolSchema: (name) => mockTools[name]?.getMetadata(),
     };
 
     mockModelProvider = {

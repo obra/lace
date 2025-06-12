@@ -28,7 +28,7 @@ describe('AgentDelegateTool', () => {
 
   describe('schema', () => {
     test('should have correct tool schema', () => {
-      const schema = tool.getSchema();
+      const schema = tool.getMetadata();
       
       expect(schema.name).toBe('agent_delegate');
       expect(schema.description).toContain('Delegate tasks to specialized sub-agents');
@@ -37,7 +37,7 @@ describe('AgentDelegateTool', () => {
     });
 
     test('should have required parameters for delegate_task', () => {
-      const schema = tool.getSchema();
+      const schema = tool.getMetadata();
       const method = schema.methods.delegate_task;
       
       expect(method.parameters.description.required).toBe(true);

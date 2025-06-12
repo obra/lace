@@ -16,7 +16,7 @@ export class MockTool extends BaseTool {
     super(options);
   }
 
-  getSchema(): ToolSchema {
+  getMetadata(): ToolSchema {
     return {
       name: 'mock',
       description: 'Mock tool for testing',
@@ -361,7 +361,7 @@ export class ToolSchemaValidator {
    */
   static validateSchema(tool: BaseTool): string[] {
     const errors: string[] = [];
-    const schema = tool.getSchema();
+    const schema = tool.getMetadata();
 
     if (!schema.name) {
       errors.push('Schema must have a name');
@@ -401,7 +401,7 @@ export class ToolSchemaValidator {
    */
   static validateImplementation(tool: BaseTool): string[] {
     const errors: string[] = [];
-    const schema = tool.getSchema();
+    const schema = tool.getMetadata();
 
     for (const methodName of Object.keys(schema.methods || {})) {
       if (typeof (tool as any)[methodName] !== 'function') {

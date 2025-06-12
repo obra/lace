@@ -18,7 +18,7 @@ export interface JavaScriptResult {
 export class JavaScriptTool extends BaseTool {
   private output: Array<[string, ...any[]]> = [];
 
-  getSchema(): ToolSchema {
+  getMetadata(): ToolSchema {
     return {
       name: 'javascript',
       description: 'Execute JavaScript code in a secure sandboxed environment',

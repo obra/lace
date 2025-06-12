@@ -30,7 +30,7 @@ export interface ShellInteractiveResult {
 }
 
 export class ShellTool extends BaseTool {
-  getSchema(): ToolSchema {
+  getMetadata(): ToolSchema {
     return {
       name: 'shell',
       description: 'Execute shell commands with output capture and cancellation support',

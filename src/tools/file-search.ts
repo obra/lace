@@ -31,7 +31,7 @@ export interface FileSearchResult {
 }
 
 export class FileSearchTool extends BaseTool {
-  getSchema(): ToolSchema {
+  getMetadata(): ToolSchema {
     return {
       name: 'file_search',
       description: 'Search for text patterns in files using ripgrep',

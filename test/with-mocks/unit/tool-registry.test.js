@@ -8,7 +8,7 @@ import { ToolRegistry } from "@/tools/tool-registry.js";
 class MockShellTool {
   async initialize() {}
   
-  getSchema() {
+  getMetadata() {
     return {
       description: "Shell command execution",
       methods: {
@@ -30,7 +30,7 @@ class MockShellTool {
 class MockFileTool {
   async initialize() {}
   
-  getSchema() {
+  getMetadata() {
     return {
       description: "File system operations",
       methods: {
@@ -70,7 +70,7 @@ class MockAgentDelegateTool {
     };
   }
   
-  getSchema() {
+  getMetadata() {
     return {
       name: 'agent_delegate',
       description: 'Mock agent delegate tool',
@@ -102,7 +102,7 @@ jest.mock("@/tools/list-files.js", () => ({
 jest.mock("@/tools/javascript.js", () => ({
   JavaScriptTool: class {
     async initialize() {}
-    getSchema() { return { description: "JavaScript execution" }; }
+    getMetadata() { return { description: "JavaScript execution" }; }
     async evaluate() { return { result: 42 }; }
   }
 }));
@@ -110,7 +110,7 @@ jest.mock("@/tools/javascript.js", () => ({
 jest.mock("@/tools/file-search.js", () => ({
   FileSearchTool: class {
     async initialize() {}
-    getSchema() { return { description: "Search operations" }; }
+    getMetadata() { return { description: "Search operations" }; }
     async find() { return { matches: [] }; }
   }
 }));
@@ -171,7 +171,7 @@ describe("ToolRegistry", () => {
 
     test("should register custom tools", () => {
       const customTool = {
-        getSchema: () => ({ description: "Custom tool" }),
+        getMetadata: () => ({ description: "Custom tool" }),
         customMethod: async () => ({ result: "custom" })
       };
 
@@ -184,7 +184,7 @@ describe("ToolRegistry", () => {
     test("should initialize all tools during setup", async () => {
       const mockTool = {
         initialize: jest.fn(),
-        getSchema: () => ({ description: "Test tool" })
+        getMetadata: () => ({ description: "Test tool" })
       };
 
       const newRegistry = new ToolRegistry();

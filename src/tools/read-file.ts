@@ -20,7 +20,7 @@ export interface ReadFileResult {
 }
 
 export class ReadFileTool extends BaseTool {
-  getSchema(): ToolSchema {
+  getMetadata(): ToolSchema {
     return {
       name: 'read_file',
       description: 'Read the contents of a file',

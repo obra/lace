@@ -17,7 +17,7 @@ export interface WriteFileResult {
 }
 
 export class WriteFileTool extends BaseTool {
-  getSchema(): ToolSchema {
+  getMetadata(): ToolSchema {
     return {
       name: 'write_file',
       description: 'Write content to a file',

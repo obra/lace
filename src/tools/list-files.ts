@@ -28,7 +28,7 @@ export interface ListFilesResult {
 }
 
 export class ListFilesTool extends BaseTool {
-  getSchema(): ToolSchema {
+  getMetadata(): ToolSchema {
     return {
       name: 'list_files',
       description: 'List files and directories',
