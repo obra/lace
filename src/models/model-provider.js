@@ -1,6 +1,7 @@
 // ABOUTME: Flexible model provider system supporting multiple LLM APIs and specialized roles
 // ABOUTME: Allows different models for planning, execution, and specialized tasks
 
+import { createHash } from "crypto";
 import { AnthropicProvider } from "./providers/anthropic-provider.js";
 import { OpenAIProvider } from "./providers/openai-provider.js";
 import { LocalProvider } from "./providers/local-provider.js";
@@ -12,6 +13,7 @@ export class ModelProvider {
     this.defaultProvider = null;
     this.debugLogger = config.debugLogger || null;
     this.sessionId = null; // Set by agent or caller
+    this.messageContentCache = new Map(); // For deduplicating message content in logs
   }
 
   async initialize() {
@@ -37,6 +39,44 @@ export class ModelProvider {
 
   setSessionId(sessionId) {
     this.sessionId = sessionId;
+    // Clear message cache for new session to avoid cross-session deduplication
+    this.messageContentCache.clear();
+  }
+
+  hashMessageContent(content) {
+    const contentStr = typeof content === "string" ? content : JSON.stringify(content);
+    return createHash("sha256").update(contentStr, "utf8").digest("hex").substring(0, 12);
+  }
+
+  getFirstLine(content) {
+    const contentStr = typeof content === "string" ? content : JSON.stringify(content);
+    const firstLine = contentStr.split('\n')[0];
+    return firstLine.length > 80 ? firstLine.substring(0, 77) + "..." : firstLine;
+  }
+
+  logMessageContent(message, index) {
+    if (!this.debugLogger) return;
+
+    const contentHash = this.hashMessageContent(message.content);
+    const cacheKey = `${message.role}:${contentHash}`;
+    
+    if (this.messageContentCache.has(cacheKey)) {
+      // Log condensed format for repeated messages
+      const firstLine = this.getFirstLine(message.content);
+      this.debugLogger.debug(`📨 Message[${index}] [${message.role}] (sha256:${contentHash}) [CACHED] "${firstLine}"`);
+    } else {
+      // Log full content for first-time messages
+      this.messageContentCache.set(cacheKey, { 
+        content: message.content,
+        firstSeen: new Date().toISOString()
+      });
+      
+      const contentStr = typeof message.content === "string" ? message.content : JSON.stringify(message.content, null, 2);
+      this.debugLogger.debug(`📨 Message[${index}] [${message.role}] (sha256:${contentHash})`);
+      this.debugLogger.debug(`====== CONTENT ======`);
+      this.debugLogger.debug(contentStr);
+      this.debugLogger.debug(`====== END CONTENT ======`);
+    }
   }
 
   async chat(messages, options = {}) {
@@ -48,13 +88,10 @@ export class ModelProvider {
       const requestInfo = `provider=${options.provider || this.defaultProvider}, model=${options.model || "default"}, messages=${messages.length}, tools=${!!(options.tools && options.tools.length > 0)}, temp=${options.temperature}`;
       this.debugLogger.debug(`🤖 LLM Request: ${requestInfo}`);
 
-      const messageInfo = messages
-        .map(
-          (msg) =>
-            `${msg.role}:${typeof msg.content === "string" ? msg.content.length : JSON.stringify(msg.content).length}chars`,
-        )
-        .join(", ");
-      this.debugLogger.debug(`📨 Messages: [${messageInfo}]`);
+      // Enhanced message logging with content deduplication
+      messages.forEach((msg, index) => {
+        this.logMessageContent(msg, index);
+      });
     }
 
     const result = await provider.chat(messages, {
@@ -70,6 +107,27 @@ export class ModelProvider {
       const duration = Date.now() - startTime;
       const responseInfo = `success=${result.success}, duration=${duration}ms, tokens=${result.usage?.total_tokens || "unknown"} (in:${result.usage?.input_tokens || "?"} out:${result.usage?.output_tokens || "?"}), tools=${!!(result.toolCalls && result.toolCalls.length > 0)}, content=${result.content ? result.content.length : 0}chars`;
       this.debugLogger.debug(`🤖 LLM Response: ${responseInfo}`);
+
+      // Log response content if it's new
+      if (result.success && result.content) {
+        const responseHash = this.hashMessageContent(result.content);
+        const cacheKey = `assistant:${responseHash}`;
+        
+        if (!this.messageContentCache.has(cacheKey)) {
+          this.messageContentCache.set(cacheKey, {
+            content: result.content,
+            firstSeen: new Date().toISOString()
+          });
+          
+          this.debugLogger.debug(`📨 Response Content (sha256:${responseHash})`);
+          this.debugLogger.debug(`====== RESPONSE ======`);
+          this.debugLogger.debug(result.content);
+          this.debugLogger.debug(`====== END RESPONSE ======`);
+        } else {
+          const firstLine = this.getFirstLine(result.content);
+          this.debugLogger.debug(`📨 Response (sha256:${responseHash}) [CACHED] "${firstLine}"`);
+        }
+      }
 
       if (!result.success) {
         this.debugLogger.warn(`❌ LLM Error: ${result.error}`);
