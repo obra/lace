@@ -25,7 +25,7 @@ describe("Tool System", () => {
   describe("ToolRegistry", () => {
     test("should initialize with core tools", async () => {
       const { ToolRegistry } = await import(
-        "../../../src/tools/tool-registry.js"
+        "@/tools/tool-registry.js"
       );
       const registry = new ToolRegistry();
       await registry.initialize();
@@ -39,7 +39,7 @@ describe("Tool System", () => {
 
     test("should provide tool schemas", async () => {
       const { ToolRegistry } = await import(
-        "../../../src/tools/tool-registry.js"
+        "@/tools/tool-registry.js"
       );
       const registry = new ToolRegistry();
       await registry.initialize();
@@ -53,7 +53,7 @@ describe("Tool System", () => {
 
     test("should execute tool methods", async () => {
       const { ToolRegistry } = await import(
-        "../../../src/tools/tool-registry.js"
+        "@/tools/tool-registry.js"
       );
       const registry = new ToolRegistry();
       await registry.initialize();
@@ -75,7 +75,7 @@ describe("Tool System", () => {
   describe("JavaScriptTool", () => {
     test("should evaluate simple expressions", async () => {
       const { JavaScriptTool } = await import(
-        "../../../src/tools/javascript-tool.js"
+        "@/tools/javascript.js"
       );
       const tool = new JavaScriptTool();
 
@@ -84,20 +84,9 @@ describe("Tool System", () => {
       assert.strictEqual(result.result, 5, "Should calculate correctly");
     });
 
-    test("should handle calculation method", async () => {
-      const { JavaScriptTool } = await import(
-        "../../../src/tools/javascript-tool.js"
-      );
-      const tool = new JavaScriptTool();
-
-      const result = await tool.calculate({ expression: "6 * 12" });
-      assert.ok(result.success, "Calculation should succeed");
-      assert.strictEqual(result.result, 72, "Should multiply correctly");
-    });
-
     test("should handle errors gracefully", async () => {
       const { JavaScriptTool } = await import(
-        "../../../src/tools/javascript-tool.js"
+        "@/tools/javascript.js"
       );
       const tool = new JavaScriptTool();
 
@@ -108,7 +97,7 @@ describe("Tool System", () => {
 
     test("should provide console output", async () => {
       const { JavaScriptTool } = await import(
-        "../../../src/tools/javascript-tool.js"
+        "@/tools/javascript.js"
       );
       const tool = new JavaScriptTool();
 
@@ -121,8 +110,8 @@ describe("Tool System", () => {
 
   describe("FileTool", () => {
     test("should read and write files", async () => {
-      const { FileTool } = await import("../../../src/tools/file-tool.js");
-      const tool = new FileTool();
+      const { ReadFileTool } = await import("@/tools/read-file.js");
+      const tool = new ReadFileTool();
 
       const tempFile = await harness.createTempFile();
 
@@ -144,17 +133,17 @@ describe("Tool System", () => {
     });
 
     test("should list directory contents", async () => {
-      const { FileTool } = await import("../../../src/tools/file-tool.js");
+      const { FileTool } = await import("@/tools/file-tool.js");
       const tool = new FileTool();
 
-      const result = await tool.list({ path: "./src" });
+      const result = await tool.list({ @" });
       assert.ok(result.success, "List should succeed");
       assert.ok(Array.isArray(result.files), "Should return array of files");
-      assert.ok(result.files.length > 0, "Should find files in src directory");
+      assert.ok(result.files.length > 0, "Should find @ directory");
     });
 
     test("should handle non-existent files", async () => {
-      const { FileTool } = await import("../../../src/tools/file-tool.js");
+      const { FileTool } = await import("@/tools/file-tool.js");
       const tool = new FileTool();
 
       const result = await tool.read({ path: "/non/existent/file.txt" });
@@ -165,7 +154,7 @@ describe("Tool System", () => {
 
   describe("ShellTool", () => {
     test("should execute simple commands", async () => {
-      const { ShellTool } = await import("../../../src/tools/shell-tool.js");
+      const { ShellTool } = await import("@/tools/shell.js");
       const tool = new ShellTool();
 
       const result = await tool.execute({ command: 'echo "test"' });
@@ -179,7 +168,7 @@ describe("Tool System", () => {
     });
 
     test("should handle command errors", async () => {
-      const { ShellTool } = await import("../../../src/tools/shell-tool.js");
+      const { ShellTool } = await import("@/tools/shell.js");
       const tool = new ShellTool();
 
       const result = await tool.execute({ command: "nonexistentcommand" });
@@ -188,7 +177,7 @@ describe("Tool System", () => {
     });
 
     test("should respect working directory", async () => {
-      const { ShellTool } = await import("../../../src/tools/shell-tool.js");
+      const { ShellTool } = await import("@/tools/shell.js");
       const tool = new ShellTool();
 
       const result = await tool.execute({ command: "pwd", cwd: "/tmp" });

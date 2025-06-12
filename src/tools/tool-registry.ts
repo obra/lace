@@ -1,14 +1,40 @@
 // ABOUTME: Tool registry that manages all available tools for agents
 // ABOUTME: Provides plugin-style architecture for extensible tool ecosystem
 
-import { ShellTool } from "./shell-tool.js";
-import { FileTool } from "./file-tool.js";
-import { JavaScriptTool } from "./javascript-tool.js";
-import { SearchTool } from "./search-tool.js";
-import { TaskTool } from "./task-tool.js";
+import { ShellTool } from "./shell.js";
+import { ReadFileTool } from "./read-file.js";
+import { WriteFileTool } from "./write-file.js";
+import { ListFilesTool } from "./list-files.js";
+import { FileSearchTool } from "./file-search.js";
+import { JavaScriptTool } from "./javascript.js";
+import { AgentDelegateTool } from "./agent-delegate.js";
+import { BaseTool } from "./base-tool.js";
+
+interface ToolRegistryOptions {
+  activityLogger?: any;
+  progressTracker?: any;
+  snapshotManager?: any;
+  conversationDB?: any;
+  snapshotConfig?: {
+    enablePreToolSnapshots?: boolean;
+    enablePostToolSnapshots?: boolean;
+    snapshotOnErrors?: boolean;
+  };
+}
 
 export class ToolRegistry {
-  constructor(options = {}) {
+  private tools: Map<string, BaseTool>;
+  private activityLogger: any;
+  private progressTracker: any;
+  private snapshotManager: any;
+  private conversationDB: any;
+  private snapshotConfig: {
+    enablePreToolSnapshots: boolean;
+    enablePostToolSnapshots: boolean;
+    snapshotOnErrors: boolean;
+  };
+
+  constructor(options: ToolRegistryOptions = {}) {
     this.tools = new Map();
     this.activityLogger = options.activityLogger || null;
     this.progressTracker = options.progressTracker || null;
@@ -25,12 +51,14 @@ export class ToolRegistry {
   }
 
   async initialize() {
-    // Register core tools
+    // Register new focused tools
     this.register("shell", new ShellTool());
-    this.register("file", new FileTool());
+    this.register("read_file", new ReadFileTool());
+    this.register("write_file", new WriteFileTool());
+    this.register("list_files", new ListFilesTool());
+    this.register("file_search", new FileSearchTool());
     this.register("javascript", new JavaScriptTool());
-    this.register("search", new SearchTool());
-    this.register("task", new TaskTool());
+    this.register("agent_delegate", new AgentDelegateTool());
 
     // Initialize all tools
     for (const tool of this.tools.values()) {
@@ -40,36 +68,23 @@ export class ToolRegistry {
     }
   }
 
-  register(name, tool) {
+  register(name: string, tool: BaseTool): void {
     this.tools.set(name, tool);
   }
 
-  get(name) {
+  get(name: string): BaseTool | undefined {
     return this.tools.get(name);
   }
 
-  async callTool(name, method, params, sessionId = null, agent = null) {
+  async callTool(name: string, method: string, params: Record<string, any> = {}, sessionId: string | null = null, agent: any = null): Promise<any> {
     const tool = this.tools.get(name);
     if (!tool) {
       throw new Error(`Tool '${name}' not found`);
     }
 
-    if (typeof tool[method] !== "function") {
-      throw new Error(`Method '${method}' not found on tool '${name}'`);
-    }
-
-    // Set agent context for TaskTool
-    if (name === "task" && agent && typeof tool.setAgent === "function") {
-      tool.setAgent(agent);
-      if (sessionId && typeof tool.setSessionId === "function") {
-        tool.setSessionId(sessionId);
-      }
-      if (
-        this.progressTracker &&
-        typeof tool.setProgressTracker === "function"
-      ) {
-        tool.setProgressTracker(this.progressTracker);
-      }
+    // All tools must be BaseTool instances
+    if (typeof tool.execute !== "function") {
+      throw new Error(`Tool '${name}' is not a valid BaseTool`);
     }
 
     // Log tool execution start
@@ -92,7 +107,17 @@ export class ToolRegistry {
     let error = null;
 
     try {
-      result = await tool[method](params);
+      const toolResult = await tool.execute(method, params, {
+        context: { sessionId, agent }
+      });
+      
+      if (toolResult.success) {
+        result = toolResult.data;
+      } else {
+        success = false;
+        error = toolResult.error?.message || 'Unknown error';
+        throw new Error(error);
+      }
     } catch (err) {
       success = false;
       error = err.message;
@@ -118,7 +143,7 @@ export class ToolRegistry {
     return result;
   }
 
-  getToolSchema(name) {
+  getToolSchema(name: string): any {
     const tool = this.tools.get(name);
     if (!tool || !tool.getSchema) {
       return null;
@@ -126,8 +151,8 @@ export class ToolRegistry {
     return tool.getSchema();
   }
 
-  getAllSchemas() {
-    const schemas = {};
+  getAllSchemas(): Record<string, any> {
+    const schemas: Record<string, any> = {};
     for (const [name, tool] of this.tools) {
       if (tool.getSchema) {
         schemas[name] = tool.getSchema();
@@ -136,7 +161,7 @@ export class ToolRegistry {
     return schemas;
   }
 
-  listTools() {
+  listTools(): string[] {
     return Array.from(this.tools.keys());
   }
 
@@ -144,13 +169,13 @@ export class ToolRegistry {
    * Execute a tool with automatic snapshot creation
    */
   async callToolWithSnapshots(
-    name,
-    method,
-    params,
-    sessionId = null,
-    generation = null,
-    agent = null,
-  ) {
+    name: string,
+    method: string,
+    params: Record<string, any> = {},
+    sessionId: string | null = null,
+    generation: number | null = null,
+    agent: any = null,
+  ): Promise<any> {
     // If no snapshot manager configured, fall back to regular tool execution
     if (!this.snapshotManager) {
       return this.callTool(name, method, params, sessionId, agent);
@@ -161,22 +186,9 @@ export class ToolRegistry {
       throw new Error(`Tool '${name}' not found`);
     }
 
-    if (typeof tool[method] !== "function") {
-      throw new Error(`Method '${method}' not found on tool '${name}'`);
-    }
-
-    // Set agent context for TaskTool
-    if (name === "task" && agent && typeof tool.setAgent === "function") {
-      tool.setAgent(agent);
-      if (sessionId && typeof tool.setSessionId === "function") {
-        tool.setSessionId(sessionId);
-      }
-      if (
-        this.progressTracker &&
-        typeof tool.setProgressTracker === "function"
-      ) {
-        tool.setProgressTracker(this.progressTracker);
-      }
+    // All tools must be BaseTool instances
+    if (typeof tool.execute !== "function") {
+      throw new Error(`Tool '${name}' is not a valid BaseTool`);
     }
 
     // Create tool call metadata
@@ -194,7 +206,7 @@ export class ToolRegistry {
       try {
         preSnapshot = await this.snapshotManager.createPreToolSnapshot(
           toolCall,
-          await this.gatherLegacyContext(sessionId),
+          await this.gatherSnapshotContext(sessionId),
           sessionId,
           generation,
         );
@@ -279,7 +291,7 @@ export class ToolRegistry {
       try {
         postSnapshot = await this.snapshotManager.createPostToolSnapshot(
           toolCall,
-          await this.gatherLegacyContext(sessionId),
+          await this.gatherSnapshotContext(sessionId),
           executionResult,
           sessionId,
           generation,
@@ -345,20 +357,20 @@ export class ToolRegistry {
   /**
    * Generate unique execution ID for tool calls
    */
-  generateExecutionId() {
+  generateExecutionId(): string {
     return `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**
-   * Gather legacy context format for backward compatibility
+   * Gather conversation context for snapshot creation
    */
-  async gatherLegacyContext(sessionId) {
-    const context = {
+  async gatherSnapshotContext(sessionId: string | null): Promise<any> {
+    const context: any = {
       sessionId,
       timestamp: new Date().toISOString(),
     };
 
-    // Add basic conversation context if available
+    // Add conversation context for debugging snapshots
     if (this.conversationDB && sessionId) {
       try {
         const recentHistory = await this.conversationDB.getConversationHistory(
@@ -368,7 +380,7 @@ export class ToolRegistry {
         context.conversationTurns = recentHistory ? recentHistory.length : 0;
         context.recentHistory = recentHistory || [];
       } catch (error) {
-        // Ignore errors in legacy context gathering
+        // Ignore errors in snapshot context gathering
         context.conversationTurns = 0;
         context.recentHistory = [];
       }

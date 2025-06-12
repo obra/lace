@@ -60,61 +60,46 @@ class MockFileTool {
   }
 }
 
-class MockTaskTool {
-  constructor() {
-    this.agent = null;
-    this.sessionId = null;
-    this.progressTracker = null;
-  }
-  
+class MockAgentDelegateTool {
   async initialize() {}
   
-  setAgent(agent) {
-    this.agent = agent;
-  }
-  
-  setSessionId(sessionId) {
-    this.currentSessionId = sessionId;
-  }
-  
-  setProgressTracker(tracker) {
-    this.progressTracker = tracker;
+  async execute(method, params, options) {
+    return {
+      success: true,
+      data: `Mocked ${method} result`
+    };
   }
   
   getSchema() {
     return {
-      description: "Task orchestration",
+      name: 'agent_delegate',
+      description: 'Mock agent delegate tool',
       methods: {
-        delegate: {
-          description: "Delegate task to specialized agent",
-          parameters: {
-            task: { type: "string", required: true },
-            role: { type: "string", required: false }
-          }
-        }
+        delegate_task: { description: 'Mock delegate task' },
+        spawn_agent: { description: 'Mock spawn agent' }
       }
-    };
-  }
-  
-  async delegate(params) {
-    return { 
-      result: `Task delegated: ${params.task}`,
-      agent: this.agent?.role || "unknown",
-      sessionId: this.sessionId || "unknown"
     };
   }
 }
 
 // Mock all tool modules
-jest.mock("@/tools/shell-tool.js", () => ({
+jest.mock("@/tools/shell.js", () => ({
   ShellTool: MockShellTool
 }));
 
-jest.mock("@/tools/file-tool.js", () => ({
-  FileTool: MockFileTool
+jest.mock("@/tools/read-file.js", () => ({
+  ReadFileTool: MockFileTool
 }));
 
-jest.mock("@/tools/javascript-tool.js", () => ({
+jest.mock("@/tools/write-file.js", () => ({
+  WriteFileTool: MockFileTool
+}));
+
+jest.mock("@/tools/list-files.js", () => ({
+  ListFilesTool: MockFileTool
+}));
+
+jest.mock("@/tools/javascript.js", () => ({
   JavaScriptTool: class {
     async initialize() {}
     getSchema() { return { description: "JavaScript execution" }; }
@@ -122,16 +107,16 @@ jest.mock("@/tools/javascript-tool.js", () => ({
   }
 }));
 
-jest.mock("@/tools/search-tool.js", () => ({
-  SearchTool: class {
+jest.mock("@/tools/file-search.js", () => ({
+  FileSearchTool: class {
     async initialize() {}
     getSchema() { return { description: "Search operations" }; }
     async find() { return { matches: [] }; }
   }
 }));
 
-jest.mock("@/tools/task-tool.js", () => ({
-  TaskTool: MockTaskTool
+jest.mock("@/tools/agent-delegate.js", () => ({
+  AgentDelegateTool: MockAgentDelegateTool
 }));
 
 describe("ToolRegistry", () => {
@@ -352,33 +337,17 @@ describe("ToolRegistry", () => {
     });
   });
 
-  describe("Agent Context Management", () => {
-    test("should set agent context for TaskTool", async () => {
-      const mockAgent = {
-        role: "execution",
-        sessionId: "test-session"
-      };
+  describe("Agent Delegate Tool", () => {
+    test("should call agent delegate tool methods", async () => {
+      await registry.initialize();
+      registry.register("agent_delegate", new MockAgentDelegateTool());
 
-      await registry.callTool("task", "delegateTask", {
+      const result = await registry.callTool("agent_delegate", "delegate_task", {
         description: "Run tests",
         role: "execution"
-      }, "test-session", mockAgent);
+      }, "test-session", null);
 
-      const taskTool = registry.get("task");
-      expect(taskTool.agent).toBe(mockAgent);
-      expect(taskTool.currentSessionId).toBe("test-session");
-      expect(taskTool.progressTracker).toBe(mockProgressTracker);
-    });
-
-    test("should not set context for non-TaskTool", async () => {
-      const mockAgent = { role: "execution" };
-
-      await registry.callTool("file", "read", {
-        path: "test.txt"
-      }, "test-session", mockAgent);
-
-      // Should not throw error, just ignore agent context
-      expect(true).toBe(true);
+      expect(result).toBe("Mocked delegate_task result");
     });
   });
 
@@ -544,7 +513,7 @@ describe("ToolRegistry", () => {
     });
 
     test("should gather legacy context", async () => {
-      const context = await registry.gatherLegacyContext("test-session");
+      const context = await registry.gatherSnapshotContext("test-session");
 
       expect(context).toEqual({
         sessionId: "test-session",
@@ -562,7 +531,7 @@ describe("ToolRegistry", () => {
         new Error("DB error")
       );
 
-      const context = await registry.gatherLegacyContext("test-session");
+      const context = await registry.gatherSnapshotContext("test-session");
 
       expect(context).toEqual({
         sessionId: "test-session",
@@ -574,7 +543,7 @@ describe("ToolRegistry", () => {
 
     test("should handle missing conversation DB", async () => {
       const registryWithoutDB = new ToolRegistry();
-      const context = await registryWithoutDB.gatherLegacyContext("test-session");
+      const context = await registryWithoutDB.gatherSnapshotContext("test-session");
 
       expect(context).toEqual({
         sessionId: "test-session",
