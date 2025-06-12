@@ -290,7 +290,7 @@ describe("Component Name", () => {
 
 #### Testing Styled Output (ANSI Codes)
 
-When testing components that use ANSI escape codes for styling (like search highlighting), use the `stripAnsi` utility from ink-test-utils:
+When testing components that use ANSI escape codes for styling (like search highlighting or cursor positioning), use the `stripAnsi` utility from ink-test-utils:
 
 ```typescript
 import { renderInkComponent, stripAnsi } from "../helpers/ink-test-utils";
@@ -321,6 +321,79 @@ describe("Search Highlighting", () => {
 - Use `stripAnsi()` to test content without styling codes
 - Test both content and styling separately for robust verification
 - ANSI codes: `[43m[30m` = yellow background, black text; `[39m[49m` = reset
+
+#### Testing Cursor Highlighting and Terminal Styling
+
+Ink components that use `inverse` text styling (like cursor highlighting) generate ANSI escape codes. To test these properly, you need to understand the ANSI code generation process:
+
+**CRITICAL**: ANSI codes are only generated when `FORCE_COLOR` environment variable is set **before the Node.js process starts**. This cannot be done within the test - it must be set at the command line level.
+
+**Testing cursor highlighting:**
+
+```typescript
+describe("TextRenderer with cursor", () => {
+  test("user can see cursor highlighting at correct position", () => {
+    const { frames } = renderInkComponent(
+      <TextRenderer
+        lines={["Hello world"]}
+        cursorLine={0}
+        cursorColumn={0}
+        isFocused={true}
+      />
+    );
+    
+    const output = frames.join('');
+    
+    // Test content is present
+    expect(stripAnsi(output)).toContain("Hello world");
+    
+    // Test cursor highlighting on first character
+    // [7m = start inverse, [27m = end inverse
+    expect(output).toMatch(/\[7mH\[27m/);
+    expect(output).toContain("ello world"); // Rest of text after cursor
+  });
+});
+```
+
+**Why this is complex:**
+
+1. **Chalk detection**: Ink uses the `chalk` library for styling, which uses `supports-color` to detect terminal capabilities
+2. **TTY detection**: `supports-color` calls `tty.isatty(1)` to check if stdout is a real terminal
+3. **Environment dependency**: Even with `process.stdout.isTTY = true`, chalk checks the actual file descriptor
+4. **Module caching**: Chalk's color detection happens at import time and is cached
+
+**Solution for consistent testing:**
+
+Run tests with FORCE_COLOR environment variable:
+
+```bash
+FORCE_COLOR=1 npm test
+```
+
+This forces chalk to generate ANSI codes regardless of TTY detection.
+
+**Common ANSI escape codes:**
+- `[7m` = Start inverse/reverse video (cursor highlighting)
+- `[27m` = End inverse/reverse video
+- `[43m` = Yellow background
+- `[30m` = Black text
+- `[39m` = Reset text color
+- `[49m` = Reset background color
+- `[?25l` = Hide cursor
+- `[?25h` = Show cursor
+
+**Testing pattern for cursor components:**
+
+```typescript
+// Test basic content
+expect(stripAnsi(output)).toContain("expected text");
+
+// Test cursor positioning
+expect(output).toMatch(/\[7m.\[27m/); // Any character highlighted
+
+// Test specific cursor position
+expect(output).toMatch(/\[7mH\[27mello/); // H is highlighted, followed by ello
+```
 
 ### Integration Testing Pattern
 
