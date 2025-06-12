@@ -130,7 +130,7 @@ class EnhancedStdout extends EventEmitter {
   public frames: string[] = [];
   private _lastFrame: string | undefined;
 
-  public columns = 100;
+  public columns = 130;
   public rows = 40;
   public isTTY = true;
 
@@ -182,9 +182,13 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
   const originalWrite = process.stdout.write;
   const originalForceColor = process.env.FORCE_COLOR;
   const originalIsatty = tty.isatty;
+  const originalColumns = process.stdout.columns;
+  const originalRows = process.stdout.rows;
   
   process.stdout.isTTY = true;
   process.stderr.isTTY = true;
+  process.stdout.columns = 130;
+  process.stdout.rows = 40;
   process.env.FORCE_COLOR = '1'; // Force chalk to enable ANSI codes
   
   // Mock tty.isatty to return true for stdout/stderr file descriptors
@@ -221,6 +225,8 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
     process.stdout.isTTY = originalIsTTY;
     process.stderr.isTTY = originalStderrIsTTY;
     process.stdout.write = originalWrite;
+    process.stdout.columns = originalColumns;
+    process.stdout.rows = originalRows;
     tty.isatty = originalIsatty;
     if (originalForceColor === undefined) {
       delete process.env.FORCE_COLOR;
@@ -237,6 +243,8 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
       process.stdout.isTTY = originalIsTTY;
       process.stderr.isTTY = originalStderrIsTTY;
       process.stdout.write = originalWrite;
+      process.stdout.columns = originalColumns;
+      process.stdout.rows = originalRows;
       tty.isatty = originalIsatty;
       if (originalForceColor === undefined) {
         delete process.env.FORCE_COLOR;

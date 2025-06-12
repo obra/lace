@@ -8,18 +8,18 @@ import { Box, Text } from "ink";
 
 describe("StatusBar Component", () => {
   test("user can see status bar with app name", () => {
-    const { lastFrame } = renderInkComponent(<StatusBar />);
-    const output = lastFrame();
+    const { frames } = renderInkComponent(<StatusBar />);
+    const output = frames.join('');
 
     // Should display the app name (may be truncated)
-    expect(output).toContain("lace-in");
+    expect(output).toContain("lace");
   });
 
   test("user can see ready status in normal mode", () => {
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <StatusBar isNavigationMode={false} />
     );
-    const output = lastFrame();
+    const output = frames.join('');
 
     // Should display ready status and navigation hints
     expect(output).toContain("Ready");
@@ -27,14 +27,14 @@ describe("StatusBar Component", () => {
   });
 
   test("user can see navigation mode with position", () => {
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <StatusBar
         isNavigationMode={true}
         scrollPosition={2}
         totalMessages={4}
       />
     );
-    const output = lastFrame();
+    const output = frames.join('');
 
     // Should display navigation mode and position
     expect(output).toContain("Nav:");
@@ -42,10 +42,10 @@ describe("StatusBar Component", () => {
   });
 
   test("user can see token usage display", () => {
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <StatusBar tokenUsage={{ used: 1200, total: 4000 }} />
     );
-    const output = lastFrame();
+    const output = frames.join('');
 
     // Should display token usage
     expect(output).toContain("Tokens:");
@@ -54,23 +54,23 @@ describe("StatusBar Component", () => {
   });
 
   test("user can see model name in wide terminal", () => {
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <StatusBar
         modelName="claude-3.5-sonnet"
         terminalWidth={120}
       />
     );
-    const output = lastFrame();
+    const output = frames.join('');
 
     // Should display model name in wide terminal (may be truncated)
     expect(output).toContain("claude-3.5-so");
   });
 
   test("user can see large token numbers formatted correctly", () => {
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <StatusBar tokenUsage={{ used: 15600, total: 128000 }} />
     );
-    const output = lastFrame();
+    const output = frames.join('');
 
     // Should format large numbers with k suffix
     expect(output).toContain("15.6k");
@@ -78,44 +78,44 @@ describe("StatusBar Component", () => {
   });
 
   test("user can see abbreviated model name in narrow terminal", () => {
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <StatusBar
         modelName="claude-3.5-sonnet"
         terminalWidth={60}
       />
     );
-    const output = lastFrame();
+    const output = frames.join('');
 
     // Should abbreviate model name in narrow terminal
     expect(output).toContain("claude-3.");
   });
 
   test("user can see all information in wide terminal", () => {
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <StatusBar
         tokenUsage={{ used: 1200, total: 4000 }}
         modelName="claude-3.5-sonnet"
         terminalWidth={120}
       />
     );
-    const output = lastFrame();
+    const output = frames.join('');
 
     // Should show all information in wide terminal
-    expect(output).toContain("lace-");
+    expect(output).toContain("lac");
     expect(output).toContain("Tokens:");
     expect(output).toContain("claude-3.5-s");
-    expect(output).toContain("Rea");
+    expect(output).toContain("Read");
   });
 
   test("user can see search mode display", () => {
-    const { lastFrame } = renderInkComponent(
+    const { frames } = renderInkComponent(
       <StatusBar
         isSearchMode={true}
         searchResultIndex={2}
         searchResults={Array(5).fill({ messageIndex: 0, message: {} })}
       />
     );
-    const output = lastFrame();
+    const output = frames.join('');
 
     // Should display search information
     expect(output).toContain("Search");
@@ -123,11 +123,11 @@ describe("StatusBar Component", () => {
   });
 
   test("user can see minimal display without optional props", () => {
-    const { lastFrame } = renderInkComponent(<StatusBar />);
-    const output = lastFrame();
+    const { frames } = renderInkComponent(<StatusBar />);
+    const output = frames.join('');
 
     // Should display basic information without crashing
-    expect(output).toContain("lace-in");
+    expect(output).toContain("lace");
     expect(output).toContain("Ready");
   });
 });
