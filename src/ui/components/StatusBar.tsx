@@ -72,7 +72,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
       borderLeft={false}
       borderRight={false}
     >
-      <Text key="app-name" color="cyan">lace-ink</Text>
+      <Text key="app-name" color="cyan">lace</Text>
       <Text key="sep1"> | </Text>
       <Text key="view-mode" color="yellow">
         {viewMode === 'conversation' ? 'Conversation Mode' : 'Log Mode'}

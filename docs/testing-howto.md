@@ -1,4 +1,4 @@
-# Testing Guide for Lace-Ink
+# Testing Guide for Lace
 
 ## Overview
 

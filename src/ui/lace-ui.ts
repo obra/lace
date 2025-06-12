@@ -348,11 +348,11 @@ export class LaceUI {
 
   // Command completion is now handled by CommandManager in the UI layer
 
-  // File completion using the file tool
+  // File completion using the list_files tool
   async getFileCompletions(prefix: string) {
     try {
-      const fileTool = this.tools.getTool("file");
-      if (!fileTool) {
+      const listFilesTool = this.tools.getTool("list_files");
+      if (!listFilesTool) {
         return [];
       }
 
@@ -362,23 +362,19 @@ export class LaceUI {
       const base = lastSlash === -1 ? prefix : prefix.substring(lastSlash + 1);
 
       // List directory contents
-      const result = await fileTool.list({
+      const result = await listFilesTool.file_list({
         path: dir === "./" ? "." : dir.replace(/\/$/, ""),
       });
 
-      if (!result.success) {
-        return [];
-      }
-
       // Filter and format results
-      return result.files
-        .filter((file) => file.name.startsWith(base))
-        .map((file) => {
-          const fullPath = dir === "." ? file.name : dir + file.name;
+      return result.entries
+        .filter((entry) => entry.name.startsWith(base))
+        .map((entry) => {
+          const fullPath = dir === "." ? entry.name : dir + entry.name;
           return {
-            value: file.isDirectory ? fullPath + "/" : fullPath,
-            description: file.isDirectory ? "Directory" : "File",
-            type: file.isDirectory ? ("directory" as const) : ("file" as const),
+            value: entry.type === "directory" ? fullPath + "/" : fullPath,
+            description: entry.type === "directory" ? "Directory" : "File",
+            type: entry.type,
           };
         });
     } catch (error) {
