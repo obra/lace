@@ -108,24 +108,28 @@ export class ModelProvider {
       const responseInfo = `success=${result.success}, duration=${duration}ms, tokens=${result.usage?.total_tokens || "unknown"} (in:${result.usage?.input_tokens || "?"} out:${result.usage?.output_tokens || "?"}), tools=${!!(result.toolCalls && result.toolCalls.length > 0)}, content=${result.content ? result.content.length : 0}chars`;
       this.debugLogger.debug(`🤖 LLM Response: ${responseInfo}`);
 
-      // Log response content if it's new
-      if (result.success && result.content) {
-        const responseHash = this.hashMessageContent(result.content);
+      // Log complete response if it's new (entire result object)
+      if (result.success || result.error) {
+        const responseHash = this.hashMessageContent(JSON.stringify(result));
         const cacheKey = `assistant:${responseHash}`;
         
         if (!this.messageContentCache.has(cacheKey)) {
           this.messageContentCache.set(cacheKey, {
-            content: result.content,
+            content: result,
             firstSeen: new Date().toISOString()
           });
           
-          this.debugLogger.debug(`📨 Response Content (sha256:${responseHash})`);
-          this.debugLogger.debug(`====== RESPONSE ======`);
-          this.debugLogger.debug(result.content);
-          this.debugLogger.debug(`====== END RESPONSE ======`);
+          this.debugLogger.debug(`📨 Complete Response (sha256:${responseHash})`);
+          this.debugLogger.debug(`====== FULL RESPONSE ======`);
+          this.debugLogger.debug(JSON.stringify(result, null, 2));
+          this.debugLogger.debug(`====== END FULL RESPONSE ======`);
         } else {
-          const firstLine = this.getFirstLine(result.content);
-          this.debugLogger.debug(`📨 Response (sha256:${responseHash}) [CACHED] "${firstLine}"`);
+          const contentPreview = result.content ? this.getFirstLine(result.content) : "";
+          const toolCallsInfo = result.toolCalls && result.toolCalls.length > 0 
+            ? ` + ${result.toolCalls.length} tool call${result.toolCalls.length === 1 ? '' : 's'}`
+            : "";
+          const successInfo = result.success ? "" : " [ERROR]";
+          this.debugLogger.debug(`📨 Response (sha256:${responseHash}) [CACHED] "${contentPreview}"${toolCallsInfo}${successInfo}`);
         }
       }
 
