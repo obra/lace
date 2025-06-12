@@ -5,12 +5,9 @@ import { BaseTool, ToolSchema, ToolContext } from './base-tool.js';
 import { getRole } from "../agents/role-registry.ts";
 
 export interface DelegateTaskParams {
-  description: string;
+  purpose: string;
+  specification: string;
   role?: string;
-  model?: string;
-  provider?: string;
-  capabilities?: string[];
-  timeout?: number;
 }
 
 export interface DelegateTaskResult {
@@ -50,6 +47,33 @@ export interface SpawnAgentResult {
 export class AgentDelegateTool extends BaseTool {
   private defaultTimeout = 300000; // 5 minutes
 
+  /**
+   * Auto-select appropriate role based on purpose keywords
+   */
+  private selectRole(purpose: string, specification: string): string {
+    const purposeLower = purpose.toLowerCase();
+    
+    // Execution patterns → execution role for efficiency
+    if (purposeLower.includes('implement') || purposeLower.includes('fix') || 
+        purposeLower.includes('run') || purposeLower.includes('update')) {
+      return 'execution';
+    }
+    
+    // Reasoning patterns → reasoning role for deep thinking
+    if (purposeLower.includes('analyze') || purposeLower.includes('debug') ||
+        purposeLower.includes('compare') || purposeLower.includes('review')) {
+      return 'reasoning';
+    }
+    
+    // Orchestration patterns → orchestrator role for coordination
+    if (purposeLower.includes('plan') || purposeLower.includes('coordinate') ||
+        purposeLower.includes('organize') || purposeLower.includes('migrate')) {
+      return 'orchestrator';
+    }
+    
+    return 'general'; // Safe default
+  }
+
   getMetadata(): ToolSchema {
     return {
       name: 'agent_delegate',
@@ -67,43 +91,28 @@ DON'T DELEGATE WHEN:
 - Small modifications to current work
 
 EXAMPLES:
-- delegate_task({ description: "Review auth code for vulnerabilities..." })
-- delegate_task({ description: "Run tests, identify issues, implement fixes...", role: "execution" })
+- delegate_task({ purpose: "security analysis", specification: "Review auth code for vulnerabilities..." })
+- delegate_task({ purpose: "fix test failures", specification: "Run tests, identify issues, implement fixes...", role: "execution" })
 
 Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → execution, 'plan' → orchestrator`,
       methods: {
         delegate_task: {
-          description: 'Delegate a task to a specialized sub-agent',
+          description: 'Delegate a focused task to a specialized sub-agent',
           parameters: {
-            description: {
+            purpose: {
               type: 'string',
               required: true,
-              description: 'Clear description of the task to be delegated'
+              description: 'What this delegation accomplishes (e.g., "security analysis", "performance review")'
+            },
+            specification: {
+              type: 'string',
+              required: true,
+              description: 'Complete task requirements including scope, deliverables, and success criteria'
             },
             role: {
               type: 'string',
               required: false,
-              description: 'Role for the sub-agent (e.g., "specialist", "researcher", "coder")'
-            },
-            model: {
-              type: 'string',
-              required: false,
-              description: 'Model to use for the sub-agent (e.g., "claude-3-5-sonnet-20241022")'
-            },
-            provider: {
-              type: 'string',
-              required: false,
-              description: 'Model provider (e.g., "anthropic", "openai")'
-            },
-            capabilities: {
-              type: 'array',
-              required: false,
-              description: 'Array of capabilities for the sub-agent'
-            },
-            timeout: {
-              type: 'number',
-              required: false,
-              description: 'Timeout in milliseconds for task completion'
+              description: 'Agent specialization (auto-selected based on task if not specified)'
             }
           }
         },
@@ -143,28 +152,41 @@ Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → executi
 
   async delegate_task(params: DelegateTaskParams, context?: ToolContext): Promise<DelegateTaskResult> {
     const {
-      description,
-      role = "general",
-      model = "claude-3-5-sonnet-20241022",
-      provider = "anthropic",
-      capabilities = ["reasoning", "tool_calling"],
-      timeout = this.defaultTimeout,
+      purpose,
+      specification,
+      role,
     } = params;
 
-    if (!description) {
+    if (!purpose) {
       return {
         success: false,
-        error: "Task description is required",
+        error: "Purpose is required",
       };
     }
 
+    if (!specification) {
+      return {
+        success: false,
+        error: "Specification is required",
+      };
+    }
+
+    // Auto-select role if not provided
+    const selectedRole = role || this.selectRole(purpose, specification);
+    
+    // Set defaults based on role
+    const model = "claude-3-5-sonnet-20241022";
+    const provider = "anthropic";
+    const capabilities = ["reasoning", "tool_calling"];
+    const timeout = this.defaultTimeout;
+
     // Validate role name
     try {
-      getRole(role);
+      getRole(selectedRole);
     } catch (error: any) {
       return {
         success: false,
-        error: `Invalid role '${role}': ${error.message}`,
+        error: `Invalid role '${selectedRole}': ${error.message}`,
       };
     }
 
@@ -195,9 +217,12 @@ Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → executi
       // Get current session ID from context
       const sessionId = context?.context?.sessionId || `task-session-${Date.now()}`;
 
+      // Combine purpose and specification into task description
+      const taskDescription = `${purpose}: ${specification}`;
+      
       // Delegate to sub-agent using existing infrastructure
-      const taskPromise = agent.delegateTask(sessionId, description, {
-        role,
+      const taskPromise = agent.delegateTask(sessionId, taskDescription, {
+        role: selectedRole,
         assignedModel: model,
         assignedProvider: provider,
         capabilities,
@@ -210,10 +235,10 @@ Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → executi
         success: true,
         result: result.content,
         metadata: {
-          role,
+          role: selectedRole,
           model,
           provider,
-          taskDescription: description,
+          taskDescription,
         },
       };
     } catch (error: any) {

@@ -37,14 +37,14 @@ Make the three plugin systems (Tools, Agents, Models) feel like they were design
 - Added comprehensive usage guidance to `AgentDelegateTool` from `agent-delegation-design.md`
 - Updated all tool implementations and tests to use new API
 
-### Step 2: Simplify Delegation Tool Interface
+### ✅ Step 2: Simplify Delegation Tool Interface - COMPLETED
 
-**Prompt:**
-> Implement the simplified delegation interface from `agent-delegation-design.md`:
-> - Replace complex parameters with: `purpose: string`, `specification: string`, `role?: string`
-> - Implement auto-role selection logic based on purpose keywords
-> - Keep underlying agent spawning infrastructure unchanged
-> - Update tests to cover new interface and auto-role selection
+**Implementation:**
+- Replaced complex parameters with simplified interface: `purpose: string`, `specification: string`, `role?: string`
+- Implemented auto-role selection logic based on purpose keywords ('analyze' → reasoning, 'implement' → execution, 'plan' → orchestrator)
+- Combined purpose and specification into task description for delegation
+- Kept underlying agent spawning infrastructure unchanged
+- Updated usage guidance examples to use new interface
 
 ### Step 3: Create Agent Registry
 
