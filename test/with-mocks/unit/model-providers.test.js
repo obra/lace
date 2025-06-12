@@ -10,136 +10,33 @@ import { LocalProvider } from "../../../src/models/providers/local-provider.js";
 describe("Model Provider Session ID Tracking", () => {
   describe("AnthropicProvider", () => {
     describe("Session ID Generation", () => {
-      test("should generate UUID when no conversation ID provided", () => {
+      test("should generate UUID at construction", () => {
         const provider = new AnthropicProvider();
-        const messages = [{ role: "user", content: "test message" }];
 
-        const sessionId1 = provider.getOrCreateSessionId(null, messages);
-        const sessionId2 = provider.getOrCreateSessionId(null, messages);
-
-        // Should be valid UUIDs
+        // Should have a valid UUID sessionId
         assert.match(
-          sessionId1,
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-        );
-
-        // Same conversation should return same session ID
-        assert.strictEqual(sessionId1, sessionId2);
-      });
-
-      test("should use provided conversation ID when available", () => {
-        const provider = new AnthropicProvider();
-        const messages = [{ role: "user", content: "test message" }];
-        const providedId = "custom-conversation-123";
-
-        const sessionId = provider.getOrCreateSessionId(providedId, messages);
-
-        assert.strictEqual(sessionId, providedId);
-      });
-
-      test("should generate different session IDs for different conversations", () => {
-        const provider = new AnthropicProvider();
-        const messages1 = [{ role: "user", content: "first conversation" }];
-        const messages2 = [{ role: "user", content: "second conversation" }];
-
-        const sessionId1 = provider.getOrCreateSessionId(null, messages1);
-        const sessionId2 = provider.getOrCreateSessionId(null, messages2);
-
-        assert.notStrictEqual(sessionId1, sessionId2);
-      });
-
-      test("should handle messages without user role", () => {
-        const provider = new AnthropicProvider();
-        const messages = [{ role: "system", content: "system message only" }];
-
-        const sessionId = provider.getOrCreateSessionId(null, messages);
-
-        // Should still generate a valid UUID
-        assert.match(
-          sessionId,
+          provider.sessionId,
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
         );
       });
-    });
 
-    describe("Conversation Key Generation", () => {
-      test("should generate consistent keys for same first user message", () => {
-        const provider = new AnthropicProvider();
-        const messages = [
-          { role: "system", content: "system prompt" },
-          { role: "user", content: "hello world" },
-        ];
-
-        const key1 = provider.generateConversationKey(messages);
-        const key2 = provider.generateConversationKey(messages);
-
-        assert.strictEqual(key1, key2);
-        assert.strictEqual(key1, "conv_hello_world");
-      });
-
-      test("should truncate long user messages in key", () => {
-        const provider = new AnthropicProvider();
-        const longMessage = "a".repeat(100);
-        const messages = [{ role: "user", content: longMessage }];
-
-        const key = provider.generateConversationKey(messages);
-
-        assert.ok(key.length <= 55); // 'conv_' + 50 chars
-        assert.ok(key.startsWith("conv_"));
-      });
-
-      test("should replace spaces with underscores in key", () => {
-        const provider = new AnthropicProvider();
-        const messages = [
-          { role: "user", content: "hello world test message" },
-        ];
-
-        const key = provider.generateConversationKey(messages);
-
-        assert.strictEqual(key, "conv_hello_world_test_message");
-      });
-
-      test("should fallback to timestamp-based key when no user message", () => {
-        const provider = new AnthropicProvider();
-        const messages = [{ role: "system", content: "system only" }];
-
-        const key = provider.generateConversationKey(messages);
-
-        assert.ok(key.startsWith("conv_"));
-        assert.match(key, /^conv_\d+$/);
-      });
-    });
-
-    describe("Session Tracking", () => {
-      test("should maintain separate session maps per provider instance", () => {
+      test("should generate different session IDs for different instances", () => {
         const provider1 = new AnthropicProvider();
         const provider2 = new AnthropicProvider();
-        const messages = [{ role: "user", content: "test" }];
 
-        const session1 = provider1.getOrCreateSessionId(null, messages);
-        const session2 = provider2.getOrCreateSessionId(null, messages);
-
-        // Different provider instances should generate different session IDs
-        assert.notStrictEqual(session1, session2);
+        assert.notStrictEqual(provider1.sessionId, provider2.sessionId);
       });
 
-      test("should track multiple conversations in same provider", () => {
+      test("should allow setting session ID", () => {
         const provider = new AnthropicProvider();
+        const customSessionId = "custom-session-123";
 
-        const session1 = provider.getOrCreateSessionId(null, [
-          { role: "user", content: "first" },
-        ]);
-        const session2 = provider.getOrCreateSessionId(null, [
-          { role: "user", content: "second" },
-        ]);
-        const session3 = provider.getOrCreateSessionId(null, [
-          { role: "user", content: "first" },
-        ]); // Same as first
+        provider.setSessionId(customSessionId);
 
-        assert.notStrictEqual(session1, session2);
-        assert.strictEqual(session1, session3); // Should reuse session for same conversation
+        assert.strictEqual(provider.sessionId, customSessionId);
       });
     });
+
 
     describe("Token Counting", () => {
       test("should have countTokens method", () => {
@@ -447,36 +344,29 @@ describe("Model Provider Session ID Tracking", () => {
 
   describe("OpenAIProvider", () => {
     describe("Session ID Generation", () => {
-      test("should generate UUID when no conversation ID provided", () => {
+      test("should generate UUID at construction", () => {
         const provider = new OpenAIProvider();
-        const messages = [{ role: "user", content: "test message" }];
-
-        const sessionId = provider.getOrCreateSessionId(null, messages);
 
         assert.match(
-          sessionId,
+          provider.sessionId,
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
         );
       });
 
-      test("should use provided conversation ID when available", () => {
-        const provider = new OpenAIProvider();
-        const messages = [{ role: "user", content: "test message" }];
-        const providedId = "openai-conversation-456";
+      test("should generate different session IDs for different instances", () => {
+        const provider1 = new OpenAIProvider();
+        const provider2 = new OpenAIProvider();
 
-        const sessionId = provider.getOrCreateSessionId(providedId, messages);
-
-        assert.strictEqual(sessionId, providedId);
+        assert.notStrictEqual(provider1.sessionId, provider2.sessionId);
       });
 
-      test("should generate consistent session IDs for same conversation", () => {
+      test("should allow setting session ID", () => {
         const provider = new OpenAIProvider();
-        const messages = [{ role: "user", content: "test message" }];
+        const customSessionId = "openai-session-456";
 
-        const sessionId1 = provider.getOrCreateSessionId(null, messages);
-        const sessionId2 = provider.getOrCreateSessionId(null, messages);
+        provider.setSessionId(customSessionId);
 
-        assert.strictEqual(sessionId1, sessionId2);
+        assert.strictEqual(provider.sessionId, customSessionId);
       });
     });
 
@@ -495,10 +385,9 @@ describe("Model Provider Session ID Tracking", () => {
           );
         }
 
-        // Verify session was created
-        const sessionId = provider.getOrCreateSessionId(null, messages);
+        // Provider should have a session ID
         assert.match(
-          sessionId,
+          provider.sessionId,
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
         );
       });
@@ -507,36 +396,29 @@ describe("Model Provider Session ID Tracking", () => {
 
   describe("LocalProvider", () => {
     describe("Session ID Generation", () => {
-      test("should generate UUID when no conversation ID provided", () => {
+      test("should generate UUID at construction", () => {
         const provider = new LocalProvider();
-        const messages = [{ role: "user", content: "test message" }];
-
-        const sessionId = provider.getOrCreateSessionId(null, messages);
 
         assert.match(
-          sessionId,
+          provider.sessionId,
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
         );
       });
 
-      test("should use provided conversation ID when available", () => {
-        const provider = new LocalProvider();
-        const messages = [{ role: "user", content: "test message" }];
-        const providedId = "local-conversation-789";
+      test("should generate different session IDs for different instances", () => {
+        const provider1 = new LocalProvider();
+        const provider2 = new LocalProvider();
 
-        const sessionId = provider.getOrCreateSessionId(providedId, messages);
-
-        assert.strictEqual(sessionId, providedId);
+        assert.notStrictEqual(provider1.sessionId, provider2.sessionId);
       });
 
-      test("should generate consistent session IDs for same conversation", () => {
+      test("should allow setting session ID", () => {
         const provider = new LocalProvider();
-        const messages = [{ role: "user", content: "test message" }];
+        const customSessionId = "local-session-789";
 
-        const sessionId1 = provider.getOrCreateSessionId(null, messages);
-        const sessionId2 = provider.getOrCreateSessionId(null, messages);
+        provider.setSessionId(customSessionId);
 
-        assert.strictEqual(sessionId1, sessionId2);
+        assert.strictEqual(provider.sessionId, customSessionId);
       });
     });
 
@@ -555,10 +437,9 @@ describe("Model Provider Session ID Tracking", () => {
           );
         }
 
-        // Verify session was created
-        const sessionId = provider.getOrCreateSessionId(null, messages);
+        // Provider should have a session ID
         assert.match(
-          sessionId,
+          provider.sessionId,
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
         );
       });
@@ -566,23 +447,18 @@ describe("Model Provider Session ID Tracking", () => {
   });
 
   describe("Cross-Provider Session Isolation", () => {
-    test("should maintain independent session tracking across providers", () => {
+    test("should maintain independent session IDs across provider instances", () => {
       const anthropic = new AnthropicProvider();
       const openai = new OpenAIProvider();
       const local = new LocalProvider();
-      const messages = [{ role: "user", content: "same message" }];
 
-      const sessionAnthropic = anthropic.getOrCreateSessionId(null, messages);
-      const sessionOpenAI = openai.getOrCreateSessionId(null, messages);
-      const sessionLocal = local.getOrCreateSessionId(null, messages);
-
-      // All should be different UUIDs despite same input
-      assert.notStrictEqual(sessionAnthropic, sessionOpenAI);
-      assert.notStrictEqual(sessionAnthropic, sessionLocal);
-      assert.notStrictEqual(sessionOpenAI, sessionLocal);
+      // Each provider instance should have its own unique session ID
+      assert.notStrictEqual(anthropic.sessionId, openai.sessionId);
+      assert.notStrictEqual(anthropic.sessionId, local.sessionId);
+      assert.notStrictEqual(openai.sessionId, local.sessionId);
 
       // All should be valid UUIDs
-      [sessionAnthropic, sessionOpenAI, sessionLocal].forEach((sessionId) => {
+      [anthropic.sessionId, openai.sessionId, local.sessionId].forEach((sessionId) => {
         assert.match(
           sessionId,
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,

@@ -11,6 +11,7 @@ export class ModelProvider {
     this.config = config;
     this.defaultProvider = null;
     this.debugLogger = config.debugLogger || null;
+    this.sessionId = null; // Set by agent or caller
   }
 
   async initialize() {
@@ -32,6 +33,10 @@ export class ModelProvider {
     //   const localProvider = new LocalProvider(this.config.local);
     //   this.providers.set('local', localProvider);
     // }
+  }
+
+  setSessionId(sessionId) {
+    this.sessionId = sessionId;
   }
 
   async chat(messages, options = {}) {
