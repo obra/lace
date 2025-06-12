@@ -1,5 +1,5 @@
 // ABOUTME: Main Ink application component for Lace terminal UI
-// ABOUTME: Implements full-window layout with ConversationView, StatusBar, and InputBar
+// ABOUTME: Implements full-window layout with ConversationView, StatusBar
 
 import React, { useState, useEffect, useRef } from "react";
 import { Box, useStdout, useStdin } from "ink";
