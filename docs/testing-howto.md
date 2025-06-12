@@ -271,23 +271,6 @@ Use this pattern for all Ink components that fail with stream-related errors:
 3. Test the rendered output string instead of JSX structure
 4. Focus on user-visible behavior rather than implementation details
 
-### Legacy Ink Component Testing (DEPRECATED)
-
-```typescript
-import Component from "../../../src/ui/components/Component";
-
-describe("Component Name", () => {
-  test("renders with correct props", () => {
-    const element = Component({ prop: "value" }) as any;
-
-    expect(element.type).toBeTruthy();
-    expect(element.props.children).toContain("expected content");
-  });
-});
-```
-
-**Note**: This approach is deprecated due to testing implementation details instead of user behavior. Use `renderInkComponent` instead.
-
 #### Testing Styled Output (ANSI Codes)
 
 When testing components that use ANSI escape codes for styling (like search highlighting or cursor positioning), use the `stripAnsi` utility from ink-test-utils:

@@ -3,9 +3,9 @@
 
 import { ActivityLogger } from "../logging/activity-logger.js";
 import { DebugLogger } from "../logging/debug-logger.js";
-import { SynthesisEngine } from "../tools/synthesis-engine.js";
-import { TokenEstimator } from "../tools/token-estimator.js";
-import { ToolResultExtractor } from "../tools/tool-result-extractor.js";
+import { SynthesisEngine } from "../utilities/synthesis-engine.js";
+import { TokenEstimator } from "../utilities/token-estimator.js";
+import { ToolResultExtractor } from "../utilities/tool-result-extractor.js";
 import { getRole } from "./role-registry.ts";
 import { Role } from "./roles/types.ts";
 

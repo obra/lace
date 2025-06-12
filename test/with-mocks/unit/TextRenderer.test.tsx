@@ -3,7 +3,15 @@
 
 import { jest, describe, test, expect } from "@jest/globals";
 import React from "react";
-import { renderInkComponent } from "../helpers/ink-test-utils";
+import { 
+  renderInkComponent, 
+  stripAnsi, 
+  expectCursorAt, 
+  expectNoCursor, 
+  expectCursorBeyondText, 
+  expectCursorOnEmptyLine,
+  cursorText 
+} from "../helpers/ink-test-utils";
 import TextRenderer from "@/ui/components/TextRenderer";
 import { Box, Text } from "ink";
 
@@ -21,6 +29,21 @@ describe("TextRenderer Component", () => {
 
     // Should render text content
     expect(output).toContain("Hello world");
+  });
+
+  test("user can see cursor highlighting at position 0", () => {
+    const { frames } = renderInkComponent(
+      <TextRenderer
+        lines={["Hello world"]}
+        cursorLine={0}
+        cursorColumn={0}
+        isFocused={true}
+      />
+    );
+    const output = frames.join('');
+
+    // Test using our new helper - cursor should highlight first character
+    expectCursorAt(output, "Hello world", 0);
   });
 
   test("user can see placeholder when empty and not focused", () => {

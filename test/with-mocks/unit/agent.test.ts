@@ -15,9 +15,9 @@ import { Agent } from "@/agents/agent.ts";
 import { getRole } from "@/agents/role-registry.ts";
 jest.mock("@/logging/activity-logger.js");
 jest.mock("@/logging/debug-logger.js");
-jest.mock("@/tools/synthesis-engine.js");
-jest.mock("@/tools/token-estimator.js");
-jest.mock("@/tools/tool-result-extractor.js");
+jest.mock("@/utilities/synthesis-engine.js");
+jest.mock("@/utilities/token-estimator.js");
+jest.mock("@/utilities/tool-result-extractor.js");
 
 describe("Agent", () => {
   let mockTools: any;
