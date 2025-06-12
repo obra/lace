@@ -8,10 +8,10 @@ import { Box, Text } from "ink";
 
 describe("Message Component", () => {
   test("user can see user message with prefix", () => {
-    const { frames } = renderInkComponent(
+    const { lastFrame } = renderInkComponent(
       <Message type="user" content="Hello world" />
     );
-    const output = frames.join('');
+    const output = lastFrame();
 
     // Should display user prefix and content
     expect(output).toContain(">");
@@ -19,10 +19,10 @@ describe("Message Component", () => {
   });
 
   test("user can see assistant message with robot prefix", () => {
-    const { frames } = renderInkComponent(
+    const { lastFrame } = renderInkComponent(
       <Message type="assistant" content="Hi there!" />
     );
-    const output = frames.join('');
+    const output = lastFrame();
 
     // Should display robot prefix and content
     expect(output).toContain("🤖");
@@ -31,10 +31,10 @@ describe("Message Component", () => {
 
   test("user can see multi-line content", () => {
     const multiLineContent = "Line 1\nLine 2\nLine 3";
-    const { frames } = renderInkComponent(
+    const { lastFrame } = renderInkComponent(
       <Message type="assistant" content={multiLineContent} />
     );
-    const output = frames.join('');
+    const output = lastFrame();
 
     // Should display all lines
     expect(output).toContain("Line 1");

@@ -186,8 +186,8 @@ describe("DetailedLogView Component", () => {
       },
     ];
 
-    const { frames } = renderInkComponent(<DetailedLogView entries={entries} />);
-    const output = frames.join('');
+    const { lastFrame } = renderInkComponent(<DetailedLogView entries={entries} />);
+    const output = lastFrame();
 
     // Verify content is displayed
     expect(output).toContain("User input message");
@@ -248,8 +248,8 @@ describe("DetailedLogView Component", () => {
       },
     ];
 
-    const { frames } = renderInkComponent(<DetailedLogView entries={entries} />);
-    const output = frames.join('');
+    const { lastFrame } = renderInkComponent(<DetailedLogView entries={entries} />);
+    const output = lastFrame();
 
     // Verify content is displayed
     expect(output).toContain("Model response with token usage");

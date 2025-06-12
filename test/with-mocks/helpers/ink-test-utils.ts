@@ -257,6 +257,6 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
     stderr,
     stdin,
     frames: capturedWrites,
-    lastFrame: () => capturedWrites[capturedWrites.length - 1]
+    lastFrame: () => capturedWrites.join('')
   };
 }
