@@ -6,7 +6,7 @@ import { getRole } from "../agents/agent-registry.ts";
 
 export interface DelegateTaskParams {
   purpose: string;
-  specification: string;
+  instructions: string;
   role?: string;
 }
 
@@ -16,31 +16,7 @@ export interface DelegateTaskResult {
   error?: string;
   metadata?: {
     role: string;
-    model: string;
-    provider: string;
     taskDescription: string;
-  };
-}
-
-export interface SpawnAgentParams {
-  role: string;
-  task: string;
-  model?: string;
-  provider?: string;
-  capabilities?: string[];
-}
-
-export interface SpawnAgentResult {
-  success: boolean;
-  agentId?: string;
-  result?: string;
-  error?: string;
-  metadata?: {
-    role: string;
-    model: string;
-    provider: string;
-    capabilities: string[];
-    task: string;
   };
 }
 
@@ -50,7 +26,7 @@ export class AgentDelegateTool extends BaseTool {
   /**
    * Auto-select appropriate role based on purpose keywords
    */
-  private selectRole(purpose: string, specification: string): string {
+  private selectRole(purpose: string, instructions: string): string {
     const purposeLower = purpose.toLowerCase();
     
     // Execution patterns → execution role for efficiency
@@ -91,8 +67,8 @@ DON'T DELEGATE WHEN:
 - Small modifications to current work
 
 EXAMPLES:
-- delegate_task({ purpose: "security analysis", specification: "Review auth code for vulnerabilities..." })
-- delegate_task({ purpose: "fix test failures", specification: "Run tests, identify issues, implement fixes...", role: "execution" })
+- delegate_task({ purpose: "security analysis", instructions: "Review auth code for vulnerabilities..." })
+- delegate_task({ purpose: "fix test failures", instructions: "Run tests, identify issues, implement fixes...", role: "execution" })
 
 Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → execution, 'plan' → orchestrator`,
       methods: {
@@ -104,7 +80,7 @@ Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → executi
               required: true,
               description: 'What this delegation accomplishes (e.g., "security analysis", "performance review")'
             },
-            specification: {
+            instructions: {
               type: 'string',
               required: true,
               description: 'Complete task requirements including scope, deliverables, and success criteria'
@@ -116,36 +92,6 @@ Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → executi
             }
           }
         },
-        spawn_agent: {
-          description: 'Create a specialized sub-agent for complex workflows',
-          parameters: {
-            role: {
-              type: 'string',
-              required: true,
-              description: 'Specific role for the sub-agent'
-            },
-            task: {
-              type: 'string',
-              required: true,
-              description: 'Initial task for the spawned agent'
-            },
-            model: {
-              type: 'string',
-              required: false,
-              description: 'Model to use for the sub-agent'
-            },
-            provider: {
-              type: 'string',
-              required: false,
-              description: 'Model provider for the sub-agent'
-            },
-            capabilities: {
-              type: 'array',
-              required: false,
-              description: 'Array of capabilities for the sub-agent'
-            }
-          }
-        }
       }
     };
   }
@@ -153,7 +99,7 @@ Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → executi
   async delegate_task(params: DelegateTaskParams, context?: ToolContext): Promise<DelegateTaskResult> {
     const {
       purpose,
-      specification,
+      instructions,
       role,
     } = params;
 
@@ -164,20 +110,16 @@ Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → executi
       };
     }
 
-    if (!specification) {
+    if (!instructions) {
       return {
         success: false,
-        error: "Specification is required",
+        error: "Instructions are required",
       };
     }
 
     // Auto-select role if not provided
-    const selectedRole = role || this.selectRole(purpose, specification);
+    const selectedRole = role || this.selectRole(purpose, instructions);
     
-    // Set defaults based on role
-    const model = "claude-3-5-sonnet-20241022";
-    const provider = "anthropic";
-    const capabilities = ["reasoning", "tool_calling"];
     const timeout = this.defaultTimeout;
 
     // Validate role name
@@ -217,15 +159,12 @@ Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → executi
       // Get current session ID from context
       const sessionId = context?.context?.sessionId || `task-session-${Date.now()}`;
 
-      // Combine purpose and specification into task description
-      const taskDescription = `${purpose}: ${specification}`;
+      // Combine purpose and instructions into task description
+      const taskDescription = `${purpose}: ${instructions}`;
       
       // Delegate to sub-agent using existing infrastructure
       const taskPromise = agent.delegateTask(sessionId, taskDescription, {
         role: selectedRole,
-        assignedModel: model,
-        assignedProvider: provider,
-        capabilities,
       });
 
       // Race timeout vs task completion
@@ -236,8 +175,6 @@ Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → executi
         result: result.content,
         metadata: {
           role: selectedRole,
-          model,
-          provider,
           taskDescription,
         },
       };
@@ -261,74 +198,4 @@ Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → executi
     }
   }
 
-  async spawn_agent(params: SpawnAgentParams, context?: ToolContext): Promise<SpawnAgentResult> {
-    const {
-      role,
-      task,
-      model = "claude-3-5-sonnet-20241022",
-      provider = "anthropic",
-      capabilities = ["reasoning", "tool_calling"],
-    } = params;
-
-    if (!role || !task) {
-      return {
-        success: false,
-        error: "Role and task are required parameters",
-      };
-    }
-
-    // Get agent from context - required for spawning
-    const agent = context?.context?.agent;
-    if (!agent) {
-      return {
-        success: false,
-        error: "Agent context is required for spawning sub-agents",
-      };
-    }
-
-    try {
-      // Check for cancellation before starting
-      if (context?.signal?.aborted) {
-        throw new Error('Agent spawning was cancelled');
-      }
-
-      // Use existing spawnSubagent infrastructure
-      const subagent = await agent.spawnSubagent({
-        role,
-        assignedModel: model,
-        assignedProvider: provider,
-        capabilities,
-        task,
-      });
-
-      // Execute the task
-      const sessionId = context?.context?.sessionId || `task-session-${Date.now()}`;
-      const result = await subagent.generateResponse(sessionId, task);
-
-      return {
-        success: true,
-        agentId: subagent.generation,
-        result: result.content,
-        metadata: {
-          role,
-          model,
-          provider,
-          capabilities,
-          task: task.length > 100 ? task.substring(0, 100) + "..." : task,
-        },
-      };
-    } catch (error: any) {
-      if (context?.signal?.aborted) {
-        return {
-          success: false,
-          error: 'Agent spawning was cancelled',
-        };
-      }
-
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }
 }

@@ -14,7 +14,6 @@ describe('AgentDelegateTool', () => {
 
     mockAgent = {
       delegateTask: jest.fn() as jest.MockedFunction<any>,
-      spawnSubagent: jest.fn() as jest.MockedFunction<any>,
     };
 
     mockContext = {
@@ -33,7 +32,6 @@ describe('AgentDelegateTool', () => {
       expect(schema.name).toBe('agent_delegate');
       expect(schema.description).toContain('Delegate tasks to specialized sub-agents');
       expect(schema.methods).toHaveProperty('delegate_task');
-      expect(schema.methods).toHaveProperty('spawn_agent');
     });
 
     test('should have required parameters for delegate_task', () => {
@@ -147,88 +145,4 @@ describe('AgentDelegateTool', () => {
 
   });
 
-  describe('spawn_agent', () => {
-    test('should successfully spawn an agent and execute task', async () => {
-      const mockSubagent = {
-        generation: 'agent-123',
-        generateResponse: jest.fn()
-      } as any;
-      mockSubagent.generateResponse.mockResolvedValue({ content: 'Agent task result' });
-      mockAgent.spawnSubagent.mockResolvedValue(mockSubagent);
-
-      const result = await tool.spawn_agent({
-        role: 'researcher',
-        task: 'Research topic X'
-      }, mockContext);
-
-      expect(result.success).toBe(true);
-      expect(result.agentId).toBe('agent-123');
-      expect(result.result).toBe('Agent task result');
-      expect(result.metadata?.role).toBe('researcher');
-      expect(mockAgent.spawnSubagent).toHaveBeenCalledWith({
-        role: 'researcher',
-        assignedModel: 'claude-3-5-sonnet-20241022',
-        assignedProvider: 'anthropic',
-        capabilities: ['reasoning', 'tool_calling'],
-        task: 'Research topic X'
-      });
-    });
-
-    test('should return error when role or task is missing', async () => {
-      const result = await tool.spawn_agent({
-        role: '',
-        task: 'Some task'
-      }, mockContext);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Role and task are required parameters');
-    });
-
-    test('should return error when agent context is missing', async () => {
-      const contextWithoutAgent = {
-        ...mockContext,
-        context: { sessionId: 'test-session' }
-      };
-
-      const result = await tool.spawn_agent({
-        role: 'researcher',
-        task: 'Research task'
-      }, contextWithoutAgent);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Agent context is required for spawning sub-agents');
-    });
-
-    test('should handle spawning errors', async () => {
-      mockAgent.spawnSubagent.mockRejectedValue(new Error('Spawn failed'));
-
-      const result = await tool.spawn_agent({
-        role: 'researcher',
-        task: 'Research task'
-      }, mockContext);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Spawn failed');
-    });
-
-    test('should truncate long tasks in metadata', async () => {
-      const mockSubagent = {
-        generation: 'agent-123',
-        generateResponse: jest.fn()
-      } as any;
-      mockSubagent.generateResponse.mockResolvedValue({ content: 'Result' });
-      mockAgent.spawnSubagent.mockResolvedValue(mockSubagent);
-
-      const longTask = 'a'.repeat(150);
-      const result = await tool.spawn_agent({
-        role: 'researcher',
-        task: longTask
-      }, mockContext);
-
-      expect(result.success).toBe(true);
-      expect(result.metadata?.task).toHaveLength(103); // 100 chars + "..."
-      expect(result.metadata?.task).toMatch(/\.\.\.$/); // Ends with ...
-    });
-
-  });
 });

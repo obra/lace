@@ -870,12 +870,12 @@ Focus on executing your assigned task efficiently.`;
     }
 
     // Fallback: try original parsing if tool not found
-    if (!this.tools.get(toolName) && parts.length > 1) {
+    if (!this.tools.getTool(toolName) && parts.length > 1) {
       toolName = parts[0];
       methodName = parts.slice(1).join("_");
     }
 
-    if (!this.tools.get(toolName)) {
+    if (!this.tools.getTool(toolName)) {
       throw new Error(`Tool '${toolName}' not found`);
     }
 

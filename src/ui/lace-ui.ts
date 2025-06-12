@@ -351,7 +351,7 @@ export class LaceUI {
   // File completion using the file tool
   async getFileCompletions(prefix: string) {
     try {
-      const fileTool = this.tools.get("file");
+      const fileTool = this.tools.getTool("file");
       if (!fileTool) {
         return [];
       }

@@ -76,7 +76,6 @@ class MockAgentDelegateTool {
       description: 'Mock agent delegate tool',
       methods: {
         delegate_task: { description: 'Mock delegate task' },
-        spawn_agent: { description: 'Mock spawn agent' }
       }
     };
   }
