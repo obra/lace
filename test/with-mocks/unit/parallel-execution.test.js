@@ -10,56 +10,18 @@ import {
   assert,
   utils,
 } from "../../test-harness.js";
+import { createMockTools } from "../__mocks__/tools-mock.js";
 
 describe("Parallel Tool Execution", () => {
   let harness;
   let agent;
   let mockTools;
-  let callOrder;
-  let callTimestamps;
 
   beforeEach(async () => {
     harness = new TestHarness();
-    callOrder = [];
-    callTimestamps = [];
-
-    // Create mock tools that track execution order and timing
-    mockTools = {
-      callTool: async (toolName, method, params, sessionId, agent) => {
-        const startTime = Date.now();
-        callTimestamps.push({ tool: `${toolName}_${method}`, startTime });
-        callOrder.push(`${toolName}_${method}_start`);
-
-        // Simulate different execution times
-        const delay =
-          {
-            tool1_method1: 100,
-            tool2_method2: 150,
-            tool3_method3: 50,
-            slow_method: 300,
-            fast_method: 25,
-            error_method: 75,
-          }[`${toolName}_${method}`] || 100;
-
-        await new Promise((resolve) => setTimeout(resolve, delay));
-
-        callOrder.push(`${toolName}_${method}_end`);
-
-        if (toolName === "error" && method === "method") {
-          throw new Error(`${toolName}_${method} failed`);
-        }
-
-        return {
-          success: true,
-          result: `${toolName}_${method} completed`,
-          executionTime: delay,
-        };
-      },
-      get: (name) => ({ name }),
-      listTools: () => ["tool1", "tool2", "tool3", "slow", "fast", "error"],
-      getToolSchema: (name) => ({ name, methods: {} }),
-      getAllSchemas: () => ({}),
-    };
+    
+    // Create reusable mock tools with call tracking
+    mockTools = createMockTools();
 
     // Use TestHarness to create agent instead of direct import
     agent = await harness.createTestAgent({
@@ -104,14 +66,15 @@ describe("Parallel Tool Execution", () => {
       );
 
       // Verify all tools started before any completed (parallel behavior)
-      const startEvents = callOrder.filter((event) => event.endsWith("_start"));
-      const endEvents = callOrder.filter((event) => event.endsWith("_end"));
+      const currentCallOrder = mockTools.getCallOrder();
+      const startEvents = currentCallOrder.filter((event) => event.endsWith("_start"));
+      const endEvents = currentCallOrder.filter((event) => event.endsWith("_end"));
 
       // In parallel execution, all starts should come before all ends
-      const lastStartIndex = callOrder.lastIndexOf(
+      const lastStartIndex = currentCallOrder.lastIndexOf(
         startEvents[startEvents.length - 1],
       );
-      const firstEndIndex = callOrder.indexOf(endEvents[0]);
+      const firstEndIndex = currentCallOrder.indexOf(endEvents[0]);
 
       assert.ok(
         lastStartIndex < firstEndIndex,

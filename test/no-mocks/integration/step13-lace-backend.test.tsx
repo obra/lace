@@ -1,5 +1,5 @@
 // ABOUTME: Integration tests for Step 13 real lace backend connection
-// ABOUTME: Tests integration between lace-ink UI and existing lace agent system
+// ABOUTME: Tests integration between lace UI and  agent system
 
 import React from "react";
 import { jest } from "@jest/globals";

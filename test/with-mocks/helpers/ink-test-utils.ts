@@ -142,6 +142,15 @@ class EnhancedStdout extends EventEmitter {
 
   public lastFrame = () => this._lastFrame;
 
+  public lastNonEmptyFrame = () => {
+    for (let i = this.frames.length - 1; i >= 0; i--) {
+      if (this.frames[i]?.trim() !== '') {
+        return this.frames[i];
+      }
+    }
+    return undefined;
+  };
+
   // Add methods that Ink might call
   public cursorTo = () => {};
   public clearLine = () => {};
@@ -257,6 +266,30 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
     stderr,
     stdin,
     frames: capturedWrites,
-    lastFrame: () => capturedWrites.join('')
+    lastFrame: () => {
+      if (capturedWrites.length === 0) return undefined;
+      
+      // Start with the last frame
+      let result = capturedWrites[capturedWrites.length - 1] || '';
+      
+      // If the last frame is only ANSI codes (no visible content), 
+      // look backwards and coalesce with frames that have content
+      const stripped = result.replace(/\u001b\[[0-9;?]*[a-zA-Z]/g, '');
+      if (stripped.trim() === '') {
+        // Last frame is only ANSI, find the last frame with content and combine
+        for (let i = capturedWrites.length - 2; i >= 0; i--) {
+          const frame = capturedWrites[i];
+          if (frame) {
+            const frameStripped = frame.replace(/\u001b\[[0-9;?]*[a-zA-Z]/g, '');
+            if (frameStripped.trim() !== '') {
+              // Found a frame with content, combine it with trailing ANSI codes
+              return frame + result;
+            }
+          }
+        }
+      }
+      
+      return result;
+    }
   };
 }

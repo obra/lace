@@ -3,7 +3,8 @@
 
 import { jest } from "@jest/globals";
 import { Agent } from "../../../src/agents/agent.ts";
-import { ToolRegistry } from "../../../src/tools/tool-registry.js";
+import { ToolRegistry } from "../../../src/tools/tool-registry.ts";
+import { BaseTool } from "../../../src/tools/base-tool.ts";
 
 describe("Error Recovery and Retry Logic", () => {
   let agent;
@@ -13,10 +14,14 @@ describe("Error Recovery and Retry Logic", () => {
 
   beforeEach(() => {
     // Mock tools that can fail/succeed
-    mockTools = {
-      flaky_tool: {
-        callTool: jest.fn(),
-        getMetadata: () => ({
+    class FlakyTool extends BaseTool {
+      constructor() {
+        super();
+        this.mockExecute = jest.fn();
+      }
+
+      getMetadata() {
+        return {
           name: "flaky_tool",
           description: "A tool that sometimes fails",
           methods: {
@@ -25,14 +30,25 @@ describe("Error Recovery and Retry Logic", () => {
               parameters: {},
             },
           },
-        }),
-      },
-      reliable_tool: {
-        callTool: jest.fn().mockResolvedValue({
+        };
+      }
+
+      async execute(methodName, params, options = {}) {
+        return this.mockExecute(methodName, params, options);
+      }
+    }
+
+    class ReliableTool extends BaseTool {
+      constructor() {
+        super();
+        this.mockExecute = jest.fn().mockResolvedValue({
           success: true,
-          result: "Always works",
-        }),
-        getMetadata: () => ({
+          data: "Always works",
+        });
+      }
+
+      getMetadata() {
+        return {
           name: "reliable_tool",
           description: "A tool that always works",
           methods: {
@@ -41,20 +57,36 @@ describe("Error Recovery and Retry Logic", () => {
               parameters: {},
             },
           },
-        }),
-      },
+        };
+      }
+
+      async execute(methodName, params, options = {}) {
+        return this.mockExecute(methodName, params, options);
+      }
+    }
+
+    mockTools = {
+      flaky_tool: new FlakyTool(),
+      reliable_tool: new ReliableTool(),
     };
 
     mockToolRegistry = {
       listTools: () => ["flaky_tool", "reliable_tool"],
-      get: (name) => mockTools[name],
-      callTool: (toolName, methodName, params, sessionId, agent) => {
-        return mockTools[toolName].callTool(
-          methodName,
-          params,
-          sessionId,
-          agent,
-        );
+      getTool: (name) => mockTools[name],
+      callTool: async (toolName, methodName, params, sessionId, agent) => {
+        const tool = mockTools[toolName];
+        if (!tool) {
+          throw new Error(`Tool '${toolName}' not found`);
+        }
+        const result = await tool.execute(methodName, params, {
+          context: { sessionId, agent }
+        });
+        if (result.success) {
+          // Return data wrapped in result property for Agent compatibility
+          return { result: result.data };
+        } else {
+          throw new Error(result.error?.message || 'Tool execution failed');
+        }
       },
       getToolSchema: (name) => mockTools[name]?.getMetadata(),
     };
@@ -79,10 +111,10 @@ describe("Error Recovery and Retry Logic", () => {
   describe("Automatic Retry with Exponential Backoff", () => {
     it("should retry transient failures with exponential backoff", async () => {
       // First two calls fail, third succeeds
-      mockTools.flaky_tool.callTool
+      mockTools.flaky_tool.mockExecute
         .mockRejectedValueOnce(new Error("Transient network error"))
         .mockRejectedValueOnce(new Error("Temporary unavailable"))
-        .mockResolvedValueOnce({ success: true, result: "Finally worked" });
+        .mockResolvedValueOnce({ success: true, data: "Finally worked" });
 
       const toolCalls = [
         {
@@ -108,12 +140,12 @@ describe("Error Recovery and Retry Logic", () => {
       // Should have exponential backoff delay (at least 100ms + 200ms = 300ms)
       expect(duration).toBeGreaterThan(300);
 
-      expect(mockTools.flaky_tool.callTool).toHaveBeenCalledTimes(3);
+      expect(mockTools.flaky_tool.mockExecute).toHaveBeenCalledTimes(3);
     });
 
     it("should give up after max retry attempts", async () => {
       // Always fail
-      mockTools.flaky_tool.callTool.mockRejectedValue(
+      mockTools.flaky_tool.mockExecute.mockRejectedValue(
         new Error("Persistent failure"),
       );
 
@@ -136,7 +168,7 @@ describe("Error Recovery and Retry Logic", () => {
       expect(results[0].retryAttempts).toBe(3); // Default max retries
       expect(results[0].finalFailure).toBe(true);
 
-      expect(mockTools.flaky_tool.callTool).toHaveBeenCalledTimes(4); // Initial + 3 retries
+      expect(mockTools.flaky_tool.mockExecute).toHaveBeenCalledTimes(4); // Initial + 3 retries
     });
 
     it("should use configurable retry settings", async () => {
@@ -147,7 +179,7 @@ describe("Error Recovery and Retry Logic", () => {
         backoffMultiplier: 2,
       };
 
-      mockTools.flaky_tool.callTool.mockRejectedValue(
+      mockTools.flaky_tool.mockExecute.mockRejectedValue(
         new Error("Always fails"),
       );
 
@@ -165,12 +197,12 @@ describe("Error Recovery and Retry Logic", () => {
       );
 
       expect(results[0].retryAttempts).toBe(2);
-      expect(mockTools.flaky_tool.callTool).toHaveBeenCalledTimes(3); // Initial + 2 retries
+      expect(mockTools.flaky_tool.mockExecute).toHaveBeenCalledTimes(3); // Initial + 2 retries
     });
 
     it("should not retry non-transient errors", async () => {
       // Authentication/permission errors should not be retried
-      mockTools.flaky_tool.callTool.mockRejectedValue(
+      mockTools.flaky_tool.mockExecute.mockRejectedValue(
         new Error("Authentication failed"),
       );
 
@@ -192,14 +224,14 @@ describe("Error Recovery and Retry Logic", () => {
       expect(results[0].retryAttempts).toBe(0);
       expect(results[0].nonRetriable).toBe(true);
 
-      expect(mockTools.flaky_tool.callTool).toHaveBeenCalledTimes(1); // No retries
+      expect(mockTools.flaky_tool.mockExecute).toHaveBeenCalledTimes(1); // No retries
     });
   });
 
   describe("Circuit Breaker Pattern", () => {
     it("should open circuit after consecutive failures", async () => {
       // Fail multiple times to trigger circuit breaker
-      mockTools.flaky_tool.callTool.mockRejectedValue(
+      mockTools.flaky_tool.mockExecute.mockRejectedValue(
         new Error("Service down"),
       );
 
@@ -221,14 +253,14 @@ describe("Error Recovery and Retry Logic", () => {
       expect(circuitBrokenResults.length).toBeGreaterThan(0);
 
       // Circuit breaker should prevent some calls
-      expect(mockTools.flaky_tool.callTool.mock.calls.length).toBeLessThan(20); // 5 tools × 4 attempts each
+      expect(mockTools.flaky_tool.mockExecute.mock.calls.length).toBeLessThan(20); // 5 tools × 4 attempts each
     });
 
     it("should close circuit after successful call following half-open state", async () => {
       // Setup mock to succeed on the recovery attempt
-      mockTools.flaky_tool.callTool
+      mockTools.flaky_tool.mockExecute
         .mockReset()
-        .mockResolvedValue({ success: true, result: "Recovery" });
+        .mockResolvedValue({ success: true, data: "Recovery" });
 
       // Force circuit breaker state
       agent.circuitBreaker.set("flaky_tool", {
@@ -258,7 +290,7 @@ describe("Error Recovery and Retry Logic", () => {
 
     it("should provide circuit breaker statistics", async () => {
       // Trigger some failures
-      mockTools.flaky_tool.callTool.mockRejectedValue(
+      mockTools.flaky_tool.mockExecute.mockRejectedValue(
         new Error("Service issues"),
       );
 
@@ -286,9 +318,9 @@ describe("Error Recovery and Retry Logic", () => {
   describe("Fallback Strategies", () => {
     it("should retry sequentially when parallel execution fails", async () => {
       // Make parallel execution fail for multiple tools
-      mockTools.flaky_tool.callTool
+      mockTools.flaky_tool.mockExecute
         .mockRejectedValueOnce(new Error("Parallel overload"))
-        .mockResolvedValueOnce({ success: true, result: "Sequential success" });
+        .mockResolvedValueOnce({ success: true, data: "Sequential success" });
 
       const toolCalls = [
         { name: "flaky_tool_execute", input: { id: 1 } },
@@ -309,7 +341,7 @@ describe("Error Recovery and Retry Logic", () => {
     });
 
     it("should use degraded execution when some tools consistently fail", async () => {
-      mockTools.flaky_tool.callTool.mockRejectedValue(
+      mockTools.flaky_tool.mockExecute.mockRejectedValue(
         new Error("Consistently failing"),
       );
 
@@ -336,7 +368,7 @@ describe("Error Recovery and Retry Logic", () => {
     });
 
     it("should continue with successful tools when others fail", async () => {
-      mockTools.flaky_tool.callTool.mockRejectedValue(
+      mockTools.flaky_tool.mockExecute.mockRejectedValue(
         new Error("Total failure"),
       );
 
@@ -367,11 +399,11 @@ describe("Error Recovery and Retry Logic", () => {
   describe("Error Aggregation and Reporting", () => {
     it("should distinguish between tool-specific and systemic errors", async () => {
       // Tool-specific error
-      mockTools.flaky_tool.callTool.mockRejectedValue(
+      mockTools.flaky_tool.mockExecute.mockRejectedValue(
         new Error("Tool validation failed"),
       );
       // Systemic error (network/infrastructure)
-      mockTools.reliable_tool.callTool.mockRejectedValue(
+      mockTools.reliable_tool.mockExecute.mockRejectedValue(
         new Error("Network timeout"),
       );
 
@@ -399,7 +431,7 @@ describe("Error Recovery and Retry Logic", () => {
     });
 
     it("should provide actionable error information for recovery", async () => {
-      mockTools.flaky_tool.callTool.mockRejectedValue(
+      mockTools.flaky_tool.mockExecute.mockRejectedValue(
         new Error("Rate limit exceeded"),
       );
 
@@ -424,7 +456,7 @@ describe("Error Recovery and Retry Logic", () => {
 
     it("should track error patterns across multiple executions", async () => {
       // Simulate multiple execution rounds
-      mockTools.flaky_tool.callTool.mockRejectedValue(
+      mockTools.flaky_tool.mockExecute.mockRejectedValue(
         new Error("Service degraded"),
       );
 
@@ -452,7 +484,7 @@ describe("Error Recovery and Retry Logic", () => {
         backoffMultiplier: 1.5,
       });
 
-      mockTools.flaky_tool.callTool.mockRejectedValue(
+      mockTools.flaky_tool.mockExecute.mockRejectedValue(
         new Error("Custom retry test"),
       );
 
@@ -470,13 +502,13 @@ describe("Error Recovery and Retry Logic", () => {
       );
 
       expect(results[0].retryAttempts).toBe(5);
-      expect(mockTools.flaky_tool.callTool).toHaveBeenCalledTimes(6); // Initial + 5 retries
+      expect(mockTools.flaky_tool.mockExecute).toHaveBeenCalledTimes(6); // Initial + 5 retries
     });
 
     it("should allow disabling retry for specific tools", async () => {
       agent.setToolRetryConfig("flaky_tool", { enabled: false });
 
-      mockTools.flaky_tool.callTool.mockRejectedValue(
+      mockTools.flaky_tool.mockExecute.mockRejectedValue(
         new Error("No retry test"),
       );
 
@@ -495,7 +527,7 @@ describe("Error Recovery and Retry Logic", () => {
 
       expect(results[0].retryAttempts).toBe(0);
       expect(results[0].retryDisabled).toBe(true);
-      expect(mockTools.flaky_tool.callTool).toHaveBeenCalledTimes(1);
+      expect(mockTools.flaky_tool.mockExecute).toHaveBeenCalledTimes(1);
     });
   });
 });

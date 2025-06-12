@@ -268,7 +268,17 @@ export class ToolRegistry {
     }
 
     try {
-      result = await tool[method](params);
+      const toolResult = await tool.execute(method, params, {
+        context: { sessionId, agent }
+      });
+      
+      if (toolResult.success) {
+        result = toolResult.data;
+      } else {
+        success = false;
+        error = toolResult.error?.message || 'Unknown error';
+        // Don't re-throw yet, create post-snapshot first
+      }
     } catch (err) {
       success = false;
       error = err.message;

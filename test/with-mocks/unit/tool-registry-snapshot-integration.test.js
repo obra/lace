@@ -65,7 +65,7 @@ describe("ToolRegistry Snapshot Integration", () => {
 
     // Try to import the classes
     try {
-      const toolModule = await import("../../../src/tools/tool-registry.js");
+      const toolModule = await import("../../../src/tools/tool-registry.ts");
       const snapshotModule = await import(
         "../../../src/snapshot/snapshot-manager.js"
       );
@@ -141,23 +141,36 @@ describe("ToolRegistry Snapshot Integration", () => {
       });
 
       // Register a simple test tool
-      const testTool = {
-        simpleOperation: async (params) => {
-          return { success: true, data: params.input };
-        },
-        getMetadata: () => ({
-          name: "test-tool",
-          description: "Test tool for snapshot integration",
-          methods: {
-            simpleOperation: {
-              description: "Simple test operation",
-              parameters: {
-                input: { type: "string", description: "Test input" },
+      class TestTool {
+        getMetadata() {
+          return {
+            name: "test-tool",
+            description: "Test tool for snapshot integration",
+            methods: {
+              simpleOperation: {
+                description: "Simple test operation",
+                parameters: {
+                  input: { type: "string", description: "Test input" },
+                },
               },
             },
-          },
-        }),
-      };
+          };
+        }
+
+        async simpleOperation(params) {
+          return { success: true, data: params.input };
+        }
+
+        async execute(methodName, params, options = {}) {
+          if (methodName === 'simpleOperation') {
+            const result = await this.simpleOperation(params);
+            return { success: true, data: result };
+          }
+          throw new Error(`Method '${methodName}' not found`);
+        }
+      }
+
+      const testTool = new TestTool();
 
       registry.register("test-tool", testTool);
 
@@ -239,10 +252,36 @@ describe("ToolRegistry Snapshot Integration", () => {
         conversationDB: mockConversationDB,
       });
 
-      const testTool = {
-        complexOperation: async (params) => ({ result: "complex result" }),
-        getMetadata: () => ({ name: "complex-tool" }),
-      };
+      class ComplexTool {
+        getMetadata() {
+          return {
+            name: "complex-tool",
+            description: "Complex test tool",
+            methods: {
+              complexOperation: {
+                description: "Complex test operation",
+                parameters: {
+                  config: { type: "string", description: "Config value" },
+                },
+              },
+            },
+          };
+        }
+
+        async complexOperation(params) {
+          return { result: "complex result" };
+        }
+
+        async execute(methodName, params, options = {}) {
+          if (methodName === 'complexOperation') {
+            const result = await this.complexOperation(params);
+            return { success: true, data: result };
+          }
+          throw new Error(`Method '${methodName}' not found`);
+        }
+      }
+
+      const testTool = new ComplexTool();
 
       registry.register("complex-tool", testTool);
 
@@ -279,12 +318,33 @@ describe("ToolRegistry Snapshot Integration", () => {
         snapshotManager: mockSnapshotManager,
       });
 
-      const failingTool = {
-        failingOperation: async () => {
+      class FailingTool {
+        getMetadata() {
+          return {
+            name: "failing-tool",
+            description: "Tool that fails",
+            methods: {
+              failingOperation: {
+                description: "Operation that fails",
+                parameters: {},
+              },
+            },
+          };
+        }
+
+        async failingOperation() {
           throw new Error("Tool execution failed");
-        },
-        getMetadata: () => ({ name: "failing-tool" }),
-      };
+        }
+
+        async execute(methodName, params, options = {}) {
+          if (methodName === 'failingOperation') {
+            await this.failingOperation(params);
+          }
+          throw new Error(`Method '${methodName}' not found`);
+        }
+      }
+
+      const failingTool = new FailingTool();
 
       registry.register("failing-tool", failingTool);
 
@@ -313,10 +373,36 @@ describe("ToolRegistry Snapshot Integration", () => {
       // Test that existing callTool method still works
       const registry = new ToolRegistry({ activityLogger: mockActivityLogger });
 
-      const regularTool = {
-        regularOperation: async (params) => ({ output: params.input }),
-        getMetadata: () => ({ name: "regular-tool" }),
-      };
+      class RegularTool {
+        getMetadata() {
+          return {
+            name: "regular-tool",
+            description: "Regular test tool",
+            methods: {
+              regularOperation: {
+                description: "Regular operation",
+                parameters: {
+                  input: { type: "string", description: "Input value" },
+                },
+              },
+            },
+          };
+        }
+
+        async regularOperation(params) {
+          return { output: params.input };
+        }
+
+        async execute(methodName, params, options = {}) {
+          if (methodName === 'regularOperation') {
+            const result = await this.regularOperation(params);
+            return { success: true, data: result };
+          }
+          throw new Error(`Method '${methodName}' not found`);
+        }
+      }
+
+      const regularTool = new RegularTool();
 
       registry.register("regular-tool", regularTool);
 
@@ -339,10 +425,34 @@ describe("ToolRegistry Snapshot Integration", () => {
       // Registry without snapshot manager should work normally
       const registry = new ToolRegistry({ activityLogger: mockActivityLogger });
 
-      const testTool = {
-        operation: async () => ({ success: true }),
-        getMetadata: () => ({ name: "no-snapshot-tool" }),
-      };
+      class NoSnapshotTool {
+        getMetadata() {
+          return {
+            name: "no-snapshot-tool",
+            description: "Tool without snapshots",
+            methods: {
+              operation: {
+                description: "Simple operation",
+                parameters: {},
+              },
+            },
+          };
+        }
+
+        async operation() {
+          return { success: true };
+        }
+
+        async execute(methodName, params, options = {}) {
+          if (methodName === 'operation') {
+            const result = await this.operation(params);
+            return { success: true, data: result };
+          }
+          throw new Error(`Method '${methodName}' not found`);
+        }
+      }
+
+      const testTool = new NoSnapshotTool();
 
       registry.register("no-snapshot-tool", testTool);
 
@@ -383,13 +493,37 @@ describe("ToolRegistry Snapshot Integration", () => {
         snapshotManager: mockSnapshotManager,
       });
 
-      const metadataTool = {
-        annotatedOperation: async (params) => ({ processed: params }),
-        getMetadata: () => ({
-          name: "metadata-tool",
-          description: "Tool with rich metadata",
-        }),
-      };
+      class MetadataTool {
+        getMetadata() {
+          return {
+            name: "metadata-tool",
+            description: "Tool with rich metadata",
+            methods: {
+              annotatedOperation: {
+                description: "Operation with annotations",
+                parameters: {
+                  file: { type: "string", description: "File path" },
+                  mode: { type: "string", description: "Operation mode" },
+                },
+              },
+            },
+          };
+        }
+
+        async annotatedOperation(params) {
+          return { processed: params };
+        }
+
+        async execute(methodName, params, options = {}) {
+          if (methodName === 'annotatedOperation') {
+            const result = await this.annotatedOperation(params);
+            return { success: true, data: result };
+          }
+          throw new Error(`Method '${methodName}' not found`);
+        }
+      }
+
+      const metadataTool = new MetadataTool();
 
       registry.register("metadata-tool", metadataTool);
 
@@ -430,13 +564,38 @@ describe("ToolRegistry Snapshot Integration", () => {
         snapshotManager: mockSnapshotManager,
       });
 
-      const performanceTool = {
-        timedOperation: async (params) => {
+      class PerformanceTool {
+        getMetadata() {
+          return {
+            name: "perf-tool",
+            description: "Performance testing tool",
+            methods: {
+              timedOperation: {
+                description: "Timed operation",
+                parameters: {
+                  data: { type: "string", description: "Test data" },
+                },
+              },
+            },
+          };
+        }
+
+        async timedOperation(params) {
           // Simulate some work
           await new Promise((resolve) => setTimeout(resolve, 10));
           return { processed: true, input: params };
-        },
-      };
+        }
+
+        async execute(methodName, params, options = {}) {
+          if (methodName === 'timedOperation') {
+            const result = await this.timedOperation(params);
+            return { success: true, data: result };
+          }
+          throw new Error(`Method '${methodName}' not found`);
+        }
+      }
+
+      const performanceTool = new PerformanceTool();
 
       registry.register("perf-tool", performanceTool);
 
@@ -493,9 +652,34 @@ describe("ToolRegistry Snapshot Integration", () => {
         ...config,
       });
 
-      const configTool = {
-        configOperation: async () => ({ configured: true }),
-      };
+      class ConfigTool {
+        getMetadata() {
+          return {
+            name: "config-tool",
+            description: "Configurable tool",
+            methods: {
+              configOperation: {
+                description: "Configured operation",
+                parameters: {},
+              },
+            },
+          };
+        }
+
+        async configOperation() {
+          return { configured: true };
+        }
+
+        async execute(methodName, params, options = {}) {
+          if (methodName === 'configOperation') {
+            const result = await this.configOperation(params);
+            return { success: true, data: result };
+          }
+          throw new Error(`Method '${methodName}' not found`);
+        }
+      }
+
+      const configTool = new ConfigTool();
 
       registry.register("config-tool", configTool);
 
@@ -538,9 +722,34 @@ describe("ToolRegistry Snapshot Integration", () => {
         },
       });
 
-      const activityTool = {
-        loggedOperation: async () => ({ logged: true }),
-      };
+      class ActivityTool {
+        getMetadata() {
+          return {
+            name: "activity-tool",
+            description: "Activity logging tool",
+            methods: {
+              loggedOperation: {
+                description: "Logged operation",
+                parameters: {},
+              },
+            },
+          };
+        }
+
+        async loggedOperation() {
+          return { logged: true };
+        }
+
+        async execute(methodName, params, options = {}) {
+          if (methodName === 'loggedOperation') {
+            const result = await this.loggedOperation(params);
+            return { success: true, data: result };
+          }
+          throw new Error(`Method '${methodName}' not found`);
+        }
+      }
+
+      const activityTool = new ActivityTool();
 
       registry.register("activity-tool", activityTool);
 
