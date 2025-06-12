@@ -38,9 +38,9 @@ describe('AgentDelegateTool', () => {
       const schema = tool.getMetadata();
       const method = schema.methods.delegate_task;
       
-      expect(method.parameters.description.required).toBe(true);
+      expect(method.parameters.purpose.required).toBe(true);
+      expect(method.parameters.instructions.required).toBe(true);
       expect(method.parameters.role.required).toBe(false);
-      expect(method.parameters.model.required).toBe(false);
     });
   });
 
@@ -50,55 +50,60 @@ describe('AgentDelegateTool', () => {
       mockAgent.delegateTask.mockResolvedValue(mockResult);
 
       const result = await tool.delegate_task({
-        description: 'Test task description'
+        purpose: 'Test task',
+        instructions: 'Complete the test task with all requirements'
       }, mockContext);
 
       expect(result.success).toBe(true);
       expect(result.result).toBe('Task completed successfully');
-      expect(result.metadata?.taskDescription).toBe('Test task description');
+      expect(result.metadata?.taskDescription).toBe('Test task: Complete the test task with all requirements');
       expect(mockAgent.delegateTask).toHaveBeenCalledWith(
         'test-session-123',
-        'Test task description',
+        'Test task: Complete the test task with all requirements',
         expect.objectContaining({
-          role: 'general',
-          assignedModel: 'claude-3-5-sonnet-20241022',
-          assignedProvider: 'anthropic'
+          role: 'general'
         })
       );
     });
 
-    test('should handle custom role and model parameters', async () => {
+    test('should handle custom role parameters', async () => {
       const mockResult = { content: 'Specialist task completed' };
       mockAgent.delegateTask.mockResolvedValue(mockResult);
 
       const result = await tool.delegate_task({
-        description: 'Complex analysis task',
+        purpose: 'Complex analysis task',
+        instructions: 'Perform detailed security analysis of the authentication system',
         role: 'reasoning',
-        model: 'claude-3-opus-20240229',
-        provider: 'anthropic',
-        capabilities: ['analysis', 'reasoning']
       }, mockContext);
 
       expect(result.success).toBe(true);
       expect(mockAgent.delegateTask).toHaveBeenCalledWith(
         'test-session-123',
-        'Complex analysis task',
+        'Complex analysis task: Perform detailed security analysis of the authentication system',
         expect.objectContaining({
           role: 'reasoning',
-          assignedModel: 'claude-3-opus-20240229',
-          assignedProvider: 'anthropic',
-          capabilities: ['analysis', 'reasoning']
         })
       );
     });
 
-    test('should return error when description is missing', async () => {
+    test('should return error when purpose is missing', async () => {
       const result = await tool.delegate_task({
-        description: ''
+        purpose: '',
+        instructions: 'Some instructions'
       }, mockContext);
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Task description is required');
+      expect(result.error).toBe('Purpose is required');
+    });
+
+    test('should return error when instructions are missing', async () => {
+      const result = await tool.delegate_task({
+        purpose: 'Test task',
+        instructions: ''
+      }, mockContext);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Instructions are required');
     });
 
     test('should return error when agent context is missing', async () => {
@@ -108,7 +113,8 @@ describe('AgentDelegateTool', () => {
       };
 
       const result = await tool.delegate_task({
-        description: 'Test task'
+        purpose: 'Test task',
+        instructions: 'Complete the test task'
       }, contextWithoutAgent);
 
       expect(result.success).toBe(false);
@@ -116,13 +122,16 @@ describe('AgentDelegateTool', () => {
     });
 
     test('should handle task timeout', async () => {
+      // Override the default timeout for testing
+      (tool as any).defaultTimeout = 100;
+      
       mockAgent.delegateTask.mockImplementation(() => 
         new Promise((resolve) => setTimeout(resolve, 200))
       );
 
       const result = await tool.delegate_task({
-        description: 'Slow task',
-        timeout: 100
+        purpose: 'Slow task',
+        instructions: 'This task takes a long time to complete'
       }, mockContext);
 
       expect(result.success).toBe(false);
@@ -136,11 +145,50 @@ describe('AgentDelegateTool', () => {
       };
 
       const result = await tool.delegate_task({
-        description: 'Test task'
+        purpose: 'Test task',
+        instructions: 'Complete the test task'
       }, cancelledContext);
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Task delegation was cancelled');
+    });
+
+    test('should auto-select execution role for implementation tasks', async () => {
+      const mockResult = { content: 'Implementation completed' };
+      mockAgent.delegateTask.mockResolvedValue(mockResult);
+
+      const result = await tool.delegate_task({
+        purpose: 'implement new feature',
+        instructions: 'Add user authentication to the login system'
+      }, mockContext);
+
+      expect(result.success).toBe(true);
+      expect(mockAgent.delegateTask).toHaveBeenCalledWith(
+        'test-session-123',
+        'implement new feature: Add user authentication to the login system',
+        expect.objectContaining({
+          role: 'execution'
+        })
+      );
+    });
+
+    test('should auto-select reasoning role for analysis tasks', async () => {
+      const mockResult = { content: 'Analysis completed' };
+      mockAgent.delegateTask.mockResolvedValue(mockResult);
+
+      const result = await tool.delegate_task({
+        purpose: 'analyze security vulnerabilities',
+        instructions: 'Review the authentication code for potential security issues'
+      }, mockContext);
+
+      expect(result.success).toBe(true);
+      expect(mockAgent.delegateTask).toHaveBeenCalledWith(
+        'test-session-123',
+        'analyze security vulnerabilities: Review the authentication code for potential security issues',
+        expect.objectContaining({
+          role: 'reasoning'
+        })
+      );
     });
 
   });
