@@ -13,6 +13,8 @@ import StatusBar from "./components/StatusBar";
 import ShellInput from "./components/ShellInput";
 import ToolApprovalModal from "./components/ToolApprovalModal";
 import { useInput, useFocus, useFocusManager } from "ink";
+import { Conversation } from "../conversation/conversation.js";
+import { Message } from "../conversation/message.js";
 
 interface ToolCall {
   id?: string;
@@ -47,7 +49,9 @@ type ConversationMessage =
 
 interface AppProps {
   laceUI?: any; // LaceUI instance passed from parent
+  conversation?: Conversation; // Current conversation from lace-ui
 }
+
 
 function extractLogEntries(conversation: ConversationMessage[]): DetailedLogEntry[] {
   const entries: DetailedLogEntry[] = [];
@@ -96,7 +100,7 @@ function extractLogEntries(conversation: ConversationMessage[]): DetailedLogEntr
     });
 
     // If this is an assistant message with tool calls, add separate tool call entries
-    if (message.type === "assistant" && message.tool_calls && message.tool_calls.length > 0) {
+    if (message.type === "assistant" && message.tool_calls && Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
       message.tool_calls.forEach((toolCall, toolIndex) => {
         // Add tool call entry with mock timing data for demonstration
         const toolCallTimestamp = new Date(Date.parse(baseTimestamp) + toolIndex + 1).toISOString();
@@ -282,7 +286,7 @@ function formatHelpModal(data: any): string {
   return data.helpText || "Help information not available.";
 }
 
-const AppInner: React.FC<AppProps> = ({ laceUI }) => {
+const AppInner: React.FC<AppProps> = ({ laceUI, conversation }) => {
   const { stdout } = useStdout();
   const { isRawModeSupported, setRawMode } = useStdin();
   const { focus } = useFocusManager();
@@ -298,7 +302,7 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [searchResultIndex, setSearchResultIndex] = useState(0);
   const [viewMode, setViewMode] = useState<'conversation' | 'log'>('conversation');
-  const [conversation, setConversation] = useState<ConversationMessage[]>([]);
+  const [uiElements, setUIElements] = useState<ConversationMessage[]>([]); // All messages are now UI elements
   const [tokenUsage, setTokenUsage] = useState({ used: 0, total: 200000 });
   const [modelName, setModelName] = useState("claude-3-5-sonnet");
   const [commandManager] = useState(() => {
@@ -323,14 +327,44 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
     resolve: (result: any) => void;
   } | null>(null);
 
-  // Update completion manager history when conversation changes
+  // Helper function to add UI message (all messages are now UI elements)
+  const addUIMessage = (message: ConversationMessage) => {
+    setUIElements((prev) => [...prev, message]);
+  };
+
+  // Load existing messages from conversation when app starts
   useEffect(() => {
-    const userMessages = conversation
+    const loadExistingMessages = async () => {
+      if (conversation) {
+        const msgs = await conversation.getMessages();
+        // Convert existing messages to UI elements
+        const uiMessages = msgs.map(msg => {
+          if (msg.role === 'user') {
+            return { type: 'user' as const, content: msg.content };
+          } else if (msg.role === 'tool') {
+            return { type: 'assistant' as const, content: msg.content }; // Tool executions display as assistant messages
+          } else {
+            return { 
+              type: 'assistant' as const, 
+              content: msg.content,
+              ...(msg.toolCalls && { tool_calls: msg.toolCalls })
+            };
+          }
+        });
+        setUIElements(uiMessages);
+      }
+    };
+    loadExistingMessages();
+  }, [conversation]);
+
+  // Update completion manager history when UI elements change
+  useEffect(() => {
+    const userMessages = uiElements
       .filter((msg) => msg.type === "user")
       .map((msg) => msg.content)
       .slice(-10);
     completionManager.updateHistory(userMessages);
-  }, [conversation, completionManager]);
+  }, [uiElements, completionManager]);
 
   // Setup raw mode to handle Ctrl+C properly
   useEffect(() => {
@@ -360,7 +394,7 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
           streamingRef.current.content += token;
 
           // Update the streaming message with new content
-          setConversation((prev) => {
+          setUIElements((prev) => {
             const updated = [...prev];
             const lastMessage = updated[updated.length - 1];
             if (lastMessage && lastMessage.type === "streaming") {
@@ -382,6 +416,12 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
       laceUI.commandManager = commandManager;
     }
   }, [laceUI, commandManager]);
+
+  // Display messages are now just the UI elements (which include user/assistant messages)
+  const getDisplayMessages = (): ConversationMessage[] => {
+    return uiElements;
+  };
+
   const filterMessages = (messages: ConversationMessage[]) => {
     switch (filterMode) {
       case "conversation":
@@ -422,20 +462,16 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
     return results;
   };
 
-  const filteredConversation = filterMessages(conversation);
+  const displayMessages = getDisplayMessages();
+  const filteredConversation = filterMessages(displayMessages);
   const searchResults = isSearchMode
-    ? findSearchResults(conversation, searchTerm)
+    ? findSearchResults(displayMessages, searchTerm)
     : [];
   const totalMessages = filteredConversation.length;
 
   const submitMessage = async (inputValue?: string) => {
     const userInput = (inputValue || inputText).trim();
     if (userInput && !isLoading && !isStreaming) {
-      // Add user message
-      setConversation((prev) => [
-        ...prev,
-        { type: "user" as const, content: userInput },
-      ]);
       setInputText("");
 
       // Check if it's a command
@@ -444,9 +480,7 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
           const commandContext = {
             laceUI,
             agent: laceUI?.primaryAgent,
-            setConversation,
-            addMessage: (msg: ConversationMessage) =>
-              setConversation((prev) => [...prev, msg]),
+            addUIMessage,
           };
 
           const result = await commandManager.execute(
@@ -464,52 +498,40 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
               result.shouldShowModal.type,
               result.shouldShowModal.data,
             );
-            setConversation((prev) => [
-              ...prev,
-              {
-                type: "assistant" as const,
-                content,
-              },
-            ]);
+            addUIMessage({
+              type: "assistant" as const,
+              content,
+            });
           } else if (result.message) {
-            setConversation((prev) => [
-              ...prev,
-              {
-                type: "assistant" as const,
-                content: result.message,
-              },
-            ]);
+            addUIMessage({
+              type: "assistant" as const,
+              content: result.message,
+            });
           }
         } catch (error) {
-          setConversation((prev) => [
-            ...prev,
-            {
-              type: "assistant" as const,
-              content: `Command error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ]);
+          addUIMessage({
+            type: "assistant" as const,
+            content: `Command error: ${error instanceof Error ? error.message : String(error)}`,
+          });
         }
         return;
       }
 
       // Not a command - handle as regular message
       if (!laceUI) {
-        setConversation((prev) => [
-          ...prev,
-          {
-            type: "assistant" as const,
-            content: "Error: LaceUI not available",
-          },
-        ]);
+        addUIMessage({
+          type: "assistant" as const,
+          content: "Error: LaceUI not available",
+        });
         return;
       }
 
+      // Add user message to UI immediately
+      addUIMessage({ type: "user" as const, content: userInput });
+      
       // Start loading state
       setIsLoading(true);
-      setConversation((prev) => [
-        ...prev,
-        { type: "loading" as const, content: "Assistant is thinking..." },
-      ]);
+      addUIMessage({ type: "loading" as const, content: "Assistant is thinking..." });
 
       try {
         // Clear streaming content
@@ -521,7 +543,7 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
           setIsStreaming(true);
 
           // Remove loading message and start streaming
-          setConversation((prev) => {
+          setUIElements((prev) => {
             const withoutLoading = prev.slice(0, -1);
             return [
               ...withoutLoading,
@@ -537,50 +559,45 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
           // Handle error
           setIsLoading(false);
           setIsStreaming(false);
-          setConversation((prev) => {
-            const withoutLoadingOrStreaming = prev.filter(
-              (msg) => msg.type !== "loading" && msg.type !== "streaming",
-            );
-            return [
-              ...withoutLoadingOrStreaming,
-              {
-                type: "assistant" as const,
-                content: `Error: ${response.error}`,
-              },
-            ];
+          // Clear UI elements and show error
+          setUIElements([]);
+          addUIMessage({
+            type: "assistant" as const,
+            content: `Error: ${response.error}`,
           });
         } else {
-          // Streaming complete - convert to assistant message and add agent activities
+          // Streaming complete - the agent has saved all messages to conversation
           setIsStreaming(false);
-
-          setConversation((prev) => {
-            const updated = [...prev];
-            const lastIndex = updated.length - 1;
-            const lastMessage = updated[lastIndex];
-
-            // Replace streaming message with final assistant response
-            if (lastMessage && lastMessage.type === "streaming") {
-              updated[lastIndex] = {
-                type: "assistant" as const,
-                content: response.content || streamingRef.current.content,
+          
+          // Clear UI elements and reload messages from conversation 
+          setUIElements([]);
+          
+          // Reload all messages including new assistant messages and tool executions
+          const msgs = await conversation.getMessages();
+          const uiMessages = msgs.map(msg => {
+            if (msg.role === 'user') {
+              return { type: 'user' as const, content: msg.content };
+            } else if (msg.role === 'tool') {
+              return { type: 'assistant' as const, content: msg.content };
+            } else {
+              return { 
+                type: 'assistant' as const, 
+                content: msg.content,
+                ...(msg.toolCalls && { tool_calls: msg.toolCalls })
               };
             }
-
-            // Add agent activities if present
-            if (
-              response.agentActivities &&
-              response.agentActivities.length > 0
-            ) {
-              updated.push({
-                type: "agent_activity" as const,
-                summary: `Agent Activity - ${response.agentActivities.length} items`,
-                content: response.agentActivities,
-                folded: true,
-              });
-            }
-
-            return updated;
           });
+          setUIElements(uiMessages);
+
+          // Add agent activities as UI elements if present
+          if (response.agentActivities && response.agentActivities.length > 0) {
+            addUIMessage({
+              type: "agent_activity" as const,
+              summary: `Agent Activity - ${response.agentActivities.length} items`,
+              content: response.agentActivities,
+              folded: true,
+            });
+          }
 
           // Update token usage if available
           if (response.usage) {
@@ -594,17 +611,11 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
       } catch (error) {
         setIsLoading(false);
         setIsStreaming(false);
-        setConversation((prev) => {
-          const withoutLoadingOrStreaming = prev.filter(
-            (msg) => msg.type !== "loading" && msg.type !== "streaming",
-          );
-          return [
-            ...withoutLoadingOrStreaming,
-            {
-              type: "assistant" as const,
-              content: `Error: ${error.message}`,
-            },
-          ];
+        // Clear UI elements and show error
+        setUIElements([]);
+        addUIMessage({
+          type: "assistant" as const,
+          content: `Error: ${error.message}`,
         });
       }
     }
@@ -664,17 +675,11 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
         if (aborted) {
           setIsLoading(false);
           setIsStreaming(false);
-          setConversation((prev) => {
-            const withoutLoadingOrStreaming = prev.filter(
-              (msg) => msg.type !== "loading" && msg.type !== "streaming",
-            );
-            return [
-              ...withoutLoadingOrStreaming,
-              {
-                type: "assistant" as const,
-                content: "Operation cancelled by user (Ctrl+C)",
-              },
-            ];
+          // Clear UI elements and show cancellation message
+          setUIElements([]);
+          addUIMessage({
+            type: "assistant" as const,
+            content: "Operation cancelled by user (Ctrl+C)",
           });
           setCtrlCCount(0);
           if (ctrlCTimeoutRef.current) {
@@ -714,17 +719,11 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
         // Update UI state to reflect abortion
         setIsLoading(false);
         setIsStreaming(false);
-        setConversation((prev) => {
-          const withoutLoadingOrStreaming = prev.filter(
-            (msg) => msg.type !== "loading" && msg.type !== "streaming",
-          );
-          return [
-            ...withoutLoadingOrStreaming,
-            {
-              type: "assistant" as const,
-              content: "Operation cancelled by user (Esc)",
-            },
-          ];
+        // Clear UI elements and show cancellation message
+        setUIElements([]);
+        addUIMessage({
+          type: "assistant" as const,
+          content: "Operation cancelled by user (Esc)",
         });
         return;
       }
@@ -747,10 +746,9 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
         // Toggle fold state
         const currentMessage = filteredConversation[scrollPosition];
         if (currentMessage && currentMessage.type === "agent_activity") {
-          setConversation((prev) =>
-            prev.map((msg, index) =>
-              index === conversation.indexOf(currentMessage) &&
-              msg.type === "agent_activity"
+          setUIElements((prev) =>
+            prev.map((msg) =>
+              msg === currentMessage && msg.type === "agent_activity"
                 ? { ...msg, folded: !msg.folded }
                 : msg,
             ),
@@ -812,8 +810,8 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
     }
   }, [isSearchMode, toolApprovalRequest, focus]);
 
-  // Extract real log entries from conversation
-  const logEntries = extractLogEntries(conversation);
+  // Extract real log entries from display messages
+  const logEntries = extractLogEntries(getDisplayMessages());
 
   return (
     <Box flexDirection="column" flexGrow={1}>
@@ -866,7 +864,7 @@ const AppInner: React.FC<AppProps> = ({ laceUI }) => {
             : submitMessage
         }
         onChange={isSearchMode ? setSearchTerm : setInputText}
-        history={conversation
+        history={uiElements
           .filter((msg) => msg.type === "user")
           .map((msg) => msg.content)
           .slice(-10)}

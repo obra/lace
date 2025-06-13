@@ -8,12 +8,13 @@ import { TokenEstimator } from "../utilities/token-estimator.js";
 import { ToolResultExtractor } from "../utilities/tool-result-extractor.js";
 import { getRole, AgentRole } from "./agent-registry.ts";
 import { ModelInstance } from "../models/model-instance.js";
+import { Conversation } from "../conversation/conversation.js";
+import { Message } from "../conversation/message.js";
 
 // TypeScript interfaces for Agent
 interface AgentOptions {
   generation?: number;
   tools?: any;
-  db?: any;
   modelProvider?: any;
   model: ModelInstance;
   verbose?: boolean;
@@ -146,7 +147,6 @@ export class Agent {
   public generation: number;
   public subagentCounter: number;
   public tools: any;
-  public db: any;
   public modelProvider: any;
   public verbose: boolean;
   public inheritedContext: any;
@@ -200,7 +200,6 @@ export class Agent {
     this.generation = options.generation || 0;
     this.subagentCounter = 0; // Track number of spawned subagents
     this.tools = options.tools;
-    this.db = options.db;
     this.modelProvider = options.modelProvider;
     this.verbose = options.verbose || false;
     this.inheritedContext = options.inheritedContext || null;
@@ -288,7 +287,7 @@ export class Agent {
   }
 
   async processInput(
-    sessionId: string,
+    conversation: Conversation,
     input: string,
     options: any = {},
   ): Promise<GenerateResponseResult> {
@@ -298,7 +297,7 @@ export class Agent {
       this.conversationMetrics.lastActivity = Date.now();
 
       // Save user message
-      await this.db.saveMessage(sessionId, this.generation, "user", input);
+      await conversation.addUserMessage(input);
 
       // Check if we need to handoff context
       if (this.shouldHandoff()) {
@@ -310,17 +309,13 @@ export class Agent {
         // TODO: Implement handoff logic
       }
 
-      // Simple echo response for now - TODO: Implement actual reasoning
-      const response = await this.generateResponse(sessionId, input, options);
+      // Generate response using conversation
+      const response = await this.generateResponse(conversation, input, options);
 
-      // Save agent response
-      await this.db.saveMessage(
-        sessionId,
-        this.generation,
-        "assistant",
+      // Save final agent response (generateResponse only saves thinking + tools, not final response)
+      await conversation.addAssistantMessage(
         response.content,
-        response.toolCalls,
-        this.contextSize,
+        response.toolCalls
       );
 
       return response;
@@ -333,32 +328,34 @@ export class Agent {
   }
 
   async generateResponse(
-    sessionId: string,
+    conversation: Conversation,
     input: string,
     options: any = {},
   ): Promise<GenerateResponseResult> {
     try {
-      // Retrieve conversation history before building messages
-      const conversationHistory = await this.getConversationHistory(sessionId, this.conversationConfig.historyLimit);
+      // Extract sessionId for internal methods that still need it
+      const sessionId = conversation.getSessionId();
       
       // Build initial messages for token counting
       let messages = [
         { role: "system", content: this.systemPrompt },
-        ...this.convertHistoryToMessages(conversationHistory),
+        ...await conversation.getFormattedMessages(this.conversationConfig.historyLimit),
         { role: "user", content: input },
       ];
 
-      // Apply smart truncation if conversation is too long
-      const maxContextTokens = Math.floor(this.maxContextSize * this.conversationConfig.contextUtilization);
-      messages = await this.truncateConversationHistory(messages, maxContextTokens);
+      // Optimize messages using model provider (truncation + caching)
+      const availableTools = this.buildToolsForLLM();
+      if (this.modelProvider && this.modelProvider.optimizeMessages) {
+        messages = await this.modelProvider.optimizeMessages(messages, {
+          model: this.model.definition.name,
+          tools: availableTools,
+          contextUtilization: this.conversationConfig.contextUtilization
+        });
+      }
 
-      // Apply caching strategy to conversation history
-      messages = this.applyCachingStrategy(messages);
-
-      // Count tokens accurately after truncation
+      // Count tokens accurately after optimization
       let initialTokenCount = 0;
       if (this.modelProvider && this.modelProvider.countTokens) {
-        const availableTools = this.buildToolsForLLM();
         const tokenCountResult = await this.modelProvider.countTokens(messages, {
           model: this.model.definition.name,
           tools: availableTools,
@@ -368,7 +365,7 @@ export class Agent {
           initialTokenCount = tokenCountResult.inputTokens;
           if (this.debugLogger) {
             this.debugLogger.debug(
-              `📊 Accurate token count: ${initialTokenCount} input tokens (max: ${maxContextTokens})`,
+              `📊 Accurate token count: ${initialTokenCount} input tokens (max: ${this.model.definition.contextWindow})`,
             );
           }
         }
@@ -560,6 +557,11 @@ export class Agent {
 
         finalContent = response.content;
 
+        // Save the assistant's thinking/reasoning message before tool execution (only if there are tools)
+        if (response.content && response.content.trim() && response.toolCalls && response.toolCalls.length > 0) {
+          await conversation.addAssistantMessage(response.content);
+        }
+
         // Execute tool calls if any
         const iterationToolResults = [];
         if (response.toolCalls && response.toolCalls.length > 0) {
@@ -569,6 +571,24 @@ export class Agent {
             sessionId,
             response.content,
           );
+
+          // Save tool executions to conversation
+          for (let i = 0; i < response.toolCalls.length; i++) {
+            const toolCall = response.toolCalls[i];
+            const toolResult = rawToolResults[i];
+            
+            if (toolResult) {
+              // Extract the actual result data - tool results have various possible fields
+              const resultData = toolResult.result || toolResult.output || toolResult.data || toolResult.content || toolResult.stdout || 'No output available';
+              
+              await conversation.addToolExecution(
+                toolCall,
+                resultData,
+                toolResult.error,
+                toolResult.duration
+              );
+            }
+          }
 
           // Apply batch synthesis for large results
           const toolResults = await this.synthesizeToolResultsBatch(
@@ -1236,8 +1256,10 @@ Tool Result:
 ${responseText}`;
 
     try {
+      // Create Conversation object for subagent call
+      const synthesisConversation = await Conversation.load(sessionId);
       const synthesisResponse = await synthesisAgent.generateResponse(
-        sessionId,
+        synthesisConversation,
         fullPrompt,
       );
 
@@ -1293,8 +1315,10 @@ ${responseText}`;
     );
 
     try {
+      // Create Conversation object for subagent call
+      const synthesisConversation = await Conversation.load(sessionId);
       const synthesisResponse = await synthesisAgent.generateResponse(
-        sessionId,
+        synthesisConversation,
         batchPrompt,
       );
 
@@ -1445,9 +1469,6 @@ ${responseText}`;
     return `Compressed context from generation ${this.generation}`;
   }
 
-  async getConversationHistory(sessionId: string, limit = 10): Promise<any> {
-    return await this.db.getConversationHistory(sessionId, limit);
-  }
 
   getConversationMetrics(): any {
     const uptime = Date.now() - this.conversationMetrics.sessionStartTime;
@@ -1483,163 +1504,8 @@ ${responseText}`;
     }
   }
 
-  convertHistoryToMessages(conversationHistory: any[], excludeLatest = true): any[] {
-    // Database returns in DESC order (newest first), so reverse for chronological order
-    const messages = [];
-    
-    // Skip the most recent message if excludeLatest is true (to avoid including current user message)
-    const startIndex = excludeLatest ? Math.min(1, conversationHistory.length) : 0;
-    
-    for (let i = conversationHistory.length - 1; i >= startIndex; i--) {
-      const dbMessage = conversationHistory[i];
-      const message: any = {
-        role: dbMessage.role,
-        content: dbMessage.content,
-      };
-      
-      // Add tool_calls if present
-      if (dbMessage.tool_calls && dbMessage.tool_calls !== 'null') {
-        try {
-          message.tool_calls = JSON.parse(dbMessage.tool_calls);
-        } catch (error) {
-          // Skip malformed tool_calls
-        }
-      }
-      
-      messages.push(message);
-    }
-    
-    return messages;
-  }
 
-  async truncateConversationHistory(messages: any[], targetTokenLimit: number): Promise<any[]> {
-    // Always preserve system prompt (first message)
-    if (messages.length <= 1) {
-      return messages;
-    }
 
-    const systemMessage = messages[0];
-    const conversationMessages = messages.slice(1);
-    
-    // If we don't have a model provider with token counting, return all messages
-    if (!this.modelProvider || !this.modelProvider.countTokens) {
-      return messages;
-    }
-
-    // Count tokens for current messages
-    const currentTokenCount = await this.modelProvider.countTokens(messages, {
-      model: this.model.definition.name,
-      tools: this.buildToolsForLLM(),
-    });
-    
-    if (!currentTokenCount.success || currentTokenCount.inputTokens <= targetTokenLimit) {
-      return messages; // Already within limit
-    }
-
-    if (this.debugLogger) {
-      this.debugLogger.debug(
-        `🔧 Truncating conversation: ${currentTokenCount.inputTokens} tokens > ${targetTokenLimit} limit`,
-      );
-    }
-
-    // Start with just system message and progressively add recent messages
-    let truncatedMessages = [systemMessage];
-    const availableTools = this.buildToolsForLLM();
-    
-    // Add messages from most recent backwards until we hit the token limit
-    for (let i = conversationMessages.length - 1; i >= 0; i--) {
-      const candidateMessages = [systemMessage, ...conversationMessages.slice(i)];
-      
-      const tokenCount = await this.modelProvider.countTokens(candidateMessages, {
-        model: this.model.definition.name,
-        tools: availableTools,
-      });
-      
-      if (tokenCount.success && tokenCount.inputTokens <= targetTokenLimit) {
-        truncatedMessages = candidateMessages;
-        break;
-      }
-    }
-
-    const finalTokenCount = truncatedMessages.length;
-    const removedCount = messages.length - finalTokenCount;
-    
-    if (this.debugLogger && removedCount > 0) {
-      this.debugLogger.debug(
-        `✂️ Removed ${removedCount} older messages, kept ${finalTokenCount} recent messages`,
-      );
-    }
-
-    return truncatedMessages;
-  }
-
-  applyCachingStrategy(messages: any[]): any[] {
-    // Check if caching is disabled
-    if (this.conversationConfig.cachingStrategy === 'disabled') {
-      return messages;
-    }
-
-    // Don't modify messages if there aren't enough to benefit from caching
-    if (messages.length <= this.conversationConfig.freshMessageCount) {
-      return messages;
-    }
-
-    const cachedMessages = [...messages];
-    
-    // Cache strategy: 
-    // 1. System prompt is already cached by the provider
-    // 2. Cache stable conversation history based on strategy
-    // 3. Keep recent messages fresh for dynamic responses
-    
-    const freshCount = this.conversationConfig.cachingStrategy === 'conservative' ? 
-      this.conversationConfig.freshMessageCount + 1 : 
-      this.conversationConfig.freshMessageCount;
-    
-    const cacheableHistoryEnd = Math.max(1, cachedMessages.length - freshCount);
-    
-    for (let i = 1; i < cacheableHistoryEnd; i++) { // Skip system message (index 0)
-      const message = cachedMessages[i];
-      
-      // Add cache control to older conversation messages
-      if (message.role === "user" || message.role === "assistant") {
-        // Convert content to array format for caching if it's a string
-        if (typeof message.content === "string") {
-          cachedMessages[i] = {
-            ...message,
-            content: [
-              {
-                type: "text",
-                text: message.content,
-                cache_control: { type: "ephemeral" },
-              },
-            ],
-          };
-        } else if (Array.isArray(message.content)) {
-          // If already an array, add cache control to the last text block
-          const contentBlocks = [...message.content];
-          const lastTextBlock = contentBlocks[contentBlocks.length - 1];
-          if (lastTextBlock && lastTextBlock.type === "text") {
-            contentBlocks[contentBlocks.length - 1] = {
-              ...lastTextBlock,
-              cache_control: { type: "ephemeral" },
-            };
-            cachedMessages[i] = {
-              ...message,
-              content: contentBlocks,
-            };
-          }
-        }
-      }
-    }
-
-    if (this.debugLogger && cacheableHistoryEnd > 1) {
-      this.debugLogger.debug(
-        `💾 Applied ${this.conversationConfig.cachingStrategy} caching to ${cacheableHistoryEnd - 1} older messages, keeping ${messages.length - cacheableHistoryEnd} recent messages fresh`,
-      );
-    }
-
-    return cachedMessages;
-  }
 
   // ORCHESTRATION METHODS - for when this agent spawns subagents
 
@@ -1651,7 +1517,6 @@ ${responseText}`;
     const subagent = new Agent({
       ...options,
       tools: this.tools,
-      db: this.db,
       modelProvider: this.modelProvider,
       generation: subgeneration,
       verbose: this.verbose,
@@ -1683,7 +1548,9 @@ ${responseText}`;
     });
 
     // Execute the task with the specialized agent
-    const result = await subagent.generateResponse(sessionId, task);
+    // Create Conversation object for subagent call
+    const delegateConversation = await Conversation.load(sessionId);
+    const result = await subagent.generateResponse(delegateConversation, task);
 
     if (this.debugLogger) {
       this.debugLogger.info(`✅ Task completed by ${agentConfig.role} agent`);

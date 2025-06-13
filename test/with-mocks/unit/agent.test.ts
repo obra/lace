@@ -147,7 +147,6 @@ describe("Agent", () => {
     test("should create agent with default configuration", () => {
       const agent = new Agent({
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -163,7 +162,6 @@ describe("Agent", () => {
       const agent = new Agent({
         role: "execution",
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -178,7 +176,6 @@ describe("Agent", () => {
       const agent = new Agent({
         role: "reasoning",
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: customModelInstance
       });
@@ -195,7 +192,6 @@ describe("Agent", () => {
         task,
         capabilities,
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -209,7 +205,6 @@ describe("Agent", () => {
     test("should set retry configuration with defaults", () => {
       const agent = new Agent({
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -230,7 +225,6 @@ describe("Agent", () => {
       const agent = new Agent({
         retryConfig,
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -250,7 +244,6 @@ describe("Agent", () => {
       const agent = new Agent({
         circuitBreakerConfig,
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -270,7 +263,6 @@ describe("Agent", () => {
       const agent = new Agent({
         conversationConfig,
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -285,7 +277,6 @@ describe("Agent", () => {
     test("should calculate context usage correctly", () => {
       const agent = new Agent({
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -301,7 +292,6 @@ describe("Agent", () => {
     test("should determine handoff threshold correctly", () => {
       const agent = new Agent({
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -316,7 +306,6 @@ describe("Agent", () => {
     test("should get conversation metrics", () => {
       const agent = new Agent({
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -341,7 +330,6 @@ describe("Agent", () => {
     test("should build tools for LLM correctly", () => {
       const agent = new Agent({
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -368,7 +356,6 @@ describe("Agent", () => {
     test("should convert parameters to properties correctly", () => {
       const agent = new Agent({
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -389,7 +376,6 @@ describe("Agent", () => {
     test("should extract required parameters correctly", () => {
       const agent = new Agent({
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -411,8 +397,6 @@ describe("Agent", () => {
       const agent = new Agent({
         generation: 1,
         tools: mockTools,
-        db: mockDb,
-        modelProvider: mockModelProvider,
         model: mockModelInstance,
         debugLogger: mockDebugLogger
       });
@@ -428,14 +412,12 @@ describe("Agent", () => {
       expect(subagent.role).toBe("execution");
       expect(subagent.model.definition.name).toBe("claude-3-haiku-20240307");
       expect(subagent.tools).toBe(mockTools); // Inherited
-      expect(subagent.db).toBe(mockDb); // Inherited
       expect(agent.subagentCounter).toBe(1);
     });
 
     test("should choose appropriate agent for task", () => {
       const agent = new Agent({
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -469,7 +451,6 @@ describe("Agent", () => {
         role: "execution",
         task: "Run tests",
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: executionModelInstance
       });
@@ -487,7 +468,6 @@ describe("Agent", () => {
       const agent = new Agent({
         role: "orchestrator",
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -503,7 +483,6 @@ describe("Agent", () => {
     test("should categorize errors correctly", () => {
       const agent = new Agent({
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -530,7 +509,6 @@ describe("Agent", () => {
     test("should identify retriable vs non-retriable errors", () => {
       const agent = new Agent({
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -549,7 +527,6 @@ describe("Agent", () => {
     test("should calculate backoff delay correctly", () => {
       const agent = new Agent({
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -580,7 +557,6 @@ describe("Agent", () => {
     test("should initialize circuit breaker correctly", () => {
       const agent = new Agent({
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -595,7 +571,6 @@ describe("Agent", () => {
     test("should record tool success and failure", () => {
       const agent = new Agent({
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
@@ -622,7 +597,6 @@ describe("Agent", () => {
       const agent = new Agent({
         circuitBreakerConfig: { failureThreshold: 2, openTimeout: 30000 },
         tools: mockTools,
-        db: mockDb,
         modelProvider: mockModelProvider,
         model: mockModelInstance
       });
