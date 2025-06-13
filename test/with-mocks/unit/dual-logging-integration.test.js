@@ -13,6 +13,21 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 
+// Helper function to create mock model instances for JavaScript tests
+function createMockModelInstance(name = "test-model", provider = "test") {
+  return {
+    definition: {
+      name,
+      provider,
+      contextWindow: 200000,
+      inputPrice: 0.01,
+      outputPrice: 0.03,
+      capabilities: ["chat", "tools"]
+    },
+    chat: async () => ({ success: true, content: "Mock response" })
+  };
+}
+
 // Mock model provider for testing
 class MockModelProvider {
   async chat(messages, options = {}) {
@@ -112,7 +127,9 @@ describe("Dual Logging System Integration", () => {
           logFile: debugLogFile,
           logFileLevel: "debug",
         });
+        const mockModel = createMockModelInstance();
         const agent = new Agent({
+          model: mockModel,
           generation: 0,
           tools,
           db,
@@ -137,7 +154,9 @@ describe("Dual Logging System Integration", () => {
       await setup();
 
       try {
+        const mockModel = createMockModelInstance();
         const agent = new Agent({
+          model: mockModel,
           generation: 0,
           tools,
           db,
@@ -166,7 +185,9 @@ describe("Dual Logging System Integration", () => {
           logFile: debugLogFile,
           logFileLevel: "debug",
         });
+        const mockModel = createMockModelInstance();
         const agent = new Agent({
+          model: mockModel,
           generation: 0,
           tools,
           db,
@@ -233,7 +254,9 @@ describe("Dual Logging System Integration", () => {
           logFile: debugLogFile,
           logFileLevel: "debug",
         });
+        const mockModel = createMockModelInstance();
         const agent = new Agent({
+          model: mockModel,
           generation: 0,
           tools,
           db,
@@ -285,7 +308,9 @@ describe("Dual Logging System Integration", () => {
           logFile: invalidDebugPath,
           logFileLevel: "debug",
         });
+        const mockModel = createMockModelInstance();
         const agent = new Agent({
+          model: mockModel,
           generation: 0,
           tools,
           db,
@@ -336,7 +361,9 @@ describe("Dual Logging System Integration", () => {
           logFile: debugLogFile,
           logFileLevel: "debug",
         });
+        const mockModel = createMockModelInstance();
         const parentAgent = new Agent({
+          model: mockModel,
           generation: 0,
           tools,
           db,
@@ -348,10 +375,10 @@ describe("Dual Logging System Integration", () => {
         });
 
         // Spawn a subagent
+        const subagentModel = createMockModelInstance("claude-3-5-haiku-20241022", "anthropic");
         const subagent = await parentAgent.spawnSubagent({
           role: "execution",
-          assignedModel: "claude-3-5-haiku-20241022",
-          assignedProvider: "anthropic",
+          model: subagentModel,
         });
 
         // Verify subagent has both loggers
@@ -389,7 +416,9 @@ describe("Dual Logging System Integration", () => {
           logFile: debugLogFile,
           logFileLevel: "debug",
         });
+        const mockModel1 = createMockModelInstance();
         const agentWithLogging = new Agent({
+          model: mockModel1,
           generation: 0,
           tools,
           db,
@@ -402,7 +431,9 @@ describe("Dual Logging System Integration", () => {
         });
 
         // Agent with no logging
+        const mockModel2 = createMockModelInstance();
         const agentNoLogging = new Agent({
+          model: mockModel2,
           generation: 0,
           tools,
           db,

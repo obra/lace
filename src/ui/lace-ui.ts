@@ -138,11 +138,10 @@ export class LaceUI {
       tools: this.tools,
       db: this.db,
       modelProvider: this.modelProvider,
+      model: this.modelProvider.getModelSession("claude-3-5-sonnet-20241022"),
       toolApproval: this.toolApproval,
       verbose: this.verbose,
       role: "orchestrator",
-      assignedModel: "claude-3-5-sonnet-20241022",
-      assignedProvider: "anthropic",
       capabilities: ["orchestration", "reasoning", "planning", "delegation"],
       activityLogger: this.activityLogger,
       debugLogger: this.debugLogger,
@@ -295,7 +294,13 @@ export class LaceUI {
       tools: this.tools,
       db: this.db,
       modelProvider: this.modelProvider,
+      model: this.modelProvider.getModelSession("claude-3-5-sonnet-20241022"),
       verbose: this.verbose,
+      role: "orchestrator",
+      capabilities: ["orchestration", "reasoning", "planning", "delegation"],
+      toolApproval: this.toolApproval,
+      activityLogger: this.activityLogger,
+      debugLogger: this.debugLogger,
       inheritedContext: compressedContext,
       memoryAgents: this.memoryAgents,
     });
@@ -325,8 +330,8 @@ export class LaceUI {
     return {
       agent: {
         role: this.primaryAgent.role,
-        model: this.primaryAgent.assignedModel,
-        provider: this.primaryAgent.assignedProvider,
+        model: this.primaryAgent.model.definition.name,
+        provider: this.primaryAgent.model.definition.provider,
         generation: this.primaryAgent.generation,
       },
       context: contextUsage,
@@ -362,7 +367,7 @@ export class LaceUI {
       const base = lastSlash === -1 ? prefix : prefix.substring(lastSlash + 1);
 
       // List directory contents
-      const result = await listFilesTool.file_list({
+      const result = await listFilesTool.run({
         path: dir === "./" ? "." : dir.replace(/\/$/, ""),
       });
 

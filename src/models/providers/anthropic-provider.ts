@@ -1,4 +1,4 @@
-// ABOUTME: Anthropic API provider with tool calling support
+// ABOUTME: Anthropic API provider with tool calling support implementing BaseModelProvider
 // ABOUTME: Handles Claude models for reasoning, planning, and execution tasks
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -6,9 +6,16 @@ import { promises as fs } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { randomUUID } from "crypto";
+import { BaseModelProvider, ModelProviderMetadata } from "../model-registry.js";
 
-export class AnthropicProvider {
-  constructor(config = {}) {
+export class AnthropicProvider implements BaseModelProvider {
+  private config: any;
+  private client: Anthropic | null;
+  private apiKey: string | null;
+  private sessionId: string;
+  private modelInfo: Record<string, any>;
+
+  constructor(config: any = {}) {
     this.config = config;
     this.client = null;
     this.apiKey = null;
@@ -103,7 +110,7 @@ export class AnthropicProvider {
     };
   }
 
-  async initialize() {
+  async initialize(): Promise<void> {
     // Load API key from ~/.lace/api-keys/anthropic
     try {
       const keyPath = join(homedir(), ".lace", "api-keys", "anthropic");
@@ -119,11 +126,11 @@ export class AnthropicProvider {
     });
   }
 
-  setSessionId(sessionId) {
+  setSessionId(sessionId: string): void {
     this.sessionId = sessionId;
   }
 
-  async chat(messages, options = {}) {
+  async chat(messages: any[], options: any = {}): Promise<any> {
     const {
       model = "claude-3-5-sonnet-20241022",
       tools = [],
@@ -137,7 +144,7 @@ export class AnthropicProvider {
       const { systemMessage, userMessages } =
         this.separateSystemMessage(messages);
 
-      const params = {
+      const params: any = {
         model,
         messages: userMessages,
         max_tokens: maxTokens,
@@ -191,7 +198,7 @@ export class AnthropicProvider {
   }
 
 
-  separateSystemMessage(messages) {
+  private separateSystemMessage(messages: any[]): { systemMessage: string | null; userMessages: any[] } {
     let systemMessage = null;
     const userMessages = [];
 
@@ -209,7 +216,7 @@ export class AnthropicProvider {
     return { systemMessage, userMessages };
   }
 
-  convertTools(tools) {
+  private convertTools(tools: any[]): any[] {
     return tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
@@ -221,7 +228,7 @@ export class AnthropicProvider {
     }));
   }
 
-  async handleStreamResponse(stream, onTokenUpdate) {
+  private async handleStreamResponse(stream: any, onTokenUpdate: any): Promise<any> {
     const result = {
       success: true,
       content: "",
@@ -400,17 +407,17 @@ export class AnthropicProvider {
   }
 
   // Rough token estimation for streaming updates
-  estimateTokens(text) {
+  private estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);
   }
 
-  async countTokens(messages, options = {}) {
+  async countTokens(messages: any[], options: any = {}): Promise<any> {
     const { model = "claude-3-5-sonnet-20241022", tools = [], enableCaching = false } = options;
 
     try {
       const { systemMessage, userMessages } = this.separateSystemMessage(messages);
 
-      const params = {
+      const params: any = {
         betas: ["token-counting-2024-11-01"],
         model,
         messages: userMessages,
@@ -458,7 +465,7 @@ export class AnthropicProvider {
     }
   }
 
-  convertResponse(response) {
+  private convertResponse(response: any): any {
     const result = {
       success: true,
       content: "",
@@ -481,12 +488,12 @@ export class AnthropicProvider {
     return result;
   }
 
-  getContextWindow(model) {
+  getContextWindow(model: string): number {
     const modelInfo = this.modelInfo[model];
     return modelInfo ? modelInfo.contextWindow : 200000; // Default fallback
   }
 
-  calculateCost(model, inputTokens, outputTokens) {
+  calculateCost(model: string, inputTokens: number, outputTokens: number): any {
     const modelInfo = this.modelInfo[model];
     if (!modelInfo) {
       return null;
@@ -505,7 +512,7 @@ export class AnthropicProvider {
     };
   }
 
-  getContextUsage(model, totalTokens) {
+  getContextUsage(model: string, totalTokens: number): any {
     const contextWindow = this.getContextWindow(model);
     return {
       used: totalTokens,
@@ -515,7 +522,7 @@ export class AnthropicProvider {
     };
   }
 
-  getInfo() {
+  getInfo(): any {
     return {
       name: "anthropic",
       models: Object.keys(this.modelInfo),
@@ -530,7 +537,7 @@ export class AnthropicProvider {
     };
   }
 
-  getMetadata() {
+  getMetadata(): ModelProviderMetadata {
     return {
       name: "anthropic",
       description: "High-quality language models from Anthropic with strong reasoning capabilities",
@@ -573,7 +580,7 @@ Best for: Most general-purpose AI tasks, reasoning, coding, analysis.`,
         "instruction_following",
         "analysis"
       ],
-      contextWindow: this.getContextWindow()
+      contextWindow: 200000
     };
   }
 }

@@ -18,21 +18,32 @@ describe("Agent System", () => {
 
   describe("Agent Construction", () => {
     test("should create agent with assigned role and model", async () => {
+      const mockModelInstance = {
+        definition: {
+          name: "claude-3-5-sonnet-20241022",
+          provider: "anthropic",
+          contextWindow: 200000,
+          inputPrice: 3.0,
+          outputPrice: 15.0,
+          capabilities: ["chat", "tools", "vision"]
+        },
+        chat: async () => ({ success: true, content: "Mock response" })
+      };
+
       const agent = await harness.createTestAgent({
         role: "planning",
-        assignedModel: "claude-3-5-sonnet-20241022",
-        assignedProvider: "anthropic",
+        model: mockModelInstance,
         capabilities: ["planning", "reasoning"],
       });
 
       assert.strictEqual(agent.role, "planning", "Should have assigned role");
       assert.strictEqual(
-        agent.assignedModel,
+        agent.model.definition.name,
         "claude-3-5-sonnet-20241022",
         "Should have assigned model",
       );
       assert.strictEqual(
-        agent.assignedProvider,
+        agent.model.definition.provider,
         "anthropic",
         "Should have assigned provider",
       );
@@ -95,7 +106,7 @@ describe("Agent System", () => {
         "Should choose execution agent",
       );
       assert.strictEqual(
-        config.assignedModel,
+        config.model.definition.name,
         "claude-3-5-haiku-20241022",
         "Should use fast model",
       );
@@ -171,9 +182,21 @@ describe("Agent System", () => {
         role: "orchestrator",
       });
 
+      const mockModelInstance = {
+        definition: {
+          name: "claude-3-5-haiku-20241022",
+          provider: "anthropic",
+          contextWindow: 200000,
+          inputPrice: 0.25,
+          outputPrice: 1.25,
+          capabilities: ["chat", "tools"]
+        },
+        chat: async () => ({ success: true, content: "Mock" })
+      };
+
       const subagent = await orchestrator.spawnSubagent({
         role: "execution",
-        assignedModel: "claude-3-5-haiku-20241022",
+        model: mockModelInstance,
         task: "Test task",
       });
 
@@ -183,7 +206,7 @@ describe("Agent System", () => {
         "Subagent should have assigned role",
       );
       assert.strictEqual(
-        subagent.assignedModel,
+        subagent.model.definition.name,
         "claude-3-5-haiku-20241022",
         "Subagent should have assigned model",
       );

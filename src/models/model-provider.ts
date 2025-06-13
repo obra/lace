@@ -1,8 +1,10 @@
-// ABOUTME: Flexible model provider system supporting multiple LLM APIs and specialized roles
-// ABOUTME: Uses ModelRegistry for provider management and provides specialized chat methods
+// ABOUTME: Flexible model provider system supporting multiple LLM APIs and model instances
+// ABOUTME: Uses ModelRegistry for provider management and provides model session creation
 
 import { createHash } from "crypto";
-import { ModelRegistry, modelRegistry } from "./model-registry.js";
+import { ModelRegistry, modelRegistry, BaseModelProvider } from "./model-registry.js";
+import { ModelInstance, SessionOptions, ChatOptions } from "./model-instance.js";
+import { ModelDefinition } from "./model-definition.js";
 import { AnthropicProvider } from "./providers/anthropic-provider.js";
 import { OpenAIProvider } from "./providers/openai-provider.js";
 import { LocalProvider } from "./providers/local-provider.js";
@@ -45,6 +47,46 @@ export class ModelProvider {
       await localProvider.initialize();
       this.registry.registerProvider("local", localProvider);
     }
+
+    // Register default model definitions
+    this.registerDefaultModelDefinitions();
+  }
+
+  private registerDefaultModelDefinitions(): void {
+    // Anthropic models
+    this.registry.registerModelDefinition("claude-3-5-sonnet-20241022", {
+      name: "claude-3-5-sonnet-20241022",
+      provider: "anthropic",
+      contextWindow: 200000,
+      inputPrice: 3.0,
+      outputPrice: 15.0,
+      capabilities: ["chat", "tools", "vision"]
+    });
+
+    this.registry.registerModelDefinition("claude-3-5-haiku-20241022", {
+      name: "claude-3-5-haiku-20241022",
+      provider: "anthropic",
+      contextWindow: 200000,
+      inputPrice: 0.8,
+      outputPrice: 4.0,
+      capabilities: ["chat", "tools", "vision"]
+    });
+
+    // Add more model definitions as needed
+  }
+
+  /**
+   * Get a model session instance for the specified model
+   */
+  getModelSession(modelName: string, options?: SessionOptions): ModelInstance {
+    const definition = this.registry.getModelDefinition(modelName);
+    if (!definition) {
+      throw new Error(`Model definition for '${modelName}' not found`);
+    }
+
+    const provider = this.getProvider(definition.provider);
+    
+    return new ModelSessionWrapper(definition, provider, options, this);
   }
 
   setSessionId(sessionId) {
@@ -89,7 +131,7 @@ export class ModelProvider {
     }
   }
 
-  async chat(messages, options = {}) {
+  async chat(messages: any[], options: ChatOptions = {}) {
     const provider = this.getProvider(options.provider);
     const startTime = Date.now();
 
@@ -151,53 +193,6 @@ export class ModelProvider {
     return result;
   }
 
-  async planningChat(messages, options = {}) {
-    // Use specialized model for planning (e.g., o3 when available)
-    return await this.chat(messages, {
-      ...options,
-      provider:
-        options.provider ||
-        this.config.planningProvider ||
-        this.defaultProvider,
-      model:
-        options.model ||
-        this.config.planningModel ||
-        "claude-3-5-sonnet-20241022",
-      temperature: 0.1, // Lower temperature for planning
-    });
-  }
-
-  async executionChat(messages, options = {}) {
-    // Use efficient model for straightforward execution (e.g., Haiku)
-    return await this.chat(messages, {
-      ...options,
-      provider:
-        options.provider ||
-        this.config.executionProvider ||
-        this.defaultProvider,
-      model:
-        options.model ||
-        this.config.executionModel ||
-        "claude-3-5-haiku-20241022",
-      temperature: 0.3,
-    });
-  }
-
-  async reasoningChat(messages, options = {}) {
-    // Use powerful model for complex reasoning
-    return await this.chat(messages, {
-      ...options,
-      provider:
-        options.provider ||
-        this.config.reasoningProvider ||
-        this.defaultProvider,
-      model:
-        options.model ||
-        this.config.reasoningModel ||
-        "claude-3-5-sonnet-20241022",
-      temperature: 0.5,
-    });
-  }
 
   getProvider(providerName?: string) {
     const name = providerName || this.defaultProvider;
@@ -251,5 +246,25 @@ export class ModelProvider {
       percentage: (totalTokens / contextWindow) * 100,
       remaining: contextWindow - totalTokens,
     };
+  }
+}
+
+/**
+ * Internal wrapper class that implements ModelInstance interface
+ */
+class ModelSessionWrapper implements ModelInstance {
+  constructor(
+    public definition: ModelDefinition,
+    private provider: BaseModelProvider,
+    private options?: SessionOptions,
+    private modelProvider?: ModelProvider
+  ) {}
+
+  async chat(messages: any[], options?: ChatOptions): Promise<any> {
+    // Use the provider's chat method with the model from our definition
+    return await this.provider.chat(messages, {
+      ...options,
+      model: this.definition.name
+    });
   }
 }

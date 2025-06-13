@@ -66,10 +66,10 @@ describe("Step 13: Connect to Lace Backend", () => {
 
     expect(laceUI.primaryAgent).toBeTruthy();
     expect(laceUI.primaryAgent.role).toBe("orchestrator");
-    expect(laceUI.primaryAgent.assignedModel).toBe(
+    expect(laceUI.primaryAgent.model.definition.name).toBe(
       "claude-3-5-sonnet-20241022",
     );
-    expect(laceUI.primaryAgent.assignedProvider).toBe("anthropic");
+    expect(laceUI.primaryAgent.model.definition.provider).toBe("anthropic");
     expect(laceUI.primaryAgent.capabilities).toContain("orchestration");
     expect(laceUI.primaryAgent.capabilities).toContain("reasoning");
   });
@@ -116,8 +116,8 @@ describe("Step 13: Connect to Lace Backend", () => {
     const mockResponse = {
       content: "Response with tool calls",
       toolCalls: [
-        { name: "file_read", input: { path: "test.txt" } },
-        { name: "shell_execute", input: { command: "ls" } },
+        { name: "read_file", input: { path: "test.txt" } },
+        { name: "shell", input: { command: "ls" } },
       ],
       toolResults: [
         { approved: true, denied: false, error: null },
@@ -136,8 +136,8 @@ describe("Step 13: Connect to Lace Backend", () => {
     expect(result.success).toBe(true);
     expect(result.toolCalls).toHaveLength(2);
     expect(result.toolResults).toHaveLength(2);
-    expect(result.agentActivities).toContain("✅ file_read → completed");
-    expect(result.agentActivities).toContain("❌ shell_execute → failed");
+    expect(result.agentActivities).toContain("✅ read_file → completed");
+    expect(result.agentActivities).toContain("❌ shell → failed");
     expect(result.agentActivities).toContain(
       "🤖 orchestrator → completed in 2 iterations",
     );

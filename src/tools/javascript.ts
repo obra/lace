@@ -23,7 +23,7 @@ export class JavaScriptTool extends BaseTool {
       name: 'javascript',
       description: 'Execute JavaScript code in a secure sandboxed environment',
       methods: {
-        js_eval: {
+        run: {
           description: 'Execute JavaScript code safely',
           parameters: {
             code: {
@@ -42,7 +42,7 @@ export class JavaScriptTool extends BaseTool {
     };
   }
 
-  async js_eval(params: JavaScriptEvalParams, context?: ToolContext): Promise<JavaScriptResult> {
+  async run(params: JavaScriptEvalParams, context?: ToolContext): Promise<JavaScriptResult> {
     const { code, context: userContext = {} } = params;
     this.output = [];
 

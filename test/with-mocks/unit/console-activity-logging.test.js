@@ -30,6 +30,26 @@ describe("LaceUI Activity Logging", () => {
       activityLogPath: testDbPath,
     });
 
+    // Override the model provider with a mock before initializing
+    laceUI.modelProvider = {
+      initialize: async () => {},
+      getModelSession: (modelName) => ({
+        definition: {
+          name: modelName,
+          provider: "anthropic",
+          contextWindow: 200000,
+          inputPrice: 3.0,
+          outputPrice: 15.0,
+          capabilities: ["chat", "tools"]
+        },
+        chat: async () => ({ 
+          success: true, 
+          content: "Mock response",
+          usage: { input_tokens: 10, output_tokens: 20 }
+        })
+      })
+    };
+
     await laceUI.initialize();
   });
 

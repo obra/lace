@@ -98,15 +98,46 @@ export class TestHarness {
     const db = new ConversationDB(":memory:");
     await db.initialize();
 
+    // Create mock model instance - use options.model if provided, otherwise create default
+    const mockModelInstance = options.model || {
+      definition: {
+        name: "test-model",
+        provider: "test",
+        contextWindow: 200000,
+        inputPrice: 0.01,
+        outputPrice: 0.03,
+        capabilities: ["chat", "tools"]
+      },
+      chat: async () => ({
+        success: true,
+        content: "Mock response",
+        usage: { input_tokens: 10, output_tokens: 20 }
+      })
+    };
+
+    // Create mock model provider for tests that need chooseAgentForTask
+    const mockModelProvider = options.modelProvider !== null ? {
+      getModelSession: (modelName: string) => ({
+        definition: {
+          name: modelName,
+          provider: "anthropic",
+          contextWindow: 200000,
+          inputPrice: modelName.includes("haiku") ? 0.25 : 3.0,
+          outputPrice: modelName.includes("haiku") ? 1.25 : 15.0,
+          capabilities: ["chat", "tools"]
+        },
+        chat: async () => ({ success: true, content: "Mock response" })
+      })
+    } : null;
+
     return new Agent({
       generation: 0,
       tools,
       db,
-      modelProvider: null, // Skip for unit tests
+      modelProvider: mockModelProvider, // Provide mock for tests that need it
+      model: mockModelInstance,
       verbose: false,
       role: options.role || "general",
-      assignedModel: options.assignedModel || "test-model",
-      assignedProvider: options.assignedProvider || "test",
       capabilities: options.capabilities || ["testing"],
       ...options,
     });

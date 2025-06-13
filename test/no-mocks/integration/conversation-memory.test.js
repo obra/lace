@@ -89,7 +89,7 @@ describe("Conversation Memory Integration", () => {
     assert.ok(tokenCountCalled, "countTokens should be called for accurate counting");
     assert.ok(countTokensParams, "countTokens should receive parameters");
     assert.ok(countTokensParams.messages.length > 0, "countTokens should receive messages");
-    assert.strictEqual(countTokensParams.options.model, agent.assignedModel, "Should use agent's assigned model");
+    assert.strictEqual(countTokensParams.options.model, agent.model.definition.name, "Should use agent's assigned model");
     
     // Verify context size is updated with accurate count
     assert.strictEqual(agent.contextSize, 150, "Agent context size should use accurate token count");

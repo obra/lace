@@ -72,7 +72,7 @@ EXAMPLES:
 
 Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → execution, 'plan' → orchestrator`,
       methods: {
-        delegate_task: {
+        run: {
           description: 'Delegate a focused task to a specialized sub-agent',
           parameters: {
             purpose: {
@@ -96,7 +96,7 @@ Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → executi
     };
   }
 
-  async delegate_task(params: DelegateTaskParams, context?: ToolContext): Promise<DelegateTaskResult> {
+  async run(params: DelegateTaskParams, context?: ToolContext): Promise<DelegateTaskResult> {
     const {
       purpose,
       instructions,

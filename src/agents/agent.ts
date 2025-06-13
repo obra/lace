@@ -7,6 +7,7 @@ import { SynthesisEngine } from "../utilities/synthesis-engine.js";
 import { TokenEstimator } from "../utilities/token-estimator.js";
 import { ToolResultExtractor } from "../utilities/tool-result-extractor.js";
 import { getRole, AgentRole } from "./agent-registry.ts";
+import { ModelInstance } from "../models/model-instance.js";
 
 // TypeScript interfaces for Agent
 interface AgentOptions {
@@ -14,12 +15,11 @@ interface AgentOptions {
   tools?: any;
   db?: any;
   modelProvider?: any;
+  model: ModelInstance;
   verbose?: boolean;
   inheritedContext?: any;
   memoryAgents?: Map<string, any>;
   role?: string;
-  assignedModel?: string;
-  assignedProvider?: string;
   task?: string;
   capabilities?: string[];
   toolApproval?: any;
@@ -155,8 +155,7 @@ export class Agent {
   // Role and assignment properties
   public roleDefinition: AgentRole;
   public role: string;
-  public assignedModel: string;
-  public assignedProvider: string;
+  public model: ModelInstance;
   public task: string | null;
   public capabilities: string[];
 
@@ -197,7 +196,7 @@ export class Agent {
   // Conversation configuration
   public conversationConfig: ConversationConfig;
 
-  constructor(options: AgentOptions = {}) {
+  constructor(options: AgentOptions) {
     this.generation = options.generation || 0;
     this.subagentCounter = 0; // Track number of spawned subagents
     this.tools = options.tools;
@@ -210,10 +209,7 @@ export class Agent {
     // Agent assignment - told by orchestrator
     this.roleDefinition = getRole(options.role || "general");
     this.role = this.roleDefinition.name;
-    this.assignedModel =
-      options.assignedModel || this.roleDefinition.defaultModel;
-    this.assignedProvider =
-      options.assignedProvider || this.roleDefinition.defaultProvider;
+    this.model = options.model;
     this.task = options.task || null;
     this.capabilities =
       options.capabilities || this.roleDefinition.capabilities;
@@ -364,7 +360,7 @@ export class Agent {
       if (this.modelProvider && this.modelProvider.countTokens) {
         const availableTools = this.buildToolsForLLM();
         const tokenCountResult = await this.modelProvider.countTokens(messages, {
-          model: this.assignedModel,
+          model: this.model.definition.name,
           tools: availableTools,
           enableCaching: true,
         });
@@ -474,18 +470,16 @@ export class Agent {
         // Log model request event
         if (this.activityLogger) {
           await this.activityLogger.logEvent("model_request", sessionId, null, {
-            provider: this.assignedProvider,
-            model: this.assignedModel,
+            provider: this.model.definition.provider,
+            model: this.model.definition.name,
             prompt: JSON.stringify(messages),
             timestamp: new Date().toISOString(),
           });
         }
 
-        // Use assigned model and provider with streaming
+        // Use model instance
         const startTime = Date.now();
-        const response = await this.modelProvider.chat(messages, {
-          provider: this.assignedProvider,
-          model: this.assignedModel,
+        const response = await this.model.chat(messages, {
           tools: availableTools,
           maxTokens: 4096,
           onTokenUpdate: onTokenUpdate,
@@ -676,7 +670,7 @@ export class Agent {
 
 AGENT CONFIGURATION:
 - Role: ${this.role}
-- Model: ${this.assignedModel}
+- Model: ${this.model.definition.name}
 - Capabilities: ${this.capabilities.join(", ")}
 ${this.task ? `- Current Task: ${this.task}` : ""}
 
@@ -855,37 +849,56 @@ Focus on executing your assigned task efficiently.`;
   }
 
   async executeTool(toolCall: ToolCall, sessionId: string): Promise<any> {
-    // Parse tool name and method from LLM response
-    // Try multiple parsing strategies to handle different naming conventions
+    // Simplified tool parsing - tools use simple names with 'execute' method
+    // Support for both simple names (preferred) and compound names (legacy)
     let toolName, methodName;
 
-    // First try: split by last underscore (preferred for new format)
-    const parts = toolCall.name.split("_");
-    if (parts.length >= 2) {
-      methodName = parts.pop(); // Last part is method
-      toolName = parts.join("_"); // Rest is tool name
-    } else {
+    // Check if this is a simple tool name first
+    if (this.tools.getTool(toolCall.name)) {
       toolName = toolCall.name;
-      methodName = "execute"; // Default method
-    }
+      methodName = "run";
+    } else {
+      // Legacy compound name parsing for backward compatibility
+      const parts = toolCall.name.split("_");
+      if (parts.length >= 2) {
+        methodName = parts.pop(); // Last part is method
+        toolName = parts.join("_"); // Rest is tool name
+      } else {
+        toolName = toolCall.name;
+        methodName = "run";
+      }
 
-    // Fallback: try original parsing if tool not found
-    if (!this.tools.getTool(toolName) && parts.length > 1) {
-      toolName = parts[0];
-      methodName = parts.slice(1).join("_");
+      // Final fallback
+      if (!this.tools.getTool(toolName) && parts.length > 1) {
+        toolName = parts[0];
+        methodName = parts.slice(1).join("_");
+      }
     }
 
     if (!this.tools.getTool(toolName)) {
       throw new Error(`Tool '${toolName}' not found`);
     }
 
-    return await this.tools.callTool(
-      toolName,
-      methodName,
-      toolCall.input,
-      sessionId,
-      this,
-    );
+    try {
+      const result = await this.tools.callTool(
+        toolName,
+        methodName,
+        toolCall.input,
+        sessionId,
+        this,
+      );
+      
+      // Return standardized format with success flag and direct access to result properties
+      return {
+        success: true,
+        ...result
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 
   async executeToolsInParallel(
@@ -1213,8 +1226,7 @@ Focus on executing your assigned task efficiently.`;
     // Create synthesis agent
     const synthesisAgent = await this.spawnSubagent({
       role: "synthesis",
-      assignedModel: "claude-3-5-haiku-20241022",
-      assignedProvider: "anthropic",
+      model: this.modelProvider.getModelSession("claude-3-5-haiku-20241022"),
       capabilities: ["synthesis", "summarization"],
       task: `Synthesize tool response for ${toolCall.name}`,
     });
@@ -1273,8 +1285,7 @@ ${responseText}`;
     // Create synthesis agent for batch processing
     const synthesisAgent = await this.spawnSubagent({
       role: "batch_synthesis",
-      assignedModel: "claude-3-5-haiku-20241022",
-      assignedProvider: "anthropic",
+      model: this.modelProvider.getModelSession("claude-3-5-haiku-20241022"),
       capabilities: ["synthesis", "summarization", "analysis"],
       task: `Batch synthesize ${toolBatch.length} parallel tool results`,
     });
@@ -1403,43 +1414,30 @@ ${responseText}`;
   }
 
   getModelContextWindow(): number {
-    if (this.modelProvider && this.modelProvider.getContextWindow) {
-      return this.modelProvider.getContextWindow(
-        this.assignedModel,
-        this.assignedProvider,
-      );
-    }
-    return 200000; // Default fallback
+    return this.model.definition.contextWindow;
   }
 
   calculateContextUsage(totalTokens: number): any {
-    if (this.modelProvider && this.modelProvider.getContextUsage) {
-      return this.modelProvider.getContextUsage(
-        this.assignedModel,
-        totalTokens,
-        this.assignedProvider,
-      );
-    }
-
-    // Fallback calculation
+    const contextWindow = this.getModelContextWindow();
     return {
       used: totalTokens,
-      total: this.maxContextSize,
-      percentage: (totalTokens / this.maxContextSize) * 100,
-      remaining: this.maxContextSize - totalTokens,
+      total: contextWindow,
+      percentage: (totalTokens / contextWindow) * 100,
+      remaining: contextWindow - totalTokens,
     };
   }
 
   calculateCost(inputTokens: number, outputTokens: number): any {
-    if (this.modelProvider && this.modelProvider.calculateCost) {
-      return this.modelProvider.calculateCost(
-        this.assignedModel,
-        inputTokens,
-        outputTokens,
-        this.assignedProvider,
-      );
-    }
-    return null;
+    const inputCost = (inputTokens / 1000000) * this.model.definition.inputPrice;
+    const outputCost = (outputTokens / 1000000) * this.model.definition.outputPrice;
+
+    return {
+      inputCost,
+      outputCost,
+      totalCost: inputCost + outputCost,
+      inputTokens,
+      outputTokens,
+    };
   }
 
   shouldHandoff() {
@@ -1534,7 +1532,7 @@ ${responseText}`;
 
     // Count tokens for current messages
     const currentTokenCount = await this.modelProvider.countTokens(messages, {
-      model: this.assignedModel,
+      model: this.model.definition.name,
       tools: this.buildToolsForLLM(),
     });
     
@@ -1557,7 +1555,7 @@ ${responseText}`;
       const candidateMessages = [systemMessage, ...conversationMessages.slice(i)];
       
       const tokenCount = await this.modelProvider.countTokens(candidateMessages, {
-        model: this.assignedModel,
+        model: this.model.definition.name,
         tools: availableTools,
       });
       
@@ -1668,7 +1666,7 @@ ${responseText}`;
 
     if (this.debugLogger) {
       this.debugLogger.debug(
-        `🤖 Spawned ${options.role || "general"} agent with ${options.assignedModel || "default"}`,
+        `🤖 Spawned ${options.role || "general"} agent with ${options.model.definition.name}`,
       );
     }
 
@@ -1700,7 +1698,7 @@ ${responseText}`;
 
   chooseAgentForTask(task: string, options: any = {}): any {
     // Override with explicit options if provided
-    if (options.role && options.assignedModel) {
+    if (options.role && options.model) {
       return options;
     }
 
@@ -1715,8 +1713,7 @@ ${responseText}`;
     ) {
       return {
         role: "planning",
-        assignedModel: "claude-3-5-sonnet-20241022",
-        assignedProvider: "anthropic",
+        model: this.modelProvider.getModelSession("claude-3-5-sonnet-20241022"),
         capabilities: ["planning", "reasoning", "analysis"],
       };
     }
@@ -1730,8 +1727,7 @@ ${responseText}`;
     ) {
       return {
         role: "execution",
-        assignedModel: "claude-3-5-haiku-20241022",
-        assignedProvider: "anthropic",
+        model: this.modelProvider.getModelSession("claude-3-5-haiku-20241022"),
         capabilities: ["execution", "tool_calling"],
       };
     }
@@ -1745,8 +1741,7 @@ ${responseText}`;
     ) {
       return {
         role: "reasoning",
-        assignedModel: "claude-3-5-sonnet-20241022",
-        assignedProvider: "anthropic",
+        model: this.modelProvider.getModelSession("claude-3-5-sonnet-20241022"),
         capabilities: ["reasoning", "analysis", "debugging"],
       };
     }
@@ -1754,8 +1749,7 @@ ${responseText}`;
     // Default to general-purpose
     return {
       role: "general",
-      assignedModel: "claude-3-5-sonnet-20241022",
-      assignedProvider: "anthropic",
+      model: this.modelProvider.getModelSession("claude-3-5-sonnet-20241022"),
       capabilities: ["reasoning", "tool_calling"],
     };
   }

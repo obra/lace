@@ -1,5 +1,7 @@
-// ABOUTME: Model registry that manages all available model providers for the system
-// ABOUTME: Simple registry for provider registration and retrieval
+// ABOUTME: Model registry that manages all available model providers and definitions for the system
+// ABOUTME: Registry for provider registration/retrieval and model definition storage
+
+import { ModelDefinition } from './model-definition.js';
 
 /**
  * Model provider metadata interface
@@ -37,16 +39,25 @@ export interface BaseModelProvider {
    * Get comprehensive metadata about this provider
    */
   getMetadata(): ModelProviderMetadata;
+
+  /**
+   * Optional methods for enhanced functionality
+   */
+  getContextWindow?(model: string): number;
+  calculateCost?(model: string, inputTokens: number, outputTokens: number): any;
+  getContextUsage?(model: string, totalTokens: number): any;
 }
 
 /**
- * Model registry that manages all available model providers
+ * Model registry that manages all available model providers and definitions
  */
 export class ModelRegistry {
   private providers: Map<string, BaseModelProvider>;
+  private modelDefinitions: Map<string, ModelDefinition>;
 
   constructor() {
     this.providers = new Map();
+    this.modelDefinitions = new Map();
   }
 
   /**
@@ -89,6 +100,41 @@ export class ModelRegistry {
    */
   getAllProviderMetadata(): ModelProviderMetadata[] {
     return this.getAllProviders().map(provider => provider.getMetadata());
+  }
+
+  /**
+   * Register a model definition in the registry
+   */
+  registerModelDefinition(name: string, definition: ModelDefinition): void {
+    this.modelDefinitions.set(name, definition);
+  }
+
+  /**
+   * Get a model definition by name
+   */
+  getModelDefinition(name: string): ModelDefinition | undefined {
+    return this.modelDefinitions.get(name);
+  }
+
+  /**
+   * Check if a model definition exists in the registry
+   */
+  hasModelDefinition(name: string): boolean {
+    return this.modelDefinitions.has(name);
+  }
+
+  /**
+   * Get all registered model definition names
+   */
+  listModelDefinitions(): string[] {
+    return Array.from(this.modelDefinitions.keys());
+  }
+
+  /**
+   * Get all model definitions as an array
+   */
+  getAllModelDefinitions(): ModelDefinition[] {
+    return Array.from(this.modelDefinitions.values());
   }
 }
 

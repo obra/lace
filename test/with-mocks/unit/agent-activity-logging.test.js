@@ -13,6 +13,21 @@ import {
 import { Agent } from "../../../src/agents/agent.ts";
 import { ActivityLogger } from "../../../src/logging/activity-logger.js";
 import { promises as fs } from "fs";
+
+// Helper function to create mock model instances for JavaScript tests
+function createMockModelInstance(name = "test-model", provider = "test") {
+  return {
+    definition: {
+      name,
+      provider,
+      contextWindow: 200000,
+      inputPrice: 0.01,
+      outputPrice: 0.03,
+      capabilities: ["chat", "tools"]
+    },
+    chat: async () => ({ success: true, content: "Mock response" })
+  };
+}
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -56,15 +71,15 @@ describe("Agent Model Call Activity Logging", () => {
     };
 
     // Create agent with activity logger
+    const mockModel = createMockModelInstance();
     agent = new Agent({
+      model: mockModel,
       generation: 0,
       tools: mockTools,
       db: await harness.createTestDatabase(),
       modelProvider: mockModelProvider,
       verbose: false,
       role: "general",
-      assignedModel: "test-model",
-      assignedProvider: "test-provider",
       activityLogger,
     });
 
@@ -164,8 +179,8 @@ describe("Agent Model Call Activity Logging", () => {
       // Simulate the logging that happens in generateResponse
       // 1. Log model request
       await activityLogger.logEvent("model_request", sessionId, null, {
-        provider: agent.assignedProvider,
-        model: agent.assignedModel,
+        provider: agent.model.definition.provider,
+        model: agent.model.definition.name,
         prompt: JSON.stringify(messages),
         timestamp: new Date().toISOString(),
       });
@@ -173,8 +188,8 @@ describe("Agent Model Call Activity Logging", () => {
       // 2. Make model call
       const startTime = Date.now();
       const response = await mockModelProvider.chat(messages, {
-        provider: agent.assignedProvider,
-        model: agent.assignedModel,
+        provider: agent.model.definition.provider,
+        model: agent.model.definition.name,
       });
       const duration = Date.now() - startTime;
 
@@ -206,7 +221,7 @@ describe("Agent Model Call Activity Logging", () => {
       const responseData = JSON.parse(responseEvent.data);
 
       // Verify request data
-      assert.strictEqual(requestData.provider, "test-provider");
+      assert.strictEqual(requestData.provider, "test");
       assert.strictEqual(requestData.model, "test-model");
       assert.ok(requestData.prompt.includes(userInput));
 
@@ -286,7 +301,9 @@ describe("Agent Model Call Activity Logging", () => {
         getToolSchema: (toolName) => ({ description: "Test tool" }),
       };
 
+      const mockModel2 = createMockModelInstance();
       const failingAgent = new Agent({
+        model: mockModel2,
         generation: 0,
         tools: mockTools,
         db: await harness.createTestDatabase(),
@@ -321,7 +338,9 @@ describe("Agent Model Call Activity Logging", () => {
         getToolSchema: (toolName) => ({ description: "Test tool" }),
       };
 
+      const mockModel3 = createMockModelInstance();
       const agentWithoutLogger = new Agent({
+        model: mockModel3,
         generation: 0,
         tools: mockTools,
         db: await harness.createTestDatabase(),

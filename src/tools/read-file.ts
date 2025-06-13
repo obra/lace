@@ -25,7 +25,7 @@ export class ReadFileTool extends BaseTool {
       name: 'read_file',
       description: 'Read the contents of a file',
       methods: {
-        file_read: {
+        run: {
           description: 'Read file content as text, optionally with line range',
           parameters: {
             path: {
@@ -49,7 +49,7 @@ export class ReadFileTool extends BaseTool {
     };
   }
 
-  async file_read(params: ReadFileParams, context?: ToolContext): Promise<ReadFileResult> {
+  async run(params: ReadFileParams, context?: ToolContext): Promise<ReadFileResult> {
     const { path, offset, limit } = params;
 
     try {

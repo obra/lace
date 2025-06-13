@@ -12,7 +12,7 @@ class MockShellTool {
     return {
       description: "Shell command execution",
       methods: {
-        shell_exec: {
+        run: {
           description: "Execute shell command",
           parameters: {
             command: { type: "string", required: true }
@@ -22,14 +22,14 @@ class MockShellTool {
     };
   }
   
-  async shell_exec(params) {
+  async run(params) {
     return { stdout: "hello\n", stderr: "", exitCode: 0 };
   }
   
   // BaseTool compatibility
   async execute(methodName, params) {
-    if (methodName === "shell_exec") {
-      return this.shell_exec(params);
+    if (methodName === "run") {
+      return this.run(params);
     }
     throw new Error(`Method '${methodName}' not found`);
   }
@@ -42,7 +42,7 @@ class MockReadFileTool {
     return {
       description: "Read file operations",
       methods: {
-        file_read: {
+        run: {
           description: "Read file",
           parameters: {
             path: { type: "string", required: true }
@@ -52,14 +52,14 @@ class MockReadFileTool {
     };
   }
   
-  async file_read(params) {
+  async run(params) {
     return { content: "hello", size: 5, path: params.path };
   }
   
   // BaseTool compatibility
   async execute(methodName, params) {
-    if (methodName === "file_read") {
-      return this.file_read(params);
+    if (methodName === "run") {
+      return this.run(params);
     }
     throw new Error(`Method '${methodName}' not found`);
   }
@@ -72,7 +72,7 @@ class MockWriteFileTool {
     return {
       description: "Write file operations", 
       methods: {
-        file_write: {
+        run: {
           description: "Write file",
           parameters: {
             path: { type: "string", required: true },
@@ -83,14 +83,14 @@ class MockWriteFileTool {
     };
   }
   
-  async file_write(params) {
+  async run(params) {
     return { bytes_written: params.content.length, path: params.path };
   }
   
   // BaseTool compatibility
   async execute(methodName, params) {
-    if (methodName === "file_write") {
-      return this.file_write(params);
+    if (methodName === "run") {
+      return this.run(params);
     }
     throw new Error(`Method '${methodName}' not found`);
   }
@@ -103,7 +103,7 @@ class MockListFilesTool {
     return {
       description: "List files operations",
       methods: {
-        file_list: {
+        run: {
           description: "List files",
           parameters: {
             path: { type: "string", required: true }
@@ -113,14 +113,14 @@ class MockListFilesTool {
     };
   }
   
-  async file_list(params) {
+  async run(params) {
     return { entries: [], count: 0, path: params.path };
   }
   
   // BaseTool compatibility
   async execute(methodName, params) {
-    if (methodName === "file_list") {
-      return this.file_list(params);
+    if (methodName === "run") {
+      return this.run(params);
     }
     throw new Error(`Method '${methodName}' not found`);
   }
@@ -133,7 +133,7 @@ class MockFileSearchTool {
     return {
       description: "Search files operations",
       methods: {
-        search_files: {
+        run: {
           description: "Search files",
           parameters: {
             pattern: { type: "string", required: true }
@@ -143,14 +143,14 @@ class MockFileSearchTool {
     };
   }
   
-  async search_files(params) {
+  async run(params) {
     return { matches: [], count: 0 };
   }
   
   // BaseTool compatibility
   async execute(methodName, params) {
-    if (methodName === "search_files") {
-      return this.search_files(params);
+    if (methodName === "run") {
+      return this.run(params);
     }
     throw new Error(`Method '${methodName}' not found`);
   }
@@ -171,7 +171,7 @@ class MockAgentDelegateTool {
       name: 'agent_delegate',
       description: 'Mock agent delegate tool',
       methods: {
-        delegate_task: { description: 'Mock delegate task' },
+        run: { description: 'Mock delegate task' },
       }
     };
   }
@@ -198,10 +198,10 @@ jest.mock("@/tools/javascript.js", () => ({
   JavaScriptTool: class {
     async initialize() {}
     getMetadata() { return { description: "JavaScript execution" }; }
-    async js_eval() { return { result: 42 }; }
+    async run() { return { result: 42 }; }
     async execute(methodName, params) {
-      if (methodName === "js_eval") {
-        return this.js_eval(params);
+      if (methodName === "run") {
+        return this.run(params);
       }
       throw new Error(`Method '${methodName}' not found`);
     }
@@ -219,18 +219,12 @@ jest.mock("@/tools/agent-delegate.js", () => ({
 describe("ToolRegistry", () => {
   let registry;
   let mockActivityLogger;
-  let mockProgressTracker;
   let mockSnapshotManager;
   let mockConversationDB;
 
   beforeEach(async () => {
     mockActivityLogger = {
       logEvent: jest.fn()
-    };
-
-    mockProgressTracker = {
-      trackProgress: jest.fn(),
-      updateProgress: jest.fn()
     };
 
     mockSnapshotManager = {
@@ -247,7 +241,6 @@ describe("ToolRegistry", () => {
 
     registry = new ToolRegistry({
       activityLogger: mockActivityLogger,
-      progressTracker: mockProgressTracker,
       snapshotManager: mockSnapshotManager,
       conversationDB: mockConversationDB
     });
@@ -301,7 +294,7 @@ describe("ToolRegistry", () => {
       expect(schema).toBeDefined();
       expect(schema.description).toBe("Read the contents of a file");
       expect(schema.methods).toBeDefined();
-      expect(schema.methods.file_read).toBeDefined();
+      expect(schema.methods.run).toBeDefined();
     });
 
     test("should return null for non-existent tool schema", () => {
@@ -336,7 +329,7 @@ describe("ToolRegistry", () => {
   describe("Tool Execution", () => {
     test("should execute tool method successfully", async () => {
       // Use shell tool which has simpler output
-      const result = await registry.callTool("shell", "shell_exec", {
+      const result = await registry.callTool("shell", "run", {
         command: "echo hello"
       });
 
@@ -392,7 +385,7 @@ describe("ToolRegistry", () => {
 
   describe("Activity Logging", () => {
     test("should log tool execution start and complete", async () => {
-      await registry.callTool("shell", "shell_exec", {
+      await registry.callTool("shell", "run", {
         command: "echo hello"
       }, "test-session");
 
@@ -402,7 +395,7 @@ describe("ToolRegistry", () => {
         null,
         expect.objectContaining({
           tool: "shell",
-          method: "shell_exec",
+          method: "run",
           params: { command: "echo hello" }
         })
       );
@@ -469,7 +462,7 @@ describe("ToolRegistry", () => {
     });
 
     test("should not log when no session ID provided", async () => {
-      await registry.callTool("read_file", "file_read", { path: "test.txt" });
+      await registry.callTool("read_file", "run", { path: "test.txt" });
 
       expect(mockActivityLogger.logEvent).not.toHaveBeenCalled();
     });
@@ -480,12 +473,12 @@ describe("ToolRegistry", () => {
       await registry.initialize();
       registry.register("agent_delegate", new MockAgentDelegateTool());
 
-      const result = await registry.callTool("agent_delegate", "delegate_task", {
+      const result = await registry.callTool("agent_delegate", "run", {
         description: "Run tests",
         role: "execution"
       }, "test-session", null);
 
-      expect(result).toBe("Mocked delegate_task result");
+      expect(result).toBe("Mocked run result");
     });
   });
 
@@ -493,7 +486,7 @@ describe("ToolRegistry", () => {
     test("should create pre and post snapshots for tool execution", async () => {
       await registry.callToolWithSnapshots(
         "write_file",
-        "file_write",
+        "run",
         { path: "test.txt", content: "hello" },
         "test-session",
         1
@@ -502,7 +495,7 @@ describe("ToolRegistry", () => {
       expect(mockSnapshotManager.createPreToolSnapshot).toHaveBeenCalledWith(
         expect.objectContaining({
           toolName: "write_file",
-          operation: "file_write",
+          operation: "run",
           parameters: { path: "test.txt", content: "hello" },
           executionId: expect.any(String)
         }),
@@ -517,7 +510,7 @@ describe("ToolRegistry", () => {
       expect(mockSnapshotManager.createPostToolSnapshot).toHaveBeenCalledWith(
         expect.objectContaining({
           toolName: "write_file",
-          operation: "file_write"
+          operation: "run"
         }),
         expect.objectContaining({
           sessionId: "test-session"
@@ -592,7 +585,7 @@ describe("ToolRegistry", () => {
       // Should still execute tool despite snapshot error
       const result = await registry.callToolWithSnapshots(
         "read_file",
-        "file_read",
+        "run",
         { path: "test.txt" },
         "test-session"
       );
@@ -622,7 +615,7 @@ describe("ToolRegistry", () => {
 
       const result = await registryWithoutSnapshots.callToolWithSnapshots(
         "read_file",
-        "file_read",
+        "run",
         { path: "test.txt" },
         "test-session"
       );
@@ -647,7 +640,7 @@ describe("ToolRegistry", () => {
 
       await registryWithDisabledSnapshots.callToolWithSnapshots(
         "read_file",
-        "file_read",
+        "run",
         { path: "test.txt" },
         "test-session"
       );

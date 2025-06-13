@@ -36,7 +36,7 @@ export class FileSearchTool extends BaseTool {
       name: 'file_search',
       description: 'Search for text patterns in files using ripgrep',
       methods: {
-        file_search: {
+        run: {
           description: 'Search for a pattern across files',
           parameters: {
             pattern: {
@@ -84,7 +84,7 @@ export class FileSearchTool extends BaseTool {
     };
   }
 
-  async file_search(params: FileSearchParams, context?: ToolContext): Promise<FileSearchResult> {
+  async run(params: FileSearchParams, context?: ToolContext): Promise<FileSearchResult> {
     const { 
       pattern, 
       path = '.', 

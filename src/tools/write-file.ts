@@ -22,7 +22,7 @@ export class WriteFileTool extends BaseTool {
       name: 'write_file',
       description: 'Write content to a file',
       methods: {
-        file_write: {
+        run: {
           description: 'Write text content to a file, creating directories if needed',
           parameters: {
             path: {
@@ -41,7 +41,7 @@ export class WriteFileTool extends BaseTool {
     };
   }
 
-  async file_write(params: WriteFileParams, context?: ToolContext): Promise<WriteFileResult> {
+  async run(params: WriteFileParams, context?: ToolContext): Promise<WriteFileResult> {
     const { path, content } = params;
 
     try {

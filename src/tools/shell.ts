@@ -35,7 +35,7 @@ export class ShellTool extends BaseTool {
       name: 'shell',
       description: 'Execute shell commands with output capture and cancellation support',
       methods: {
-        shell_exec: {
+        run: {
           description: 'Execute a shell command and capture output',
           parameters: {
             command: {
@@ -59,7 +59,7 @@ export class ShellTool extends BaseTool {
             }
           }
         },
-        shell_interactive: {
+        interactive: {
           description: 'Run command interactively (inherit stdio)',
           parameters: {
             command: {
@@ -84,7 +84,7 @@ export class ShellTool extends BaseTool {
     };
   }
 
-  async shell_exec(params: ShellExecuteParams, context?: ToolContext): Promise<ShellExecuteResult> {
+  async run(params: ShellExecuteParams, context?: ToolContext): Promise<ShellExecuteResult> {
     const { command, cwd = process.cwd(), timeout = 30000 } = params;
 
     try {
@@ -142,7 +142,7 @@ export class ShellTool extends BaseTool {
     }
   }
 
-  async shell_interactive(params: ShellInteractiveParams, context?: ToolContext): Promise<ShellInteractiveResult> {
+  async interactive(params: ShellInteractiveParams, context?: ToolContext): Promise<ShellInteractiveResult> {
     const { command, args = [], cwd = process.cwd() } = params;
 
     return new Promise((resolve, reject) => {

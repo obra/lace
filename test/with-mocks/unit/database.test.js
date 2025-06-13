@@ -27,8 +27,7 @@ describe("Conversation Database", () => {
         "../../../src/database/conversation-db.js"
       );
 
-      const dbPath = await harness.createTestDatabase();
-      const db = new ConversationDB(dbPath);
+      const db = new ConversationDB(":memory:");
       await db.initialize();
 
       // Test that database is working by attempting a simple operation
@@ -45,10 +44,10 @@ describe("Conversation Database", () => {
         "../../../src/database/conversation-db.js"
       );
 
-      const dbPath = await harness.createTestDatabase();
-      const db = new ConversationDB(dbPath);
+      const testPath = ":memory:";
+      const db = new ConversationDB(testPath);
 
-      assert.strictEqual(db.path, dbPath, "Should store correct database path");
+      assert.strictEqual(db.path, testPath, "Should store correct database path");
 
       await db.initialize();
       await db.close();
@@ -61,8 +60,7 @@ describe("Conversation Database", () => {
         "../../../src/database/conversation-db.js"
       );
 
-      const dbPath = await harness.createTestDatabase();
-      const db = new ConversationDB(dbPath);
+      const db = new ConversationDB(":memory:");
       await db.initialize();
 
       const sessionId = "test-session-001";
@@ -106,8 +104,7 @@ describe("Conversation Database", () => {
         "../../../src/database/conversation-db.js"
       );
 
-      const dbPath = await harness.createTestDatabase();
-      const db = new ConversationDB(dbPath);
+      const db = new ConversationDB(":memory:");
       await db.initialize();
 
       const toolCalls = [{ name: "file_read", input: { path: "test.txt" } }];
@@ -151,8 +148,7 @@ describe("Conversation Database", () => {
         "../../../src/database/conversation-db.js"
       );
 
-      const dbPath = await harness.createTestDatabase();
-      const db = new ConversationDB(dbPath);
+      const db = new ConversationDB(":memory:");
       await db.initialize();
 
       await db.saveMessage("session-1", 0, "user", "Message in session 1");
@@ -190,8 +186,7 @@ describe("Conversation Database", () => {
         "../../../src/database/conversation-db.js"
       );
 
-      const dbPath = await harness.createTestDatabase();
-      const db = new ConversationDB(dbPath);
+      const db = new ConversationDB(":memory:");
       await db.initialize();
 
       const sessionId = "test-session";
@@ -225,8 +220,7 @@ describe("Conversation Database", () => {
         "../../../src/database/conversation-db.js"
       );
 
-      const dbPath = await harness.createTestDatabase();
-      const db = new ConversationDB(dbPath);
+      const db = new ConversationDB(":memory:");
       await db.initialize();
 
       const sessionId = "search-test";
@@ -270,8 +264,7 @@ describe("Conversation Database", () => {
         "../../../src/database/conversation-db.js"
       );
 
-      const dbPath = await harness.createTestDatabase();
-      const db = new ConversationDB(dbPath);
+      const db = new ConversationDB(":memory:");
       await db.initialize();
 
       const sessionId = "generation-test";
@@ -311,8 +304,7 @@ describe("Conversation Database", () => {
         "../../../src/database/conversation-db.js"
       );
 
-      const dbPath = await harness.createTestDatabase();
-      const db = new ConversationDB(dbPath);
+      const db = new ConversationDB(":memory:");
       await db.initialize();
 
       const sessionId = "handoff-test";

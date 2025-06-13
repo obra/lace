@@ -13,17 +13,40 @@ jest.mock("@/agents/agent-registry.ts", () => ({
 
 import { Agent } from "@/agents/agent.ts";
 import { getRole } from "@/agents/agent-registry.ts";
+import { ModelInstance } from "@/models/model-instance.js";
 jest.mock("@/logging/activity-logger.js");
 jest.mock("@/logging/debug-logger.js");
 jest.mock("@/utilities/synthesis-engine.js");
 jest.mock("@/utilities/token-estimator.js");
 jest.mock("@/utilities/tool-result-extractor.js");
 
+// Helper function to create properly typed mock model instances
+function createMockModelInstance(name: string, provider: string = "anthropic"): ModelInstance {
+  const mockChat = jest.fn().mockImplementation(() => Promise.resolve({
+    success: true,
+    content: "Mock response",
+    usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 }
+  }));
+
+  return {
+    definition: {
+      name,
+      provider,
+      contextWindow: 200000,
+      inputPrice: 3.0,
+      outputPrice: 15.0,
+      capabilities: ["chat", "tools", "vision"]
+    },
+    chat: mockChat as unknown as (messages: unknown[], options?: unknown) => Promise<unknown>
+  };
+}
+
 describe("Agent", () => {
   let mockTools: any;
   let mockDb: any;
   let mockModelProvider: any;
   let mockDebugLogger: any;
+  let mockModelInstance: any;
 
   beforeEach(() => {
     // Reset mocks
@@ -73,7 +96,8 @@ describe("Agent", () => {
         inputCost: 0.001,
         outputCost: 0.002,
         totalCost: 0.003
-      }))
+      })),
+      getModelSession: jest.fn((modelName: string) => createMockModelInstance(modelName))
     };
 
     mockDebugLogger = {
@@ -81,6 +105,8 @@ describe("Agent", () => {
       debug: jest.fn(),
       warn: jest.fn()
     };
+
+    mockModelInstance = createMockModelInstance("claude-3-5-sonnet-20241022");
 
     // Mock role definitions
     mockGetRole.mockImplementation((roleName: string) => {
@@ -122,13 +148,14 @@ describe("Agent", () => {
       const agent = new Agent({
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       expect(agent.generation).toBe(0);
       expect(agent.role).toBe("general");
-      expect(agent.assignedModel).toBe("claude-3-5-sonnet-20241022");
-      expect(agent.assignedProvider).toBe("anthropic");
+      expect(agent.model.definition.name).toBe("claude-3-5-sonnet-20241022");
+      expect(agent.model.definition.provider).toBe("anthropic");
       expect(agent.capabilities).toEqual(["reasoning", "tool_calling", "analysis", "execution", "planning", "problem_solving"]);
     });
 
@@ -137,25 +164,27 @@ describe("Agent", () => {
         role: "execution",
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       expect(agent.role).toBe("execution");
       // Note: getRole mock verification skipped due to Jest module hoisting issues
     });
 
-    test("should override model and provider when specified", () => {
+    test("should use provided model instance", () => {
+      const customModelInstance = createMockModelInstance("claude-3-haiku-20240307");
+
       const agent = new Agent({
         role: "reasoning",
-        assignedModel: "claude-3-haiku-20240307",
-        assignedProvider: "openai",
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: customModelInstance
       });
 
-      expect(agent.assignedModel).toBe("claude-3-haiku-20240307");
-      expect(agent.assignedProvider).toBe("openai");
+      expect(agent.model.definition.name).toBe("claude-3-haiku-20240307");
+      expect(agent.model.definition.provider).toBe("anthropic");
     });
 
     test("should set task and capabilities correctly", () => {
@@ -167,7 +196,8 @@ describe("Agent", () => {
         capabilities,
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       expect(agent.task).toBe(task);
@@ -180,7 +210,8 @@ describe("Agent", () => {
       const agent = new Agent({
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       expect(agent.retryConfig.maxRetries).toBe(3);
@@ -200,7 +231,8 @@ describe("Agent", () => {
         retryConfig,
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       expect(agent.retryConfig.maxRetries).toBe(5);
@@ -219,7 +251,8 @@ describe("Agent", () => {
         circuitBreakerConfig,
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       expect(agent.circuitBreakerConfig.failureThreshold).toBe(3);
@@ -238,7 +271,8 @@ describe("Agent", () => {
         conversationConfig,
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       expect(agent.conversationConfig.historyLimit).toBe(20);
@@ -252,7 +286,8 @@ describe("Agent", () => {
       const agent = new Agent({
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       const usage = agent.calculateContextUsage(50000);
@@ -267,7 +302,8 @@ describe("Agent", () => {
       const agent = new Agent({
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       agent.contextSize = 100000; // 50% of max
@@ -281,7 +317,8 @@ describe("Agent", () => {
       const agent = new Agent({
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       // Simulate some activity
@@ -305,7 +342,8 @@ describe("Agent", () => {
       const agent = new Agent({
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       const llmTools = agent.buildToolsForLLM();
@@ -331,7 +369,8 @@ describe("Agent", () => {
       const agent = new Agent({
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       const parameters = {
@@ -351,7 +390,8 @@ describe("Agent", () => {
       const agent = new Agent({
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       const parameters = {
@@ -373,17 +413,20 @@ describe("Agent", () => {
         tools: mockTools,
         db: mockDb,
         modelProvider: mockModelProvider,
+        model: mockModelInstance,
         debugLogger: mockDebugLogger
       });
 
+      const customModel = createMockModelInstance("claude-3-haiku-20240307");
+
       const subagent = await agent.spawnSubagent({
         role: "execution",
-        assignedModel: "claude-3-haiku-20240307"
+        model: customModel
       });
 
       expect(subagent.generation).toBe(1.1); // Parent generation + 0.1
       expect(subagent.role).toBe("execution");
-      expect(subagent.assignedModel).toBe("claude-3-haiku-20240307");
+      expect(subagent.model.definition.name).toBe("claude-3-haiku-20240307");
       expect(subagent.tools).toBe(mockTools); // Inherited
       expect(subagent.db).toBe(mockDb); // Inherited
       expect(agent.subagentCounter).toBe(1);
@@ -393,39 +436,42 @@ describe("Agent", () => {
       const agent = new Agent({
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       // Planning task
       let config = agent.chooseAgentForTask("Plan the architecture for a new feature");
       expect(config.role).toBe("planning");
-      expect(config.assignedModel).toBe("claude-3-5-sonnet-20241022");
+      expect(config.model.definition.name).toBe("claude-3-5-sonnet-20241022");
 
       // Execution task
       config = agent.chooseAgentForTask("Run the unit tests");
       expect(config.role).toBe("execution");
-      expect(config.assignedModel).toBe("claude-3-5-haiku-20241022");
+      expect(config.model.definition.name).toBe("claude-3-5-haiku-20241022");
 
       // Reasoning task
       config = agent.chooseAgentForTask("Analyze this bug and explain the root cause");
       expect(config.role).toBe("reasoning");
-      expect(config.assignedModel).toBe("claude-3-5-sonnet-20241022");
+      expect(config.model.definition.name).toBe("claude-3-5-sonnet-20241022");
 
       // Default task
       config = agent.chooseAgentForTask("Help me with something");
       expect(config.role).toBe("general");
-      expect(config.assignedModel).toBe("claude-3-5-sonnet-20241022");
+      expect(config.model.definition.name).toBe("claude-3-5-sonnet-20241022");
     });
   });
 
   describe("System Prompt Generation", () => {
     test("should build system prompt with role information", () => {
+      const executionModelInstance = createMockModelInstance("claude-3-5-haiku-20241022");
       const agent = new Agent({
         role: "execution",
         task: "Run tests",
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: executionModelInstance
       });
 
       const systemPrompt = agent.buildSystemPrompt();
@@ -442,7 +488,8 @@ describe("Agent", () => {
         role: "orchestrator",
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       const guidelines = agent.getRoleSpecificGuidelines();
@@ -457,7 +504,8 @@ describe("Agent", () => {
       const agent = new Agent({
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       // Rate limit error
@@ -483,7 +531,8 @@ describe("Agent", () => {
       const agent = new Agent({
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       // Retriable errors
@@ -501,7 +550,8 @@ describe("Agent", () => {
       const agent = new Agent({
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       const config = {
@@ -531,7 +581,8 @@ describe("Agent", () => {
       const agent = new Agent({
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       const state = agent.checkCircuitBreaker("test_tool");
@@ -545,7 +596,8 @@ describe("Agent", () => {
       const agent = new Agent({
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       // Record failures
@@ -571,7 +623,8 @@ describe("Agent", () => {
         circuitBreakerConfig: { failureThreshold: 2, openTimeout: 30000 },
         tools: mockTools,
         db: mockDb,
-        modelProvider: mockModelProvider
+        modelProvider: mockModelProvider,
+        model: mockModelInstance
       });
 
       const error = new Error("Test error");

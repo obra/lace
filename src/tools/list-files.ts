@@ -33,7 +33,7 @@ export class ListFilesTool extends BaseTool {
       name: 'list_files',
       description: 'List files and directories',
       methods: {
-        file_list: {
+        run: {
           description: 'List contents of a directory with optional filtering',
           parameters: {
             path: {
@@ -64,7 +64,7 @@ export class ListFilesTool extends BaseTool {
     };
   }
 
-  async file_list(params: ListFilesParams, context?: ToolContext): Promise<ListFilesResult> {
+  async run(params: ListFilesParams, context?: ToolContext): Promise<ListFilesResult> {
     const { path, recursive = false, pattern, include_hidden = false } = params;
 
     try {

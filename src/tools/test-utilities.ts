@@ -1,7 +1,7 @@
 // ABOUTME: Testing utilities for tools that reduce mocking complexity and provide consistent test patterns
 // ABOUTME: Includes test tool implementations, assertion helpers, and tool behavior verification utilities
 
-import { BaseTool, ToolSchema, ToolResult, ToolContext, ToolExecutionOptions, ProgressUpdate } from './base-tool.js';
+import { BaseTool, ToolSchema, ToolResult, ToolContext, ToolExecutionOptions } from './base-tool.js';
 
 /**
  * Mock tool for testing that implements the BaseTool interface
@@ -169,7 +169,6 @@ export class MockTool extends BaseTool {
  */
 export class ToolTestHarness {
   private abortController: AbortController | null = null;
-  private progressUpdates: ProgressUpdate[] = [];
 
   /**
    * Execute a tool method with test infrastructure
@@ -181,13 +180,9 @@ export class ToolTestHarness {
     options: Partial<ToolExecutionOptions> = {}
   ): Promise<ToolResult<T>> {
     this.abortController = new AbortController();
-    this.progressUpdates = [];
 
     const testOptions: ToolExecutionOptions = {
       abortController: this.abortController,
-      onProgress: (progress: ProgressUpdate) => {
-        this.progressUpdates.push(progress);
-      },
       ...options
     };
 
@@ -203,25 +198,6 @@ export class ToolTestHarness {
     }
   }
 
-  /**
-   * Get all progress updates from the last execution
-   */
-  getProgressUpdates(): ProgressUpdate[] {
-    return [...this.progressUpdates];
-  }
-
-  /**
-   * Wait for a specific number of progress updates
-   */
-  async waitForProgressUpdates(count: number, timeoutMs: number = 5000): Promise<ProgressUpdate[]> {
-    const startTime = Date.now();
-    
-    while (this.progressUpdates.length < count && Date.now() - startTime < timeoutMs) {
-      await new Promise(resolve => setTimeout(resolve, 10));
-    }
-    
-    return this.getProgressUpdates();
-  }
 
   /**
    * Assert that a tool result is successful
@@ -313,24 +289,6 @@ export class ToolBehaviorVerifier {
     }
   }
 
-  /**
-   * Verify that a tool reports progress for long operations
-   */
-  static async verifyProgressReporting(
-    tool: BaseTool,
-    method: string,
-    params: Record<string, any>,
-    expectedProgressUpdates: number = 1
-  ): Promise<void> {
-    const harness = new ToolTestHarness();
-    
-    await harness.executeTool(tool, method, params);
-    
-    const progressUpdates = harness.getProgressUpdates();
-    if (progressUpdates.length < expectedProgressUpdates) {
-      throw new Error(`Expected at least ${expectedProgressUpdates} progress updates, got ${progressUpdates.length}`);
-    }
-  }
 
   /**
    * Verify that a tool handles timeouts correctly

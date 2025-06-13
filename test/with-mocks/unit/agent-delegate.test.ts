@@ -31,12 +31,12 @@ describe('AgentDelegateTool', () => {
       
       expect(schema.name).toBe('agent_delegate');
       expect(schema.description).toContain('Delegate tasks to specialized sub-agents');
-      expect(schema.methods).toHaveProperty('delegate_task');
+      expect(schema.methods).toHaveProperty('run');
     });
 
-    test('should have required parameters for delegate_task', () => {
+    test('should have required parameters for run', () => {
       const schema = tool.getMetadata();
-      const method = schema.methods.delegate_task;
+      const method = schema.methods.run;
       
       expect(method.parameters.purpose.required).toBe(true);
       expect(method.parameters.instructions.required).toBe(true);
@@ -49,7 +49,7 @@ describe('AgentDelegateTool', () => {
       const mockResult = { content: 'Task completed successfully' };
       mockAgent.delegateTask.mockResolvedValue(mockResult);
 
-      const result = await tool.delegate_task({
+      const result = await tool.run({
         purpose: 'Test task',
         instructions: 'Complete the test task with all requirements'
       }, mockContext);
@@ -70,7 +70,7 @@ describe('AgentDelegateTool', () => {
       const mockResult = { content: 'Specialist task completed' };
       mockAgent.delegateTask.mockResolvedValue(mockResult);
 
-      const result = await tool.delegate_task({
+      const result = await tool.run({
         purpose: 'Complex analysis task',
         instructions: 'Perform detailed security analysis of the authentication system',
         role: 'reasoning',
@@ -87,7 +87,7 @@ describe('AgentDelegateTool', () => {
     });
 
     test('should return error when purpose is missing', async () => {
-      const result = await tool.delegate_task({
+      const result = await tool.run({
         purpose: '',
         instructions: 'Some instructions'
       }, mockContext);
@@ -97,7 +97,7 @@ describe('AgentDelegateTool', () => {
     });
 
     test('should return error when instructions are missing', async () => {
-      const result = await tool.delegate_task({
+      const result = await tool.run({
         purpose: 'Test task',
         instructions: ''
       }, mockContext);
@@ -112,7 +112,7 @@ describe('AgentDelegateTool', () => {
         context: { sessionId: 'test-session' }
       };
 
-      const result = await tool.delegate_task({
+      const result = await tool.run({
         purpose: 'Test task',
         instructions: 'Complete the test task'
       }, contextWithoutAgent);
@@ -129,7 +129,7 @@ describe('AgentDelegateTool', () => {
         new Promise((resolve) => setTimeout(resolve, 200))
       );
 
-      const result = await tool.delegate_task({
+      const result = await tool.run({
         purpose: 'Slow task',
         instructions: 'This task takes a long time to complete'
       }, mockContext);
@@ -144,7 +144,7 @@ describe('AgentDelegateTool', () => {
         signal: { aborted: true }
       };
 
-      const result = await tool.delegate_task({
+      const result = await tool.run({
         purpose: 'Test task',
         instructions: 'Complete the test task'
       }, cancelledContext);
@@ -157,7 +157,7 @@ describe('AgentDelegateTool', () => {
       const mockResult = { content: 'Implementation completed' };
       mockAgent.delegateTask.mockResolvedValue(mockResult);
 
-      const result = await tool.delegate_task({
+      const result = await tool.run({
         purpose: 'implement new feature',
         instructions: 'Add user authentication to the login system'
       }, mockContext);
@@ -176,7 +176,7 @@ describe('AgentDelegateTool', () => {
       const mockResult = { content: 'Analysis completed' };
       mockAgent.delegateTask.mockResolvedValue(mockResult);
 
-      const result = await tool.delegate_task({
+      const result = await tool.run({
         purpose: 'analyze security vulnerabilities',
         instructions: 'Review the authentication code for potential security issues'
       }, mockContext);

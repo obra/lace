@@ -12,7 +12,6 @@ import { BaseTool } from "./base-tool.js";
 
 interface ToolRegistryOptions {
   activityLogger?: any;
-  progressTracker?: any;
   snapshotManager?: any;
   conversationDB?: any;
   snapshotConfig?: {
@@ -25,7 +24,6 @@ interface ToolRegistryOptions {
 export class ToolRegistry {
   private tools: Map<string, BaseTool>;
   private activityLogger: any;
-  private progressTracker: any;
   private snapshotManager: any;
   private conversationDB: any;
   private snapshotConfig: {
@@ -37,7 +35,6 @@ export class ToolRegistry {
   constructor(options: ToolRegistryOptions = {}) {
     this.tools = new Map();
     this.activityLogger = options.activityLogger || null;
-    this.progressTracker = options.progressTracker || null;
     this.snapshotManager = options.snapshotManager || null;
     this.conversationDB = options.conversationDB || null;
 

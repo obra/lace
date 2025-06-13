@@ -6,6 +6,21 @@ import { Agent } from "../../../src/agents/agent.ts";
 import { ToolRegistry } from "../../../src/tools/tool-registry.ts";
 import { BaseTool } from "../../../src/tools/base-tool.ts";
 
+// Helper function to create mock model instances for JavaScript tests
+function createMockModelInstance(name = "test-model", provider = "test") {
+  return {
+    definition: {
+      name,
+      provider,
+      contextWindow: 200000,
+      inputPrice: 0.01,
+      outputPrice: 0.03,
+      capabilities: ["chat", "tools"]
+    },
+    chat: async () => ({ success: true, content: "Mock response" })
+  };
+}
+
 describe("Error Recovery and Retry Logic", () => {
   let agent;
   let mockModelProvider;
@@ -100,7 +115,9 @@ describe("Error Recovery and Retry Logic", () => {
       }),
     };
 
+    const mockModelInstance = createMockModelInstance();
     agent = new Agent({
+      model: mockModelInstance,
       tools: mockToolRegistry,
       modelProvider: mockModelProvider,
       maxConcurrentTools: 3,

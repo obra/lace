@@ -42,7 +42,7 @@ describe("Lace Integration Tests", () => {
       const lace = await harness.createTestLaceUI();
 
       const tools = lace.tools.listTools();
-      const requiredTools = ["shell", "file", "javascript", "search"];
+      const requiredTools = ["shell", "read_file", "javascript", "file_search"];
 
       for (const tool of requiredTools) {
         assert.ok(tools.includes(tool), `Should have ${tool} tool`);
@@ -69,10 +69,21 @@ describe("Lace Integration Tests", () => {
     test("should spawn subagents with correct configuration", async () => {
       const lace = await harness.createTestLaceUI();
 
+      const mockModelInstance = {
+        definition: {
+          name: "claude-3-5-haiku-20241022",
+          provider: "anthropic",
+          contextWindow: 200000,
+          inputPrice: 0.25,
+          outputPrice: 1.25,
+          capabilities: ["chat", "tools"]
+        },
+        chat: async () => ({ success: true, content: "Mock" })
+      };
+
       const subagent = await lace.primaryAgent.spawnSubagent({
         role: "execution",
-        assignedModel: "claude-3-5-haiku-20241022",
-        assignedProvider: "anthropic",
+        model: mockModelInstance,
         task: "Test task",
       });
 
@@ -82,7 +93,7 @@ describe("Lace Integration Tests", () => {
         "Subagent should have correct role",
       );
       assert.strictEqual(
-        subagent.assignedModel,
+        subagent.model.definition.name,
         "claude-3-5-haiku-20241022",
         "Subagent should have correct model",
       );
@@ -123,7 +134,7 @@ describe("Lace Integration Tests", () => {
 
       // Test tool execution through agent
       const result = await lace.primaryAgent.executeTool({
-        name: "file_read",
+        name: "read_file",
         input: { path: tempFile },
       });
 
@@ -139,8 +150,8 @@ describe("Lace Integration Tests", () => {
       const lace = await harness.createTestLaceUI();
 
       const result = await lace.primaryAgent.executeTool({
-        name: "javascript_calculate",
-        input: { expression: "6 * 12" },
+        name: "javascript",
+        input: { code: "6 * 12" },
       });
 
       assert.ok(result.success, "Calculation should succeed");
@@ -151,7 +162,7 @@ describe("Lace Integration Tests", () => {
       const lace = await harness.createTestLaceUI();
 
       const result = await lace.primaryAgent.executeTool({
-        name: "shell_execute",
+        name: "shell",
         input: { command: 'echo "test"' },
       });
 
@@ -242,7 +253,7 @@ describe("Lace Integration Tests", () => {
       const lace = await harness.createTestLaceUI();
 
       const result = await lace.primaryAgent.executeTool({
-        name: "file_read",
+        name: "read_file",
         input: { path: "/nonexistent/file.txt" },
       });
 

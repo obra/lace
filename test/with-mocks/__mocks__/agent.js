@@ -4,14 +4,23 @@ import { jest } from "@jest/globals";
 export class Agent {
   constructor(config = {}) {
     this.role = config.role || "orchestrator";
-    this.assignedModel = config.assignedModel || "claude-3-5-sonnet-20241022";
+    this.model = config.model || {
+      definition: {
+        name: "claude-3-5-sonnet-20241022",
+        provider: "anthropic",
+        contextWindow: 200000,
+        inputPrice: 3.0,
+        outputPrice: 15.0,
+        capabilities: ["chat", "tools", "vision"]
+      },
+      chat: async () => ({ success: true, content: "Mock response" })
+    };
     this.generation = config.generation || 0;
     this.contextSize = 0;
     this.maxContextSize = 200000;
     this.debugLogger = config.debugLogger || null;
     this.activityLogger = config.activityLogger || null;
     this.task = config.task || null;
-    this.assignedProvider = config.assignedProvider || "anthropic";
     this.capabilities = config.capabilities || ["reasoning"];
   }
 
@@ -34,8 +43,17 @@ export class Agent {
     ) {
       return {
         role: "planning",
-        assignedModel: "claude-3-5-sonnet-20241022",
-        assignedProvider: "anthropic",
+        model: {
+          definition: {
+            name: "claude-3-5-sonnet-20241022",
+            provider: "anthropic",
+            contextWindow: 200000,
+            inputPrice: 3.0,
+            outputPrice: 15.0,
+            capabilities: ["chat", "tools", "vision"]
+          },
+          chat: async () => ({ success: true, content: "Mock response" })
+        },
         capabilities: ["planning", "reasoning", "analysis"],
       };
     }
@@ -47,8 +65,17 @@ export class Agent {
     ) {
       return {
         role: "execution",
-        assignedModel: "claude-3-5-haiku-20241022",
-        assignedProvider: "anthropic",
+        model: {
+          definition: {
+            name: "claude-3-5-haiku-20241022",
+            provider: "anthropic",
+            contextWindow: 200000,
+            inputPrice: 0.25,
+            outputPrice: 1.25,
+            capabilities: ["chat", "tools"]
+          },
+          chat: async () => ({ success: true, content: "Mock response" })
+        },
         capabilities: ["execution", "tool_calling"],
       };
     }
@@ -60,15 +87,33 @@ export class Agent {
     ) {
       return {
         role: "reasoning",
-        assignedModel: "claude-3-5-sonnet-20241022",
-        assignedProvider: "anthropic",
+        model: {
+          definition: {
+            name: "claude-3-5-sonnet-20241022",
+            provider: "anthropic",
+            contextWindow: 200000,
+            inputPrice: 3.0,
+            outputPrice: 15.0,
+            capabilities: ["chat", "tools", "vision"]
+          },
+          chat: async () => ({ success: true, content: "Mock response" })
+        },
         capabilities: ["reasoning", "analysis", "debugging"],
       };
     }
     return {
       role: "general",
-      assignedModel: "claude-3-5-sonnet-20241022",
-      assignedProvider: "anthropic",
+      model: {
+        definition: {
+          name: "claude-3-5-sonnet-20241022",
+          provider: "anthropic",
+          contextWindow: 200000,
+          inputPrice: 3.0,
+          outputPrice: 15.0,
+          capabilities: ["chat", "tools", "vision"]
+        },
+        chat: async () => ({ success: true, content: "Mock response" })
+      },
       capabilities: ["reasoning", "tool_calling"],
     };
   });

@@ -50,7 +50,7 @@ describe("Tool System", () => {
       const schema = registry.getToolSchema("read_file");
       assert.ok(schema, "Should have read_file tool schema");
       assert.ok(schema.methods, "Schema should have methods");
-      assert.ok(schema.methods.file_read, "Should have file_read method");
+      assert.ok(schema.methods.run, "Should have run method");
     });
 
     test("should execute tool methods", async () => {
@@ -61,7 +61,7 @@ describe("Tool System", () => {
       await registry.initialize();
 
       const tempFile = await harness.createTempFile("test content");
-      const result = await registry.callTool("read_file", "file_read", {
+      const result = await registry.callTool("read_file", "run", {
         path: tempFile,
       });
 
@@ -81,7 +81,7 @@ describe("Tool System", () => {
       );
       const tool = new JavaScriptTool();
 
-      const result = await tool.execute("js_eval", { code: "2 + 3" });
+      const result = await tool.execute("run", { code: "2 + 3" });
       assert.ok(result.success, "Evaluation should succeed");
       assert.strictEqual(result.data.result, 5, "Should calculate correctly");
     });
@@ -92,7 +92,7 @@ describe("Tool System", () => {
       );
       const tool = new JavaScriptTool();
 
-      const result = await tool.execute("js_eval", { code: "undefined.property" });
+      const result = await tool.execute("run", { code: "undefined.property" });
       assert.ok(!result.success, "Should fail for invalid code");
       assert.ok(result.error, "Should provide error message");
     });
@@ -103,7 +103,7 @@ describe("Tool System", () => {
       );
       const tool = new JavaScriptTool();
 
-      const result = await tool.execute("js_eval", { code: 'console.log("test"); 42' });
+      const result = await tool.execute("run", { code: 'console.log("test"); 42' });
       assert.ok(result.success, "Evaluation should succeed");
       assert.strictEqual(result.data.result, 42, "Should return result");
       assert.ok(result.data.output.length > 0, "Should capture console output");
@@ -120,7 +120,7 @@ describe("Tool System", () => {
       const tempFile = await harness.createTempFile();
 
       // Write content
-      const writeResult = await writeTool.execute("file_write", {
+      const writeResult = await writeTool.execute("run", {
         path: tempFile,
         content: "hello world",
       });
@@ -128,7 +128,7 @@ describe("Tool System", () => {
       assert.ok(writeResult.data.bytes_written > 0, "Write should return bytes written");
 
       // Read content
-      const readResult = await readTool.execute("file_read", { path: tempFile });
+      const readResult = await readTool.execute("run", { path: tempFile });
       assert.ok(readResult.success, "Read should succeed");
       assert.strictEqual(
         readResult.data.content,
@@ -141,7 +141,7 @@ describe("Tool System", () => {
       const { ListFilesTool } = await import("@/tools/list-files.js");
       const tool = new ListFilesTool();
 
-      const result = await tool.execute("file_list", { path: "." });
+      const result = await tool.execute("run", { path: "." });
       assert.ok(result.success, "List should succeed");
       assert.ok(Array.isArray(result.data.entries), "Should return array of entries");
       assert.ok(result.data.entries.length > 0, "Should find files in current directory");
@@ -151,7 +151,7 @@ describe("Tool System", () => {
       const { ReadFileTool } = await import("@/tools/read-file.js");
       const tool = new ReadFileTool();
 
-      const result = await tool.execute("file_read", { path: "/non/existent/file.txt" });
+      const result = await tool.execute("run", { path: "/non/existent/file.txt" });
       assert.ok(!result.success, "Should fail for non-existent file");
       assert.ok(result.error, "Should provide error message");
     });
@@ -162,7 +162,7 @@ describe("Tool System", () => {
       const { ShellTool } = await import("@/tools/shell.js");
       const tool = new ShellTool();
 
-      const result = await tool.execute("shell_exec", { command: 'echo "test"' });
+      const result = await tool.execute("run", { command: 'echo "test"' });
       assert.ok(result.success, "Command should succeed");
       assert.strictEqual(
         result.data.stdout.trim(),
@@ -176,7 +176,7 @@ describe("Tool System", () => {
       const { ShellTool } = await import("@/tools/shell.js");
       const tool = new ShellTool();
 
-      const result = await tool.execute("shell_exec", { command: "nonexistentcommand" });
+      const result = await tool.execute("run", { command: "nonexistentcommand" });
       assert.ok(result.success, "Command execution should succeed (non-zero exit code is handled)");
       assert.ok(result.data.exitCode !== 0, "Should have non-zero exit code for invalid command");
     });
@@ -185,7 +185,7 @@ describe("Tool System", () => {
       const { ShellTool } = await import("@/tools/shell.js");
       const tool = new ShellTool();
 
-      const result = await tool.execute("shell_exec", { command: "pwd", cwd: "/tmp" });
+      const result = await tool.execute("run", { command: "pwd", cwd: "/tmp" });
       assert.ok(result.success, "Command should succeed");
       assert.ok(
         result.data.stdout.includes("/tmp"),
