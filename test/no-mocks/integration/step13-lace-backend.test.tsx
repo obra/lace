@@ -7,12 +7,26 @@ import { jest } from "@jest/globals";
 // Mock only the essential modules needed for test environment
 
 // Mock ModelProvider to avoid API costs and network dependencies
-jest.mock("../src/models/model-provider", () => ({
+jest.mock("../../../src/models/model-provider", () => ({
   ModelProvider: jest.fn().mockImplementation(() => ({
     // @ts-ignore
     initialize: jest.fn().mockResolvedValue(undefined),
-    // @ts-ignore - Add any other methods the real tests might need
-    chat: jest.fn().mockResolvedValue({ content: "Mocked response" }),
+    // @ts-ignore
+    getModelSession: jest.fn().mockReturnValue({
+      definition: {
+        name: "test-model",
+        provider: "mock",
+        contextWindow: 200000,
+        inputPrice: 0.01,
+        outputPrice: 0.03,
+        capabilities: ["chat", "tools"]
+      },
+      chat: jest.fn().mockResolvedValue({ 
+        success: true,
+        content: "Mocked response",
+        usage: { input_tokens: 10, output_tokens: 20 }
+      })
+    })
   })),
 }));
 

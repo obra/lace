@@ -36,7 +36,10 @@ export function createMockTools() {
         executionTime: delay,
       };
     },
-    getTool: (name) => ({ name }), // Required by agent.executeTool()
+    getTool: (name) => {
+      const validTools = ["tool1", "tool2", "tool3", "slow", "fast", "error"];
+      return validTools.includes(name) ? { name } : null;
+    },
     get: (name) => ({ name }),
     listTools: () => ["tool1", "tool2", "tool3", "slow", "fast", "error"],
     getToolSchema: (name) => ({ name, methods: {} }),

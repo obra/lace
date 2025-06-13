@@ -18,11 +18,10 @@ describe("Conversation Memory Integration", () => {
 
   test("agent remembers previous message in same session", async () => {
     const agent = await harness.createTestAgent();
-    const mockProvider = harness.createMockModelProvider();
     
     // Override with mock that tracks what messages it receives
     const receivedMessages = [];
-    mockProvider.chat = async (messages, options) => {
+    agent.model.chat = async (messages, options) => {
       receivedMessages.push([...messages]); // Store copy of messages array
       
       // Return different responses based on whether history is present
@@ -34,8 +33,6 @@ describe("Conversation Memory Integration", () => {
         usage: { input_tokens: 10, output_tokens: 20 },
       };
     };
-    
-    agent.modelProvider = mockProvider;
     const sessionId = "test-session-123";
 
     // First message - should only have system prompt + user message
@@ -141,13 +138,12 @@ describe("Conversation Memory Integration", () => {
 
   test("agent applies caching strategy to conversation history", async () => {
     const agent = await harness.createTestAgent();
-    const mockProvider = harness.createMockModelProvider();
     
     // Track what messages are sent to the provider
     let sentMessages = null;
     let cachingEnabled = false;
     
-    mockProvider.chat = async (messages, options) => {
+    agent.model.chat = async (messages, options) => {
       sentMessages = messages;
       cachingEnabled = options.enableCaching;
       
@@ -159,15 +155,13 @@ describe("Conversation Memory Integration", () => {
       };
     };
 
-    mockProvider.countTokens = async (messages, options) => {
+    agent.model.countTokens = async (messages, options) => {
       return {
         success: true,
         inputTokens: messages.length * 30, // Mock calculation
         totalTokens: messages.length * 30,
       };
     };
-    
-    agent.modelProvider = mockProvider;
     const sessionId = "test-session-caching";
 
     // Add some conversation history to the database
@@ -211,9 +205,8 @@ describe("Conversation Memory Integration", () => {
 
   test("agent tracks conversation metrics correctly", async () => {
     const agent = await harness.createTestAgent();
-    const mockProvider = harness.createMockModelProvider();
     
-    mockProvider.chat = async (messages, options) => {
+    agent.model.chat = async (messages, options) => {
       return {
         success: true,
         content: "Test response",
@@ -228,15 +221,13 @@ describe("Conversation Memory Integration", () => {
       };
     };
 
-    mockProvider.countTokens = async (messages, options) => {
+    agent.model.countTokens = async (messages, options) => {
       return {
         success: true,
         inputTokens: 50,
         totalTokens: 50,
       };
     };
-    
-    agent.modelProvider = mockProvider;
     const sessionId = "test-session-metrics";
 
     // Process two messages
