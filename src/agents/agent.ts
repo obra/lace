@@ -1425,12 +1425,6 @@ ${responseText}`;
     return `Tool execution results:\n${formattedResults.join("\n")}`;
   }
 
-  formatFileList(files: any[]): string {
-    return files
-      .map((file: any) => `${file.isDirectory ? "📁" : "📄"} ${file.name}`)
-      .join("\n");
-  }
-
   getModelContextWindow(): number {
     return this.model.definition.contextWindow;
   }

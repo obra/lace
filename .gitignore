@@ -36,3 +36,4 @@ test-snapshot-*/
 .Trashes
 ehthumbs.db
 Thumbs.db
+debug-*
