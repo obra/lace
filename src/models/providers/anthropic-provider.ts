@@ -123,6 +123,9 @@ export class AnthropicProvider implements BaseModelProvider {
 
     this.client = new Anthropic({
       apiKey: this.apiKey,
+      defaultHeaders: {
+        "anthropic-beta": "prompt-caching-2024-07-31",
+      },
     });
   }
 
@@ -152,12 +155,8 @@ export class AnthropicProvider implements BaseModelProvider {
         stream: true,
       };
 
-      // Add prompt caching beta header if enabled
-      if (enableCaching) {
-        params.extra_headers = {
-          "anthropic-beta": "prompt-caching-2024-07-31",
-        };
-      }
+      // Note: Prompt caching headers are set at client level, not per-request
+      // The extra_headers parameter is not supported in messages.create()
 
       // Add system message if present
       if (systemMessage) {
