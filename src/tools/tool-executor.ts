@@ -37,6 +37,8 @@ interface ToolExecutorConfig {
   activityLogger?: any;
   debugLogger?: any;
   verbose?: boolean;
+  tools?: any;
+  modelProvider?: any;
 }
 
 // Simple semaphore for concurrency control
@@ -228,7 +230,13 @@ export class ToolExecutor {
         toolName,
         toolCall.input,
         sessionId,
-        this, // Pass self as agent context
+        { 
+          tools: this.config.tools,
+          modelProvider: this.config.modelProvider,
+          toolApproval: this.config.toolApproval,
+          debugLogger: this.config.debugLogger,
+          activityLogger: this.config.activityLogger
+        }
       );
       
       // Return standardized format with success flag and direct access to result properties

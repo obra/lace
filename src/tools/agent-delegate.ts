@@ -3,6 +3,8 @@
 
 import { BaseTool, ToolSchema, ToolContext } from './base-tool.js';
 import { getRole } from "../agents/agent-registry.ts";
+import { Agent } from "../agents/agent.ts";
+import { Conversation } from "../conversation/conversation.js";
 
 export interface DelegateTaskParams {
   purpose: string;
@@ -132,12 +134,12 @@ Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → executi
       };
     }
 
-    // Get agent from context - required for delegation
-    const agent = context?.context?.agent;
-    if (!agent) {
+    // Get tools and modelProvider from context to create subagent
+    const { tools, modelProvider, toolApproval, debugLogger, activityLogger } = context?.context || {};
+    if (!tools || !modelProvider) {
       return {
         success: false,
-        error: "Agent context is required for task delegation",
+        error: "Tools and modelProvider are required for task delegation",
       };
     }
 
@@ -162,22 +164,42 @@ Auto-selects appropriate roles: 'analyze' → reasoning, 'implement' → executi
       // Combine purpose and instructions into task description
       const taskDescription = `${purpose}: ${instructions}`;
       
-      // Delegate to sub-agent using existing infrastructure
-      const taskPromise = agent.delegateTask(sessionId, taskDescription, {
+      // Create and use subagent directly
+      const roleDefinition = getRole(selectedRole);
+      const subagent = new Agent({
+        tools,
+        modelProvider,
+        model: modelProvider.getModelSession(roleDefinition.defaultModel),
         role: selectedRole,
+        task: taskDescription,
+        toolApproval,
+        debugLogger,
+        activityLogger,
+        generation: 0.1, // Mark as subagent
       });
+      
+      const delegateConversation = await Conversation.load(sessionId);
+      const taskPromise = subagent.generateResponse(delegateConversation, taskDescription);
 
       // Race timeout vs task completion
       const result = await Promise.race([taskPromise, timeoutPromise]);
 
-      return {
-        success: true,
-        result: result.content,
-        metadata: {
-          role: selectedRole,
-          taskDescription,
-        },
-      };
+      // Type guard to ensure we have a valid result
+      if (result && typeof result === 'object' && 'content' in result) {
+        return {
+          success: true,
+          result: String(result.content),
+          metadata: {
+            role: selectedRole,
+            taskDescription,
+          },
+        };
+      } else {
+        return {
+          success: false,
+          error: "Invalid result from subagent",
+        };
+      }
     } catch (error: any) {
       if (context?.signal?.aborted) {
         return {

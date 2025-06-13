@@ -50,7 +50,7 @@ describe("Parallel Tool Execution", () => {
       const startTime = Date.now();
 
       // Execute tools using the new parallel execution method directly
-      const results = await agent.executeToolsInParallel(
+      const results = await agent.toolExecutor.executeToolsInParallel(
         toolCalls,
         sessionId,
         "test context",
@@ -99,7 +99,7 @@ describe("Parallel Tool Execution", () => {
       const sessionId = "test-session";
 
       // This should continue executing successful tools even if some fail
-      const results = await agent.executeToolsInParallel(
+      const results = await agent.toolExecutor.executeToolsInParallel(
         toolCalls,
         sessionId,
         "test context",
@@ -155,7 +155,7 @@ describe("Parallel Tool Execution", () => {
       const sessionId = "test-session";
 
       // Execute with concurrency limit
-      const results = await agent.executeToolsInParallel(
+      const results = await agent.toolExecutor.executeToolsInParallel(
         toolCalls,
         sessionId,
         "test context",
@@ -223,7 +223,7 @@ describe("Parallel Tool Execution", () => {
       const sessionId = "test-session";
 
       // Execute tools
-      const results = await agent.executeToolsInParallel(
+      const results = await agent.toolExecutor.executeToolsInParallel(
         toolCalls,
         sessionId,
         "test context",
@@ -264,7 +264,7 @@ describe("Parallel Tool Execution", () => {
 
       const sessionId = "test-session";
 
-      const results = await agent.executeToolsInParallel(
+      const results = await agent.toolExecutor.executeToolsInParallel(
         toolCalls,
         sessionId,
         "test context",
@@ -296,7 +296,7 @@ describe("Parallel Tool Execution", () => {
       const sessionId = "test-session";
       const startTime = Date.now();
 
-      const results = await agent.executeToolsInParallel(
+      const results = await agent.toolExecutor.executeToolsInParallel(
         toolCalls,
         sessionId,
         "test context",
@@ -333,7 +333,7 @@ describe("Parallel Tool Execution", () => {
       const sessionId = "test-session";
       const startTime = Date.now();
 
-      const results = await agent.executeToolsInParallel(
+      const results = await agent.toolExecutor.executeToolsInParallel(
         toolCalls,
         sessionId,
         "test context",
@@ -362,7 +362,7 @@ describe("Parallel Tool Execution", () => {
       const sessionId = "test-session";
 
       // Should handle gracefully without errors
-      const results = await agent.executeToolsInParallel(
+      const results = await agent.toolExecutor.executeToolsInParallel(
         toolCalls,
         sessionId,
         "test context",
@@ -376,7 +376,7 @@ describe("Parallel Tool Execution", () => {
 
       const sessionId = "test-session";
 
-      const results = await agent.executeToolsInParallel(
+      const results = await agent.toolExecutor.executeToolsInParallel(
         toolCalls,
         sessionId,
         "test context",

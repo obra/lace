@@ -240,6 +240,8 @@ export class Agent {
         activityLogger: this.activityLogger,
         debugLogger: this.debugLogger,
         verbose: this.verbose,
+        tools: this.tools,
+        modelProvider: this.modelProvider,
       }
     );
 
