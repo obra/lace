@@ -54,6 +54,20 @@ class MockModelProvider {
       totalCost: 0.003,
     };
   }
+
+  async countTokens(messages, options = {}) {
+    return {
+      success: true,
+      inputTokens: 100,
+      outputTokens: 0,
+      totalTokens: 100,
+    };
+  }
+
+  async optimizeMessages(messages, options = {}) {
+    // Return messages as-is for testing
+    return messages;
+  }
 }
 
 describe("Dual Logging System Integration", () => {
@@ -253,7 +267,6 @@ describe("Dual Logging System Integration", () => {
           model: mockModel,
           generation: 0,
           tools,
-          db,
           modelProvider,
           toolApproval,
           activityLogger, // Closed logger should cause failures
@@ -268,6 +281,9 @@ describe("Dual Logging System Integration", () => {
 
         // Verify result is still successful despite activity logging failure
         assert.ok(result.content);
+
+        // Wait a bit for async file writes to complete
+        await new Promise(resolve => setTimeout(resolve, 100));
 
         // Verify debug logging still worked
         const debugLogExists = await fs
@@ -306,7 +322,6 @@ describe("Dual Logging System Integration", () => {
           model: mockModel,
           generation: 0,
           tools,
-          db,
           modelProvider,
           toolApproval,
           activityLogger,
@@ -316,9 +331,10 @@ describe("Dual Logging System Integration", () => {
         });
 
         const sessionId = "test-session-debug-failure";
+        const testConversation = await Conversation.load(sessionId, path.join(tempDir, "conversation-test.db"));
 
         // Process input - debug logging may fail but activity logging should work
-        const result = await agent.processInput(sessionId, "test message");
+        const result = await agent.processInput(testConversation, "test message");
 
         // Verify result is successful
         assert.ok(result.content);
@@ -359,7 +375,6 @@ describe("Dual Logging System Integration", () => {
           model: mockModel,
           generation: 0,
           tools,
-          db,
           modelProvider,
           toolApproval,
           activityLogger,
@@ -414,7 +429,6 @@ describe("Dual Logging System Integration", () => {
           model: mockModel1,
           generation: 0,
           tools,
-          db,
           modelProvider,
           toolApproval,
           activityLogger,
@@ -429,7 +443,6 @@ describe("Dual Logging System Integration", () => {
           model: mockModel2,
           generation: 0,
           tools,
-          db,
           modelProvider,
           toolApproval,
           activityLogger: null,

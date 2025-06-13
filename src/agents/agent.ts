@@ -10,6 +10,7 @@ import { getRole, AgentRole } from "./agent-registry.ts";
 import { ModelInstance } from "../models/model-instance.js";
 import { Conversation } from "../conversation/conversation.js";
 import { Message } from "../conversation/message.js";
+import { ToolExecutor } from "../tools/tool-executor.js";
 
 // TypeScript interfaces for Agent
 interface AgentOptions {
@@ -109,38 +110,6 @@ interface ErrorPattern {
   examples: string[];
 }
 
-// Simple semaphore for concurrency control
-class Semaphore {
-  private maxConcurrent: number;
-  private current: number;
-  private queue: (() => void)[];
-
-  constructor(maxConcurrent: number) {
-    this.maxConcurrent = maxConcurrent;
-    this.current = 0;
-    this.queue = [];
-  }
-
-  async acquire(): Promise<void> {
-    if (this.current < this.maxConcurrent) {
-      this.current++;
-      return Promise.resolve();
-    }
-
-    return new Promise((resolve) => {
-      this.queue.push(resolve);
-    });
-  }
-
-  release(): void {
-    this.current--;
-    if (this.queue.length > 0) {
-      const next = this.queue.shift();
-      this.current++;
-      if (next) next();
-    }
-  }
-}
 
 export class Agent {
   // Core properties
@@ -176,6 +145,7 @@ export class Agent {
   public resultExtractor: ToolResultExtractor;
   public activityLogger: any;
   public debugLogger: DebugLogger | null;
+  public toolExecutor: ToolExecutor;
 
   // Context management
   public contextSize: number;
@@ -256,6 +226,22 @@ export class Agent {
 
     // Debug logging
     this.debugLogger = options.debugLogger || null;
+
+    // Initialize tool executor
+    this.toolExecutor = new ToolExecutor(
+      this.tools,
+      this.synthesisEngine,
+      this.resultExtractor,
+      {
+        maxConcurrentTools: this.maxConcurrentTools,
+        retryConfig: this.retryConfig,
+        circuitBreakerConfig: this.circuitBreakerConfig,
+        toolApproval: this.toolApproval,
+        activityLogger: this.activityLogger,
+        debugLogger: this.debugLogger,
+        verbose: this.verbose,
+      }
+    );
 
     this.contextSize = 0;
     this.maxContextSize =
@@ -344,7 +330,7 @@ export class Agent {
       ];
 
       // Optimize messages using model provider (truncation + caching)
-      const availableTools = this.buildToolsForLLM();
+      const availableTools = this.toolExecutor.buildToolsForLLM();
       if (this.modelProvider && this.modelProvider.optimizeMessages) {
         messages = await this.modelProvider.optimizeMessages(messages, {
           model: this.model.definition.name,
@@ -402,7 +388,7 @@ export class Agent {
         }
 
         // Get available tools for the LLM
-        const availableTools = this.buildToolsForLLM();
+        const availableTools = this.toolExecutor.buildToolsForLLM();
 
         // Track token usage during streaming
         const onTokenUpdate = (tokenData: any) => {
@@ -566,7 +552,7 @@ export class Agent {
         const iterationToolResults = [];
         if (response.toolCalls && response.toolCalls.length > 0) {
           // Execute tools in parallel with concurrency limiting
-          const rawToolResults = await this.executeToolsInParallel(
+          const rawToolResults = await this.toolExecutor.executeToolsInParallel(
             response.toolCalls,
             sessionId,
             response.content,
@@ -591,7 +577,7 @@ export class Agent {
           }
 
           // Apply batch synthesis for large results
-          const toolResults = await this.synthesizeToolResultsBatch(
+          const toolResults = await this.toolExecutor.synthesizeToolResultsBatch(
             rawToolResults,
             response.toolCalls,
             sessionId,
@@ -616,7 +602,7 @@ export class Agent {
           // Add tool results to conversation for next iteration
           if (iterationToolResults.length > 0) {
             const toolResultsMessage =
-              this.formatToolResultsForLLM(iterationToolResults);
+              this.toolExecutor.formatToolResultsForLLM(iterationToolResults);
             messages.push({
               role: "user",
               content: toolResultsMessage,
@@ -722,661 +708,20 @@ Focus on executing your assigned task efficiently.`;
     return this.roleDefinition.toolRestrictions || {};
   }
 
-  buildToolsForLLM(): any[] {
-    const tools = [];
-    for (const toolName of this.tools.listTools()) {
-      const schema = this.tools.getToolSchema(toolName);
-      if (schema && schema.methods) {
-        // Convert our tool schema to Anthropic tool format
-        for (const [methodName, methodInfo] of Object.entries(schema.methods)) {
-          const method = methodInfo as any;
-          tools.push({
-            name: `${toolName}_${methodName}`,
-            description: `${schema.description}: ${method.description}`,
-            input_schema: {
-              type: "object",
-              properties: this.convertParametersToProperties(method.parameters),
-              required: this.extractRequiredParameters(method.parameters),
-            },
-          });
-        }
-      }
-    }
-    return tools;
-  }
 
-  convertParametersToProperties(parameters: any): any {
-    const properties: any = {};
-    for (const [paramName, paramInfo] of Object.entries(parameters || {})) {
-      const param = paramInfo as any;
-      properties[paramName] = {
-        type: param.type || "string",
-        description: param.description || "",
-      };
-    }
-    return properties;
-  }
 
-  extractRequiredParameters(parameters: any): string[] {
-    const required: string[] = [];
-    for (const [paramName, paramInfo] of Object.entries(parameters || {})) {
-      const param = paramInfo as any;
-      if (param.required) {
-        required.push(paramName);
-      }
-    }
-    return required;
-  }
 
-  async executeToolWithApproval(
-    toolCall: ToolCall,
-    sessionId: string,
-    reasoning: string,
-  ): Promise<ToolResult> {
-    // Request approval if approval system is available
-    let approvedCall = toolCall;
-    let postExecutionComment = null;
 
-    if (this.toolApproval) {
-      const approval = await this.toolApproval.requestApproval({
-        toolCall,
-        context: {
-          reasoning: reasoning,
-          agent: this.role,
-          sessionId: sessionId,
-        },
-      });
 
-      if (!approval.approved) {
-        return {
-          toolCall,
-          error: `Tool execution denied: ${approval.reason}`,
-          success: false,
-          denied: true,
-          approved: false,
-          shouldStop: approval.shouldStop,
-        };
-      }
 
-      approvedCall = approval.modifiedCall || toolCall;
-      postExecutionComment = approval.postExecutionComment;
-    }
 
-    // Execute the tool
-    const result = await this.executeTool(approvedCall, sessionId);
 
-    // Check if tool response needs synthesis (over 200 tokens)
-    const synthesisPrompt = `Summarize this ${approvedCall.name} result for continued reasoning. Focus on key findings and next steps.`;
-    const synthesizedResult = await this.synthesizeToolResponse(
-      result,
-      approvedCall,
-      sessionId,
-      synthesisPrompt,
-    );
 
-    return {
-      toolCall: approvedCall,
-      ...synthesizedResult, // Flatten the result into the response
-      approved: true,
-      denied: false,
-      postExecutionComment,
-    };
-  }
 
-  async executeTool(toolCall: ToolCall, sessionId: string): Promise<any> {
-    // Simplified tool parsing - tools use simple names
-    // Support for both simple names (preferred) and compound names (legacy)
-    let toolName;
 
-    // Check if this is a simple tool name first
-    if (this.tools.getTool(toolCall.name)) {
-      toolName = toolCall.name;
-    } else {
-      // Legacy compound name parsing for backward compatibility
-      const parts = toolCall.name.split("_");
-      if (parts.length >= 2) {
-        parts.pop(); // Remove method part
-        toolName = parts.join("_"); // Rest is tool name
-      } else {
-        toolName = toolCall.name;
-      }
 
-      // Final fallback
-      if (!this.tools.getTool(toolName) && parts.length > 1) {
-        toolName = parts[0];
-      }
-    }
 
-    if (!this.tools.getTool(toolName)) {
-      throw new Error(`Tool '${toolName}' not found`);
-    }
 
-    try {
-      const result = await this.tools.callTool(
-        toolName,
-        toolCall.input,
-        sessionId,
-        this,
-      );
-      
-      // Return standardized format with success flag and direct access to result properties
-      return {
-        success: true,
-        ...result
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
-
-  async executeToolsInParallel(
-    toolCalls: ToolCall[],
-    sessionId: string,
-    reasoning: string,
-  ): Promise<ToolResult[]> {
-    if (!toolCalls || toolCalls.length === 0) {
-      return [];
-    }
-
-    // Create semaphore for concurrency limiting
-    const semaphore = new Semaphore(this.maxConcurrentTools);
-
-    // Create promise for each tool call with concurrency control
-    const toolPromises = toolCalls.map(async (toolCall) => {
-      await semaphore.acquire();
-
-      try {
-        const result = await this.executeToolWithApproval(
-          toolCall,
-          sessionId,
-          reasoning,
-        );
-        return result;
-      } catch (error: any) {
-        // Return error result instead of throwing
-        return {
-          toolCall,
-          error: error.message,
-          success: false,
-          denied: false,
-          approved: false,
-        };
-      } finally {
-        semaphore.release();
-      }
-    });
-
-    // Execute all tools in parallel and collect results
-    const results = await Promise.all(toolPromises);
-
-    if (this.debugLogger) {
-      this.debugLogger.debug(
-        `⚡ Executed ${toolCalls.length} tools in parallel (limit: ${this.maxConcurrentTools})`,
-      );
-    }
-
-    return results;
-  }
-
-  async executeToolsInParallelWithRetry(
-    toolCalls: ToolCall[],
-    sessionId: string,
-    reasoning: string,
-  ): Promise<ToolResult[]> {
-    if (!toolCalls || toolCalls.length === 0) {
-      return [];
-    }
-
-    const results: ToolResult[] = [];
-    const hasFailures = [];
-
-    try {
-      // First attempt: parallel execution with retry logic
-      const parallelResults = await this.executeToolsWithRetryLogic(
-        toolCalls,
-        sessionId,
-        reasoning,
-      );
-      results.push(...parallelResults);
-
-      // Check for systemic failures that might require fallback
-      const failedResults = parallelResults.filter(
-        (r) => !r.success && !r.circuitBroken,
-      );
-      const failureRate = failedResults.length / parallelResults.length;
-
-      // If failure rate is high, consider sequential fallback
-      if (failureRate > 0.5 && failedResults.length > 1) {
-        const sequentialCandidates = failedResults.filter(
-          (r) =>
-            r.error &&
-            (r.error.includes("overload") ||
-              r.error.includes("timeout") ||
-              r.error.includes("concurrent")),
-        );
-
-        if (sequentialCandidates.length > 0) {
-          const retryToolCalls = sequentialCandidates.map((r) => r.toolCall);
-          const sequentialResults =
-            await this.executeToolsSequentiallyWithRetry(
-              retryToolCalls,
-              sessionId,
-              reasoning,
-            );
-
-          // Replace failed results with sequential results
-          sequentialResults.forEach((seqResult, index) => {
-            const originalIndex = results.findIndex(
-              (r) => r.toolCall === retryToolCalls[index],
-            );
-            if (originalIndex !== -1) {
-              results[originalIndex] = {
-                ...seqResult,
-                sequentialFallback: true,
-              };
-            }
-          });
-        }
-      }
-
-      // Mark graceful degradation if some tools succeeded
-      const successCount = results.filter((r) => r.success).length;
-      if (successCount > 0 && successCount < results.length) {
-        results.forEach((r) => {
-          if (!r.success) r.degradedExecution = true;
-          r.gracefulDegradation = true;
-        });
-      }
-
-      return results;
-    } catch (error: any) {
-      // Catastrophic failure - return error results for all tools
-      return toolCalls.map((toolCall: ToolCall) => ({
-        toolCall,
-        success: false,
-        error: error.message,
-        catastrophicFailure: true,
-        approved: false,
-        denied: false,
-      }));
-    }
-  }
-
-  async executeToolsWithRetryLogic(
-    toolCalls: ToolCall[],
-    sessionId: string,
-    reasoning: string,
-  ): Promise<ToolResult[]> {
-    const semaphore = new Semaphore(this.maxConcurrentTools);
-
-    const toolPromises = toolCalls.map(async (toolCall) => {
-      await semaphore.acquire();
-
-      try {
-        return await this.executeToolWithRetry(toolCall, sessionId, reasoning);
-      } finally {
-        semaphore.release();
-      }
-    });
-
-    return await Promise.all(toolPromises);
-  }
-
-  async executeToolsSequentiallyWithRetry(
-    toolCalls: ToolCall[],
-    sessionId: string,
-    reasoning: string,
-  ): Promise<ToolResult[]> {
-    const results: ToolResult[] = [];
-
-    for (const toolCall of toolCalls) {
-      const result = await this.executeToolWithRetry(
-        toolCall,
-        sessionId,
-        reasoning,
-      );
-      results.push(result);
-    }
-
-    return results;
-  }
-
-  async executeToolWithRetry(
-    toolCall: ToolCall,
-    sessionId: string,
-    reasoning: string,
-  ): Promise<ToolResult> {
-    // Parse tool name consistently with executeTool
-    const parts = toolCall.name.split("_");
-    let toolName;
-    if (parts.length >= 2) {
-      toolName = parts.slice(0, -1).join("_"); // All but last part
-    } else {
-      toolName = parts[0];
-    }
-
-    const retryConfig = this.getToolRetryConfig(toolName);
-
-    // Check if retry is disabled for this tool
-    if (retryConfig.enabled === false) {
-      try {
-        const result = await this.executeToolWithApproval(
-          toolCall,
-          sessionId,
-          reasoning,
-        );
-        return { ...result, retryAttempts: 0, retryDisabled: true };
-      } catch (error: any) {
-        return {
-          toolCall,
-          success: false,
-          error: error.message,
-          retryAttempts: 0,
-          retryDisabled: true,
-          approved: false,
-          denied: false,
-        };
-      }
-    }
-
-    // Check circuit breaker
-    const circuitState = this.checkCircuitBreaker(toolName);
-    if (circuitState.blocked) {
-      return {
-        toolCall,
-        success: false,
-        error: `Circuit breaker open for ${toolName}`,
-        circuitBroken: true,
-        approved: false,
-        denied: false,
-      };
-    }
-
-    let lastError;
-    let retryAttempts = 0;
-    let totalRetryDelay = 0;
-
-    for (let attempt = 0; attempt <= retryConfig.maxRetries!; attempt++) {
-      try {
-        if (attempt > 0) {
-          const delay = this.calculateBackoffDelay(attempt - 1, retryConfig);
-          totalRetryDelay += delay;
-          await this.sleep(delay);
-        }
-
-        const result = await this.executeToolWithApproval(
-          toolCall,
-          sessionId,
-          reasoning,
-        );
-
-        // Check if the result indicates an error that should be retried
-        if (result.error && !result.denied) {
-          // Treat tool result errors as exceptions for retry logic
-          throw new Error(result.error);
-        }
-
-        // Success - reset circuit breaker
-        this.recordToolSuccess(toolName);
-
-        return {
-          ...result,
-          success: true,
-          retryAttempts: attempt, // Current attempt number is the retry count
-          totalRetryDelay,
-          circuitRecovered: circuitState.recovered,
-          // Track if this was recovered from a parallel overload
-          sequentialFallback:
-            lastError &&
-            (lastError as any).message.includes("Parallel overload"),
-        };
-      } catch (error: any) {
-        lastError = error;
-
-        // Check if error is retriable
-        if (!this.isRetriableError(error)) {
-          this.recordToolFailure(toolName, error);
-          return {
-            toolCall,
-            success: false,
-            error: error.message,
-            nonRetriable: true,
-            retryAttempts: 0,
-            approved: false,
-            denied: false,
-            actionableError: this.categorizeError(error),
-          };
-        }
-
-        this.recordToolFailure(toolName, error);
-      }
-    }
-
-    // All retries exhausted - return the max retry count
-    return {
-      toolCall,
-      success: false,
-      error: (lastError as any).message,
-      finalFailure: true,
-      retryAttempts: retryConfig.maxRetries!,
-      totalRetryDelay,
-      approved: false,
-      denied: false,
-      actionableError: this.categorizeError(lastError),
-    };
-  }
-
-  async synthesizeToolResponse(
-    toolResult: any,
-    toolCall: ToolCall,
-    sessionId: string,
-    synthesisPrompt: string,
-  ): Promise<any> {
-    const responseText = this.resultExtractor.extract(toolResult);
-    const estimatedTokens = this.tokenEstimator.estimate(responseText);
-
-    // Get tool-specific threshold
-    const toolName = toolCall.name.split("_")[0];
-    const threshold =
-      (this.synthesisEngine.config as any).toolThresholds[toolName] ||
-      (this.synthesisEngine.config as any).defaultThreshold;
-
-    if (estimatedTokens <= threshold) {
-      return toolResult; // Return as-is for short responses
-    }
-
-    if (this.debugLogger) {
-      this.debugLogger.debug(
-        `🔬 Synthesizing tool response (${estimatedTokens} estimated tokens)`,
-      );
-    }
-
-    // Create synthesis agent
-    const synthesisAgent = await this.spawnSubagent({
-      role: "synthesis",
-      task: `Synthesize tool response for ${toolCall.name}`,
-    });
-
-    const fullPrompt = `${synthesisPrompt}
-
-Tool: ${toolCall.name}
-Arguments: ${JSON.stringify(toolCall.input, null, 2)}
-
-Tool Result:
-${responseText}`;
-
-    try {
-      // Create Conversation object for subagent call
-      const synthesisConversation = await Conversation.load(sessionId);
-      const synthesisResponse = await synthesisAgent.generateResponse(
-        synthesisConversation,
-        fullPrompt,
-      );
-
-      return {
-        ...toolResult,
-        synthesized: true,
-        originalResult: toolResult,
-        summary: synthesisResponse.content,
-      };
-    } catch (error: any) {
-      if (this.debugLogger) {
-        this.debugLogger.warn(
-          `⚠️ Tool synthesis failed: ${error.message}, using original result`,
-        );
-      }
-      return toolResult;
-    }
-  }
-
-  async synthesizeToolResultsBatch(
-    toolResults: any[],
-    toolCalls: ToolCall[],
-    sessionId: string,
-    synthesisPrompt: string,
-  ): Promise<any[]> {
-    return await this.synthesisEngine.processSynthesis(toolResults, toolCalls, {
-      individual: (result: any, call: any) =>
-        this.synthesizeToolResponse(result, call, sessionId, synthesisPrompt),
-      batch: (batch: any) =>
-        this.synthesizeMultipleToolResults(batch, sessionId, synthesisPrompt),
-    } as any);
-  }
-
-  async synthesizeMultipleToolResults(
-    toolBatch: any[],
-    sessionId: string,
-    synthesisPrompt: string,
-  ): Promise<any[]> {
-    if (toolBatch.length === 0) return [];
-
-    // Create synthesis agent for batch processing
-    const synthesisAgent = await this.spawnSubagent({
-      role: "synthesis",
-      task: `Batch synthesize ${toolBatch.length} parallel tool results`,
-    });
-
-    // Use synthesis engine to create enhanced batch prompt
-    const batchPrompt = this.synthesisEngine.createBatchPrompt(
-      toolBatch,
-      synthesisPrompt,
-    );
-
-    try {
-      // Create Conversation object for subagent call
-      const synthesisConversation = await Conversation.load(sessionId);
-      const synthesisResponse = await synthesisAgent.generateResponse(
-        synthesisConversation,
-        batchPrompt,
-      );
-
-      // Parse response using synthesis engine
-      const summaries = this.synthesisEngine.parseBatchSynthesis(
-        synthesisResponse.content,
-        toolBatch.length,
-      );
-      const totalTokens = toolBatch.reduce(
-        (sum: number, item: any) => sum + item.tokens,
-        0,
-      );
-
-      // Return synthesized results with enhanced metadata
-      return toolBatch.map((item: any, index: number) => ({
-        ...item.result,
-        synthesized: true,
-        batchSynthesized: true,
-        originalResult: item.result,
-        summary: summaries[index] || "Synthesis failed",
-        batchContext: {
-          batchSize: toolBatch.length,
-          toolIndex: index,
-          totalTokens,
-          relationships: this.synthesisEngine.analyzeRelationships(toolBatch),
-        },
-      }));
-    } catch (error: any) {
-      if (this.debugLogger) {
-        this.debugLogger.warn(
-          `⚠️ Batch synthesis failed: ${error.message}, falling back to individual synthesis`,
-        );
-      }
-
-      // Fallback to individual synthesis
-      const individualResults = [];
-      for (const item of toolBatch) {
-        const synthesized = await this.synthesizeToolResponse(
-          item.result,
-          item.call,
-          sessionId,
-          synthesisPrompt,
-        );
-        individualResults.push(synthesized);
-      }
-      return individualResults;
-    }
-  }
-
-  extractTextFromToolResult(toolResult: any): string {
-    // Delegate to utility class
-    return this.resultExtractor.extract(toolResult);
-  }
-
-  formatToolResultsForLLM(toolResults: ToolResult[]): string {
-    const formattedResults = toolResults.map((tr) => {
-      if (tr.denied) {
-        return `Tool ${tr.toolCall.name} was denied: ${tr.error}`;
-      }
-
-      if (tr.error) {
-        return `Tool ${tr.toolCall.name} failed: ${tr.error}`;
-      }
-
-      // Use flat structure - tool result properties are at top level
-      if (tr.synthesized) {
-        return `Tool ${tr.toolCall.name} executed successfully. Summary: ${tr.summary}`;
-      }
-
-      if (tr.success) {
-        let resultText = "";
-
-        // Handle different result formats
-        if (tr.result !== undefined) {
-          resultText =
-            typeof tr.result === "object"
-              ? JSON.stringify(tr.result)
-              : String(tr.result);
-        } else if (tr.content !== undefined) {
-          resultText = `Content: ${tr.content.substring(0, 100)}${tr.content.length > 100 ? "..." : ""}`;
-        } else if (tr.bytesWritten !== undefined) {
-          resultText = `File written successfully (${tr.bytesWritten} bytes)`;
-        } else if (tr.files !== undefined) {
-          resultText = `Found ${tr.files.length} files`;
-        } else {
-          // Show relevant non-result fields
-          const details = Object.keys(tr)
-            .filter(
-              (key) =>
-                !["success", "toolCall", "approved", "denied"].includes(key),
-            )
-            .map((key) => `${key}: ${tr[key]}`)
-            .join(", ");
-          resultText = details || "Completed successfully";
-        }
-
-        if (tr.output && tr.output.length > 0) {
-          resultText += tr.output.join("\n");
-        }
-        return `Tool ${tr.toolCall.name} executed successfully. ${resultText}`;
-      } else {
-        return `Tool ${tr.toolCall.name} failed: ${tr.error || "Unknown error"}`;
-      }
-    });
-
-    return `Tool execution results:\n${formattedResults.join("\n")}`;
-  }
 
   getModelContextWindow(): number {
     return this.model.definition.contextWindow;

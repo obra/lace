@@ -334,7 +334,7 @@ describe("Agent", () => {
         model: mockModelInstance
       });
 
-      const llmTools = agent.buildToolsForLLM();
+      const llmTools = agent.toolExecutor.buildToolsForLLM();
 
       expect(llmTools).toHaveLength(3); // 3 tools × 1 method each
       expect(llmTools[0]).toEqual({
@@ -365,7 +365,7 @@ describe("Agent", () => {
         timeout: { type: "number", description: "Timeout in seconds", required: false }
       };
 
-      const properties = agent.convertParametersToProperties(parameters);
+      const properties = agent.toolExecutor.convertParametersToProperties(parameters);
 
       expect(properties).toEqual({
         command: { type: "string", description: "Command to execute" },
@@ -386,7 +386,7 @@ describe("Agent", () => {
         force: { type: "boolean", required: true }
       };
 
-      const required = agent.extractRequiredParameters(parameters);
+      const required = agent.toolExecutor.extractRequiredParameters(parameters);
 
       expect(required).toEqual(["command", "force"]);
     });

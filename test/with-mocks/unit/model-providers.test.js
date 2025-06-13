@@ -155,15 +155,8 @@ describe("Model Provider Session ID Tracking", () => {
 
         await provider.chat(messages, { enableCaching: true });
 
-        // Verify cache control was added
-        assert.ok(capturedParams.extra_headers, "Should include extra headers for caching");
-        assert.strictEqual(
-          capturedParams.extra_headers["anthropic-beta"], 
-          "prompt-caching-2024-07-31",
-          "Should include prompt caching beta header"
-        );
-        
-        // Verify system message formatting
+        // Verify system message formatting for caching
+        // Note: Headers are now set at client level, not per-request
         assert.ok(Array.isArray(capturedParams.system), "System should be formatted as array for caching");
         assert.strictEqual(capturedParams.system[0].type, "text");
         assert.strictEqual(capturedParams.system[0].text, "You are a helpful assistant.");

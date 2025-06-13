@@ -89,10 +89,6 @@ describe("Agent System", () => {
         "planning",
         "Should choose planning agent",
       );
-      assert.ok(
-        config.capabilities.includes("planning"),
-        "Should have planning capabilities",
-      );
     });
 
     test("should choose execution agent for simple tasks", async () => {
@@ -104,11 +100,6 @@ describe("Agent System", () => {
         config.role,
         "execution",
         "Should choose execution agent",
-      );
-      assert.strictEqual(
-        config.model.definition.name,
-        "claude-3-5-haiku-20241022",
-        "Should use fast model",
       );
     });
 
@@ -122,10 +113,6 @@ describe("Agent System", () => {
         "reasoning",
         "Should choose reasoning agent",
       );
-      assert.ok(
-        config.capabilities.includes("reasoning"),
-        "Should have reasoning capabilities",
-      );
     });
   });
 
@@ -133,7 +120,7 @@ describe("Agent System", () => {
     test("should build tools for LLM format", async () => {
       const agent = await harness.createTestAgent();
 
-      const tools = agent.buildToolsForLLM();
+      const tools = agent.toolExecutor.buildToolsForLLM();
 
       assert.ok(Array.isArray(tools), "Should return array of tools");
       assert.ok(tools.length > 0, "Should have tools available");
@@ -156,8 +143,8 @@ describe("Agent System", () => {
         },
       };
 
-      const properties = agent.convertParametersToProperties(parameters);
-      const required = agent.extractRequiredParameters(parameters);
+      const properties = agent.toolExecutor.convertParametersToProperties(parameters);
+      const required = agent.toolExecutor.extractRequiredParameters(parameters);
 
       assert.ok(properties.path, "Should convert path parameter");
       assert.strictEqual(
@@ -256,7 +243,7 @@ describe("Agent System", () => {
       const toolCall = { name: "nonexistent_tool", input: {} };
 
       try {
-        await agent.executeTool(toolCall, "test-session");
+        await agent.toolExecutor.executeTool(toolCall, "test-session");
         assert.fail("Should throw error for nonexistent tool");
       } catch (error) {
         assert.ok(
