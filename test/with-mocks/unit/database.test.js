@@ -82,18 +82,18 @@ describe("Conversation Database", () => {
       assert.strictEqual(history.length, 2, "Should have saved both messages");
       assert.strictEqual(
         history[0].role,
-        "assistant",
-        "Should return most recent first",
+        "user",
+        "Should return messages in chronological order (oldest first)",
       );
       assert.strictEqual(
         history[1].role,
-        "user",
-        "Should include user message",
+        "assistant",
+        "Should include assistant message",
       );
       assert.strictEqual(
         history[0].content,
-        "Hi there!",
-        "Should preserve content",
+        "Hello world",
+        "Should preserve user message content",
       );
 
       await db.close();
