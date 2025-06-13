@@ -5,7 +5,7 @@ import { test, describe, jest, beforeAll, afterAll } from "@jest/globals";
 import assert from "node:assert";
 import { Agent } from "../../../src/agents/agent.ts";
 import { ToolRegistry } from "../../../src/tools/tool-registry.js";
-import { ConversationDB } from "../../../src/database/conversation-db.js";
+import { Conversation } from "../../../src/conversation/conversation.js";
 import { ActivityLogger } from "../../../src/logging/activity-logger.js";
 import { DebugLogger } from "../../../src/logging/debug-logger.js";
 import { ApprovalEngine } from "../../../src/safety/index.js";
@@ -60,7 +60,7 @@ describe("Dual Logging System Integration", () => {
   let tempDir;
   let activityLogger;
   let tools;
-  let db;
+  let conversation;
   let toolApproval;
   let modelProvider;
   let originalConsoleError;
@@ -90,8 +90,8 @@ describe("Dual Logging System Integration", () => {
     tools = new ToolRegistry({ activityLogger });
     await tools.initialize();
 
-    db = new ConversationDB(path.join(tempDir, "conversation-test.db"));
-    await db.initialize();
+    const sessionId = `test-session-${Date.now()}`;
+    conversation = await Conversation.load(sessionId, path.join(tempDir, "conversation-test.db"));
 
     toolApproval = new ApprovalEngine({
       interactive: false,
@@ -106,9 +106,7 @@ describe("Dual Logging System Integration", () => {
     if (activityLogger) {
       await activityLogger.close();
     }
-    if (db) {
-      await db.close();
-    }
+    // Conversation will close its database automatically
     try {
       await fs.rm(tempDir, { recursive: true, force: true });
     } catch (error) {
@@ -132,7 +130,6 @@ describe("Dual Logging System Integration", () => {
           model: mockModel,
           generation: 0,
           tools,
-          db,
           modelProvider,
           toolApproval,
           activityLogger,
@@ -159,7 +156,6 @@ describe("Dual Logging System Integration", () => {
           model: mockModel,
           generation: 0,
           tools,
-          db,
           modelProvider,
           toolApproval,
           activityLogger,
@@ -190,7 +186,6 @@ describe("Dual Logging System Integration", () => {
           model: mockModel,
           generation: 0,
           tools,
-          db,
           modelProvider,
           toolApproval,
           activityLogger,
@@ -199,10 +194,9 @@ describe("Dual Logging System Integration", () => {
           debugLogger,
         });
 
-        const sessionId = "test-session-dual-logging";
-
         // Process input to trigger both logging systems
-        const result = await agent.processInput(sessionId, "test message");
+        const sessionId = conversation.getSessionId();
+        const result = await agent.processInput(conversation, "test message");
 
         // Verify activity logging worked
         const activityEvents = await activityLogger.getEvents({ sessionId });
@@ -268,10 +262,9 @@ describe("Dual Logging System Integration", () => {
           debugLogger,
         });
 
-        const sessionId = "test-session-activity-failure";
-
         // Process input - activity logging should fail but debug logging should work
-        const result = await agent.processInput(sessionId, "test message");
+        const sessionId = conversation.getSessionId();
+        const result = await agent.processInput(conversation, "test message");
 
         // Verify result is still successful despite activity logging failure
         assert.ok(result.content);
@@ -444,18 +437,16 @@ describe("Dual Logging System Integration", () => {
           verbose: false,
         });
 
-        const sessionId1 = "perf-test-with-logging";
-        const sessionId2 = "perf-test-no-logging";
         const testMessage = "performance test message";
 
         // Measure with logging
         const startWith = Date.now();
-        await agentWithLogging.processInput(sessionId1, testMessage);
+        await agentWithLogging.processInput(conversation, testMessage);
         const timeWith = Date.now() - startWith;
 
         // Measure without logging
         const startWithout = Date.now();
-        await agentNoLogging.processInput(sessionId2, testMessage);
+        await agentNoLogging.processInput(conversation, testMessage);
         const timeWithout = Date.now() - startWithout;
 
         // Logging should not add more than 200ms overhead (generous threshold)
