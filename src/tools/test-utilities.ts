@@ -186,7 +186,7 @@ export class ToolTestHarness {
       ...options
     };
 
-    return tool.execute<T>(method, params, testOptions);
+    return tool.execute<T>(params, testOptions);
   }
 
   /**
