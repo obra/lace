@@ -16,7 +16,7 @@ interface AgentOptions {
   generation?: number;
   tools?: any;
   modelProvider?: any;
-  model: ModelInstance;
+  model?: ModelInstance;
   verbose?: boolean;
   inheritedContext?: any;
   memoryAgents?: Map<string, any>;
@@ -208,7 +208,7 @@ export class Agent {
     // Agent assignment - told by orchestrator
     this.roleDefinition = getRole(options.role || "general");
     this.role = this.roleDefinition.name;
-    this.model = options.model;
+    this.model = options.model || options.modelProvider?.getModelSession(this.roleDefinition.defaultModel);
     this.task = options.task || null;
     this.capabilities =
       options.capabilities || this.roleDefinition.capabilities;
@@ -722,51 +722,6 @@ Focus on executing your assigned task efficiently.`;
     return this.roleDefinition.toolRestrictions || {};
   }
 
-  getRoleSpecificGuidelines(): string {
-    switch (this.role) {
-      case "orchestrator":
-        return `- You coordinate and delegate tasks to specialized agents
-- Choose appropriate models for subtasks based on complexity and requirements
-- Manage the overall workflow and context
-- Spawn subagents when needed for focused work`;
-
-      case "planning":
-        return `- You break down complex tasks into actionable steps
-- Analyze requirements and identify dependencies
-- Create detailed execution plans
-- Consider edge cases and error scenarios`;
-
-      case "execution":
-        return `- You execute specific tasks efficiently
-- Follow provided plans and instructions
-- Use tools to accomplish concrete goals
-- Report results clearly and concisely`;
-
-      case "reasoning":
-        return `- You analyze complex problems and provide insights
-- Consider multiple approaches and trade-offs
-- Provide detailed explanations of your thinking
-- Help with architectural decisions`;
-
-      case "memory":
-        return `- You are a memory oracle from a previous conversation context
-- Answer specific questions about past interactions
-- Provide historical context when asked
-- Focus on relevant details from your assigned time period`;
-
-      case "synthesis":
-        return `- You process and synthesize information as requested
-- Follow the specific synthesis instructions provided in the user prompt
-- Be concise and focus on what the requesting agent needs to know
-- Preserve essential information while reducing verbosity`;
-
-      default:
-        return `- You are a general-purpose agent
-- Adapt your approach based on the task at hand
-- Use your full range of capabilities as needed`;
-    }
-  }
-
   buildToolsForLLM(): any[] {
     const tools = [];
     for (const toolName of this.tools.listTools()) {
@@ -1242,7 +1197,6 @@ Focus on executing your assigned task efficiently.`;
     // Create synthesis agent
     const synthesisAgent = await this.spawnSubagent({
       role: "synthesis",
-      model: this.modelProvider.getModelSession("claude-3-5-haiku-20241022"),
       task: `Synthesize tool response for ${toolCall.name}`,
     });
 
@@ -1302,7 +1256,6 @@ ${responseText}`;
     // Create synthesis agent for batch processing
     const synthesisAgent = await this.spawnSubagent({
       role: "synthesis",
-      model: this.modelProvider.getModelSession("claude-3-5-haiku-20241022"),
       task: `Batch synthesize ${toolBatch.length} parallel tool results`,
     });
 
@@ -1506,8 +1459,16 @@ ${responseText}`;
     this.subagentCounter++;
     const subgeneration = this.generation + this.subagentCounter * 0.1;
 
+    // Use role's default model if no explicit model provided
+    let model = options.model;
+    if (!model && options.role) {
+      const roleDefinition = getRole(options.role);
+      model = this.modelProvider.getModelSession(roleDefinition.defaultModel);
+    }
+
     const subagent = new Agent({
       ...options,
+      model: model || this.model, // Fallback to parent model if still no model
       tools: this.tools,
       modelProvider: this.modelProvider,
       generation: subgeneration,
@@ -1519,7 +1480,7 @@ ${responseText}`;
 
     if (this.debugLogger) {
       this.debugLogger.debug(
-        `🤖 Spawned ${options.role || "general"} agent with ${options.model.definition.name}`,
+        `🤖 Spawned ${options.role || "general"} agent with ${(model || this.model).definition.name}`,
       );
     }
 
@@ -1568,8 +1529,6 @@ ${responseText}`;
     ) {
       return {
         role: "planning",
-        model: this.modelProvider.getModelSession("claude-3-5-sonnet-20241022"),
-        capabilities: ["planning", "reasoning", "analysis"],
       };
     }
 
@@ -1582,8 +1541,6 @@ ${responseText}`;
     ) {
       return {
         role: "execution",
-        model: this.modelProvider.getModelSession("claude-3-5-haiku-20241022"),
-        capabilities: ["execution", "tool_calling"],
       };
     }
 
@@ -1596,16 +1553,12 @@ ${responseText}`;
     ) {
       return {
         role: "reasoning",
-        model: this.modelProvider.getModelSession("claude-3-5-sonnet-20241022"),
-        capabilities: ["reasoning", "analysis", "debugging"],
       };
     }
 
     // Default to general-purpose
     return {
       role: "general",
-      model: this.modelProvider.getModelSession("claude-3-5-sonnet-20241022"),
-      capabilities: ["reasoning", "tool_calling"],
     };
   }
 

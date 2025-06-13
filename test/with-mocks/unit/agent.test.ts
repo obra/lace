@@ -425,22 +425,22 @@ describe("Agent", () => {
       // Planning task
       let config = agent.chooseAgentForTask("Plan the architecture for a new feature");
       expect(config.role).toBe("planning");
-      expect(config.model.definition.name).toBe("claude-3-5-sonnet-20241022");
+      expect(config.model).toBeUndefined(); // Model comes from role definition now
 
       // Execution task
       config = agent.chooseAgentForTask("Run the unit tests");
       expect(config.role).toBe("execution");
-      expect(config.model.definition.name).toBe("claude-3-5-haiku-20241022");
+      expect(config.model).toBeUndefined(); // Model comes from role definition now
 
       // Reasoning task
       config = agent.chooseAgentForTask("Analyze this bug and explain the root cause");
       expect(config.role).toBe("reasoning");
-      expect(config.model.definition.name).toBe("claude-3-5-sonnet-20241022");
+      expect(config.model).toBeUndefined(); // Model comes from role definition now
 
       // Default task
       config = agent.chooseAgentForTask("Help me with something");
       expect(config.role).toBe("general");
-      expect(config.model.definition.name).toBe("claude-3-5-sonnet-20241022");
+      expect(config.model).toBeUndefined(); // Model comes from role definition now
     });
   });
 
@@ -464,19 +464,6 @@ describe("Agent", () => {
       expect(systemPrompt).toContain("file: Mock file tool");
     });
 
-    test("should include role-specific guidelines", () => {
-      const agent = new Agent({
-        role: "orchestrator",
-        tools: mockTools,
-        modelProvider: mockModelProvider,
-        model: mockModelInstance
-      });
-
-      const guidelines = agent.getRoleSpecificGuidelines();
-
-      expect(guidelines).toContain("coordinate and delegate tasks");
-      expect(guidelines).toContain("Choose appropriate models");
-    });
   });
 
   describe("Error Handling and Recovery", () => {
