@@ -19,6 +19,7 @@ describe("ContextCapture", () => {
   let ContextCapture;
   let mockConversationDB;
   let mockActivityLogger;
+  let mockConversation;
 
   beforeEach(async () => {
     testHarness = new TestHarness();
@@ -54,6 +55,41 @@ describe("ContextCapture", () => {
           timestamp: "2025-06-05T14:25:00Z",
         },
       ],
+    };
+
+    // Create mock Conversation
+    mockConversation = {
+      getSessionId: () => "session-123",
+      getMessages: async (limit) => {
+        const allMessages = [
+          {
+            id: 1,
+            sessionId: "session-123",
+            generation: 1,
+            role: "user",
+            content: "Please help me with my code",
+            timestamp: "2025-06-05T14:30:00Z",
+            contextSize: 100,
+          },
+          {
+            id: 2,
+            sessionId: "session-123",
+            generation: 1,
+            role: "assistant",
+            content: "I'll help you with that.",
+            timestamp: "2025-06-05T14:30:05Z",
+            contextSize: 150,
+          },
+        ];
+        return limit ? allMessages.slice(0, limit) : allMessages;
+      },
+      search: async (query, limit) => [
+        {
+          id: 3,
+          content: "Related conversation about code",
+          timestamp: "2025-06-05T14:25:00Z",
+        },
+      ]
     };
 
     // Create mock ActivityLogger
@@ -107,16 +143,14 @@ describe("ContextCapture", () => {
   });
 
   describe("constructor", () => {
-    test("should create ContextCapture with database dependencies", async () => {
+    test("should create ContextCapture with activity logger", async () => {
       if (!ContextCapture) {
         assert.fail("ContextCapture class not implemented yet");
       }
 
       const capture = new ContextCapture(
-        mockConversationDB,
         mockActivityLogger,
       );
-      assert.strictEqual(capture.conversationDB, mockConversationDB);
       assert.strictEqual(capture.activityLogger, mockActivityLogger);
     });
 
@@ -132,7 +166,6 @@ describe("ContextCapture", () => {
       };
 
       const capture = new ContextCapture(
-        mockConversationDB,
         mockActivityLogger,
         config,
       );
@@ -149,11 +182,10 @@ describe("ContextCapture", () => {
       }
 
       const capture = new ContextCapture(
-        mockConversationDB,
         mockActivityLogger,
       );
       const context = await capture.captureConversationContext(
-        "session-123",
+        mockConversation,
         1,
       );
 
@@ -181,12 +213,11 @@ describe("ContextCapture", () => {
 
       const config = { conversationTurnsToCapture: 1 };
       const capture = new ContextCapture(
-        mockConversationDB,
         mockActivityLogger,
         config,
       );
       const context = await capture.captureConversationContext(
-        "session-123",
+        mockConversation,
         1,
       );
 
@@ -208,11 +239,15 @@ describe("ContextCapture", () => {
       };
 
       const capture = new ContextCapture(
-        emptyConversationDB,
         mockActivityLogger,
       );
+      // Create a conversation that returns empty data
+      const emptyConversation = {
+        getSessionId: () => "nonexistent-session",
+        getMessages: async () => []
+      };
       const context = await capture.captureConversationContext(
-        "nonexistent-session",
+        emptyConversation,
         1,
       );
 
@@ -235,7 +270,6 @@ describe("ContextCapture", () => {
       }
 
       const capture = new ContextCapture(
-        mockConversationDB,
         mockActivityLogger,
       );
       const context = await capture.captureActivityContext("session-123");
@@ -276,7 +310,6 @@ describe("ContextCapture", () => {
       };
 
       const capture = new ContextCapture(
-        mockConversationDB,
         mixedActivityLogger,
       );
       const context = await capture.captureActivityContext("session-123");
@@ -299,7 +332,6 @@ describe("ContextCapture", () => {
 
       const config = { toolUsesToCapture: 1 };
       const capture = new ContextCapture(
-        mockConversationDB,
         mockActivityLogger,
         config,
       );
@@ -320,7 +352,6 @@ describe("ContextCapture", () => {
       }
 
       const capture = new ContextCapture(
-        mockConversationDB,
         mockActivityLogger,
       );
 
@@ -342,7 +373,6 @@ describe("ContextCapture", () => {
       }
 
       const capture = new ContextCapture(
-        mockConversationDB,
         mockActivityLogger,
       );
 
@@ -363,7 +393,6 @@ describe("ContextCapture", () => {
       }
 
       const capture = new ContextCapture(
-        mockConversationDB,
         mockActivityLogger,
       );
 
@@ -410,7 +439,6 @@ describe("ContextCapture", () => {
       }
 
       const capture = new ContextCapture(
-        mockConversationDB,
         mockActivityLogger,
       );
 
@@ -439,7 +467,6 @@ describe("ContextCapture", () => {
       }
 
       const capture = new ContextCapture(
-        mockConversationDB,
         mockActivityLogger,
       );
 
@@ -464,7 +491,6 @@ describe("ContextCapture", () => {
       }
 
       const capture = new ContextCapture(
-        mockConversationDB,
         mockActivityLogger,
       );
 
@@ -508,11 +534,11 @@ describe("ContextCapture", () => {
       );
 
       // First call
-      await capture.captureConversationContext("session-123", 1);
+      await capture.captureConversationContext(mockConversation, 1);
       const firstCallCount = dbCallCount;
 
       // Second call (should use cache if implemented)
-      await capture.captureConversationContext("session-123", 1);
+      await capture.captureConversationContext(mockConversation, 1);
       const secondCallCount = dbCallCount;
 
       // This test allows for caching but doesn't require it
@@ -543,7 +569,7 @@ describe("ContextCapture", () => {
 
       // Should not throw, but return degraded context
       const context = await capture.captureConversationContext(
-        "session-123",
+        mockConversation,
         1,
       );
 
