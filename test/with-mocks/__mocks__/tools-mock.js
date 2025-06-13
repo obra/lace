@@ -6,33 +6,33 @@ export function createMockTools() {
   let callTimestamps = [];
 
   const mockTools = {
-    callTool: async (toolName, method, params, sessionId, agent) => {
+    callTool: async (toolName, params, sessionId, agent) => {
       const startTime = Date.now();
-      callTimestamps.push({ tool: `${toolName}_${method}`, startTime });
-      callOrder.push(`${toolName}_${method}_start`);
+      callTimestamps.push({ tool: `${toolName}_run`, startTime });
+      callOrder.push(`${toolName}_run_start`);
 
       // Simulate different execution times
       const delay =
         {
-          tool1_method1: 100,
-          tool2_method2: 150,
-          tool3_method3: 50,
-          slow_method: 300,
-          fast_method: 25,
-          error_method: 75,
-        }[`${toolName}_${method}`] || 100;
+          tool1_run: 100,
+          tool2_run: 150,
+          tool3_run: 50,
+          slow_run: 300,
+          fast_run: 25,
+          error_run: 75,
+        }[`${toolName}_run`] || 100;
 
       await new Promise((resolve) => setTimeout(resolve, delay));
 
-      callOrder.push(`${toolName}_${method}_end`);
+      callOrder.push(`${toolName}_run_end`);
 
-      if (toolName === "error" && method === "method") {
-        throw new Error(`${toolName}_${method} failed`);
+      if (toolName === "error") {
+        throw new Error(`${toolName}_run failed`);
       }
 
       return {
         success: true,
-        result: `${toolName}_${method} completed`,
+        result: `${toolName}_run completed`,
         executionTime: delay,
       };
     },

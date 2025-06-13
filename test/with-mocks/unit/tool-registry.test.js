@@ -27,11 +27,8 @@ class MockShellTool {
   }
   
   // BaseTool compatibility
-  async execute(methodName, params) {
-    if (methodName === "run") {
-      return this.run(params);
-    }
-    throw new Error(`Method '${methodName}' not found`);
+  async execute(params) {
+    return this.run(params);
   }
 }
 
@@ -57,11 +54,8 @@ class MockReadFileTool {
   }
   
   // BaseTool compatibility
-  async execute(methodName, params) {
-    if (methodName === "run") {
-      return this.run(params);
-    }
-    throw new Error(`Method '${methodName}' not found`);
+  async execute(params) {
+    return this.run(params);
   }
 }
 
@@ -88,11 +82,8 @@ class MockWriteFileTool {
   }
   
   // BaseTool compatibility
-  async execute(methodName, params) {
-    if (methodName === "run") {
-      return this.run(params);
-    }
-    throw new Error(`Method '${methodName}' not found`);
+  async execute(params) {
+    return this.run(params);
   }
 }
 
@@ -118,11 +109,8 @@ class MockListFilesTool {
   }
   
   // BaseTool compatibility
-  async execute(methodName, params) {
-    if (methodName === "run") {
-      return this.run(params);
-    }
-    throw new Error(`Method '${methodName}' not found`);
+  async execute(params) {
+    return this.run(params);
   }
 }
 
@@ -148,21 +136,18 @@ class MockFileSearchTool {
   }
   
   // BaseTool compatibility
-  async execute(methodName, params) {
-    if (methodName === "run") {
-      return this.run(params);
-    }
-    throw new Error(`Method '${methodName}' not found`);
+  async execute(params) {
+    return this.run(params);
   }
 }
 
 class MockAgentDelegateTool {
   async initialize() {}
   
-  async execute(method, params, options) {
+  async execute(params, options) {
     return {
       success: true,
-      data: `Mocked ${method} result`
+      data: `Mocked run result`
     };
   }
   
@@ -199,11 +184,8 @@ jest.mock("@/tools/javascript.js", () => ({
     async initialize() {}
     getMetadata() { return { description: "JavaScript execution" }; }
     async run() { return { result: 42 }; }
-    async execute(methodName, params) {
-      if (methodName === "run") {
-        return this.run(params);
-      }
-      throw new Error(`Method '${methodName}' not found`);
+    async execute(params) {
+      return this.run(params);
     }
   }
 }));
@@ -329,7 +311,7 @@ describe("ToolRegistry", () => {
   describe("Tool Execution", () => {
     test("should execute tool method successfully", async () => {
       // Use shell tool which has simpler output
-      const result = await registry.callTool("shell", "run", {
+      const result = await registry.callTool("shell", {
         command: "echo hello"
       });
 
@@ -341,14 +323,14 @@ describe("ToolRegistry", () => {
 
     test("should throw error for non-existent tool", async () => {
       await expect(
-        registry.callTool("nonexistent", "method", {})
+        registry.callTool("nonexistent", {})
       ).rejects.toThrow("Tool 'nonexistent' not found");
     });
 
     test("should throw error for non-existent method", async () => {
       await expect(
-        registry.callTool("shell", "nonexistent", {})
-      ).rejects.toThrow("Method 'nonexistent' not found in tool 'shell'");
+        registry.callTool("shell", { nonexistent: "value" })
+      ).rejects.toThrow("Parameter validation failed");
     });
 
     test("should handle tool execution errors", async () => {
@@ -361,7 +343,7 @@ describe("ToolRegistry", () => {
             name: 'error',
             description: 'Test error tool',
             methods: {
-              failingMethod: {
+              run: {
                 description: 'A method that always fails',
                 parameters: {}
               }
@@ -369,7 +351,7 @@ describe("ToolRegistry", () => {
           };
         }
         
-        async failingMethod() {
+        async run() {
           throw new Error("Tool execution failed");
         }
       }
@@ -378,14 +360,14 @@ describe("ToolRegistry", () => {
       registry.register("error", errorTool);
 
       await expect(
-        registry.callTool("error", "failingMethod", {})
+        registry.callTool("error", {})
       ).rejects.toThrow("Tool execution failed");
     });
   });
 
   describe("Activity Logging", () => {
     test("should log tool execution start and complete", async () => {
-      await registry.callTool("shell", "run", {
+      await registry.callTool("shell", {
         command: "echo hello"
       }, "test-session");
 
@@ -426,7 +408,7 @@ describe("ToolRegistry", () => {
             name: 'error',
             description: 'Test error tool',
             methods: {
-              failingMethod: {
+              run: {
                 description: 'A method that always fails',
                 parameters: {}
               }
@@ -434,7 +416,7 @@ describe("ToolRegistry", () => {
           };
         }
         
-        async failingMethod() {
+        async run() {
           throw new Error("Execution failed");
         }
       }
@@ -443,7 +425,7 @@ describe("ToolRegistry", () => {
       registry.register("error", errorTool);
 
       try {
-        await registry.callTool("error", "failingMethod", {}, "test-session");
+        await registry.callTool("error", {}, "test-session");
       } catch (error) {
         // Expected to throw
       }
@@ -462,7 +444,7 @@ describe("ToolRegistry", () => {
     });
 
     test("should not log when no session ID provided", async () => {
-      await registry.callTool("read_file", "run", { path: "test.txt" });
+      await registry.callTool("read_file", { path: "test.txt" });
 
       expect(mockActivityLogger.logEvent).not.toHaveBeenCalled();
     });
@@ -473,7 +455,7 @@ describe("ToolRegistry", () => {
       await registry.initialize();
       registry.register("agent_delegate", new MockAgentDelegateTool());
 
-      const result = await registry.callTool("agent_delegate", "run", {
+      const result = await registry.callTool("agent_delegate", {
         description: "Run tests",
         role: "execution"
       }, "test-session", null);
@@ -486,7 +468,6 @@ describe("ToolRegistry", () => {
     test("should create pre and post snapshots for tool execution", async () => {
       await registry.callToolWithSnapshots(
         "write_file",
-        "run",
         { path: "test.txt", content: "hello" },
         "test-session",
         1
@@ -534,7 +515,7 @@ describe("ToolRegistry", () => {
             name: 'error',
             description: 'Test error tool',
             methods: {
-              failingMethod: {
+              run: {
                 description: 'A method that always fails',
                 parameters: {}
               }
@@ -542,7 +523,7 @@ describe("ToolRegistry", () => {
           };
         }
         
-        async failingMethod() {
+        async run() {
           throw new Error("Tool failed");
         }
       }
@@ -553,7 +534,6 @@ describe("ToolRegistry", () => {
       try {
         await registry.callToolWithSnapshots(
           "error",
-          "failingMethod",
           {},
           "test-session",
           1
@@ -565,7 +545,7 @@ describe("ToolRegistry", () => {
       expect(mockSnapshotManager.createPostToolSnapshot).toHaveBeenCalledWith(
         expect.objectContaining({
           toolName: "error",
-          operation: "failingMethod"
+          operation: "run"
         }),
         expect.any(Object),
         expect.objectContaining({
@@ -585,7 +565,6 @@ describe("ToolRegistry", () => {
       // Should still execute tool despite snapshot error
       const result = await registry.callToolWithSnapshots(
         "read_file",
-        "run",
         { path: "test.txt" },
         "test-session"
       );
@@ -615,7 +594,6 @@ describe("ToolRegistry", () => {
 
       const result = await registryWithoutSnapshots.callToolWithSnapshots(
         "read_file",
-        "run",
         { path: "test.txt" },
         "test-session"
       );
@@ -640,7 +618,6 @@ describe("ToolRegistry", () => {
 
       await registryWithDisabledSnapshots.callToolWithSnapshots(
         "read_file",
-        "run",
         { path: "test.txt" },
         "test-session"
       );

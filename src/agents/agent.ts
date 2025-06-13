@@ -849,29 +849,26 @@ Focus on executing your assigned task efficiently.`;
   }
 
   async executeTool(toolCall: ToolCall, sessionId: string): Promise<any> {
-    // Simplified tool parsing - tools use simple names with 'execute' method
+    // Simplified tool parsing - tools use simple names
     // Support for both simple names (preferred) and compound names (legacy)
-    let toolName, methodName;
+    let toolName;
 
     // Check if this is a simple tool name first
     if (this.tools.getTool(toolCall.name)) {
       toolName = toolCall.name;
-      methodName = "run";
     } else {
       // Legacy compound name parsing for backward compatibility
       const parts = toolCall.name.split("_");
       if (parts.length >= 2) {
-        methodName = parts.pop(); // Last part is method
+        parts.pop(); // Remove method part
         toolName = parts.join("_"); // Rest is tool name
       } else {
         toolName = toolCall.name;
-        methodName = "run";
       }
 
       // Final fallback
       if (!this.tools.getTool(toolName) && parts.length > 1) {
         toolName = parts[0];
-        methodName = parts.slice(1).join("_");
       }
     }
 
@@ -882,7 +879,6 @@ Focus on executing your assigned task efficiently.`;
     try {
       const result = await this.tools.callTool(
         toolName,
-        methodName,
         toolCall.input,
         sessionId,
         this,

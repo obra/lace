@@ -77,7 +77,7 @@ export class ToolRegistry {
     return this.tools.has(name);
   }
 
-  async callTool(name: string, method: string, params: Record<string, any> = {}, sessionId: string | null = null, agent: any = null): Promise<any> {
+  async callTool(name: string, params: Record<string, any> = {}, sessionId: string | null = null, agent: any = null): Promise<any> {
     const tool = this.getTool(name);
     if (!tool) {
       throw new Error(`Tool '${name}' not found`);
@@ -96,7 +96,7 @@ export class ToolRegistry {
         null,
         {
           tool: name,
-          method,
+          method: "run",
           params,
         },
       );
@@ -108,7 +108,7 @@ export class ToolRegistry {
     let error = null;
 
     try {
-      const toolResult = await tool.execute(method, params, {
+      const toolResult = await tool.execute(params, {
         context: { sessionId, agent }
       });
       
@@ -171,7 +171,6 @@ export class ToolRegistry {
    */
   async callToolWithSnapshots(
     name: string,
-    method: string,
     params: Record<string, any> = {},
     sessionId: string | null = null,
     generation: number | null = null,
@@ -179,7 +178,7 @@ export class ToolRegistry {
   ): Promise<any> {
     // If no snapshot manager configured, fall back to regular tool execution
     if (!this.snapshotManager) {
-      return this.callTool(name, method, params, sessionId, agent);
+      return this.callTool(name, params, sessionId, agent);
     }
 
     const tool = this.tools.get(name);
@@ -195,7 +194,7 @@ export class ToolRegistry {
     // Create tool call metadata
     const toolCall = {
       toolName: name,
-      operation: method,
+      operation: "run",
       parameters: params,
       executionId: this.generateExecutionId(),
       timestamp: new Date().toISOString(),
@@ -256,7 +255,7 @@ export class ToolRegistry {
         null,
         {
           tool: name,
-          method,
+          method: "run",
           params,
           executionId: toolCall.executionId,
           preSnapshotId: preSnapshot?.snapshotId,
@@ -265,7 +264,7 @@ export class ToolRegistry {
     }
 
     try {
-      const toolResult = await tool.execute(method, params, {
+      const toolResult = await tool.execute(params, {
         context: { sessionId, agent }
       });
       

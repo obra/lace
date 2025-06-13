@@ -313,7 +313,7 @@ export abstract class BaseTool {
   /**
    * Execute a tool method with full infrastructure support
    */
-  async execute<T = any>(methodName: string, params: Record<string, any> = {}, options: ToolExecutionOptions = {}): Promise<ToolResult<T>> {
+  async execute<T = any>(params: Record<string, any> = {}, options: ToolExecutionOptions = {}): Promise<ToolResult<T>> {
     try {
       // Ensure tool is initialized
       if (!this.initialized) {
@@ -326,13 +326,13 @@ export abstract class BaseTool {
 
 
       // Validate parameters
-      const validatedParams = this.validateParameters(methodName, params);
+      const validatedParams = this.validateParameters("run", params);
 
-      // Check if method exists
-      const method = (this as any)[methodName];
+      // Check if run method exists
+      const method = (this as any)["run"];
       if (typeof method !== 'function') {
         throw new ToolError(
-          `Method '${methodName}' not implemented in tool '${this.name}'`,
+          `Method 'run' not implemented in tool '${this.name}'`,
           'METHOD_NOT_IMPLEMENTED'
         );
       }
@@ -363,7 +363,7 @@ export abstract class BaseTool {
         return ToolResult.error<T>(error);
       }
       
-      return ToolResult.error<T>(error instanceof Error ? error : new Error(String(error)), { method: methodName, params });
+      return ToolResult.error<T>(error instanceof Error ? error : new Error(String(error)), { method: "run", params });
     }
   }
 
@@ -418,9 +418,9 @@ export abstract class BaseTool {
   /**
    * Stream results for large outputs
    */
-  async *streamResults<T = any>(methodName: string, params: Record<string, any> = {}, options: ToolExecutionOptions = {}): AsyncGenerator<ToolResult<T>, void, unknown> {
+  async *streamResults<T = any>(params: Record<string, any> = {}, options: ToolExecutionOptions = {}): AsyncGenerator<ToolResult<T>, void, unknown> {
     // Default implementation - subclasses can override for true streaming
-    const result = await this.execute<T>(methodName, params, options);
+    const result = await this.execute<T>(params, options);
     yield result;
   }
 }

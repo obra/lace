@@ -88,12 +88,12 @@ describe("Error Recovery and Retry Logic", () => {
     mockToolRegistry = {
       listTools: () => ["flaky_tool", "reliable_tool"],
       getTool: (name) => mockTools[name],
-      callTool: async (toolName, methodName, params, sessionId, agent) => {
+      callTool: async (toolName, params, sessionId, agent) => {
         const tool = mockTools[toolName];
         if (!tool) {
           throw new Error(`Tool '${toolName}' not found`);
         }
-        const result = await tool.execute(methodName, params, {
+        const result = await tool.execute("run", params, {
           context: { sessionId, agent }
         });
         if (result.success) {

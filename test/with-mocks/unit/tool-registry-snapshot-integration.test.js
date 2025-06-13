@@ -147,7 +147,7 @@ describe("ToolRegistry Snapshot Integration", () => {
             name: "test-tool",
             description: "Test tool for snapshot integration",
             methods: {
-              simpleOperation: {
+              run: {
                 description: "Simple test operation",
                 parameters: {
                   input: { type: "string", description: "Test input" },
@@ -157,16 +157,13 @@ describe("ToolRegistry Snapshot Integration", () => {
           };
         }
 
-        async simpleOperation(params) {
+        async run(params) {
           return { success: true, data: params.input };
         }
 
-        async execute(methodName, params, options = {}) {
-          if (methodName === 'simpleOperation') {
-            const result = await this.simpleOperation(params);
-            return { success: true, data: result };
-          }
-          throw new Error(`Method '${methodName}' not found`);
+        async execute(params, options = {}) {
+          const result = await this.run(params);
+          return { success: true, data: result };
         }
       }
 
@@ -181,7 +178,6 @@ describe("ToolRegistry Snapshot Integration", () => {
 
       const result = await registry.callToolWithSnapshots(
         "test-tool",
-        "simpleOperation",
         params,
         sessionId,
         generation,
@@ -210,7 +206,7 @@ describe("ToolRegistry Snapshot Integration", () => {
 
       // Verify snapshot metadata
       assert.strictEqual(preSnapshot.toolCall.toolName, "test-tool");
-      assert.strictEqual(preSnapshot.toolCall.operation, "simpleOperation");
+      assert.strictEqual(preSnapshot.toolCall.operation, "run");
       assert.deepStrictEqual(preSnapshot.toolCall.parameters, params);
       assert.strictEqual(preSnapshot.sessionId, sessionId);
       assert.strictEqual(preSnapshot.generation, generation);
@@ -258,7 +254,7 @@ describe("ToolRegistry Snapshot Integration", () => {
             name: "complex-tool",
             description: "Complex test tool",
             methods: {
-              complexOperation: {
+              run: {
                 description: "Complex test operation",
                 parameters: {
                   config: { type: "string", description: "Config value" },
@@ -268,16 +264,13 @@ describe("ToolRegistry Snapshot Integration", () => {
           };
         }
 
-        async complexOperation(params) {
+        async run(params) {
           return { result: "complex result" };
         }
 
-        async execute(methodName, params, options = {}) {
-          if (methodName === 'complexOperation') {
-            const result = await this.complexOperation(params);
-            return { success: true, data: result };
-          }
-          throw new Error(`Method '${methodName}' not found`);
+        async execute(params, options = {}) {
+          const result = await this.run(params);
+          return { success: true, data: result };
         }
       }
 
@@ -287,7 +280,6 @@ describe("ToolRegistry Snapshot Integration", () => {
 
       await registry.callToolWithSnapshots(
         "complex-tool",
-        "complexOperation",
         { config: "advanced" },
         "session-rich-context",
         5,
@@ -324,7 +316,7 @@ describe("ToolRegistry Snapshot Integration", () => {
             name: "failing-tool",
             description: "Tool that fails",
             methods: {
-              failingOperation: {
+              run: {
                 description: "Operation that fails",
                 parameters: {},
               },
@@ -332,15 +324,12 @@ describe("ToolRegistry Snapshot Integration", () => {
           };
         }
 
-        async failingOperation() {
+        async run() {
           throw new Error("Tool execution failed");
         }
 
-        async execute(methodName, params, options = {}) {
-          if (methodName === 'failingOperation') {
-            await this.failingOperation(params);
-          }
-          throw new Error(`Method '${methodName}' not found`);
+        async execute(params, options = {}) {
+          await this.run(params);
         }
       }
 
@@ -351,7 +340,6 @@ describe("ToolRegistry Snapshot Integration", () => {
       try {
         await registry.callToolWithSnapshots(
           "failing-tool",
-          "failingOperation",
           {},
           "session-error-test",
           1,
@@ -379,7 +367,7 @@ describe("ToolRegistry Snapshot Integration", () => {
             name: "regular-tool",
             description: "Regular test tool",
             methods: {
-              regularOperation: {
+              run: {
                 description: "Regular operation",
                 parameters: {
                   input: { type: "string", description: "Input value" },
@@ -389,16 +377,13 @@ describe("ToolRegistry Snapshot Integration", () => {
           };
         }
 
-        async regularOperation(params) {
+        async run(params) {
           return { output: params.input };
         }
 
-        async execute(methodName, params, options = {}) {
-          if (methodName === 'regularOperation') {
-            const result = await this.regularOperation(params);
-            return { success: true, data: result };
-          }
-          throw new Error(`Method '${methodName}' not found`);
+        async execute(params, options = {}) {
+          const result = await this.run(params);
+          return { success: true, data: result };
         }
       }
 
@@ -408,7 +393,6 @@ describe("ToolRegistry Snapshot Integration", () => {
 
       const result = await registry.callTool(
         "regular-tool",
-        "regularOperation",
         { input: "regular test" },
         "session-regular",
       );
@@ -431,7 +415,7 @@ describe("ToolRegistry Snapshot Integration", () => {
             name: "no-snapshot-tool",
             description: "Tool without snapshots",
             methods: {
-              operation: {
+              run: {
                 description: "Simple operation",
                 parameters: {},
               },
@@ -439,16 +423,13 @@ describe("ToolRegistry Snapshot Integration", () => {
           };
         }
 
-        async operation() {
+        async run() {
           return { success: true };
         }
 
-        async execute(methodName, params, options = {}) {
-          if (methodName === 'operation') {
-            const result = await this.operation(params);
-            return { success: true, data: result };
-          }
-          throw new Error(`Method '${methodName}' not found`);
+        async execute(params, options = {}) {
+          const result = await this.run(params);
+          return { success: true, data: result };
         }
       }
 
@@ -459,7 +440,6 @@ describe("ToolRegistry Snapshot Integration", () => {
       // This should work even if callToolWithSnapshots is called
       const result = await registry.callToolWithSnapshots(
         "no-snapshot-tool",
-        "operation",
         {},
         "session-no-snapshots",
         1,
@@ -499,7 +479,7 @@ describe("ToolRegistry Snapshot Integration", () => {
             name: "metadata-tool",
             description: "Tool with rich metadata",
             methods: {
-              annotatedOperation: {
+              run: {
                 description: "Operation with annotations",
                 parameters: {
                   file: { type: "string", description: "File path" },
@@ -510,16 +490,13 @@ describe("ToolRegistry Snapshot Integration", () => {
           };
         }
 
-        async annotatedOperation(params) {
+        async run(params) {
           return { processed: params };
         }
 
-        async execute(methodName, params, options = {}) {
-          if (methodName === 'annotatedOperation') {
-            const result = await this.annotatedOperation(params);
-            return { success: true, data: result };
-          }
-          throw new Error(`Method '${methodName}' not found`);
+        async execute(params, options = {}) {
+          const result = await this.run(params);
+          return { success: true, data: result };
         }
       }
 
@@ -529,7 +506,6 @@ describe("ToolRegistry Snapshot Integration", () => {
 
       await registry.callToolWithSnapshots(
         "metadata-tool",
-        "annotatedOperation",
         { file: "important.js", mode: "edit" },
         "session-metadata",
         3,
@@ -538,7 +514,7 @@ describe("ToolRegistry Snapshot Integration", () => {
       // Verify enhanced tool call metadata
       assert.ok(capturedToolCall, "Should capture tool call");
       assert.strictEqual(capturedToolCall.toolName, "metadata-tool");
-      assert.strictEqual(capturedToolCall.operation, "annotatedOperation");
+      assert.strictEqual(capturedToolCall.operation, "run");
       assert.ok(capturedToolCall.parameters, "Should have parameters");
       assert.ok(capturedToolCall.executionId, "Should have execution ID");
       assert.ok(capturedToolCall.timestamp, "Should have timestamp");
@@ -570,7 +546,7 @@ describe("ToolRegistry Snapshot Integration", () => {
             name: "perf-tool",
             description: "Performance testing tool",
             methods: {
-              timedOperation: {
+              run: {
                 description: "Timed operation",
                 parameters: {
                   data: { type: "string", description: "Test data" },
@@ -580,18 +556,15 @@ describe("ToolRegistry Snapshot Integration", () => {
           };
         }
 
-        async timedOperation(params) {
+        async run(params) {
           // Simulate some work
           await new Promise((resolve) => setTimeout(resolve, 10));
           return { processed: true, input: params };
         }
 
-        async execute(methodName, params, options = {}) {
-          if (methodName === 'timedOperation') {
-            const result = await this.timedOperation(params);
-            return { success: true, data: result };
-          }
-          throw new Error(`Method '${methodName}' not found`);
+        async execute(params, options = {}) {
+          const result = await this.run(params);
+          return { success: true, data: result };
         }
       }
 
@@ -601,7 +574,6 @@ describe("ToolRegistry Snapshot Integration", () => {
 
       await registry.callToolWithSnapshots(
         "perf-tool",
-        "timedOperation",
         { data: "performance test" },
         "session-performance",
         1,
@@ -658,7 +630,7 @@ describe("ToolRegistry Snapshot Integration", () => {
             name: "config-tool",
             description: "Configurable tool",
             methods: {
-              configOperation: {
+              run: {
                 description: "Configured operation",
                 parameters: {},
               },
@@ -666,16 +638,13 @@ describe("ToolRegistry Snapshot Integration", () => {
           };
         }
 
-        async configOperation() {
+        async run() {
           return { configured: true };
         }
 
-        async execute(methodName, params, options = {}) {
-          if (methodName === 'configOperation') {
-            const result = await this.configOperation(params);
-            return { success: true, data: result };
-          }
-          throw new Error(`Method '${methodName}' not found`);
+        async execute(params, options = {}) {
+          const result = await this.run(params);
+          return { success: true, data: result };
         }
       }
 
@@ -685,7 +654,6 @@ describe("ToolRegistry Snapshot Integration", () => {
 
       await registry.callToolWithSnapshots(
         "config-tool",
-        "configOperation",
         {},
         "session-config",
         1,
@@ -728,7 +696,7 @@ describe("ToolRegistry Snapshot Integration", () => {
             name: "activity-tool",
             description: "Activity logging tool",
             methods: {
-              loggedOperation: {
+              run: {
                 description: "Logged operation",
                 parameters: {},
               },
@@ -736,16 +704,13 @@ describe("ToolRegistry Snapshot Integration", () => {
           };
         }
 
-        async loggedOperation() {
+        async run() {
           return { logged: true };
         }
 
-        async execute(methodName, params, options = {}) {
-          if (methodName === 'loggedOperation') {
-            const result = await this.loggedOperation(params);
-            return { success: true, data: result };
-          }
-          throw new Error(`Method '${methodName}' not found`);
+        async execute(params, options = {}) {
+          const result = await this.run(params);
+          return { success: true, data: result };
         }
       }
 
@@ -755,7 +720,6 @@ describe("ToolRegistry Snapshot Integration", () => {
 
       await registry.callToolWithSnapshots(
         "activity-tool",
-        "loggedOperation",
         {},
         "session-activity",
         1,
