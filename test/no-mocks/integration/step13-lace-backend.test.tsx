@@ -7,26 +7,30 @@ import { jest } from "@jest/globals";
 // Mock only the essential modules needed for test environment
 
 // Mock ModelProvider to avoid API costs and network dependencies
-jest.mock("../../../src/models/model-provider", () => ({
+jest.mock("@/models/model-provider", () => ({
   ModelProvider: jest.fn().mockImplementation(() => ({
-    // @ts-ignore
-    initialize: jest.fn().mockResolvedValue(undefined),
-    // @ts-ignore
-    getModelSession: jest.fn().mockReturnValue({
+    initialize: jest.fn(() => Promise.resolve()),
+    getModelSession: jest.fn(() => ({
       definition: {
-        name: "test-model",
-        provider: "mock",
+        name: "claude-3-5-sonnet-20241022",
+        provider: "anthropic",
         contextWindow: 200000,
-        inputPrice: 0.01,
-        outputPrice: 0.03,
-        capabilities: ["chat", "tools"]
+        inputPrice: 3.0,
+        outputPrice: 15.0,
+        capabilities: ["chat", "tools", "vision"]
       },
-      chat: jest.fn().mockResolvedValue({ 
+      chat: jest.fn(() => Promise.resolve({ 
         success: true,
         content: "Mocked response",
         usage: { input_tokens: 10, output_tokens: 20 }
-      })
-    })
+      }))
+    })),
+    setSessionId: jest.fn(() => {}),
+    listProviders: jest.fn(() => ["anthropic"]),
+    getProviderInfo: jest.fn(() => ({ name: "anthropic" })),
+    getContextWindow: jest.fn(() => 200000),
+    calculateCost: jest.fn(() => ({ inputCost: 0.01, outputCost: 0.03, totalCost: 0.04 })),
+    getContextUsage: jest.fn(() => ({ used: 1000, total: 200000, percentage: 0.5, remaining: 199000 }))
   })),
 }));
 

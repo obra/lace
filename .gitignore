@@ -14,6 +14,7 @@ lace-memory.db
 debug-tool.js
 *.swp
 *.tmp
+test-debug-direct.log
 
 # Test artifacts
 test-db-*.db
