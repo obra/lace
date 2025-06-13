@@ -213,6 +213,7 @@ describe("Parallel Tool Execution", () => {
       };
 
       agent.toolApproval = mockApproval;
+      agent.toolExecutor.config.toolApproval = mockApproval;
 
       const toolCalls = [
         { name: "tool1_method1", input: {} },
@@ -255,6 +256,7 @@ describe("Parallel Tool Execution", () => {
       };
 
       agent.toolApproval = mockApproval;
+      agent.toolExecutor.config.toolApproval = mockApproval;
 
       const toolCalls = [
         { name: "tool1_method1", input: {} },

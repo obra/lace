@@ -231,7 +231,7 @@ export class ToolExecutor {
         toolCall.input,
         sessionId,
         { 
-          tools: this.config.tools,
+          tools: this.tools,
           modelProvider: this.config.modelProvider,
           toolApproval: this.config.toolApproval,
           debugLogger: this.config.debugLogger,
