@@ -94,7 +94,7 @@ describe("LaceUI Activity Logging", () => {
 
       const event = userInputEvents[0];
       assert.strictEqual(event.event_type, "user_input");
-      assert.strictEqual(event.local_session_id, laceUI.sessionId);
+      assert.strictEqual(event.local_session_id, laceUI.conversation.getSessionId());
 
       const data = JSON.parse(event.data);
       assert.strictEqual(data.content, testInput);
@@ -120,7 +120,7 @@ describe("LaceUI Activity Logging", () => {
 
       const event = agentResponseEvents[0];
       assert.strictEqual(event.event_type, "agent_response");
-      assert.strictEqual(event.local_session_id, laceUI.sessionId);
+      assert.strictEqual(event.local_session_id, laceUI.conversation.getSessionId());
 
       const data = JSON.parse(event.data);
       assert.ok(data.content);
@@ -192,7 +192,7 @@ describe("LaceUI Activity Logging", () => {
 
       // Verify all events have the same session ID
       for (const event of events) {
-        assert.strictEqual(event.local_session_id, laceUI.sessionId);
+        assert.strictEqual(event.local_session_id, laceUI.conversation.getSessionId());
       }
 
       // Verify our specific inputs were logged
