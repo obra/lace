@@ -4,6 +4,21 @@
 import { jest, describe, test, beforeEach, afterEach, expect } from "@jest/globals";
 import { ToolRegistry } from "@/tools/tool-registry.js";
 
+// Mock the Conversation class
+const mockConversation = {
+  getMessages: jest.fn(() => Promise.resolve([
+    { role: "user", content: "Hello" },
+    { role: "assistant", content: "Hi there" }
+  ]))
+};
+
+// Mock Conversation.load to return our mock
+jest.mock("@/conversation/conversation.js", () => ({
+  Conversation: {
+    load: jest.fn(() => Promise.resolve(mockConversation))
+  }
+}));
+
 // Mock tool classes
 class MockShellTool {
   async initialize() {}
@@ -205,6 +220,12 @@ describe("ToolRegistry", () => {
   let mockConversationDB;
 
   beforeEach(async () => {
+    // Reset the conversation mock
+    mockConversation.getMessages.mockResolvedValue([
+      { role: "user", content: "Hello" },
+      { role: "assistant", content: "Hi there" }
+    ]);
+
     mockActivityLogger = {
       logEvent: jest.fn()
     };
@@ -223,8 +244,7 @@ describe("ToolRegistry", () => {
 
     registry = new ToolRegistry({
       activityLogger: mockActivityLogger,
-      snapshotManager: mockSnapshotManager,
-      conversationDB: mockConversationDB
+      snapshotManager: mockSnapshotManager
     });
 
     await registry.initialize();
@@ -667,13 +687,23 @@ describe("ToolRegistry", () => {
     });
 
     test("should handle missing conversation DB", async () => {
+      // Mock conversation to throw error for this test
+      const { Conversation } = await import("@/conversation/conversation.js");
+      const originalLoad = Conversation.load;
+      Conversation.load = jest.fn().mockRejectedValue(new Error("No conversation DB"));
+
       const registryWithoutDB = new ToolRegistry();
       const context = await registryWithoutDB.gatherSnapshotContext("test-session");
 
       expect(context).toEqual({
         sessionId: "test-session",
-        timestamp: expect.any(String)
+        timestamp: expect.any(String),
+        conversationTurns: 0,
+        recentHistory: []
       });
+
+      // Restore original
+      Conversation.load = originalLoad;
     });
   });
 });
