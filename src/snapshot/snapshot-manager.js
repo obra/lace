@@ -45,11 +45,10 @@ export class SnapshotManager {
   }
 
   /**
-   * Set up context capture with database connections
+   * Set up context capture with activity logger
    */
-  setupContextCapture(conversationDB, activityLogger) {
+  setupContextCapture(activityLogger) {
     this.contextCapture = new ContextCapture(
-      conversationDB,
       activityLogger,
       this.config.integration,
     );

@@ -4,13 +4,13 @@
 import { render } from "ink";
 import React from "react";
 import { withFullScreen } from "fullscreen-ink";
-import { ConversationDB } from "../database/conversation-db.js";
 import { ToolRegistry } from "../tools/tool-registry.js";
 import { Agent } from "../agents/agent.js";
 import { ModelProvider } from "../models/model-provider.js";
 import { ApprovalEngine } from "../safety/index.js";
 import { ActivityLogger } from "../logging/activity-logger.js";
 import { DebugLogger } from "../logging/debug-logger.js";
+import { Conversation } from "../conversation/conversation.js";
 import App from "./App";
 
 interface LaceUIOptions {
@@ -53,7 +53,6 @@ export class LaceUI {
   private verbose: boolean;
   private memoryPath: string;
   private activityLogPath: string;
-  private db: any;
   private tools: any;
   private modelProvider: any;
   private toolApproval: any;
@@ -62,7 +61,7 @@ export class LaceUI {
   private primaryAgent: any;
   private memoryAgents: Map<string, any>;
   private currentGeneration: number;
-  public sessionId: string;
+  public conversation: Conversation;
   private app: any;
   private uiRef: any;
   public isProcessing: boolean;
@@ -88,7 +87,6 @@ export class LaceUI {
     );
 
     // Initialize lace backend components
-    this.db = new ConversationDB(this.memoryPath);
     this.tools = new ToolRegistry();
     this.modelProvider = new ModelProvider({
       anthropic: {
@@ -111,7 +109,6 @@ export class LaceUI {
     this.primaryAgent = null;
     this.memoryAgents = new Map(); // generationId -> agent
     this.currentGeneration = 0;
-    this.sessionId = `session-${Date.now()}`;
 
     // UI state management
     this.app = null;
@@ -121,9 +118,12 @@ export class LaceUI {
   }
 
   async initialize() {
-    await this.db.initialize();
     await this.tools.initialize();
     await this.modelProvider.initialize();
+
+    // Initialize conversation
+    const sessionId = `session-${Date.now()}`;
+    this.conversation = await Conversation.load(sessionId, this.memoryPath);
 
     // Initialize activity logger
     try {
@@ -136,7 +136,6 @@ export class LaceUI {
     this.primaryAgent = new Agent({
       generation: this.currentGeneration,
       tools: this.tools,
-      db: this.db,
       modelProvider: this.modelProvider,
       model: this.modelProvider.getModelSession("claude-3-5-sonnet-20241022"),
       toolApproval: this.toolApproval,
@@ -153,7 +152,7 @@ export class LaceUI {
 
     // Start the fullscreen Ink UI with exitOnCtrlC disabled
     const fullscreenApp = withFullScreen(
-      React.createElement(App, { laceUI: this }),
+      React.createElement(App, { laceUI: this, conversation: this.conversation }),
       {
         exitOnCtrlC: false,
       },
@@ -192,7 +191,7 @@ export class LaceUI {
       };
 
       const response = await this.primaryAgent.processInput(
-        this.sessionId,
+        this.conversation,
         input,
         {
           signal: this.abortController.signal,
@@ -292,7 +291,6 @@ export class LaceUI {
     this.primaryAgent = new Agent({
       generation: this.currentGeneration,
       tools: this.tools,
-      db: this.db,
       modelProvider: this.modelProvider,
       model: this.modelProvider.getModelSession("claude-3-5-sonnet-20241022"),
       verbose: this.verbose,
@@ -337,7 +335,7 @@ export class LaceUI {
       context: contextUsage,
       cost: cost,
       tools: this.tools.listTools(),
-      session: this.sessionId,
+      session: this.conversation.getSessionId(),
       conversation: this.primaryAgent.getConversationMetrics(),
       config: this.primaryAgent.getConversationConfig(),
     };
@@ -390,11 +388,11 @@ export class LaceUI {
   // Activity logging methods
   private async logUserInput(input: string): Promise<void> {
     try {
-      await this.activityLogger.logEvent("user_input", this.sessionId, null, {
+      await this.activityLogger.logEvent("user_input", this.conversation.getSessionId(), null, {
         content: input,
         timestamp: new Date().toISOString(),
         input_length: input.length,
-        session_id: this.sessionId,
+        session_id: this.conversation.getSessionId(),
       });
     } catch (error) {
       // Activity logging errors should not break the application
@@ -416,7 +414,7 @@ export class LaceUI {
 
       await this.activityLogger.logEvent(
         "agent_response",
-        this.sessionId,
+        this.conversation.getSessionId(),
         null,
         {
           content: response.content || "",
@@ -442,7 +440,7 @@ export class LaceUI {
     try {
       await this.activityLogger.logEvent(
         "streaming_token",
-        this.sessionId,
+        this.conversation.getSessionId(),
         null,
         {
           token: token,
@@ -466,7 +464,7 @@ export class LaceUI {
 
         await this.activityLogger.logEvent(
           "tool_execution",
-          this.sessionId,
+          this.conversation.getSessionId(),
           null,
           {
             tool_name: toolCall.name,
@@ -526,7 +524,7 @@ export class LaceUI {
       case "recent":
         return await this.getRecentActivity(options.limit || 20);
       case "session":
-        const sessionId = options.sessionId || this.sessionId;
+        const sessionId = options.sessionId || this.conversation.getSessionId();
         return await this.getSessionActivity(sessionId);
       case "type":
         return await this.getActivityByType(options.eventType);

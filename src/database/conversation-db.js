@@ -111,7 +111,7 @@ export class ConversationDB {
       `
       SELECT * FROM conversations 
       WHERE session_id = ? 
-      ORDER BY id DESC 
+      ORDER BY id ASC 
       LIMIT ?
     `,
       [sessionId, limit],

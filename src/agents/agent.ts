@@ -1243,7 +1243,6 @@ Focus on executing your assigned task efficiently.`;
     const synthesisAgent = await this.spawnSubagent({
       role: "synthesis",
       model: this.modelProvider.getModelSession("claude-3-5-haiku-20241022"),
-      capabilities: ["synthesis", "summarization"],
       task: `Synthesize tool response for ${toolCall.name}`,
     });
 
@@ -1302,9 +1301,8 @@ ${responseText}`;
 
     // Create synthesis agent for batch processing
     const synthesisAgent = await this.spawnSubagent({
-      role: "batch_synthesis",
+      role: "synthesis",
       model: this.modelProvider.getModelSession("claude-3-5-haiku-20241022"),
-      capabilities: ["synthesis", "summarization", "analysis"],
       task: `Batch synthesize ${toolBatch.length} parallel tool results`,
     });
 

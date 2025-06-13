@@ -1,13 +1,13 @@
 // ABOUTME: Captures rich context from conversation and activity data for snapshot metadata enrichment
-// ABOUTME: Integrates with ConversationDB and ActivityLogger to provide comprehensive snapshot context
+// ABOUTME: Integrates with Conversation and ActivityLogger to provide comprehensive snapshot context
 
 import { promises as fs } from "fs";
 import { join } from "path";
 import simpleGit from "simple-git";
+import { Conversation } from "../conversation/conversation.js";
 
 export class ContextCapture {
-  constructor(conversationDB, activityLogger, config = {}) {
-    this.conversationDB = conversationDB;
+  constructor(activityLogger, config = {}) {
     this.activityLogger = activityLogger;
 
     // Default configuration
@@ -24,9 +24,18 @@ export class ContextCapture {
   }
 
   /**
-   * Capture conversation context for a session and generation
+   * Helper method to get Conversation object from sessionId
    */
-  async captureConversationContext(sessionId, generation) {
+  async getConversation(sessionId) {
+    // Use default path since we no longer have access to conversationDB
+    return await Conversation.load(sessionId);
+  }
+
+  /**
+   * Capture conversation context for a conversation and generation
+   */
+  async captureConversationContext(conversation, generation) {
+    const sessionId = conversation.getSessionId();
     const cacheKey = `conv-${sessionId}-${generation}`;
 
     try {
@@ -38,8 +47,7 @@ export class ContextCapture {
         }
       }
 
-      const recentHistory = await this.conversationDB.getConversationHistory(
-        sessionId,
+      const recentHistory = await conversation.getMessages(
         this.config.conversationTurnsToCapture,
       );
 
@@ -158,6 +166,9 @@ export class ContextCapture {
    */
   async captureFullContext(sessionId, generation, toolCall, projectPath) {
     try {
+      // Get conversation object
+      const conversation = await this.getConversation(sessionId);
+      
       // Capture all context types in parallel for performance
       const [
         conversationContext,
@@ -165,10 +176,10 @@ export class ContextCapture {
         realRepoSha,
         relatedContext,
       ] = await Promise.all([
-        this.captureConversationContext(sessionId, generation),
+        this.captureConversationContext(conversation, generation),
         this.captureActivityContext(sessionId),
         this.getRealRepoSha(projectPath),
-        this.findRelatedConversations(sessionId, toolCall),
+        this.findRelatedConversations(conversation, toolCall),
       ]);
 
       // Enrich with tool-specific context
@@ -218,13 +229,13 @@ export class ContextCapture {
   /**
    * Find related conversations based on tool context
    */
-  async findRelatedConversations(sessionId, toolCall) {
+  async findRelatedConversations(conversation, toolCall) {
     try {
       const searchTerms = this.generateSearchTerms(toolCall);
       const searchPromises = searchTerms
         .slice(0, this.config.searchDepth)
         .map((term) =>
-          this.conversationDB.searchConversations(sessionId, term, 3),
+          conversation.search(term, 3),
         );
 
       const searchResults = await Promise.all(searchPromises);

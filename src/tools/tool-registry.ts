@@ -8,12 +8,12 @@ import { ListFilesTool } from "./list-files.js";
 import { FileSearchTool } from "./file-search.js";
 import { JavaScriptTool } from "./javascript.js";
 import { AgentDelegateTool } from "./agent-delegate.js";
+import { Conversation } from "../conversation/conversation.js";
 import { BaseTool } from "./base-tool.js";
 
 interface ToolRegistryOptions {
   activityLogger?: any;
   snapshotManager?: any;
-  conversationDB?: any;
   snapshotConfig?: {
     enablePreToolSnapshots?: boolean;
     enablePostToolSnapshots?: boolean;
@@ -25,7 +25,6 @@ export class ToolRegistry {
   private tools: Map<string, BaseTool>;
   private activityLogger: any;
   private snapshotManager: any;
-  private conversationDB: any;
   private snapshotConfig: {
     enablePreToolSnapshots: boolean;
     enablePostToolSnapshots: boolean;
@@ -36,7 +35,6 @@ export class ToolRegistry {
     this.tools = new Map();
     this.activityLogger = options.activityLogger || null;
     this.snapshotManager = options.snapshotManager || null;
-    this.conversationDB = options.conversationDB || null;
 
     // Snapshot configuration
     this.snapshotConfig = {
@@ -75,6 +73,15 @@ export class ToolRegistry {
 
   hasTool(name: string): boolean {
     return this.tools.has(name);
+  }
+
+  /**
+   * Helper method to get Conversation object from sessionId
+   */
+  private async getConversation(sessionId: string): Promise<Conversation> {
+    // Note: We use a default path since tool registry doesn't know the DB path
+    // In practice, this should work since the conversation should already exist
+    return await Conversation.load(sessionId);
   }
 
   async callTool(name: string, params: Record<string, any> = {}, sessionId: string | null = null, agent: any = null): Promise<any> {
@@ -381,12 +388,10 @@ export class ToolRegistry {
     };
 
     // Add conversation context for debugging snapshots
-    if (this.conversationDB && sessionId) {
+    if (sessionId) {
       try {
-        const recentHistory = await this.conversationDB.getConversationHistory(
-          sessionId,
-          3,
-        );
+        const conversation = await this.getConversation(sessionId);
+        const recentHistory = await conversation.getMessages(3);
         context.conversationTurns = recentHistory ? recentHistory.length : 0;
         context.recentHistory = recentHistory || [];
       } catch (error) {
