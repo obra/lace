@@ -46,6 +46,13 @@ export interface BaseModelProvider {
   getContextWindow?(model: string): number;
   calculateCost?(model: string, inputTokens: number, outputTokens: number): any;
   getContextUsage?(model: string, totalTokens: number): any;
+  
+  /**
+   * Context optimization methods
+   */
+  optimizeMessages?(messages: any[], options?: any): Promise<any[]>;
+  applyCaching?(messages: any[]): any[];
+  countTokens?(messages: any[], options?: any): Promise<any>;
 }
 
 /**

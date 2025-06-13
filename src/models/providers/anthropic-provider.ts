@@ -582,4 +582,96 @@ Best for: Most general-purpose AI tasks, reasoning, coding, analysis.`,
       contextWindow: 200000
     };
   }
+
+  /**
+   * Optimize messages for Anthropic API by applying truncation and caching
+   */
+  async optimizeMessages(messages: any[], options: any = {}): Promise<any[]> {
+    const {
+      model,
+      tools,
+      maxTokens,
+      contextUtilization = 0.7
+    } = options;
+
+    // First apply smart truncation if needed
+    const contextWindow = this.getContextWindow(model);
+    const targetTokenLimit = Math.floor(contextWindow * contextUtilization);
+    
+    let optimizedMessages = await this.truncateMessages(messages, targetTokenLimit, { model, tools });
+    
+    // Then apply Anthropic-specific caching (always cache all but last 2)
+    optimizedMessages = this.applyCaching(optimizedMessages);
+    
+    return optimizedMessages;
+  }
+
+  /**
+   * Truncate conversation history to fit within token limits
+   */
+  async truncateMessages(messages: any[], targetTokenLimit: number, options: any = {}): Promise<any[]> {
+    if (messages.length <= 1) {
+      return messages;
+    }
+
+    const systemMessage = messages[0];
+    const conversationMessages = messages.slice(1);
+    
+    // Count tokens for current messages
+    const currentTokenCount = await this.countTokens(messages, options);
+    
+    if (!currentTokenCount.success || currentTokenCount.inputTokens <= targetTokenLimit) {
+      return messages; // Already within limit
+    }
+
+    // Start with just system message and progressively add recent messages
+    let truncatedMessages = [systemMessage];
+    
+    // Add messages from most recent backwards until we hit the token limit
+    for (let i = conversationMessages.length - 1; i >= 0; i--) {
+      const candidateMessages = [systemMessage, ...conversationMessages.slice(i)];
+      
+      const tokenCount = await this.countTokens(candidateMessages, options);
+      
+      if (tokenCount.success && tokenCount.inputTokens <= targetTokenLimit) {
+        truncatedMessages = candidateMessages;
+        break;
+      }
+    }
+
+    return truncatedMessages;
+  }
+
+  /**
+   * Apply Anthropic-specific caching strategy to messages
+   * Always cache everything but the last 2 messages
+   */
+  applyCaching(messages: any[]): any[] {
+    if (messages.length <= 3) return messages; // Need at least system + 2 messages to cache anything
+    
+    const cachedMessages = [...messages];
+    const cacheableEnd = messages.length - 2; // Cache all but last 2 messages
+    
+    // Apply cache control to older messages (skip system message at index 0)
+    for (let i = 1; i < cacheableEnd; i++) {
+      const message = cachedMessages[i];
+      
+      if (message.role === "user" || message.role === "assistant") {
+        if (typeof message.content === "string") {
+          cachedMessages[i] = {
+            ...message,
+            content: [
+              {
+                type: "text",
+                text: message.content,
+                cache_control: { type: "ephemeral" },
+              },
+            ],
+          };
+        }
+      }
+    }
+
+    return cachedMessages;
+  }
 }
