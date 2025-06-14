@@ -84,14 +84,14 @@ describe("Step 13: Connect to Lace Backend", () => {
   test("LaceUI creates primary agent with correct configuration", async () => {
     await laceUI.start();
 
-    expect(laceUI.primaryAgent).toBeTruthy();
-    expect(laceUI.primaryAgent.role).toBe("orchestrator");
-    expect(laceUI.primaryAgent.model.definition.name).toBe(
+    expect(laceUI.agentCoordinator.primaryAgentInstance).toBeTruthy();
+    expect(laceUI.agentCoordinator.primaryAgentInstance.role).toBe("orchestrator");
+    expect(laceUI.agentCoordinator.primaryAgentInstance.model.definition.name).toBe(
       "claude-3-5-sonnet-20241022",
     );
-    expect(laceUI.primaryAgent.model.definition.provider).toBe("anthropic");
-    expect(laceUI.primaryAgent.capabilities).toContain("orchestration");
-    expect(laceUI.primaryAgent.capabilities).toContain("reasoning");
+    expect(laceUI.agentCoordinator.primaryAgentInstance.model.definition.provider).toBe("anthropic");
+    expect(laceUI.agentCoordinator.primaryAgentInstance.capabilities).toContain("orchestration");
+    expect(laceUI.agentCoordinator.primaryAgentInstance.capabilities).toContain("reasoning");
   });
 
   test("handleMessage processes input through real agent", async () => {
@@ -107,7 +107,7 @@ describe("Step 13: Connect to Lace Backend", () => {
     };
 
     jest
-      .spyOn(laceUI.primaryAgent, "processInput")
+      .spyOn(laceUI.agentCoordinator.primaryAgentInstance, "processInput")
       .mockResolvedValue(mockResponse);
 
     const result = await laceUI.handleMessage("Hello, test message");
@@ -120,7 +120,7 @@ describe("Step 13: Connect to Lace Backend", () => {
     );
 
     // Verify agent was called correctly
-    expect(laceUI.primaryAgent.processInput).toHaveBeenCalledWith(
+    expect(laceUI.agentCoordinator.primaryAgentInstance.processInput).toHaveBeenCalledWith(
       laceUI.conversation,
       "Hello, test message",
       expect.objectContaining({
@@ -148,7 +148,7 @@ describe("Step 13: Connect to Lace Backend", () => {
     };
 
     jest
-      .spyOn(laceUI.primaryAgent, "processInput")
+      .spyOn(laceUI.agentCoordinator.primaryAgentInstance, "processInput")
       .mockResolvedValue(mockResponse);
 
     const result = await laceUI.handleMessage("Read file and run command");
@@ -178,7 +178,7 @@ describe("Step 13: Connect to Lace Backend", () => {
 
     // Mock agent to call onToken callback
     jest
-      .spyOn(laceUI.primaryAgent, "processInput")
+      .spyOn(laceUI.agentCoordinator.primaryAgentInstance, "processInput")
       .mockImplementation(async (sessionId, input, options: any) => {
         onTokenCallback = options.onToken;
 
@@ -209,7 +209,7 @@ describe("Step 13: Connect to Lace Backend", () => {
 
     // Mock agent to simulate abortable operation
     jest
-      .spyOn(laceUI.primaryAgent, "processInput")
+      .spyOn(laceUI.agentCoordinator.primaryAgentInstance, "processInput")
       .mockImplementation(async (sessionId, input, options: any) => {
         // Simulate immediate abort
         const error = new Error("Operation was aborted");
@@ -284,18 +284,25 @@ describe("Step 13: Connect to Lace Backend", () => {
   test("getStatus returns comprehensive agent status", async () => {
     await laceUI.start();
 
-    // Mock context usage calculation
-    jest.spyOn(laceUI.primaryAgent, "calculateContextUsage").mockReturnValue({
+    // Mock context usage calculation on agentCoordinator
+    jest.spyOn(laceUI.agentCoordinator, "calculateContextUsage").mockReturnValue({
       used: 1000,
       total: 200000,
       percentage: 0.5,
       remaining: 199000,
     });
 
-    jest.spyOn(laceUI.primaryAgent, "calculateCost").mockReturnValue({
+    jest.spyOn(laceUI.agentCoordinator, "calculateCost").mockReturnValue({
       inputCost: 0.001,
       outputCost: 0.002,
       totalCost: 0.003,
+    });
+
+    jest.spyOn(laceUI.agentCoordinator, "getAgentStatus").mockReturnValue({
+      role: "orchestrator",
+      model: "claude-3-5-sonnet-20241022",
+      provider: "anthropic",
+      generation: 0,
     });
 
     jest
@@ -320,7 +327,7 @@ describe("Step 13: Connect to Lace Backend", () => {
 
     // Mock long-running agent operation
     jest
-      .spyOn(laceUI.primaryAgent, "processInput")
+      .spyOn(laceUI.agentCoordinator.primaryAgentInstance, "processInput")
       .mockImplementation(async () => {
         return new Promise((resolve) => {
           resolveFirst = resolve;

@@ -31,9 +31,9 @@ describe("Lace Integration Tests", () => {
 
       assert.ok(lace.conversation, "Should have conversation");
       assert.ok(lace.tools, "Should have tool registry");
-      assert.ok(lace.primaryAgent, "Should have primary agent");
+      assert.ok(lace.agentCoordinator.primaryAgentInstance, "Should have primary agent");
       assert.strictEqual(
-        lace.primaryAgent.role,
+        lace.agentCoordinator.primaryAgentInstance.role,
         "orchestrator",
         "Primary agent should be orchestrator",
       );
@@ -53,7 +53,7 @@ describe("Lace Integration Tests", () => {
     test("should prepare tools for LLM format", async () => {
       const lace = await harness.createTestLaceUI();
 
-      const toolsForLLM = lace.primaryAgent.toolExecutor.buildToolsForLLM();
+      const toolsForLLM = lace.agentCoordinator.primaryAgentInstance.toolExecutor.buildToolsForLLM();
 
       assert.ok(Array.isArray(toolsForLLM), "Should return array of tools");
       assert.ok(toolsForLLM.length > 0, "Should have tools available");
@@ -82,7 +82,7 @@ describe("Lace Integration Tests", () => {
         chat: async () => ({ success: true, content: "Mock" })
       };
 
-      const subagent = await lace.primaryAgent.spawnSubagent({
+      const subagent = await lace.agentCoordinator.primaryAgentInstance.spawnSubagent({
         role: "execution",
         model: mockModelInstance,
         task: "Test task",
@@ -116,7 +116,7 @@ describe("Lace Integration Tests", () => {
       ];
 
       for (const testCase of testCases) {
-        const config = lace.primaryAgent.chooseAgentForTask(testCase.task);
+        const config = lace.agentCoordinator.primaryAgentInstance.chooseAgentForTask(testCase.task);
         assert.strictEqual(
           config.role,
           testCase.expectedRole,
@@ -134,7 +134,7 @@ describe("Lace Integration Tests", () => {
       const tempFile = await harness.createTempFile("test content");
 
       // Test tool execution through agent
-      const result = await lace.primaryAgent.toolExecutor.executeTool({
+      const result = await lace.agentCoordinator.primaryAgentInstance.toolExecutor.executeTool({
         name: "read_file",
         input: { path: tempFile },
       }, "test-session");
@@ -150,7 +150,7 @@ describe("Lace Integration Tests", () => {
     test("should execute JavaScript calculations", async () => {
       const lace = await harness.createTestLaceUI();
 
-      const result = await lace.primaryAgent.toolExecutor.executeTool({
+      const result = await lace.agentCoordinator.primaryAgentInstance.toolExecutor.executeTool({
         name: "javascript",
         input: { code: "6 * 12" },
       }, "test-session");
@@ -162,7 +162,7 @@ describe("Lace Integration Tests", () => {
     test("should handle shell commands", async () => {
       const lace = await harness.createTestLaceUI();
 
-      const result = await lace.primaryAgent.toolExecutor.executeTool({
+      const result = await lace.agentCoordinator.primaryAgentInstance.toolExecutor.executeTool({
         name: "shell",
         input: { command: 'echo "test"' },
       }, "test-session");
@@ -234,7 +234,7 @@ describe("Lace Integration Tests", () => {
       const lace = await harness.createTestLaceUI();
 
       try {
-        await lace.primaryAgent.toolExecutor.executeTool({
+        await lace.agentCoordinator.primaryAgentInstance.toolExecutor.executeTool({
           name: "nonexistent_tool",
           input: {},
         }, "test-session");
@@ -250,7 +250,7 @@ describe("Lace Integration Tests", () => {
     test("should handle file operation errors", async () => {
       const lace = await harness.createTestLaceUI();
 
-      const result = await lace.primaryAgent.toolExecutor.executeTool({
+      const result = await lace.agentCoordinator.primaryAgentInstance.toolExecutor.executeTool({
         name: "read_file",
         input: { path: "/nonexistent/file.txt" },
       }, "test-session");
@@ -264,7 +264,7 @@ describe("Lace Integration Tests", () => {
     test("should track context size and handoff conditions", async () => {
       const lace = await harness.createTestLaceUI();
 
-      const agent = lace.primaryAgent;
+      const agent = lace.agentCoordinator.primaryAgentInstance;
 
       assert.strictEqual(
         agent.contextSize,
