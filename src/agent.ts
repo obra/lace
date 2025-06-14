@@ -3,12 +3,12 @@
 // ABOUTME: Handles user input/output and orchestrates agent, tools, and thread management
 
 import * as readline from 'readline';
-import Anthropic from '@anthropic-ai/sdk';
 import { Agent } from './agents/agent.js';
 import { ToolRegistry } from './tools/registry.js';
 import { ToolExecutor } from './tools/executor.js';
 import { BashTool } from './tools/implementations/bash.js';
 import { ThreadManager } from './threads/thread.js';
+import { buildConversationFromEvents } from './threads/conversation-builder.js';
 
 // Initialize components
 const apiKey = process.env.ANTHROPIC_KEY;
@@ -35,36 +35,19 @@ threadManager.createThread(threadId);
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
-// Keep conversation state simple like the original
-const conversation: Anthropic.MessageParam[] = [];
-
 async function processMessage(userMessage: string): Promise<string> {
   if (userMessage.trim()) {
-    // Add user message to thread and conversation
+    // Add user message to thread
     threadManager.addEvent(threadId, 'USER_MESSAGE', userMessage);
-    conversation.push({ role: 'user', content: userMessage });
   }
+
+  // Rebuild conversation from thread events
+  const events = threadManager.getEvents(threadId);
+  const conversation = buildConversationFromEvents(events);
 
   // Get agent response with available tools
   const availableTools = toolRegistry.getAllTools();
   const response = await agent.createResponse(conversation, availableTools);
-
-  // Build assistant message content (text + tool calls)
-  const assistantContent: (Anthropic.TextBlock | Anthropic.ToolUseBlock)[] = [];
-  if (response.content) {
-    assistantContent.push({ type: 'text', text: response.content });
-  }
-  for (const toolCall of response.toolCalls) {
-    assistantContent.push({
-      type: 'tool_use',
-      id: toolCall.id,
-      name: toolCall.name,
-      input: toolCall.input,
-    });
-  }
-
-  // Add agent response to conversation
-  conversation.push({ role: 'assistant', content: assistantContent });
 
   // Add agent message to thread
   if (response.content) {
@@ -86,17 +69,12 @@ async function processMessage(userMessage: string): Promise<string> {
       // Execute tool
       const result = await toolExecutor.executeTool(toolCall.name, toolCall.input);
 
-      // Add tool result to thread and conversation
+      // Add tool result to thread
       threadManager.addEvent(threadId, 'TOOL_RESULT', {
         callId: toolCall.id,
         output: result.output,
         success: result.success,
         error: result.error,
-      });
-
-      conversation.push({
-        role: 'user',
-        content: [{ type: 'tool_result', tool_use_id: toolCall.id, content: result.output }],
       });
 
       console.log(result.output);
