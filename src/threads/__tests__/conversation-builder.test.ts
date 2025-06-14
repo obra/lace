@@ -1,5 +1,5 @@
-// ABOUTME: Tests for conversation reconstruction from thread events
-// ABOUTME: Ensures proper Anthropic message format is built from event sequence
+// ABOUTME: Tests for the updated conversation builder with provider abstraction
+// ABOUTME: Verifies correct conversion of events to provider-agnostic message format
 
 import { describe, it, expect } from 'vitest';
 import { ThreadEvent } from '../types.js';
@@ -28,7 +28,7 @@ describe('buildConversationFromEvents', () => {
 
     expect(messages).toEqual([
       { role: 'user', content: 'Hello!' },
-      { role: 'assistant', content: [{ type: 'text', text: 'Hi there!' }] },
+      { role: 'assistant', content: 'Hi there!' },
     ]);
   });
 
@@ -76,27 +76,12 @@ describe('buildConversationFromEvents', () => {
 
     expect(messages).toEqual([
       { role: 'user', content: 'List files' },
-      {
-        role: 'assistant',
-        content: [
-          { type: 'text', text: "I'll list the files for you." },
-          {
-            type: 'tool_use',
-            id: 'call_123',
-            name: 'bash',
-            input: { command: 'ls' },
-          },
-        ],
-      },
+      { role: 'assistant', content: "I'll list the files for you." },
+      { role: 'assistant', content: '[Called tool: bash with input: {"command":"ls"}]' },
       {
         role: 'user',
-        content: [
-          {
-            type: 'tool_result',
-            tool_use_id: 'call_123',
-            content: '{"stdout":"file1.txt\\nfile2.txt","stderr":"","exitCode":0}',
-          },
-        ],
+        content:
+          '[Tool result: SUCCESS - {"stdout":"file1.txt\\nfile2.txt","stderr":"","exitCode":0}]',
       },
     ]);
   });
@@ -130,9 +115,35 @@ describe('buildConversationFromEvents', () => {
       },
     ];
 
-    expect(() => buildConversationFromEvents(events)).toThrow(
-      'Tool result without corresponding tool call'
-    );
+    // In the new format, orphaned tool results are just converted to messages
+    const messages = buildConversationFromEvents(events);
+    expect(messages).toEqual([{ role: 'user', content: '[Tool result: SUCCESS - result]' }]);
+  });
+
+  it('should handle tool result with error', () => {
+    const events: ThreadEvent[] = [
+      {
+        id: 'evt1',
+        threadId: 'thread1',
+        type: 'TOOL_RESULT',
+        timestamp: new Date(),
+        data: {
+          callId: 'call_123',
+          output: 'Failed to execute command',
+          success: false,
+          error: 'Permission denied',
+        },
+      },
+    ];
+
+    const messages = buildConversationFromEvents(events);
+
+    expect(messages).toEqual([
+      {
+        role: 'user',
+        content: '[Tool result: ERROR - Failed to execute command (Error: Permission denied)]',
+      },
+    ]);
   });
 
   it('should handle real event structure from logging', () => {
@@ -181,28 +192,17 @@ describe('buildConversationFromEvents', () => {
 
     expect(messages).toEqual([
       { role: 'user', content: "echo 'test'" },
-      {
-        role: 'assistant',
-        content: [
-          { type: 'text', text: "I'll execute the echo command for you:" },
-          {
-            type: 'tool_use',
-            id: 'toolu_01RkT8GPyHVx4SDwZiaoacs8',
-            name: 'bash',
-            input: { command: "echo 'test'" },
-          },
-        ],
-      },
+      { role: 'assistant', content: "I'll execute the echo command for you:" },
+      { role: 'assistant', content: '[Called tool: bash with input: {"command":"echo \'test\'"}]' },
       {
         role: 'user',
-        content: [
-          {
-            type: 'tool_result',
-            tool_use_id: 'toolu_01RkT8GPyHVx4SDwZiaoacs8',
-            content: '{"stdout":"test\\n","stderr":"","exitCode":0}',
-          },
-        ],
+        content: '[Tool result: SUCCESS - {"stdout":"test\\n","stderr":"","exitCode":0}]',
       },
     ]);
+  });
+
+  it('should handle empty events array', () => {
+    const messages = buildConversationFromEvents([]);
+    expect(messages).toEqual([]);
   });
 });

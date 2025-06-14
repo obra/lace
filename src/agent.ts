@@ -4,6 +4,7 @@
 
 import * as readline from 'readline';
 import { Agent } from './agents/agent.js';
+import { AnthropicProvider } from './providers/anthropic-provider.js';
 import { ToolRegistry } from './tools/registry.js';
 import { ToolExecutor } from './tools/executor.js';
 import { BashTool } from './tools/implementations/bash.js';
@@ -17,10 +18,12 @@ if (!apiKey) {
   process.exit(1);
 }
 
-const agent = new Agent({
+const provider = new AnthropicProvider({
   apiKey,
   systemPrompt: 'You are a coding assistant. Use the bash tool to help with programming tasks.',
 });
+
+const agent = new Agent({ provider });
 
 const toolRegistry = new ToolRegistry();
 const toolExecutor = new ToolExecutor(toolRegistry);
