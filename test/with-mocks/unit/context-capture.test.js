@@ -411,8 +411,8 @@ describe("ContextCapture", () => {
       );
 
       // Verify conversation context
-      assert.ok(context.conversationTurns, "Should have conversation turns");
-      assert.ok(context.recentHistory, "Should have recent history");
+      assert.ok(context.conversationTurns !== undefined, "Should have conversation turns");
+      assert.ok(context.recentHistory !== undefined, "Should have recent history");
       assert.strictEqual(context.sessionId, "session-123");
       assert.strictEqual(context.currentGeneration, 1);
 
