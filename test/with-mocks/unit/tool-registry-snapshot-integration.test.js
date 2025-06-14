@@ -13,6 +13,12 @@ import {
 import { promises as fs } from "fs";
 import { join } from "path";
 
+// Import new mock factories
+import {
+  createMockDatabase,
+  createMockActivityLogger,
+} from "../__mocks__/standard-mocks.js";
+
 describe("ToolRegistry Snapshot Integration", () => {
   let testHarness;
   let testDir;
@@ -30,37 +36,44 @@ describe("ToolRegistry Snapshot Integration", () => {
     // Track created snapshots for verification
     mockSnapshots = [];
 
-    // Create mock ConversationDB
-    mockConversationDB = {
-      getConversationHistory: async (sessionId, limit) => [
-        {
-          id: 1,
-          sessionId,
-          generation: 1,
-          role: "user",
-          content: "Please execute this tool",
-          timestamp: new Date().toISOString(),
-          contextSize: 100,
-        },
-      ],
-      searchConversations: async () => [],
-    };
-
-    // Create mock ActivityLogger
-    mockActivityLogger = {
-      getEvents: async (options) => [
-        {
-          id: 1,
-          eventType: "tool_call",
-          localSessionId: options.sessionId || "session-123",
-          timestamp: new Date().toISOString(),
-          data: { toolName: "previous-tool", operation: "previous-op" },
-        },
-      ],
-      logEvent: async (eventType, sessionId, modelSessionId, data) => {
-        // Store logged events for verification
-        return { id: Date.now(), eventType, sessionId, data };
+    // Create mock ConversationDB using factory
+    const conversationHistory = [
+      {
+        id: 1,
+        sessionId: "session-123",
+        generation: 1,
+        role: "user",
+        content: "Please execute this tool",
+        timestamp: new Date().toISOString(),
+        contextSize: 100,
       },
+    ];
+    
+    mockConversationDB = createMockDatabase({
+      conversationHistory,
+      shouldSucceed: true
+    });
+    
+    // Override searchConversations for specific test behavior
+    mockConversationDB.searchConversations = async () => [];
+
+    // Create mock ActivityLogger using factory
+    mockActivityLogger = createMockActivityLogger();
+    
+    // Override getEvents and logEvent for specific test behavior
+    mockActivityLogger.getEvents = async (options) => [
+      {
+        id: 1,
+        eventType: "tool_call",
+        localSessionId: options.sessionId || "session-123",
+        timestamp: new Date().toISOString(),
+        data: { toolName: "previous-tool", operation: "previous-op" },
+      },
+    ];
+    
+    mockActivityLogger.logEvent = async (eventType, sessionId, modelSessionId, data) => {
+      // Store logged events for verification
+      return { id: Date.now(), eventType, sessionId, data };
     };
 
     // Try to import the classes

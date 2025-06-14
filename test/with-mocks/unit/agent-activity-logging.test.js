@@ -13,23 +13,12 @@ import {
 import { Agent } from "../../../src/agents/agent.ts";
 import { ActivityLogger } from "../../../src/logging/activity-logger.js";
 import { promises as fs } from "fs";
-
-// Helper function to create mock model instances for JavaScript tests
-function createMockModelInstance(name = "test-model", provider = "test") {
-  return {
-    definition: {
-      name,
-      provider,
-      contextWindow: 200000,
-      inputPrice: 0.01,
-      outputPrice: 0.03,
-      capabilities: ["chat", "tools"]
-    },
-    chat: async () => ({ success: true, content: "Mock response" })
-  };
-}
 import { tmpdir } from "os";
 import { join } from "path";
+
+// Import new mock factories
+import { createMockModelInstance, createMockModelProvider } from "../__mocks__/model-definitions.js";
+import { createMockTools } from "../__mocks__/standard-mocks.js";
 
 describe("Agent Model Call Activity Logging", () => {
   let harness;
@@ -47,31 +36,36 @@ describe("Agent Model Call Activity Logging", () => {
 
     sessionId = `test-session-${Date.now()}`;
 
-    // Create mock model provider
-    mockModelProvider = {
-      chat: async (messages, options) => {
-        // Simulate processing delay
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        return {
-          success: true,
-          content: "Mock model response",
-          usage: {
-            input_tokens: 100,
-            output_tokens: 50,
-            total_tokens: 150,
-          },
-        };
-      },
+    // Create mock model provider using factory
+    mockModelProvider = createMockModelProvider("test", {
+      defaultResponse: "Mock model response"
+    });
+    
+    // Override chat method to include processing delay and proper usage data
+    mockModelProvider.chat = async (messages, options) => {
+      // Simulate processing delay
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      return {
+        success: true,
+        content: "Mock model response",
+        usage: {
+          input_tokens: 100,
+          output_tokens: 50,
+          total_tokens: 150,
+        },
+      };
     };
 
-    // Create mock tools
-    const mockTools = {
-      listTools: () => ["test-tool"],
-      getToolSchema: (toolName) => ({ description: "Test tool" }),
-    };
+    // Create mock tools using factory
+    const mockTools = createMockTools({
+      availableTools: ["test-tool"],
+      shouldSucceed: true
+    });
 
     // Create agent with activity logger
-    const mockModel = createMockModelInstance();
+    const mockModel = createMockModelInstance("test-model", {
+      definitionOverrides: { provider: "test" }
+    });
     agent = new Agent({
       model: mockModel,
       generation: 0,
@@ -289,19 +283,24 @@ describe("Agent Model Call Activity Logging", () => {
   describe("Error Handling", () => {
     test("should not log response events when model call fails", async () => {
       // Create failing mock provider
-      const failingProvider = {
-        chat: async () => ({
-          success: false,
-          error: "Mock API error",
-        }),
-      };
+      const failingProvider = createMockModelProvider("test", {
+        shouldSucceed: false
+      });
+      
+      // Override to return specific error structure
+      failingProvider.chat = async () => ({
+        success: false,
+        error: "Mock API error",
+      });
 
-      const mockTools = {
-        listTools: () => ["test-tool"],
-        getToolSchema: (toolName) => ({ description: "Test tool" }),
-      };
+      const mockTools = createMockTools({
+        availableTools: ["test-tool"],
+        shouldSucceed: true
+      });
 
-      const mockModel2 = createMockModelInstance();
+      const mockModel2 = createMockModelInstance("test-model", {
+        defaultResponse: "Mock response"
+      });
       const failingAgent = new Agent({
         model: mockModel2,
         generation: 0,
@@ -333,12 +332,14 @@ describe("Agent Model Call Activity Logging", () => {
     });
 
     test("should handle missing activity logger gracefully", async () => {
-      const mockTools = {
-        listTools: () => ["test-tool"],
-        getToolSchema: (toolName) => ({ description: "Test tool" }),
-      };
+      const mockTools = createMockTools({
+        availableTools: ["test-tool"],
+        shouldSucceed: true
+      });
 
-      const mockModel3 = createMockModelInstance();
+      const mockModel3 = createMockModelInstance("test-model", {
+        defaultResponse: "Mock response"
+      });
       const agentWithoutLogger = new Agent({
         model: mockModel3,
         generation: 0,

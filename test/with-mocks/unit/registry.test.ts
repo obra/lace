@@ -10,6 +10,9 @@ import {
 } from "@/ui/commands/registry";
 import type { CommandContext } from "@/ui/commands/types";
 
+// Import new mock factories
+import { createMockTools, createMockDatabase } from "../__mocks__/standard-mocks.js";
+
 describe("Command Registry", () => {
   let mockContext: CommandContext;
   let mockLaceUI: any;
@@ -32,13 +35,22 @@ describe("Command Registry", () => {
       sessionId: "test-session",
     };
 
+    const mockTools = createMockTools({
+      availableTools: ["file", "shell", "search"],
+      shouldSucceed: true,
+      customResponses: {}
+    });
+
+    const mockDatabase = createMockDatabase({
+      conversationHistory: [
+        { role: "user", content: "test message", timestamp: Date.now() },
+        { role: "assistant", content: "test response", timestamp: Date.now() },
+      ],
+      shouldSucceed: true
+    });
+
     mockAgent = {
-      tools: {
-        listTools: jest.fn(() => ["file", "shell", "search"]),
-        getToolSchema: jest.fn((toolName) => ({
-          description: `${toolName} tool description`,
-        })),
-      },
+      tools: mockTools,
       toolApproval: {
         getStatus: jest.fn(() => ({
           interactive: true,
@@ -48,10 +60,7 @@ describe("Command Registry", () => {
         addAutoApprove: jest.fn(),
         addDenyList: jest.fn(),
       },
-      getConversationHistory: jest.fn(async () => [
-        { role: "user", content: "test message", timestamp: Date.now() },
-        { role: "assistant", content: "test response", timestamp: Date.now() },
-      ]),
+      getConversationHistory: mockDatabase.getConversationHistory,
     };
 
     mockContext = {
@@ -117,9 +126,9 @@ describe("Command Registry", () => {
       expect(result.success).toBe(true);
       expect(result.shouldShowModal?.type).toBe("tools");
       expect(result.shouldShowModal?.data.tools).toEqual([
-        { name: "file", description: "file tool description" },
-        { name: "shell", description: "shell tool description" },
-        { name: "search", description: "search tool description" },
+        { name: "file", description: "Mock file tool description" },
+        { name: "shell", description: "Mock shell tool description" },
+        { name: "search", description: "Mock search tool description" },
       ]);
     });
 

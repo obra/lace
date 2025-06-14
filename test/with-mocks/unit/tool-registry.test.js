@@ -4,6 +4,19 @@
 import { jest, describe, test, beforeEach, afterEach, expect } from "@jest/globals";
 import { ToolRegistry } from "@/tools/tool-registry.js";
 
+// Import new mock factories
+import { 
+  MockShellTool as FactoryShellTool, 
+  MockReadFileTool as FactoryReadFileTool, 
+  MockWriteFileTool as FactoryWriteFileTool, 
+  MockJavaScriptTool as FactoryJavaScriptTool 
+} from "../__mocks__/tools-mock.js";
+import { 
+  createMockActivityLogger, 
+  createMockSnapshotManager, 
+  createMockDatabase 
+} from "../__mocks__/standard-mocks.js";
+
 // Mock the Conversation class
 const mockConversation = {
   getMessages: jest.fn(() => Promise.resolve([
@@ -19,33 +32,7 @@ jest.mock("@/conversation/conversation.js", () => ({
   }
 }));
 
-// Mock tool classes
-class MockShellTool {
-  async initialize() {}
-  
-  getMetadata() {
-    return {
-      description: "Shell command execution",
-      methods: {
-        run: {
-          description: "Execute shell command",
-          parameters: {
-            command: { type: "string", required: true }
-          }
-        }
-      }
-    };
-  }
-  
-  async run(params) {
-    return { stdout: "hello\n", stderr: "", exitCode: 0 };
-  }
-  
-  // BaseTool compatibility
-  async execute(params) {
-    return this.run(params);
-  }
-}
+// Additional mock tool classes (using our tool factories for core tools)
 
 class MockReadFileTool {
   async initialize() {}
@@ -179,15 +166,15 @@ class MockAgentDelegateTool {
 
 // Mock all tool modules
 jest.mock("@/tools/shell.js", () => ({
-  ShellTool: MockShellTool
+  ShellTool: FactoryShellTool
 }));
 
 jest.mock("@/tools/read-file.js", () => ({
-  ReadFileTool: MockReadFileTool
+  ReadFileTool: FactoryReadFileTool
 }));
 
 jest.mock("@/tools/write-file.js", () => ({
-  WriteFileTool: MockWriteFileTool
+  WriteFileTool: FactoryWriteFileTool
 }));
 
 jest.mock("@/tools/list-files.js", () => ({
@@ -195,14 +182,7 @@ jest.mock("@/tools/list-files.js", () => ({
 }));
 
 jest.mock("@/tools/javascript.js", () => ({
-  JavaScriptTool: class {
-    async initialize() {}
-    getMetadata() { return { description: "JavaScript execution" }; }
-    async run() { return { result: 42 }; }
-    async execute(params) {
-      return this.run(params);
-    }
-  }
+  JavaScriptTool: FactoryJavaScriptTool
 }));
 
 jest.mock("@/tools/file-search.js", () => ({
@@ -226,21 +206,15 @@ describe("ToolRegistry", () => {
       { role: "assistant", content: "Hi there" }
     ]);
 
-    mockActivityLogger = {
-      logEvent: jest.fn()
-    };
-
-    mockSnapshotManager = {
-      createPreToolSnapshot: jest.fn(() => ({ snapshotId: "pre-123" })),
-      createPostToolSnapshot: jest.fn(() => ({ snapshotId: "post-456" }))
-    };
-
-    mockConversationDB = {
-      getConversationHistory: jest.fn(() => [
+    // Use mock factories instead of duplicated mock setup
+    mockActivityLogger = createMockActivityLogger();
+    mockSnapshotManager = createMockSnapshotManager();
+    mockConversationDB = createMockDatabase({
+      conversationHistory: [
         { role: "user", content: "Hello" },
         { role: "assistant", content: "Hi there" }
-      ])
-    };
+      ]
+    });
 
     registry = new ToolRegistry({
       activityLogger: mockActivityLogger,

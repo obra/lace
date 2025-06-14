@@ -337,19 +337,9 @@ export class LaceUI {
       tools: this.tools.listTools(),
       session: this.conversation.getSessionId(),
       conversation: this.primaryAgent.getConversationMetrics(),
-      config: this.primaryAgent.getConversationConfig(),
     };
   }
 
-  updateConversationConfig(updates: any) {
-    if (!this.primaryAgent) {
-      throw new Error("No primary agent available");
-    }
-    
-    return this.primaryAgent.updateConversationConfig(updates);
-  }
-
-  // Command completion is now handled by CommandManager in the UI layer
 
   // File completion using the list_files tool
   async getFileCompletions(prefix: string) {

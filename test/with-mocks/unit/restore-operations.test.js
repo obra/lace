@@ -10,8 +10,12 @@ import {
   TestHarness,
   utils,
 } from "../../test-harness.js";
+import { jest } from "@jest/globals";
 import { promises as fs } from "fs";
 import { join } from "path";
+
+// Import new mock factories
+import { createMockSnapshotManager, createMockGitOperations } from "../__mocks__/standard-mocks.js";
 
 describe("RestoreOperations", () => {
   let testHarness;
@@ -63,66 +67,75 @@ describe("RestoreOperations", () => {
       },
     ];
 
-    // Create mock SnapshotManager
-    mockSnapshotManager = {
-      listSnapshots: async (filters = {}) => {
-        let results = [...testSnapshots];
-        if (filters.type) {
-          results = results.filter((s) => s.type === filters.type);
-        }
-        if (filters.since) {
-          const sinceTime = new Date(filters.since);
-          results = results.filter((s) => new Date(s.timestamp) >= sinceTime);
-        }
-        return results;
-      },
-      loadSnapshotMetadata: async (snapshotId) => {
-        const snapshot = testSnapshots.find((s) => s.snapshotId === snapshotId);
-        if (!snapshot) {
-          throw new Error(`Snapshot ${snapshotId} not found`);
-        }
-        return snapshot;
-      },
-      getSystemStats: async () => ({
-        totalSnapshots: testSnapshots.length,
-        totalSize: 2136,
-        averageSnapshotSize: 712,
-        oldestSnapshot: "2025-06-05T15:30:00Z",
-        newestSnapshot: "2025-06-05T15:35:01Z",
-      }),
-    };
+    // Create mock SnapshotManager using factory with custom methods
+    mockSnapshotManager = createMockSnapshotManager();
+    
+    // Add the specific methods this test needs
+    mockSnapshotManager.listSnapshots = jest.fn().mockImplementation(async (filters = {}) => {
+      let results = [...testSnapshots];
+      if (filters.type) {
+        results = results.filter((s) => s.type === filters.type);
+      }
+      if (filters.since) {
+        const sinceTime = new Date(filters.since);
+        results = results.filter((s) => new Date(s.timestamp) >= sinceTime);
+      }
+      return results;
+    });
+    
+    mockSnapshotManager.loadSnapshotMetadata = jest.fn().mockImplementation(async (snapshotId) => {
+      const snapshot = testSnapshots.find((s) => s.snapshotId === snapshotId);
+      if (!snapshot) {
+        throw new Error(`Snapshot ${snapshotId} not found`);
+      }
+      return snapshot;
+    });
+    
+    mockSnapshotManager.getSystemStats = jest.fn().mockResolvedValue({
+      totalSnapshots: testSnapshots.length,
+      totalSize: 2136,
+      averageSnapshotSize: 712,
+      oldestSnapshot: "2025-06-05T15:30:00Z",
+      newestSnapshot: "2025-06-05T15:35:01Z",
+    });
 
-    // Create mock GitOperations
-    mockGitOperations = {
-      checkout: async (commitSha) => {
-        if (!commitSha || commitSha === "invalid") {
-          throw new Error("Invalid commit SHA");
-        }
-        return { success: true, commit: commitSha };
-      },
-      getWorkingTreeStatus: async () => ({
-        modified: ["file1.js"],
-        untracked: ["temp.log"],
-        deleted: [],
-        hasChanges: true,
-      }),
-      createBranch: async (branchName, startPoint = null) => {
-        return { branch: branchName, startPoint };
-      },
-      getCurrentCommit: async () => "current-abc123",
-      getDiffFiles: async (fromCommit, toCommit) => ({
-        modified: ["src/main.js", "package.json"],
-        added: ["src/new-feature.js"],
-        deleted: ["src/old-file.js"],
-        totalChanges: 4,
-      }),
-      restoreFiles: async (commitSha, filePaths) => {
-        if (filePaths.includes("nonexistent.js")) {
-          throw new Error("File not found in snapshot");
-        }
-        return { restoredFiles: filePaths, commit: commitSha };
-      },
-    };
+    // Create mock GitOperations using factory with custom methods  
+    mockGitOperations = createMockGitOperations();
+    
+    // Add the specific methods this test needs
+    mockGitOperations.checkout = jest.fn().mockImplementation(async (commitSha) => {
+      if (!commitSha || commitSha === "invalid") {
+        throw new Error("Invalid commit SHA");
+      }
+      return { success: true, commit: commitSha };
+    });
+    
+    mockGitOperations.getWorkingTreeStatus = jest.fn().mockResolvedValue({
+      modified: ["file1.js"],
+      untracked: ["temp.log"],
+      deleted: [],
+      hasChanges: true,
+    });
+    
+    mockGitOperations.createBranch = jest.fn().mockImplementation(async (branchName, startPoint = null) => {
+      return { branch: branchName, startPoint };
+    });
+    
+    mockGitOperations.getCurrentCommit = jest.fn().mockResolvedValue("current-abc123");
+    
+    mockGitOperations.getDiffFiles = jest.fn().mockResolvedValue({
+      modified: ["src/main.js", "package.json"],
+      added: ["src/new-feature.js"],
+      deleted: ["src/old-file.js"],
+      totalChanges: 4,
+    });
+    
+    mockGitOperations.restoreFiles = jest.fn().mockImplementation(async (commitSha, filePaths) => {
+      if (filePaths.includes("nonexistent.js")) {
+        throw new Error("File not found in snapshot");
+      }
+      return { restoredFiles: filePaths, commit: commitSha };
+    });
 
     // Try to import the class
     try {

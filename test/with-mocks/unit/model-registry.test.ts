@@ -5,6 +5,9 @@ import { describe, it, expect, jest } from '@jest/globals';
 import { ModelRegistry, BaseModelProvider, ModelProviderMetadata } from '../../../src/models/model-registry.js';
 import { ModelDefinition } from '../../../src/models/model-definition.js';
 
+// Import new mock factories
+import { createMockModelDefinition, createMockModelProvider } from '../__mocks__/model-definitions.js';
+
 describe('ModelRegistry', () => {
   let registry: ModelRegistry;
 
@@ -13,17 +16,7 @@ describe('ModelRegistry', () => {
   });
 
   describe('provider management', () => {
-    const mockProvider: BaseModelProvider = {
-      initialize: jest.fn().mockImplementation(() => Promise.resolve()),
-      chat: jest.fn().mockImplementation(() => Promise.resolve({ role: 'assistant', content: 'response' })),
-      getInfo: jest.fn().mockReturnValue({ name: 'test-provider' }),
-      getMetadata: jest.fn().mockReturnValue({
-        name: 'test-provider',
-        description: 'Test provider',
-        supportedModels: {},
-        capabilities: []
-      })
-    } as BaseModelProvider;
+    const mockProvider = createMockModelProvider('test-provider');
 
     it('should register and retrieve providers', () => {
       registry.registerProvider('test', mockProvider);
@@ -60,14 +53,7 @@ describe('ModelRegistry', () => {
   });
 
   describe('model definition management', () => {
-    const mockDefinition: ModelDefinition = {
-      name: 'claude-3-5-sonnet-20241022',
-      provider: 'anthropic',
-      contextWindow: 200000,
-      inputPrice: 3.0,
-      outputPrice: 15.0,
-      capabilities: ['chat', 'tools', 'vision']
-    };
+    const mockDefinition = createMockModelDefinition('claude-3-5-sonnet-20241022');
 
     it('should register and retrieve model definitions', () => {
       registry.registerModelDefinition('claude-3-5-sonnet-20241022', mockDefinition);
@@ -100,23 +86,13 @@ describe('ModelRegistry', () => {
     });
 
     it('should handle multiple model definitions from different providers', () => {
-      const anthropicModel: ModelDefinition = {
-        name: 'claude-3-5-sonnet-20241022',
-        provider: 'anthropic',
-        contextWindow: 200000,
-        inputPrice: 3.0,
-        outputPrice: 15.0,
-        capabilities: ['chat', 'tools', 'vision']
-      };
-
-      const openaiModel: ModelDefinition = {
-        name: 'gpt-4-turbo',
+      const anthropicModel = createMockModelDefinition('claude-3-5-sonnet-20241022', { provider: 'anthropic' });
+      const openaiModel = createMockModelDefinition('gpt-4-turbo', { 
         provider: 'openai',
         contextWindow: 128000,
         inputPrice: 10.0,
-        outputPrice: 30.0,
-        capabilities: ['chat', 'tools', 'vision']
-      };
+        outputPrice: 30.0
+      });
 
       registry.registerModelDefinition('claude-3-5-sonnet-20241022', anthropicModel);
       registry.registerModelDefinition('gpt-4-turbo', openaiModel);

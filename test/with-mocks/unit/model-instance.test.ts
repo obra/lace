@@ -5,50 +5,43 @@ import { describe, it, expect, jest } from '@jest/globals';
 import { ModelInstance, ChatOptions, SessionOptions } from '../../../src/models/model-instance.js';
 import { ModelDefinition } from '../../../src/models/model-definition.js';
 
+// Import new mock factories
+import { createMockModelDefinition, createMockModelInstance } from '../__mocks__/model-definitions.js';
+
 describe('ModelInstance', () => {
-  const mockDefinition: ModelDefinition = {
-    name: 'claude-3-5-sonnet-20241022',
-    provider: 'anthropic',
-    contextWindow: 200000,
-    inputPrice: 3.0,
-    outputPrice: 15.0,
-    capabilities: ['chat', 'tools', 'vision']
-  };
+  const mockDefinition = createMockModelDefinition('claude-3-5-sonnet-20241022');
 
   it('should have definition and chat method', () => {
-    const mockChat = jest.fn().mockImplementation(() => Promise.resolve({ role: 'assistant', content: 'Hello' }));
-    
-    const instance: ModelInstance = {
-      definition: mockDefinition,
-      chat: mockChat
-    } as ModelInstance;
+    const instance = createMockModelInstance('claude-3-5-sonnet-20241022', {
+      defaultResponse: 'Hello',
+      shouldSucceed: true,
+      definitionOverrides: {}
+    });
 
-    expect(instance.definition).toBe(mockDefinition);
+    expect(instance.definition.name).toBe('claude-3-5-sonnet-20241022');
     expect(typeof instance.chat).toBe('function');
   });
 
   it('should support chat with basic messages', async () => {
-    const mockChat = jest.fn().mockImplementation(() => Promise.resolve({ role: 'assistant', content: 'Hello' }));
-    
-    const instance: ModelInstance = {
-      definition: mockDefinition,
-      chat: mockChat
-    } as ModelInstance;
+    const instance = createMockModelInstance('claude-3-5-sonnet-20241022', {
+      defaultResponse: 'Hello',
+      shouldSucceed: true,
+      definitionOverrides: {}
+    });
 
     const messages = [{ role: 'user', content: 'Hi' }];
     const result = await instance.chat(messages);
 
-    expect(mockChat).toHaveBeenCalledWith(messages);
-    expect(result).toEqual({ role: 'assistant', content: 'Hello' });
+    expect(instance.chat).toHaveBeenCalledWith(messages);
+    expect(result).toEqual({ success: true, content: 'Hello', usage: expect.any(Object) });
   });
 
   it('should support chat with options', async () => {
-    const mockChat = jest.fn().mockImplementation(() => Promise.resolve({ role: 'assistant', content: 'Response' }));
-    
-    const instance: ModelInstance = {
-      definition: mockDefinition,
-      chat: mockChat
-    } as ModelInstance;
+    const instance = createMockModelInstance('claude-3-5-sonnet-20241022', {
+      defaultResponse: 'Response',
+      shouldSucceed: true,
+      definitionOverrides: {}
+    });
 
     const messages = [{ role: 'user', content: 'Hi' }];
     const options: ChatOptions = {
@@ -60,7 +53,7 @@ describe('ModelInstance', () => {
 
     await instance.chat(messages, options);
 
-    expect(mockChat).toHaveBeenCalledWith(messages, options);
+    expect(instance.chat).toHaveBeenCalledWith(messages, options);
   });
 
   describe('ChatOptions', () => {

@@ -13,6 +13,9 @@ import {
 import { promises as fs } from "fs";
 import { join } from "path";
 
+// Import new mock factories
+import { createMockGitOperations, createMockSnapshotConfig } from "../__mocks__/standard-mocks.js";
+
 describe("SnapshotManager", () => {
   let testHarness;
   let testDir;
@@ -25,42 +28,9 @@ describe("SnapshotManager", () => {
     testDir = join(process.cwd(), `test-snapshot-${Date.now()}`);
     await fs.mkdir(testDir, { recursive: true });
 
-    // Create mock config
-    mockConfig = {
-      enabled: true,
-      retentionPolicy: {
-        maxAge: "7 days",
-        maxSnapshots: 1000,
-        keepCheckpoints: true,
-      },
-      performance: {
-        excludePatterns: ["node_modules/**", "*.log"],
-        compressionLevel: 6,
-        backgroundPruning: true,
-      },
-      integration: {
-        autoSnapshotOnToolUse: true,
-        conversationTurnsToCapture: 5,
-        toolUsesToCapture: 10,
-      },
-    };
-
-    // Create mock GitOperations
-    mockGitOperations = {
-      initialize: async () => {},
-      addAndCommit: async (message) => `commit-${Date.now()}`,
-      getRepositoryStats: async () => ({
-        commitCount: 5,
-        fileCount: 10,
-        repositorySize: 1024,
-      }),
-      getChangedFiles: async () => ({
-        modified: ["file1.txt"],
-        untracked: ["file2.txt"],
-        deleted: [],
-      }),
-      cleanup: async () => {},
-    };
+    // Use mock factories to reduce duplication
+    mockConfig = createMockSnapshotConfig();
+    mockGitOperations = createMockGitOperations();
 
     // Try to import the class
     try {

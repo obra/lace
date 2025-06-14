@@ -13,6 +13,13 @@ import {
 import { promises as fs } from "fs";
 import { join } from "path";
 
+// Import new mock factories
+import {
+  createMockDatabase,
+  createMockActivityLogger,
+  createMockGitOperations,
+} from "../__mocks__/standard-mocks.js";
+
 describe("SnapshotManager + ContextCapture Integration", () => {
   let testHarness;
   let testDir;
@@ -27,72 +34,76 @@ describe("SnapshotManager + ContextCapture Integration", () => {
     testDir = join(process.cwd(), `test-integration-${Date.now()}`);
     await fs.mkdir(testDir, { recursive: true });
 
-    // Create mock ConversationDB
-    mockConversationDB = {
-      getConversationHistory: async (sessionId, limit) => [
-        {
-          id: 1,
-          sessionId,
-          generation: 1,
-          role: "user",
-          content: "Test user message",
-          timestamp: "2025-06-05T14:30:00Z",
-          contextSize: 100,
-        },
-        {
-          id: 2,
-          sessionId,
-          generation: 1,
-          role: "assistant",
-          content: "Test assistant response",
-          timestamp: "2025-06-05T14:30:05Z",
-          contextSize: 150,
-        },
-      ],
-      searchConversations: async (sessionId, query, limit) => [
-        {
-          id: 3,
-          content: `Related conversation about ${query}`,
-          timestamp: "2025-06-05T14:25:00Z",
-        },
-      ],
-    };
+    // Create mock ConversationDB using factory
+    const conversationHistory = [
+      {
+        id: 1,
+        sessionId: "session-123",
+        generation: 1,
+        role: "user",
+        content: "Test user message",
+        timestamp: "2025-06-05T14:30:00Z",
+        contextSize: 100,
+      },
+      {
+        id: 2,
+        sessionId: "session-123",
+        generation: 1,
+        role: "assistant",
+        content: "Test assistant response",
+        timestamp: "2025-06-05T14:30:05Z",
+        contextSize: 150,
+      },
+    ];
+    
+    mockConversationDB = createMockDatabase({
+      conversationHistory,
+      shouldSucceed: true
+    });
+    
+    // Override searchConversations for specific test behavior
+    mockConversationDB.searchConversations = async (sessionId, query, limit) => [
+      {
+        id: 3,
+        content: `Related conversation about ${query}`,
+        timestamp: "2025-06-05T14:25:00Z",
+      },
+    ];
 
-    // Create mock ActivityLogger
-    mockActivityLogger = {
-      getEvents: async (options) => [
-        {
-          id: 1,
-          eventType: "tool_call",
-          localSessionId: options.sessionId || "session-123",
-          modelSessionId: "model-456",
-          timestamp: "2025-06-05T14:29:30Z",
-          data: {
-            toolName: "file-tool",
-            operation: "read",
-            parameters: { path: "test.js" },
-            executionId: "exec-789",
-          },
+    // Create mock ActivityLogger using factory
+    mockActivityLogger = createMockActivityLogger();
+    
+    // Override getEvents for specific test behavior
+    mockActivityLogger.getEvents = async (options) => [
+      {
+        id: 1,
+        eventType: "tool_call",
+        localSessionId: options.sessionId || "session-123",
+        modelSessionId: "model-456",
+        timestamp: "2025-06-05T14:29:30Z",
+        data: {
+          toolName: "file-tool",
+          operation: "read",
+          parameters: { path: "test.js" },
+          executionId: "exec-789",
         },
-      ],
-    };
+      },
+    ];
 
-    // Create mock GitOperations
-    mockGitOperations = {
-      initialize: async () => {},
-      addAndCommit: async (message) => `commit-${Date.now()}`,
-      getRepositoryStats: async () => ({
+    // Create mock GitOperations using factory
+    mockGitOperations = createMockGitOperations({
+      shouldSucceed: true,
+      stats: {
         commitCount: 5,
         fileCount: 10,
         repositorySize: 1024,
-      }),
-      getChangedFiles: async () => ({
+      },
+      changedFiles: {
         modified: ["file1.txt"],
         untracked: ["file2.txt"],
         deleted: [],
-      }),
-      cleanup: async () => {},
-    };
+      },
+    });
 
     // Try to import the classes
     try {
@@ -221,15 +232,10 @@ describe("SnapshotManager + ContextCapture Integration", () => {
         assert.fail("Classes not implemented yet");
       }
 
-      // Create failing conversation DB
-      const failingConversationDB = {
-        getConversationHistory: async () => {
-          throw new Error("DB connection failed");
-        },
-        searchConversations: async () => {
-          throw new Error("DB connection failed");
-        },
-      };
+      // Create failing conversation DB using factory
+      const failingConversationDB = createMockDatabase({
+        shouldSucceed: false
+      });
 
       const manager = new SnapshotManager(testDir);
       manager.gitOps = mockGitOperations;

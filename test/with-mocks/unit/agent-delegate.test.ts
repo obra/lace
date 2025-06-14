@@ -4,6 +4,9 @@
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import { AgentDelegateTool } from '@/tools/agent-delegate.js';
 
+// Import new mock factories
+import { createMockTools, createMockModelProvider } from '../__mocks__/standard-mocks.js';
+
 describe('AgentDelegateTool', () => {
   let tool: AgentDelegateTool;
   let mockContext: any;
@@ -11,32 +14,15 @@ describe('AgentDelegateTool', () => {
   beforeEach(() => {
     tool = new AgentDelegateTool();
 
-    const mockTools = {
-      listTools: () => [],
-      getTool: () => null,
-    };
-
-    const mockModelProvider = {
-      getModelSession: () => ({
-        definition: {
-          name: 'test-model',
-          provider: 'test',
-          contextWindow: 200000,
-          inputPrice: 0.01,
-          outputPrice: 0.03,
-          capabilities: ['chat', 'tools']
-        },
-        chat: async () => ({
-          success: true,
-          content: 'Task completed successfully',
-          usage: {
-            prompt_tokens: 100,
-            completion_tokens: 50,
-            total_tokens: 150
-          }
-        })
-      })
-    };
+    // Use mock factories to reduce duplication
+    const mockTools = createMockTools({ 
+      availableTools: [], 
+      shouldSucceed: true, 
+      customResponses: {} 
+    });
+    const mockModelProvider = createMockModelProvider('test', {
+      defaultResponse: 'Task completed successfully'
+    });
 
     mockContext = {
       context: {

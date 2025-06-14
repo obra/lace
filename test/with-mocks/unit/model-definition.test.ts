@@ -4,16 +4,12 @@
 import { describe, it, expect } from '@jest/globals';
 import { ModelDefinition } from '../../../src/models/model-definition.js';
 
+// Import new mock factories
+import { createMockModelDefinition } from '../__mocks__/model-definitions.js';
+
 describe('ModelDefinition', () => {
   it('should have all required properties', () => {
-    const definition: ModelDefinition = {
-      name: 'claude-3-5-sonnet-20241022',
-      provider: 'anthropic',
-      contextWindow: 200000,
-      inputPrice: 3.0,
-      outputPrice: 15.0,
-      capabilities: ['chat', 'tools', 'vision']
-    };
+    const definition = createMockModelDefinition('claude-3-5-sonnet-20241022');
 
     expect(definition.name).toBe('claude-3-5-sonnet-20241022');
     expect(definition.provider).toBe('anthropic');
@@ -24,46 +20,42 @@ describe('ModelDefinition', () => {
   });
 
   it('should support different capability sets', () => {
-    const basicModel: ModelDefinition = {
-      name: 'gpt-3.5-turbo',
+    const basicModel = createMockModelDefinition('gpt-3.5-turbo', {
       provider: 'openai',
       contextWindow: 16385,
       inputPrice: 0.5,
       outputPrice: 1.5,
       capabilities: ['chat']
-    };
+    });
 
-    const advancedModel: ModelDefinition = {
-      name: 'gpt-4-vision-preview',
+    const advancedModel = createMockModelDefinition('gpt-4-vision-preview', {
       provider: 'openai',
       contextWindow: 128000,
       inputPrice: 10.0,
       outputPrice: 30.0,
       capabilities: ['chat', 'tools', 'vision', 'json']
-    };
+    });
 
     expect(basicModel.capabilities).toEqual(['chat']);
     expect(advancedModel.capabilities).toEqual(['chat', 'tools', 'vision', 'json']);
   });
 
   it('should support various pricing models', () => {
-    const freeModel: ModelDefinition = {
-      name: 'local-llama',
+    const freeModel = createMockModelDefinition('local-llama', {
       provider: 'local',
       contextWindow: 4096,
       inputPrice: 0,
       outputPrice: 0,
       capabilities: ['chat']
-    };
+    });
 
-    const expensiveModel: ModelDefinition = {
-      name: 'gpt-4-32k',
+    const expensiveModel = createMockModelDefinition('gpt-4-32k', {
       provider: 'openai',
       contextWindow: 32768,
       inputPrice: 60.0,
       outputPrice: 120.0,
       capabilities: ['chat', 'tools']
-    };
+    });
 
     expect(freeModel.inputPrice).toBe(0);
     expect(freeModel.outputPrice).toBe(0);

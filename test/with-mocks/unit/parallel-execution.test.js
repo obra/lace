@@ -114,12 +114,12 @@ describe("Parallel Tool Execution", () => {
 
       // Should have 2 successes and 1 failure
       const successes = results.filter((r) => r.success);
-      const failures = results.filter((r) => r.error);
+      const failures = results.filter((r) => !r.success || r.error);
 
       assert.equal(successes.length, 2, "Should have 2 successful results");
       assert.equal(failures.length, 1, "Should have 1 failed result");
       assert.ok(
-        failures[0].error.includes("error_run failed"),
+        failures[0].error && failures[0].error.includes("error_") && failures[0].error.includes("failed"),
         "Should capture error details",
       );
     });

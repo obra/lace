@@ -124,14 +124,7 @@ const agent = new Agent({
   }
 });
 
-// Update configuration at runtime
-agent.updateConversationConfig({
-  cachingStrategy: 'disabled',
-  historyLimit: 5
-});
 
-// Get current configuration
-const config = agent.getConversationConfig();
 ```
 
 ## TypeScript Migration Strategy

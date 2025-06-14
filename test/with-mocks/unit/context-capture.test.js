@@ -10,8 +10,12 @@ import {
   TestHarness,
   utils,
 } from "../../test-harness.js";
+import { jest } from "@jest/globals";
 import { promises as fs } from "fs";
 import { join } from "path";
+
+// Import new mock factories
+import { createMockActivityLogger, createMockConversation, createMockDatabase } from "../__mocks__/standard-mocks.js";
 
 describe("ContextCapture", () => {
   let testHarness;
@@ -26,7 +30,7 @@ describe("ContextCapture", () => {
     testDir = join(process.cwd(), `test-context-${Date.now()}`);
     await fs.mkdir(testDir, { recursive: true });
 
-    // Create mock ConversationDB
+    // Create mock ConversationDB using factory (kept for compatibility)
     mockConversationDB = {
       getConversationHistory: async (sessionId, limit) => [
         {
@@ -57,44 +61,12 @@ describe("ContextCapture", () => {
       ],
     };
 
-    // Create mock Conversation
-    mockConversation = {
-      getSessionId: () => "session-123",
-      getMessages: async (limit) => {
-        const allMessages = [
-          {
-            id: 1,
-            sessionId: "session-123",
-            generation: 1,
-            role: "user",
-            content: "Please help me with my code",
-            timestamp: "2025-06-05T14:30:00Z",
-            contextSize: 100,
-          },
-          {
-            id: 2,
-            sessionId: "session-123",
-            generation: 1,
-            role: "assistant",
-            content: "I'll help you with that.",
-            timestamp: "2025-06-05T14:30:05Z",
-            contextSize: 150,
-          },
-        ];
-        return limit ? allMessages.slice(0, limit) : allMessages;
-      },
-      search: async (query, limit) => [
-        {
-          id: 3,
-          content: "Related conversation about code",
-          timestamp: "2025-06-05T14:25:00Z",
-        },
-      ]
-    };
+    // Create mock Conversation using factory
+    mockConversation = createMockConversation();
 
-    // Create mock ActivityLogger
-    mockActivityLogger = {
-      getEvents: async (options) => [
+    // Create mock ActivityLogger using factory with default events
+    mockActivityLogger = createMockActivityLogger({
+      defaultEvents: [
         {
           id: 1,
           eventType: "tool_call",
@@ -120,8 +92,8 @@ describe("ContextCapture", () => {
             output: "File content here",
           },
         },
-      ],
-    };
+      ]
+    });
 
     // Try to import the class
     try {
@@ -294,8 +266,8 @@ describe("ContextCapture", () => {
         assert.fail("ContextCapture class not implemented yet");
       }
 
-      const mixedActivityLogger = {
-        getEvents: async (options) => [
+      const mixedActivityLogger = createMockActivityLogger({
+        defaultEvents: [
           {
             eventType: "tool_call",
             localSessionId: "session-123",
@@ -306,8 +278,8 @@ describe("ContextCapture", () => {
             localSessionId: "session-456",
             data: { toolName: "wrong-session" },
           },
-        ],
-      };
+        ]
+      });
 
       const capture = new ContextCapture(
         mixedActivityLogger,
@@ -517,16 +489,21 @@ describe("ContextCapture", () => {
       }
 
       let dbCallCount = 0;
-      const countingConversationDB = {
-        getConversationHistory: async (...args) => {
-          dbCallCount++;
-          return mockConversationDB.getConversationHistory(...args);
-        },
-        searchConversations: async (...args) => {
-          dbCallCount++;
-          return mockConversationDB.searchConversations(...args);
-        },
-      };
+      const countingConversationDB = createMockDatabase();
+      
+      // Override methods to add counting
+      const originalGetHistory = countingConversationDB.getConversationHistory;
+      const originalSearch = countingConversationDB.searchConversations;
+      
+      countingConversationDB.getConversationHistory = jest.fn().mockImplementation(async (...args) => {
+        dbCallCount++;
+        return originalGetHistory(...args);
+      });
+      
+      countingConversationDB.searchConversations = jest.fn().mockImplementation(async (...args) => {
+        dbCallCount++;
+        return originalSearch(...args);
+      });
 
       const capture = new ContextCapture(
         countingConversationDB,
@@ -553,14 +530,7 @@ describe("ContextCapture", () => {
         assert.fail("ContextCapture class not implemented yet");
       }
 
-      const failingConversationDB = {
-        getConversationHistory: async () => {
-          throw new Error("Database connection failed");
-        },
-        searchConversations: async () => {
-          throw new Error("Database connection failed");
-        },
-      };
+      const failingConversationDB = createMockDatabase({ shouldSucceed: false });
 
       const capture = new ContextCapture(
         failingConversationDB,

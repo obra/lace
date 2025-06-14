@@ -779,25 +779,6 @@ Focus on executing your assigned task efficiently.`;
     };
   }
 
-  getConversationConfig(): ConversationConfig {
-    return { ...this.conversationConfig };
-  }
-
-  updateConversationConfig(updates: Partial<ConversationConfig>): void {
-    this.conversationConfig = {
-      ...this.conversationConfig,
-      ...updates,
-    };
-    
-    if (this.debugLogger) {
-      this.debugLogger.debug(
-        `⚙️ Updated conversation config: ${JSON.stringify(updates)}`,
-      );
-    }
-  }
-
-
-
 
   // ORCHESTRATION METHODS - for when this agent spawns subagents
 

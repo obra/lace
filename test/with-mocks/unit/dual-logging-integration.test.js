@@ -13,62 +13,8 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 
-// Helper function to create mock model instances for JavaScript tests
-function createMockModelInstance(name = "test-model", provider = "test") {
-  return {
-    definition: {
-      name,
-      provider,
-      contextWindow: 200000,
-      inputPrice: 0.01,
-      outputPrice: 0.03,
-      capabilities: ["chat", "tools"]
-    },
-    chat: async () => ({ success: true, content: "Mock response" })
-  };
-}
-
-// Mock model provider for testing
-class MockModelProvider {
-  async chat(messages, options = {}) {
-    return {
-      success: true,
-      content: "Mock response",
-      usage: {
-        input_tokens: 100,
-        output_tokens: 50,
-        total_tokens: 150,
-      },
-      sessionId: "mock-session-123",
-    };
-  }
-
-  getContextWindow() {
-    return 8000;
-  }
-
-  calculateCost() {
-    return {
-      inputCost: 0.001,
-      outputCost: 0.002,
-      totalCost: 0.003,
-    };
-  }
-
-  async countTokens(messages, options = {}) {
-    return {
-      success: true,
-      inputTokens: 100,
-      outputTokens: 0,
-      totalTokens: 100,
-    };
-  }
-
-  async optimizeMessages(messages, options = {}) {
-    // Return messages as-is for testing
-    return messages;
-  }
-}
+// Import new mock factories
+import { createMockModelInstance, createMockModelProvider } from "../__mocks__/model-definitions.js";
 
 describe("Dual Logging System Integration", () => {
   let tempDir;
@@ -112,7 +58,11 @@ describe("Dual Logging System Integration", () => {
       autoApproveTools: ["javascript_evaluate"],
     });
 
-    modelProvider = new MockModelProvider();
+    modelProvider = createMockModelProvider("test", {
+      defaultResponse: "Mock response",
+      usage: { input_tokens: 100, output_tokens: 50, total_tokens: 150 },
+      sessionId: "mock-session-123"
+    });
   }
 
   // Cleanup after each test

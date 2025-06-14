@@ -16,6 +16,9 @@ import { promises as fs } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
+// Import new mock factories
+import { createMockModelProvider } from "../__mocks__/model-definitions.js";
+
 describe("LaceUI Activity Logging", () => {
   let harness;
   let testDbPath;
@@ -31,24 +34,26 @@ describe("LaceUI Activity Logging", () => {
     });
 
     // Override the model provider with a mock before initializing
-    laceUI.modelProvider = {
-      initialize: async () => {},
-      getModelSession: (modelName) => ({
-        definition: {
-          name: modelName,
-          provider: "anthropic",
-          contextWindow: 200000,
-          inputPrice: 3.0,
-          outputPrice: 15.0,
-          capabilities: ["chat", "tools"]
-        },
-        chat: async () => ({ 
-          success: true, 
-          content: "Mock response",
-          usage: { input_tokens: 10, output_tokens: 20 }
-        })
+    laceUI.modelProvider = createMockModelProvider("anthropic", {
+      defaultResponse: "Mock response"
+    });
+    
+    // Override getModelSession to return properly structured session
+    laceUI.modelProvider.getModelSession = (modelName) => ({
+      definition: {
+        name: modelName,
+        provider: "anthropic",
+        contextWindow: 200000,
+        inputPrice: 3.0,
+        outputPrice: 15.0,
+        capabilities: ["chat", "tools"]
+      },
+      chat: async () => ({ 
+        success: true, 
+        content: "Mock response",
+        usage: { input_tokens: 10, output_tokens: 20 }
       })
-    };
+    });
 
     await laceUI.initialize();
   });

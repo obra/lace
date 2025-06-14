@@ -185,32 +185,4 @@ describe("Conversation Memory Integration", () => {
     assert.ok(metrics.lastActivity > 0, "Should track last activity");
   });
 
-  test("agent supports configurable conversation settings", async () => {
-    const agent = await harness.createTestAgent({
-      conversationConfig: {
-        historyLimit: 5,
-        contextUtilization: 0.8,
-        cachingStrategy: 'conservative',
-        freshMessageCount: 3
-      }
-    });
-
-    // Check initial configuration
-    const config = agent.getConversationConfig();
-    assert.strictEqual(config.historyLimit, 5, "Should use custom history limit");
-    assert.strictEqual(config.contextUtilization, 0.8, "Should use custom context utilization");
-    assert.strictEqual(config.cachingStrategy, 'conservative', "Should use custom caching strategy");
-    assert.strictEqual(config.freshMessageCount, 3, "Should use custom fresh message count");
-
-    // Update configuration
-    agent.updateConversationConfig({
-      cachingStrategy: 'disabled',
-      historyLimit: 15
-    });
-
-    const updatedConfig = agent.getConversationConfig();
-    assert.strictEqual(updatedConfig.cachingStrategy, 'disabled', "Should update caching strategy");
-    assert.strictEqual(updatedConfig.historyLimit, 15, "Should update history limit");
-    assert.strictEqual(updatedConfig.contextUtilization, 0.8, "Should preserve unchanged settings");
-  });
 });

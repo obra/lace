@@ -5,6 +5,9 @@ import { test, describe, beforeEach, afterEach } from "@jest/globals";
 import { TestHarness } from "@test/test-harness.js";
 import assert from "node:assert";
 
+// Import new mock factories
+import { createMockModelInstance } from "../__mocks__/model-definitions.js";
+
 describe("Agent System", () => {
   let harness: TestHarness;
 
@@ -18,17 +21,8 @@ describe("Agent System", () => {
 
   describe("Agent Construction", () => {
     test("should create agent with assigned role and model", async () => {
-      const mockModelInstance = {
-        definition: {
-          name: "claude-3-5-sonnet-20241022",
-          provider: "anthropic",
-          contextWindow: 200000,
-          inputPrice: 3.0,
-          outputPrice: 15.0,
-          capabilities: ["chat", "tools", "vision"]
-        },
-        chat: async () => ({ success: true, content: "Mock response" })
-      };
+      // Use mock factory instead of duplicated model object
+      const mockModelInstance = createMockModelInstance("claude-3-5-sonnet-20241022");
 
       const agent = await harness.createTestAgent({
         role: "planning",
@@ -169,17 +163,8 @@ describe("Agent System", () => {
         role: "orchestrator",
       });
 
-      const mockModelInstance = {
-        definition: {
-          name: "claude-3-5-haiku-20241022",
-          provider: "anthropic",
-          contextWindow: 200000,
-          inputPrice: 0.25,
-          outputPrice: 1.25,
-          capabilities: ["chat", "tools"]
-        },
-        chat: async () => ({ success: true, content: "Mock" })
-      };
+      // Use mock factory for consistent model instances
+      const mockModelInstance = createMockModelInstance("claude-3-5-haiku-20241022");
 
       const subagent = await orchestrator.spawnSubagent({
         role: "execution",

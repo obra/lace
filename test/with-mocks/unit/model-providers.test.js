@@ -7,6 +7,9 @@ import { AnthropicProvider } from "../../../src/models/providers/anthropic-provi
 import { OpenAIProvider } from "../../../src/models/providers/openai-provider.js";
 import { LocalProvider } from "../../../src/models/providers/local-provider.js";
 
+// Import new mock factories
+import { createMockAnthropicClient } from "../__mocks__/standard-mocks.js";
+
 describe("Model Provider Session ID Tracking", () => {
   describe("AnthropicProvider", () => {
     describe("Session ID Generation", () => {
@@ -47,16 +50,10 @@ describe("Model Provider Session ID Tracking", () => {
       test("should return proper structure from countTokens with mock", async () => {
         const provider = new AnthropicProvider();
         
-        // Mock the client to avoid actual API calls
-        provider.client = {
-          beta: {
-            messages: {
-              countTokens: async (params) => ({
-                input_tokens: 42,
-              }),
-            },
-          },
-        };
+        // Use mock factory to avoid actual API calls
+        provider.client = createMockAnthropicClient({ 
+          countTokensResponse: { input_tokens: 42 } 
+        });
 
         const messages = [
           { role: "system", content: "You are a helpful assistant." },
@@ -74,22 +71,14 @@ describe("Model Provider Session ID Tracking", () => {
       test("should handle countTokens errors gracefully", async () => {
         const provider = new AnthropicProvider();
         
-        // Mock the client to simulate an error
-        provider.client = {
-          beta: {
-            messages: {
-              countTokens: async () => {
-                throw new Error("API error");
-              },
-            },
-          },
-        };
+        // Use mock factory to simulate an error
+        provider.client = createMockAnthropicClient({ shouldSucceed: false });
 
         const messages = [{ role: "user", content: "test" }];
         const result = await provider.countTokens(messages);
 
         assert.strictEqual(result.success, false);
-        assert.strictEqual(result.error, "API error");
+        assert.strictEqual(result.error, "Token counting error");
         assert.strictEqual(result.inputTokens, 0);
         assert.strictEqual(result.totalTokens, 0);
       });
@@ -99,16 +88,14 @@ describe("Model Provider Session ID Tracking", () => {
         let capturedParams = null;
         
         // Mock the client to capture parameters
-        provider.client = {
-          beta: {
-            messages: {
-              countTokens: async (params) => {
-                capturedParams = params;
-                return { input_tokens: 10 };
-              },
-            },
-          },
-        };
+        const mockClient = createMockAnthropicClient({ 
+          countTokensResponse: { input_tokens: 10 } 
+        });
+        mockClient.beta.messages.countTokens.mockImplementation(async (params) => {
+          capturedParams = params;
+          return { input_tokens: 10 };
+        });
+        provider.client = mockClient;
 
         const messages = [
           { role: "system", content: "System prompt" },
@@ -136,17 +123,15 @@ describe("Model Provider Session ID Tracking", () => {
         let capturedParams = null;
         
         // Mock the client to capture parameters
-        provider.client = {
-          messages: {
-            create: async (params) => {
-              capturedParams = params;
-              return { 
-                content: [{ text: "response" }],
-                usage: { input_tokens: 10, output_tokens: 5 }
-              };
-            },
-          },
-        };
+        const mockClient = createMockAnthropicClient();
+        mockClient.messages.create.mockImplementation(async (params) => {
+          capturedParams = params;
+          return { 
+            content: [{ text: "response" }],
+            usage: { input_tokens: 10, output_tokens: 5 }
+          };
+        });
+        provider.client = mockClient;
 
         const messages = [
           { role: "system", content: "You are a helpful assistant." },
@@ -168,17 +153,15 @@ describe("Model Provider Session ID Tracking", () => {
         let capturedParams = null;
         
         // Mock the client to capture parameters
-        provider.client = {
-          messages: {
-            create: async (params) => {
-              capturedParams = params;
-              return { 
-                content: [{ text: "response" }],
-                usage: { input_tokens: 10, output_tokens: 5 }
-              };
-            },
-          },
-        };
+        const mockClient = createMockAnthropicClient();
+        mockClient.messages.create.mockImplementation(async (params) => {
+          capturedParams = params;
+          return { 
+            content: [{ text: "response" }],
+            usage: { input_tokens: 10, output_tokens: 5 }
+          };
+        });
+        provider.client = mockClient;
 
         const messages = [
           { role: "system", content: "You are a helpful assistant." },
@@ -198,16 +181,14 @@ describe("Model Provider Session ID Tracking", () => {
         let capturedParams = null;
         
         // Mock the client for token counting
-        provider.client = {
-          beta: {
-            messages: {
-              countTokens: async (params) => {
-                capturedParams = params;
-                return { input_tokens: 42 };
-              },
-            },
-          },
-        };
+        const mockClient = createMockAnthropicClient({ 
+          countTokensResponse: { input_tokens: 42 } 
+        });
+        mockClient.beta.messages.countTokens.mockImplementation(async (params) => {
+          capturedParams = params;
+          return { input_tokens: 42 };
+        });
+        provider.client = mockClient;
 
         const messages = [
           { role: "system", content: "System prompt" },
