@@ -144,7 +144,7 @@ describe("Debug Logging Direct Tests", () => {
     await laceUI.initialize();
 
     // Check that the primary agent has the debugLogger
-    const agent = laceUI.primaryAgent;
+    const agent = laceUI.agentCoordinator.primaryAgentInstance;
     assert.ok(agent, "LaceUI should have primaryAgent");
 
     console.log("LaceUI debugLogger:", !!laceUI.debugLogger);
