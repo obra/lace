@@ -30,7 +30,9 @@ export class Agent {
   });
 
   getConversationHistory = jest.fn(() => Promise.resolve([]));
-  executeTool = jest.fn(() => Promise.resolve({ success: true }));
+  toolExecutor = {
+    executeTool: jest.fn(() => Promise.resolve({ success: true }))
+  };
   shouldHandoff = jest.fn(() => false);
   buildToolsForLLM = jest.fn(() => []);
   spawnSubagent = jest.fn((options) => Promise.resolve(new Agent(options)));

@@ -9,6 +9,7 @@ import {
   TestHarness,
   assert,
 } from "@test/test-harness.ts";
+import { Conversation } from "../../../src/conversation/conversation.js";
 import { jest } from "@jest/globals";
 
 // Integration tests use real implementations
@@ -28,7 +29,7 @@ describe("Lace Integration Tests", () => {
     test("should initialize all core systems", async () => {
       const lace = await harness.createTestLaceUI();
 
-      assert.ok(lace.db, "Should have database");
+      assert.ok(lace.conversation, "Should have conversation");
       assert.ok(lace.tools, "Should have tool registry");
       assert.ok(lace.primaryAgent, "Should have primary agent");
       assert.strictEqual(
@@ -52,7 +53,7 @@ describe("Lace Integration Tests", () => {
     test("should prepare tools for LLM format", async () => {
       const lace = await harness.createTestLaceUI();
 
-      const toolsForLLM = lace.primaryAgent.buildToolsForLLM();
+      const toolsForLLM = lace.primaryAgent.toolExecutor.buildToolsForLLM();
 
       assert.ok(Array.isArray(toolsForLLM), "Should return array of tools");
       assert.ok(toolsForLLM.length > 0, "Should have tools available");
@@ -133,10 +134,10 @@ describe("Lace Integration Tests", () => {
       const tempFile = await harness.createTempFile("test content");
 
       // Test tool execution through agent
-      const result = await lace.primaryAgent.executeTool({
+      const result = await lace.primaryAgent.toolExecutor.executeTool({
         name: "read_file",
         input: { path: tempFile },
-      });
+      }, "test-session");
 
       assert.ok(result.success, "File read should succeed");
       assert.strictEqual(
@@ -149,10 +150,10 @@ describe("Lace Integration Tests", () => {
     test("should execute JavaScript calculations", async () => {
       const lace = await harness.createTestLaceUI();
 
-      const result = await lace.primaryAgent.executeTool({
+      const result = await lace.primaryAgent.toolExecutor.executeTool({
         name: "javascript",
         input: { code: "6 * 12" },
-      });
+      }, "test-session");
 
       assert.ok(result.success, "Calculation should succeed");
       assert.strictEqual(result.result, 72, "Should calculate correctly");
@@ -161,10 +162,10 @@ describe("Lace Integration Tests", () => {
     test("should handle shell commands", async () => {
       const lace = await harness.createTestLaceUI();
 
-      const result = await lace.primaryAgent.executeTool({
+      const result = await lace.primaryAgent.toolExecutor.executeTool({
         name: "shell",
         input: { command: 'echo "test"' },
-      });
+      }, "test-session");
 
       assert.ok(result.success, "Shell command should succeed");
       assert.strictEqual(
@@ -179,39 +180,36 @@ describe("Lace Integration Tests", () => {
     test("should save and retrieve conversation history", async () => {
       const lace = await harness.createTestLaceUI();
 
-      const sessionId = "integration-test-session";
-
-      // Save a message
-      await lace.db.saveMessage(sessionId, 0, "user", "Test message");
-      await lace.db.saveMessage(sessionId, 0, "assistant", "Test response");
+      // Use the existing conversation from lace
+      await lace.conversation.addUserMessage("Test message");
+      await lace.conversation.addAssistantMessage("Test response");
 
       // Retrieve history
-      const history = await lace.primaryAgent.getConversationHistory(
-        sessionId,
-        10,
-      );
+      const history = await lace.conversation.getMessages();
 
       assert.strictEqual(history.length, 2, "Should have saved messages");
       assert.strictEqual(
         history[0].role,
-        "assistant",
-        "Should return most recent first",
+        "user",
+        "Should return chronological order (user first)",
       );
       assert.strictEqual(
         history[1].role,
-        "user",
-        "Should include user message",
+        "assistant",
+        "Should include assistant message",
       );
     });
 
     test("should maintain session isolation", async () => {
-      const lace = await harness.createTestLaceUI();
+      // Create separate conversations with different session IDs
+      const conversation1 = await Conversation.load("session-1", ":memory:");
+      const conversation2 = await Conversation.load("session-2", ":memory:");
 
-      await lace.db.saveMessage("session-1", 0, "user", "Message 1");
-      await lace.db.saveMessage("session-2", 0, "user", "Message 2");
+      await conversation1.addUserMessage("Message 1");
+      await conversation2.addUserMessage("Message 2");
 
-      const session1History = await lace.db.getConversationHistory("session-1");
-      const session2History = await lace.db.getConversationHistory("session-2");
+      const session1History = await conversation1.getMessages();
+      const session2History = await conversation2.getMessages();
 
       assert.strictEqual(
         session1History.length,
@@ -236,10 +234,10 @@ describe("Lace Integration Tests", () => {
       const lace = await harness.createTestLaceUI();
 
       try {
-        await lace.primaryAgent.executeTool({
+        await lace.primaryAgent.toolExecutor.executeTool({
           name: "nonexistent_tool",
           input: {},
-        });
+        }, "test-session");
         assert.fail("Should throw error for nonexistent tool");
       } catch (error) {
         assert.ok(
@@ -252,10 +250,10 @@ describe("Lace Integration Tests", () => {
     test("should handle file operation errors", async () => {
       const lace = await harness.createTestLaceUI();
 
-      const result = await lace.primaryAgent.executeTool({
+      const result = await lace.primaryAgent.toolExecutor.executeTool({
         name: "read_file",
         input: { path: "/nonexistent/file.txt" },
-      });
+      }, "test-session");
 
       assert.ok(!result.success, "Should fail for nonexistent file");
       assert.ok(result.error, "Should provide error message");

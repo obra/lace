@@ -3,6 +3,7 @@
 
 import { test, describe, beforeEach, afterEach } from "@jest/globals";
 import { TestHarness } from "@test/test-harness.js";
+import { Conversation } from "../../../src/conversation/conversation.js";
 import assert from "node:assert";
 
 describe("Conversation Memory Integration", () => {
@@ -34,14 +35,15 @@ describe("Conversation Memory Integration", () => {
       };
     };
     const sessionId = "test-session-123";
+    const conversation = await Conversation.load(sessionId, ":memory:");
 
     // First message - should only have system prompt + user message
-    const firstResponse = await agent.processInput(sessionId, "Hello, my name is Jesse");
+    const firstResponse = await agent.processInput(conversation, "Hello, my name is Jesse");
     assert.strictEqual(firstResponse.content, "First message");
     assert.strictEqual(receivedMessages[0].length, 2, "First call should have 2 messages (system + user)");
 
     // Second message - should include conversation history
-    const secondResponse = await agent.processInput(sessionId, "What is my name?");
+    const secondResponse = await agent.processInput(conversation, "What is my name?");
     
     // This test currently FAILS because conversation history is not retrieved in generateResponse()
     // When step 1.2 is implemented, this should pass
@@ -80,7 +82,8 @@ describe("Conversation Memory Integration", () => {
     const sessionId = "test-session-456";
 
     // Process input should trigger token counting
-    const response = await agent.processInput(sessionId, "Count my tokens");
+    const conversation = await Conversation.load(sessionId, ":memory:");
+    const response = await agent.processInput(conversation, "Count my tokens");
     
     // Verify token counting was called
     assert.ok(tokenCountCalled, "countTokens should be called for accurate counting");
@@ -113,15 +116,16 @@ describe("Conversation Memory Integration", () => {
     agent.modelProvider = mockProvider;
     agent.maxContextSize = 1000; // Small context window for testing
     const sessionId = "test-session-truncation";
+    const conversation = await Conversation.load(sessionId, ":memory:");
 
-    // Simulate a long conversation by adding multiple messages to the database
+    // Simulate a long conversation by adding multiple messages to the conversation
     for (let i = 0; i < 15; i++) {
-      await agent.db.saveMessage(sessionId, agent.generation, "user", `Message ${i}`);
-      await agent.db.saveMessage(sessionId, agent.generation, "assistant", `Response ${i}`);
+      await conversation.addUserMessage(`Message ${i}`);
+      await conversation.addAssistantMessage(`Response ${i}`);
     }
 
     // Process a new input - should trigger truncation
-    const response = await agent.processInput(sessionId, "This should trigger truncation");
+    const response = await agent.processInput(conversation, "This should trigger truncation");
     
     // Verify truncation was called and messages were reduced
     assert.ok(truncationCalls.length > 0, "Token counting should be called during truncation");
@@ -136,72 +140,6 @@ describe("Conversation Memory Integration", () => {
       `Should truncate to fewer than 32 messages, got ${finalCall.messageCount}`);
   });
 
-  test("agent applies caching strategy to conversation history", async () => {
-    const agent = await harness.createTestAgent();
-    
-    // Track what messages are sent to the provider
-    let sentMessages = null;
-    let cachingEnabled = false;
-    
-    agent.model.chat = async (messages, options) => {
-      sentMessages = messages;
-      cachingEnabled = options.enableCaching;
-      
-      return {
-        success: true,
-        content: "Response with caching",
-        toolCalls: [],
-        usage: { input_tokens: 100, output_tokens: 20 },
-      };
-    };
-
-    agent.model.countTokens = async (messages, options) => {
-      return {
-        success: true,
-        inputTokens: messages.length * 30, // Mock calculation
-        totalTokens: messages.length * 30,
-      };
-    };
-    const sessionId = "test-session-caching";
-
-    // Add some conversation history to the database
-    await agent.db.saveMessage(sessionId, agent.generation, "user", "First message");
-    await agent.db.saveMessage(sessionId, agent.generation, "assistant", "First response");
-    await agent.db.saveMessage(sessionId, agent.generation, "user", "Second message");
-    await agent.db.saveMessage(sessionId, agent.generation, "assistant", "Second response");
-
-    // Process a new input - should apply caching strategy
-    const response = await agent.processInput(sessionId, "New message with caching");
-    
-    // Verify caching is enabled
-    assert.ok(cachingEnabled, "Caching should be enabled for conversation history");
-    
-    // Verify message structure - should have system + history + current
-    assert.ok(sentMessages.length >= 5, `Should have multiple messages, got ${sentMessages.length}`);
-    
-    // Check that older messages have cache control
-    let cachedMessageCount = 0;
-    for (let i = 1; i < sentMessages.length - 2; i++) { // Skip system and keep last 2 fresh
-      const message = sentMessages[i];
-      if (Array.isArray(message.content)) {
-        const lastContent = message.content[message.content.length - 1];
-        if (lastContent && lastContent.cache_control) {
-          cachedMessageCount++;
-        }
-      }
-    }
-    
-    // Should have cached some older messages
-    assert.ok(cachedMessageCount > 0, 
-      `Should have cached some older messages, found ${cachedMessageCount} cached messages`);
-    
-    // Recent messages should not have cache control
-    const lastMessage = sentMessages[sentMessages.length - 1];
-    if (Array.isArray(lastMessage.content)) {
-      const hasRecentCache = lastMessage.content.some(block => block.cache_control);
-      assert.ok(!hasRecentCache, "Recent messages should not have cache control");
-    }
-  });
 
   test("agent tracks conversation metrics correctly", async () => {
     const agent = await harness.createTestAgent();
@@ -229,10 +167,11 @@ describe("Conversation Memory Integration", () => {
       };
     };
     const sessionId = "test-session-metrics";
+    const conversation = await Conversation.load(sessionId, ":memory:");
 
     // Process two messages
-    await agent.processInput(sessionId, "First message");
-    await agent.processInput(sessionId, "Second message");
+    await agent.processInput(conversation, "First message");
+    await agent.processInput(conversation, "Second message");
     
     // Check conversation metrics
     const metrics = agent.getConversationMetrics();

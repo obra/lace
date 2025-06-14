@@ -68,15 +68,17 @@ describe("Step 13: Connect to Lace Backend", () => {
   });
 
   test("LaceUI initializes with real lace backend components", async () => {
+    await laceUI.start();
+    
     // Should initialize all backend components
-    expect(laceUI.db).toBeTruthy();
+    expect(laceUI.conversation).toBeTruthy();
     expect(laceUI.tools).toBeTruthy();
     expect(laceUI.modelProvider).toBeTruthy();
     expect(laceUI.toolApproval).toBeTruthy();
 
     // Should have proper session ID
-    expect(laceUI.sessionId).toMatch(/^session-\d+$/);
-    expect(laceUI.sessionId).toBeTruthy();
+    expect(laceUI.conversation.getSessionId()).toMatch(/^session-\d+$/);
+    expect(laceUI.conversation.getSessionId()).toBeTruthy();
   });
 
   test("LaceUI creates primary agent with correct configuration", async () => {
@@ -119,7 +121,7 @@ describe("Step 13: Connect to Lace Backend", () => {
 
     // Verify agent was called correctly
     expect(laceUI.primaryAgent.processInput).toHaveBeenCalledWith(
-      laceUI.sessionId,
+      laceUI.conversation,
       "Hello, test message",
       expect.objectContaining({
         signal: expect.any(Object), // AbortController signal is just an object
@@ -308,7 +310,7 @@ describe("Step 13: Connect to Lace Backend", () => {
     expect(status.context.total).toBe(200000);
     expect(status.cost.totalCost).toBe(0.003);
     expect(status.tools).toEqual(["file-tool", "shell-tool", "search-tool"]);
-    expect(status.session).toBe(laceUI.sessionId);
+    expect(status.session).toBe(laceUI.conversation.getSessionId());
   });
 
   test("prevents concurrent message processing", async () => {
