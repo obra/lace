@@ -11,6 +11,9 @@ import { ApprovalEngine } from "../safety/index.js";
 import { ActivityLogger } from "../logging/activity-logger.js";
 import { DebugLogger } from "../logging/debug-logger.js";
 import { Conversation } from "../conversation/conversation.js";
+import { ActivityCoordinator } from "./activity-coordinator.js";
+import { AgentCoordinator } from "../agents/agent-coordinator.js";
+import { ToolApprovalCoordinator } from "./tool-approval-coordinator.js";
 import App from "./App";
 
 interface LaceUIOptions {
@@ -58,9 +61,9 @@ export class LaceUI {
   private toolApproval: any;
   private activityLogger: ActivityLogger;
   private debugLogger: DebugLogger;
-  private primaryAgent: any;
-  private memoryAgents: Map<string, any>;
-  private currentGeneration: number;
+  private activityCoordinator: ActivityCoordinator;
+  private agentCoordinator: AgentCoordinator;
+  private toolApprovalCoordinator: ToolApprovalCoordinator;
   public conversation: Conversation;
   private app: any;
   private uiRef: any;
@@ -106,10 +109,6 @@ export class LaceUI {
       activityLogger: this.activityLogger,
     });
 
-    this.primaryAgent = null;
-    this.memoryAgents = new Map(); // generationId -> agent
-    this.currentGeneration = 0;
-
     // UI state management
     this.app = null;
     this.uiRef = null;
@@ -133,18 +132,27 @@ export class LaceUI {
       // Continue without activity logging
     }
 
-    this.primaryAgent = new Agent({
-      generation: this.currentGeneration,
+    // Initialize activity coordinator
+    this.activityCoordinator = new ActivityCoordinator(
+      this.activityLogger,
+      this.verbose,
+      this.conversation
+    );
+
+    // Initialize agent coordinator
+    this.agentCoordinator = new AgentCoordinator({
       tools: this.tools,
       modelProvider: this.modelProvider,
-      model: this.modelProvider.getModelSession("claude-3-5-sonnet-20241022"),
       toolApproval: this.toolApproval,
-      verbose: this.verbose,
-      role: "orchestrator",
-      capabilities: ["orchestration", "reasoning", "planning", "delegation"],
       activityLogger: this.activityLogger,
       debugLogger: this.debugLogger,
+      verbose: this.verbose,
     });
+
+    await this.agentCoordinator.initialize();
+
+    // Initialize tool approval coordinator
+    this.toolApprovalCoordinator = new ToolApprovalCoordinator(this.toolApproval);
   }
 
   async start() {
@@ -175,14 +183,14 @@ export class LaceUI {
     const startTime = Date.now();
 
     // Log user input
-    await this.logUserInput(input);
+    await this.activityCoordinator.logUserInput(input);
 
     try {
       // Setup streaming callback that sends tokens to UI and logs tokens
       let tokenPosition = 0;
       const onToken = (token: string) => {
         // Log streaming token
-        this.logStreamingToken(token, tokenPosition++);
+        this.activityCoordinator.logStreamingToken(token, tokenPosition++);
 
         // Send to UI
         if (this.uiRef && this.uiRef.handleStreamingToken) {
@@ -190,7 +198,7 @@ export class LaceUI {
         }
       };
 
-      const response = await this.primaryAgent.processInput(
+      const response = await this.agentCoordinator.primaryAgentInstance!.processInput(
         this.conversation,
         input,
         {
@@ -201,11 +209,11 @@ export class LaceUI {
 
       // Log agent response
       const duration = Date.now() - startTime;
-      await this.logAgentResponse(response, duration);
+      await this.activityCoordinator.logAgentResponse(response, duration);
 
       // Log tool executions
       if (response.toolCalls && response.toolResults) {
-        await this.logToolExecutions(response.toolCalls, response.toolResults);
+        await this.activityCoordinator.logToolExecutions(response.toolCalls, response.toolResults);
       }
 
       return {
@@ -282,56 +290,25 @@ export class LaceUI {
   }
 
   async handoffContext() {
-    // Move current agent to memory agents
-    this.memoryAgents.set(this.currentGeneration.toString(), this.primaryAgent);
-    this.currentGeneration++;
-
-    // Create new primary agent with compressed context
-    const compressedContext = await this.primaryAgent.compressContext();
-    this.primaryAgent = new Agent({
-      generation: this.currentGeneration,
-      tools: this.tools,
-      modelProvider: this.modelProvider,
-      model: this.modelProvider.getModelSession("claude-3-5-sonnet-20241022"),
-      verbose: this.verbose,
-      role: "orchestrator",
-      capabilities: ["orchestration", "reasoning", "planning", "delegation"],
-      toolApproval: this.toolApproval,
-      activityLogger: this.activityLogger,
-      debugLogger: this.debugLogger,
-      inheritedContext: compressedContext,
-      memoryAgents: this.memoryAgents,
-    });
-
-    return this.primaryAgent;
+    return this.agentCoordinator.handoffContext();
   }
 
   setToolApprovalUICallback(callback) {
-    if (this.toolApproval && this.toolApproval.setUICallback) {
-      this.toolApproval.setUICallback(callback);
-    }
+    this.toolApprovalCoordinator.setUICallback(callback);
   }
 
   getStatus() {
-    if (!this.primaryAgent) {
+    const agentStatus = this.agentCoordinator.getAgentStatus();
+    if (!agentStatus) {
       return null;
     }
 
-    const contextUsage = this.primaryAgent.calculateContextUsage(
-      this.primaryAgent.contextSize,
-    );
-    const cost = this.primaryAgent.calculateCost(
-      this.primaryAgent.contextSize * 0.7, // Rough estimate for input tokens
-      this.primaryAgent.contextSize * 0.3, // Rough estimate for output tokens
-    );
+    const contextUsage = this.agentCoordinator.calculateContextUsage();
+    const cost = this.agentCoordinator.calculateCost();
+    const primaryAgent = this.agentCoordinator.primaryAgentInstance;
 
     return {
-      agent: {
-        role: this.primaryAgent.role,
-        model: this.primaryAgent.model.definition.name,
-        provider: this.primaryAgent.model.definition.provider,
-        generation: this.primaryAgent.generation,
-      },
+      agent: agentStatus,
       context: contextUsage,
       cost: cost,
       tools: this.tools.listTools(),
@@ -375,152 +352,25 @@ export class LaceUI {
     }
   }
 
-  // Activity logging methods
-  private async logUserInput(input: string): Promise<void> {
-    try {
-      await this.activityLogger.logEvent("user_input", this.conversation.getSessionId(), null, {
-        content: input,
-        timestamp: new Date().toISOString(),
-        input_length: input.length,
-        session_id: this.conversation.getSessionId(),
-      });
-    } catch (error) {
-      // Activity logging errors should not break the application
-      if (this.verbose) {
-        console.error("Failed to log user input:", error);
-      }
-    }
-  }
-
-  private async logAgentResponse(
-    response: AgentResponse,
-    duration: number,
-  ): Promise<void> {
-    try {
-      const tokens =
-        response.usage?.total_tokens || response.usage?.output_tokens || 0;
-      const inputTokens = response.usage?.input_tokens || 0;
-      const outputTokens = response.usage?.output_tokens || 0;
-
-      await this.activityLogger.logEvent(
-        "agent_response",
-        this.conversation.getSessionId(),
-        null,
-        {
-          content: response.content || "",
-          tokens: tokens,
-          input_tokens: inputTokens,
-          output_tokens: outputTokens,
-          duration_ms: duration,
-          iterations: response.iterations || 1,
-          error: response.error || null,
-        },
-      );
-    } catch (error) {
-      if (this.verbose) {
-        console.error("Failed to log agent response:", error);
-      }
-    }
-  }
-
-  private async logStreamingToken(
-    token: string,
-    position: number,
-  ): Promise<void> {
-    try {
-      await this.activityLogger.logEvent(
-        "streaming_token",
-        this.conversation.getSessionId(),
-        null,
-        {
-          token: token,
-          timestamp: new Date().toISOString(),
-          position: position,
-        },
-      );
-    } catch (error) {
-      // Silent fail for streaming tokens to avoid spam
-    }
-  }
-
-  private async logToolExecutions(
-    toolCalls: any[],
-    toolResults: any[],
-  ): Promise<void> {
-    try {
-      for (let i = 0; i < toolCalls.length; i++) {
-        const toolCall = toolCalls[i];
-        const toolResult = toolResults[i];
-
-        await this.activityLogger.logEvent(
-          "tool_execution",
-          this.conversation.getSessionId(),
-          null,
-          {
-            tool_name: toolCall.name,
-            input: toolCall.input || {},
-            result: toolResult || {},
-            duration_ms: Date.now(), // This would be more accurate with start/end timing
-          },
-        );
-      }
-    } catch (error) {
-      if (this.verbose) {
-        console.error("Failed to log tool executions:", error);
-      }
-    }
-  }
-
-  // Activity retrieval methods
-  async getRecentActivity(limit: number = 20): Promise<any[]> {
-    try {
-      return await this.activityLogger.getRecentEvents(limit);
-    } catch (error) {
-      if (this.verbose) {
-        console.error("Failed to retrieve recent activity:", error);
-      }
-      return [];
-    }
-  }
-
-  async getSessionActivity(sessionId: string): Promise<any[]> {
-    try {
-      return await this.activityLogger.getEvents({ sessionId });
-    } catch (error) {
-      if (this.verbose) {
-        console.error("Failed to retrieve session activity:", error);
-      }
-      return [];
-    }
-  }
-
-  async getActivityByType(eventType: string): Promise<any[]> {
-    try {
-      return await this.activityLogger.getEvents({ eventType });
-    } catch (error) {
-      if (this.verbose) {
-        console.error("Failed to retrieve activity by type:", error);
-      }
-      return [];
-    }
-  }
-
-  // Activity command handler for UI commands
+  // Activity delegation
   async handleActivityCommand(
     subcommand: string,
     options: any = {},
   ): Promise<any[]> {
-    switch (subcommand) {
-      case "recent":
-        return await this.getRecentActivity(options.limit || 20);
-      case "session":
-        const sessionId = options.sessionId || this.conversation.getSessionId();
-        return await this.getSessionActivity(sessionId);
-      case "type":
-        return await this.getActivityByType(options.eventType);
-      default:
-        return await this.getRecentActivity(options.limit || 20);
-    }
+    return this.activityCoordinator.handleActivityCommand(subcommand, options);
+  }
+
+  // Re-expose activity methods for backward compatibility
+  async getRecentActivity(limit: number = 20): Promise<any[]> {
+    return this.activityCoordinator.getRecentActivity(limit);
+  }
+
+  async getSessionActivity(sessionId?: string): Promise<any[]> {
+    return this.activityCoordinator.getSessionActivity(sessionId);
+  }
+
+  async getActivityByType(eventType: string): Promise<any[]> {
+    return this.activityCoordinator.getActivityByType(eventType);
   }
 
   async stop() {
