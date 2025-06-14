@@ -313,7 +313,7 @@ export class LaceUI {
       cost: cost,
       tools: this.tools.listTools(),
       session: this.conversation.getSessionId(),
-      conversation: this.primaryAgent.getConversationMetrics(),
+      conversation: primaryAgent.getConversationMetrics(),
     };
   }
 
