@@ -383,6 +383,28 @@ export function createMockSnapshotManager(options = {}) {
 }
 
 /**
+ * Create a mock tool call object
+ * @param {object} options - Configuration options
+ * @param {string} options.name - Tool name
+ * @param {object} options.input - Tool input parameters
+ * @param {string} options.description - Tool description
+ * @returns {object} Mock tool call object
+ */
+export function createMockToolCall(options = {}) {
+  const {
+    name = "file_write",
+    input = { path: "/test/file.txt", content: "test content" },
+    description = "Write content to a file"
+  } = options;
+
+  return {
+    name,
+    input,
+    description
+  };
+}
+
+/**
  * Create a complete standard mock configuration for agents
  * @param {object} options - Configuration options
  * @param {string} options.modelName - Model to use

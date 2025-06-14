@@ -9,6 +9,7 @@ import {
   TestHarness,
   assert,
 } from "../../test-harness.js";
+import { createMockToolCall } from "../__mocks__/standard-mocks.js";
 
 describe("Conversation Database", () => {
   let harness;
@@ -107,7 +108,7 @@ describe("Conversation Database", () => {
       const db = new ConversationDB(":memory:");
       await db.initialize();
 
-      const toolCalls = [{ name: "file_read", input: { path: "test.txt" } }];
+      const toolCalls = [createMockToolCall({ name: "file_read", input: { path: "test.txt" } })];
 
       await db.saveMessage(
         "test-session",

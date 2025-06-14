@@ -449,3 +449,16 @@ export const UI_TEST_SCENARIOS = {
     expectedBehavior: "should prompt for tool approval"
   }
 };
+
+/**
+ * Create a jest module mock for useTextBuffer hook
+ * @param {object} options - Configuration options for the mock
+ * @returns {object} Jest module mock object
+ */
+export function createUseTextBufferModuleMock(options = {}) {
+  const mockHook = createMockUseTextBuffer(options);
+  
+  return {
+    useTextBuffer: jest.fn(() => mockHook)
+  };
+}

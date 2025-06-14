@@ -6,6 +6,7 @@ import { jest, describe, test, beforeEach, afterEach, expect } from "@jest/globa
 // Import new mock factories
 import { createMockModelInstance } from "../__mocks__/model-definitions.js";
 import { createStandardMockConfig, resetStandardMocks } from "../__mocks__/standard-mocks.js";
+import { createMockAgentRegistry } from "../__mocks__/agent-roles.js";
 
 // Create mock function first
 const mockGetRole = jest.fn();
@@ -35,39 +36,9 @@ describe("Agent", () => {
       availableTools: ["file", "shell", "javascript"]
     });
 
-    // Mock role definitions
-    mockGetRole.mockImplementation((roleName: string) => {
-      const roleDefaults = {
-        general: {
-          defaultModel: "claude-3-5-sonnet-20241022",
-          capabilities: ["reasoning", "tool_calling", "analysis", "execution", "planning", "problem_solving"]
-        },
-        execution: {
-          defaultModel: "claude-3-5-haiku-20241022", 
-          capabilities: ["execution", "tool_calling", "implementation", "task_completion"]
-        },
-        reasoning: {
-          defaultModel: "claude-3-5-sonnet-20241022",
-          capabilities: ["reasoning", "analysis", "problem_solving", "critical_thinking"]
-        }
-      };
-      
-      const roleData = roleDefaults[roleName] || roleDefaults.general;
-      
-      return {
-        name: roleName,
-        defaultModel: roleData.defaultModel,
-        defaultProvider: "anthropic",
-        capabilities: roleData.capabilities,
-        systemPrompt: `You are a ${roleName} agent`,
-        maxConcurrentTools: 10,
-        contextPreferences: {
-          maxContextSize: 200000,
-          handoffThreshold: 0.8
-        },
-        toolRestrictions: {}
-      };
-    });
+    // Use centralized role registry factory
+    const mockRegistry = createMockAgentRegistry();
+    mockGetRole.mockImplementation(mockRegistry.getRole);
   });
 
   afterEach(() => {

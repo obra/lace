@@ -6,16 +6,10 @@ import React from "react";
 import { renderInkComponent } from "../helpers/ink-test-utils";
 import ToolApprovalModal from "@/ui/components/ToolApprovalModal";
 import { Box, Text } from "ink";
+import { createMockToolCall } from "../__mocks__/standard-mocks.js";
 
 describe("ToolApprovalModal Component", () => {
-  const mockToolCall = {
-    name: "file_write",
-    input: {
-      path: "/test/file.txt",
-      content: "test content"
-    },
-    description: "Write content to a file"
-  };
+  const mockToolCall = createMockToolCall();
 
   const defaultProps = {
     toolCall: mockToolCall,
