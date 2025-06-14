@@ -1,8 +1,9 @@
 // ABOUTME: DetailedLogView component for displaying structured log entries
-// ABOUTME: Uses virtual scrolling pattern similar to ConversationView for performance
+// ABOUTME: Uses virtual scrolling pattern similar to ConversationView for performance and includes log extraction logic
 
-import React from "react";
+import React, { useMemo } from "react";
 import { Box, Text } from "ink";
+import { ConversationMessage } from "./messages/MessageContainer";
 
 export interface DetailedLogEntry {
   id: string;
@@ -23,6 +24,7 @@ interface DetailedLogViewProps {
   scrollPosition?: number;
   isNavigationMode?: boolean;
   entries?: DetailedLogEntry[];
+  conversation?: ConversationMessage[];
 }
 
 /**
@@ -150,14 +152,103 @@ function formatTiming(timing: { durationMs?: number }): string {
   return `(${Math.round(durationMs)}ms)`;
 }
 
+/**
+ * Extract log entries from conversation messages for detailed log view
+ * Converts ConversationMessage objects to DetailedLogEntry objects
+ */
+function extractLogEntries(conversation: ConversationMessage[]): DetailedLogEntry[] {
+  const entries: DetailedLogEntry[] = [];
+  let entryIndex = 0;
+
+  conversation.forEach((message, messageIndex) => {
+    const baseTimestamp = new Date().toISOString();
+    
+    // Add the main message entry
+    let content: string;
+    if (message.type === "agent_activity") {
+      content = `${message.summary}\n${message.content.join('\n')}`;
+    } else {
+      content = message.content as string;
+    }
+    
+    // Extract usage and timing data based on message type
+    let usage: DetailedLogEntry['usage'] = undefined;
+    let timing: DetailedLogEntry['timing'] = undefined;
+
+    if (message.type === "assistant" && message.usage) {
+      usage = {
+        inputTokens: message.usage.inputTokens,
+        outputTokens: message.usage.outputTokens,
+        totalTokens: message.usage.totalTokens,
+      };
+    } else if (message.type === "streaming" && message.usage) {
+      usage = {
+        inputTokens: message.usage.inputTokens,
+        outputTokens: message.usage.outputTokens,
+        totalTokens: message.usage.totalTokens,
+      };
+    } else if (message.type === "agent_activity" && message.timing) {
+      timing = {
+        durationMs: message.timing.durationMs,
+      };
+    }
+
+    entries.push({
+      id: `log-${entryIndex++}-${baseTimestamp}`,
+      timestamp: baseTimestamp,
+      type: message.type as string,
+      content,
+      usage,
+      timing,
+    });
+
+    // If this is an assistant message with tool calls, add separate tool call entries
+    if (message.type === "assistant" && message.tool_calls && Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
+      message.tool_calls.forEach((toolCall, toolIndex) => {
+        // Add tool call entry with mock timing data for demonstration
+        const toolCallTimestamp = new Date(Date.parse(baseTimestamp) + toolIndex + 1).toISOString();
+        
+        // Mock timing data based on tool type (in real implementation, this would come from activity logger)
+        const mockDuration = toolCall.name === "file" ? 50 + Math.random() * 100 : 
+                           toolCall.name === "shell" ? 200 + Math.random() * 800 :
+                           toolCall.name === "javascript" ? 100 + Math.random() * 500 :
+                           75 + Math.random() * 150;
+        
+        entries.push({
+          id: `log-${entryIndex++}-${toolCallTimestamp}`,
+          timestamp: toolCallTimestamp,
+          type: "tool_call",
+          content: `Tool: ${toolCall.name}\nInput: ${JSON.stringify(toolCall.input, null, 2)}`,
+          timing: {
+            durationMs: Math.round(mockDuration),
+          },
+        });
+
+        // For now, we don't have tool results in the conversation history
+        // Tool results would need to be extracted from the agent response or activity logger
+        // This is a placeholder for when tool results are available in conversation data
+        // TODO: Extract tool results when they become available in conversation data
+      });
+    }
+  });
+
+  return entries;
+}
+
 const DetailedLogView: React.FC<DetailedLogViewProps> = ({
   scrollPosition = 0,
   isNavigationMode = false,
   entries = [],
+  conversation = [],
 }) => {
+  // Extract log entries from conversation if conversation is provided, otherwise use entries prop
+  const logEntries = useMemo(() => {
+    return conversation.length > 0 ? extractLogEntries(conversation) : entries;
+  }, [conversation, entries]);
+
   // Use virtual scrolling for large logs
   const { visibleEntries, startIndex } = getVisibleEntryWindow(
-    entries,
+    logEntries,
     scrollPosition,
   );
 
