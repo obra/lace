@@ -13,6 +13,7 @@ import { BashTool } from './tools/implementations/bash.js';
 import { ThreadManager } from './threads/thread.js';
 import { buildConversationFromEvents } from './threads/conversation-builder.js';
 import { logger } from './utils/logger.js';
+import { loadPromptConfig, getPromptFilePaths } from './config/prompts.js';
 
 // Parse command line arguments
 function parseArgs() {
@@ -116,8 +117,18 @@ if (options.help) {
 
 // Create provider based on CLI option
 async function createProvider(providerType: 'anthropic' | 'lmstudio'): Promise<AIProvider> {
-  const systemPrompt =
-    'You are a coding assistant. Use the bash tool to help with programming tasks.';
+  // Load configurable prompts from user's Lace directory
+  const promptConfig = loadPromptConfig();
+  const { systemPrompt, filesCreated } = promptConfig;
+
+  // Show helpful message if configuration files were created for the first time
+  if (filesCreated.length > 0) {
+    console.log('\n📝 Created default Lace configuration files:');
+    filesCreated.forEach((filePath) => {
+      console.log(`   ${filePath}`);
+    });
+    console.log("\n💡 Edit these files to customize your AI assistant's behavior.\n");
+  }
 
   switch (providerType) {
     case 'anthropic': {
@@ -140,6 +151,14 @@ async function main() {
   // Initialize logging
   logger.configure(options.logLevel, options.logFile);
   logger.info('Starting Lace Agent', { provider: options.provider, logLevel: options.logLevel });
+
+  // Show configuration file locations on first startup
+  const { systemPromptPath, userInstructionsPath } = getPromptFilePaths();
+  logger.info('Lace configuration files', {
+    systemPromptPath,
+    userInstructionsPath,
+    laceDir: process.env.LACE_DIR || '~/.lace',
+  });
 
   const provider = await createProvider(options.provider);
   const agent = new Agent({ provider });
