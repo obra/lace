@@ -169,13 +169,43 @@ async function main() {
 
     // Get agent response with available tools
     const availableTools = toolRegistry.getAllTools();
+
+    logger.debug('AGENT: Requesting response from provider', {
+      conversationLength: conversation.length,
+      availableToolCount: availableTools.length,
+      availableToolNames: availableTools.map((t) => t.name),
+      conversationMessages: conversation.map((msg) => ({
+        role: msg.role,
+        contentLength: msg.content.length,
+        contentPreview: msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : ''),
+      })),
+    });
+
     let response;
 
     try {
       response = await agent.createResponse(conversation, availableTools);
-    } catch (error: any) {
+
+      logger.debug('AGENT: Received response from provider', {
+        hasContent: !!response.content,
+        contentLength: response.content?.length || 0,
+        toolCallCount: response.toolCalls.length,
+        toolCallDetails: response.toolCalls.map((tc) => ({
+          id: tc.id,
+          name: tc.name,
+          input: tc.input,
+        })),
+        responseContent: response.content,
+      });
+    } catch (error: unknown) {
+      logger.error('AGENT: Provider error', {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        providerName: agent.providerName,
+      });
+
       // Handle provider-specific errors gracefully
-      console.error(`\n❌ Error: ${error.message}\n`);
+      console.error(`\n❌ Error: ${error instanceof Error ? error.message : String(error)}\n`);
 
       // Suggest alternatives based on the provider
       if (agent.providerName === 'lmstudio') {
@@ -187,14 +217,49 @@ async function main() {
       return 'I encountered an error processing your request. Please see the error message above.';
     }
 
-    // Add agent message to thread
+    // Clean up and add agent message to thread
     if (response.content) {
+      // Extract think blocks and regular content
+      const thinkMatches = response.content.match(/<think>([\s\S]*?)<\/think>/g);
+      const cleanedContent = response.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
       threadManager.addEvent(threadId, 'AGENT_MESSAGE', response.content);
+      logger.debug('AGENT: Added agent message to thread', {
+        contentLength: response.content.length,
+        cleanedLength: cleanedContent.length,
+        thinkBlockCount: thinkMatches?.length || 0,
+      });
+
+      // Show think blocks in italics if present
+      if (thinkMatches) {
+        thinkMatches.forEach((thinkBlock) => {
+          const thinkContent = thinkBlock.replace(/<\/?think>/g, '').trim();
+          if (thinkContent) {
+            process.stdout.write(`\n\x1b[3m${thinkContent}\x1b[0m\n\n`);
+          }
+        });
+      }
+
+      // Show cleaned response to user if there's meaningful content
+      if (cleanedContent && cleanedContent.length > 0) {
+        process.stdout.write(`${cleanedContent}\n\n`);
+      }
     }
 
     // Handle tool calls
     if (response.toolCalls.length > 0) {
+      logger.debug('AGENT: Processing tool calls', {
+        toolCallCount: response.toolCalls.length,
+        toolCalls: response.toolCalls,
+      });
+
       for (const toolCall of response.toolCalls) {
+        logger.debug('AGENT: Executing individual tool call', {
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+          toolInput: toolCall.input,
+        });
+
         // Add tool call to thread
         threadManager.addEvent(threadId, 'TOOL_CALL', {
           toolName: toolCall.name,
@@ -202,12 +267,40 @@ async function main() {
           callId: toolCall.id,
         });
 
-        process.stdout.write(
-          `\n🔧 Running: ${toolCall.name} with ${JSON.stringify(toolCall.input)}\n`
-        );
+        // Show tool call with truncated input for readability
+        const inputDisplay =
+          JSON.stringify(toolCall.input).length > 100
+            ? JSON.stringify(toolCall.input).substring(0, 100) + '...'
+            : JSON.stringify(toolCall.input);
+
+        process.stdout.write(`\n🔧 Running: ${toolCall.name} with ${inputDisplay}\n`);
 
         // Execute tool
         const result = await toolExecutor.executeTool(toolCall.name, toolCall.input);
+
+        logger.debug('AGENT: Tool execution completed', {
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+          success: result.success,
+          outputLength: result.output?.length || 0,
+          hasError: !!result.error,
+          toolResult: result,
+        });
+
+        // Show tool result status
+        if (result.success) {
+          const outputLength = result.output?.length || 0;
+          if (outputLength > 500) {
+            // Show truncated output for large results
+            const truncated = result.output.substring(0, 500);
+            process.stdout.write(`✅ Tool completed (${outputLength} chars):\n${truncated}...\n\n`);
+          } else {
+            // Show full output for small results
+            process.stdout.write(`✅ Tool completed:\n${result.output}\n\n`);
+          }
+        } else {
+          process.stdout.write(`❌ Tool failed: ${result.error || 'Unknown error'}\n\n`);
+        }
 
         // Add tool result to thread
         threadManager.addEvent(threadId, 'TOOL_RESULT', {
@@ -216,15 +309,14 @@ async function main() {
           success: result.success,
           error: result.error,
         });
-
-        process.stdout.write(result.output + '\n');
       }
 
       // Recurse to get next response
       return processMessage('');
     }
 
-    return response.content;
+    // Return empty string since we already displayed the content above
+    return '';
   }
 
   console.log(

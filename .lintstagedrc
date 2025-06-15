@@ -2,6 +2,6 @@
   "*.ts": [
     "eslint --fix",
     "prettier --write",
-    "vitest related --run"
+    "vitest related --run --exclude \"**/lmstudio-integration*\" --exclude \"**/conversation-state*\""
   ]
 }

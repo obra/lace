@@ -38,7 +38,7 @@ class Logger {
     return LOG_LEVELS[level] <= LOG_LEVELS[this._level];
   }
 
-  private _write(level: LogLevel, message: string, data?: any) {
+  private _write(level: LogLevel, message: string, data?: unknown) {
     if (!this._shouldLog(level) || !this._logFile) {
       return;
     }
@@ -55,19 +55,19 @@ class Logger {
     }
   }
 
-  error(message: string, data?: any) {
+  error(message: string, data?: unknown) {
     this._write('error', message, data);
   }
 
-  warn(message: string, data?: any) {
+  warn(message: string, data?: unknown) {
     this._write('warn', message, data);
   }
 
-  info(message: string, data?: any) {
+  info(message: string, data?: unknown) {
     this._write('info', message, data);
   }
 
-  debug(message: string, data?: any) {
+  debug(message: string, data?: unknown) {
     this._write('debug', message, data);
   }
 }
