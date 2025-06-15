@@ -52,20 +52,62 @@ export class BashTool implements Tool {
       };
 
       return {
-        success: true,
+        success: true, // Tool succeeded: command executed successfully
         output: JSON.stringify(result),
       };
     } catch (error: unknown) {
       const err = error as { message: string; stdout?: string; stderr?: string; code?: number };
 
+      // Important distinction: Tool success vs Command exit code
+      // - Tool success = "Did the bash tool successfully execute the command?"
+      // - Command exit code = "What was the result of the command itself?"
+      //
+      // Examples:
+      // - ESLint finds issues: Tool success=true, exit code=1, stdout=linting errors
+      // - Git status with changes: Tool success=true, exit code=1, stdout=file list
+      // - Single invalid command: Tool success=false, exit code=127, stderr=command not found
+      // - Command sequence with invalid command: Tool success=true, exit code=0, stderr=command not found
+
+      // Special case: Command not found with exit code 127 and no stdout = tool failure
+      // This handles single nonexistent commands like "nonexistentcommand12345"
+      if (err.code === 127 && (!err.stdout || err.stdout.trim() === '')) {
+        const result: BashOutput = {
+          stdout: err.stdout || '',
+          stderr: err.stderr || err.message,
+          exitCode: 127,
+        };
+
+        return {
+          success: false, // Tool failed: command not found
+          output: JSON.stringify(result),
+          error: err.message,
+        };
+      }
+
+      // If we have stdout or command executed in a sequence, treat as tool success
+      // This handles cases like: echo "test"; nonexistentcmd; echo "after"
+      if (err.stdout !== undefined || err.stderr !== undefined) {
+        const result: BashOutput = {
+          stdout: err.stdout || '',
+          stderr: err.stderr || '',
+          exitCode: err.code || 1, // Preserve actual exit code (non-zero)
+        };
+
+        return {
+          success: true, // Tool succeeded: command sequence ran and produced output
+          output: JSON.stringify(result),
+        };
+      }
+
+      // True failure - command couldn't execute at all (rare cases)
       const result: BashOutput = {
-        stdout: err.stdout || '',
-        stderr: err.stderr || err.message,
+        stdout: '',
+        stderr: err.message,
         exitCode: err.code || 1,
       };
 
       return {
-        success: false,
+        success: false, // Tool failed: command couldn't be executed
         output: JSON.stringify(result),
         error: err.message,
       };
