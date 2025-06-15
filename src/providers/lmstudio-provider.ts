@@ -42,7 +42,7 @@ export class LMStudioProvider extends AIProvider {
   }
 
   get defaultModel(): string {
-    return 'deepseek/deepseek-r1-0528-qwen3-8b';
+    return 'qwen/qwen3-30b-a3b';
   }
 
   async diagnose(): Promise<{ connected: boolean; models: string[]; error?: string }> {

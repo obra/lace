@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
+import { getLaceDir, ensureLaceDir } from './lace-dir';
 
 export interface PromptConfig {
   systemPrompt: string;
@@ -16,33 +16,6 @@ const DEFAULT_SYSTEM_PROMPT = `You are a coding assistant. Use the bash tool to 
 
 // Default user instructions - empty by default
 const DEFAULT_USER_INSTRUCTIONS = ``;
-
-/**
- * Get the Lace configuration directory
- * Uses LACE_DIR environment variable, falls back to ~/.lace/
- */
-function getLaceDir(): string {
-  const laceDir = process.env.LACE_DIR || path.join(os.homedir(), '.lace');
-  return laceDir;
-}
-
-/**
- * Ensure the Lace configuration directory exists
- */
-function ensureLaceDir(): string {
-  const laceDir = getLaceDir();
-
-  try {
-    if (!fs.existsSync(laceDir)) {
-      fs.mkdirSync(laceDir, { recursive: true });
-    }
-    return laceDir;
-  } catch (error) {
-    throw new Error(
-      `Failed to create Lace configuration directory at ${laceDir}: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-}
 
 /**
  * Read a prompt file, creating it with default content if it doesn't exist

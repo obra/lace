@@ -36,7 +36,7 @@ describe('LMStudioProvider', () => {
     });
 
     it('should have correct default model', () => {
-      expect(provider.defaultModel).toBe('deepseek/deepseek-r1-0528-qwen3-8b');
+      expect(provider.defaultModel).toBe('qwen/qwen3-30b-a3b');
     });
 
     it('should accept custom configuration', () => {
