@@ -37,6 +37,8 @@ coverage/
 # Logs
 logs
 *.log
+debug-log*
+debug.log*
 
 # Runtime data
 pids
