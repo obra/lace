@@ -6,6 +6,7 @@ import * as readline from 'readline';
 import { Agent } from './agents/agent.js';
 import { AnthropicProvider } from './providers/anthropic-provider.js';
 import { LMStudioProvider } from './providers/lmstudio-provider.js';
+import { OllamaProvider } from './providers/ollama-provider.js';
 import { AIProvider } from './providers/types.js';
 import { ToolRegistry } from './tools/registry.js';
 import { ToolExecutor } from './tools/executor.js';
@@ -19,7 +20,7 @@ import { loadPromptConfig, getPromptFilePaths } from './config/prompts.js';
 function parseArgs() {
   const args = process.argv.slice(2);
   const options = {
-    provider: 'anthropic' as 'anthropic' | 'lmstudio',
+    provider: 'anthropic' as 'anthropic' | 'lmstudio' | 'ollama',
     help: false,
     logLevel: 'info' as 'error' | 'warn' | 'info' | 'debug',
     logFile: undefined as string | undefined,
@@ -32,19 +33,19 @@ function parseArgs() {
       options.help = true;
     } else if (arg === '--provider' || arg === '-p') {
       const providerValue = args[i + 1];
-      if (!providerValue || !['anthropic', 'lmstudio'].includes(providerValue)) {
-        console.error('Error: --provider must be "anthropic" or "lmstudio"');
+      if (!providerValue || !['anthropic', 'lmstudio', 'ollama'].includes(providerValue)) {
+        console.error('Error: --provider must be "anthropic", "lmstudio", or "ollama"');
         process.exit(1);
       }
-      options.provider = providerValue as 'anthropic' | 'lmstudio';
+      options.provider = providerValue as 'anthropic' | 'lmstudio' | 'ollama';
       i++; // Skip next argument since we consumed it
     } else if (arg.startsWith('--provider=')) {
       const providerValue = arg.split('=')[1];
-      if (!['anthropic', 'lmstudio'].includes(providerValue)) {
-        console.error('Error: --provider must be "anthropic" or "lmstudio"');
+      if (!['anthropic', 'lmstudio', 'ollama'].includes(providerValue)) {
+        console.error('Error: --provider must be "anthropic", "lmstudio", or "ollama"');
         process.exit(1);
       }
-      options.provider = providerValue as 'anthropic' | 'lmstudio';
+      options.provider = providerValue as 'anthropic' | 'lmstudio' | 'ollama';
     } else if (arg === '--log-level') {
       const levelValue = args[i + 1];
       if (!levelValue || !['error', 'warn', 'info', 'debug'].includes(levelValue)) {
@@ -92,7 +93,7 @@ Usage: lace [options]
 
 Options:
   -h, --help                Show this help message
-  -p, --provider <name>     Choose AI provider: "anthropic" (default) or "lmstudio"
+  -p, --provider <name>     Choose AI provider: "anthropic" (default), "lmstudio", or "ollama"
   --log-level <level>       Set log level: "error", "warn", "info" (default), or "debug"
   --log-file <path>         Write logs to file (no file = no logging)
 
@@ -100,6 +101,7 @@ Examples:
   lace                      # Use Anthropic Claude (default)
   lace --provider anthropic # Use Anthropic Claude explicitly
   lace --provider lmstudio  # Use local LMStudio server
+  lace --provider ollama    # Use local Ollama server
   lace --log-level debug --log-file debug.log  # Debug logging to file
 
 Environment Variables:
@@ -116,7 +118,9 @@ if (options.help) {
 }
 
 // Create provider based on CLI option
-async function createProvider(providerType: 'anthropic' | 'lmstudio'): Promise<AIProvider> {
+async function createProvider(
+  providerType: 'anthropic' | 'lmstudio' | 'ollama'
+): Promise<AIProvider> {
   // Load configurable prompts from user's Lace directory
   const promptConfig = loadPromptConfig();
   const { systemPrompt, filesCreated } = promptConfig;
@@ -141,6 +145,9 @@ async function createProvider(providerType: 'anthropic' | 'lmstudio'): Promise<A
     }
     case 'lmstudio': {
       return new LMStudioProvider({ systemPrompt });
+    }
+    case 'ollama': {
+      return new OllamaProvider({ systemPrompt });
     }
     default:
       throw new Error(`Unknown provider: ${providerType}`);

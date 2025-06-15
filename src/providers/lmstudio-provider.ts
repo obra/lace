@@ -6,6 +6,16 @@ import { AIProvider, ProviderMessage, ProviderResponse, ProviderConfig } from '.
 import { Tool } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
 
+// Interface for LMStudio model objects
+interface LMStudioModel {
+  respond(messages: { role: string; content: string }[]): AsyncIterable<LMStudioChunk>;
+}
+
+// Interface for streaming chunks from LMStudio
+interface LMStudioChunk {
+  content?: string;
+}
+
 export interface LMStudioProviderConfig extends ProviderConfig {
   baseUrl?: string;
   verbose?: boolean;
@@ -15,7 +25,7 @@ export class LMStudioProvider extends AIProvider {
   private readonly _client: LMStudioClient;
   private readonly _verbose: boolean;
   private readonly _baseUrl: string;
-  private _cachedModel: unknown = null;
+  private _cachedModel: LMStudioModel | null = null;
   private _cachedModelId: string | null = null;
 
   constructor(config: LMStudioProviderConfig = {}) {
@@ -104,7 +114,7 @@ export class LMStudioProvider extends AIProvider {
 
         if (existingModel) {
           process.stdout.write(`✅ Using existing model instance "${modelId}"\n`);
-          this._cachedModel = existingModel;
+          this._cachedModel = existingModel as LMStudioModel;
           this._cachedModelId = modelId;
         } else {
           throw new Error(`Model "${modelId}" appears loaded but could not retrieve instance`);
@@ -116,7 +126,9 @@ export class LMStudioProvider extends AIProvider {
         process.stdout.write(`🔄 Attempting to load "${modelId}"...\n`);
 
         try {
-          this._cachedModel = await this._client.llm.load(modelId, { verbose: this._verbose });
+          this._cachedModel = (await this._client.llm.load(modelId, {
+            verbose: this._verbose,
+          })) as LMStudioModel;
           this._cachedModelId = modelId;
           process.stdout.write(`✅ Model "${modelId}" loaded successfully\n`);
         } catch (error: unknown) {
@@ -225,10 +237,10 @@ export class LMStudioProvider extends AIProvider {
     });
 
     // Make the request using cached model
-    const prediction = this._cachedModel.respond(lmMessages);
+    const prediction = this._cachedModel!.respond(lmMessages);
 
     let fullResponse = '';
-    const chunks: unknown[] = [];
+    const chunks: LMStudioChunk[] = [];
 
     let chunkCount = 0;
     for await (const chunk of prediction) {
@@ -247,7 +259,7 @@ export class LMStudioProvider extends AIProvider {
       totalChunks: chunkCount,
       finalContentLength: fullResponse.length,
       chunkTypes: [...new Set(chunks.map((c) => typeof c))],
-      hasContent: chunks.some((c) => c.content),
+      hasContent: chunks.some((c) => !!c.content),
     });
 
     // Log the complete raw response
