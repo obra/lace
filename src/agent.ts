@@ -12,6 +12,7 @@ import { ToolExecutor } from './tools/executor.js';
 import { BashTool } from './tools/implementations/bash.js';
 import { ThreadManager } from './threads/thread.js';
 import { buildConversationFromEvents } from './threads/conversation-builder.js';
+import { logger } from './utils/logger.js';
 
 // Parse command line arguments
 function parseArgs() {
@@ -19,6 +20,8 @@ function parseArgs() {
   const options = {
     provider: 'anthropic' as 'anthropic' | 'lmstudio',
     help: false,
+    logLevel: 'info' as 'error' | 'warn' | 'info' | 'debug',
+    logFile: undefined as string | undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -41,6 +44,36 @@ function parseArgs() {
         process.exit(1);
       }
       options.provider = providerValue as 'anthropic' | 'lmstudio';
+    } else if (arg === '--log-level') {
+      const levelValue = args[i + 1];
+      if (!levelValue || !['error', 'warn', 'info', 'debug'].includes(levelValue)) {
+        console.error('Error: --log-level must be "error", "warn", "info", or "debug"');
+        process.exit(1);
+      }
+      options.logLevel = levelValue as 'error' | 'warn' | 'info' | 'debug';
+      i++; // Skip next argument since we consumed it
+    } else if (arg.startsWith('--log-level=')) {
+      const levelValue = arg.split('=')[1];
+      if (!['error', 'warn', 'info', 'debug'].includes(levelValue)) {
+        console.error('Error: --log-level must be "error", "warn", "info", or "debug"');
+        process.exit(1);
+      }
+      options.logLevel = levelValue as 'error' | 'warn' | 'info' | 'debug';
+    } else if (arg === '--log-file') {
+      const fileValue = args[i + 1];
+      if (!fileValue) {
+        console.error('Error: --log-file requires a file path');
+        process.exit(1);
+      }
+      options.logFile = fileValue;
+      i++; // Skip next argument since we consumed it
+    } else if (arg.startsWith('--log-file=')) {
+      const fileValue = arg.split('=')[1];
+      if (!fileValue) {
+        console.error('Error: --log-file requires a file path');
+        process.exit(1);
+      }
+      options.logFile = fileValue;
     } else {
       console.error(`Error: Unknown argument "${arg}"`);
       process.exit(1);
@@ -59,11 +92,14 @@ Usage: lace [options]
 Options:
   -h, --help                Show this help message
   -p, --provider <name>     Choose AI provider: "anthropic" (default) or "lmstudio"
+  --log-level <level>       Set log level: "error", "warn", "info" (default), or "debug"
+  --log-file <path>         Write logs to file (no file = no logging)
 
 Examples:
   lace                      # Use Anthropic Claude (default)
   lace --provider anthropic # Use Anthropic Claude explicitly
   lace --provider lmstudio  # Use local LMStudio server
+  lace --log-level debug --log-file debug.log  # Debug logging to file
 
 Environment Variables:
   ANTHROPIC_KEY            Required for Anthropic provider
@@ -101,6 +137,10 @@ async function createProvider(providerType: 'anthropic' | 'lmstudio'): Promise<A
 }
 
 async function main() {
+  // Initialize logging
+  logger.configure(options.logLevel, options.logFile);
+  logger.info('Starting Lace Agent', { provider: options.provider, logLevel: options.logLevel });
+
   const provider = await createProvider(options.provider);
   const agent = new Agent({ provider });
 

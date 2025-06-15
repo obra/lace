@@ -4,6 +4,7 @@
 import { LMStudioClient } from '@lmstudio/sdk';
 import { AIProvider, ProviderMessage, ProviderResponse, ProviderConfig } from './types.js';
 import { Tool } from '../tools/types.js';
+import { logger } from '../utils/logger.js';
 
 export interface LMStudioProviderConfig extends ProviderConfig {
   baseUrl?: string;
@@ -201,6 +202,16 @@ export class LMStudioProvider extends AIProvider {
       }
     }
 
+    // Log the request
+    logger.debug('Sending request to LMStudio', {
+      provider: 'lmstudio',
+      model: modelId,
+      messageCount: lmMessages.length,
+      toolCount: tools.length,
+      toolNames: tools.map((t) => t.name),
+      messages: lmMessages,
+    });
+
     // Make the request using cached model
     const prediction = this._cachedModel.respond(lmMessages);
 
@@ -216,6 +227,16 @@ export class LMStudioProvider extends AIProvider {
 
     // Remove tool call JSON from the response content
     const cleanedContent = this._removeToolCallsFromContent(fullResponse);
+
+    logger.debug('Received response from LMStudio', {
+      provider: 'lmstudio',
+      model: modelId,
+      rawContentLength: fullResponse.length,
+      cleanedContentLength: cleanedContent.length,
+      toolCallCount: toolCalls.length,
+      toolCallNames: toolCalls.map((tc) => tc.name),
+      rawContent: fullResponse,
+    });
 
     return {
       content: cleanedContent.trim(),

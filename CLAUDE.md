@@ -145,6 +145,41 @@ The conversation builder (`buildConversationFromEvents`) is critical for debuggi
 - Unknown event types cause hard failures (by design)
 - Event ordering is critical - events must be processed sequentially
 
+## Logging Guidelines
+
+### When to Log
+- **DEBUG**: LLM request/response payloads, tool parsing details, performance metrics
+- **INFO**: High-level operations (conversation start, tool execution, provider switching)
+- **WARN**: Recoverable issues (fallback behavior, retries, deprecation warnings)
+- **ERROR**: Unrecoverable failures (authentication errors, network failures, invalid configurations)
+
+### What to Log
+```typescript
+// DEBUG: Raw LLM communication
+logger.debug('Sending request to LLM', { provider: 'anthropic', messageCount: messages.length, tools: tools.map(t => t.name) });
+logger.debug('LLM response received', { provider: 'anthropic', contentLength: response.content.length, toolCalls: response.toolCalls.length });
+
+// INFO: User-visible operations  
+logger.info('Tool execution started', { toolName: 'bash', command: input.command });
+logger.info('Conversation thread created', { threadId, provider: 'lmstudio' });
+
+// WARN: Fallback scenarios
+logger.warn('LMStudio connection failed, using cached model', { modelId, errorMessage: error.message });
+
+// ERROR: Critical failures
+logger.error('Provider initialization failed', { provider: 'anthropic', error: error.message });
+```
+
+### Privacy and Security
+- **Never log**: API keys, user credentials, sensitive file contents
+- **Sanitize**: File paths (log relative paths only), user input (truncate if very long)
+- **Hash**: User identifiers if needed for debugging
+
+### Performance Considerations  
+- Log payloads at DEBUG level only (they can be large)
+- Include relevant metadata for filtering (provider, operation, threadId)
+- Use structured data objects rather than string concatenation
+
 ## Future Architecture
 
 The current design is prepared for:

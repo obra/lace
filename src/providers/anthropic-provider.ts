@@ -4,6 +4,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { AIProvider, ProviderMessage, ProviderResponse, ProviderConfig } from './types.js';
 import { Tool } from '../tools/types.js';
+import { logger } from '../utils/logger.js';
 
 export interface AnthropicProviderConfig extends ProviderConfig {
   apiKey: string;
@@ -46,13 +47,24 @@ export class AnthropicProvider extends AIProvider {
       input_schema: tool.input_schema,
     }));
 
-    const response = await this._anthropic.messages.create({
+    const requestPayload = {
       model: this._config.model || this.defaultModel,
       max_tokens: this._config.maxTokens || 4000,
       messages: anthropicMessages,
       system: systemPrompt,
       tools: anthropicTools,
+    };
+
+    logger.debug('Sending request to Anthropic', {
+      provider: 'anthropic',
+      model: requestPayload.model,
+      messageCount: anthropicMessages.length,
+      systemPromptLength: systemPrompt.length,
+      toolCount: anthropicTools.length,
+      toolNames: anthropicTools.map((t) => t.name),
     });
+
+    const response = await this._anthropic.messages.create(requestPayload);
 
     const textContent = response.content
       .filter((content): content is Anthropic.TextBlock => content.type === 'text')
@@ -66,6 +78,14 @@ export class AnthropicProvider extends AIProvider {
         name: content.name,
         input: content.input as Record<string, unknown>,
       }));
+
+    logger.debug('Received response from Anthropic', {
+      provider: 'anthropic',
+      contentLength: textContent.length,
+      toolCallCount: toolCalls.length,
+      toolCallNames: toolCalls.map((tc) => tc.name),
+      usage: response.usage,
+    });
 
     return {
       content: textContent,
