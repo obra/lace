@@ -2,13 +2,13 @@
 // ABOUTME: Verifies that buildConversationFromEvents preserves full history
 
 import { describe, it, expect } from 'vitest';
-import { ThreadManager } from '../thread.js';
+import { ThreadManager } from '../thread-manager.js';
 import { buildConversationFromEvents } from '../conversation-builder.js';
 import type { ThreadEvent } from '../types.js';
 
 describe('Conversation Context Preservation', () => {
-  it('should preserve all messages in long conversations', () => {
-    const threadManager = new ThreadManager();
+  it('should preserve all messages in long conversations', async () => {
+    const threadManager = new ThreadManager(':memory:');
     const threadId = 'test_thread';
     threadManager.createThread(threadId);
 
@@ -84,10 +84,12 @@ describe('Conversation Context Preservation', () => {
         expect(found).toBe(true);
       }
     });
+
+    await threadManager.close();
   });
 
-  it('should handle the exact message pattern from debug logs', () => {
-    const threadManager = new ThreadManager();
+  it('should handle the exact message pattern from debug logs', async () => {
+    const threadManager = new ThreadManager(':memory:');
     const threadId = 'debug_reproduction';
     threadManager.createThread(threadId);
 
@@ -176,10 +178,12 @@ describe('Conversation Context Preservation', () => {
     expect(userTexts).toContain('can you explore the code for the project?');
     expect(userTexts).toContain('please do dig through all the files');
     expect(userTexts).toContain('go ahead');
+
+    await threadManager.close();
   });
 
-  it('should handle tool calls and results correctly in sequence', () => {
-    const threadManager = new ThreadManager();
+  it('should handle tool calls and results correctly in sequence', async () => {
+    const threadManager = new ThreadManager(':memory:');
     const threadId = 'tool_sequence_test';
     threadManager.createThread(threadId);
 
@@ -238,6 +242,8 @@ describe('Conversation Context Preservation', () => {
     expect(conversation[6].role).toBe('assistant'); // Third tool call
     expect(conversation[7].role).toBe('user'); // Third tool result
     expect(conversation[8].role).toBe('assistant'); // Final response
+
+    await threadManager.close();
   });
 
   it('should preserve event ordering and not lose any events', () => {

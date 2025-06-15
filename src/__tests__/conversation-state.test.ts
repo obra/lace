@@ -1,10 +1,10 @@
 // ABOUTME: Integration tests for conversation state management across multiple turns
 // ABOUTME: Tests the full conversation flow to catch context truncation bugs
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Agent } from '../agents/agent.js';
 import { LMStudioProvider } from '../providers/lmstudio-provider.js';
-import { ThreadManager } from '../threads/thread.js';
+import { ThreadManager } from '../threads/thread-manager.js';
 import { buildConversationFromEvents } from '../threads/conversation-builder.js';
 import { ToolRegistry } from '../tools/registry.js';
 import { ToolExecutor } from '../tools/executor.js';
@@ -37,7 +37,7 @@ describe('Conversation State Management', () => {
     }
 
     agent = new Agent({ provider });
-    threadManager = new ThreadManager();
+    threadManager = new ThreadManager(':memory:'); // Use SQLite in-memory database for testing
     toolRegistry = new ToolRegistry();
     toolExecutor = new ToolExecutor(toolRegistry);
 
@@ -45,6 +45,12 @@ describe('Conversation State Management', () => {
 
     threadId = `test_thread_${Date.now()}`;
     threadManager.createThread(threadId);
+  });
+
+  afterEach(async () => {
+    if (threadManager) {
+      await threadManager.close();
+    }
   });
 
   it('should maintain conversation context across multiple tool calls', async () => {

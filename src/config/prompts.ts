@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { getLaceDir, ensureLaceDir } from './lace-dir';
+import { getLaceDir, ensureLaceDir } from './lace-dir.js';
 
 export interface PromptConfig {
   systemPrompt: string;

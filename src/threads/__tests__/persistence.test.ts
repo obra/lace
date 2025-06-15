@@ -1,0 +1,733 @@
+// ABOUTME: Comprehensive test suite for thread persistence system
+// ABOUTME: Tests ThreadPersistence, enhanced ThreadManager, and integration scenarios
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import Database from 'better-sqlite3';
+import { ThreadPersistence } from '../persistence.js';
+import { ThreadManager } from '../thread-manager.js';
+import { Thread, ThreadEvent, EventType } from '../types.js';
+import { startSession, handleGracefulShutdown } from '../session.js';
+import * as laceDir from '../../config/lace-dir.js';
+
+describe('ThreadPersistence', () => {
+  let tempDbPath: string;
+  let persistence: ThreadPersistence;
+
+  beforeEach(() => {
+    // Create temporary database file
+    tempDbPath = path.join(os.tmpdir(), `lace-test-${Date.now()}.db`);
+    persistence = new ThreadPersistence(tempDbPath);
+  });
+
+  afterEach(() => {
+    persistence.close();
+    if (fs.existsSync(tempDbPath)) {
+      fs.unlinkSync(tempDbPath);
+    }
+  });
+
+  describe('initialization', () => {
+    it('should create database file', () => {
+      expect(fs.existsSync(tempDbPath)).toBe(true);
+    });
+
+    it('should create required tables', () => {
+      const db = new Database(tempDbPath);
+
+      const tables = db
+        .prepare(
+          `
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name IN ('threads', 'events')
+      `
+        )
+        .all() as Array<{ name: string }>;
+
+      expect(tables).toHaveLength(2);
+      expect(tables.map((t) => t.name)).toContain('threads');
+      expect(tables.map((t) => t.name)).toContain('events');
+
+      db.close();
+    });
+
+    it('should create required indexes', () => {
+      const db = new Database(tempDbPath);
+
+      const indexes = db
+        .prepare(
+          `
+        SELECT name FROM sqlite_master 
+        WHERE type='index' AND name LIKE 'idx_%'
+      `
+        )
+        .all() as Array<{ name: string }>;
+
+      expect(indexes.length).toBeGreaterThan(0);
+      expect(indexes.map((i) => i.name)).toContain('idx_events_thread_timestamp');
+      expect(indexes.map((i) => i.name)).toContain('idx_threads_updated');
+
+      db.close();
+    });
+  });
+
+  describe('thread operations', () => {
+    it('should save and load a thread', async () => {
+      const thread: Thread = {
+        id: 'test_thread_123',
+        createdAt: new Date('2025-01-01T10:00:00Z'),
+        updatedAt: new Date('2025-01-01T10:30:00Z'),
+        events: [],
+      };
+
+      await persistence.saveThread(thread);
+      const loaded = await persistence.loadThread('test_thread_123');
+
+      expect(loaded).not.toBeNull();
+      expect(loaded!.id).toBe('test_thread_123');
+      expect(loaded!.createdAt).toEqual(thread.createdAt);
+      expect(loaded!.updatedAt).toEqual(thread.updatedAt);
+      expect(loaded!.events).toEqual([]);
+    });
+
+    it('should return null for non-existent thread', async () => {
+      const loaded = await persistence.loadThread('non_existent');
+      expect(loaded).toBeNull();
+    });
+
+    it('should update existing thread on save', async () => {
+      const thread: Thread = {
+        id: 'test_thread_123',
+        createdAt: new Date('2025-01-01T10:00:00Z'),
+        updatedAt: new Date('2025-01-01T10:30:00Z'),
+        events: [],
+      };
+
+      await persistence.saveThread(thread);
+
+      // Update and save again
+      thread.updatedAt = new Date('2025-01-01T11:00:00Z');
+      await persistence.saveThread(thread);
+
+      const loaded = await persistence.loadThread('test_thread_123');
+      expect(loaded!.updatedAt).toEqual(new Date('2025-01-01T11:00:00Z'));
+    });
+  });
+
+  describe('event operations', () => {
+    it('should save and load events', async () => {
+      const thread: Thread = {
+        id: 'test_thread_123',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        events: [],
+      };
+      await persistence.saveThread(thread);
+
+      const event: ThreadEvent = {
+        id: 'evt_123',
+        threadId: 'test_thread_123',
+        type: 'USER_MESSAGE',
+        timestamp: new Date('2025-01-01T10:00:00Z'),
+        data: 'Hello world',
+      };
+
+      await persistence.saveEvent(event);
+      const events = await persistence.loadEvents('test_thread_123');
+
+      expect(events).toHaveLength(1);
+      expect(events[0].id).toBe('evt_123');
+      expect(events[0].type).toBe('USER_MESSAGE');
+      expect(events[0].data).toBe('Hello world');
+      expect(events[0].timestamp).toEqual(new Date('2025-01-01T10:00:00Z'));
+    });
+
+    it('should load events in chronological order', async () => {
+      const thread: Thread = {
+        id: 'test_thread_123',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        events: [],
+      };
+      await persistence.saveThread(thread);
+
+      const events = [
+        {
+          id: 'evt_3',
+          threadId: 'test_thread_123',
+          type: 'USER_MESSAGE' as EventType,
+          timestamp: new Date('2025-01-01T10:02:00Z'),
+          data: 'Third message',
+        },
+        {
+          id: 'evt_1',
+          threadId: 'test_thread_123',
+          type: 'USER_MESSAGE' as EventType,
+          timestamp: new Date('2025-01-01T10:00:00Z'),
+          data: 'First message',
+        },
+        {
+          id: 'evt_2',
+          threadId: 'test_thread_123',
+          type: 'AGENT_MESSAGE' as EventType,
+          timestamp: new Date('2025-01-01T10:01:00Z'),
+          data: 'Second message',
+        },
+      ];
+
+      // Save events out of order
+      for (const event of events) {
+        await persistence.saveEvent(event);
+      }
+
+      const loaded = await persistence.loadEvents('test_thread_123');
+
+      expect(loaded).toHaveLength(3);
+      expect(loaded[0].id).toBe('evt_1'); // First chronologically
+      expect(loaded[1].id).toBe('evt_2'); // Second chronologically
+      expect(loaded[2].id).toBe('evt_3'); // Third chronologically
+    });
+
+    it('should handle complex event data', async () => {
+      const thread: Thread = {
+        id: 'test_thread_123',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        events: [],
+      };
+      await persistence.saveThread(thread);
+
+      const complexData = {
+        toolName: 'bash',
+        input: { command: 'ls -la' },
+        callId: 'call_123',
+        nested: {
+          array: [1, 2, 3],
+          object: { key: 'value' },
+        },
+      };
+
+      const event: ThreadEvent = {
+        id: 'evt_complex',
+        threadId: 'test_thread_123',
+        type: 'TOOL_CALL',
+        timestamp: new Date(),
+        data: complexData,
+      };
+
+      await persistence.saveEvent(event);
+      const events = await persistence.loadEvents('test_thread_123');
+
+      expect(events).toHaveLength(1);
+      expect(events[0].data).toEqual(complexData);
+    });
+
+    it('should update thread timestamp when saving event', async () => {
+      const thread: Thread = {
+        id: 'test_thread_123',
+        createdAt: new Date('2025-01-01T10:00:00Z'),
+        updatedAt: new Date('2025-01-01T10:00:00Z'),
+        events: [],
+      };
+      await persistence.saveThread(thread);
+
+      const event: ThreadEvent = {
+        id: 'evt_123',
+        threadId: 'test_thread_123',
+        type: 'USER_MESSAGE',
+        timestamp: new Date('2025-01-01T10:30:00Z'),
+        data: 'Hello',
+      };
+
+      const saveTime = new Date();
+      await persistence.saveEvent(event);
+
+      const loaded = await persistence.loadThread('test_thread_123');
+      expect(loaded!.updatedAt.getTime()).toBeGreaterThanOrEqual(saveTime.getTime() - 1000);
+    });
+  });
+
+  describe('thread discovery', () => {
+    it('should return latest thread ID', async () => {
+      const threads = [
+        {
+          id: 'thread_old',
+          createdAt: new Date('2025-01-01T10:00:00Z'),
+          updatedAt: new Date('2025-01-01T10:00:00Z'),
+          events: [],
+        },
+        {
+          id: 'thread_latest',
+          createdAt: new Date('2025-01-01T11:00:00Z'),
+          updatedAt: new Date('2025-01-01T12:00:00Z'), // Most recently updated
+          events: [],
+        },
+        {
+          id: 'thread_middle',
+          createdAt: new Date('2025-01-01T10:30:00Z'),
+          updatedAt: new Date('2025-01-01T11:30:00Z'),
+          events: [],
+        },
+      ];
+
+      for (const thread of threads) {
+        await persistence.saveThread(thread);
+      }
+
+      const latestId = await persistence.getLatestThreadId();
+      expect(latestId).toBe('thread_latest');
+    });
+
+    it('should return null when no threads exist', async () => {
+      const latestId = await persistence.getLatestThreadId();
+      expect(latestId).toBeNull();
+    });
+  });
+
+  describe('error handling', () => {
+    it('should handle invalid JSON in event data gracefully', async () => {
+      // Manually insert malformed JSON
+      const db = new Database(tempDbPath);
+      db.prepare(
+        `
+        INSERT INTO threads (id, created_at, updated_at)
+        VALUES ('test_thread', '2025-01-01T10:00:00Z', '2025-01-01T10:00:00Z')
+      `
+      ).run();
+
+      db.prepare(
+        `
+        INSERT INTO events (id, thread_id, type, timestamp, data)
+        VALUES ('evt_bad', 'test_thread', 'USER_MESSAGE', '2025-01-01T10:00:00Z', 'invalid json')
+      `
+      ).run();
+      db.close();
+
+      // Should throw when trying to load events with invalid JSON
+      expect(() => persistence.loadEvents('test_thread')).toThrow();
+    });
+  });
+});
+
+describe('Enhanced ThreadManager', () => {
+  let tempDbPath: string;
+  let threadManager: ThreadManager;
+
+  beforeEach(() => {
+    tempDbPath = path.join(os.tmpdir(), `lace-test-${Date.now()}.db`);
+    threadManager = new ThreadManager(tempDbPath);
+  });
+
+  afterEach(async () => {
+    await threadManager.close();
+    if (fs.existsSync(tempDbPath)) {
+      fs.unlinkSync(tempDbPath);
+    }
+  });
+
+  describe('existing API compatibility', () => {
+    it('should preserve createThread behavior', () => {
+      const thread = threadManager.createThread('test_123');
+
+      expect(thread.id).toBe('test_123');
+      expect(thread.events).toEqual([]);
+      expect(thread.createdAt).toBeInstanceOf(Date);
+      expect(thread.updatedAt).toBeInstanceOf(Date);
+    });
+
+    it('should preserve getThread behavior', () => {
+      threadManager.createThread('test_123');
+
+      const thread = threadManager.getThread('test_123');
+      expect(thread).not.toBeUndefined();
+      expect(thread!.id).toBe('test_123');
+
+      const nonExistent = threadManager.getThread('non_existent');
+      expect(nonExistent).toBeUndefined();
+    });
+
+    it('should preserve addEvent behavior', () => {
+      threadManager.createThread('test_123');
+
+      const event = threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
+
+      expect(event.threadId).toBe('test_123');
+      expect(event.type).toBe('USER_MESSAGE');
+      expect(event.data).toBe('Hello');
+      expect(event.id).toMatch(/^evt_\d+_[a-z0-9]+$/);
+    });
+
+    it('should preserve getEvents behavior', () => {
+      threadManager.createThread('test_123');
+      threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
+      threadManager.addEvent('test_123', 'AGENT_MESSAGE', 'Hi there');
+
+      const events = threadManager.getEvents('test_123');
+      expect(events).toHaveLength(2);
+      expect(events[0].data).toBe('Hello');
+      expect(events[1].data).toBe('Hi there');
+    });
+  });
+
+  describe('persistence integration', () => {
+    it('should auto-save events to database', async () => {
+      threadManager.createThread('test_123');
+      threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
+
+      // Give auto-save a moment
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Create new manager to verify persistence
+      await threadManager.close();
+      const newManager = new ThreadManager(tempDbPath);
+
+      const loadedThread = await newManager.loadThread('test_123');
+      expect(loadedThread.events).toHaveLength(1);
+      expect(loadedThread.events[0].data).toBe('Hello');
+
+      await newManager.close();
+    });
+
+    it('should load thread from database', async () => {
+      // Create and save thread with first manager
+      threadManager.createThread('test_123');
+      threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
+      threadManager.addEvent('test_123', 'AGENT_MESSAGE', 'Hi');
+      await threadManager.saveCurrentThread();
+      await threadManager.close();
+
+      // Load with new manager
+      const newManager = new ThreadManager(tempDbPath);
+      const thread = await newManager.loadThread('test_123');
+
+      expect(thread.id).toBe('test_123');
+      expect(thread.events).toHaveLength(2);
+      expect(thread.events[0].data).toBe('Hello');
+      expect(thread.events[1].data).toBe('Hi');
+
+      await newManager.close();
+    });
+
+    it('should set current thread from database', async () => {
+      // Create and save thread
+      threadManager.createThread('test_123');
+      threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
+      await threadManager.saveCurrentThread();
+
+      // Create new thread and switch to database thread
+      threadManager.createThread('test_456');
+      await threadManager.setCurrentThread('test_123');
+
+      expect(threadManager.getCurrentThreadId()).toBe('test_123');
+
+      const events = threadManager.getEvents('test_123');
+      expect(events).toHaveLength(1);
+      expect(events[0].data).toBe('Hello');
+    });
+
+    it('should get latest thread ID', async () => {
+      threadManager.createThread('test_old');
+      await threadManager.saveCurrentThread();
+
+      // Wait a moment to ensure different timestamps
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      threadManager.createThread('test_new');
+      threadManager.addEvent('test_new', 'USER_MESSAGE', 'Latest');
+      await threadManager.saveCurrentThread();
+
+      const latestId = await threadManager.getLatestThreadId();
+      expect(latestId).toBe('test_new');
+    });
+  });
+
+  describe('auto-save functionality', () => {
+    it('should enable and disable auto-save', () => {
+      threadManager.enableAutoSave(100); // 100ms interval
+      threadManager.disableAutoSave();
+
+      // Should not throw
+      expect(true).toBe(true);
+    });
+
+    it('should auto-save current thread periodically', async () => {
+      threadManager.createThread('test_123');
+      threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
+
+      threadManager.enableAutoSave(50); // Very short interval for testing
+
+      // Wait for auto-save to trigger
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      threadManager.disableAutoSave();
+
+      // Verify thread was saved
+      const newManager = new ThreadManager(tempDbPath);
+      const loadedThread = await newManager.loadThread('test_123');
+      expect(loadedThread.events).toHaveLength(1);
+
+      await newManager.close();
+    });
+  });
+
+  describe('error handling', () => {
+    it('should throw error when adding event to non-existent thread', () => {
+      expect(() => {
+        threadManager.addEvent('non_existent', 'USER_MESSAGE', 'Hello');
+      }).toThrow('Thread non_existent not found');
+    });
+
+    it('should throw error when loading non-existent thread', async () => {
+      await expect(threadManager.loadThread('non_existent')).rejects.toThrow(
+        'Thread non_existent not found in database'
+      );
+    });
+
+    it('should handle database connection issues gracefully', () => {
+      // Close database to simulate connection issue
+      threadManager.close();
+
+      // Should not throw when adding events (they just won't be persisted)
+      threadManager.createThread('test_123');
+      const event = threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
+      expect(event.data).toBe('Hello');
+    });
+  });
+});
+
+describe('Session Management', () => {
+  let tempDbPath: string;
+
+  beforeEach(() => {
+    tempDbPath = path.join(os.tmpdir(), `lace-test-${Date.now()}.db`);
+  });
+
+  afterEach(() => {
+    if (fs.existsSync(tempDbPath)) {
+      fs.unlinkSync(tempDbPath);
+    }
+  });
+
+  describe('startSession', () => {
+    it('should start new session by default', async () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(laceDir, 'getLaceDbPath').mockReturnValue(tempDbPath);
+
+      const { threadManager, threadId } = await startSession([]);
+
+      expect(threadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
+      expect(threadManager.getCurrentThreadId()).toBe(threadId);
+
+      await threadManager.close();
+      vi.restoreAllMocks();
+    });
+
+    it('should continue latest session with --continue', async () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(laceDir, 'getLaceDbPath').mockReturnValue(tempDbPath);
+
+      // Create a session first
+      const { threadManager: firstManager, threadId: firstId } = await startSession([]);
+      firstManager.addEvent(firstId, 'USER_MESSAGE', 'First session');
+      await firstManager.saveCurrentThread();
+      await firstManager.close();
+
+      // Continue session
+      const { threadManager, threadId } = await startSession(['--continue']);
+
+      expect(threadId).toBe(firstId);
+      expect(threadManager.getEvents(threadId)).toHaveLength(1);
+      expect(threadManager.getEvents(threadId)[0].data).toBe('First session');
+
+      await threadManager.close();
+      vi.restoreAllMocks();
+    });
+
+    it('should continue specific session with --continue and ID', async () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(laceDir, 'getLaceDbPath').mockReturnValue(tempDbPath);
+
+      // Create multiple sessions
+      const { threadManager: manager1, threadId: id1 } = await startSession([]);
+      manager1.addEvent(id1, 'USER_MESSAGE', 'First session');
+      await manager1.saveCurrentThread();
+      await manager1.close();
+
+      const { threadManager: manager2, threadId: id2 } = await startSession([]);
+      manager2.addEvent(id2, 'USER_MESSAGE', 'Second session');
+      await manager2.saveCurrentThread();
+      await manager2.close();
+
+      // Continue first session specifically
+      const { threadManager, threadId } = await startSession(['--continue', id1]);
+
+      expect(threadId).toBe(id1);
+      expect(threadManager.getEvents(threadId)[0].data).toBe('First session');
+
+      await threadManager.close();
+      vi.restoreAllMocks();
+    });
+
+    it('should start new session if continue fails', async () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.spyOn(laceDir, 'getLaceDbPath').mockReturnValue(tempDbPath);
+
+      // Try to continue non-existent session
+      const { threadManager, threadId } = await startSession(['--continue', 'lace_invalid_id']);
+
+      expect(threadId).not.toBe('lace_invalid_id');
+      expect(threadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
+
+      await threadManager.close();
+      vi.restoreAllMocks();
+    });
+  });
+
+  describe('handleGracefulShutdown', () => {
+    it('should save current session on shutdown', async () => {
+      vi.spyOn(laceDir, 'getLaceDbPath').mockReturnValue(tempDbPath);
+
+      const { threadManager, threadId } = await startSession([]);
+      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test message');
+
+      await handleGracefulShutdown(threadManager);
+
+      // Verify session was saved
+      const newManager = new ThreadManager(tempDbPath);
+      const loadedThread = await newManager.loadThread(threadId);
+      expect(loadedThread.events).toHaveLength(1);
+      expect(loadedThread.events[0].data).toBe('Test message');
+
+      await newManager.close();
+      vi.restoreAllMocks();
+    });
+  });
+});
+
+describe('Integration Tests', () => {
+  let tempDbPath: string;
+
+  beforeEach(() => {
+    tempDbPath = path.join(os.tmpdir(), `lace-test-${Date.now()}.db`);
+  });
+
+  afterEach(() => {
+    if (fs.existsSync(tempDbPath)) {
+      fs.unlinkSync(tempDbPath);
+    }
+  });
+
+  it('should handle complete conversation workflow', async () => {
+    // Start session
+    const threadManager = new ThreadManager(tempDbPath);
+    const threadId = `lace_${Date.now()}_test`;
+    threadManager.createThread(threadId);
+    threadManager.enableAutoSave(10); // Fast auto-save for testing
+
+    // Simulate conversation
+    threadManager.addEvent(threadId, 'USER_MESSAGE', 'List files in current directory');
+    threadManager.addEvent(threadId, 'AGENT_MESSAGE', "I'll help you list the files");
+    threadManager.addEvent(threadId, 'TOOL_CALL', {
+      toolName: 'bash',
+      input: { command: 'ls -la' },
+      callId: 'call_123',
+    });
+    threadManager.addEvent(threadId, 'TOOL_RESULT', {
+      callId: 'call_123',
+      output: 'file1.txt\nfile2.txt\n',
+      success: true,
+    });
+    threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Here are the files in your directory');
+
+    // Wait for auto-save
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await threadManager.close();
+
+    // Resume session
+    const newManager = new ThreadManager(tempDbPath);
+    const resumedThread = await newManager.loadThread(threadId);
+
+    // Verify full conversation was preserved
+    expect(resumedThread.events).toHaveLength(5);
+    expect(resumedThread.events[0].type).toBe('USER_MESSAGE');
+    expect(resumedThread.events[1].type).toBe('AGENT_MESSAGE');
+    expect(resumedThread.events[2].type).toBe('TOOL_CALL');
+    expect(resumedThread.events[3].type).toBe('TOOL_RESULT');
+    expect(resumedThread.events[4].type).toBe('AGENT_MESSAGE');
+
+    // Continue conversation
+    await newManager.setCurrentThread(threadId);
+    newManager.addEvent(threadId, 'USER_MESSAGE', "What's in file1.txt?");
+
+    const finalEvents = newManager.getEvents(threadId);
+    expect(finalEvents).toHaveLength(6);
+    expect(finalEvents[5].data).toBe("What's in file1.txt?");
+
+    await newManager.close();
+  });
+
+  it('should handle multiple concurrent sessions', async () => {
+    const manager1 = new ThreadManager(tempDbPath);
+    const manager2 = new ThreadManager(tempDbPath);
+
+    // Create different sessions
+    const thread1 = 'lace_session_1';
+    const thread2 = 'lace_session_2';
+
+    manager1.createThread(thread1);
+    manager2.createThread(thread2);
+
+    // Add events to both
+    manager1.addEvent(thread1, 'USER_MESSAGE', 'Session 1 message');
+    manager2.addEvent(thread2, 'USER_MESSAGE', 'Session 2 message');
+
+    await manager1.saveCurrentThread();
+    await manager2.saveCurrentThread();
+
+    // Verify isolation
+    const events1 = manager1.getEvents(thread1);
+    const events2 = manager2.getEvents(thread2);
+
+    expect(events1).toHaveLength(1);
+    expect(events2).toHaveLength(1);
+    expect(events1[0].data).toBe('Session 1 message');
+    expect(events2[0].data).toBe('Session 2 message');
+
+    await manager1.close();
+    await manager2.close();
+  });
+
+  it('should handle large conversations efficiently', async () => {
+    const threadManager = new ThreadManager(tempDbPath);
+    const threadId = 'lace_large_test';
+    threadManager.createThread(threadId);
+
+    // Add many events
+    const eventCount = 1000;
+    for (let i = 0; i < eventCount; i++) {
+      const type = i % 2 === 0 ? 'USER_MESSAGE' : 'AGENT_MESSAGE';
+      threadManager.addEvent(threadId, type, `Message ${i}`);
+    }
+
+    await threadManager.saveCurrentThread();
+
+    // Verify all events preserved
+    const events = threadManager.getEvents(threadId);
+    expect(events).toHaveLength(eventCount);
+    expect(events[0].data).toBe('Message 0');
+    expect(events[eventCount - 1].data).toBe(`Message ${eventCount - 1}`);
+
+    // Test loading performance
+    const startTime = Date.now();
+    await threadManager.setCurrentThread(threadId);
+    const loadTime = Date.now() - startTime;
+
+    // Should load reasonably quickly (adjust threshold as needed)
+    expect(loadTime).toBeLessThan(1000); // 1 second
+
+    await threadManager.close();
+  });
+});

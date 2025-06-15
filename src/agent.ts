@@ -11,8 +11,8 @@ import { AIProvider } from './providers/types.js';
 import { ToolRegistry } from './tools/registry.js';
 import { ToolExecutor } from './tools/executor.js';
 import { BashTool } from './tools/implementations/bash.js';
-import { ThreadManager } from './threads/thread.js';
 import { buildConversationFromEvents } from './threads/conversation-builder.js';
+import { startSession, handleGracefulShutdown } from './threads/session.js';
 import { logger } from './utils/logger.js';
 import { loadPromptConfig, getPromptFilePaths } from './config/prompts.js';
 
@@ -24,6 +24,7 @@ function parseArgs() {
     help: false,
     logLevel: 'info' as 'error' | 'warn' | 'info' | 'debug',
     logFile: undefined as string | undefined,
+    prompt: undefined as string | undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -76,6 +77,25 @@ function parseArgs() {
         process.exit(1);
       }
       options.logFile = fileValue;
+    } else if (arg === '--prompt') {
+      const promptValue = args[i + 1];
+      if (!promptValue) {
+        console.error('Error: --prompt requires a prompt text');
+        process.exit(1);
+      }
+      options.prompt = promptValue;
+      i++; // Skip next argument since we consumed it
+    } else if (arg.startsWith('--prompt=')) {
+      const promptValue = arg.split('=')[1];
+      if (!promptValue) {
+        console.error('Error: --prompt requires a prompt text');
+        process.exit(1);
+      }
+      options.prompt = promptValue;
+    } else if (arg === '--continue') {
+      // --continue is handled by startSession(), just allow it to pass through
+    } else if (arg.startsWith('lace_')) {
+      // Thread ID arguments are handled by startSession(), just allow them to pass through
     } else {
       console.error(`Error: Unknown argument "${arg}"`);
       process.exit(1);
@@ -96,6 +116,8 @@ Options:
   -p, --provider <name>     Choose AI provider: "anthropic" (default), "lmstudio", or "ollama"
   --log-level <level>       Set log level: "error", "warn", "info" (default), or "debug"
   --log-file <path>         Write logs to file (no file = no logging)
+  --prompt <text>           Send a single prompt and exit (non-interactive mode)
+  --continue [session_id]   Continue previous conversation (latest if no ID provided)
 
 Examples:
   lace                      # Use Anthropic Claude (default)
@@ -103,6 +125,10 @@ Examples:
   lace --provider lmstudio  # Use local LMStudio server
   lace --provider ollama    # Use local Ollama server
   lace --log-level debug --log-file debug.log  # Debug logging to file
+  lace --prompt "What files are in the current directory?"  # Single command
+  lace --continue           # Continue latest conversation
+  lace --continue lace_20250615_abc123  # Continue specific conversation
+  lace --continue --prompt "What number was that again?"  # Continue with new prompt
 
 Environment Variables:
   ANTHROPIC_KEY            Required for Anthropic provider
@@ -172,14 +198,12 @@ async function main() {
 
   const toolRegistry = new ToolRegistry();
   const toolExecutor = new ToolExecutor(toolRegistry);
-  const threadManager = new ThreadManager();
 
   // Register tools
   toolRegistry.registerTool(new BashTool());
 
-  // Create thread for this session
-  const threadId = `thread_${Date.now()}`;
-  threadManager.createThread(threadId);
+  // Start or resume session using enhanced thread management
+  const { threadManager, threadId } = await startSession(process.argv.slice(2));
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
@@ -345,13 +369,33 @@ async function main() {
     return '';
   }
 
+  // Handle single prompt mode (non-interactive)
+  if (options.prompt) {
+    console.log(`🤖 Lace Agent using ${provider.providerName} provider.\n`);
+
+    // Process the single prompt
+    await processMessage(options.prompt);
+
+    // Save and exit
+    await handleGracefulShutdown(threadManager);
+    process.exit(0);
+  }
+
   console.log(
     `🤖 Lace Agent started using ${provider.providerName} provider. Type "exit" to quit.\n`
   );
 
+  // Handle graceful shutdown on Ctrl+C
+  process.on('SIGINT', async () => {
+    console.log('\n\nShutting down gracefully...');
+    await handleGracefulShutdown(threadManager);
+    process.exit(0);
+  });
+
   while (true) {
     const input = await new Promise<string>((resolve) => rl.question('> ', resolve));
     if (input.toLowerCase() === 'exit') {
+      await handleGracefulShutdown(threadManager);
       rl.close();
       break;
     }
