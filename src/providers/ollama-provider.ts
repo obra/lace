@@ -31,23 +31,14 @@ export class OllamaProvider extends AIProvider {
 
   async diagnose(): Promise<{ connected: boolean; models: string[]; error?: string }> {
     try {
-      process.stdout.write(`🔍 Connecting to Ollama at ${this._host}...\n`);
-
       // Try to list models to test connection
       const models = await this._ollama.list();
-      process.stdout.write(`✅ Connected successfully\n`);
-      process.stdout.write(
-        `📦 Available models (${models.models.length}): ${models.models.map((m) => m.name).join(', ')}\n`
-      );
 
       return {
         connected: true,
         models: models.models.map((m) => m.name),
       };
     } catch (error: unknown) {
-      process.stdout.write(
-        `❌ Connection failed: ${error instanceof Error ? error.message : String(error)}\n`
-      );
       return {
         connected: false,
         models: [],
