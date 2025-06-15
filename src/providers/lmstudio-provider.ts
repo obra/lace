@@ -13,11 +13,15 @@ export interface LMStudioProviderConfig extends ProviderConfig {
 export class LMStudioProvider extends AIProvider {
   private readonly _client: LMStudioClient;
   private readonly _verbose: boolean;
+  private readonly _baseUrl: string;
+  private _cachedModel: any = null;
+  private _cachedModelId: string | null = null;
 
   constructor(config: LMStudioProviderConfig = {}) {
     super(config);
+    this._baseUrl = config.baseUrl || 'ws://localhost:1234';
     this._client = new LMStudioClient({
-      baseUrl: config.baseUrl || 'ws://localhost:1234',
+      baseUrl: this._baseUrl,
     });
     this._verbose = config.verbose ?? false;
   }
@@ -30,10 +34,150 @@ export class LMStudioProvider extends AIProvider {
     return 'deepseek/deepseek-r1-0528-qwen3-8b';
   }
 
+  async diagnose(): Promise<{ connected: boolean; models: string[]; error?: string }> {
+    try {
+      process.stdout.write(`🔍 Connecting to LMStudio at ${this._baseUrl}...\n`);
+
+      // Try to list loaded models to test connection
+      const models = await this._client.llm.listLoaded();
+      process.stdout.write(`✅ Connected successfully\n`);
+      process.stdout.write(
+        `📦 Loaded models (${models.length}): ${models.map((m) => m.identifier).join(', ')}\n`
+      );
+
+      return {
+        connected: true,
+        models: models.map((m) => m.identifier),
+      };
+    } catch (error: any) {
+      process.stdout.write(`❌ Connection failed: ${error.message}\n`);
+      return {
+        connected: false,
+        models: [],
+        error: error.message,
+      };
+    }
+  }
+
   async createResponse(messages: ProviderMessage[], tools: Tool[] = []): Promise<ProviderResponse> {
-    // Load the model
     const modelId = this._config.model || this.defaultModel;
-    const model = await this._client.llm.load(modelId, { verbose: this._verbose });
+
+    // Check if we have a cached model for this modelId
+    if (this._cachedModel && this._cachedModelId === modelId) {
+      process.stdout.write(`✅ Using cached model "${modelId}"\n`);
+    } else {
+      // Need to get/load the model
+      const diagnostics = await this.diagnose();
+
+      if (!diagnostics.connected) {
+        throw new Error(
+          `Cannot connect to LMStudio server at ${this._baseUrl}.\n` +
+            `Make sure LMStudio is running and accessible.\n\n` +
+            `To fix this:\n` +
+            `  - Start LMStudio application\n` +
+            `  - Ensure the server is running on ${this._baseUrl}\n` +
+            `  - Check firewall settings if using a remote server\n\n` +
+            `Connection error: ${diagnostics.error}`
+        );
+      }
+
+      // Check if any models are loaded
+      if (diagnostics.models.length === 0) {
+        throw new Error(
+          `No models are currently loaded in LMStudio.\n\n` +
+            `To fix this:\n` +
+            `  - Open LMStudio and load a model\n` +
+            `  - Download ${modelId} if not available\n` +
+            `  - Or use --provider anthropic as fallback`
+        );
+      }
+
+      // Check if our target model is already loaded
+      if (diagnostics.models.includes(modelId)) {
+        process.stdout.write(`✅ Found already loaded model "${modelId}"\n`);
+        // Get reference to existing loaded model from the list
+        const loadedModels = await this._client.llm.listLoaded();
+        const existingModel = loadedModels.find((m) => m.identifier === modelId);
+
+        if (existingModel) {
+          process.stdout.write(`✅ Using existing model instance "${modelId}"\n`);
+          this._cachedModel = existingModel;
+          this._cachedModelId = modelId;
+        } else {
+          throw new Error(`Model "${modelId}" appears loaded but could not retrieve instance`);
+        }
+      } else {
+        process.stdout.write(
+          `⚠️  Target model "${modelId}" not loaded. Available models: ${diagnostics.models.join(', ')}\n`
+        );
+        process.stdout.write(`🔄 Attempting to load "${modelId}"...\n`);
+
+        try {
+          this._cachedModel = await this._client.llm.load(modelId, { verbose: this._verbose });
+          this._cachedModelId = modelId;
+          process.stdout.write(`✅ Model "${modelId}" loaded successfully\n`);
+        } catch (error: any) {
+          // Provide helpful error messages based on the error type
+          if (error.message?.includes('insufficient system resources')) {
+            const loadedCount = diagnostics.models.length;
+            const hasMultipleCopies =
+              diagnostics.models.filter((m) => m.startsWith(modelId)).length > 1;
+
+            let specific = '';
+            if (loadedCount > 3) {
+              specific += `\n🚨 You have ${loadedCount} models loaded, which is quite a lot!`;
+            }
+            if (hasMultipleCopies) {
+              specific += `\n🚨 Multiple copies of the same model detected. Consider unloading duplicates.`;
+            }
+
+            throw new Error(
+              `LMStudio model loading failed due to insufficient system resources.${specific}\n\n` +
+                `Currently loaded models (${loadedCount}): ${diagnostics.models.join(', ')}\n\n` +
+                `To fix this:\n` +
+                `  1. Open LMStudio and unload unused models (especially duplicates)\n` +
+                `  2. Keep only one instance of ${modelId} loaded\n` +
+                `  3. Try again, or use --provider anthropic as fallback\n\n` +
+                `Original error: ${error.message}`
+            );
+          } else if (
+            error.message?.includes('ECONNREFUSED') ||
+            error.message?.includes('Connection refused')
+          ) {
+            throw new Error(
+              `Cannot connect to LMStudio server.\n` +
+                `Make sure LMStudio is running and accessible at the configured URL.\n\n` +
+                `To fix this:\n` +
+                `  - Start LMStudio application\n` +
+                `  - Ensure the server is running on ws://localhost:1234\n` +
+                `  - Check firewall settings if using a remote server\n\n` +
+                `Original error: ${error.message}`
+            );
+          } else if (
+            error.message?.includes('Model not found') ||
+            error.message?.includes('not available')
+          ) {
+            throw new Error(
+              `Model "${modelId}" is not available in LMStudio.\n\n` +
+                `To fix this:\n` +
+                `  - Download the model in LMStudio\n` +
+                `  - Check the model name is correct\n` +
+                `  - Use --provider anthropic if LMStudio isn't set up\n\n` +
+                `Original error: ${error.message}`
+            );
+          } else {
+            throw new Error(
+              `LMStudio connection failed: ${error.message}\n\n` +
+                `Common solutions:\n` +
+                `  - Ensure LMStudio is running\n` +
+                `  - Check if the model is loaded\n` +
+                `  - Try restarting LMStudio\n` +
+                `  - Use --provider anthropic as fallback`
+            );
+          }
+        }
+      }
+    }
 
     // Convert messages to LMStudio format
     const lmMessages = messages.map((msg) => ({
@@ -57,8 +201,8 @@ export class LMStudioProvider extends AIProvider {
       }
     }
 
-    // Make the request
-    const prediction = model.respond(lmMessages);
+    // Make the request using cached model
+    const prediction = this._cachedModel.respond(lmMessages);
 
     let fullResponse = '';
     for await (const chunk of prediction) {
