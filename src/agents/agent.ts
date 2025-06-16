@@ -8,6 +8,7 @@ import { ToolExecutor } from '../tools/executor.js';
 import { ThreadManager } from '../threads/thread-manager.js';
 import { buildConversationFromEvents } from '../threads/conversation-builder.js';
 import { logger } from '../utils/logger.js';
+import { StopReasonHandler } from '../token-management/stop-reason-handler.js';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -49,6 +50,7 @@ export class Agent extends EventEmitter {
   private readonly _threadManager: ThreadManager;
   private readonly _threadId: string;
   private readonly _tools: Tool[];
+  private readonly _stopReasonHandler: StopReasonHandler;
   private _state: AgentState = 'idle';
   private _isRunning = false;
 
@@ -59,6 +61,7 @@ export class Agent extends EventEmitter {
     this._threadManager = config.threadManager;
     this._threadId = config.threadId;
     this._tools = config.tools;
+    this._stopReasonHandler = new StopReasonHandler();
   }
 
   // Core conversation methods
@@ -266,9 +269,12 @@ export class Agent extends EventEmitter {
     try {
       const response = await this._provider.createStreamingResponse(messages, tools);
 
+      // Apply stop reason handling to filter incomplete tool calls
+      const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
+
       return {
-        content: response.content,
-        toolCalls: response.toolCalls,
+        content: processedResponse.content,
+        toolCalls: processedResponse.toolCalls,
       };
     } finally {
       // Clean up event listeners
@@ -283,9 +289,12 @@ export class Agent extends EventEmitter {
   ): Promise<AgentResponse> {
     const response = await this._provider.createResponse(messages, tools);
 
+    // Apply stop reason handling to filter incomplete tool calls
+    const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
+
     return {
-      content: response.content,
-      toolCalls: response.toolCalls,
+      content: processedResponse.content,
+      toolCalls: processedResponse.toolCalls,
     };
   }
 

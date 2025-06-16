@@ -314,6 +314,9 @@ export class LMStudioProvider extends AIProvider {
     return {
       content: cleanedContent.trim(),
       toolCalls,
+      stopReason: 'stop', // .respond() method doesn't provide stop reasons
+      usage: this._estimateUsage(fullResponse, lmMessages),
+      performance: this._calculatePerformance(chunkCount, fullResponse.length),
     };
   }
 
@@ -632,6 +635,9 @@ You can provide regular text response along with tool calls. If you need to call
       const result = {
         content: cleanedContent.trim(),
         toolCalls,
+        stopReason: 'stop', // .respond() method doesn't provide stop reasons
+        usage: this._estimateUsage(fullResponse, lmMessages),
+        performance: this._calculatePerformance(chunkCount, fullResponse.length),
       };
 
       // Emit completion event
@@ -644,5 +650,36 @@ You can provide regular text response along with tool calls. If you need to call
       this.emit('error', { error: errorObj });
       throw error;
     }
+  }
+
+  private _estimateUsage(
+    response: string,
+    messages: any[]
+  ): { promptTokens: number; completionTokens: number; totalTokens: number } {
+    // Rough estimation since .respond() doesn't provide exact token counts
+    // This could be enhanced by using LMStudio's tokenizer API if available
+    const promptText = messages.map((m) => m.content).join(' ');
+    const promptTokens = Math.ceil(promptText.length / 4); // Rough estimate: ~4 chars per token
+    const completionTokens = Math.ceil(response.length / 4);
+
+    return {
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
+    };
+  }
+
+  private _calculatePerformance(
+    chunkCount: number,
+    responseLength: number
+  ): { tokensPerSecond?: number; totalDuration?: number } | undefined {
+    // Basic performance metrics from streaming data
+    // This could be enhanced with actual timing data
+    if (chunkCount === 0) return undefined;
+
+    return {
+      // Very rough estimate - actual implementation would need timing data
+      tokensPerSecond: responseLength / 4, // Rough tokens estimate
+    };
   }
 }

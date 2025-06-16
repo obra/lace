@@ -108,6 +108,14 @@ export class AnthropicProvider extends AIProvider {
     return {
       content: textContent,
       toolCalls,
+      stopReason: this._normalizeStopReason(response.stop_reason),
+      usage: response.usage
+        ? {
+            promptTokens: response.usage.input_tokens,
+            completionTokens: response.usage.output_tokens,
+            totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+          }
+        : undefined,
     };
   }
 
@@ -200,6 +208,14 @@ export class AnthropicProvider extends AIProvider {
       const response = {
         content: textContent,
         toolCalls,
+        stopReason: this._normalizeStopReason(finalMessage.stop_reason),
+        usage: finalMessage.usage
+          ? {
+              promptTokens: finalMessage.usage.input_tokens,
+              completionTokens: finalMessage.usage.output_tokens,
+              totalTokens: finalMessage.usage.input_tokens + finalMessage.usage.output_tokens,
+            }
+          : undefined,
       };
 
       // Emit completion event
@@ -211,6 +227,23 @@ export class AnthropicProvider extends AIProvider {
       logger.error('Streaming error from Anthropic', { error: errorObj.message });
       this.emit('error', { error: errorObj });
       throw error;
+    }
+  }
+
+  private _normalizeStopReason(stopReason: string | null): string | undefined {
+    if (!stopReason) return undefined;
+
+    switch (stopReason) {
+      case 'max_tokens':
+        return 'max_tokens';
+      case 'end_turn':
+        return 'stop';
+      case 'tool_use':
+        return 'tool_use';
+      case 'stop_sequence':
+        return 'stop';
+      default:
+        return 'stop';
     }
   }
 }

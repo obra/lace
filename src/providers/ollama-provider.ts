@@ -145,6 +145,9 @@ export class OllamaProvider extends AIProvider {
     return {
       content,
       toolCalls,
+      stopReason: response.done ? 'stop' : undefined,
+      usage: this._extractUsage(response),
+      performance: this._extractPerformance(response),
     };
   }
 
@@ -257,6 +260,9 @@ export class OllamaProvider extends AIProvider {
       const result = {
         content,
         toolCalls,
+        stopReason: 'stop', // Streaming always completes normally
+        usage: finalMessage ? this._extractUsageFromMessage(finalMessage) : undefined,
+        performance: this._extractPerformanceFromStream(finalMessage),
       };
 
       // Emit completion event
@@ -269,5 +275,56 @@ export class OllamaProvider extends AIProvider {
       this.emit('error', { error: errorObj });
       throw error;
     }
+  }
+
+  private _extractUsage(
+    response: any
+  ): { promptTokens: number; completionTokens: number; totalTokens: number } | undefined {
+    if (!response.prompt_eval_count && !response.eval_count) return undefined;
+
+    const promptTokens = response.prompt_eval_count || 0;
+    const completionTokens = response.eval_count || 0;
+
+    return {
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
+    };
+  }
+
+  private _extractUsageFromMessage(
+    message: any
+  ): { promptTokens: number; completionTokens: number; totalTokens: number } | undefined {
+    // For streaming, token counts might be in different locations
+    return this._extractUsage(message);
+  }
+
+  private _extractPerformance(
+    response: any
+  ): { tokensPerSecond?: number; timeToFirstToken?: number; totalDuration?: number } | undefined {
+    if (!response.total_duration && !response.eval_duration) return undefined;
+
+    const result: any = {};
+
+    if (response.total_duration) {
+      result.totalDuration = response.total_duration / 1_000_000; // Convert nanoseconds to milliseconds
+    }
+
+    if (response.eval_duration && response.eval_count) {
+      const durationSeconds = response.eval_duration / 1_000_000_000; // Convert nanoseconds to seconds
+      result.tokensPerSecond = response.eval_count / durationSeconds;
+    }
+
+    if (response.prompt_eval_duration) {
+      result.timeToFirstToken = response.prompt_eval_duration / 1_000_000; // Convert nanoseconds to milliseconds
+    }
+
+    return Object.keys(result).length > 0 ? result : undefined;
+  }
+
+  private _extractPerformanceFromStream(
+    finalMessage: any
+  ): { tokensPerSecond?: number; timeToFirstToken?: number; totalDuration?: number } | undefined {
+    return this._extractPerformance(finalMessage);
   }
 }
