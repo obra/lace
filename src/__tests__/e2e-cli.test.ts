@@ -212,7 +212,7 @@ describe('End-to-End CLI Tests', () => {
 
       // Should not crash, should start new session
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toMatch(/Starting conversation lace_\d{8}_[a-z0-9]{6}/);
+      expect(result.stdout).toMatch(/🆕 Starting new conversation lace_\d{8}_[a-z0-9]{6}/);
     });
   });
 

@@ -5,6 +5,7 @@ import { LMStudioClient } from '@lmstudio/sdk';
 import { AIProvider, ProviderMessage, ProviderResponse, ProviderConfig } from './types.js';
 import { Tool } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
+import { convertToTextOnlyFormat } from './format-converters.js';
 
 // Interface for LMStudio model objects
 interface LMStudioModel {
@@ -195,8 +196,10 @@ export class LMStudioProvider extends AIProvider {
       }
     }
 
-    // Convert messages to LMStudio format
-    const lmMessages = messages.map((msg) => ({
+    // Convert messages to text-only format since we're using the simple respond() method
+    // TODO: Consider using LMStudio's .act() method or chat completions API for native tool calling
+    const textOnlyMessages = convertToTextOnlyFormat(messages);
+    const lmMessages = textOnlyMessages.map((msg) => ({
       role: msg.role,
       content: msg.content,
     }));

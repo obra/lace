@@ -93,14 +93,27 @@ describe('LMStudio Provider Integration Tests', () => {
   it('should handle conversation with tool results', async () => {
     const messages = [
       { role: 'user' as const, content: 'Use mock_tool with action "initial"' },
-      { role: 'assistant' as const, content: "I'll use the mock tool for you." },
       {
         role: 'assistant' as const,
-        content: '[Called tool: mock_tool with input: {"action":"initial"}]',
+        content: "I'll use the mock tool for you.",
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'mock_tool',
+            input: { action: 'initial' },
+          },
+        ],
       },
       {
         role: 'user' as const,
-        content: '[Tool result: SUCCESS - Mock executed: {"action":"initial"}]',
+        content: '',
+        toolResults: [
+          {
+            id: 'call_1',
+            output: 'Mock executed: {"action":"initial"}',
+            success: true,
+          },
+        ],
       },
       { role: 'user' as const, content: 'Now use it again with action "followup"' },
     ];
