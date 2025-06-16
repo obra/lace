@@ -20,7 +20,7 @@ async function runCLI(
   const { timeout = 10000, input } = options;
 
   return new Promise((resolve, reject) => {
-    const child = spawn('node', ['dist/agent.js', ...args], {
+    const child = spawn('node', ['dist/cli.js', ...args], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, ANTHROPIC_KEY: 'fake-key-for-testing' },
     });
@@ -245,7 +245,7 @@ describe('End-to-End CLI Tests', () => {
       // Run without the fake API key to test the error case
       const child = spawn(
         'node',
-        ['dist/agent.js', '--provider', 'anthropic', '--prompt', 'Test'],
+        ['dist/cli.js', '--provider', 'anthropic', '--prompt', 'Test'],
         {
           stdio: ['pipe', 'pipe', 'pipe'],
           env: { ...process.env, ANTHROPIC_KEY: undefined }, // Explicitly unset the key

@@ -21,4 +21,8 @@ export class ToolRegistry {
   getToolNames(): string[] {
     return Array.from(this._tools.keys());
   }
+
+  clear(): void {
+    this._tools.clear();
+  }
 }

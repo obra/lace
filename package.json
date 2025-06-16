@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "type": "module",
   "bin": {
-    "mini-agent": "./dist/agent.js"
+    "mini-agent": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
-    "start": "npm run build && node dist/agent.js",
+    "start": "npm run build && node dist/cli.js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "test:run": "vitest run",

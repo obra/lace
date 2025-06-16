@@ -78,6 +78,13 @@ export class ThreadManager {
     return thread?.events || [];
   }
 
+  clearEvents(threadId: string): void {
+    const thread = this.getThread(threadId);
+    if (thread) {
+      thread.events.length = 0; // Clear the events array to free memory
+    }
+  }
+
   // New persistence methods
   async loadThread(threadId: string): Promise<Thread> {
     const thread = this._persistence.loadThread(threadId);
