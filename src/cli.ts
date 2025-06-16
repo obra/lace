@@ -28,7 +28,8 @@ import { CLIInterface } from './cli/interface.js';
 
 // Create provider based on CLI option
 async function createProvider(
-  providerType: 'anthropic' | 'lmstudio' | 'ollama'
+  providerType: 'anthropic' | 'lmstudio' | 'ollama',
+  model?: string
 ): Promise<AIProvider> {
   // Load configurable prompts from user's Lace directory
   const promptConfig = loadPromptConfig();
@@ -50,13 +51,13 @@ async function createProvider(
         console.error('Error: ANTHROPIC_KEY environment variable required for Anthropic provider');
         process.exit(1);
       }
-      return new AnthropicProvider({ apiKey, systemPrompt });
+      return new AnthropicProvider({ apiKey, systemPrompt, model });
     }
     case 'lmstudio': {
-      return new LMStudioProvider({ systemPrompt });
+      return new LMStudioProvider({ systemPrompt, model });
     }
     case 'ollama': {
-      return new OllamaProvider({ systemPrompt });
+      return new OllamaProvider({ systemPrompt, model });
     }
     default:
       throw new Error(`Unknown provider: ${providerType}`);
@@ -74,7 +75,11 @@ async function main() {
 
   // Initialize logging
   logger.configure(options.logLevel, options.logFile);
-  logger.info('Starting Lace Agent', { provider: options.provider, logLevel: options.logLevel });
+  logger.info('Starting Lace Agent', {
+    provider: options.provider,
+    model: options.model || 'default',
+    logLevel: options.logLevel,
+  });
 
   // Show configuration file locations on first startup
   const { systemPromptPath, userInstructionsPath } = getPromptFilePaths();
@@ -84,7 +89,7 @@ async function main() {
     laceDir: process.env.LACE_DIR || '~/.lace',
   });
 
-  const provider = await createProvider(options.provider);
+  const provider = await createProvider(options.provider, options.model);
 
   const toolRegistry = new ToolRegistry();
   const toolExecutor = new ToolExecutor(toolRegistry);

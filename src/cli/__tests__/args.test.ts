@@ -2,15 +2,14 @@
 // ABOUTME: Tests all argument combinations, validation, and error cases
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseArgs, showHelp, CLIOptions } from '../args.js';
+import { parseArgs, showHelp } from '../args.js';
 
 describe('CLI Arguments', () => {
   let consoleSpy: any;
-  let processExitSpy: any;
 
   beforeEach(() => {
     consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+    vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
   });
@@ -22,9 +21,10 @@ describe('CLI Arguments', () => {
   describe('parseArgs', () => {
     it('should return default options when no args provided', () => {
       const result = parseArgs([]);
-      
+
       expect(result).toEqual({
         provider: 'anthropic',
+        model: undefined,
         help: false,
         logLevel: 'info',
         logFile: undefined,
@@ -55,6 +55,26 @@ describe('CLI Arguments', () => {
       expect(consoleSpy).toHaveBeenCalledWith(
         'Error: --provider must be "anthropic", "lmstudio", or "ollama"'
       );
+    });
+
+    it('should parse model flags', () => {
+      expect(parseArgs(['--model', 'claude-3-haiku-20240307']).model).toBe(
+        'claude-3-haiku-20240307'
+      );
+      expect(parseArgs(['-m', 'gpt-4']).model).toBe('gpt-4');
+      expect(parseArgs(['--model=mistralai/devstral-small-2505']).model).toBe(
+        'mistralai/devstral-small-2505'
+      );
+    });
+
+    it('should handle missing model value', () => {
+      expect(() => parseArgs(['--model'])).toThrow('process.exit called');
+      expect(consoleSpy).toHaveBeenCalledWith('Error: --model requires a model name');
+    });
+
+    it('should handle empty model value with equals', () => {
+      expect(() => parseArgs(['--model='])).toThrow('process.exit called');
+      expect(consoleSpy).toHaveBeenCalledWith('Error: --model requires a model name');
     });
 
     it('should parse log level flags', () => {
@@ -102,14 +122,18 @@ describe('CLI Arguments', () => {
 
     it('should parse complex argument combinations', () => {
       const result = parseArgs([
-        '--provider', 'lmstudio',
+        '--provider',
+        'lmstudio',
+        '--model=mistralai/devstral-small-2505',
         '--log-level=debug',
-        '--log-file', '/tmp/debug.log',
-        '--prompt=What is 2+2?'
+        '--log-file',
+        '/tmp/debug.log',
+        '--prompt=What is 2+2?',
       ]);
 
       expect(result).toEqual({
         provider: 'lmstudio',
+        model: 'mistralai/devstral-small-2505',
         help: false,
         logLevel: 'debug',
         logFile: '/tmp/debug.log',
@@ -119,8 +143,10 @@ describe('CLI Arguments', () => {
 
     it('should handle arguments with spaces in values', () => {
       const result = parseArgs([
-        '--prompt', 'This is a long prompt with spaces',
-        '--log-file', '/path/with spaces/log.txt'
+        '--prompt',
+        'This is a long prompt with spaces',
+        '--log-file',
+        '/path/with spaces/log.txt',
       ]);
 
       expect(result.prompt).toBe('This is a long prompt with spaces');
@@ -131,32 +157,33 @@ describe('CLI Arguments', () => {
   describe('showHelp', () => {
     it('should output help text', () => {
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      
+
       showHelp();
-      
+
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Lace AI Coding Assistant'));
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Usage: lace [options]'));
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('--provider'));
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Examples:'));
-      
+
       logSpy.mockRestore();
     });
 
     it('should include all supported options in help', () => {
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      
+
       showHelp();
-      
-      const helpText = logSpy.mock.calls.map(call => call[0]).join('');
-      
+
+      const helpText = logSpy.mock.calls.map((call) => call[0]).join('');
+
       expect(helpText).toContain('--help');
       expect(helpText).toContain('--provider');
+      expect(helpText).toContain('--model');
       expect(helpText).toContain('--log-level');
       expect(helpText).toContain('--log-file');
       expect(helpText).toContain('--prompt');
       expect(helpText).toContain('--continue');
       expect(helpText).toContain('ANTHROPIC_KEY');
-      
+
       logSpy.mockRestore();
     });
   });

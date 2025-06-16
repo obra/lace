@@ -3,6 +3,7 @@
 
 export interface CLIOptions {
   provider: 'anthropic' | 'lmstudio' | 'ollama';
+  model: string | undefined;
   help: boolean;
   logLevel: 'error' | 'warn' | 'info' | 'debug';
   logFile: string | undefined;
@@ -12,6 +13,7 @@ export interface CLIOptions {
 export function parseArgs(args: string[] = process.argv.slice(2)): CLIOptions {
   const options: CLIOptions = {
     provider: 'anthropic',
+    model: undefined,
     help: false,
     logLevel: 'info',
     logFile: undefined,
@@ -38,6 +40,21 @@ export function parseArgs(args: string[] = process.argv.slice(2)): CLIOptions {
         process.exit(1);
       }
       options.provider = providerValue as 'anthropic' | 'lmstudio' | 'ollama';
+    } else if (arg === '--model' || arg === '-m') {
+      const modelValue = args[i + 1];
+      if (!modelValue) {
+        console.error('Error: --model requires a model name');
+        process.exit(1);
+      }
+      options.model = modelValue;
+      i++; // Skip next argument since we consumed it
+    } else if (arg.startsWith('--model=')) {
+      const modelValue = arg.split('=')[1];
+      if (!modelValue) {
+        console.error('Error: --model requires a model name');
+        process.exit(1);
+      }
+      options.model = modelValue;
     } else if (arg === '--log-level') {
       const levelValue = args[i + 1];
       if (!levelValue || !['error', 'warn', 'info', 'debug'].includes(levelValue)) {
@@ -105,6 +122,7 @@ Usage: lace [options]
 Options:
   -h, --help                Show this help message
   -p, --provider <name>     Choose AI provider: "anthropic" (default), "lmstudio", or "ollama"
+  -m, --model <name>        Override the default model for the selected provider
   --log-level <level>       Set log level: "error", "warn", "info" (default), or "debug"
   --log-file <path>         Write logs to file (no file = no logging)
   --prompt <text>           Send a single prompt and exit (non-interactive mode)
@@ -115,6 +133,8 @@ Examples:
   lace --provider anthropic # Use Anthropic Claude explicitly
   lace --provider lmstudio  # Use local LMStudio server
   lace --provider ollama    # Use local Ollama server
+  lace --model claude-haiku-3-20241022  # Use specific Anthropic model
+  lace --provider lmstudio --model mistralai/devstral-small-2505  # Use specific LMStudio model
   lace --log-level debug --log-file debug.log  # Debug logging to file
   lace --prompt "What files are in the current directory?"  # Single command
   lace --continue           # Continue latest conversation
