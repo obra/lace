@@ -3,7 +3,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Tool, ToolResult } from '../types.js';
+import { Tool, ToolResult, ToolContext } from '../types.js';
 
 const execAsync = promisify(exec);
 
@@ -16,6 +16,7 @@ interface BashOutput {
 export class BashTool implements Tool {
   name = 'bash';
   description = 'Execute bash commands';
+  destructive = true;
   input_schema = {
     type: 'object' as const,
     properties: {
@@ -24,17 +25,22 @@ export class BashTool implements Tool {
     required: ['command'],
   };
 
-  async executeTool(input: Record<string, unknown>): Promise<ToolResult> {
+  async executeTool(input: Record<string, unknown>, _context?: ToolContext): Promise<ToolResult> {
     const { command } = input as { command: string };
 
     if (!command || typeof command !== 'string') {
       return {
         success: false,
-        output: JSON.stringify({
-          stdout: '',
-          stderr: 'Command must be a non-empty string',
-          exitCode: 1,
-        }),
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              stdout: '',
+              stderr: 'Command must be a non-empty string',
+              exitCode: 1,
+            }),
+          },
+        ],
         error: 'Command must be a non-empty string',
       };
     }
@@ -53,7 +59,12 @@ export class BashTool implements Tool {
 
       return {
         success: true, // Tool succeeded: command executed successfully
-        output: JSON.stringify(result),
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result),
+          },
+        ],
       };
     } catch (error: unknown) {
       const err = error as { message: string; stdout?: string; stderr?: string; code?: number };
@@ -79,7 +90,12 @@ export class BashTool implements Tool {
 
         return {
           success: false, // Tool failed: command not found
-          output: JSON.stringify(result),
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result),
+            },
+          ],
           error: err.message,
         };
       }
@@ -95,7 +111,12 @@ export class BashTool implements Tool {
 
         return {
           success: true, // Tool succeeded: command sequence ran and produced output
-          output: JSON.stringify(result),
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result),
+            },
+          ],
         };
       }
 
@@ -108,7 +129,12 @@ export class BashTool implements Tool {
 
       return {
         success: false, // Tool failed: command couldn't be executed
-        output: JSON.stringify(result),
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result),
+          },
+        ],
         error: err.message,
       };
     }

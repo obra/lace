@@ -11,6 +11,16 @@ import { AIProvider } from './providers/types.js';
 import { ToolRegistry } from './tools/registry.js';
 import { ToolExecutor } from './tools/executor.js';
 import { BashTool } from './tools/implementations/bash.js';
+import { FileReadTool } from './tools/implementations/file-read.js';
+import { FileWriteTool } from './tools/implementations/file-write.js';
+import { FileListTool } from './tools/implementations/file-list.js';
+import { RipgrepSearchTool } from './tools/implementations/ripgrep-search.js';
+import { FileFindTool } from './tools/implementations/file-find.js';
+import {
+  TaskAddTool,
+  TaskListTool,
+  TaskCompleteTool,
+} from './tools/implementations/task-manager.js';
 import { buildConversationFromEvents } from './threads/conversation-builder.js';
 import { startSession, handleGracefulShutdown } from './threads/session.js';
 import { logger } from './utils/logger.js';
@@ -201,6 +211,14 @@ async function main() {
 
   // Register tools
   toolRegistry.registerTool(new BashTool());
+  toolRegistry.registerTool(new FileReadTool());
+  toolRegistry.registerTool(new FileWriteTool());
+  toolRegistry.registerTool(new FileListTool());
+  toolRegistry.registerTool(new RipgrepSearchTool());
+  toolRegistry.registerTool(new FileFindTool());
+  toolRegistry.registerTool(new TaskAddTool());
+  toolRegistry.registerTool(new TaskListTool());
+  toolRegistry.registerTool(new TaskCompleteTool());
 
   // Start or resume session using enhanced thread management
   const { threadManager, threadId } = await startSession(process.argv.slice(2));
@@ -326,27 +344,28 @@ async function main() {
         process.stdout.write(`\n🔧 Running: ${toolCall.name} with ${inputDisplay}\n`);
 
         // Execute tool
-        const result = await toolExecutor.executeTool(toolCall.name, toolCall.input);
+        const result = await toolExecutor.executeTool(toolCall.name, toolCall.input, { threadId });
 
+        const outputText = result.content[0]?.text || '';
         logger.debug('AGENT: Tool execution completed', {
           toolCallId: toolCall.id,
           toolName: toolCall.name,
           success: result.success,
-          outputLength: result.output?.length || 0,
+          outputLength: outputText.length,
           hasError: !!result.error,
           toolResult: result,
         });
 
         // Show tool result status
         if (result.success) {
-          const outputLength = result.output?.length || 0;
+          const outputLength = outputText.length;
           if (outputLength > 500) {
             // Show truncated output for large results
-            const truncated = result.output.substring(0, 500);
+            const truncated = outputText.substring(0, 500);
             process.stdout.write(`✅ Tool completed (${outputLength} chars):\n${truncated}...\n\n`);
           } else {
             // Show full output for small results
-            process.stdout.write(`✅ Tool completed:\n${result.output}\n\n`);
+            process.stdout.write(`✅ Tool completed:\n${outputText}\n\n`);
           }
         } else {
           process.stdout.write(`❌ Tool failed: ${result.error || 'Unknown error'}\n\n`);
@@ -355,7 +374,7 @@ async function main() {
         // Add tool result to thread
         threadManager.addEvent(threadId, 'TOOL_RESULT', {
           callId: toolCall.id,
-          output: result.output,
+          output: outputText,
           success: result.success,
           error: result.error,
         });

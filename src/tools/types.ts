@@ -1,11 +1,16 @@
 // ABOUTME: Tool system type definitions and interfaces
-// ABOUTME: Model-agnostic tool definitions compatible with multiple AI SDKs
+// ABOUTME: Model-agnostic tool definitions compatible with multiple AI SDKs and MCP
+
+export interface ToolContext {
+  threadId?: string;
+}
 
 export interface Tool {
   name: string;
   description: string;
   input_schema: ToolInputSchema;
-  executeTool(input: Record<string, unknown>): Promise<ToolResult>;
+  destructive?: boolean;
+  executeTool(input: Record<string, unknown>, context?: ToolContext): Promise<ToolResult>;
 }
 
 export interface ToolInputSchema {
@@ -18,10 +23,19 @@ export interface ToolInputSchema {
 export interface ToolProperty {
   type: string;
   description?: string;
+  enum?: string[];
+  items?: ToolProperty;
+}
+
+export interface ContentBlock {
+  type: 'text' | 'image' | 'resource';
+  text?: string;
+  data?: string;
+  uri?: string;
 }
 
 export interface ToolResult {
   success: boolean;
-  output: string;
+  content: ContentBlock[];
   error?: string;
 }

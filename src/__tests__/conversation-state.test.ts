@@ -9,6 +9,16 @@ import { buildConversationFromEvents } from '../threads/conversation-builder.js'
 import { ToolRegistry } from '../tools/registry.js';
 import { ToolExecutor } from '../tools/executor.js';
 import { BashTool } from '../tools/implementations/bash.js';
+import { FileReadTool } from '../tools/implementations/file-read.js';
+import { FileWriteTool } from '../tools/implementations/file-write.js';
+import { FileListTool } from '../tools/implementations/file-list.js';
+import { RipgrepSearchTool } from '../tools/implementations/ripgrep-search.js';
+import { FileFindTool } from '../tools/implementations/file-find.js';
+import {
+  TaskAddTool,
+  TaskListTool,
+  TaskCompleteTool,
+} from '../tools/implementations/task-manager.js';
 
 // These tests use LMStudio heavily since it's local and free
 describe('Conversation State Management', () => {
@@ -41,7 +51,16 @@ describe('Conversation State Management', () => {
     toolRegistry = new ToolRegistry();
     toolExecutor = new ToolExecutor(toolRegistry);
 
+    // Register all tools like the main agent
     toolRegistry.registerTool(new BashTool());
+    toolRegistry.registerTool(new FileReadTool());
+    toolRegistry.registerTool(new FileWriteTool());
+    toolRegistry.registerTool(new FileListTool());
+    toolRegistry.registerTool(new RipgrepSearchTool());
+    toolRegistry.registerTool(new FileFindTool());
+    toolRegistry.registerTool(new TaskAddTool());
+    toolRegistry.registerTool(new TaskListTool());
+    toolRegistry.registerTool(new TaskCompleteTool());
 
     threadId = `test_thread_${Date.now()}`;
     threadManager.createThread(threadId);
@@ -78,10 +97,10 @@ describe('Conversation State Management', () => {
         callId: toolCall.id,
       });
 
-      const result = await toolExecutor.executeTool(toolCall.name, toolCall.input);
+      const result = await toolExecutor.executeTool(toolCall.name, toolCall.input, { threadId });
       threadManager.addEvent(threadId, 'TOOL_RESULT', {
         callId: toolCall.id,
-        output: result.output,
+        output: result.content[0]?.text || '',
         success: result.success,
         error: result.error,
       });
@@ -112,10 +131,10 @@ describe('Conversation State Management', () => {
         callId: toolCall.id,
       });
 
-      const result = await toolExecutor.executeTool(toolCall.name, toolCall.input);
+      const result = await toolExecutor.executeTool(toolCall.name, toolCall.input, { threadId });
       threadManager.addEvent(threadId, 'TOOL_RESULT', {
         callId: toolCall.id,
-        output: result.output,
+        output: result.content[0]?.text || '',
         success: result.success,
         error: result.error,
       });
@@ -148,10 +167,10 @@ describe('Conversation State Management', () => {
         callId: toolCall.id,
       });
 
-      const result = await toolExecutor.executeTool(toolCall.name, toolCall.input);
+      const result = await toolExecutor.executeTool(toolCall.name, toolCall.input, { threadId });
       threadManager.addEvent(threadId, 'TOOL_RESULT', {
         callId: toolCall.id,
-        output: result.output,
+        output: result.content[0]?.text || '',
         success: result.success,
         error: result.error,
       });
@@ -192,12 +211,18 @@ describe('Conversation State Management', () => {
 
   it('should handle rapid-fire tool calls without losing context', async () => {
     const availableTools = toolRegistry.getAllTools();
-    const commands = ['pwd', 'ls', 'cat package.json | head -5', 'echo "test"', 'date'];
+    const commands = [
+      'Show me the current directory',
+      'List the files in this directory',
+      'Read the first 5 lines of package.json',
+      'Echo the text "test"',
+      'Show me the current date',
+    ];
 
     let expectedMessageCount = 0; // Start with 0
 
     for (let i = 0; i < commands.length; i++) {
-      threadManager.addEvent(threadId, 'USER_MESSAGE', `Run this command: ${commands[i]}`);
+      threadManager.addEvent(threadId, 'USER_MESSAGE', commands[i]);
       expectedMessageCount += 1; // User message
 
       const events = threadManager.getEvents(threadId);
@@ -221,10 +246,10 @@ describe('Conversation State Management', () => {
           callId: toolCall.id,
         });
 
-        const result = await toolExecutor.executeTool(toolCall.name, toolCall.input);
+        const result = await toolExecutor.executeTool(toolCall.name, toolCall.input, { threadId });
         threadManager.addEvent(threadId, 'TOOL_RESULT', {
           callId: toolCall.id,
-          output: result.output,
+          output: result.content[0]?.text || '',
           success: result.success,
           error: result.error,
         });
@@ -279,10 +304,10 @@ describe('Conversation State Management', () => {
           callId: toolCall.id,
         });
 
-        const result = await toolExecutor.executeTool(toolCall.name, toolCall.input);
+        const result = await toolExecutor.executeTool(toolCall.name, toolCall.input, { threadId });
         threadManager.addEvent(threadId, 'TOOL_RESULT', {
           callId: toolCall.id,
-          output: result.output,
+          output: result.content[0]?.text || '',
           success: result.success,
           error: result.error,
         });

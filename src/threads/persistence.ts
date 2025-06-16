@@ -2,7 +2,7 @@
 // ABOUTME: Handles database schema, CRUD operations, and data serialization
 
 import Database from 'better-sqlite3';
-import { Thread, ThreadEvent } from './types.js';
+import { Thread, ThreadEvent, EventType } from './types.js';
 
 export class ThreadPersistence {
   private db: Database.Database | null = null;
@@ -127,7 +127,7 @@ export class ThreadPersistence {
         return {
           id: row.id,
           threadId: row.thread_id,
-          type: row.type,
+          type: row.type as EventType,
           timestamp: new Date(row.timestamp),
           data: JSON.parse(row.data),
         };

@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { LMStudioProvider } from '../lmstudio-provider.js';
-import { Tool } from '../../tools/types.js';
+import { Tool, ToolContext } from '../../tools/types.js';
 
 // Mock tool for testing without side effects
 class MockTool implements Tool {
@@ -18,10 +18,10 @@ class MockTool implements Tool {
     required: ['action'],
   };
 
-  async executeTool(input: Record<string, unknown>) {
+  async executeTool(input: Record<string, unknown>, _context?: ToolContext) {
     return {
       success: true,
-      output: `Mock executed: ${JSON.stringify(input)}`,
+      content: [{ type: 'text' as const, text: `Mock executed: ${JSON.stringify(input)}` }],
     };
   }
 }
@@ -38,10 +38,10 @@ class FailingTool implements Tool {
     required: ['message'],
   };
 
-  async executeTool(_input: Record<string, unknown>) {
+  async executeTool(_input: Record<string, unknown>, _context?: ToolContext) {
     return {
       success: false,
-      output: 'Tool execution failed',
+      content: [{ type: 'text' as const, text: 'Tool execution failed' }],
       error: 'Simulated failure',
     };
   }
@@ -163,10 +163,15 @@ describe('LMStudio Provider Integration Tests', () => {
         },
         required: ['operation', 'target'],
       },
-      async executeTool(input: Record<string, unknown>) {
+      async executeTool(input: Record<string, unknown>, _context?: ToolContext) {
         return {
           success: true,
-          output: `Complex operation completed: ${JSON.stringify(input)}`,
+          content: [
+            {
+              type: 'text' as const,
+              text: `Complex operation completed: ${JSON.stringify(input)}`,
+            },
+          ],
         };
       },
     };

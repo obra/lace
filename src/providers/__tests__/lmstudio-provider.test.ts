@@ -3,7 +3,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LMStudioProvider } from '../lmstudio-provider.js';
-import { Tool } from '../../tools/types.js';
+import { Tool, ToolContext } from '../../tools/types.js';
 
 // Mock the LMStudio SDK
 vi.mock('@lmstudio/sdk', () => {
@@ -190,7 +190,10 @@ The temperature is 72°F.`;
             },
             required: ['location'],
           },
-          executeTool: async () => ({ success: true, output: 'sunny' }),
+          executeTool: async (_input: Record<string, unknown>, _context?: ToolContext) => ({
+            success: true,
+            content: [{ type: 'text' as const, text: 'sunny' }],
+          }),
         },
       ];
 
@@ -208,13 +211,19 @@ The temperature is 72°F.`;
           name: 'tool1',
           description: 'First tool',
           input_schema: { type: 'object', properties: {}, required: [] },
-          executeTool: async () => ({ success: true, output: 'result1' }),
+          executeTool: async (_input: Record<string, unknown>, _context?: ToolContext) => ({
+            success: true,
+            content: [{ type: 'text' as const, text: 'result1' }],
+          }),
         },
         {
           name: 'tool2',
           description: 'Second tool',
           input_schema: { type: 'object', properties: {}, required: [] },
-          executeTool: async () => ({ success: true, output: 'result2' }),
+          executeTool: async (_input: Record<string, unknown>, _context?: ToolContext) => ({
+            success: true,
+            content: [{ type: 'text' as const, text: 'result2' }],
+          }),
         },
       ];
 

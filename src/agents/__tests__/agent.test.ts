@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Agent } from '../agent.js';
 import { AIProvider, ProviderMessage, ProviderResponse } from '../../providers/types.js';
-import { Tool } from '../../tools/types.js';
+import { Tool, ToolContext } from '../../tools/types.js';
 
 // Mock provider for testing
 class MockProvider extends AIProvider {
@@ -63,7 +63,10 @@ describe('Agent', () => {
           name: 'test_tool',
           description: 'Test tool',
           input_schema: { type: 'object', properties: {}, required: [] },
-          executeTool: async () => ({ success: true, output: 'test result' }),
+          executeTool: async (_input: Record<string, unknown>, _context?: ToolContext) => ({
+            success: true,
+            content: [{ type: 'text' as const, text: 'test result' }],
+          }),
         },
       ];
 
