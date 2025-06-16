@@ -11,6 +11,7 @@ import {
 } from './types.js';
 import { Tool } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
+import { convertToAnthropicFormat } from './format-converters.js';
 
 export interface AnthropicProviderConfig extends ProviderConfig {
   apiKey: string;
@@ -37,13 +38,8 @@ export class AnthropicProvider extends AIProvider {
   }
 
   async createResponse(messages: ProviderMessage[], tools: Tool[] = []): Promise<ProviderResponse> {
-    // Convert our generic messages to Anthropic format
-    const anthropicMessages: Anthropic.MessageParam[] = messages
-      .filter((msg) => msg.role !== 'system')
-      .map((msg) => ({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content,
-      }));
+    // Convert our enhanced generic messages to Anthropic format
+    const anthropicMessages = convertToAnthropicFormat(messages);
 
     // Extract system message if present
     const systemMessage = messages.find((msg) => msg.role === 'system');
@@ -74,7 +70,19 @@ export class AnthropicProvider extends AIProvider {
       toolNames: anthropicTools.map((t) => t.name),
     });
 
+    // Log full request payload for debugging
+    logger.debug('Anthropic request payload', {
+      provider: 'anthropic',
+      payload: JSON.stringify(requestPayload, null, 2),
+    });
+
     const response = await this._anthropic.messages.create(requestPayload);
+
+    // Log full response for debugging
+    logger.debug('Anthropic response payload', {
+      provider: 'anthropic',
+      response: JSON.stringify(response, null, 2),
+    });
 
     const textContent = response.content
       .filter((content): content is Anthropic.TextBlock => content.type === 'text')
@@ -107,13 +115,8 @@ export class AnthropicProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[] = []
   ): Promise<ProviderResponse> {
-    // Convert our generic messages to Anthropic format
-    const anthropicMessages: Anthropic.MessageParam[] = messages
-      .filter((msg) => msg.role !== 'system')
-      .map((msg) => ({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content,
-      }));
+    // Convert our enhanced generic messages to Anthropic format
+    const anthropicMessages = convertToAnthropicFormat(messages);
 
     // Extract system message if present
     const systemMessage = messages.find((msg) => msg.role === 'system');
@@ -142,6 +145,12 @@ export class AnthropicProvider extends AIProvider {
       systemPromptLength: systemPrompt.length,
       toolCount: anthropicTools.length,
       toolNames: anthropicTools.map((t) => t.name),
+    });
+
+    // Log full request payload for debugging
+    logger.debug('Anthropic streaming request payload', {
+      provider: 'anthropic',
+      payload: JSON.stringify(requestPayload, null, 2),
     });
 
     // Use the streaming API
@@ -173,6 +182,12 @@ export class AnthropicProvider extends AIProvider {
           name: content.name,
           input: content.input as Record<string, unknown>,
         }));
+
+      // Log full response for debugging
+      logger.debug('Anthropic streaming response payload', {
+        provider: 'anthropic',
+        response: JSON.stringify(finalMessage, null, 2),
+      });
 
       logger.debug('Received streaming response from Anthropic', {
         provider: 'anthropic',

@@ -4,15 +4,24 @@
 import { Tool } from '../tools/types.js';
 import { EventEmitter } from 'events';
 
-export interface ProviderMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
-
 export interface ProviderToolCall {
   id: string;
   name: string;
   input: Record<string, unknown>;
+}
+
+export interface ProviderToolResult {
+  id: string;
+  output: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface ProviderMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  toolCalls?: ProviderToolCall[]; // For assistant messages with tool calls
+  toolResults?: ProviderToolResult[]; // For user messages with tool results
 }
 
 export interface ProviderResponse {
