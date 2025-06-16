@@ -48,7 +48,7 @@ describe('Conversation Context Preservation', () => {
           input: { command: index === 0 ? 'ls' : 'ls src/' },
           callId: `call_${index}`,
         });
-        expectedMessageCount += 1; // Tool call message
+        // Tool call gets grouped with preceding agent message (no extra message)
 
         threadManager.addEvent(threadId, 'TOOL_RESULT', {
           callId: `call_${index}`,
@@ -58,7 +58,7 @@ describe('Conversation Context Preservation', () => {
               : '{"stdout":"agents\\nproviders\\ntools","stderr":"","exitCode":0}',
           success: true,
         });
-        expectedMessageCount += 1; // Tool result message
+        expectedMessageCount += 1; // Only tool result creates a new user message
       }
 
       // Check that conversation length matches expected
@@ -74,7 +74,11 @@ describe('Conversation Context Preservation', () => {
 
       // Verify all previous user messages are still there
       const userMessages = conversation.filter(
-        (msg) => msg.role === 'user' && !msg.content.startsWith('[Tool result:')
+        (msg) =>
+          msg.role === 'user' &&
+          msg.content &&
+          !msg.content.startsWith('[Tool result:') &&
+          msg.content.trim() !== ''
       );
       expect(userMessages.length).toBe(index + 1);
 
@@ -118,7 +122,7 @@ describe('Conversation Context Preservation', () => {
       success: true,
     });
 
-    // Turn 2: Should be 5 messages total (user, agent, tool_call, tool_result, recursive_response)
+    // Turn 2: Should be 4 messages total (user, agent+tool_call, tool_result, recursive_response)
     threadManager.addEvent(
       threadId,
       'AGENT_MESSAGE',
@@ -127,7 +131,7 @@ describe('Conversation Context Preservation', () => {
 
     events = threadManager.getEvents(threadId);
     conversation = buildConversationFromEvents(events);
-    expect(conversation.length).toBe(5);
+    expect(conversation.length).toBe(4);
 
     // Turn 3: Add another user message
     threadManager.addEvent(threadId, 'USER_MESSAGE', 'can you explore the code for the project?');
@@ -135,7 +139,7 @@ describe('Conversation Context Preservation', () => {
 
     events = threadManager.getEvents(threadId);
     conversation = buildConversationFromEvents(events);
-    expect(conversation.length).toBe(7);
+    expect(conversation.length).toBe(6);
 
     // Turn 4: Should continue growing, NOT reset to 10 like in the bug
     threadManager.addEvent(threadId, 'USER_MESSAGE', 'please do dig through all the files');
@@ -154,8 +158,8 @@ describe('Conversation Context Preservation', () => {
     events = threadManager.getEvents(threadId);
     conversation = buildConversationFromEvents(events);
 
-    // This should be 11 messages, NOT 10 like in the bug
-    expect(conversation.length).toBe(11);
+    // This should be 9 messages with grouping (user, agent+tool, tool_result, user, agent, user, agent+tool, tool_result, agent)
+    expect(conversation.length).toBe(9);
 
     // Turn 5: Final turn should be even longer
     threadManager.addEvent(threadId, 'USER_MESSAGE', 'go ahead');
@@ -164,12 +168,16 @@ describe('Conversation Context Preservation', () => {
     events = threadManager.getEvents(threadId);
     conversation = buildConversationFromEvents(events);
 
-    // This should be 13 messages, NOT 14 like in the truncated bug
-    expect(conversation.length).toBe(13);
+    // This should be 11 messages with grouping
+    expect(conversation.length).toBe(11);
 
     // Verify that ALL original user messages are still present
     const userMessages = conversation.filter(
-      (msg) => msg.role === 'user' && !msg.content.startsWith('[Tool result:')
+      (msg) =>
+        msg.role === 'user' &&
+        msg.content &&
+        !msg.content.startsWith('[Tool result:') &&
+        msg.content.trim() !== ''
     );
     expect(userMessages.length).toBe(4);
 
@@ -218,8 +226,9 @@ describe('Conversation Context Preservation', () => {
       events = threadManager.getEvents(threadId);
       conversation = buildConversationFromEvents(events);
 
-      // Should have: user + agent + (tool_call + tool_result) * (index + 1)
-      const expectedLength = 2 + (index + 1) * 2;
+      // Should have: user + agent+tool_calls + tool_result * (index + 1)
+      // With grouping: user(1) + agent+tool(1) + tool_result(index+1) = 2 + (index + 1)
+      const expectedLength = 2 + (index + 1);
       expect(conversation.length).toBe(expectedLength);
     });
 
@@ -229,19 +238,18 @@ describe('Conversation Context Preservation', () => {
     events = threadManager.getEvents(threadId);
     conversation = buildConversationFromEvents(events);
 
-    // Final count: 2 initial + 6 tool messages + 1 final = 9
-    expect(conversation.length).toBe(9);
+    // Final count: user(1) + agent+tools(1) + tool_results(3) + final_agent(1) = 6
+    expect(conversation.length).toBe(6);
 
-    // Verify the structure
-    expect(conversation[0].role).toBe('user');
-    expect(conversation[1].role).toBe('assistant');
-    expect(conversation[2].role).toBe('assistant'); // First tool call
-    expect(conversation[3].role).toBe('user'); // First tool result
-    expect(conversation[4].role).toBe('assistant'); // Second tool call
-    expect(conversation[5].role).toBe('user'); // Second tool result
-    expect(conversation[6].role).toBe('assistant'); // Third tool call
-    expect(conversation[7].role).toBe('user'); // Third tool result
-    expect(conversation[8].role).toBe('assistant'); // Final response
+    // Verify the structure with grouping
+    expect(conversation[0].role).toBe('user'); // Initial user message
+    expect(conversation[1].role).toBe('assistant'); // Agent message with all tool calls grouped
+    expect(conversation[1].toolCalls).toBeDefined();
+    expect(conversation[1].toolCalls).toHaveLength(3); // All 3 tool calls grouped
+    expect(conversation[2].role).toBe('user'); // First tool result
+    expect(conversation[3].role).toBe('user'); // Second tool result
+    expect(conversation[4].role).toBe('user'); // Third tool result
+    expect(conversation[5].role).toBe('assistant'); // Final response
 
     await threadManager.close();
   });
@@ -278,25 +286,59 @@ describe('Conversation Context Preservation', () => {
 
     const conversation = buildConversationFromEvents(events);
 
-    // Should convert to 9 messages
-    expect(conversation.length).toBe(9);
+    // Should convert to 7 messages with grouping
+    expect(conversation.length).toBe(7);
 
-    // Check the exact sequence
+    // Check the exact sequence with new grouped format
     expect(conversation[0]).toEqual({ role: 'user', content: 'Message 1' });
-    expect(conversation[1]).toEqual({ role: 'assistant', content: 'Response 1' });
+    expect(conversation[1]).toEqual({
+      role: 'assistant',
+      content: 'Response 1',
+      toolCalls: [
+        {
+          id: 'call_1',
+          name: 'bash',
+          input: { command: 'ls' },
+        },
+      ],
+    });
     expect(conversation[2]).toEqual({
-      role: 'assistant',
-      content: '[Called tool: bash with input: {"command":"ls"}]',
+      role: 'user',
+      content: '',
+      toolResults: [
+        {
+          id: 'call_1',
+          output: 'result1',
+          success: true,
+          error: undefined,
+        },
+      ],
     });
-    expect(conversation[3]).toEqual({ role: 'user', content: '[Tool result: SUCCESS - result1]' });
-    expect(conversation[4]).toEqual({ role: 'user', content: 'Message 2' });
-    expect(conversation[5]).toEqual({ role: 'assistant', content: 'Response 2' });
-    expect(conversation[6]).toEqual({
+    expect(conversation[3]).toEqual({ role: 'user', content: 'Message 2' });
+    expect(conversation[4]).toEqual({
       role: 'assistant',
-      content: '[Called tool: bash with input: {"command":"pwd"}]',
+      content: 'Response 2',
+      toolCalls: [
+        {
+          id: 'call_2',
+          name: 'bash',
+          input: { command: 'pwd' },
+        },
+      ],
     });
-    expect(conversation[7]).toEqual({ role: 'user', content: '[Tool result: SUCCESS - result2]' });
-    expect(conversation[8]).toEqual({ role: 'assistant', content: 'Final response' });
+    expect(conversation[5]).toEqual({
+      role: 'user',
+      content: '',
+      toolResults: [
+        {
+          id: 'call_2',
+          output: 'result2',
+          success: true,
+          error: undefined,
+        },
+      ],
+    });
+    expect(conversation[6]).toEqual({ role: 'assistant', content: 'Final response' });
   });
 
   it('should handle conversation rebuild after simulated process restart', () => {
