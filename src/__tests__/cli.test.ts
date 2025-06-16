@@ -28,7 +28,8 @@ describe('CLI Integration', () => {
     it('should start new session by default', async () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      const { threadManager, threadId } = await startSession([]);
+      const sessionInfo = await startSession([]);
+      const { threadManager, threadId } = sessionInfo;
 
       expect(threadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
       expect(threadManager.getCurrentThreadId()).toBe(threadId);
@@ -41,13 +42,15 @@ describe('CLI Integration', () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
 
       // Create first session
-      const { threadManager: manager1, threadId: id1 } = await startSession([]);
+      const sessionInfo1 = await startSession([]);
+      const { threadManager: manager1, threadId: id1 } = sessionInfo1;
       manager1.addEvent(id1, 'USER_MESSAGE', 'Hello world');
       await manager1.saveCurrentThread();
       await manager1.close();
 
       // Continue session
-      const { threadManager: manager2, threadId: id2 } = await startSession(['--continue']);
+      const sessionInfo2 = await startSession(['--continue']);
+      const { threadManager: manager2, threadId: id2 } = sessionInfo2;
 
       expect(id2).toBe(id1);
       const events = manager2.getEvents(id2);
@@ -62,19 +65,22 @@ describe('CLI Integration', () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
 
       // Create first session
-      const { threadManager: manager1, threadId: id1 } = await startSession([]);
+      const sessionInfo1 = await startSession([]);
+      const { threadManager: manager1, threadId: id1 } = sessionInfo1;
       manager1.addEvent(id1, 'USER_MESSAGE', 'First session');
       await manager1.saveCurrentThread();
       await manager1.close();
 
       // Create second session (this becomes the latest)
-      const { threadManager: manager2, threadId: id2 } = await startSession([]);
+      const sessionInfo2 = await startSession([]);
+      const { threadManager: manager2, threadId: id2 } = sessionInfo2;
       manager2.addEvent(id2, 'USER_MESSAGE', 'Latest session');
       await manager2.saveCurrentThread();
       await manager2.close();
 
       // Continue without specifying ID - should get the latest (id2)
-      const { threadManager: manager3, threadId: continuedId } = await startSession(['--continue']);
+      const sessionInfo3 = await startSession(['--continue']);
+      const { threadManager: manager3, threadId: continuedId } = sessionInfo3;
 
       expect(continuedId).toBe(id2); // Should be the latest session
       expect(manager3.getEvents(continuedId)[0].data).toBe('Latest session');
@@ -87,18 +93,21 @@ describe('CLI Integration', () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
 
       // Create multiple sessions
-      const { threadManager: manager1, threadId: id1 } = await startSession([]);
+      const sessionInfo1 = await startSession([]);
+      const { threadManager: manager1, threadId: id1 } = sessionInfo1;
       manager1.addEvent(id1, 'USER_MESSAGE', 'Session 1');
       await manager1.saveCurrentThread();
       await manager1.close();
 
-      const { threadManager: manager2, threadId: id2 } = await startSession([]);
+      const sessionInfo2 = await startSession([]);
+      const { threadManager: manager2, threadId: id2 } = sessionInfo2;
       manager2.addEvent(id2, 'USER_MESSAGE', 'Session 2');
       await manager2.saveCurrentThread();
       await manager2.close();
 
       // Continue first session specifically
-      const { threadManager: manager3, threadId: id3 } = await startSession(['--continue', id1]);
+      const sessionInfo3 = await startSession(['--continue', id1]);
+      const { threadManager: manager3, threadId: id3 } = sessionInfo3;
 
       expect(id3).toBe(id1);
       expect(manager3.getEvents(id3)[0].data).toBe('Session 1');
@@ -110,7 +119,8 @@ describe('CLI Integration', () => {
     it('should handle graceful shutdown', async () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      const { threadManager, threadId } = await startSession([]);
+      const sessionInfo = await startSession([]);
+      const { threadManager, threadId } = sessionInfo;
       threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test message');
 
       await handleGracefulShutdown(threadManager);
@@ -130,7 +140,8 @@ describe('CLI Integration', () => {
     it('should handle empty arguments', async () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      const { threadManager, threadId } = await startSession([]);
+      const sessionInfo = await startSession([]);
+      const { threadManager, threadId } = sessionInfo;
 
       expect(threadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
       expect(threadManager.getCurrentThreadId()).toBe(threadId);
@@ -143,7 +154,8 @@ describe('CLI Integration', () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
 
       // Test that --prompt doesn't interfere with session creation
-      const { threadManager, threadId } = await startSession(['--prompt', 'test message']);
+      const sessionInfo = await startSession(['--prompt', 'test message']);
+      const { threadManager, threadId } = sessionInfo;
 
       // Should still create a valid session
       expect(threadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
@@ -157,7 +169,8 @@ describe('CLI Integration', () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
 
       // Turn 1: Start new conversation with --prompt
-      const { threadManager: manager1, threadId } = await startSession([]);
+      const sessionInfo1 = await startSession([]);
+      const { threadManager: manager1, threadId } = sessionInfo1;
       // Simulate what --prompt would do: add user message
       manager1.addEvent(threadId, 'USER_MESSAGE', 'What is 2+2?');
       manager1.addEvent(threadId, 'AGENT_MESSAGE', '2+2 equals 4.');
@@ -165,10 +178,8 @@ describe('CLI Integration', () => {
       await manager1.close();
 
       // Turn 2: Continue conversation with --continue and --prompt that references the previous answer
-      const { threadManager: manager2, threadId: continuedId } = await startSession([
-        '--continue',
-        threadId,
-      ]);
+      const sessionInfo2 = await startSession(['--continue', threadId]);
+      const { threadManager: manager2, threadId: continuedId } = sessionInfo2;
 
       expect(continuedId).toBe(threadId);
 
@@ -185,10 +196,8 @@ describe('CLI Integration', () => {
       await manager2.close();
 
       // Turn 3: Continue again with another contextual prompt
-      const { threadManager: manager3, threadId: finalId } = await startSession([
-        '--continue',
-        threadId,
-      ]);
+      const sessionInfo3 = await startSession(['--continue', threadId]);
+      const { threadManager: manager3, threadId: finalId } = sessionInfo3;
 
       expect(finalId).toBe(threadId);
 
@@ -215,7 +224,8 @@ describe('CLI Integration', () => {
     it('should handle unknown arguments gracefully', async () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      const { threadManager, threadId } = await startSession(['--unknown', 'arg']);
+      const sessionInfo = await startSession(['--unknown', 'arg']);
+      const { threadManager, threadId } = sessionInfo;
 
       // Should start new session when unknown args are passed
       expect(threadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
@@ -228,7 +238,8 @@ describe('CLI Integration', () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
       vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      const { threadManager, threadId } = await startSession(['--continue', 'invalid_thread_id']);
+      const sessionInfo = await startSession(['--continue', 'invalid_thread_id']);
+      const { threadManager, threadId } = sessionInfo;
 
       // Should start new session when invalid ID provided
       expect(threadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
@@ -244,7 +255,8 @@ describe('CLI Integration', () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
 
       // Session 1: Create conversation
-      const { threadManager: manager1, threadId } = await startSession([]);
+      const sessionInfo1 = await startSession([]);
+      const { threadManager: manager1, threadId } = sessionInfo1;
       manager1.addEvent(threadId, 'USER_MESSAGE', 'What files are here?');
       manager1.addEvent(threadId, 'AGENT_MESSAGE', 'Let me check the files');
       manager1.addEvent(threadId, 'TOOL_CALL', {
@@ -260,10 +272,8 @@ describe('CLI Integration', () => {
       await manager1.close();
 
       // Session 2: Resume and continue
-      const { threadManager: manager2, threadId: resumedId } = await startSession([
-        '--continue',
-        threadId,
-      ]);
+      const sessionInfo2 = await startSession(['--continue', threadId]);
+      const { threadManager: manager2, threadId: resumedId } = sessionInfo2;
 
       expect(resumedId).toBe(threadId);
       const events = manager2.getEvents(resumedId);
@@ -292,7 +302,8 @@ describe('CLI Integration', () => {
       vi.spyOn(laceDir, 'getLaceDbPath').mockReturnValue(invalidPath);
 
       // Should still start (graceful degradation)
-      const { threadManager, threadId } = await startSession([]);
+      const sessionInfo = await startSession([]);
+      const { threadManager, threadId } = sessionInfo;
 
       expect(threadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
 
@@ -310,7 +321,8 @@ describe('CLI Integration', () => {
     it('should enable auto-save on session start', async () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      const { threadManager, threadId } = await startSession([]);
+      const sessionInfo = await startSession([]);
+      const { threadManager, threadId } = sessionInfo;
 
       // Add an event
       threadManager.addEvent(threadId, 'USER_MESSAGE', 'Auto-save test');

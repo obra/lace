@@ -10,9 +10,15 @@ export function generateThreadId(): string {
   return `lace_${date}_${random}`;
 }
 
-export async function startSession(
-  args: string[]
-): Promise<{ threadManager: ThreadManager; threadId: string }> {
+export interface SessionInfo {
+  threadManager: ThreadManager;
+  threadId: string;
+  isNewSession: boolean;
+  isResumed: boolean;
+  resumeError?: string;
+}
+
+export async function startSession(args: string[]): Promise<SessionInfo> {
   const threadManager = new ThreadManager(getLaceDbPath());
 
   if (args.includes('--continue')) {
@@ -22,10 +28,25 @@ export async function startSession(
     if (threadId) {
       try {
         await threadManager.setCurrentThread(threadId);
-        console.log(`Continuing conversation ${threadId}`);
-        return { threadManager, threadId };
-      } catch {
-        console.warn(`Could not resume ${threadId}, starting new session`);
+        return {
+          threadManager,
+          threadId,
+          isNewSession: false,
+          isResumed: true,
+        };
+      } catch (error) {
+        // Fall through to create new session
+        const resumeError = error instanceof Error ? error.message : 'Unknown error';
+        const newThreadId = generateThreadId();
+        threadManager.createThread(newThreadId);
+        threadManager.enableAutoSave();
+        return {
+          threadManager,
+          threadId: newThreadId,
+          isNewSession: true,
+          isResumed: false,
+          resumeError: `Could not resume ${threadId}: ${resumeError}`,
+        };
       }
     }
   }
@@ -34,9 +55,13 @@ export async function startSession(
   const threadId = generateThreadId();
   threadManager.createThread(threadId);
   threadManager.enableAutoSave();
-  console.log(`Starting conversation ${threadId}`);
 
-  return { threadManager, threadId };
+  return {
+    threadManager,
+    threadId,
+    isNewSession: true,
+    isResumed: false,
+  };
 }
 
 export async function handleGracefulShutdown(threadManager: ThreadManager): Promise<void> {

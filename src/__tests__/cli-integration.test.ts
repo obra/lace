@@ -32,6 +32,8 @@ vi.mock('../threads/session.js', () => ({
       getEvents: vi.fn().mockReturnValue([]),
     },
     threadId: 'test_thread_123',
+    isNewSession: true,
+    isResumed: false,
   }),
 }));
 

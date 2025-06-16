@@ -85,7 +85,7 @@ async function main() {
   });
 
   const provider = await createProvider(options.provider);
-  
+
   const toolRegistry = new ToolRegistry();
   const toolExecutor = new ToolExecutor(toolRegistry);
 
@@ -102,10 +102,21 @@ async function main() {
     new TaskCompleteTool(),
   ];
 
-  tools.forEach(tool => toolRegistry.registerTool(tool));
+  tools.forEach((tool) => toolRegistry.registerTool(tool));
 
   // Start or resume session using enhanced thread management
-  const { threadManager, threadId } = await startSession(process.argv.slice(2));
+  const sessionInfo = await startSession(process.argv.slice(2));
+  const { threadManager, threadId } = sessionInfo;
+
+  // Display session status to user
+  if (sessionInfo.isResumed) {
+    console.log(`📖 Continuing conversation ${threadId}`);
+  } else if (sessionInfo.resumeError) {
+    console.warn(`⚠️  ${sessionInfo.resumeError}`);
+    console.log(`🆕 Starting new conversation ${threadId}`);
+  } else {
+    console.log(`🆕 Starting conversation ${threadId}`);
+  }
 
   // Create the enhanced Agent
   const agent = new Agent({
