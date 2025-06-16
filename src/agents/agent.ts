@@ -229,8 +229,11 @@ export class Agent extends EventEmitter {
     messages: ProviderMessage[],
     tools: Tool[]
   ): Promise<AgentResponse> {
-    // Check if provider supports streaming and it's enabled in config
-    if (this._provider.supportsStreaming && this._provider.config?.streaming) {
+    // Default to streaming if provider supports it (unless explicitly disabled)
+    const useStreaming =
+      this._provider.supportsStreaming && this._provider.config?.streaming !== false;
+
+    if (useStreaming) {
       return this._createStreamingResponse(messages, tools);
     } else {
       return this._createNonStreamingResponse(messages, tools);

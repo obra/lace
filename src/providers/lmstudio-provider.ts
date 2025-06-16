@@ -46,6 +46,10 @@ export class LMStudioProvider extends AIProvider {
     return 'qwen/qwen3-30b-a3b';
   }
 
+  get supportsStreaming(): boolean {
+    return true;
+  }
+
   async diagnose(): Promise<{ connected: boolean; models: string[]; error?: string }> {
     try {
       process.stdout.write(`🔍 Connecting to LMStudio at ${this._baseUrl}...\n`);
@@ -502,5 +506,143 @@ You can provide regular text response along with tool calls. If you need to call
     cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
 
     return cleaned;
+  }
+
+  async createStreamingResponse(
+    messages: ProviderMessage[],
+    tools: Tool[] = []
+  ): Promise<ProviderResponse> {
+    const modelId = this._config.model || this.defaultModel;
+
+    // Check if we have a cached model for this modelId
+    if (this._cachedModel && this._cachedModelId === modelId) {
+      logger.debug('Using cached LMStudio model for streaming', { modelId });
+    } else {
+      // Need to get/load the model (same logic as non-streaming)
+      const diagnostics = await this.diagnose();
+
+      if (!diagnostics.connected) {
+        throw new Error(
+          `Cannot connect to LMStudio server at ${this._baseUrl}.\n` +
+            `Make sure LMStudio is running and accessible.\n\n` +
+            `To fix this:\n` +
+            `  - Start LMStudio application\n` +
+            `  - Ensure the server is running on ${this._baseUrl}\n` +
+            `  - Check firewall settings if using a remote server\n\n` +
+            `Connection error: ${diagnostics.error}`
+        );
+      }
+
+      if (diagnostics.models.length === 0) {
+        throw new Error(
+          `No models are currently loaded in LMStudio.\n\n` +
+            `To fix this:\n` +
+            `  - Open LMStudio and load a model\n` +
+            `  - Download ${modelId} if not available\n` +
+            `  - Or use --provider anthropic as fallback`
+        );
+      }
+
+      // Check if our target model is already loaded
+      if (diagnostics.models.includes(modelId)) {
+        const loadedModels = await this._client.llm.listLoaded();
+        const existingModel = loadedModels.find((m) => m.identifier === modelId);
+
+        if (existingModel) {
+          this._cachedModel = existingModel as LMStudioModel;
+          this._cachedModelId = modelId;
+        } else {
+          throw new Error(`Model "${modelId}" appears loaded but could not retrieve instance`);
+        }
+      } else {
+        try {
+          this._cachedModel = (await this._client.llm.load(modelId, {
+            verbose: this._verbose,
+          })) as LMStudioModel;
+          this._cachedModelId = modelId;
+        } catch (error: unknown) {
+          throw new Error(
+            `LMStudio model loading failed: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
+    }
+
+    // Convert messages to text-only format
+    const textOnlyMessages = convertToTextOnlyFormat(messages);
+    const lmMessages = textOnlyMessages.map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    }));
+
+    // If we have tools, add tool instructions
+    if (tools.length > 0) {
+      const toolInstructions = this._buildToolInstructions(tools);
+
+      const systemMessageIndex = lmMessages.findIndex((msg) => msg.role === 'system');
+      if (systemMessageIndex >= 0) {
+        lmMessages[systemMessageIndex].content += '\n\n' + toolInstructions;
+      } else {
+        lmMessages.unshift({
+          role: 'system',
+          content: toolInstructions,
+        });
+      }
+    }
+
+    logger.debug('Sending streaming request to LMStudio', {
+      provider: 'lmstudio',
+      model: modelId,
+      messageCount: lmMessages.length,
+      toolCount: tools.length,
+      toolNames: tools.map((t) => t.name),
+    });
+
+    // Make the streaming request
+    const prediction = this._cachedModel!.respond(lmMessages);
+
+    let fullResponse = '';
+    let chunkCount = 0;
+
+    try {
+      // Process streaming response
+      for await (const chunk of prediction) {
+        chunkCount++;
+
+        if (chunk.content) {
+          // Emit token events for real-time display
+          this.emit('token', { token: chunk.content });
+          fullResponse += chunk.content;
+        }
+      }
+
+      logger.debug('Received streaming response from LMStudio', {
+        provider: 'lmstudio',
+        model: modelId,
+        totalChunks: chunkCount,
+        contentLength: fullResponse.length,
+      });
+
+      // Parse tool calls from the response
+      const toolCalls = this._extractToolCalls(fullResponse);
+
+      // Remove tool call JSON from the response content
+      const cleanedContent = this._removeToolCallsFromContent(fullResponse);
+
+      const result = {
+        content: cleanedContent.trim(),
+        toolCalls,
+      };
+
+      // Emit completion event
+      this.emit('complete', { response: result });
+
+      return result;
+    } catch (error) {
+      const errorObj = error as Error;
+      logger.error('Streaming error from LMStudio', { error: errorObj.message });
+      this.emit('error', { error: errorObj });
+      throw error;
+    }
   }
 }

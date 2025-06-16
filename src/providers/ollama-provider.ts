@@ -29,6 +29,10 @@ export class OllamaProvider extends AIProvider {
     return 'qwen3:32b';
   }
 
+  get supportsStreaming(): boolean {
+    return true;
+  }
+
   async diagnose(): Promise<{ connected: boolean; models: string[]; error?: string }> {
     try {
       // Try to list models to test connection
@@ -142,5 +146,128 @@ export class OllamaProvider extends AIProvider {
       content,
       toolCalls,
     };
+  }
+
+  async createStreamingResponse(
+    messages: ProviderMessage[],
+    tools: Tool[] = []
+  ): Promise<ProviderResponse> {
+    const modelId = this._config.model || this.defaultModel;
+
+    // First check if we can connect and if the model exists
+    const diagnostics = await this.diagnose();
+
+    if (!diagnostics.connected) {
+      throw new Error(
+        `Cannot connect to Ollama server at ${this._host}.\n` +
+          `Make sure Ollama is running and accessible.\n\n` +
+          `To fix this:\n` +
+          `  - Start Ollama service: 'ollama serve'\n` +
+          `  - Ensure the server is running on ${this._host}\n` +
+          `  - Check firewall settings if using a remote server\n\n` +
+          `Connection error: ${diagnostics.error}`
+      );
+    }
+
+    // Check if our target model is available
+    if (!diagnostics.models.includes(modelId)) {
+      throw new Error(
+        `Model "${modelId}" is not available in Ollama.\n\n` +
+          `Available models: ${diagnostics.models.join(', ')}\n\n` +
+          `To fix this:\n` +
+          `  - Pull the model: 'ollama pull ${modelId}'\n` +
+          `  - Choose an available model from the list above\n` +
+          `  - Use --provider anthropic as fallback`
+      );
+    }
+
+    // Convert messages to Ollama format
+    const ollamaMessages = messages.map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    }));
+
+    logger.debug('Sending streaming request to Ollama', {
+      provider: 'ollama',
+      model: modelId,
+      messageCount: ollamaMessages.length,
+      toolCount: tools.length,
+      toolNames: tools.map((t) => t.name),
+    });
+
+    // Prepare the request payload for streaming
+    const requestPayload = {
+      model: modelId,
+      messages: ollamaMessages,
+      stream: true as const,
+      tools:
+        tools.length > 0
+          ? tools.map(
+              (tool): OllamaTool => ({
+                type: 'function',
+                function: {
+                  name: tool.name,
+                  description: tool.description,
+                  parameters: tool.input_schema,
+                },
+              })
+            )
+          : undefined,
+    };
+
+    // Make the streaming request
+    const response = await this._ollama.chat(requestPayload);
+
+    let content = '';
+    let toolCalls: { id: string; name: string; input: Record<string, unknown> }[] = [];
+    let finalMessage: any = null;
+
+    try {
+      // Process streaming response
+      for await (const part of response) {
+        if (part.message?.content) {
+          // Emit token events for real-time display
+          this.emit('token', { token: part.message.content });
+          content += part.message.content;
+        }
+
+        // Store the final message for tool calls
+        if (part.done) {
+          finalMessage = part.message;
+        }
+      }
+
+      // Extract tool calls from final message
+      if (finalMessage?.tool_calls) {
+        toolCalls = finalMessage.tool_calls.map((tc: any, index: number) => ({
+          id: `call_${index + 1}`,
+          name: tc.function.name,
+          input: tc.function.arguments,
+        }));
+      }
+
+      logger.debug('Received streaming response from Ollama', {
+        provider: 'ollama',
+        model: modelId,
+        contentLength: content.length,
+        toolCallCount: toolCalls.length,
+        toolCallNames: toolCalls.map((tc) => tc.name),
+      });
+
+      const result = {
+        content,
+        toolCalls,
+      };
+
+      // Emit completion event
+      this.emit('complete', { response: result });
+
+      return result;
+    } catch (error) {
+      const errorObj = error as Error;
+      logger.error('Streaming error from Ollama', { error: errorObj.message });
+      this.emit('error', { error: errorObj });
+      throw error;
+    }
   }
 }
