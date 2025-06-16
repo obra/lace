@@ -48,6 +48,11 @@ program
     "comma-separated list of tools to always deny",
     (value) => value.split(","),
   )
+  .option(
+    "--model <model>",
+    "default model to use for orchestration",
+    "claude-4-sonnet",
+  )
   .action(async (options) => {
     const laceUIOptions = {
       ...options,

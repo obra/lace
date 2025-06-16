@@ -2,6 +2,7 @@
 // ABOUTME: Analyzes requirements, identifies dependencies, creates detailed execution plans
 
 import { Role } from "./types.ts";
+import { getDefaultModelForRole } from "../../config/model-defaults.ts";
 
 export const planning: Role = {
   name: "planning",
@@ -22,7 +23,7 @@ PLANNING GUIDELINES:
 - Provide time estimates and resource requirements
 - Ensure plans are comprehensive yet practical`,
 
-  defaultModel: "claude-3-5-sonnet-20241022",
+  defaultModel: getDefaultModelForRole("planning"),
   defaultProvider: "anthropic",
 
   capabilities: [

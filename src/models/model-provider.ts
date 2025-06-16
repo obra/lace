@@ -32,6 +32,7 @@ export class ModelProvider {
       const anthropicProvider = new AnthropicProvider(this.config.anthropic);
       await anthropicProvider.initialize();
       this.registry.registerProvider("anthropic", anthropicProvider);
+      anthropicProvider.registerModels(this.registry);
       this.defaultProvider = "anthropic";
     }
 
@@ -40,40 +41,17 @@ export class ModelProvider {
       const openaiProvider = new OpenAIProvider(this.config.openai);
       await openaiProvider.initialize();
       this.registry.registerProvider("openai", openaiProvider);
+      openaiProvider.registerModels(this.registry);
     }
 
     if (this.config.local) {
       const localProvider = new LocalProvider(this.config.local);
       await localProvider.initialize();
       this.registry.registerProvider("local", localProvider);
+      localProvider.registerModels(this.registry);
     }
-
-    // Register default model definitions
-    this.registerDefaultModelDefinitions();
   }
 
-  private registerDefaultModelDefinitions(): void {
-    // Anthropic models
-    this.registry.registerModelDefinition("claude-3-5-sonnet-20241022", {
-      name: "claude-3-5-sonnet-20241022",
-      provider: "anthropic",
-      contextWindow: 200000,
-      inputPrice: 3.0,
-      outputPrice: 15.0,
-      capabilities: ["chat", "tools", "vision"]
-    });
-
-    this.registry.registerModelDefinition("claude-3-5-haiku-20241022", {
-      name: "claude-3-5-haiku-20241022",
-      provider: "anthropic",
-      contextWindow: 200000,
-      inputPrice: 0.8,
-      outputPrice: 4.0,
-      capabilities: ["chat", "tools", "vision"]
-    });
-
-    // Add more model definitions as needed
-  }
 
   /**
    * Get a model session instance for the specified model

@@ -14,6 +14,36 @@ export class LocalProvider {
     throw new Error("Local provider not yet implemented");
   }
 
+  registerModels(registry) {
+    // Local models - no pricing since they're self-hosted
+    registry.registerModelDefinition("deepseek-v3", {
+      name: "deepseek-v3",
+      provider: "local",
+      contextWindow: 64000,
+      inputPrice: 0, // Local hosting
+      outputPrice: 0,
+      capabilities: ["chat", "code_generation", "reasoning"]
+    });
+
+    registry.registerModelDefinition("llama-3.3", {
+      name: "llama-3.3",
+      provider: "local", 
+      contextWindow: 128000,
+      inputPrice: 0,
+      outputPrice: 0,
+      capabilities: ["chat", "reasoning", "general"]
+    });
+
+    registry.registerModelDefinition("qwen-2.5", {
+      name: "qwen-2.5",
+      provider: "local",
+      contextWindow: 32000,
+      inputPrice: 0,
+      outputPrice: 0,
+      capabilities: ["chat", "reasoning", "efficiency"]
+    });
+  }
+
   setSessionId(sessionId) {
     this.sessionId = sessionId;
   }

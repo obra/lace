@@ -14,6 +14,37 @@ export class OpenAIProvider {
     throw new Error("OpenAI provider not yet implemented");
   }
 
+  registerModels(registry) {
+    // GPT-4 models
+    registry.registerModelDefinition("gpt-4o", {
+      name: "gpt-4o",
+      provider: "openai",
+      contextWindow: 128000,
+      inputPrice: 2.5,
+      outputPrice: 10.0,
+      capabilities: ["chat", "tools", "reasoning"]
+    });
+
+    registry.registerModelDefinition("gpt-4o-mini", {
+      name: "gpt-4o-mini", 
+      provider: "openai",
+      contextWindow: 128000,
+      inputPrice: 0.15,
+      outputPrice: 0.6,
+      capabilities: ["chat", "tools"]
+    });
+
+    // Future o3 models
+    registry.registerModelDefinition("o3-mini", {
+      name: "o3-mini",
+      provider: "openai",
+      contextWindow: 128000,
+      inputPrice: 1.0, // Placeholder pricing
+      outputPrice: 4.0,
+      capabilities: ["chat", "reasoning", "planning"]
+    });
+  }
+
   setSessionId(sessionId) {
     this.sessionId = sessionId;
   }

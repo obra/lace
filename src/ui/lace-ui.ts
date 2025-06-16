@@ -15,6 +15,7 @@ import { ActivityCoordinator } from "./activity-coordinator.js";
 import { AgentCoordinator } from "../agents/agent-coordinator.js";
 import { ToolApprovalCoordinator } from "./tool-approval-coordinator.js";
 import App from "./App";
+import { setGlobalModelDefaults } from "../config/model-defaults.ts";
 
 interface LaceUIOptions {
   verbose?: boolean;
@@ -28,6 +29,7 @@ interface LaceUIOptions {
   autoApproveTools?: string[];
   deny?: string[];
   alwaysDenyTools?: string[];
+  model?: string;
 }
 
 interface AgentResponse {
@@ -117,6 +119,16 @@ export class LaceUI {
   }
 
   async initialize() {
+    // Set global model defaults from CLI options
+    if (this.options.model) {
+      setGlobalModelDefaults({
+        orchestrator: this.options.model,
+        reasoning: this.options.model,
+        planning: this.options.model,
+        general: this.options.model
+      });
+    }
+
     await this.tools.initialize();
     await this.modelProvider.initialize();
 

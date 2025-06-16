@@ -2,6 +2,7 @@
 // ABOUTME: Considers multiple approaches, provides detailed explanations, helps with architectural decisions
 
 import { Role } from "./types.ts";
+import { getDefaultModelForRole } from "../../config/model-defaults.ts";
 
 export const reasoning: Role = {
   name: "reasoning",
@@ -22,7 +23,7 @@ REASONING GUIDELINES:
 - Provide well-reasoned recommendations
 - Help with complex debugging and analysis tasks`,
 
-  defaultModel: "claude-3-5-sonnet-20241022",
+  defaultModel: getDefaultModelForRole("reasoning"),
   defaultProvider: "anthropic",
 
   capabilities: [

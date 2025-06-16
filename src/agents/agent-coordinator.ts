@@ -7,6 +7,7 @@ import { ModelProvider } from "../models/model-provider.js";
 import { ApprovalEngine } from "../safety/index.js";
 import { ActivityLogger } from "../logging/activity-logger.js";
 import { DebugLogger } from "../logging/debug-logger.js";
+import { getDefaultModelForRole } from "../config/model-defaults.ts";
 
 interface AgentCoordinatorOptions {
   tools: ToolRegistry;
@@ -15,6 +16,7 @@ interface AgentCoordinatorOptions {
   activityLogger: ActivityLogger;
   debugLogger: DebugLogger;
   verbose?: boolean;
+  model?: string;
 }
 
 interface AgentStatusInfo {
@@ -68,7 +70,7 @@ export class AgentCoordinator {
       generation: this.currentGeneration,
       tools: this.tools,
       modelProvider: this.modelProvider,
-      model: this.modelProvider.getModelSession("claude-3-5-sonnet-20241022"),
+      model: this.modelProvider.getModelSession(getDefaultModelForRole("orchestrator")),
       toolApproval: this.toolApproval,
       verbose: this.verbose,
       role: "orchestrator",
@@ -93,7 +95,7 @@ export class AgentCoordinator {
       generation: this.currentGeneration,
       tools: this.tools,
       modelProvider: this.modelProvider,
-      model: this.modelProvider.getModelSession("claude-3-5-sonnet-20241022"),
+      model: this.modelProvider.getModelSession(getDefaultModelForRole("orchestrator")),
       verbose: this.verbose,
       role: "orchestrator",
       capabilities: ["orchestration", "reasoning", "planning", "delegation"],

@@ -7,6 +7,7 @@ import { join } from "path";
 import { homedir } from "os";
 import { randomUUID } from "crypto";
 import { BaseModelProvider, ModelProviderMetadata } from "../model-registry.js";
+import { getDefaultModelForRole } from "../../config/model-defaults.ts";
 
 export class AnthropicProvider implements BaseModelProvider {
   private config: any;
@@ -129,13 +130,53 @@ export class AnthropicProvider implements BaseModelProvider {
     });
   }
 
+  registerModels(registry: any): void {
+    // Claude 4 models
+    registry.registerModelDefinition("claude-4-sonnet", {
+      name: "claude-4-sonnet", 
+      provider: "anthropic",
+      contextWindow: 200000,
+      inputPrice: 3.0,
+      outputPrice: 15.0,
+      capabilities: ["chat", "tools", "vision"]
+    });
+
+    registry.registerModelDefinition("claude-4-opus", {
+      name: "claude-4-opus",
+      provider: "anthropic", 
+      contextWindow: 200000,
+      inputPrice: 15.0,
+      outputPrice: 75.0,
+      capabilities: ["chat", "tools", "vision"]
+    });
+
+    // Claude 3.5 models
+    registry.registerModelDefinition("claude-3-5-sonnet-20241022", {
+      name: "claude-3-5-sonnet-20241022",
+      provider: "anthropic",
+      contextWindow: 200000,
+      inputPrice: 3.0,
+      outputPrice: 15.0,
+      capabilities: ["chat", "tools", "vision"]
+    });
+
+    registry.registerModelDefinition("claude-3-5-haiku-20241022", {
+      name: "claude-3-5-haiku-20241022", 
+      provider: "anthropic",
+      contextWindow: 200000,
+      inputPrice: 0.8,
+      outputPrice: 4.0,
+      capabilities: ["chat", "tools", "vision"]
+    });
+  }
+
   setSessionId(sessionId: string): void {
     this.sessionId = sessionId;
   }
 
   async chat(messages: any[], options: any = {}): Promise<any> {
     const {
-      model = "claude-3-5-sonnet-20241022",
+      model = getDefaultModelForRole("orchestrator"),
       tools = [],
       maxTokens = 4096,
       temperature = 0.7,
@@ -411,7 +452,7 @@ export class AnthropicProvider implements BaseModelProvider {
   }
 
   async countTokens(messages: any[], options: any = {}): Promise<any> {
-    const { model = "claude-3-5-sonnet-20241022", tools = [], enableCaching = false } = options;
+    const { model = getDefaultModelForRole("orchestrator"), tools = [], enableCaching = false } = options;
 
     try {
       const { systemMessage, userMessages } = this.separateSystemMessage(messages);
@@ -571,7 +612,7 @@ Best for: Most general-purpose AI tasks, reasoning, coding, analysis.`,
         "code_generation",
         "analysis"
       ],
-      defaultModel: "claude-3-5-sonnet-20241022",
+      defaultModel: getDefaultModelForRole("orchestrator"),
       strengths: [
         "reasoning",
         "code_understanding", 

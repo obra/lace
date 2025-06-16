@@ -2,6 +2,7 @@
 // ABOUTME: Follows provided plans and instructions, uses tools to accomplish concrete goals
 
 import { Role } from "./types.ts";
+import { getDefaultModelForRole } from "../../config/model-defaults.ts";
 
 export const execution: Role = {
   name: "execution",
@@ -22,7 +23,7 @@ EXECUTION GUIDELINES:
 - Ask for clarification when instructions are ambiguous
 - Optimize for speed and accuracy in task completion`,
 
-  defaultModel: "claude-3-5-haiku-20241022",
+  defaultModel: getDefaultModelForRole("execution"),
   defaultProvider: "anthropic",
 
   capabilities: [

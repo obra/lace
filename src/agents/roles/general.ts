@@ -2,6 +2,7 @@
 // ABOUTME: Provides full range of capabilities when no specialized role is needed
 
 import { Role } from "./types.ts";
+import { getDefaultModelForRole } from "../../config/model-defaults.ts";
 
 export const general: Role = {
   name: "general",
@@ -22,7 +23,7 @@ GENERAL GUIDELINES:
 - Balance different concerns (speed, accuracy, completeness) based on context
 - Ask for clarification when task requirements are unclear`,
 
-  defaultModel: "claude-3-5-sonnet-20241022",
+  defaultModel: getDefaultModelForRole("general"),
   defaultProvider: "anthropic",
 
   capabilities: [

@@ -2,6 +2,7 @@
 // ABOUTME: Manages workflow, context, and spawns subagents when needed for focused work
 
 import { Role } from "./types.ts";
+import { getDefaultModelForRole } from "../../config/model-defaults.ts";
 
 export const orchestrator: Role = {
   name: "orchestrator",
@@ -22,7 +23,7 @@ ORCHESTRATION GUIDELINES:
 - Handle escalation when specialist agents need help
 - Maintain overall project coherence and quality`,
 
-  defaultModel: "claude-3-5-sonnet-20241022",
+  defaultModel: getDefaultModelForRole("orchestrator"),
   defaultProvider: "anthropic",
 
   capabilities: [
