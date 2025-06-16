@@ -92,7 +92,10 @@ export class Agent extends EventEmitter {
   // Control methods
   start(): void {
     this._isRunning = true;
-    logger.info('AGENT: Started', { threadId: this._threadId, provider: this._provider.providerName });
+    logger.info('AGENT: Started', {
+      threadId: this._threadId,
+      provider: this._provider.providerName,
+    });
   }
 
   stop(): void {
@@ -107,7 +110,7 @@ export class Agent extends EventEmitter {
   }
 
   resume(): void {
-    // TODO: Implement pause/resume functionality  
+    // TODO: Implement pause/resume functionality
     throw new Error('Pause/resume not yet implemented');
   }
 
@@ -153,10 +156,10 @@ export class Agent extends EventEmitter {
 
       // Get agent response with available tools
       let response: AgentResponse;
-      
+
       try {
         response = await this._createResponse(conversation, this._tools);
-        
+
         logger.debug('AGENT: Received response from provider', {
           threadId: this._threadId,
           hasContent: !!response.content,
@@ -165,7 +168,7 @@ export class Agent extends EventEmitter {
         });
       } catch (error: unknown) {
         this._setState('idle');
-        
+
         logger.error('AGENT: Provider error', {
           threadId: this._threadId,
           errorMessage: error instanceof Error ? error.message : String(error),
@@ -183,14 +186,13 @@ export class Agent extends EventEmitter {
       // Process agent response
       if (response.content) {
         // Extract think blocks and regular content
-        const thinkMatches = response.content.match(/<think>([\s\S]*?)<\/think>/g);
         const cleanedContent = response.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 
         // Add agent message to thread
         this._threadManager.addEvent(this._threadId, 'AGENT_MESSAGE', response.content);
-        
+
         this.emit('agent_thinking_complete', { content: response.content });
-        
+
         // Emit cleaned response if there's meaningful content
         if (cleanedContent && cleanedContent.length > 0) {
           this.emit('agent_response_complete', { content: cleanedContent });
@@ -207,10 +209,9 @@ export class Agent extends EventEmitter {
         this._setState('idle');
         this.emit('conversation_complete');
       }
-
     } catch (error: unknown) {
       this._setState('idle');
-      
+
       logger.error('AGENT: Unexpected error in conversation processing', {
         threadId: this._threadId,
         error: error instanceof Error ? error.message : String(error),
@@ -224,7 +225,10 @@ export class Agent extends EventEmitter {
     }
   }
 
-  private async _createResponse(messages: ProviderMessage[], tools: Tool[]): Promise<AgentResponse> {
+  private async _createResponse(
+    messages: ProviderMessage[],
+    tools: Tool[]
+  ): Promise<AgentResponse> {
     // Check if provider supports streaming and it's enabled in config
     if (this._provider.supportsStreaming && this._provider.config?.streaming) {
       return this._createStreamingResponse(messages, tools);
@@ -233,7 +237,10 @@ export class Agent extends EventEmitter {
     }
   }
 
-  private async _createStreamingResponse(messages: ProviderMessage[], tools: Tool[]): Promise<AgentResponse> {
+  private async _createStreamingResponse(
+    messages: ProviderMessage[],
+    tools: Tool[]
+  ): Promise<AgentResponse> {
     // Set to streaming state
     this._setState('streaming');
 
@@ -243,7 +250,10 @@ export class Agent extends EventEmitter {
     };
 
     const errorListener = ({ error }: { error: Error }) => {
-      this.emit('error', { error, context: { phase: 'streaming_response', threadId: this._threadId } });
+      this.emit('error', {
+        error,
+        context: { phase: 'streaming_response', threadId: this._threadId },
+      });
     };
 
     // Subscribe to provider events
@@ -252,7 +262,7 @@ export class Agent extends EventEmitter {
 
     try {
       const response = await this._provider.createStreamingResponse(messages, tools);
-      
+
       return {
         content: response.content,
         toolCalls: response.toolCalls,
@@ -264,7 +274,10 @@ export class Agent extends EventEmitter {
     }
   }
 
-  private async _createNonStreamingResponse(messages: ProviderMessage[], tools: Tool[]): Promise<AgentResponse> {
+  private async _createNonStreamingResponse(
+    messages: ProviderMessage[],
+    tools: Tool[]
+  ): Promise<AgentResponse> {
     const response = await this._provider.createResponse(messages, tools);
 
     return {
@@ -279,7 +292,7 @@ export class Agent extends EventEmitter {
     logger.debug('AGENT: Processing tool calls', {
       threadId: this._threadId,
       toolCallCount: toolCalls.length,
-      toolCalls: toolCalls.map(tc => ({ id: tc.id, name: tc.name })),
+      toolCalls: toolCalls.map((tc) => ({ id: tc.id, name: tc.name })),
     });
 
     for (const toolCall of toolCalls) {
@@ -305,14 +318,12 @@ export class Agent extends EventEmitter {
 
       try {
         // Execute tool
-        const result = await this._toolExecutor.executeTool(
-          toolCall.name,
-          toolCall.input,
-          { threadId: this._threadId }
-        );
+        const result = await this._toolExecutor.executeTool(toolCall.name, toolCall.input, {
+          threadId: this._threadId,
+        });
 
         const outputText = result.content[0]?.text || '';
-        
+
         logger.debug('AGENT: Tool execution completed', {
           threadId: this._threadId,
           toolCallId: toolCall.id,
@@ -336,7 +347,6 @@ export class Agent extends EventEmitter {
           success: result.success,
           error: result.error,
         });
-
       } catch (error: unknown) {
         logger.error('AGENT: Tool execution error', {
           threadId: this._threadId,
@@ -374,7 +384,7 @@ export class Agent extends EventEmitter {
     if (oldState !== newState) {
       this._state = newState;
       this.emit('state_change', { from: oldState, to: newState });
-      
+
       logger.debug('AGENT: State change', {
         threadId: this._threadId,
         from: oldState,
@@ -393,7 +403,7 @@ export class Agent extends EventEmitter {
     return super.on(event, listener);
   }
 
-  // Override once to provide type safety  
+  // Override once to provide type safety
   once<K extends keyof AgentEvents>(event: K, listener: (...args: AgentEvents[K]) => void): this {
     return super.once(event, listener);
   }

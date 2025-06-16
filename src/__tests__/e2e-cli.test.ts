@@ -243,14 +243,10 @@ describe('End-to-End CLI Tests', () => {
   describe('error handling', () => {
     it('should handle missing ANTHROPIC_KEY for anthropic provider', async () => {
       // Run without the fake API key to test the error case
-      const child = spawn(
-        'node',
-        ['dist/cli.js', '--provider', 'anthropic', '--prompt', 'Test'],
-        {
-          stdio: ['pipe', 'pipe', 'pipe'],
-          env: { ...process.env, ANTHROPIC_KEY: undefined }, // Explicitly unset the key
-        }
-      );
+      const child = spawn('node', ['dist/cli.js', '--provider', 'anthropic', '--prompt', 'Test'], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, ANTHROPIC_KEY: undefined }, // Explicitly unset the key
+      });
 
       let stderr = '';
       child.stderr?.on('data', (data) => {

@@ -1,4 +1,4 @@
-// ABOUTME: Integration tests for main CLI orchestration (src/cli.ts)  
+// ABOUTME: Integration tests for main CLI orchestration (src/cli.ts)
 // ABOUTME: Tests provider creation, tool setup, and CLIInterface integration
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -10,22 +10,29 @@ import { OllamaProvider } from '../providers/ollama-provider.js';
 // Mock the CLIInterface to avoid readline complications
 vi.mock('../cli/interface.js', () => ({
   CLIInterface: class MockCLIInterface {
-    constructor(public agent: any, public threadManager: any) {}
-    async handleSinglePrompt(_prompt: string) { return; }
-    async startInteractive() { return; }
-  }
+    constructor(
+      public agent: any,
+      public threadManager: any
+    ) {}
+    async handleSinglePrompt(_prompt: string) {
+      return;
+    }
+    async startInteractive() {
+      return;
+    }
+  },
 }));
 
 // Mock session management to avoid file system
 vi.mock('../threads/session.js', () => ({
   startSession: vi.fn().mockResolvedValue({
-    threadManager: { 
+    threadManager: {
       close: vi.fn().mockResolvedValue(undefined),
       createThread: vi.fn(),
-      getEvents: vi.fn().mockReturnValue([])
+      getEvents: vi.fn().mockReturnValue([]),
     },
-    threadId: 'test_thread_123'
-  })
+    threadId: 'test_thread_123',
+  }),
 }));
 
 // Mock logger to avoid file I/O
@@ -35,23 +42,23 @@ vi.mock('../utils/logger.js', () => ({
     info: vi.fn(),
     debug: vi.fn(),
     error: vi.fn(),
-  }
+  },
 }));
 
 // Mock prompt config
 vi.mock('../config/prompts.js', () => ({
   loadPromptConfig: vi.fn().mockReturnValue({
     systemPrompt: 'Test system prompt',
-    filesCreated: []
+    filesCreated: [],
   }),
   getPromptFilePaths: vi.fn().mockReturnValue({
     systemPromptPath: '/test/system.txt',
-    userInstructionsPath: '/test/user.txt'
-  })
+    userInstructionsPath: '/test/user.txt',
+  }),
 }));
 
 describe('CLI Orchestration', () => {
-  let originalEnv: NodeJS.ProcessEnv;
+  let originalEnv: typeof process.env;
 
   beforeEach(() => {
     originalEnv = process.env;
@@ -66,9 +73,12 @@ describe('CLI Orchestration', () => {
   describe('argument parsing integration', () => {
     it('should parse all CLI arguments correctly', () => {
       const result = parseArgs([
-        '--provider', 'lmstudio',
-        '--log-level', 'debug', 
-        '--prompt', 'test prompt'
+        '--provider',
+        'lmstudio',
+        '--log-level',
+        'debug',
+        '--prompt',
+        'test prompt',
       ]);
 
       expect(result).toEqual({
@@ -76,7 +86,7 @@ describe('CLI Orchestration', () => {
         help: false,
         logLevel: 'debug',
         logFile: undefined,
-        prompt: 'test prompt'
+        prompt: 'test prompt',
       });
     });
   });
@@ -84,12 +94,12 @@ describe('CLI Orchestration', () => {
   describe('provider creation', () => {
     it('should create AnthropicProvider with API key', () => {
       process.env.ANTHROPIC_KEY = 'test-key';
-      
-      const provider = new AnthropicProvider({ 
-        apiKey: process.env.ANTHROPIC_KEY!, 
-        systemPrompt: 'test' 
+
+      const provider = new AnthropicProvider({
+        apiKey: process.env.ANTHROPIC_KEY!,
+        systemPrompt: 'test',
       });
-      
+
       expect(provider.providerName).toBe('anthropic');
     });
 
@@ -105,7 +115,7 @@ describe('CLI Orchestration', () => {
 
     it('should validate required environment variables', () => {
       delete process.env.ANTHROPIC_KEY;
-      
+
       expect(() => {
         if (!process.env.ANTHROPIC_KEY) {
           throw new Error('ANTHROPIC_KEY environment variable required for Anthropic provider');
@@ -123,11 +133,13 @@ describe('CLI Orchestration', () => {
       const { FileListTool } = await import('../tools/implementations/file-list.js');
       const { RipgrepSearchTool } = await import('../tools/implementations/ripgrep-search.js');
       const { FileFindTool } = await import('../tools/implementations/file-find.js');
-      const { TaskAddTool, TaskListTool, TaskCompleteTool } = await import('../tools/implementations/task-manager.js');
+      const { TaskAddTool, TaskListTool, TaskCompleteTool } = await import(
+        '../tools/implementations/task-manager.js'
+      );
 
       const tools = [
         new BashTool(),
-        new FileReadTool(), 
+        new FileReadTool(),
         new FileWriteTool(),
         new FileListTool(),
         new RipgrepSearchTool(),
@@ -138,7 +150,7 @@ describe('CLI Orchestration', () => {
       ];
 
       expect(tools).toHaveLength(9);
-      tools.forEach(tool => {
+      tools.forEach((tool) => {
         expect(tool.name).toBeDefined();
         expect(tool.description).toBeDefined();
         expect(tool.input_schema).toBeDefined();
@@ -161,15 +173,15 @@ describe('CLI Orchestration', () => {
       const toolExecutor = new ToolExecutor(toolRegistry);
       const threadManager = new ThreadManager(':memory:');
       const threadId = 'test_thread';
-      
+
       threadManager.createThread(threadId);
 
       const agent = new Agent({
         provider,
-        toolExecutor, 
+        toolExecutor,
         threadManager,
         threadId,
-        tools: []
+        tools: [],
       });
 
       const cli = new CLIInterface(agent, threadManager);

@@ -45,7 +45,10 @@ export abstract class AIProvider extends EventEmitter {
   abstract createResponse(messages: ProviderMessage[], tools: Tool[]): Promise<ProviderResponse>;
 
   // Optional streaming support - providers can override this
-  async createStreamingResponse(messages: ProviderMessage[], tools: Tool[]): Promise<ProviderResponse> {
+  async createStreamingResponse(
+    messages: ProviderMessage[],
+    tools: Tool[]
+  ): Promise<ProviderResponse> {
     // Default implementation: fall back to non-streaming
     return this.createResponse(messages, tools);
   }

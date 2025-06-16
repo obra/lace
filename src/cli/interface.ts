@@ -29,7 +29,7 @@ export class CLIInterface {
     this.agent.on('agent_thinking_complete', ({ content }) => {
       // Extract think blocks and show them in italics
       const thinkMatches = content.match(/<think>[\s\S]*?<\/think>/g);
-      
+
       if (thinkMatches) {
         thinkMatches.forEach((thinkBlock) => {
           const thinkContent = thinkBlock.replace(/<\/?think>/g, '').trim();
@@ -65,9 +65,9 @@ export class CLIInterface {
       process.stdout.write(`\n🔧 Running: ${toolName} with ${inputDisplay}\n`);
     });
 
-    this.agent.on('tool_call_complete', ({ toolName, result }) => {
+    this.agent.on('tool_call_complete', ({ result }) => {
       const outputText = result.content[0]?.text || '';
-      
+
       // Show tool result status
       if (result.success) {
         const outputLength = outputText.length;
@@ -85,7 +85,7 @@ export class CLIInterface {
     });
 
     // Handle errors
-    this.agent.on('error', ({ error, context }) => {
+    this.agent.on('error', ({ error }) => {
       console.error(`\n❌ Error: ${error.message}\n`);
 
       // Suggest alternatives based on the provider
@@ -99,11 +99,11 @@ export class CLIInterface {
 
   async handleSinglePrompt(prompt: string): Promise<void> {
     console.log(`🤖 Lace Agent using ${this.agent.providerName} provider.\n`);
-    
+
     // Start agent and process the prompt
     this.agent.start();
     await this.agent.sendMessage(prompt);
-    
+
     // Save and exit
     await handleGracefulShutdown(this.threadManager);
   }
@@ -132,15 +132,13 @@ export class CLIInterface {
 
     // Interactive loop
     while (this.isRunning) {
-      const input = await new Promise<string>((resolve) => 
-        this.rl!.question('> ', resolve)
-      );
-      
+      const input = await new Promise<string>((resolve) => this.rl!.question('> ', resolve));
+
       if (input.toLowerCase() === 'exit') {
         await this.stop();
         break;
       }
-      
+
       if (input.trim()) {
         await this.agent.sendMessage(input);
       }
@@ -153,16 +151,16 @@ export class CLIInterface {
     }
 
     this.isRunning = false;
-    
+
     if (this.agent) {
       this.agent.stop();
     }
-    
+
     if (this.rl) {
       this.rl.close();
       this.rl = null;
     }
-    
+
     await handleGracefulShutdown(this.threadManager);
   }
 }

@@ -2,7 +2,13 @@
 // ABOUTME: Wraps Anthropic SDK in the common provider interface
 
 import Anthropic from '@anthropic-ai/sdk';
-import { AIProvider, ProviderMessage, ProviderResponse, ProviderConfig, ProviderToolCall } from './types.js';
+import {
+  AIProvider,
+  ProviderMessage,
+  ProviderResponse,
+  ProviderConfig,
+  ProviderToolCall,
+} from './types.js';
 import { Tool } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
 
@@ -97,7 +103,10 @@ export class AnthropicProvider extends AIProvider {
     };
   }
 
-  async createStreamingResponse(messages: ProviderMessage[], tools: Tool[] = []): Promise<ProviderResponse> {
+  async createStreamingResponse(
+    messages: ProviderMessage[],
+    tools: Tool[] = []
+  ): Promise<ProviderResponse> {
     // Convert our generic messages to Anthropic format
     const anthropicMessages: Anthropic.MessageParam[] = messages
       .filter((msg) => msg.role !== 'system')
@@ -138,13 +147,11 @@ export class AnthropicProvider extends AIProvider {
     // Use the streaming API
     const stream = this._anthropic.messages.stream(requestPayload);
 
-    let fullTextContent = '';
     let toolCalls: ProviderToolCall[] = [];
 
     try {
       // Handle streaming events - use the 'text' event for token-by-token streaming
       stream.on('text', (text) => {
-        fullTextContent += text;
         // Emit token events for real-time display
         this.emit('token', { token: text });
       });

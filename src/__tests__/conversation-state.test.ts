@@ -19,7 +19,6 @@ import {
   TaskListTool,
   TaskCompleteTool,
 } from '../tools/implementations/task-manager.js';
-import { Tool } from '../tools/types.js';
 
 // These tests use LMStudio heavily since it's local and free
 describe.skip('Conversation State Management with Enhanced Agent', () => {
@@ -64,17 +63,17 @@ describe.skip('Conversation State Management with Enhanced Agent', () => {
       new TaskCompleteTool(),
     ];
 
-    tools.forEach(tool => toolRegistry.registerTool(tool));
+    tools.forEach((tool) => toolRegistry.registerTool(tool));
 
     threadId = `test_thread_${Date.now()}`;
     threadManager.createThread(threadId);
 
-    agent = new Agent({ 
-      provider, 
+    agent = new Agent({
+      provider,
       toolExecutor,
       threadManager,
       threadId,
-      tools
+      tools,
     });
     agent.start();
   });
@@ -166,18 +165,18 @@ describe.skip('Conversation State Management with Enhanced Agent', () => {
 
     for (let i = 0; i < commands.length; i++) {
       console.log(`Executing command ${i + 1}: "${commands[i]}"`);
-      
+
       const eventsBefore = threadManager.getEvents(threadId).length;
-      
+
       await agent.sendMessage(commands[i]);
-      
+
       const eventsAfter = threadManager.getEvents(threadId);
       const conversation = buildConversationFromEvents(eventsAfter);
 
       console.log(
         `Command ${i + 1} - Message count: ${conversation.length}, Events added: ${eventsAfter.length - eventsBefore}`
       );
-      
+
       // Verify message count keeps growing
       expect(conversation.length).toBeGreaterThan(expectedMessageCount);
       expectedMessageCount = conversation.length;
@@ -186,9 +185,11 @@ describe.skip('Conversation State Management with Enhanced Agent', () => {
     // Final verification
     const finalEvents = threadManager.getEvents(threadId);
     const finalConversation = buildConversationFromEvents(finalEvents);
-    const userMessages = finalConversation.filter(msg => msg.role === 'user');
-    
-    console.log(`Final stats - Total messages: ${finalConversation.length}, User messages: ${userMessages.length}`);
+    const userMessages = finalConversation.filter((msg) => msg.role === 'user');
+
+    console.log(
+      `Final stats - Total messages: ${finalConversation.length}, User messages: ${userMessages.length}`
+    );
     expect(userMessages.length).toBe(commands.length);
   }, 120000); // Extra long timeout for multiple LMStudio calls
 
@@ -205,7 +206,7 @@ describe.skip('Conversation State Management with Enhanced Agent', () => {
 
     for (let i = 0; i < turns.length; i++) {
       console.log(`\nTurn ${i + 1}: "${turns[i]}"`);
-      
+
       await agent.sendMessage(turns[i]);
 
       const events = threadManager.getEvents(threadId);
@@ -264,7 +265,7 @@ describe.skip('Conversation State Management with Enhanced Agent', () => {
 
   it('should emit proper events during conversation flow', async () => {
     const events: string[] = [];
-    
+
     agent.on('agent_thinking_start', () => events.push('thinking_start'));
     agent.on('agent_thinking_complete', () => events.push('thinking_complete'));
     agent.on('agent_response_complete', () => events.push('response_complete'));
@@ -276,26 +277,26 @@ describe.skip('Conversation State Management with Enhanced Agent', () => {
     await agent.sendMessage('List the files in the current directory');
 
     console.log('Events emitted:', events);
-    
+
     // Should have basic conversation flow events
     expect(events).toContain('thinking_start');
     expect(events).toContain('thinking_complete');
-    
+
     // Should have state transitions
-    expect(events.some(e => e.includes('state:idle->thinking'))).toBe(true);
-    expect(events.some(e => e.includes('state:thinking->tool_execution'))).toBe(true);
-    
+    expect(events.some((e) => e.includes('state:idle->thinking'))).toBe(true);
+    expect(events.some((e) => e.includes('state:thinking->tool_execution'))).toBe(true);
+
     // Should have tool events (likely file_list)
-    expect(events.some(e => e.startsWith('tool_start:'))).toBe(true);
-    expect(events.some(e => e.startsWith('tool_complete:'))).toBe(true);
-    
+    expect(events.some((e) => e.startsWith('tool_start:'))).toBe(true);
+    expect(events.some((e) => e.startsWith('tool_complete:'))).toBe(true);
+
     // Should end with conversation complete
     expect(events[events.length - 1]).toBe('conversation_complete');
   }, 30000);
 
   it('should maintain proper state throughout conversation', async () => {
     const stateChanges: Array<{ from: string; to: string }> = [];
-    
+
     agent.on('state_change', ({ from, to }) => {
       stateChanges.push({ from, to });
       console.log(`State change: ${from} -> ${to}`);
@@ -307,13 +308,13 @@ describe.skip('Conversation State Management with Enhanced Agent', () => {
     await agent.sendMessage('Run echo "hello world"');
 
     // Should have gone through: idle -> thinking -> tool_execution -> thinking -> idle
-    const stateSequence = stateChanges.map(sc => `${sc.from}->${sc.to}`);
+    const stateSequence = stateChanges.map((sc) => `${sc.from}->${sc.to}`);
     console.log('State sequence:', stateSequence);
-    
+
     expect(stateSequence).toContain('idle->thinking');
     expect(stateSequence).toContain('thinking->tool_execution');
     expect(stateSequence[stateSequence.length - 1]).toContain('->idle');
-    
+
     // Final state should be idle
     expect(agent.getCurrentState()).toBe('idle');
   }, 30000);
