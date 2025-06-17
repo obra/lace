@@ -118,6 +118,9 @@ export function buildConversationFromEvents(events: ThreadEvent[]): ProviderMess
         content: '', // No text content for pure tool results
         toolResults: toolResultsForThisMessage,
       });
+    } else if (event.type === 'LOCAL_SYSTEM_MESSAGE') {
+      // Skip local system messages - they're informational only, not sent to model
+      continue;
     } else {
       throw new Error(`Unknown event type: ${event.type}`);
     }

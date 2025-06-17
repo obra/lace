@@ -3,6 +3,9 @@
 
 import { ThreadPersistence } from './persistence.js';
 import { Thread, ThreadEvent, EventType, ToolCallData, ToolResultData } from './types.js';
+import { buildConversationFromEvents } from './conversation-builder.js';
+import { ProviderMessage } from '../providers/types.js';
+import { logger } from '../utils/logger.js';
 
 export class ThreadManager {
   private _currentThread: Thread | null = null;
@@ -76,6 +79,79 @@ export class ThreadManager {
   getEvents(threadId: string): ThreadEvent[] {
     const thread = this.getThread(threadId);
     return thread?.events || [];
+  }
+
+  buildConversation(threadId: string): ProviderMessage[] {
+    const events = this.getEvents(threadId);
+    return buildConversationFromEvents(events);
+  }
+
+  compact(threadId: string): void {
+    const thread = this.getThread(threadId);
+    if (!thread) return;
+
+    let compactedCount = 0;
+    let totalTokensSaved = 0;
+
+    // Modify the actual events in memory - that's it
+    for (const event of thread.events) {
+      if (event.type === 'TOOL_RESULT') {
+        const toolResult = event.data as ToolResultData;
+        const originalOutput = toolResult.output || '';
+        const originalTokens = this._estimateTokens(originalOutput);
+
+        toolResult.output = this._truncateToolResult(originalOutput);
+        const newTokens = this._estimateTokens(toolResult.output);
+
+        if (newTokens < originalTokens) {
+          compactedCount++;
+          totalTokensSaved += originalTokens - newTokens;
+        }
+      }
+    }
+
+    logger.info('Thread compacted', {
+      threadId,
+      toolResultsCompacted: compactedCount,
+      approximateTokensSaved: totalTokensSaved,
+    });
+
+    // Add informational message to thread (shown to user but not sent to model)
+    const tokenMessage =
+      totalTokensSaved > 0 ? ` to save about ${totalTokensSaved} tokens` : ' to save tokens';
+
+    const event: ThreadEvent = {
+      id: generateEventId(),
+      threadId,
+      type: 'LOCAL_SYSTEM_MESSAGE',
+      timestamp: new Date(),
+      data: `🗜️ Compacted ${compactedCount} tool results${tokenMessage}.`,
+    };
+
+    thread.events.push(event);
+    thread.updatedAt = new Date();
+
+    // Save the compaction event to persistence
+    try {
+      this._persistence.saveEvent(event);
+    } catch (error) {
+      logger.error('Failed to save compaction event', { error });
+    }
+  }
+
+  private _truncateToolResult(output: string): string {
+    const words = output.split(/\s+/);
+    if (words.length <= 200) return output;
+
+    const truncated = words.slice(0, 200).join(' ');
+    const remaining = words.length - 200;
+    return `${truncated}... [truncated ${remaining} more words of tool output]`;
+  }
+
+  private _estimateTokens(text: string): number {
+    // Rough approximation: 1 token ≈ 4 characters for English text
+    // This is a commonly used heuristic, though actual tokenization varies by model
+    return Math.ceil(text.length / 4);
   }
 
   clearEvents(threadId: string): void {

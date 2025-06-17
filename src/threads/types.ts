@@ -1,7 +1,12 @@
 // ABOUTME: Type definitions for thread events and thread management
 // ABOUTME: Events include user messages, agent messages, tool calls, and tool results
 
-export type EventType = 'USER_MESSAGE' | 'AGENT_MESSAGE' | 'TOOL_CALL' | 'TOOL_RESULT';
+export type EventType =
+  | 'USER_MESSAGE'
+  | 'AGENT_MESSAGE'
+  | 'TOOL_CALL'
+  | 'TOOL_RESULT'
+  | 'LOCAL_SYSTEM_MESSAGE';
 
 export interface ThreadEvent {
   id: string;

@@ -6,7 +6,6 @@ import { AIProvider, ProviderMessage } from '../providers/types.js';
 import { Tool, ToolResult } from '../tools/types.js';
 import { ToolExecutor } from '../tools/executor.js';
 import { ThreadManager } from '../threads/thread-manager.js';
-import { buildConversationFromEvents } from '../threads/conversation-builder.js';
 import { logger } from '../utils/logger.js';
 import { StopReasonHandler } from '../token-management/stop-reason-handler.js';
 import { TokenBudgetManager } from '../token-management/token-budget-manager.js';
@@ -126,10 +125,6 @@ export class Agent extends EventEmitter {
   }
 
   // State access (read-only)
-  getConversationHistory(): ProviderMessage[] {
-    const events = this._threadManager.getEvents(this._threadId);
-    return buildConversationFromEvents(events);
-  }
 
   getCurrentState(): AgentState {
     return this._state;
@@ -164,8 +159,7 @@ export class Agent extends EventEmitter {
   private async _processConversation(): Promise<void> {
     try {
       // Rebuild conversation from thread events
-      const events = this._threadManager.getEvents(this._threadId);
-      const conversation = buildConversationFromEvents(events);
+      const conversation = this._threadManager.buildConversation(this._threadId);
 
       logger.debug('AGENT: Requesting response from provider', {
         threadId: this._threadId,
