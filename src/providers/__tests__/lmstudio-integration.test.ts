@@ -54,6 +54,7 @@ describe('LMStudio Provider Integration Tests', () => {
 
   beforeEach(async () => {
     provider = new LMStudioProvider({
+      model: 'qwen/qwen3-1.7b',
       systemPrompt: 'You are a helpful assistant. Use tools when asked.',
     });
 
@@ -123,7 +124,7 @@ describe('LMStudio Provider Integration Tests', () => {
     expect(response.toolCalls.length).toBeGreaterThanOrEqual(1);
     expect(response.toolCalls[0].name).toBe('mock_tool');
     expect(response.toolCalls[0].input.action).toBe('followup');
-  });
+  }, 15000);
 
   it('should preserve context across long conversations', async () => {
     let messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
@@ -155,7 +156,7 @@ describe('LMStudio Provider Integration Tests', () => {
         responseText.includes('software engineer') ||
         responseText.includes('typescript')
     ).toBe(true);
-  });
+  }, 15000);
 
   it('should handle complex tool instructions', async () => {
     const complexTool: Tool = {
@@ -203,7 +204,7 @@ describe('LMStudio Provider Integration Tests', () => {
     expect(response.toolCalls[0].name).toBe('complex_tool');
     expect(response.toolCalls[0].input.operation).toBe('create');
     expect(response.toolCalls[0].input.target).toBe('test_resource');
-  });
+  }, 15000);
 
   it('should handle rapid consecutive requests', async () => {
     const requests = [
@@ -233,7 +234,7 @@ describe('LMStudio Provider Integration Tests', () => {
       finalResponse.includes('javascript') ||
       finalResponse.includes('python');
     expect(hasContext).toBe(true);
-  });
+  }, 15000);
 
   it('should handle tool failure gracefully', async () => {
     const messages = [
@@ -245,7 +246,7 @@ describe('LMStudio Provider Integration Tests', () => {
     // Should still generate a tool call even if we know it will fail
     expect(response.toolCalls.length).toBeGreaterThanOrEqual(1);
     expect(response.toolCalls[0].name).toBe('failing_tool');
-  });
+  }, 15000);
 
   it('should handle mixed tool and text responses', async () => {
     const messages = [
@@ -263,7 +264,7 @@ describe('LMStudio Provider Integration Tests', () => {
     expect(response.content.length).toBeGreaterThan(10);
     expect(response.toolCalls.length).toBeGreaterThan(0);
     expect(response.toolCalls[0].name).toBe('mock_tool');
-  });
+  }, 15000);
 
   it('should handle no available tools', async () => {
     const messages = [{ role: 'user' as const, content: 'Hello, can you help me?' }];
@@ -272,7 +273,7 @@ describe('LMStudio Provider Integration Tests', () => {
 
     expect(response.content).toBeTruthy();
     expect(response.toolCalls.length).toBe(0);
-  });
+  }, 15000);
 
   it('should handle malformed tool instructions', async () => {
     const messages = [
@@ -286,7 +287,7 @@ describe('LMStudio Provider Integration Tests', () => {
 
     // Should respond without crashing, might not generate tool calls for nonexistent tool
     expect(response.content).toBeTruthy();
-  });
+  }, 15000);
 
   it('should maintain performance under load', async () => {
     const startTime = Date.now();
@@ -315,7 +316,7 @@ describe('LMStudio Provider Integration Tests', () => {
 
     // Should complete in reasonable time (adjust based on model speed)
     expect(totalTime).toBeLessThan(60000); // 60 seconds max for 3 concurrent requests
-  });
+  }, 15000);
 
   it('should handle unicode and special characters', async () => {
     const messages = [
@@ -330,5 +331,5 @@ describe('LMStudio Provider Integration Tests', () => {
     expect(response.content).toBeTruthy();
     // Should handle the request without crashing
     expect(response.content.length).toBeGreaterThan(5);
-  });
+  }, 15000);
 });
