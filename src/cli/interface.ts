@@ -117,7 +117,7 @@ export class CLIInterface {
     this.rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
     console.log(
-      `🤖 Lace Agent started using ${this.agent.providerName} provider. Type "exit" to quit.\n`
+      `🤖 Lace Agent started using ${this.agent.providerName} provider. Type "/exit" to quit.\n`
     );
 
     // Start the agent
@@ -134,13 +134,65 @@ export class CLIInterface {
     while (this.isRunning) {
       const input = await new Promise<string>((resolve) => this.rl!.question('> ', resolve));
 
-      if (input.toLowerCase() === 'exit') {
+      if (input.toLowerCase() === '/exit' || input.toLowerCase() === 'exit') {
         await this.stop();
         break;
       }
 
+      // Handle slash commands
+      if (input.startsWith('/')) {
+        await this.handleSlashCommand(input);
+        continue;
+      }
+
       if (input.trim()) {
         await this.agent.sendMessage(input);
+      }
+    }
+  }
+
+  private async handleSlashCommand(input: string): Promise<void> {
+    const command = input.toLowerCase().trim();
+
+    switch (command) {
+      case '/compact': {
+        const threadId = this.threadManager.getCurrentThreadId();
+        if (!threadId) {
+          console.log('❌ No active thread to compact');
+          return;
+        }
+
+        this.threadManager.compact(threadId);
+
+        // Get the system message that was added
+        const events = this.threadManager.getEvents(threadId);
+        const systemMessage = events.find(
+          (e) =>
+            e.type === 'LOCAL_SYSTEM_MESSAGE' &&
+            typeof e.data === 'string' &&
+            e.data.includes('Compacted')
+        );
+
+        if (systemMessage) {
+          console.log(systemMessage.data);
+        } else {
+          console.log('✅ Thread compaction completed');
+        }
+        break;
+      }
+
+      case '/help': {
+        console.log('Available commands:');
+        console.log('  /compact  - Compress tool results to save tokens');
+        console.log('  /help     - Show this help message');
+        console.log('  /exit     - Exit the application (or just "exit")');
+        break;
+      }
+
+      default: {
+        console.log(`❌ Unknown command: ${command}`);
+        console.log('Type /help for available commands');
+        break;
       }
     }
   }
