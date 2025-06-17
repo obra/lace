@@ -1,7 +1,7 @@
 // ABOUTME: Delegate tool for spawning subagents with specific tasks
 // ABOUTME: Enables efficient token usage by delegating to cheaper models
 
-import { Tool, ToolResult, ToolContext } from '../types.js';
+import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
 import { Agent } from '../../agents/agent.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 import { ToolExecutor } from '../executor.js';
@@ -24,7 +24,9 @@ Examples:
 - title: "Search authentication logs", prompt: "grep through the application logs for authentication errors in the last hour", expected_response: "Timestamps and error messages for each auth failure"
 - title: "Count code statistics", prompt: "Count total lines of code, number of files, and test coverage percentage", expected_response: "JSON with {loc: number, files: number, coverage: number}"`;
 
-  destructive = false;
+  annotations = {
+    openWorldHint: true,
+  };
 
   input_schema = {
     type: 'object' as const,
@@ -78,58 +80,35 @@ Examples:
 
     // Validate inputs
     if (!title || typeof title !== 'string') {
-      return {
-        success: false,
-        content: [],
-        error: 'Title must be a non-empty string',
-      };
+      return createErrorResult('Title must be a non-empty string');
     }
 
     if (!prompt || typeof prompt !== 'string') {
-      return {
-        success: false,
-        content: [],
-        error: 'Prompt must be a non-empty string',
-      };
+      return createErrorResult('Prompt must be a non-empty string');
     }
 
     if (!expected_response || typeof expected_response !== 'string') {
-      return {
-        success: false,
-        content: [],
-        error: 'Expected response must be a non-empty string',
-      };
+      return createErrorResult('Expected response must be a non-empty string');
     }
 
     // Parse provider:model format
     const [providerName, modelName] = model.split(':');
     if (!providerName || !modelName) {
-      return {
-        success: false,
-        content: [],
-        error:
-          'Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3.5-haiku-latest")',
-      };
+      return createErrorResult(
+        'Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3.5-haiku-latest")'
+      );
     }
 
     try {
       // Create provider for subagent
       const provider = await this.createProvider(providerName, modelName, expected_response);
       if (!provider) {
-        return {
-          success: false,
-          content: [],
-          error: `Unknown provider: ${providerName}`,
-        };
+        return createErrorResult(`Unknown provider: ${providerName}`);
       }
 
       // Use shared thread manager from parent (avoids multiple SQLite connections)
       if (!this.threadManager) {
-        return {
-          success: false,
-          content: [],
-          error: 'Delegate tool not properly initialized - missing ThreadManager',
-        };
+        return createErrorResult('Delegate tool not properly initialized - missing ThreadManager');
       }
       const threadManager = this.threadManager;
 
@@ -218,22 +197,16 @@ Examples:
 
       // Return collected responses
       const combinedResponse = responses.join('\n\n');
-      return {
-        success: true,
-        content: [
-          {
-            type: 'text',
-            text: combinedResponse || 'Subagent completed without response',
-          },
-        ],
-      };
+      return createSuccessResult([
+        {
+          type: 'text',
+          text: combinedResponse || 'Subagent completed without response',
+        },
+      ]);
     } catch (error) {
-      return {
-        success: false,
-        content: [],
-        error:
-          error instanceof Error ? `Subagent error: ${error.message}` : 'Unknown error occurred',
-      };
+      return createErrorResult(
+        error instanceof Error ? `Subagent error: ${error.message}` : 'Unknown error occurred'
+      );
     }
   }
 

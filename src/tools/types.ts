@@ -5,11 +5,19 @@ export interface ToolContext {
   threadId?: string;
 }
 
+export interface ToolAnnotations {
+  title?: string;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+}
+
 export interface Tool {
   name: string;
   description: string;
   input_schema: ToolInputSchema;
-  destructive?: boolean;
+  annotations?: ToolAnnotations;
   executeTool(input: Record<string, unknown>, context?: ToolContext): Promise<ToolResult>;
 }
 
@@ -35,7 +43,24 @@ export interface ContentBlock {
 }
 
 export interface ToolResult {
-  success: boolean;
   content: ContentBlock[];
-  error?: string;
+  isError: boolean;
+}
+
+export function createToolResult(isError: boolean, content: ContentBlock[]): ToolResult {
+  return {
+    content,
+    isError,
+  };
+}
+
+export function createSuccessResult(content: ContentBlock[]): ToolResult {
+  return createToolResult(false, content);
+}
+
+export function createErrorResult(input: string | ContentBlock[]): ToolResult {
+  if (typeof input === 'string') {
+    return createToolResult(true, [{ type: 'text', text: input }]);
+  }
+  return createToolResult(true, input);
 }

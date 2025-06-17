@@ -18,7 +18,7 @@ describe('FileWriteTool', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('file_write');
       expect(tool.description).toBe('Write content to a file, creating directories if needed');
-      expect(tool.destructive).toBe(true);
+      expect(tool.annotations?.destructiveHint).toBe(true);
     });
 
     it('should have correct input schema', () => {
@@ -44,7 +44,7 @@ describe('FileWriteTool', () => {
 
       const result = await tool.executeTool({ path: testFile, content });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe(
         `Successfully wrote ${content.length} characters to ${testFile}`
       );
@@ -64,7 +64,7 @@ describe('FileWriteTool', () => {
       // Overwrite
       const result = await tool.executeTool({ path: testFile, content: newContent });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe(newContent);
@@ -76,7 +76,7 @@ describe('FileWriteTool', () => {
 
       const result = await tool.executeTool({ path: testFile, content });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe(content);
@@ -96,8 +96,8 @@ describe('FileWriteTool', () => {
         createDirs: false,
       });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('ENOENT');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('ENOENT');
     });
   });
 
@@ -105,22 +105,22 @@ describe('FileWriteTool', () => {
     it('should handle missing path parameter', async () => {
       const result = await tool.executeTool({ content: 'test' });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Path must be a non-empty string');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Path must be a non-empty string');
     });
 
     it('should handle empty path parameter', async () => {
       const result = await tool.executeTool({ path: '', content: 'test' });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Path must be a non-empty string');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Path must be a non-empty string');
     });
 
     it('should handle missing content parameter', async () => {
       const result = await tool.executeTool({ path: '/tmp/test.txt' });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Content must be a string');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Content must be a string');
     });
 
     it('should handle non-string content parameter', async () => {
@@ -129,8 +129,8 @@ describe('FileWriteTool', () => {
         content: 123,
       });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Content must be a string');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Content must be a string');
     });
   });
 
@@ -141,7 +141,7 @@ describe('FileWriteTool', () => {
 
       const result = await tool.executeTool({ path: testFile, content });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe('');
@@ -153,7 +153,7 @@ describe('FileWriteTool', () => {
 
       const result = await tool.executeTool({ path: testFile, content });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe(content);
@@ -166,7 +166,7 @@ describe('FileWriteTool', () => {
 
       const result = await tool.executeTool({ path: testFile, content });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe(content);

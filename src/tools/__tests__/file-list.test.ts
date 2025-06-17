@@ -33,7 +33,7 @@ describe('FileListTool', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('file_list');
       expect(tool.description).toBe('List files and directories with optional filtering');
-      expect(tool.destructive).toBe(false);
+      expect(tool.annotations?.readOnlyHint).toBe(true);
     });
 
     it('should have correct input schema', () => {
@@ -49,7 +49,7 @@ describe('FileListTool', () => {
     it('should list files in specified directory', async () => {
       const result = await tool.executeTool({ path: testDir });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('file1.txt');
@@ -64,7 +64,7 @@ describe('FileListTool', () => {
         includeHidden: true,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
       expect(output).toContain('.hidden');
     });
@@ -75,7 +75,7 @@ describe('FileListTool', () => {
         pattern: '*.txt',
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('file1.txt');
@@ -91,7 +91,7 @@ describe('FileListTool', () => {
         recursive: true,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('file1.txt');
@@ -108,7 +108,7 @@ describe('FileListTool', () => {
         maxDepth: 1,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('subdir/');
@@ -124,7 +124,7 @@ describe('FileListTool', () => {
         pattern: 'file*',
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('file1.txt');
@@ -138,7 +138,7 @@ describe('FileListTool', () => {
         pattern: 'file?.txt',
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('file1.txt');
@@ -151,7 +151,7 @@ describe('FileListTool', () => {
         pattern: 'FILE*',
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
       expect(output).toContain('file1.txt');
     });
@@ -161,8 +161,8 @@ describe('FileListTool', () => {
     it('should handle non-existent directory', async () => {
       const result = await tool.executeTool({ path: '/non/existent/dir' });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('ENOENT');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('ENOENT');
     });
 
     it('should return empty result for empty directory', async () => {
@@ -171,7 +171,7 @@ describe('FileListTool', () => {
 
       const result = await tool.executeTool({ path: emptyDir });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('No files found');
     });
   });
@@ -180,7 +180,7 @@ describe('FileListTool', () => {
     it('should show file sizes', async () => {
       const result = await tool.executeTool({ path: testDir });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
       expect(output).toMatch(/file1\.txt \(\d+ bytes\)/);
     });
@@ -188,7 +188,7 @@ describe('FileListTool', () => {
     it('should distinguish directories with slash', async () => {
       const result = await tool.executeTool({ path: testDir });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
       expect(output).toContain('subdir/');
     });
@@ -196,7 +196,7 @@ describe('FileListTool', () => {
     it('should sort directories before files', async () => {
       const result = await tool.executeTool({ path: testDir });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
       const lines = output.split('\n');
 
@@ -211,7 +211,7 @@ describe('FileListTool', () => {
     it('should output tree structure with proper characters', async () => {
       const result = await tool.executeTool({ path: testDir });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       // Should contain tree characters
@@ -225,7 +225,7 @@ describe('FileListTool', () => {
     it('should use └ for last item at each level', async () => {
       const result = await tool.executeTool({ path: testDir });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
       const lines = output.split('\n');
 
@@ -239,7 +239,7 @@ describe('FileListTool', () => {
     it('should show nested structure with proper indentation', async () => {
       const result = await tool.executeTool({ path: testDir, recursive: true });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       // Check for nested indentation - we use spaces for indentation
@@ -274,7 +274,7 @@ describe('FileListTool', () => {
         includeHidden: true,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       // node_modules should be summarized, not expanded
@@ -290,7 +290,7 @@ describe('FileListTool', () => {
         includeHidden: true,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       // .git should be summarized even with few files
@@ -305,7 +305,7 @@ describe('FileListTool', () => {
         summaryThreshold: 50,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       // large-dir should be summarized
@@ -320,7 +320,7 @@ describe('FileListTool', () => {
         summaryThreshold: 10,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       // With low threshold, large-dir should still be summarized
@@ -338,7 +338,7 @@ describe('FileListTool', () => {
         summaryThreshold: 10,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       // Should still show all files at root level
@@ -358,7 +358,7 @@ describe('FileListTool', () => {
         includeHidden: true,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       // Should show correct counts
@@ -374,7 +374,7 @@ describe('FileListTool', () => {
         recursive: true,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       // Should show .txt files but not .js files
@@ -394,7 +394,7 @@ describe('FileListTool', () => {
         includeHidden: true,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('.hidden');

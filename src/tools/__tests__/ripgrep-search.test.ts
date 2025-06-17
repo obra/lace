@@ -44,7 +44,7 @@ describe('RipgrepSearchTool', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('ripgrep_search');
       expect(tool.description).toBe('Fast text search across files using ripgrep');
-      expect(tool.destructive).toBe(false);
+      expect(tool.annotations?.readOnlyHint).toBe(true);
     });
 
     it('should have correct input schema', () => {
@@ -62,7 +62,7 @@ describe('RipgrepSearchTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('Found');
@@ -78,7 +78,7 @@ describe('RipgrepSearchTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('No matches found for pattern: nonexistentpattern');
     });
 
@@ -88,7 +88,7 @@ describe('RipgrepSearchTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
       expect(output).toMatch(/\d+: function hello/);
     });
@@ -108,10 +108,10 @@ describe('RipgrepSearchTool', () => {
         caseSensitive: true,
       });
 
-      expect(caseInsensitive.success).toBe(true);
+      expect(caseInsensitive.isError).toBe(false);
       expect(caseInsensitive.content[0].text).toContain('Found');
 
-      expect(caseSensitive.success).toBe(true);
+      expect(caseSensitive.isError).toBe(false);
       expect(caseSensitive.content[0].text).toContain('No matches found');
     });
 
@@ -122,7 +122,7 @@ describe('RipgrepSearchTool', () => {
         includePattern: '*.ts',
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('file1.ts');
@@ -137,7 +137,7 @@ describe('RipgrepSearchTool', () => {
         excludePattern: '*.spec.ts',
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('file1.ts');
@@ -152,7 +152,7 @@ describe('RipgrepSearchTool', () => {
         maxResults: 1,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       // Should find matches but be limited (max-count is per file)
@@ -179,8 +179,8 @@ describe('RipgrepSearchTool', () => {
         wholeWord: false,
       });
 
-      expect(wholeWord.success).toBe(true);
-      expect(partialWord.success).toBe(true);
+      expect(wholeWord.isError).toBe(false);
+      expect(partialWord.isError).toBe(false);
 
       // Partial word should find both files, whole word only the exact match
       expect(partialWord.content[0].text).toContain('partial.txt');
@@ -194,22 +194,22 @@ describe('RipgrepSearchTool', () => {
     it('should handle missing pattern parameter', async () => {
       const result = await tool.executeTool({ path: testDir });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Pattern must be a non-empty string');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
     });
 
     it('should handle empty pattern parameter', async () => {
       const result = await tool.executeTool({ pattern: '', path: testDir });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Pattern must be a non-empty string');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
     });
 
     it('should handle non-string pattern parameter', async () => {
       const result = await tool.executeTool({ pattern: 123, path: testDir });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Pattern must be a non-empty string');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
     });
 
     it('should handle non-existent directory', async () => {
@@ -218,8 +218,8 @@ describe('RipgrepSearchTool', () => {
         path: '/non/existent/directory',
       });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('No such file or directory');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('No such file or directory');
     });
 
     // Note: This test will be skipped if ripgrep is not installed
@@ -238,7 +238,7 @@ describe('RipgrepSearchTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       // Should have file headers
@@ -255,7 +255,7 @@ describe('RipgrepSearchTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
       expect(output).toMatch(/Found \d+ match(es)?:/);
     });
@@ -266,7 +266,7 @@ describe('RipgrepSearchTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
       expect(output).toContain('Found 1 match:');
       expect(output).not.toContain('matches');
@@ -282,7 +282,7 @@ describe('RipgrepSearchTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
       expect(output).toContain('$10.50');
     });
@@ -295,7 +295,7 @@ describe('RipgrepSearchTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       // Should not crash and should not find matches in empty file
     });
 
@@ -309,7 +309,7 @@ describe('RipgrepSearchTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       // Should not crash when encountering binary files
     });
   });

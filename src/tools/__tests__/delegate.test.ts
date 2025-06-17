@@ -73,7 +73,7 @@ describe('DelegateTool', () => {
 
   it('should have correct metadata', () => {
     expect(tool.name).toBe('delegate');
-    expect(tool.destructive).toBe(false);
+    expect(tool.annotations?.openWorldHint).toBe(true);
     expect(tool.input_schema.required).toEqual(['title', 'prompt', 'expected_response']);
   });
 
@@ -102,7 +102,7 @@ describe('DelegateTool', () => {
       expected_response: 'List of failing tests',
     });
 
-    expect(result.success).toBe(true);
+    expect(result.isError).toBe(false);
     expect(result.content[0]?.text).toContain('Analysis complete: 3 tests failed');
 
     // Verify agent was created with correct config
@@ -117,7 +117,7 @@ describe('DelegateTool', () => {
 
     // Verify delegate tool was excluded from subagent's tools
     const agentConfig = vi.mocked(Agent).mock.calls[0][0];
-    expect(agentConfig.tools.find((t: any) => t.name === 'delegate')).toBeUndefined();
+    expect(agentConfig.tools.find((t: any) => t.name === 'delegate'));
   });
 
   it('should handle custom provider:model format', async () => {
@@ -142,7 +142,7 @@ describe('DelegateTool', () => {
       model: 'anthropic:claude-3.5-sonnet-latest',
     });
 
-    expect(result.success).toBe(true);
+    expect(result.isError).toBe(false);
     expect(AnthropicProvider).toHaveBeenCalledWith(
       expect.objectContaining({
         model: 'claude-3.5-sonnet-latest',
@@ -221,8 +221,8 @@ describe('DelegateTool', () => {
       expected_response: 'Should not get this',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Subagent error: Subagent failed');
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Subagent error: Subagent failed');
   });
 
   it('should timeout if subagent takes too long', async () => {
@@ -240,8 +240,8 @@ describe('DelegateTool', () => {
       expected_response: 'Will not complete',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('timeout after 100ms');
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('timeout after 100ms');
   });
 
   it('should format the subagent system prompt correctly', async () => {
@@ -283,8 +283,8 @@ describe('DelegateTool', () => {
       model: 'invalid-format',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Invalid model format');
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid model format');
   });
 
   it('should collect all subagent responses', async () => {
@@ -310,7 +310,7 @@ describe('DelegateTool', () => {
       expected_response: 'Multiple outputs',
     });
 
-    expect(result.success).toBe(true);
+    expect(result.isError).toBe(false);
     expect(result.content[0]?.text).toContain('First response');
     expect(result.content[0]?.text).toContain('Second response');
   });

@@ -25,7 +25,7 @@ describe('FileReadTool', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('file_read');
       expect(tool.description).toBe('Read file contents with optional line range');
-      expect(tool.destructive).toBe(false);
+      expect(tool.annotations?.readOnlyHint).toBe(true);
     });
 
     it('should have correct input schema', () => {
@@ -45,11 +45,10 @@ describe('FileReadTool', () => {
     it('should read entire file when no range specified', async () => {
       const result = await tool.executeTool({ path: testFile });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
       expect(result.content[0].text).toBe(testContent);
-      expect(result.error).toBeUndefined();
     });
 
     it('should read specific line range', async () => {
@@ -59,7 +58,7 @@ describe('FileReadTool', () => {
         endLine: 4,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('Line 2\nLine 3\nLine 4');
     });
 
@@ -69,7 +68,7 @@ describe('FileReadTool', () => {
         startLine: 3,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('Line 3\nLine 4\nLine 5');
     });
 
@@ -79,7 +78,7 @@ describe('FileReadTool', () => {
         endLine: 2,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('Line 1\nLine 2');
     });
   });
@@ -88,24 +87,22 @@ describe('FileReadTool', () => {
     it('should handle missing path parameter', async () => {
       const result = await tool.executeTool({});
 
-      expect(result.success).toBe(false);
-      expect(result.content).toHaveLength(0);
-      expect(result.error).toBe('Path must be a non-empty string');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Path must be a non-empty string');
     });
 
     it('should handle empty path parameter', async () => {
       const result = await tool.executeTool({ path: '' });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Path must be a non-empty string');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Path must be a non-empty string');
     });
 
     it('should handle non-existent file', async () => {
       const result = await tool.executeTool({ path: '/non/existent/file.txt' });
 
-      expect(result.success).toBe(false);
-      expect(result.content).toHaveLength(0);
-      expect(result.error).toContain('ENOENT');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('ENOENT');
     });
 
     it('should handle start line beyond file length', async () => {
@@ -114,8 +111,8 @@ describe('FileReadTool', () => {
         startLine: 10,
       });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Start line 10 exceeds file length (5 lines)');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Start line 10 exceeds file length (5 lines)');
     });
 
     it('should handle end line beyond file length gracefully', async () => {
@@ -125,7 +122,7 @@ describe('FileReadTool', () => {
         endLine: 10,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('Line 3\nLine 4\nLine 5');
     });
   });
@@ -137,7 +134,7 @@ describe('FileReadTool', () => {
 
       const result = await tool.executeTool({ path: emptyFile });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('');
     });
 
@@ -147,7 +144,7 @@ describe('FileReadTool', () => {
 
       const result = await tool.executeTool({ path: singleLineFile });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('Only line');
     });
   });

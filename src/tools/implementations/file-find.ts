@@ -3,12 +3,15 @@
 
 import { readdir, stat, access } from 'fs/promises';
 import { join } from 'path';
-import { Tool, ToolResult, ToolContext } from '../types.js';
+import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
 
 export class FileFindTool implements Tool {
   name = 'file_find';
   description = 'Find files by name pattern or glob';
-  destructive = false;
+  annotations = {
+    readOnlyHint: true,
+    idempotentHint: true,
+  };
   input_schema = {
     type: 'object' as const,
     properties: {
@@ -47,11 +50,7 @@ export class FileFindTool implements Tool {
     };
 
     if (!pattern || typeof pattern !== 'string') {
-      return {
-        success: false,
-        content: [],
-        error: 'Pattern must be a non-empty string',
-      };
+      return createErrorResult('Pattern must be a non-empty string');
     }
 
     try {
@@ -70,21 +69,14 @@ export class FileFindTool implements Tool {
       const resultText =
         matches.length > 0 ? matches.join('\n') : `No files found matching pattern: ${pattern}`;
 
-      return {
-        success: true,
-        content: [
-          {
-            type: 'text',
-            text: resultText,
-          },
-        ],
-      };
+      return createSuccessResult([
+        {
+          type: 'text',
+          text: resultText,
+        },
+      ]);
     } catch (error) {
-      return {
-        success: false,
-        content: [],
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-      };
+      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred');
     }
   }
 

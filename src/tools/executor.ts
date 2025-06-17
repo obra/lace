@@ -15,19 +15,24 @@ export class ToolExecutor {
     const tool = this._registry.getTool(toolName);
     if (!tool) {
       return {
-        success: false,
-        content: [],
-        error: `Tool '${toolName}' not found`,
+        content: [{ type: 'text', text: `Tool '${toolName}' not found` }],
+        isError: true,
       };
     }
 
     try {
-      return await tool.executeTool(input, context);
+      const result = await tool.executeTool(input, context);
+
+      // Track tool usage in registry
+      this._registry.trackToolUsage(toolName);
+
+      return result;
     } catch (error) {
       return {
-        success: false,
-        content: [],
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        content: [
+          { type: 'text', text: error instanceof Error ? error.message : 'Unknown error occurred' },
+        ],
+        isError: true,
       };
     }
   }

@@ -176,7 +176,7 @@ describe('CLIInterface', () => {
       agent.emit('tool_call_complete', {
         toolName: 'test_tool',
         result: {
-          success: true,
+          isError: false,
           content: [{ type: 'text', text: 'Tool executed successfully' }],
         },
         callId: 'call_123',
@@ -189,9 +189,8 @@ describe('CLIInterface', () => {
       agent.emit('tool_call_complete', {
         toolName: 'test_tool',
         result: {
-          success: false,
-          content: [],
-          error: 'Tool execution failed',
+          isError: true,
+          content: [{ type: 'text', text: 'Tool execution failed' }],
         },
         callId: 'call_123',
       });
@@ -205,7 +204,7 @@ describe('CLIInterface', () => {
       agent.emit('tool_call_complete', {
         toolName: 'test_tool',
         result: {
-          success: true,
+          isError: false,
           content: [{ type: 'text', text: largeOutput }],
         },
         callId: 'call_123',

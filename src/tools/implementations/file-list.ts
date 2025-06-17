@@ -3,7 +3,7 @@
 
 import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
-import { Tool, ToolResult, ToolContext } from '../types.js';
+import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
 
 interface FileEntry {
   name: string;
@@ -24,7 +24,10 @@ interface TreeNode {
 export class FileListTool implements Tool {
   name = 'file_list';
   description = 'List files and directories with optional filtering';
-  destructive = false;
+  annotations = {
+    readOnlyHint: true,
+    idempotentHint: true,
+  };
   input_schema = {
     type: 'object' as const,
     properties: {
@@ -72,21 +75,14 @@ export class FileListTool implements Tool {
       const output =
         tree.children && tree.children.length > 0 ? this.formatTree(tree) : 'No files found';
 
-      return {
-        success: true,
-        content: [
-          {
-            type: 'text',
-            text: output,
-          },
-        ],
-      };
+      return createSuccessResult([
+        {
+          type: 'text',
+          text: output,
+        },
+      ]);
     } catch (error) {
-      return {
-        success: false,
-        content: [],
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-      };
+      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred');
     }
   }
 
