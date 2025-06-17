@@ -1,7 +1,7 @@
 // ABOUTME: OpenAI GPT provider implementation
 // ABOUTME: Wraps OpenAI SDK in the common provider interface
 
-import OpenAI from 'openai';
+import OpenAI, { ClientOptions } from 'openai';
 import {
   AIProvider,
   ProviderMessage,
@@ -22,7 +22,19 @@ export class OpenAIProvider extends AIProvider {
 
   constructor(config: OpenAIProviderConfig) {
     super(config);
-    this._openai = new OpenAI({ apiKey: config.apiKey });
+
+    const openaiConfig: ClientOptions = {
+      apiKey: config.apiKey,
+    };
+
+    // Support custom base URL for OpenAI-compatible APIs
+    const baseURL = process.env.OPENAI_BASE_URL;
+    if (baseURL) {
+      openaiConfig.baseURL = baseURL;
+      logger.info('Using custom OpenAI base URL', { baseURL });
+    }
+
+    this._openai = new OpenAI(openaiConfig);
   }
 
   get providerName(): string {
