@@ -12,6 +12,7 @@ import { OllamaProvider } from '../../providers/ollama-provider.js';
 import { AIProvider } from '../../providers/types.js';
 import { TokenBudgetConfig } from '../../token-management/types.js';
 import { generateThreadId } from '../../threads/session.js';
+import { getEnvVar } from '../../config/env-loader.js';
 
 export class DelegateTool implements Tool {
   name = 'delegate';
@@ -264,7 +265,7 @@ Remember: You are optimized for efficiency. Get the job done and report back.`;
 
     switch (providerName.toLowerCase()) {
       case 'anthropic': {
-        const apiKey = process.env.ANTHROPIC_KEY;
+        const apiKey = getEnvVar('ANTHROPIC_KEY');
         if (!apiKey) {
           throw new Error('ANTHROPIC_KEY environment variable required for Anthropic provider');
         }

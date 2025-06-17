@@ -32,6 +32,9 @@ describe('DelegateTool', () => {
     // Reset mocks
     vi.clearAllMocks();
 
+    // Set up test environment variables
+    process.env.ANTHROPIC_KEY = 'test-api-key';
+
     // Create mock instances
     mockThreadManager = new ThreadManager(':memory:');
     mockToolRegistry = new ToolRegistry();
@@ -69,6 +72,8 @@ describe('DelegateTool', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Clean up test environment variables
+    delete process.env.ANTHROPIC_KEY;
   });
 
   it('should have correct metadata', () => {
