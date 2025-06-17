@@ -12,6 +12,8 @@ import { ToolExecutor } from './tools/executor.js';
 import { BashTool } from './tools/implementations/bash.js';
 import { FileReadTool } from './tools/implementations/file-read.js';
 import { FileWriteTool } from './tools/implementations/file-write.js';
+import { FileEditTool } from './tools/implementations/file-edit.js';
+import { FileInsertTool } from './tools/implementations/file-insert.js';
 import { FileListTool } from './tools/implementations/file-list.js';
 import { RipgrepSearchTool } from './tools/implementations/ripgrep-search.js';
 import { FileFindTool } from './tools/implementations/file-find.js';
@@ -99,6 +101,8 @@ async function main() {
     new BashTool(),
     new FileReadTool(),
     new FileWriteTool(),
+    new FileEditTool(),
+    new FileInsertTool(),
     new FileListTool(),
     new RipgrepSearchTool(),
     new FileFindTool(),
