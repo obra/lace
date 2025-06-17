@@ -22,6 +22,7 @@ import {
   TaskListTool,
   TaskCompleteTool,
 } from './tools/implementations/task-manager.js';
+import { DelegateTool } from './tools/implementations/delegate.js';
 import { startSession } from './threads/session.js';
 import { logger } from './utils/logger.js';
 import { loadPromptConfig, getPromptFilePaths } from './config/prompts.js';
@@ -97,6 +98,8 @@ async function main() {
   const toolExecutor = new ToolExecutor(toolRegistry);
 
   // Register tools
+  const delegateTool = new DelegateTool();
+
   const tools = [
     new BashTool(),
     new FileReadTool(),
@@ -109,6 +112,7 @@ async function main() {
     new TaskAddTool(),
     new TaskListTool(),
     new TaskCompleteTool(),
+    delegateTool,
   ];
 
   tools.forEach((tool) => toolRegistry.registerTool(tool));
@@ -116,6 +120,9 @@ async function main() {
   // Start or resume session using enhanced thread management
   const sessionInfo = await startSession(process.argv.slice(2));
   const { threadManager, threadId } = sessionInfo;
+
+  // Inject dependencies into delegate tool (after we have threadManager)
+  delegateTool.setDependencies(threadManager, toolRegistry);
 
   // Display session status to user
   if (sessionInfo.isResumed) {
