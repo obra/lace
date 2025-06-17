@@ -4,13 +4,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { getEnvVar } from './env-loader.js';
 
 /**
  * Get the Lace configuration directory
  * Uses LACE_DIR environment variable, falls back to ~/.lace/
  */
 export function getLaceDir(): string {
-  const laceDir = process.env.LACE_DIR || path.join(os.homedir(), '.lace');
+  const laceDir = getEnvVar('LACE_DIR') || path.join(os.homedir(), '.lace');
   return laceDir;
 }
 

@@ -2,6 +2,11 @@
 // ABOUTME: Main CLI entry point for Lace AI coding assistant
 // ABOUTME: Orchestrates provider setup, Agent creation, and CLI interface management
 
+import { loadEnvFile, getEnvVar } from './config/env-loader.js';
+
+// Load environment variables from .env file before anything else
+loadEnvFile();
+
 import { Agent } from './agents/agent.js';
 import { AnthropicProvider } from './providers/anthropic-provider.js';
 import { LMStudioProvider } from './providers/lmstudio-provider.js';
@@ -49,7 +54,7 @@ async function createProvider(
 
   switch (providerType) {
     case 'anthropic': {
-      const apiKey = process.env.ANTHROPIC_KEY;
+      const apiKey = getEnvVar('ANTHROPIC_KEY');
       if (!apiKey) {
         console.error('Error: ANTHROPIC_KEY environment variable required for Anthropic provider');
         process.exit(1);
@@ -89,7 +94,7 @@ async function main() {
   logger.info('Lace configuration files', {
     systemPromptPath,
     userInstructionsPath,
-    laceDir: process.env.LACE_DIR || '~/.lace',
+    laceDir: getEnvVar('LACE_DIR', '~/.lace'),
   });
 
   const provider = await createProvider(options.provider, options.model);
