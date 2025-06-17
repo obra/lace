@@ -2,7 +2,7 @@
 // ABOUTME: Handles all CLI flags, validation, and help text generation
 
 export interface CLIOptions {
-  provider: 'anthropic' | 'lmstudio' | 'ollama';
+  provider: 'anthropic' | 'openai' | 'lmstudio' | 'ollama';
   model: string | undefined;
   help: boolean;
   logLevel: 'error' | 'warn' | 'info' | 'debug';
@@ -27,19 +27,22 @@ export function parseArgs(args: string[] = process.argv.slice(2)): CLIOptions {
       options.help = true;
     } else if (arg === '--provider' || arg === '-p') {
       const providerValue = args[i + 1];
-      if (!providerValue || !['anthropic', 'lmstudio', 'ollama'].includes(providerValue)) {
-        console.error('Error: --provider must be "anthropic", "lmstudio", or "ollama"');
+      if (
+        !providerValue ||
+        !['anthropic', 'openai', 'lmstudio', 'ollama'].includes(providerValue)
+      ) {
+        console.error('Error: --provider must be "anthropic", "openai", "lmstudio", or "ollama"');
         process.exit(1);
       }
-      options.provider = providerValue as 'anthropic' | 'lmstudio' | 'ollama';
+      options.provider = providerValue as 'anthropic' | 'openai' | 'lmstudio' | 'ollama';
       i++; // Skip next argument since we consumed it
     } else if (arg.startsWith('--provider=')) {
       const providerValue = arg.split('=')[1];
-      if (!['anthropic', 'lmstudio', 'ollama'].includes(providerValue)) {
-        console.error('Error: --provider must be "anthropic", "lmstudio", or "ollama"');
+      if (!['anthropic', 'openai', 'lmstudio', 'ollama'].includes(providerValue)) {
+        console.error('Error: --provider must be "anthropic", "openai", "lmstudio", or "ollama"');
         process.exit(1);
       }
-      options.provider = providerValue as 'anthropic' | 'lmstudio' | 'ollama';
+      options.provider = providerValue as 'anthropic' | 'openai' | 'lmstudio' | 'ollama';
     } else if (arg === '--model' || arg === '-m') {
       const modelValue = args[i + 1];
       if (!modelValue) {
@@ -121,7 +124,7 @@ Usage: lace [options]
 
 Options:
   -h, --help                Show this help message
-  -p, --provider <name>     Choose AI provider: "anthropic" (default), "lmstudio", or "ollama"
+  -p, --provider <name>     Choose AI provider: "anthropic" (default), "openai", "lmstudio", or "ollama"
   -m, --model <name>        Override the default model for the selected provider
   --log-level <level>       Set log level: "error", "warn", "info" (default), or "debug"
   --log-file <path>         Write logs to file (no file = no logging)
@@ -131,9 +134,11 @@ Options:
 Examples:
   lace                      # Use Anthropic Claude (default)
   lace --provider anthropic # Use Anthropic Claude explicitly
+  lace --provider openai    # Use OpenAI GPT models
   lace --provider lmstudio  # Use local LMStudio server
   lace --provider ollama    # Use local Ollama server
   lace --model claude-haiku-3-20241022  # Use specific Anthropic model
+  lace --provider openai --model gpt-4o  # Use specific OpenAI model
   lace --provider lmstudio --model mistralai/devstral-small-2505  # Use specific LMStudio model
   lace --log-level debug --log-file debug.log  # Debug logging to file
   lace --prompt "What files are in the current directory?"  # Single command
@@ -143,5 +148,6 @@ Examples:
 
 Environment Variables:
   ANTHROPIC_KEY            Required for Anthropic provider
+  OPENAI_API_KEY           Required for OpenAI provider (or OPENAI_KEY)
 `);
 }

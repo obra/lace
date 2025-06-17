@@ -4,6 +4,7 @@
 
 import { Agent } from './agents/agent.js';
 import { AnthropicProvider } from './providers/anthropic-provider.js';
+import { OpenAIProvider } from './providers/openai-provider.js';
 import { LMStudioProvider } from './providers/lmstudio-provider.js';
 import { OllamaProvider } from './providers/ollama-provider.js';
 import { AIProvider } from './providers/types.js';
@@ -31,7 +32,7 @@ import { CLIInterface } from './cli/interface.js';
 
 // Create provider based on CLI option
 async function createProvider(
-  providerType: 'anthropic' | 'lmstudio' | 'ollama',
+  providerType: 'anthropic' | 'openai' | 'lmstudio' | 'ollama',
   model?: string
 ): Promise<AIProvider> {
   // Load configurable prompts from user's Lace directory
@@ -55,6 +56,16 @@ async function createProvider(
         process.exit(1);
       }
       return new AnthropicProvider({ apiKey, systemPrompt, model });
+    }
+    case 'openai': {
+      const apiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_KEY;
+      if (!apiKey) {
+        console.error(
+          'Error: OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider'
+        );
+        process.exit(1);
+      }
+      return new OpenAIProvider({ apiKey, systemPrompt, model });
     }
     case 'lmstudio': {
       return new LMStudioProvider({ systemPrompt, model });
