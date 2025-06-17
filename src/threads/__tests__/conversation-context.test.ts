@@ -65,10 +65,12 @@ describe('Conversation Context Preservation', () => {
       const events = threadManager.getEvents(threadId);
       const conversation = buildConversationFromEvents(events);
 
-      console.log(`After interaction ${index + 1}:`);
-      console.log(`  Events: ${events.length}`);
-      console.log(`  Messages: ${conversation.length}`);
-      console.log(`  Expected: ${expectedMessageCount}`);
+      // Debug info for test verification
+      if (process.env.VITEST_VERBOSE) {
+        console.log(
+          `After interaction ${index + 1}: Events: ${events.length}, Messages: ${conversation.length}, Expected: ${expectedMessageCount}`
+        );
+      }
 
       expect(conversation.length).toBe(expectedMessageCount);
 

@@ -52,23 +52,24 @@ export class LMStudioProvider extends AIProvider {
 
   async diagnose(): Promise<{ connected: boolean; models: string[]; error?: string }> {
     try {
-      process.stdout.write(`🔍 Connecting to LMStudio at ${this._baseUrl}...\n`);
+      logger.info('Connecting to LMStudio', { baseUrl: this._baseUrl });
 
       // Try to list loaded models to test connection
       const models = await this._client.llm.listLoaded();
-      process.stdout.write(`✅ Connected successfully\n`);
-      process.stdout.write(
-        `📦 Loaded models (${models.length}): ${models.map((m) => m.identifier).join(', ')}\n`
-      );
+      logger.info('Connected to LMStudio successfully');
+      logger.info('Loaded models from LMStudio', {
+        count: models.length,
+        models: models.map((m) => m.identifier),
+      });
 
       return {
         connected: true,
         models: models.map((m) => m.identifier),
       };
     } catch (error: unknown) {
-      process.stdout.write(
-        `❌ Connection failed: ${error instanceof Error ? error.message : String(error)}\n`
-      );
+      logger.warn('LMStudio connection failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return {
         connected: false,
         models: [],
@@ -112,30 +113,31 @@ export class LMStudioProvider extends AIProvider {
 
       // Check if our target model is already loaded
       if (diagnostics.models.includes(modelId)) {
-        process.stdout.write(`✅ Found already loaded model "${modelId}"\n`);
+        logger.info('Found already loaded model', { modelId });
         // Get reference to existing loaded model from the list
         const loadedModels = await this._client.llm.listLoaded();
         const existingModel = loadedModels.find((m) => m.identifier === modelId);
 
         if (existingModel) {
-          process.stdout.write(`✅ Using existing model instance "${modelId}"\n`);
+          logger.info('Using existing model instance', { modelId });
           this._cachedModel = existingModel as LMStudioModel;
           this._cachedModelId = modelId;
         } else {
           throw new Error(`Model "${modelId}" appears loaded but could not retrieve instance`);
         }
       } else {
-        process.stdout.write(
-          `⚠️  Target model "${modelId}" not loaded. Available models: ${diagnostics.models.join(', ')}\n`
-        );
-        process.stdout.write(`🔄 Attempting to load "${modelId}"...\n`);
+        logger.info('Target model not loaded, available models', {
+          targetModel: modelId,
+          availableModels: diagnostics.models,
+        });
+        logger.info('Attempting to load model', { modelId });
 
         try {
           this._cachedModel = (await this._client.llm.load(modelId, {
             verbose: this._verbose,
           })) as LMStudioModel;
           this._cachedModelId = modelId;
-          process.stdout.write(`✅ Model "${modelId}" loaded successfully\n`);
+          logger.info('Model loaded successfully', { modelId });
         } catch (error: unknown) {
           // Provide helpful error messages based on the error type
           const errorMessage = error instanceof Error ? error.message : String(error);

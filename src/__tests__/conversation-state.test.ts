@@ -37,11 +37,15 @@ describe('Conversation State Management with Enhanced Agent', () => {
     try {
       const diagnostics = await provider.diagnose();
       if (!diagnostics.connected) {
-        console.log('Skipping LMStudio tests - server not available');
+        if (process.env.VITEST_VERBOSE) {
+          console.log('Skipping LMStudio tests - server not available');
+        }
         return;
       }
     } catch (error) {
-      console.log('Skipping LMStudio tests - connection failed:', error);
+      if (process.env.VITEST_VERBOSE) {
+        console.log('Skipping LMStudio tests - connection failed:', error);
+      }
       return;
     }
 
@@ -97,51 +101,57 @@ describe('Conversation State Management with Enhanced Agent', () => {
 
   it('should maintain conversation context across multiple tool calls', async () => {
     // Turn 1: Ask for directory listing
-    console.log('Starting Turn 1...');
+    if (process.env.VITEST_VERBOSE) console.log('Starting Turn 1...');
     await agent.sendMessage('List the files in the current directory');
 
     let events = threadManager.getEvents(threadId);
     let conversation = threadManager.buildConversation(threadId);
 
-    console.log(`Turn 1 - Message count: ${conversation.length}, Event count: ${events.length}`);
+    if (process.env.VITEST_VERBOSE) {
+      console.log(`Turn 1 - Message count: ${conversation.length}, Event count: ${events.length}`);
+    }
     expect(conversation.length).toBeGreaterThan(1); // Should have user message + agent response + tool calls
 
     // Turn 2: Ask follow-up question
-    console.log('Starting Turn 2...');
+    if (process.env.VITEST_VERBOSE) console.log('Starting Turn 2...');
     await agent.sendMessage('What programming language is this project written in?');
 
     events = threadManager.getEvents(threadId);
     conversation = threadManager.buildConversation(threadId);
 
-    console.log(`Turn 2 - Message count: ${conversation.length}, Event count: ${events.length}`);
+    if (process.env.VITEST_VERBOSE) {
+      console.log(`Turn 2 - Message count: ${conversation.length}, Event count: ${events.length}`);
+    }
     expect(conversation.length).toBeGreaterThan(3); // Should have multiple messages by now
     expect(events.length).toBeGreaterThanOrEqual(5); // Should have multiple events
 
     // Turn 3: Ask another question that requires tool use
-    console.log('Starting Turn 3...');
+    if (process.env.VITEST_VERBOSE) console.log('Starting Turn 3...');
     await agent.sendMessage('Run the command "echo hello world" and show me the output');
 
     events = threadManager.getEvents(threadId);
     conversation = threadManager.buildConversation(threadId);
 
-    console.log(`Turn 3 - Message count: ${conversation.length}, Event count: ${events.length}`);
+    if (process.env.VITEST_VERBOSE)
+      console.log(`Turn 3 - Message count: ${conversation.length}, Event count: ${events.length}`);
     expect(conversation.length).toBeGreaterThan(5); // Should keep growing
     expect(events.length).toBeGreaterThanOrEqual(7); // Should keep growing
 
     // Turn 4: Ask a question that should reference previous context
-    console.log('Starting Turn 4...');
+    if (process.env.VITEST_VERBOSE) console.log('Starting Turn 4...');
     await agent.sendMessage('Based on what you just saw, what kind of project is this?');
 
     events = threadManager.getEvents(threadId);
     conversation = threadManager.buildConversation(threadId);
 
-    console.log(`Turn 4 - Message count: ${conversation.length}, Event count: ${events.length}`);
+    if (process.env.VITEST_VERBOSE)
+      console.log(`Turn 4 - Message count: ${conversation.length}, Event count: ${events.length}`);
     expect(conversation.length).toBeGreaterThan(8); // Should be substantial by now
     expect(events.length).toBeGreaterThanOrEqual(11); // Should have many events
 
     // Verify the conversation contains the full history
     const userMessages = conversation.filter((msg) => msg.role === 'user');
-    console.log('User message count:', userMessages.length);
+    if (process.env.VITEST_VERBOSE) console.log('User message count:', userMessages.length);
     expect(userMessages.length).toBeGreaterThanOrEqual(4); // All 4 user messages
 
     // Check for specific content from previous turns
@@ -163,7 +173,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
     let expectedMessageCount = 0; // Start with 0
 
     for (let i = 0; i < commands.length; i++) {
-      console.log(`Executing command ${i + 1}: "${commands[i]}"`);
+      if (process.env.VITEST_VERBOSE) console.log(`Executing command ${i + 1}: "${commands[i]}"`);
 
       const eventsBefore = threadManager.getEvents(threadId).length;
 
@@ -172,9 +182,10 @@ describe('Conversation State Management with Enhanced Agent', () => {
       const eventsAfter = threadManager.getEvents(threadId);
       const conversation = threadManager.buildConversation(threadId);
 
-      console.log(
-        `Command ${i + 1} - Message count: ${conversation.length}, Events added: ${eventsAfter.length - eventsBefore}`
-      );
+      if (process.env.VITEST_VERBOSE)
+        console.log(
+          `Command ${i + 1} - Message count: ${conversation.length}, Events added: ${eventsAfter.length - eventsBefore}`
+        );
 
       // Verify message count keeps growing
       expect(conversation.length).toBeGreaterThan(expectedMessageCount);
@@ -185,9 +196,10 @@ describe('Conversation State Management with Enhanced Agent', () => {
     const finalConversation = threadManager.buildConversation(threadId);
     const userMessages = finalConversation.filter((msg) => msg.role === 'user');
 
-    console.log(
-      `Final stats - Total messages: ${finalConversation.length}, User messages: ${userMessages.length}`
-    );
+    if (process.env.VITEST_VERBOSE)
+      console.log(
+        `Final stats - Total messages: ${finalConversation.length}, User messages: ${userMessages.length}`
+      );
     expect(userMessages.length).toBe(commands.length);
   }, 120000); // Extra long timeout for multiple LMStudio calls
 
@@ -203,15 +215,15 @@ describe('Conversation State Management with Enhanced Agent', () => {
     let previousMessageCount = 0;
 
     for (let i = 0; i < turns.length; i++) {
-      console.log(`\nTurn ${i + 1}: "${turns[i]}"`);
+      if (process.env.VITEST_VERBOSE) console.log(`\nTurn ${i + 1}: "${turns[i]}"`);
 
       await agent.sendMessage(turns[i]);
 
       const events = threadManager.getEvents(threadId);
       const conversation = threadManager.buildConversation(threadId);
 
-      console.log(`  Message count: ${conversation.length}`);
-      console.log(`  Event count: ${events.length}`);
+      if (process.env.VITEST_VERBOSE) console.log(`  Message count: ${conversation.length}`);
+      if (process.env.VITEST_VERBOSE) console.log(`  Event count: ${events.length}`);
 
       // Message count should always increase
       expect(conversation.length).toBeGreaterThan(previousMessageCount);
@@ -270,7 +282,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
 
     await agent.sendMessage('List the files in the current directory');
 
-    console.log('Events emitted:', events);
+    if (process.env.VITEST_VERBOSE) console.log('Events emitted:', events);
 
     // Should have basic conversation flow events
     expect(events).toContain('thinking_start');
@@ -293,7 +305,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
 
     agent.on('state_change', ({ from, to }) => {
       stateChanges.push({ from, to });
-      console.log(`State change: ${from} -> ${to}`);
+      if (process.env.VITEST_VERBOSE) console.log(`State change: ${from} -> ${to}`);
     });
 
     // Initial state should be idle
@@ -303,7 +315,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
 
     // Should have gone through: idle -> thinking -> tool_execution -> thinking -> idle
     const stateSequence = stateChanges.map((sc) => `${sc.from}->${sc.to}`);
-    console.log('State sequence:', stateSequence);
+    if (process.env.VITEST_VERBOSE) console.log('State sequence:', stateSequence);
 
     expect(stateSequence).toContain('idle->thinking');
     expect(stateSequence).toContain('thinking->tool_execution');

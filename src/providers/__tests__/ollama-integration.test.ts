@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { OllamaProvider } from '../ollama-provider.js';
 import { Tool, ToolContext } from '../../tools/types.js';
+import { logger } from '../../utils/logger.js';
 
 // Mock tool for testing without side effects
 class MockTool implements Tool {
@@ -51,17 +52,15 @@ describe.sequential('Ollama Provider Integration Tests', () => {
 
         if (testResponse.content) {
           isOllamaAvailable = true;
-          console.log('✅ Ollama integration tests enabled - server working properly');
+          logger.info('Ollama integration tests enabled - server working properly');
         } else {
-          console.log('⚠️ Skipping Ollama integration tests - server not responding properly');
+          logger.info('Skipping Ollama integration tests - server not responding properly');
         }
       } else {
-        console.log(
-          '⚠️ Skipping Ollama integration tests - server not available or no models loaded'
-        );
+        logger.info('Skipping Ollama integration tests - server not available or no models loaded');
       }
     } catch (error) {
-      console.log('⚠️ Skipping Ollama integration tests - connection or response failed:', error);
+      logger.info('Skipping Ollama integration tests - connection or response failed', { error });
     }
   }, 60000);
 

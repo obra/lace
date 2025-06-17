@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { LMStudioProvider } from '../lmstudio-provider.js';
 import { Tool, ToolContext } from '../../tools/types.js';
+import { logger } from '../../utils/logger.js';
 
 // Mock tool for testing without side effects
 class MockTool implements Tool {
@@ -67,14 +68,14 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
       const diagnostics = await provider.diagnose();
       if (diagnostics.connected && diagnostics.models.length > 0) {
         isLMStudioAvailable = true;
-        console.log('✅ LMStudio integration tests enabled - server available with models');
+        logger.info('LMStudio integration tests enabled - server available with models');
       } else {
-        console.log(
-          '⚠️ Skipping LMStudio integration tests - server not available or no models loaded'
+        logger.info(
+          'Skipping LMStudio integration tests - server not available or no models loaded'
         );
       }
     } catch (error) {
-      console.log('⚠️ Skipping LMStudio integration tests - connection failed:', error);
+      logger.info('Skipping LMStudio integration tests - connection failed', { error });
     }
   });
 
