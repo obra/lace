@@ -41,19 +41,21 @@ describe('CLI Arguments', () => {
       expect(parseArgs(['--provider', 'lmstudio']).provider).toBe('lmstudio');
       expect(parseArgs(['-p', 'ollama']).provider).toBe('ollama');
       expect(parseArgs(['--provider=anthropic']).provider).toBe('anthropic');
+      expect(parseArgs(['--provider', 'openai']).provider).toBe('openai');
+      expect(parseArgs(['-p', 'openai']).provider).toBe('openai');
     });
 
     it('should validate provider values', () => {
       expect(() => parseArgs(['--provider', 'invalid'])).toThrow('process.exit called');
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Error: --provider must be "anthropic", "lmstudio", or "ollama"'
+        'Error: --provider must be "anthropic", "openai", "lmstudio", or "ollama"'
       );
     });
 
     it('should handle missing provider value', () => {
       expect(() => parseArgs(['--provider'])).toThrow('process.exit called');
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Error: --provider must be "anthropic", "lmstudio", or "ollama"'
+        'Error: --provider must be "anthropic", "openai", "lmstudio", or "ollama"'
       );
     });
 

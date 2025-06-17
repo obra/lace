@@ -266,7 +266,9 @@ describe('End-to-End CLI Tests', () => {
       const result = await runCLI(['--provider', 'invalid']);
 
       expect(result.exitCode).toBe(1);
-      expect(result.stderr).toContain('--provider must be "anthropic", "lmstudio", or "ollama"');
+      expect(result.stderr).toContain(
+        '--provider must be "anthropic", "openai", "lmstudio", or "ollama"'
+      );
     });
 
     it('should validate log level values', async () => {
