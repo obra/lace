@@ -28,7 +28,7 @@ describe('BashTool', () => {
     });
 
     it('should be marked as destructive', () => {
-      expect(bashTool.destructive).toBe(true);
+      expect(bashTool.annotations?.destructiveHint).toBe(true);
     });
   });
 
@@ -36,8 +36,7 @@ describe('BashTool', () => {
     it('should reject empty command', async () => {
       const result = await bashTool.executeTool({ command: '' });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Command must be a non-empty string');
+      expect(result.isError).toBe(true);
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(1);
@@ -47,15 +46,19 @@ describe('BashTool', () => {
     it('should reject non-string command', async () => {
       const result = await bashTool.executeTool({ command: 123 });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Command must be a non-empty string');
+      expect(result.isError).toBe(true);
+
+      const output = JSON.parse(result.content[0].text!);
+      expect(output.stderr).toBe('Command must be a non-empty string');
     });
 
     it('should reject missing command', async () => {
       const result = await bashTool.executeTool({});
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Command must be a non-empty string');
+      expect(result.isError).toBe(true);
+
+      const output = JSON.parse(result.content[0].text!);
+      expect(output.stderr).toBe('Command must be a non-empty string');
     });
   });
 
@@ -63,8 +66,7 @@ describe('BashTool', () => {
     it('should execute simple commands successfully', async () => {
       const result = await bashTool.executeTool({ command: 'echo "hello world"' });
 
-      expect(result.success).toBe(true);
-      expect(result.error).toBeUndefined();
+      expect(result.isError).toBe(false);
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(0);
@@ -75,7 +77,7 @@ describe('BashTool', () => {
     it('should handle commands with no output', async () => {
       const result = await bashTool.executeTool({ command: 'true' });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(0);
@@ -90,8 +92,7 @@ describe('BashTool', () => {
       const result = await bashTool.executeTool({ command: 'false' });
 
       // Tool should succeed because it executed the command successfully
-      expect(result.success).toBe(true);
-      expect(result.error).toBeUndefined();
+      expect(result.isError).toBe(false);
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(1); // Command failed, but tool succeeded
@@ -103,7 +104,7 @@ describe('BashTool', () => {
         command: 'echo "hello" | grep "world"',
       });
 
-      expect(result.success).toBe(true); // Tool executed successfully
+      expect(result.isError).toBe(false); // Tool executed successfully
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(1); // grep found no matches
@@ -116,7 +117,7 @@ describe('BashTool', () => {
         command: 'echo "  spaces  " | wc -w && exit 1', // Simulate linter finding issues
       });
 
-      expect(result.success).toBe(true); // Tool ran the "linter"
+      expect(result.isError).toBe(false); // Tool ran the "linter"
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(1); // "Linter" found issues
@@ -131,9 +132,9 @@ describe('BashTool', () => {
       });
 
       // Based on observed behavior: single nonexistent command = tool failure
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('command not found');
-      expect(result.error).toContain('nonexistentcommand12345');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('command not found');
+      expect(result.content[0].text).toContain('nonexistentcommand12345');
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(127); // Command not found
@@ -146,8 +147,7 @@ describe('BashTool', () => {
       });
 
       // Based on observed behavior: command in sequence = tool success
-      expect(result.success).toBe(true);
-      expect(result.error).toBeUndefined();
+      expect(result.isError).toBe(false);
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.stdout).toContain('before');
@@ -161,7 +161,7 @@ describe('BashTool', () => {
         command: 'cat /root/nonexistent 2>/dev/null || echo "permission issue" >&2 && exit 126',
       });
 
-      expect(result.success).toBe(true); // Command executed (even though it failed)
+      expect(result.isError).toBe(false); // Command executed (even though it failed)
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(126);
@@ -175,7 +175,7 @@ describe('BashTool', () => {
         command: 'echo "to stdout" && echo "to stderr" >&2',
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(0);
@@ -188,7 +188,7 @@ describe('BashTool', () => {
         command: 'for i in {1..100}; do echo "line $i"; done',
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(0);
@@ -202,7 +202,7 @@ describe('BashTool', () => {
         command: 'echo "Hello 🌍 World! Special: àáâãäå"',
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(0);
@@ -214,7 +214,7 @@ describe('BashTool', () => {
     it('should always return valid JSON in output field', async () => {
       const result = await bashTool.executeTool({ command: 'echo "test"' });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(() => JSON.parse(result.content[0].text!)).not.toThrow();
 
       const output = JSON.parse(result.content[0].text!);
@@ -230,7 +230,7 @@ describe('BashTool', () => {
         command: 'echo \'{"test": "value", "number": 42}\'',
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.stdout).toBe('{"test": "value", "number": 42}\n');
@@ -249,7 +249,7 @@ describe('BashTool', () => {
         command: 'echo "src/file.ts:1:1 error Delete spaces" && exit 1',
       });
 
-      expect(result.success).toBe(true); // ✅ Tool completed (not ❌ Tool failed)
+      expect(result.isError).toBe(false); // ✅ Tool completed (not ❌ Tool failed)
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(1); // ESLint found issues
@@ -260,7 +260,7 @@ describe('BashTool', () => {
       // Observed: 'false' command shows as ✅ Tool completed
       const result = await bashTool.executeTool({ command: 'false' });
 
-      expect(result.success).toBe(true); // ✅ Tool completed
+      expect(result.isError).toBe(false); // ✅ Tool completed
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(1);
@@ -272,7 +272,7 @@ describe('BashTool', () => {
       // Observed: 'echo' commands show as ✅ Tool completed
       const result = await bashTool.executeTool({ command: 'echo "hello"' });
 
-      expect(result.success).toBe(true); // ✅ Tool completed
+      expect(result.isError).toBe(false); // ✅ Tool completed
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(0);
@@ -286,7 +286,7 @@ describe('BashTool', () => {
         command: 'echo "hello" | grep "xyz"',
       });
 
-      expect(result.success).toBe(true); // ✅ Tool completed
+      expect(result.isError).toBe(false); // ✅ Tool completed
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(1); // grep found no matches
@@ -299,7 +299,7 @@ describe('BashTool', () => {
         command: 'echo "Testing"; nonexistentcmd123; echo "After error"',
       });
 
-      expect(result.success).toBe(true); // ✅ Tool completed (what I observed)
+      expect(result.isError).toBe(false); // ✅ Tool completed (what I observed)
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.stdout).toContain('Testing');

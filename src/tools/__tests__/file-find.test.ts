@@ -45,7 +45,7 @@ describe('FileFindTool', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('file_find');
       expect(tool.description).toBe('Find files by name pattern or glob');
-      expect(tool.destructive).toBe(false);
+      expect(tool.annotations?.readOnlyHint).toBe(true);
     });
 
     it('should have correct input schema', () => {
@@ -84,7 +84,7 @@ describe('FileFindTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('test.ts');
@@ -101,7 +101,7 @@ describe('FileFindTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('test.ts');
@@ -116,7 +116,7 @@ describe('FileFindTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('app.ts');
@@ -130,7 +130,7 @@ describe('FileFindTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('test.ts');
@@ -147,7 +147,7 @@ describe('FileFindTool', () => {
         type: 'file',
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('test.ts');
@@ -165,7 +165,7 @@ describe('FileFindTool', () => {
         type: 'directory',
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('src');
@@ -181,7 +181,7 @@ describe('FileFindTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('test.ts');
@@ -197,7 +197,7 @@ describe('FileFindTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('README.md');
     });
 
@@ -214,10 +214,10 @@ describe('FileFindTool', () => {
         caseSensitive: false,
       });
 
-      expect(caseSensitive.success).toBe(true);
+      expect(caseSensitive.isError).toBe(false);
       expect(caseSensitive.content[0].text).toContain('No files found');
 
-      expect(caseInsensitive.success).toBe(true);
+      expect(caseInsensitive.isError).toBe(false);
       expect(caseInsensitive.content[0].text).toContain('README.md');
     });
   });
@@ -229,7 +229,7 @@ describe('FileFindTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('No files found');
     });
 
@@ -240,7 +240,7 @@ describe('FileFindTool', () => {
         includeHidden: true,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('.gitignore');
@@ -254,7 +254,7 @@ describe('FileFindTool', () => {
         includeHidden: true,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('secret.txt');
     });
   });
@@ -267,7 +267,7 @@ describe('FileFindTool', () => {
         maxDepth: 1,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('No files found');
     });
 
@@ -278,7 +278,7 @@ describe('FileFindTool', () => {
         maxDepth: 2,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('Button.tsx');
     });
 
@@ -288,7 +288,7 @@ describe('FileFindTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('Button.tsx');
     });
   });
@@ -297,22 +297,22 @@ describe('FileFindTool', () => {
     it('should handle missing pattern parameter', async () => {
       const result = await tool.executeTool({ path: testDir });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Pattern must be a non-empty string');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
     });
 
     it('should handle empty pattern parameter', async () => {
       const result = await tool.executeTool({ pattern: '', path: testDir });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Pattern must be a non-empty string');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
     });
 
     it('should handle non-string pattern parameter', async () => {
       const result = await tool.executeTool({ pattern: 123, path: testDir });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Pattern must be a non-empty string');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
     });
 
     it('should handle non-existent directory', async () => {
@@ -321,8 +321,8 @@ describe('FileFindTool', () => {
         path: '/non/existent/directory',
       });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('ENOENT');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('ENOENT');
     });
   });
 
@@ -333,7 +333,7 @@ describe('FileFindTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
       const files = output.split('\n').filter((line) => line.trim());
 
@@ -348,7 +348,7 @@ describe('FileFindTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('No files found matching pattern: *.nonexistent');
     });
 
@@ -358,7 +358,7 @@ describe('FileFindTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
       expect(output).toContain(join(testDir, 'src', 'app.ts'));
     });
@@ -372,7 +372,7 @@ describe('FileFindTool', () => {
         includeHidden: true,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
       expect(output).toContain('test.ts');
@@ -392,7 +392,7 @@ describe('FileFindTool', () => {
         path: testDir,
       });
 
-      expect(result.success).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('file-with-dash.ts');
       expect(result.content[0].text).not.toContain('file_with_underscore.js');
     });

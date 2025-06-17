@@ -27,7 +27,7 @@ describe('FileInsertTool', () => {
 
   it('should have correct metadata', () => {
     expect(tool.name).toBe('file_insert');
-    expect(tool.destructive).toBe(true);
+    expect(tool.annotations?.destructiveHint).toBe(true);
     expect(tool.input_schema.required).toEqual(['path', 'content']);
   });
 
@@ -39,7 +39,7 @@ describe('FileInsertTool', () => {
       content: 'Line 3\nLine 4',
     });
 
-    expect(result.success).toBe(true);
+    expect(result.isError).toBe(false);
     expect(result.content[0]?.text).toContain('Appended to end of file');
     expect(result.content[0]?.text).toContain('+2 lines');
   });
@@ -53,7 +53,7 @@ describe('FileInsertTool', () => {
       line: 2,
     });
 
-    expect(result.success).toBe(true);
+    expect(result.isError).toBe(false);
     expect(result.content[0]?.text).toContain('Inserted after line 2');
   });
 
@@ -65,7 +65,7 @@ describe('FileInsertTool', () => {
       content: 'First Line',
     });
 
-    expect(result.success).toBe(true);
+    expect(result.isError).toBe(false);
   });
 
   it('should fail when line exceeds file length', async () => {
@@ -77,8 +77,8 @@ describe('FileInsertTool', () => {
       line: 5,
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Line 5 exceeds file length');
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Line 5 exceeds file length');
   });
 
   it('should validate input parameters', async () => {
@@ -87,8 +87,8 @@ describe('FileInsertTool', () => {
       content: 'test',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Path must be a non-empty string');
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Path must be a non-empty string');
   });
 
   it('should validate line number', async () => {
@@ -100,7 +100,7 @@ describe('FileInsertTool', () => {
       line: 0,
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Line must be a positive number');
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Line must be a positive number');
   });
 });

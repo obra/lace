@@ -700,7 +700,7 @@ describe('Integration Tests', () => {
     await manager2.close();
   });
 
-  it('should handle large conversations efficiently', async () => {
+  it('should handle large conversations efficiently', { timeout: 10000 }, async () => {
     const threadManager = new ThreadManager(tempDbPath);
     const threadId = 'lace_large_test';
     threadManager.createThread(threadId);

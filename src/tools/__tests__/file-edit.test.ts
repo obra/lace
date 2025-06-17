@@ -27,7 +27,7 @@ describe('FileEditTool', () => {
 
   it('should have correct metadata', () => {
     expect(tool.name).toBe('file_edit');
-    expect(tool.destructive).toBe(true);
+    expect(tool.annotations?.destructiveHint).toBe(true);
     expect(tool.input_schema.required).toEqual(['path', 'old_text', 'new_text']);
   });
 
@@ -43,7 +43,7 @@ describe('FileEditTool', () => {
       new_text: "console.log('Hello, Universe!');",
     });
 
-    expect(result.success).toBe(true);
+    expect(result.isError).toBe(false);
     expect(result.content[0]?.text).toContain('Successfully replaced text');
   });
 
@@ -65,7 +65,7 @@ describe('FileEditTool', () => {
   return x * y;`,
     });
 
-    expect(result.success).toBe(true);
+    expect(result.isError).toBe(false);
     expect(result.content[0]?.text).toContain('Successfully replaced text');
     expect(result.content[0]?.text).toContain('3 lines');
   });
@@ -79,8 +79,8 @@ describe('FileEditTool', () => {
       new_text: 'Hello Universe',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('No exact matches found');
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('No exact matches found');
   });
 
   it('should fail when multiple matches exist', async () => {
@@ -92,8 +92,8 @@ describe('FileEditTool', () => {
       new_text: 'baz',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Found 2 matches');
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Found 2 matches');
   });
 
   it('should validate input parameters', async () => {
@@ -103,8 +103,8 @@ describe('FileEditTool', () => {
       new_text: 'test2',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Path must be a non-empty string');
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Path must be a non-empty string');
   });
 
   it('should handle file not found', async () => {
@@ -114,7 +114,7 @@ describe('FileEditTool', () => {
       new_text: 'test2',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('ENOENT');
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('ENOENT');
   });
 });

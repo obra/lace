@@ -411,9 +411,9 @@ export class Agent extends EventEmitter {
           threadId: this._threadId,
           toolCallId: toolCall.id,
           toolName: toolCall.name,
-          success: result.success,
+          success: !result.isError,
           outputLength: outputText.length,
-          hasError: !!result.error,
+          hasError: result.isError,
         });
 
         // Emit tool call complete event
@@ -427,8 +427,8 @@ export class Agent extends EventEmitter {
         this._threadManager.addEvent(this._threadId, 'TOOL_RESULT', {
           callId: toolCall.id,
           output: outputText,
-          success: result.success,
-          error: result.error,
+          success: !result.isError,
+          error: result.isError ? result.content[0]?.text || 'Unknown error' : undefined,
         });
       } catch (error: unknown) {
         logger.error('AGENT: Tool execution error', {
@@ -440,9 +440,8 @@ export class Agent extends EventEmitter {
 
         // Create a failed tool result
         const failedResult: ToolResult = {
-          success: false,
-          content: [],
-          error: error instanceof Error ? error.message : String(error),
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
+          isError: true,
         };
 
         this.emit('tool_call_complete', {

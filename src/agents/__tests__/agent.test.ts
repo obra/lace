@@ -113,7 +113,7 @@ describe('Enhanced Agent', () => {
     });
 
     it('should return copy of tools to prevent mutation', () => {
-      const tools = [new MockTool({ success: true, content: [] })];
+      const tools = [new MockTool({ isError: false, content: [] })];
       agent = createAgent({ tools });
 
       const returnedTools = agent.getAvailableTools();
@@ -261,7 +261,7 @@ describe('Enhanced Agent', () => {
 
     beforeEach(() => {
       mockTool = new MockTool({
-        success: true,
+        isError: false,
         content: [{ type: 'text', text: 'Tool executed successfully' }],
       });
 
@@ -331,7 +331,7 @@ describe('Enhanced Agent', () => {
 
       expect(toolEvents[1].data.toolName).toBe('mock_tool');
       expect(toolEvents[1].data.callId).toBe('call_123');
-      expect(toolEvents[1].data.result.success).toBe(true);
+      expect(toolEvents[1].data.result.isError).toBe(false);
     });
 
     it('should transition to tool_execution state during tool calls', async () => {
@@ -369,9 +369,8 @@ describe('Enhanced Agent', () => {
 
     it('should handle tool execution errors gracefully', async () => {
       const failingTool = new MockTool({
-        success: false,
-        content: [],
-        error: 'Tool failed',
+        isError: true,
+        content: [{ type: 'text', text: 'Tool failed' }],
       });
 
       toolRegistry.registerTool(failingTool);
@@ -382,7 +381,7 @@ describe('Enhanced Agent', () => {
 
       const errorEvents: any[] = [];
       agent.on('tool_call_complete', (data) => {
-        if (!data.result.success) {
+        if (data.result.isError) {
           errorEvents.push(data);
         }
       });
@@ -390,8 +389,8 @@ describe('Enhanced Agent', () => {
       await agent.sendMessage('Use the tool');
 
       expect(errorEvents).toHaveLength(1);
-      expect(errorEvents[0].result.success).toBe(false);
-      expect(errorEvents[0].result.error).toBe('Execution error');
+      expect(errorEvents[0].result.isError).toBe(true);
+      expect(errorEvents[0].result.content[0].text).toBe('Execution error');
     });
 
     it('should recurse for next response after tool execution', async () => {
@@ -556,11 +555,11 @@ describe('Enhanced Agent', () => {
   describe('multiple tool calls', () => {
     beforeEach(() => {
       const tool1 = new MockTool({
-        success: true,
+        isError: false,
         content: [{ type: 'text', text: 'Tool 1 result' }],
       });
       const tool2 = new MockTool({
-        success: true,
+        isError: false,
         content: [{ type: 'text', text: 'Tool 2 result' }],
       });
 

@@ -2,7 +2,7 @@
 // ABOUTME: Essential tool for precise code modifications and refactoring
 
 import { readFile, writeFile } from 'fs/promises';
-import { Tool, ToolResult, ToolContext } from '../types.js';
+import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
 
 export class FileEditTool implements Tool {
   name = 'file_edit';
@@ -11,7 +11,9 @@ For modifying existing code, configuration, or any file content.
 Requires exact text matching including all whitespace and line breaks.
 The old_text must appear exactly once in the file.`;
 
-  destructive = true;
+  annotations = {
+    destructiveHint: true,
+  };
 
   input_schema = {
     type: 'object' as const,
@@ -41,27 +43,15 @@ The old_text must appear exactly once in the file.`;
 
     // Input validation
     if (!path || typeof path !== 'string') {
-      return {
-        success: false,
-        content: [],
-        error: 'Path must be a non-empty string',
-      };
+      return createErrorResult('Path must be a non-empty string');
     }
 
     if (typeof old_text !== 'string') {
-      return {
-        success: false,
-        content: [],
-        error: 'old_text must be a string',
-      };
+      return createErrorResult('old_text must be a string');
     }
 
     if (typeof new_text !== 'string') {
-      return {
-        success: false,
-        content: [],
-        error: 'new_text must be a string',
-      };
+      return createErrorResult('new_text must be a string');
     }
 
     try {
@@ -72,21 +62,13 @@ The old_text must appear exactly once in the file.`;
       const occurrences = content.split(old_text).length - 1;
 
       if (occurrences === 0) {
-        return {
-          success: false,
-          content: [],
-          error: `No exact matches found for the specified text in ${path}. 
-SOLUTION: Use file_read to see the exact file content, then copy the text exactly including all whitespace, tabs, and line breaks. Even a single space difference will cause this error.`,
-        };
+        return createErrorResult(`No exact matches found for the specified text in ${path}. 
+SOLUTION: Use file_read to see the exact file content, then copy the text exactly including all whitespace, tabs, and line breaks. Even a single space difference will cause this error.`);
       }
 
       if (occurrences > 1) {
-        return {
-          success: false,
-          content: [],
-          error: `Found ${occurrences} matches for the specified text. 
-SOLUTION: Include more surrounding context (lines before/after) to make old_text unique. For example, include the entire function or block instead of just one line.`,
-        };
+        return createErrorResult(`Found ${occurrences} matches for the specified text. 
+SOLUTION: Include more surrounding context (lines before/after) to make old_text unique. For example, include the entire function or block instead of just one line.`);
       }
 
       // Perform replacement
@@ -103,21 +85,14 @@ SOLUTION: Include more surrounding context (lines before/after) to make old_text
           ? `${oldLines} line${oldLines === 1 ? '' : 's'}`
           : `${oldLines} line${oldLines === 1 ? '' : 's'} → ${newLines} line${newLines === 1 ? '' : 's'}`;
 
-      return {
-        success: true,
-        content: [
-          {
-            type: 'text',
-            text: `Successfully replaced text in ${path} (${lineInfo})`,
-          },
-        ],
-      };
+      return createSuccessResult([
+        {
+          type: 'text',
+          text: `Successfully replaced text in ${path} (${lineInfo})`,
+        },
+      ]);
     } catch (error) {
-      return {
-        success: false,
-        content: [],
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-      };
+      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred');
     }
   }
 }

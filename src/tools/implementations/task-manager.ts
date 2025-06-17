@@ -1,7 +1,7 @@
 // ABOUTME: Session-based task management tools for tracking work items
 // ABOUTME: In-memory task storage for current session workflow management
 
-import { Tool, ToolResult, ToolContext } from '../types.js';
+import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
 
 interface Task {
   id: string;
@@ -69,7 +69,9 @@ function getTaskStore(threadId: string = 'default'): TaskStore {
 export class TaskAddTool implements Tool {
   name = 'task_add';
   description = 'Add a new task to the session task list';
-  destructive = false;
+  annotations = {
+    idempotentHint: false,
+  };
   input_schema = {
     type: 'object' as const,
     properties: {
@@ -82,32 +84,28 @@ export class TaskAddTool implements Tool {
     const { description } = input as { description: string };
 
     if (!description || typeof description !== 'string' || description.trim() === '') {
-      return {
-        success: false,
-        content: [],
-        error: 'Description must be a non-empty string',
-      };
+      return createErrorResult('Description must be a non-empty string');
     }
 
     const taskStore = getTaskStore(context?.threadId);
     const task = taskStore.addTask(description.trim());
 
-    return {
-      success: true,
-      content: [
-        {
-          type: 'text',
-          text: `Added task #${task.id}: ${task.description}`,
-        },
-      ],
-    };
+    return createSuccessResult([
+      {
+        type: 'text',
+        text: `Added task #${task.id}: ${task.description}`,
+      },
+    ]);
   }
 }
 
 export class TaskListTool implements Tool {
   name = 'task_list';
   description = 'List current session tasks';
-  destructive = false;
+  annotations = {
+    readOnlyHint: true,
+    idempotentHint: true,
+  };
   input_schema = {
     type: 'object' as const,
     properties: {
@@ -127,15 +125,12 @@ export class TaskListTool implements Tool {
 
     if (tasks.length === 0) {
       const message = includeCompleted ? 'No tasks found' : 'No pending tasks';
-      return {
-        success: true,
-        content: [
-          {
-            type: 'text',
-            text: message,
-          },
-        ],
-      };
+      return createSuccessResult([
+        {
+          type: 'text',
+          text: message,
+        },
+      ]);
     }
 
     const taskLines = tasks.map((task) => {
@@ -151,22 +146,21 @@ export class TaskListTool implements Tool {
       ? `Tasks (${tasks.filter((t) => !t.completed).length} pending, ${tasks.filter((t) => t.completed).length} completed):`
       : `Pending tasks (${tasks.length}):`;
 
-    return {
-      success: true,
-      content: [
-        {
-          type: 'text',
-          text: `${summary}\n${taskLines.join('\n')}`,
-        },
-      ],
-    };
+    return createSuccessResult([
+      {
+        type: 'text',
+        text: `${summary}\n${taskLines.join('\n')}`,
+      },
+    ]);
   }
 }
 
 export class TaskCompleteTool implements Tool {
   name = 'task_complete';
   description = 'Mark a task as completed';
-  destructive = false;
+  annotations = {
+    idempotentHint: false,
+  };
   input_schema = {
     type: 'object' as const,
     properties: {
@@ -179,32 +173,21 @@ export class TaskCompleteTool implements Tool {
     const { id } = input as { id: string };
 
     if (!id || typeof id !== 'string') {
-      return {
-        success: false,
-        content: [],
-        error: 'Task ID must be a non-empty string',
-      };
+      return createErrorResult('Task ID must be a non-empty string');
     }
 
     const taskStore = getTaskStore(context?.threadId);
     const task = taskStore.completeTask(id);
 
     if (!task) {
-      return {
-        success: false,
-        content: [],
-        error: `Task #${id} not found`,
-      };
+      return createErrorResult(`Task #${id} not found`);
     }
 
-    return {
-      success: true,
-      content: [
-        {
-          type: 'text',
-          text: `Completed task #${task.id}: ${task.description}`,
-        },
-      ],
-    };
+    return createSuccessResult([
+      {
+        type: 'text',
+        text: `Completed task #${task.id}: ${task.description}`,
+      },
+    ]);
   }
 }

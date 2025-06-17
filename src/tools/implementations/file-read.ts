@@ -2,12 +2,16 @@
 // ABOUTME: Safe file access for code inspection and analysis
 
 import { readFile } from 'fs/promises';
-import { Tool, ToolResult, ToolContext } from '../types.js';
+import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
 
 export class FileReadTool implements Tool {
   name = 'file_read';
   description = 'Read file contents with optional line range';
-  destructive = false;
+  annotations = {
+    title: 'File Reader',
+    readOnlyHint: true,
+    idempotentHint: true,
+  };
   input_schema = {
     type: 'object' as const,
     properties: {
@@ -26,11 +30,7 @@ export class FileReadTool implements Tool {
     };
 
     if (!path || typeof path !== 'string') {
-      return {
-        success: false,
-        content: [],
-        error: 'Path must be a non-empty string',
-      };
+      return createErrorResult('Path must be a non-empty string');
     }
 
     try {
@@ -43,11 +43,9 @@ export class FileReadTool implements Tool {
         const end = endLine !== undefined ? Math.min(lines.length, endLine) : lines.length;
 
         if (start >= lines.length) {
-          return {
-            success: false,
-            content: [],
-            error: `Start line ${startLine} exceeds file length (${lines.length} lines)`,
-          };
+          return createErrorResult(
+            `Start line ${startLine} exceeds file length (${lines.length} lines)`
+          );
         }
 
         resultLines = lines.slice(start, end);
@@ -55,21 +53,14 @@ export class FileReadTool implements Tool {
 
       const resultContent = resultLines.join('\n');
 
-      return {
-        success: true,
-        content: [
-          {
-            type: 'text',
-            text: resultContent,
-          },
-        ],
-      };
+      return createSuccessResult([
+        {
+          type: 'text',
+          text: resultContent,
+        },
+      ]);
     } catch (error) {
-      return {
-        success: false,
-        content: [],
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-      };
+      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred');
     }
   }
 }

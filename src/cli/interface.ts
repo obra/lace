@@ -69,7 +69,7 @@ export class CLIInterface {
       const outputText = result.content[0]?.text || '';
 
       // Show tool result status
-      if (result.success) {
+      if (!result.isError) {
         const outputLength = outputText.length;
         if (outputLength > 500) {
           // Show truncated output for large results
@@ -80,7 +80,8 @@ export class CLIInterface {
           process.stdout.write(`✅ Tool completed:\n${outputText}\n\n`);
         }
       } else {
-        process.stdout.write(`❌ Tool failed: ${result.error || 'Unknown error'}\n\n`);
+        const errorText = result.content[0]?.text || 'Unknown error';
+        process.stdout.write(`❌ Tool failed: ${errorText}\n\n`);
       }
     });
 
