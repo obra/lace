@@ -9,6 +9,8 @@ import { ThreadManager } from '../threads/thread-manager.js';
 import { buildConversationFromEvents } from '../threads/conversation-builder.js';
 import { logger } from '../utils/logger.js';
 import { StopReasonHandler } from '../token-management/stop-reason-handler.js';
+import { TokenBudgetManager } from '../token-management/token-budget-manager.js';
+import { TokenBudgetConfig } from '../token-management/types.js';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -16,6 +18,7 @@ export interface AgentConfig {
   threadManager: ThreadManager;
   threadId: string;
   tools: Tool[];
+  tokenBudget?: TokenBudgetConfig;
 }
 
 export interface AgentResponse {
@@ -42,6 +45,7 @@ export interface AgentEvents {
   state_change: [{ from: AgentState; to: AgentState }];
   error: [{ error: Error; context: object }];
   conversation_complete: [];
+  token_budget_warning: [{ message: string; usage: object; recommendations: object }];
 }
 
 export class Agent extends EventEmitter {
@@ -51,6 +55,7 @@ export class Agent extends EventEmitter {
   private readonly _threadId: string;
   private readonly _tools: Tool[];
   private readonly _stopReasonHandler: StopReasonHandler;
+  private readonly _tokenBudgetManager: TokenBudgetManager | null;
   private _state: AgentState = 'idle';
   private _isRunning = false;
 
@@ -62,6 +67,9 @@ export class Agent extends EventEmitter {
     this._threadId = config.threadId;
     this._tools = config.tools;
     this._stopReasonHandler = new StopReasonHandler();
+    this._tokenBudgetManager = config.tokenBudget
+      ? new TokenBudgetManager(config.tokenBudget)
+      : null;
   }
 
   // Core conversation methods
@@ -139,6 +147,19 @@ export class Agent extends EventEmitter {
     return this._provider.providerName;
   }
 
+  // Token budget management
+  getTokenBudgetStatus() {
+    return this._tokenBudgetManager?.getBudgetStatus() || null;
+  }
+
+  getTokenBudgetRecommendations() {
+    return this._tokenBudgetManager?.getRecommendations() || null;
+  }
+
+  resetTokenBudget(): void {
+    this._tokenBudgetManager?.reset();
+  }
+
   // Private implementation methods
   private async _processConversation(): Promise<void> {
     try {
@@ -152,6 +173,32 @@ export class Agent extends EventEmitter {
         availableToolCount: this._tools.length,
         availableToolNames: this._tools.map((t) => t.name),
       });
+
+      // Check token budget before making request
+      if (this._tokenBudgetManager) {
+        const conversationTokens = this._tokenBudgetManager.estimateConversationTokens(
+          conversation.map((msg) => ({ role: msg.role, content: msg.content }))
+        );
+
+        if (!this._tokenBudgetManager.canMakeRequest(conversationTokens + 200)) {
+          const recommendations = this._tokenBudgetManager.getRecommendations();
+          this.emit('token_budget_warning', {
+            message: 'Cannot make request: would exceed token budget',
+            usage: this._tokenBudgetManager.getBudgetStatus(),
+            recommendations,
+          });
+
+          logger.warn('Request blocked by token budget', {
+            threadId: this._threadId,
+            estimatedTokens: conversationTokens + 200,
+            budgetStatus: this._tokenBudgetManager.getBudgetStatus(),
+            recommendations,
+          });
+
+          this._setState('idle');
+          return;
+        }
+      }
 
       // Set state and emit thinking start
       this._setState('thinking');
@@ -272,6 +319,21 @@ export class Agent extends EventEmitter {
       // Apply stop reason handling to filter incomplete tool calls
       const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
 
+      // Record token usage if budget tracking is enabled
+      if (this._tokenBudgetManager) {
+        this._tokenBudgetManager.recordUsage(processedResponse);
+
+        // Emit warning if approaching budget limits
+        const recommendations = this._tokenBudgetManager.getRecommendations();
+        if (recommendations.warningMessage) {
+          this.emit('token_budget_warning', {
+            message: recommendations.warningMessage,
+            usage: this._tokenBudgetManager.getBudgetStatus(),
+            recommendations,
+          });
+        }
+      }
+
       return {
         content: processedResponse.content,
         toolCalls: processedResponse.toolCalls,
@@ -291,6 +353,21 @@ export class Agent extends EventEmitter {
 
     // Apply stop reason handling to filter incomplete tool calls
     const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
+
+    // Record token usage if budget tracking is enabled
+    if (this._tokenBudgetManager) {
+      this._tokenBudgetManager.recordUsage(processedResponse);
+
+      // Emit warning if approaching budget limits
+      const recommendations = this._tokenBudgetManager.getRecommendations();
+      if (recommendations.warningMessage) {
+        this.emit('token_budget_warning', {
+          message: recommendations.warningMessage,
+          usage: this._tokenBudgetManager.getBudgetStatus(),
+          recommendations,
+        });
+      }
+    }
 
     return {
       content: processedResponse.content,
