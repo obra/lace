@@ -195,7 +195,8 @@ describe('Conversation State Management with Enhanced Agent', () => {
 
     // Final verification
     const finalConversation = threadManager.buildConversation(threadId);
-    const userMessages = finalConversation.filter((msg) => msg.role === 'user');
+    // Filter out tool result messages (they have toolResults but no meaningful content)
+    const userMessages = finalConversation.filter((msg) => msg.role === 'user' && !msg.toolResults);
 
     if (process.env.VITEST_VERBOSE)
       console.log(
@@ -231,9 +232,8 @@ describe('Conversation State Management with Enhanced Agent', () => {
       previousMessageCount = conversation.length;
 
       // Verify all previous user messages are still in conversation
-      const userMessages = conversation.filter(
-        (msg) => msg.role === 'user' && !msg.content.startsWith('[Tool result:')
-      );
+      // Filter out tool result messages (they have toolResults but no meaningful content)
+      const userMessages = conversation.filter((msg) => msg.role === 'user' && !msg.toolResults);
 
       expect(userMessages.length).toBe(i + 1);
 
@@ -291,7 +291,8 @@ describe('Conversation State Management with Enhanced Agent', () => {
 
     // Should have state transitions
     expect(events.some((e) => e.includes('state:idle->thinking'))).toBe(true);
-    expect(events.some((e) => e.includes('state:thinking->tool_execution'))).toBe(true);
+    // With streaming, flow goes: thinking->streaming->tool_execution
+    expect(events.some((e) => e.includes('state:streaming->tool_execution'))).toBe(true);
 
     // Should have tool events (likely file_list)
     expect(events.some((e) => e.startsWith('tool_start:'))).toBe(true);
@@ -319,7 +320,8 @@ describe('Conversation State Management with Enhanced Agent', () => {
     if (process.env.VITEST_VERBOSE) console.log('State sequence:', stateSequence);
 
     expect(stateSequence).toContain('idle->thinking');
-    expect(stateSequence).toContain('thinking->tool_execution');
+    // With streaming, flow goes: thinking->streaming->tool_execution
+    expect(stateSequence).toContain('streaming->tool_execution');
     expect(stateSequence[stateSequence.length - 1]).toContain('->idle');
 
     // Final state should be idle
