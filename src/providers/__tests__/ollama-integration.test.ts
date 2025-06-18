@@ -21,7 +21,7 @@ class MockTool implements Tool {
 
   async executeTool(input: Record<string, unknown>, _context?: ToolContext) {
     return {
-      success: true,
+      isError: false,
       content: [{ type: 'text' as const, text: `Mock executed: ${JSON.stringify(input)}` }],
     };
   }

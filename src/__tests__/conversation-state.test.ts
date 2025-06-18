@@ -30,6 +30,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
 
   beforeEach(async () => {
     provider = new LMStudioProvider({
+      model: 'qwen/qwen3-1.7b',
       systemPrompt: 'You are a helpful coding assistant. Use tools when appropriate.',
     });
 

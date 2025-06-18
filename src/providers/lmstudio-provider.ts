@@ -1,20 +1,21 @@
 // ABOUTME: LMStudio provider implementation using local LMStudio server
-// ABOUTME: Handles tool calling by parsing JSON from model responses since LMStudio may not support structured tool calls
+// ABOUTME: Uses native tool calling via low-level channel API for proper tool execution
 
 import { LMStudioClient } from '@lmstudio/sdk';
 import { AIProvider, ProviderMessage, ProviderResponse, ProviderConfig } from './types.js';
 import { Tool } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
-import { convertToTextOnlyFormat } from './format-converters.js';
 
 // Interface for LMStudio model objects
 interface LMStudioModel {
-  respond(messages: { role: string; content: string }[]): AsyncIterable<LMStudioChunk>;
-}
-
-// Interface for streaming chunks from LMStudio
-interface LMStudioChunk {
-  content?: string;
+  // Access to the low-level port for native tool calling
+  port: {
+    createChannel(type: string, config: unknown, onMessage: (message: unknown) => void): unknown;
+  };
+  specifier: string;
+  predictionConfigInputToKVConfig(input: unknown): unknown;
+  internalKVConfigStack: { layers: unknown[] };
+  internalIgnoreServerSessionConfig: boolean;
 }
 
 export interface LMStudioProviderConfig extends ProviderConfig {
@@ -26,7 +27,7 @@ export class LMStudioProvider extends AIProvider {
   private readonly _client: LMStudioClient;
   private readonly _verbose: boolean;
   private readonly _baseUrl: string;
-  private _cachedModel: LMStudioModel | null = null;
+  public _cachedModel: LMStudioModel | null = null;
   private _cachedModelId: string | null = null;
 
   constructor(config: LMStudioProviderConfig = {}) {
@@ -80,437 +81,450 @@ export class LMStudioProvider extends AIProvider {
 
   async createResponse(messages: ProviderMessage[], tools: Tool[] = []): Promise<ProviderResponse> {
     const modelId = this._config.model || this.defaultModel;
+    await this._ensureModelLoaded(modelId);
 
+    logger.debug('Creating LMStudio response with native tool calling', {
+      provider: 'lmstudio',
+      model: modelId,
+      messageCount: messages.length,
+      toolCount: tools.length,
+      toolNames: tools.map((t) => t.name),
+    });
+
+    return this._createResponseWithNativeToolCalling(messages, tools, modelId);
+  }
+
+  private async _ensureModelLoaded(modelId: string): Promise<void> {
     // Check if we have a cached model for this modelId
     if (this._cachedModel && this._cachedModelId === modelId) {
       logger.debug('Using cached LMStudio model', { modelId });
+      return;
+    }
+
+    // Need to get/load the model
+    const diagnostics = await this.diagnose();
+
+    if (!diagnostics.connected) {
+      throw new Error(
+        `Cannot connect to LMStudio server at ${this._baseUrl}.\n` +
+          `Make sure LMStudio is running and accessible.\n\n` +
+          `To fix this:\n` +
+          `  - Start LMStudio application\n` +
+          `  - Ensure the server is running on ${this._baseUrl}\n` +
+          `  - Check firewall settings if using a remote server\n\n` +
+          `Connection error: ${diagnostics.error}`
+      );
+    }
+
+    // Check if any models are loaded
+    if (diagnostics.models.length === 0) {
+      throw new Error(
+        `No models are currently loaded in LMStudio.\n\n` +
+          `To fix this:\n` +
+          `  - Open LMStudio and load a model\n` +
+          `  - Download ${modelId} if not available\n` +
+          `  - Or use --provider anthropic as fallback`
+      );
+    }
+
+    // Check if our target model is already loaded
+    if (diagnostics.models.includes(modelId)) {
+      logger.info('Found already loaded model', { modelId });
+      // Get reference to existing loaded model from the list
+      const loadedModels = await this._client.llm.listLoaded();
+      const existingModel = loadedModels.find((m) => m.identifier === modelId);
+
+      if (existingModel) {
+        logger.info('Using existing model instance', { modelId });
+        this._cachedModel = existingModel as unknown as LMStudioModel;
+        this._cachedModelId = modelId;
+      } else {
+        throw new Error(`Model "${modelId}" appears loaded but could not retrieve instance`);
+      }
     } else {
-      // Need to get/load the model
-      const diagnostics = await this.diagnose();
+      logger.info('Target model not loaded, available models', {
+        targetModel: modelId,
+        availableModels: diagnostics.models,
+      });
+      logger.info('Attempting to load model', { modelId });
 
-      if (!diagnostics.connected) {
-        throw new Error(
-          `Cannot connect to LMStudio server at ${this._baseUrl}.\n` +
-            `Make sure LMStudio is running and accessible.\n\n` +
-            `To fix this:\n` +
-            `  - Start LMStudio application\n` +
-            `  - Ensure the server is running on ${this._baseUrl}\n` +
-            `  - Check firewall settings if using a remote server\n\n` +
-            `Connection error: ${diagnostics.error}`
-        );
-      }
+      try {
+        this._cachedModel = (await this._client.llm.load(modelId, {
+          verbose: this._verbose,
+        })) as unknown as LMStudioModel;
+        this._cachedModelId = modelId;
+        logger.info('Model loaded successfully', { modelId });
+      } catch (error: unknown) {
+        // Provide helpful error messages based on the error type
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage?.includes('insufficient system resources')) {
+          const loadedCount = diagnostics.models.length;
+          const hasMultipleCopies =
+            diagnostics.models.filter((m) => m.startsWith(modelId)).length > 1;
 
-      // Check if any models are loaded
-      if (diagnostics.models.length === 0) {
-        throw new Error(
-          `No models are currently loaded in LMStudio.\n\n` +
-            `To fix this:\n` +
-            `  - Open LMStudio and load a model\n` +
-            `  - Download ${modelId} if not available\n` +
-            `  - Or use --provider anthropic as fallback`
-        );
-      }
-
-      // Check if our target model is already loaded
-      if (diagnostics.models.includes(modelId)) {
-        logger.info('Found already loaded model', { modelId });
-        // Get reference to existing loaded model from the list
-        const loadedModels = await this._client.llm.listLoaded();
-        const existingModel = loadedModels.find((m) => m.identifier === modelId);
-
-        if (existingModel) {
-          logger.info('Using existing model instance', { modelId });
-          this._cachedModel = existingModel as LMStudioModel;
-          this._cachedModelId = modelId;
-        } else {
-          throw new Error(`Model "${modelId}" appears loaded but could not retrieve instance`);
-        }
-      } else {
-        logger.info('Target model not loaded, available models', {
-          targetModel: modelId,
-          availableModels: diagnostics.models,
-        });
-        logger.info('Attempting to load model', { modelId });
-
-        try {
-          this._cachedModel = (await this._client.llm.load(modelId, {
-            verbose: this._verbose,
-          })) as LMStudioModel;
-          this._cachedModelId = modelId;
-          logger.info('Model loaded successfully', { modelId });
-        } catch (error: unknown) {
-          // Provide helpful error messages based on the error type
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          if (errorMessage?.includes('insufficient system resources')) {
-            const loadedCount = diagnostics.models.length;
-            const hasMultipleCopies =
-              diagnostics.models.filter((m) => m.startsWith(modelId)).length > 1;
-
-            let specific = '';
-            if (loadedCount > 3) {
-              specific += `\n🚨 You have ${loadedCount} models loaded, which is quite a lot!`;
-            }
-            if (hasMultipleCopies) {
-              specific += `\n🚨 Multiple copies of the same model detected. Consider unloading duplicates.`;
-            }
-
-            throw new Error(
-              `LMStudio model loading failed due to insufficient system resources.${specific}\n\n` +
-                `Currently loaded models (${loadedCount}): ${diagnostics.models.join(', ')}\n\n` +
-                `To fix this:\n` +
-                `  1. Open LMStudio and unload unused models (especially duplicates)\n` +
-                `  2. Keep only one instance of ${modelId} loaded\n` +
-                `  3. Try again, or use --provider anthropic as fallback\n\n` +
-                `Original error: ${errorMessage}`
-            );
-          } else if (
-            errorMessage?.includes('ECONNREFUSED') ||
-            errorMessage?.includes('Connection refused')
-          ) {
-            throw new Error(
-              `Cannot connect to LMStudio server.\n` +
-                `Make sure LMStudio is running and accessible at the configured URL.\n\n` +
-                `To fix this:\n` +
-                `  - Start LMStudio application\n` +
-                `  - Ensure the server is running on ws://localhost:1234\n` +
-                `  - Check firewall settings if using a remote server\n\n` +
-                `Original error: ${errorMessage}`
-            );
-          } else if (
-            errorMessage?.includes('Model not found') ||
-            errorMessage?.includes('not available')
-          ) {
-            throw new Error(
-              `Model "${modelId}" is not available in LMStudio.\n\n` +
-                `To fix this:\n` +
-                `  - Download the model in LMStudio\n` +
-                `  - Check the model name is correct\n` +
-                `  - Use --provider anthropic if LMStudio isn't set up\n\n` +
-                `Original error: ${errorMessage}`
-            );
-          } else {
-            throw new Error(
-              `LMStudio connection failed: ${errorMessage}\n\n` +
-                `Common solutions:\n` +
-                `  - Ensure LMStudio is running\n` +
-                `  - Check if the model is loaded\n` +
-                `  - Try restarting LMStudio\n` +
-                `  - Use --provider anthropic as fallback`
-            );
+          let specific = '';
+          if (loadedCount > 3) {
+            specific += `\n🚨 You have ${loadedCount} models loaded, which is quite a lot!`;
           }
+          if (hasMultipleCopies) {
+            specific += `\n🚨 Multiple copies of the same model detected. Consider unloading duplicates.`;
+          }
+
+          throw new Error(
+            `LMStudio model loading failed due to insufficient system resources.${specific}\n\n` +
+              `Currently loaded models (${loadedCount}): ${diagnostics.models.join(', ')}\n\n` +
+              `To fix this:\n` +
+              `  1. Open LMStudio and unload unused models (especially duplicates)\n` +
+              `  2. Keep only one instance of ${modelId} loaded\n` +
+              `  3. Try again, or use --provider anthropic as fallback\n\n` +
+              `Original error: ${errorMessage}`
+          );
+        } else if (
+          errorMessage?.includes('ECONNREFUSED') ||
+          errorMessage?.includes('Connection refused')
+        ) {
+          throw new Error(
+            `Cannot connect to LMStudio server.\n` +
+              `Make sure LMStudio is running and accessible at the configured URL.\n\n` +
+              `To fix this:\n` +
+              `  - Start LMStudio application\n` +
+              `  - Ensure the server is running on ws://localhost:1234\n` +
+              `  - Check firewall settings if using a remote server\n\n` +
+              `Original error: ${errorMessage}`
+          );
+        } else if (
+          errorMessage?.includes('Model not found') ||
+          errorMessage?.includes('not available')
+        ) {
+          throw new Error(
+            `Model "${modelId}" is not available in LMStudio.\n\n` +
+              `To fix this:\n` +
+              `  - Download the model in LMStudio\n` +
+              `  - Check the model name is correct\n` +
+              `  - Use --provider anthropic if LMStudio isn't set up\n\n` +
+              `Original error: ${errorMessage}`
+          );
+        } else {
+          throw new Error(
+            `LMStudio connection failed: ${errorMessage}\n\n` +
+              `Common solutions:\n` +
+              `  - Ensure LMStudio is running\n` +
+              `  - Check if the model is loaded\n` +
+              `  - Try restarting LMStudio\n` +
+              `  - Use --provider anthropic as fallback`
+          );
         }
       }
     }
+  }
 
-    // Convert messages to text-only format since we're using the simple respond() method
-    // TODO: Consider using LMStudio's .act() method or chat completions API for native tool calling
-    const textOnlyMessages = convertToTextOnlyFormat(messages);
-    const lmMessages = textOnlyMessages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
+  private async _createResponseWithNativeToolCalling(
+    messages: ProviderMessage[],
+    tools: Tool[],
+    modelId: string
+  ): Promise<ProviderResponse> {
+    // Convert tools to LMStudio format
+    let rawTools;
+    if (tools.length === 0) {
+      rawTools = { type: 'none' };
+    } else {
+      rawTools = {
+        type: 'toolArray',
+        tools: tools.map((tool) => ({
+          type: 'function',
+          function: {
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.input_schema,
+          },
+        })),
+      };
+    }
 
-    // If we have tools, add a system message explaining how to use them
-    if (tools.length > 0) {
-      const toolInstructions = this._buildToolInstructions(tools);
+    // Note: Tools are not executed here - the Agent handles execution
 
-      // Check if there's already a system message
-      const systemMessageIndex = lmMessages.findIndex((msg) => msg.role === 'system');
-      if (systemMessageIndex >= 0) {
-        lmMessages[systemMessageIndex].content += '\n\n' + toolInstructions;
+    // Convert messages to LMStudio format with proper tool result handling
+    const lmMessages: unknown[] = [];
+
+    for (const msg of messages) {
+      // For assistant messages with tool calls, add the assistant message with tool_calls array
+      if (msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0) {
+        lmMessages.push({
+          role: 'assistant',
+          content: msg.content || '',
+          tool_calls: msg.toolCalls.map((toolCall) => ({
+            id: toolCall.id,
+            type: 'function',
+            function: {
+              name: toolCall.name,
+              arguments: JSON.stringify(toolCall.input),
+            },
+          })),
+        });
+      } else if (msg.role === 'user' && msg.toolResults && msg.toolResults.length > 0) {
+        // For user messages with tool results, convert to tool messages
+        // First add the user message if it has content
+        if (msg.content) {
+          lmMessages.push({
+            role: 'user',
+            content: msg.content,
+          });
+        }
+
+        // Then add tool result messages
+        for (const result of msg.toolResults) {
+          lmMessages.push({
+            role: 'tool',
+            content: result.output,
+            tool_call_id: result.id,
+          });
+        }
       } else {
-        lmMessages.unshift({
-          role: 'system',
-          content: toolInstructions,
+        // Regular messages
+        lmMessages.push({
+          role: msg.role,
+          content: msg.content || '',
         });
       }
     }
 
-    // Log the complete request payload
-    logger.debug('LMStudio RAW REQUEST PAYLOAD', {
+    // Create chat data structure manually to support tool messages
+    // Chat.from() doesn't accept OpenAI-style tool_calls or role:'tool' messages
+    const chatData = {
+      messages: lmMessages.map((msg) => {
+        // Handle tool result messages
+        if (msg.role === 'tool') {
+          return {
+            role: msg.role,
+            content: [
+              {
+                type: 'toolCallResult',
+                toolCallId: msg.tool_call_id,
+                content: msg.content || '',
+              },
+            ],
+          };
+        }
+
+        // Handle assistant messages with tool calls
+        if (msg.role === 'assistant' && msg.tool_calls) {
+          const content = [];
+
+          // Add text content if present
+          if (msg.content) {
+            content.push({
+              type: 'text',
+              text: msg.content,
+            });
+          }
+
+          // Add tool call request blocks
+          msg.tool_calls.forEach((toolCall) => {
+            content.push({
+              type: 'toolCallRequest',
+              toolCallRequest: {
+                id: toolCall.id,
+                type: toolCall.type,
+                name: toolCall.function.name,
+                arguments: JSON.parse(toolCall.function.arguments),
+              },
+            });
+          });
+
+          return {
+            role: msg.role,
+            content,
+          };
+        }
+
+        // Regular text messages
+        return {
+          role: msg.role,
+          content: [
+            {
+              type: 'text',
+              text: msg.content || '',
+            },
+          ],
+        };
+      }),
+    };
+
+    // Create config stack
+    const toolConfig = this._cachedModel!.predictionConfigInputToKVConfig({
+      maxTokens: this._config.maxTokens,
+      temperature: this._config.temperature,
+      rawTools,
+    });
+
+    const predictionConfigStack = {
+      layers: [
+        ...this._cachedModel!.internalKVConfigStack.layers,
+        {
+          layerName: 'apiOverride',
+          config: toolConfig,
+        },
+      ],
+    };
+
+    logger.debug('LMStudio native tool calling request', {
       provider: 'lmstudio',
       model: modelId,
       messageCount: lmMessages.length,
       toolCount: tools.length,
       toolNames: tools.map((t) => t.name),
-      rawMessages: JSON.stringify(lmMessages, null, 2),
-      availableTools: JSON.stringify(
-        tools.map((t) => ({
-          name: t.name,
-          description: t.description,
-          schema: t.input_schema,
-        })),
-        null,
-        2
-      ),
     });
 
-    // Make the request using cached model
-    const prediction = this._cachedModel!.respond(lmMessages);
-
-    let fullResponse = '';
-    const chunks: LMStudioChunk[] = [];
-
-    let chunkCount = 0;
-    for await (const chunk of prediction) {
-      chunkCount++;
-      chunks.push(chunk);
-
-      if (chunk.content) {
-        fullResponse += chunk.content;
-      }
-    }
-
-    // Log streaming summary instead of every chunk
-    logger.debug('LMStudio STREAMING SUMMARY', {
-      provider: 'lmstudio',
-      model: modelId,
-      totalChunks: chunkCount,
-      finalContentLength: fullResponse.length,
-      chunkTypes: [...new Set(chunks.map((c) => typeof c))],
-      hasContent: chunks.some((c) => !!c.content),
-    });
-
-    // Log the complete raw response
-    logger.debug('LMStudio RAW RESPONSE COMPLETE', {
-      provider: 'lmstudio',
-      model: modelId,
-      totalChunks: chunks.length,
-      fullResponseLength: fullResponse.length,
-      fullRawResponse: fullResponse,
-      allChunks: JSON.stringify(chunks, null, 2),
-    });
-
-    // Parse tool calls from the response
-    logger.debug('Extracting tool calls from LMStudio response', {
-      provider: 'lmstudio',
-      model: modelId,
-      rawContentLength: fullResponse.length,
-      rawContent: fullResponse,
-      toolsAvailable: tools.length,
-      toolNames: tools.map((t) => t.name),
-    });
-
-    const toolCalls = this._extractToolCalls(fullResponse);
-
-    logger.debug('Tool call extraction results', {
-      provider: 'lmstudio',
-      model: modelId,
-      extractedToolCallCount: toolCalls.length,
-      extractedToolCalls: toolCalls,
-    });
-
-    // Remove tool call JSON from the response content
-    const cleanedContent = this._removeToolCallsFromContent(fullResponse);
-
-    logger.debug('Received response from LMStudio', {
-      provider: 'lmstudio',
-      model: modelId,
-      rawContentLength: fullResponse.length,
-      cleanedContentLength: cleanedContent.length,
-      toolCallCount: toolCalls.length,
-      toolCallNames: toolCalls.map((tc) => tc.name),
-      contentAfterToolRemoval: cleanedContent,
-    });
-
-    return {
-      content: cleanedContent.trim(),
-      toolCalls,
-      stopReason: 'stop', // .respond() method doesn't provide stop reasons
-      usage: this._estimateUsage(fullResponse, lmMessages),
-      performance: this._calculatePerformance(chunkCount, fullResponse.length),
-    };
-  }
-
-  private _buildToolInstructions(tools: Tool[]): string {
-    const toolDescriptions = tools
-      .map((tool) => {
-        return `- ${tool.name}: ${tool.description}\n  Parameters: ${JSON.stringify(tool.input_schema, null, 2)}`;
-      })
-      .join('\n');
-
-    return `You have access to the following tools. When you need to use a tool, respond with a JSON object in this exact format:
-
-\`\`\`json
-{
-  "name": "tool_name",
-  "arguments": {
-    "param1": "value1",
-    "param2": "value2"
-  }
-}
-\`\`\`
-
-Available tools:
-${toolDescriptions}
-
-You can provide regular text response along with tool calls. If you need to call multiple tools, include multiple JSON blocks.`;
-  }
-
-  private _extractToolCalls(
-    response: string
-  ): Array<{ id: string; name: string; input: Record<string, unknown> }> {
-    const toolCalls: Array<{ id: string; name: string; input: Record<string, unknown> }> = [];
-
-    logger.debug('LMStudio: Starting tool call extraction', {
-      responseLength: response.length,
-      response: response,
-    });
-
-    // Look for JSON blocks in the response
-    const jsonBlockRegex = /```json\s*\n?([\s\S]*?)\n?```/g;
-    let match;
-    let callId = 1;
-    let jsonBlockCount = 0;
-
-    while ((match = jsonBlockRegex.exec(response)) !== null) {
-      jsonBlockCount++;
-      const jsonContent = match[1].trim();
-
-      logger.debug('LMStudio: Found JSON block', {
-        blockNumber: jsonBlockCount,
-        rawJsonContent: jsonContent,
-        fullMatch: match[0],
-      });
+    return new Promise((resolve, reject) => {
+      let allContent = '';
+      const toolCalls: Array<{ id: string; name: string; input: Record<string, unknown> }> = [];
+      let chunkCount = 0;
+      let resolved = false;
 
       try {
-        const parsed = JSON.parse(jsonContent);
-
-        logger.debug('LMStudio: Parsed JSON block successfully', {
-          blockNumber: jsonBlockCount,
-          parsedData: parsed,
-          hasName: !!parsed.name,
-          hasArguments: !!parsed.arguments,
-        });
-
-        if (parsed.name && parsed.arguments) {
-          const toolCall = {
-            id: `call_${callId++}`,
-            name: parsed.name,
-            input: parsed.arguments,
-          };
-
-          toolCalls.push(toolCall);
-
-          logger.debug('LMStudio: Added tool call from JSON block', {
-            toolCall: toolCall,
-          });
-        } else {
-          logger.debug('LMStudio: JSON block missing required fields', {
-            blockNumber: jsonBlockCount,
-            hasName: !!parsed.name,
-            hasArguments: !!parsed.arguments,
-            parsed: parsed,
-          });
-        }
-      } catch (error) {
-        logger.debug('LMStudio: JSON block parse failed', {
-          blockNumber: jsonBlockCount,
-          jsonContent: jsonContent,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        continue;
-      }
-    }
-
-    // Also look for standalone JSON objects (without code blocks)
-    // This regex finds JSON objects that contain both "name" and "arguments" fields
-    const standaloneJsonRegex =
-      /\{(?:[^{}]|\{[^{}]*\})*"name"(?:[^{}]|\{[^{}]*\})*"arguments"(?:[^{}]|\{[^{}]*\})*\}/g;
-    let standaloneMatch;
-    let standaloneCount = 0;
-
-    logger.debug('LMStudio: Looking for standalone JSON objects', {
-      regexPattern: standaloneJsonRegex.source,
-    });
-
-    while ((standaloneMatch = standaloneJsonRegex.exec(response)) !== null) {
-      standaloneCount++;
-
-      logger.debug('LMStudio: Found standalone JSON', {
-        standaloneNumber: standaloneCount,
-        rawJson: standaloneMatch[0],
-      });
-
-      try {
-        const parsed = JSON.parse(standaloneMatch[0]);
-
-        logger.debug('LMStudio: Parsed standalone JSON successfully', {
-          standaloneNumber: standaloneCount,
-          parsedData: parsed,
-          hasName: !!parsed.name,
-          hasArguments: !!parsed.arguments,
-        });
-
-        if (parsed.name && parsed.arguments) {
-          // Check if we already have this tool call (avoid duplicates)
-          const isDuplicate = toolCalls.some(
-            (tc) =>
-              tc.name === parsed.name &&
-              JSON.stringify(tc.input) === JSON.stringify(parsed.arguments)
-          );
-
-          logger.debug('LMStudio: Duplicate check result', {
-            standaloneNumber: standaloneCount,
-            isDuplicate: isDuplicate,
-            existingToolCalls: toolCalls.map((tc) => ({ name: tc.name, input: tc.input })),
-          });
-
-          if (!isDuplicate) {
-            const toolCall = {
-              id: `call_${callId++}`,
-              name: parsed.name,
-              input: parsed.arguments,
+        // Create the low-level prediction channel
+        this._cachedModel!.port.createChannel(
+          'predict',
+          {
+            modelSpecifier: this._cachedModel!.specifier,
+            history: chatData,
+            predictionConfigStack,
+            fuzzyPresetIdentifier: undefined,
+            ignoreServerSessionConfig: this._cachedModel!.internalIgnoreServerSessionConfig,
+          },
+          async (message: unknown) => {
+            const msg = message as {
+              type: string;
+              fragment?: { content?: string };
+              toolCallRequest?: { id: string; name: string; arguments: Record<string, unknown> };
+              stats?: {
+                stopReason?: string;
+                promptTokensCount?: number;
+                promptTokens?: number;
+                predictedTokensCount?: number;
+                completionTokens?: number;
+                totalTokensCount?: number;
+                tokensPerSecond?: number;
+                totalDuration?: number;
+                timeToFirstTokenSec?: number;
+              };
+              error?: string;
             };
+            logger.debug('LMStudio channel message', { type: msg.type });
 
-            toolCalls.push(toolCall);
+            switch (msg.type) {
+              case 'fragment': {
+                chunkCount++;
+                const fragment = msg.fragment;
 
-            logger.debug('LMStudio: Added tool call from standalone JSON', {
-              toolCall: toolCall,
-            });
+                if (fragment.content) {
+                  allContent += fragment.content;
+                  // Emit token events for streaming
+                  this.emit('token', { token: fragment.content });
+                }
+                break;
+              }
+
+              case 'toolCallGenerationStart': {
+                logger.debug('LMStudio tool call generation started');
+                break;
+              }
+
+              case 'toolCallGenerationEnd': {
+                logger.debug('LMStudio tool call generation ended', {
+                  toolCall: msg.toolCallRequest,
+                });
+
+                const toolCallRequest = msg.toolCallRequest;
+                if (!toolCallRequest) return;
+                const toolName = toolCallRequest.name;
+                const toolArgs = toolCallRequest.arguments;
+
+                // Record the tool call for Agent to execute (standard flow)
+                toolCalls.push({
+                  id: toolCallRequest.id || `call_${toolCalls.length + 1}`,
+                  name: toolName,
+                  input: toolArgs,
+                });
+
+                logger.debug('LMStudio tool call detected - returning immediately', {
+                  toolName,
+                  arguments: toolArgs,
+                });
+
+                // Return immediately with tool calls (like other providers)
+                if (!resolved) {
+                  resolved = true;
+                  resolve({
+                    content: allContent.trim(),
+                    toolCalls,
+                    stopReason: 'tool_use',
+                    usage: this._estimateUsage(allContent, lmMessages),
+                    performance: this._calculatePerformance(chunkCount, allContent.length),
+                  });
+                }
+                return;
+              }
+
+              case 'finished':
+              case 'success': {
+                logger.debug('LMStudio prediction finished', {
+                  contentLength: allContent.length,
+                  toolCallCount: toolCalls.length,
+                  chunkCount,
+                });
+
+                // Only resolve here if we haven't already resolved due to tool calls
+                if (!resolved) {
+                  resolved = true;
+                  resolve({
+                    content: allContent.trim(),
+                    toolCalls,
+                    stopReason: msg.stats?.stopReason || 'stop',
+                    usage: msg.stats
+                      ? {
+                          promptTokens: msg.stats.promptTokensCount || msg.stats.promptTokens || 0,
+                          completionTokens:
+                            msg.stats.predictedTokensCount || msg.stats.completionTokens || 0,
+                          totalTokens:
+                            msg.stats.totalTokensCount ||
+                            (msg.stats.promptTokensCount || msg.stats.promptTokens || 0) +
+                              (msg.stats.predictedTokensCount || msg.stats.completionTokens || 0),
+                        }
+                      : this._estimateUsage(allContent, lmMessages),
+                    performance: msg.stats
+                      ? {
+                          tokensPerSecond: msg.stats.tokensPerSecond,
+                          totalDuration: msg.stats.totalDuration,
+                          timeToFirstToken: msg.stats.timeToFirstTokenSec,
+                        }
+                      : this._calculatePerformance(chunkCount, allContent.length),
+                  });
+                }
+                break;
+              }
+
+              case 'error': {
+                logger.error('LMStudio prediction error', { error: msg.error });
+                if (!resolved) {
+                  resolved = true;
+                  reject(new Error(`LMStudio prediction failed: ${msg.error}`));
+                }
+                break;
+              }
+
+              default:
+                logger.debug('LMStudio unhandled message type', { type: msg.type });
+            }
           }
-        } else {
-          logger.debug('LMStudio: Standalone JSON missing required fields', {
-            standaloneNumber: standaloneCount,
-            hasName: !!parsed.name,
-            hasArguments: !!parsed.arguments,
-            parsed: parsed,
-          });
-        }
+        );
       } catch (error) {
-        logger.debug('LMStudio: Standalone JSON parse failed', {
-          standaloneNumber: standaloneCount,
-          rawJson: standaloneMatch[0],
+        logger.error('LMStudio channel creation failed', {
           error: error instanceof Error ? error.message : String(error),
         });
-        continue;
+        reject(error);
       }
-    }
-
-    logger.debug('LMStudio: Tool call extraction complete', {
-      jsonBlocksFound: jsonBlockCount,
-      standaloneJsonFound: standaloneCount,
-      totalToolCallsExtracted: toolCalls.length,
-      extractedToolCalls: toolCalls,
     });
-
-    return toolCalls;
-  }
-
-  private _removeToolCallsFromContent(response: string): string {
-    // Remove JSON code blocks
-    let cleaned = response.replace(/```json\s*\n?[\s\S]*?\n?```/g, '');
-
-    // Remove standalone JSON objects that look like tool calls
-    cleaned = cleaned.replace(
-      /\{(?:[^{}]|\{[^{}]*\})*"name"(?:[^{}]|\{[^{}]*\})*"arguments"(?:[^{}]|\{[^{}]*\})*\}/g,
-      ''
-    );
-
-    // Clean up extra whitespace but preserve single newlines
-    cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
-
-    return cleaned;
   }
 
   async createStreamingResponse(
@@ -518,149 +532,27 @@ You can provide regular text response along with tool calls. If you need to call
     tools: Tool[] = []
   ): Promise<ProviderResponse> {
     const modelId = this._config.model || this.defaultModel;
+    await this._ensureModelLoaded(modelId);
 
-    // Check if we have a cached model for this modelId
-    if (this._cachedModel && this._cachedModelId === modelId) {
-      logger.debug('Using cached LMStudio model for streaming', { modelId });
-    } else {
-      // Need to get/load the model (same logic as non-streaming)
-      const diagnostics = await this.diagnose();
-
-      if (!diagnostics.connected) {
-        throw new Error(
-          `Cannot connect to LMStudio server at ${this._baseUrl}.\n` +
-            `Make sure LMStudio is running and accessible.\n\n` +
-            `To fix this:\n` +
-            `  - Start LMStudio application\n` +
-            `  - Ensure the server is running on ${this._baseUrl}\n` +
-            `  - Check firewall settings if using a remote server\n\n` +
-            `Connection error: ${diagnostics.error}`
-        );
-      }
-
-      if (diagnostics.models.length === 0) {
-        throw new Error(
-          `No models are currently loaded in LMStudio.\n\n` +
-            `To fix this:\n` +
-            `  - Open LMStudio and load a model\n` +
-            `  - Download ${modelId} if not available\n` +
-            `  - Or use --provider anthropic as fallback`
-        );
-      }
-
-      // Check if our target model is already loaded
-      if (diagnostics.models.includes(modelId)) {
-        const loadedModels = await this._client.llm.listLoaded();
-        const existingModel = loadedModels.find((m) => m.identifier === modelId);
-
-        if (existingModel) {
-          this._cachedModel = existingModel as LMStudioModel;
-          this._cachedModelId = modelId;
-        } else {
-          throw new Error(`Model "${modelId}" appears loaded but could not retrieve instance`);
-        }
-      } else {
-        try {
-          this._cachedModel = (await this._client.llm.load(modelId, {
-            verbose: this._verbose,
-          })) as LMStudioModel;
-          this._cachedModelId = modelId;
-        } catch (error: unknown) {
-          throw new Error(
-            `LMStudio model loading failed: ${error instanceof Error ? error.message : String(error)}`
-          );
-        }
-      }
-    }
-
-    // Convert messages to text-only format
-    const textOnlyMessages = convertToTextOnlyFormat(messages);
-    const lmMessages = textOnlyMessages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
-
-    // If we have tools, add tool instructions
-    if (tools.length > 0) {
-      const toolInstructions = this._buildToolInstructions(tools);
-
-      const systemMessageIndex = lmMessages.findIndex((msg) => msg.role === 'system');
-      if (systemMessageIndex >= 0) {
-        lmMessages[systemMessageIndex].content += '\n\n' + toolInstructions;
-      } else {
-        lmMessages.unshift({
-          role: 'system',
-          content: toolInstructions,
-        });
-      }
-    }
-
-    logger.debug('Sending streaming request to LMStudio', {
+    logger.debug('Creating streaming LMStudio response with native tool calling', {
       provider: 'lmstudio',
       model: modelId,
-      messageCount: lmMessages.length,
+      messageCount: messages.length,
       toolCount: tools.length,
       toolNames: tools.map((t) => t.name),
     });
 
-    // Make the streaming request
-    const prediction = this._cachedModel!.respond(lmMessages);
-
-    let fullResponse = '';
-    let chunkCount = 0;
-
-    try {
-      // Process streaming response
-      for await (const chunk of prediction) {
-        chunkCount++;
-
-        if (chunk.content) {
-          // Emit token events for real-time display
-          this.emit('token', { token: chunk.content });
-          fullResponse += chunk.content;
-        }
-      }
-
-      logger.debug('Received streaming response from LMStudio', {
-        provider: 'lmstudio',
-        model: modelId,
-        totalChunks: chunkCount,
-        contentLength: fullResponse.length,
-      });
-
-      // Parse tool calls from the response
-      const toolCalls = this._extractToolCalls(fullResponse);
-
-      // Remove tool call JSON from the response content
-      const cleanedContent = this._removeToolCallsFromContent(fullResponse);
-
-      const result = {
-        content: cleanedContent.trim(),
-        toolCalls,
-        stopReason: 'stop', // .respond() method doesn't provide stop reasons
-        usage: this._estimateUsage(fullResponse, lmMessages),
-        performance: this._calculatePerformance(chunkCount, fullResponse.length),
-      };
-
-      // Emit completion event
-      this.emit('complete', { response: result });
-
-      return result;
-    } catch (error) {
-      const errorObj = error as Error;
-      logger.error('Streaming error from LMStudio', { error: errorObj.message });
-      this.emit('error', { error: errorObj });
-      throw error;
-    }
+    // Use the same native tool calling method
+    return this._createResponseWithNativeToolCalling(messages, tools, modelId);
   }
 
   private _estimateUsage(
     response: string,
-    messages: any[]
+    messages: unknown[]
   ): { promptTokens: number; completionTokens: number; totalTokens: number } {
     // Rough estimation since .respond() doesn't provide exact token counts
     // This could be enhanced by using LMStudio's tokenizer API if available
-    const promptText = messages.map((m) => m.content).join(' ');
+    const promptText = messages.map((m) => (m as { content?: string }).content || '').join(' ');
     const promptTokens = Math.ceil(promptText.length / 4); // Rough estimate: ~4 chars per token
     const completionTokens = Math.ceil(response.length / 4);
 

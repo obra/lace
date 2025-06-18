@@ -21,7 +21,7 @@ class MockTool implements Tool {
 
   async executeTool(input: Record<string, unknown>, _context?: ToolContext) {
     return {
-      success: true,
+      isError: false,
       content: [{ type: 'text' as const, text: `Mock executed: ${JSON.stringify(input)}` }],
     };
   }
@@ -41,9 +41,8 @@ class FailingTool implements Tool {
 
   async executeTool(_input: Record<string, unknown>, _context?: ToolContext) {
     return {
-      success: false,
-      content: [{ type: 'text' as const, text: 'Tool execution failed' }],
-      error: 'Simulated failure',
+      isError: true,
+      content: [{ type: 'text' as const, text: 'Simulated failure' }],
     };
   }
 }
@@ -86,6 +85,8 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
   });
 
   it('should handle multiple tool calls in sequence', async () => {
+    if (!isLMStudioAvailable) return;
+
     const messages = [
       {
         role: 'user' as const,
@@ -95,9 +96,11 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
 
     const response = await provider.createResponse(messages, [mockTool]);
 
-    // For now, just test that we get a response - tool calling might not work correctly yet
+    // With native tool calling, we should get proper tool calls
     expect(response.content).toBeTruthy();
     expect(response.content.length).toBeGreaterThan(0);
+    // The model should attempt to use the tool
+    expect(response.toolCalls.length).toBeGreaterThanOrEqual(1);
   }, 30000);
 
   it('should handle conversation with tool results', async () => {
@@ -156,7 +159,7 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
       },
       async executeTool(input: Record<string, unknown>, _context?: ToolContext) {
         return {
-          success: true,
+          isError: false,
           content: [
             {
               type: 'text' as const,
@@ -237,6 +240,8 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
   }, 30000);
 
   it('should handle unicode and special characters', async () => {
+    if (!isLMStudioAvailable) return;
+
     const messages = [
       {
         role: 'user' as const,
@@ -249,5 +254,47 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
     expect(response.content).toBeTruthy();
     // Should handle the request without crashing
     expect(response.content.length).toBeGreaterThan(5);
+  }, 30000);
+
+  it('should execute tools using native tool calling', async () => {
+    if (!isLMStudioAvailable) return;
+
+    const simpleTool: Tool = {
+      name: 'get_weather',
+      description: 'Get weather information for a location',
+      input_schema: {
+        type: 'object',
+        properties: {
+          location: { type: 'string', description: 'Location name' },
+        },
+        required: ['location'],
+      },
+      async executeTool(input: Record<string, unknown>, _context?: ToolContext) {
+        return {
+          isError: false,
+          content: [
+            {
+              type: 'text' as const,
+              text: `Weather in ${input.location}: Sunny, 72°F`,
+            },
+          ],
+        };
+      },
+    };
+
+    const messages = [
+      {
+        role: 'user' as const,
+        content: 'What is the weather like in San Francisco? Please use the get_weather tool.',
+      },
+    ];
+
+    const response = await provider.createResponse(messages, [simpleTool]);
+
+    // Verify native tool calling works
+    expect(response.toolCalls.length).toBeGreaterThan(0);
+    expect(response.toolCalls[0].name).toBe('get_weather');
+    expect(response.toolCalls[0].input.location).toBe('San Francisco');
+    expect(response.content).toBeTruthy();
   }, 30000);
 });

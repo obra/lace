@@ -45,3 +45,6 @@ pids
 *.pid
 *.seed
 .claude/settings.local.json
+
+# Temp dir
+temp/
