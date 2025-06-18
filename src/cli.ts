@@ -15,7 +15,7 @@ import { DelegateTool } from './tools/implementations/delegate.js';
 import { startSession } from './threads/session.js';
 import { logger } from './utils/logger.js';
 import { loadPromptConfig, getPromptFilePaths } from './config/prompts.js';
-import { parseArgs, showHelp, validateProvider } from './cli/args.js';
+import { parseArgs, validateProvider } from './cli/args.js';
 import { CLIInterface } from './cli/interface.js';
 import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
 
@@ -42,7 +42,9 @@ async function createProvider(
   const baseProvider = registry.getProvider(providerType);
   if (!baseProvider) {
     const availableProviders = registry.getProviderNames();
-    console.error(`Error: Unknown provider '${providerType}'. Available providers: ${availableProviders.join(', ')}`);
+    console.error(
+      `Error: Unknown provider '${providerType}'. Available providers: ${availableProviders.join(', ')}`
+    );
     process.exit(1);
   }
 
@@ -83,12 +85,7 @@ async function createProvider(
 
 async function main() {
   // Parse arguments
-  const options = parseArgs();
-
-  if (options.help) {
-    await showHelp();
-    process.exit(0);
-  }
+  const options = await parseArgs();
 
   // Initialize logging
   logger.configure(options.logLevel, options.logFile);
@@ -108,10 +105,10 @@ async function main() {
 
   // Initialize provider registry
   const registry = await ProviderRegistry.createWithAutoDiscovery();
-  
+
   // Validate provider against registry
   validateProvider(options.provider, registry);
-  
+
   const provider = await createProvider(registry, options.provider, options.model);
 
   // Create and configure tool executor with all available tools

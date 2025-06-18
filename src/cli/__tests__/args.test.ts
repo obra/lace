@@ -19,8 +19,8 @@ describe('CLI Arguments (Commander-based)', () => {
   });
 
   describe('basic argument parsing', () => {
-    it('should return default options when no args provided', () => {
-      const result = parseArgs([]);
+    it('should return default options when no args provided', async () => {
+      const result = await parseArgs([]);
 
       expect(result).toEqual({
         provider: 'anthropic',
@@ -39,37 +39,37 @@ describe('CLI Arguments (Commander-based)', () => {
       });
     });
 
-    it('should parse existing provider and model flags', () => {
-      const result = parseArgs(['--provider', 'lmstudio', '--model', 'test-model']);
+    it('should parse existing provider and model flags', async () => {
+      const result = await parseArgs(['--provider', 'lmstudio', '--model', 'test-model']);
 
       expect(result.provider).toBe('lmstudio');
       expect(result.model).toBe('test-model');
     });
 
-    it('should parse help flag', () => {
+    it('should parse help flag', async () => {
       // Help flag triggers exit, so we expect it to throw
-      expect(() => parseArgs(['--help'])).toThrow('process.exit called');
+      await expect(() => parseArgs(['--help'])).rejects.toThrow('process.exit called');
     });
   });
 
   describe('tool approval flags', () => {
-    it('should parse --allow-non-destructive-tools flag', () => {
-      const result = parseArgs(['--allow-non-destructive-tools']);
+    it('should parse --allow-non-destructive-tools flag', async () => {
+      const result = await parseArgs(['--allow-non-destructive-tools']);
       expect(result.allowNonDestructiveTools).toBe(true);
     });
 
-    it('should parse --auto-approve-tools with single tool', () => {
-      const result = parseArgs(['--auto-approve-tools=bash']);
+    it('should parse --auto-approve-tools with single tool', async () => {
+      const result = await parseArgs(['--auto-approve-tools=bash']);
       expect(result.autoApproveTools).toEqual(['bash']);
     });
 
-    it('should parse --auto-approve-tools with multiple tools', () => {
-      const result = parseArgs(['--auto-approve-tools=bash,file_read,file_write']);
+    it('should parse --auto-approve-tools with multiple tools', async () => {
+      const result = await parseArgs(['--auto-approve-tools=bash,file_read,file_write']);
       expect(result.autoApproveTools).toEqual(['bash', 'file_read', 'file_write']);
     });
 
-    it('should parse multiple --auto-approve-tools flags additively', () => {
-      const result = parseArgs([
+    it('should parse multiple --auto-approve-tools flags additively', async () => {
+      const result = await parseArgs([
         '--auto-approve-tools=bash',
         '--auto-approve-tools=file_read',
         '--auto-approve-tools=file_write',
@@ -77,99 +77,103 @@ describe('CLI Arguments (Commander-based)', () => {
       expect(result.autoApproveTools).toEqual(['bash', 'file_read', 'file_write']);
     });
 
-    it('should parse --disable-tools with single tool', () => {
-      const result = parseArgs(['--disable-tools=bash']);
+    it('should parse --disable-tools with single tool', async () => {
+      const result = await parseArgs(['--disable-tools=bash']);
       expect(result.disableTools).toEqual(['bash']);
     });
 
-    it('should parse --disable-tools with multiple tools', () => {
-      const result = parseArgs(['--disable-tools=bash,file_write']);
+    it('should parse --disable-tools with multiple tools', async () => {
+      const result = await parseArgs(['--disable-tools=bash,file_write']);
       expect(result.disableTools).toEqual(['bash', 'file_write']);
     });
 
-    it('should parse multiple --disable-tools flags additively', () => {
-      const result = parseArgs(['--disable-tools=bash', '--disable-tools=file_write']);
+    it('should parse multiple --disable-tools flags additively', async () => {
+      const result = await parseArgs(['--disable-tools=bash', '--disable-tools=file_write']);
       expect(result.disableTools).toEqual(['bash', 'file_write']);
     });
 
-    it('should parse --disable-all-tools flag', () => {
-      const result = parseArgs(['--disable-all-tools']);
+    it('should parse --disable-all-tools flag', async () => {
+      const result = await parseArgs(['--disable-all-tools']);
       expect(result.disableAllTools).toBe(true);
     });
 
-    it('should parse --disable-tool-guardrails flag', () => {
-      const result = parseArgs(['--disable-tool-guardrails']);
+    it('should parse --disable-tool-guardrails flag', async () => {
+      const result = await parseArgs(['--disable-tool-guardrails']);
       expect(result.disableToolGuardrails).toBe(true);
     });
 
-    it('should parse --list-tools flag', () => {
+    it('should parse --list-tools flag', async () => {
       // --list-tools triggers exit after listing tools
-      expect(() => parseArgs(['--list-tools'])).toThrow('process.exit called');
+      await expect(() => parseArgs(['--list-tools'])).rejects.toThrow('process.exit called');
     });
   });
 
   describe('tool validation', () => {
-    it('should reject unknown tools in --auto-approve-tools', () => {
-      expect(() => parseArgs(['--auto-approve-tools=nonexistent'])).toThrow('process.exit called');
+    it('should reject unknown tools in --auto-approve-tools', async () => {
+      await expect(() => parseArgs(['--auto-approve-tools=nonexistent'])).rejects.toThrow(
+        'process.exit called'
+      );
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Unknown tool 'nonexistent'")
       );
     });
 
-    it('should reject unknown tools in --disable-tools', () => {
-      expect(() => parseArgs(['--disable-tools=unknown,bash'])).toThrow('process.exit called');
+    it('should reject unknown tools in --disable-tools', async () => {
+      await expect(() => parseArgs(['--disable-tools=unknown,bash'])).rejects.toThrow(
+        'process.exit called'
+      );
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Unknown tool 'unknown'"));
     });
 
-    it('should reject mixed known and unknown tools', () => {
-      expect(() => parseArgs(['--auto-approve-tools=bash,unknown,file_read'])).toThrow(
-        'process.exit called'
-      );
+    it('should reject mixed known and unknown tools', async () => {
+      await expect(() =>
+        parseArgs(['--auto-approve-tools=bash,unknown,file_read'])
+      ).rejects.toThrow('process.exit called');
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Unknown tool 'unknown'"));
     });
   });
 
   describe('flag combination validation', () => {
-    it('should reject --disable-all-tools with --auto-approve-tools', () => {
-      expect(() => parseArgs(['--disable-all-tools', '--auto-approve-tools=bash'])).toThrow(
-        'process.exit called'
-      );
+    it('should reject --disable-all-tools with --auto-approve-tools', async () => {
+      await expect(() =>
+        parseArgs(['--disable-all-tools', '--auto-approve-tools=bash'])
+      ).rejects.toThrow('process.exit called');
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Cannot auto-approve tools when all tools are disabled')
       );
     });
 
-    it('should reject --disable-all-tools with --allow-non-destructive-tools', () => {
-      expect(() => parseArgs(['--disable-all-tools', '--allow-non-destructive-tools'])).toThrow(
-        'process.exit called'
-      );
+    it('should reject --disable-all-tools with --allow-non-destructive-tools', async () => {
+      await expect(() =>
+        parseArgs(['--disable-all-tools', '--allow-non-destructive-tools'])
+      ).rejects.toThrow('process.exit called');
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Cannot allow tools when all tools are disabled')
       );
     });
 
-    it('should reject --disable-tool-guardrails with --disable-all-tools', () => {
-      expect(() => parseArgs(['--disable-tool-guardrails', '--disable-all-tools'])).toThrow(
-        'process.exit called'
-      );
+    it('should reject --disable-tool-guardrails with --disable-all-tools', async () => {
+      await expect(() =>
+        parseArgs(['--disable-tool-guardrails', '--disable-all-tools'])
+      ).rejects.toThrow('process.exit called');
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Cannot disable guardrails and all tools simultaneously')
       );
     });
 
-    it('should reject auto-approving a disabled tool', () => {
-      expect(() => parseArgs(['--disable-tools=bash', '--auto-approve-tools=bash'])).toThrow(
-        'process.exit called'
-      );
+    it('should reject auto-approving a disabled tool', async () => {
+      await expect(() =>
+        parseArgs(['--disable-tools=bash', '--auto-approve-tools=bash'])
+      ).rejects.toThrow('process.exit called');
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Cannot auto-approve disabled tool 'bash'")
       );
     });
 
-    it('should reject auto-approving a tool that gets disabled later in args', () => {
-      expect(() => parseArgs(['--auto-approve-tools=bash', '--disable-tools=bash'])).toThrow(
-        'process.exit called'
-      );
+    it('should reject auto-approving a tool that gets disabled later in args', async () => {
+      await expect(() =>
+        parseArgs(['--auto-approve-tools=bash', '--disable-tools=bash'])
+      ).rejects.toThrow('process.exit called');
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Cannot auto-approve disabled tool 'bash'")
       );
@@ -177,8 +181,8 @@ describe('CLI Arguments (Commander-based)', () => {
   });
 
   describe('complex flag combinations', () => {
-    it('should parse valid complex combination', () => {
-      const result = parseArgs([
+    it('should parse valid complex combination', async () => {
+      const result = await parseArgs([
         '--provider=lmstudio',
         '--allow-non-destructive-tools',
         '--auto-approve-tools=bash',
@@ -202,24 +206,24 @@ describe('CLI Arguments (Commander-based)', () => {
       });
     });
 
-    it('should handle empty tool lists gracefully', () => {
-      const result = parseArgs(['--auto-approve-tools=']);
+    it('should handle empty tool lists gracefully', async () => {
+      const result = await parseArgs(['--auto-approve-tools=']);
       expect(result.autoApproveTools).toEqual([]);
     });
 
-    it('should handle whitespace in tool lists', () => {
-      const result = parseArgs(['--auto-approve-tools=bash, file_read ,file_write']);
+    it('should handle whitespace in tool lists', async () => {
+      const result = await parseArgs(['--auto-approve-tools=bash, file_read ,file_write']);
       expect(result.autoApproveTools).toEqual(['bash', 'file_read', 'file_write']);
     });
   });
 
   describe('help and list functionality', () => {
-    it('should show help with tool approval options', () => {
+    it('should show help with tool approval options', async () => {
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       // Mock process.stdout.write since Commander uses it for help output
       const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-      showHelp();
+      await showHelp();
 
       // Combine both console.log and stdout.write outputs
       const logOutput = logSpy.mock.calls.map((call) => call[0]).join('');
@@ -237,11 +241,11 @@ describe('CLI Arguments (Commander-based)', () => {
       stdoutSpy.mockRestore();
     });
 
-    it('should list tools with descriptions when --list-tools is used', () => {
+    it('should list tools with descriptions when --list-tools is used', async () => {
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       // This would normally exit, but we'll test the behavior
-      expect(() => parseArgs(['--list-tools'])).toThrow('process.exit called');
+      await expect(() => parseArgs(['--list-tools'])).rejects.toThrow('process.exit called');
 
       // The tool listing should have been called
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Available tools:'));
@@ -253,10 +257,10 @@ describe('CLI Arguments (Commander-based)', () => {
       logSpy.mockRestore();
     });
 
-    it('should show tool safety classification in list', () => {
+    it('should show tool safety classification in list', async () => {
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      expect(() => parseArgs(['--list-tools'])).toThrow('process.exit called');
+      await expect(() => parseArgs(['--list-tools'])).rejects.toThrow('process.exit called');
 
       const logOutput = logSpy.mock.calls.map((call) => call[0]).join('');
       expect(logOutput).toContain('(destructive)');
@@ -267,8 +271,8 @@ describe('CLI Arguments (Commander-based)', () => {
   });
 
   describe('error handling', () => {
-    it('should reject unknown flags', () => {
-      expect(() => parseArgs(['--unknown-flag'])).toThrow('process.exit called');
+    it('should reject unknown flags', async () => {
+      await expect(() => parseArgs(['--unknown-flag'])).rejects.toThrow('process.exit called');
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Error: error: unknown option')
       );

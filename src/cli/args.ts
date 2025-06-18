@@ -104,7 +104,7 @@ function listToolsAndExit(toolExecutor: ToolExecutor): void {
   process.exit(0);
 }
 
-export function parseArgs(args: string[] = process.argv.slice(2)): CLIOptions {
+export async function parseArgs(args: string[] = process.argv.slice(2)): Promise<CLIOptions> {
   const program = new Command();
 
   program
@@ -208,7 +208,7 @@ export function parseArgs(args: string[] = process.argv.slice(2)): CLIOptions {
 
   // Handle --help (exits after showing help)
   if (result.help) {
-    program.outputHelp();
+    await showHelp();
     process.exit(0);
   }
 
@@ -226,12 +226,8 @@ export function parseArgs(args: string[] = process.argv.slice(2)): CLIOptions {
 async function getProviderHelpText(): Promise<string> {
   const registry = await ProviderRegistry.createWithAutoDiscovery();
   const providers = registry.getProviderNames().sort();
-  const defaultProvider = 'anthropic';
-  const otherProviders = providers.filter((p) => p !== defaultProvider);
 
-  return otherProviders.length > 0
-    ? `Choose AI provider: "${defaultProvider}" (default), "${otherProviders.join('", "')}"`
-    : `Choose AI provider: "${defaultProvider}" (default)`;
+  return `Choose AI provider: ${providers.join(', ')}`;
 }
 
 export function validateProvider(provider: string, registry: ProviderRegistry): void {
