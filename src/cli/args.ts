@@ -3,9 +3,10 @@
 
 import { Command } from 'commander';
 import { ToolExecutor } from '../tools/executor.js';
+import { ProviderRegistry } from '../providers/registry.js';
 
 export interface CLIOptions {
-  provider: 'anthropic' | 'openai' | 'lmstudio' | 'ollama';
+  provider: string;
   model: string | undefined;
   help: boolean;
   logLevel: 'error' | 'warn' | 'info' | 'debug';
@@ -113,11 +114,7 @@ export function parseArgs(args: string[] = process.argv.slice(2)): CLIOptions {
     .exitOverride() // Prevent Commander from calling process.exit directly
     .helpOption(false) // Disable automatic help handling
     .option('-h, --help', 'display help for command', false)
-    .option(
-      '-p, --provider <name>',
-      'Choose AI provider: "anthropic" (default), "openai", "lmstudio", or "ollama"',
-      'anthropic'
-    )
+    .option('-p, --provider <name>', 'Choose AI provider (use --help for full list)', 'anthropic')
     .option('-m, --model <name>', 'Override the default model for the selected provider')
     .option(
       '--log-level <level>',
@@ -158,13 +155,6 @@ export function parseArgs(args: string[] = process.argv.slice(2)): CLIOptions {
   }
 
   const options = program.opts();
-
-  // Validate provider
-  const validProviders = ['anthropic', 'openai', 'lmstudio', 'ollama'];
-  if (!validProviders.includes(options.provider)) {
-    console.error('Error: --provider must be "anthropic", "openai", "lmstudio", or "ollama"');
-    process.exit(1);
-  }
 
   // Validate log level
   const validLogLevels = ['error', 'warn', 'info', 'debug'];
@@ -233,18 +223,37 @@ export function parseArgs(args: string[] = process.argv.slice(2)): CLIOptions {
   return result;
 }
 
-export function showHelp(): void {
+async function getProviderHelpText(): Promise<string> {
+  const registry = await ProviderRegistry.createWithAutoDiscovery();
+  const providers = registry.getProviderNames().sort();
+  const defaultProvider = 'anthropic';
+  const otherProviders = providers.filter((p) => p !== defaultProvider);
+
+  return otherProviders.length > 0
+    ? `Choose AI provider: "${defaultProvider}" (default), "${otherProviders.join('", "')}"`
+    : `Choose AI provider: "${defaultProvider}" (default)`;
+}
+
+export function validateProvider(provider: string, registry: ProviderRegistry): void {
+  const availableProviders = registry.getProviderNames();
+  if (!availableProviders.includes(provider)) {
+    console.error(
+      `Error: Unknown provider '${provider}'. Available providers: ${availableProviders.join(', ')}`
+    );
+    process.exit(1);
+  }
+}
+
+export async function showHelp(): Promise<void> {
+  const providerHelpText = await getProviderHelpText();
+
   // Commander generates help automatically, just trigger it
   const program = new Command();
 
   program
     .name('lace')
     .description('Lace AI Coding Assistant')
-    .option(
-      '-p, --provider <name>',
-      'Choose AI provider: "anthropic" (default), "openai", "lmstudio", or "ollama"',
-      'anthropic'
-    )
+    .option('-p, --provider <name>', providerHelpText, 'anthropic')
     .option('-m, --model <name>', 'Override the default model for the selected provider')
     .option(
       '--log-level <level>',

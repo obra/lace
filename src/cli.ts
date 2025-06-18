@@ -8,23 +8,21 @@ import { loadEnvFile, getEnvVar } from './config/env-loader.js';
 loadEnvFile();
 
 import { Agent } from './agents/agent.js';
-import { AnthropicProvider } from './providers/anthropic-provider.js';
-import { OpenAIProvider } from './providers/openai-provider.js';
-import { LMStudioProvider } from './providers/lmstudio-provider.js';
-import { OllamaProvider } from './providers/ollama-provider.js';
+import { ProviderRegistry } from './providers/registry.js';
 import { AIProvider } from './providers/types.js';
 import { ToolExecutor } from './tools/executor.js';
 import { DelegateTool } from './tools/implementations/delegate.js';
 import { startSession } from './threads/session.js';
 import { logger } from './utils/logger.js';
 import { loadPromptConfig, getPromptFilePaths } from './config/prompts.js';
-import { parseArgs, showHelp } from './cli/args.js';
+import { parseArgs, showHelp, validateProvider } from './cli/args.js';
 import { CLIInterface } from './cli/interface.js';
 import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
 
 // Create provider based on CLI option
 async function createProvider(
-  providerType: 'anthropic' | 'openai' | 'lmstudio' | 'ollama',
+  registry: ProviderRegistry,
+  providerType: string,
   model?: string
 ): Promise<AIProvider> {
   // Load configurable prompts from user's Lace directory
@@ -40,6 +38,15 @@ async function createProvider(
     console.log("\n💡 Edit these files to customize your AI assistant's behavior.\n");
   }
 
+  // Get base provider from registry
+  const baseProvider = registry.getProvider(providerType);
+  if (!baseProvider) {
+    const availableProviders = registry.getProviderNames();
+    console.error(`Error: Unknown provider '${providerType}'. Available providers: ${availableProviders.join(', ')}`);
+    process.exit(1);
+  }
+
+  // Create properly configured provider based on type
   switch (providerType) {
     case 'anthropic': {
       const apiKey = getEnvVar('ANTHROPIC_KEY');
@@ -47,6 +54,7 @@ async function createProvider(
         console.error('Error: ANTHROPIC_KEY environment variable required for Anthropic provider');
         process.exit(1);
       }
+      const { AnthropicProvider } = await import('./providers/anthropic-provider.js');
       return new AnthropicProvider({ apiKey, systemPrompt, model });
     }
     case 'openai': {
@@ -57,12 +65,15 @@ async function createProvider(
         );
         process.exit(1);
       }
+      const { OpenAIProvider } = await import('./providers/openai-provider.js');
       return new OpenAIProvider({ apiKey, systemPrompt, model });
     }
     case 'lmstudio': {
+      const { LMStudioProvider } = await import('./providers/lmstudio-provider.js');
       return new LMStudioProvider({ systemPrompt, model });
     }
     case 'ollama': {
+      const { OllamaProvider } = await import('./providers/ollama-provider.js');
       return new OllamaProvider({ systemPrompt, model });
     }
     default:
@@ -75,7 +86,7 @@ async function main() {
   const options = parseArgs();
 
   if (options.help) {
-    showHelp();
+    await showHelp();
     process.exit(0);
   }
 
@@ -95,7 +106,13 @@ async function main() {
     laceDir: getEnvVar('LACE_DIR', '~/.lace'),
   });
 
-  const provider = await createProvider(options.provider, options.model);
+  // Initialize provider registry
+  const registry = await ProviderRegistry.createWithAutoDiscovery();
+  
+  // Validate provider against registry
+  validateProvider(options.provider, registry);
+  
+  const provider = await createProvider(registry, options.provider, options.model);
 
   // Create and configure tool executor with all available tools
   const toolExecutor = new ToolExecutor();

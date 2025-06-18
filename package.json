@@ -19,9 +19,11 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
     "@lmstudio/sdk": "^1.2.1",
+    "@types/glob": "^8.1.0",
     "better-sqlite3": "^11.10.0",
     "commander": "^14.0.0",
     "dotenv": "^16.5.0",
+    "glob": "^11.0.3",
     "ollama": "^0.5.16",
     "openai": "^4.77.0",
     "pino": "^9.7.0",

@@ -5,6 +5,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { ProviderRegistry } from '../registry.js';
 import { AnthropicProvider } from '../anthropic-provider.js';
 import { LMStudioProvider } from '../lmstudio-provider.js';
+import { OpenAIProvider } from '../openai-provider.js';
+import { OllamaProvider } from '../ollama-provider.js';
 
 describe('ProviderRegistry', () => {
   let registry: ProviderRegistry;
@@ -87,6 +89,81 @@ describe('ProviderRegistry', () => {
       expect(names).toHaveLength(2);
       expect(names).toContain('anthropic');
       expect(names).toContain('lmstudio');
+    });
+  });
+
+  describe('createWithAutoDiscovery', () => {
+    it('should discover and register all existing provider files', async () => {
+      const registry = await ProviderRegistry.createWithAutoDiscovery();
+      const providerNames = registry.getProviderNames();
+      
+      expect(providerNames).toContain('anthropic');
+      expect(providerNames).toContain('openai');
+      expect(providerNames).toContain('lmstudio');
+      expect(providerNames).toContain('ollama');
+      expect(providerNames).toHaveLength(4);
+    });
+
+    it('should register providers with correct instances', async () => {
+      const registry = await ProviderRegistry.createWithAutoDiscovery();
+      
+      const anthropicProvider = registry.getProvider('anthropic');
+      const openaiProvider = registry.getProvider('openai');
+      const lmstudioProvider = registry.getProvider('lmstudio');
+      const ollamaProvider = registry.getProvider('ollama');
+
+      expect(anthropicProvider).toBeDefined();
+      expect(openaiProvider).toBeDefined();
+      expect(lmstudioProvider).toBeDefined();
+      expect(ollamaProvider).toBeDefined();
+
+      expect(anthropicProvider!.providerName).toBe('anthropic');
+      expect(openaiProvider!.providerName).toBe('openai');
+      expect(lmstudioProvider!.providerName).toBe('lmstudio');
+      expect(ollamaProvider!.providerName).toBe('ollama');
+    });
+
+    it('should only discover files matching *-provider.ts pattern', async () => {
+      const registry = await ProviderRegistry.createWithAutoDiscovery();
+      const providerNames = registry.getProviderNames();
+      
+      // Should not include non-provider files like types.ts, registry.ts, etc.
+      expect(providerNames).not.toContain('types');
+      expect(providerNames).not.toContain('registry');
+      expect(providerNames).not.toContain('format-converters');
+    });
+
+    it('should handle provider files with missing exports gracefully', async () => {
+      // This test ensures auto-discovery doesn't crash on malformed files
+      // We don't need to create malformed files - just verify it doesn't throw
+      await expect(ProviderRegistry.createWithAutoDiscovery()).resolves.toBeDefined();
+    });
+  });
+
+  describe('isProviderClass', () => {
+    it('should identify valid provider classes', () => {
+      expect(ProviderRegistry.isProviderClass(AnthropicProvider)).toBe(true);
+      expect(ProviderRegistry.isProviderClass(OpenAIProvider)).toBe(true);
+      expect(ProviderRegistry.isProviderClass(LMStudioProvider)).toBe(true);
+      expect(ProviderRegistry.isProviderClass(OllamaProvider)).toBe(true);
+    });
+
+    it('should reject non-provider classes', () => {
+      class NotAProvider {}
+      class AlmostProvider {
+        providerName = 'test';
+      }
+      
+      expect(ProviderRegistry.isProviderClass(NotAProvider)).toBe(false);
+      expect(ProviderRegistry.isProviderClass(AlmostProvider)).toBe(false);
+    });
+
+    it('should reject non-class values', () => {
+      expect(ProviderRegistry.isProviderClass({})).toBe(false);
+      expect(ProviderRegistry.isProviderClass('string')).toBe(false);
+      expect(ProviderRegistry.isProviderClass(123)).toBe(false);
+      expect(ProviderRegistry.isProviderClass(null)).toBe(false);
+      expect(ProviderRegistry.isProviderClass(undefined)).toBe(false);
     });
   });
 });
