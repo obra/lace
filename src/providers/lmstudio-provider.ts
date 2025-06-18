@@ -244,7 +244,21 @@ export class LMStudioProvider extends AIProvider {
     // Note: Tools are not executed here - the Agent handles execution
 
     // Convert messages to LMStudio format with proper tool result handling
-    const lmMessages: unknown[] = [];
+    interface OpenAIStyleMessage {
+      role: string;
+      content?: string;
+      tool_calls?: Array<{
+        id: string;
+        type: string;
+        function: {
+          name: string;
+          arguments: string;
+        };
+      }>;
+      tool_call_id?: string;
+    }
+
+    const lmMessages: OpenAIStyleMessage[] = [];
 
     for (const msg of messages) {
       // For assistant messages with tool calls, add the assistant message with tool_calls array
@@ -417,7 +431,7 @@ export class LMStudioProvider extends AIProvider {
                 chunkCount++;
                 const fragment = msg.fragment;
 
-                if (fragment.content) {
+                if (fragment?.content) {
                   allContent += fragment.content;
                   // Emit token events for streaming
                   this.emit('token', { token: fragment.content });
