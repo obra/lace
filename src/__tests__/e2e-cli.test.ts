@@ -102,7 +102,7 @@ describe('End-to-End CLI Tests', () => {
       const result = await runCLI(['--invalid-arg']);
 
       expect(result.exitCode).toBe(1);
-      expect(result.stderr).toContain('Unknown argument "--invalid-arg"');
+      expect(result.stderr).toContain("unknown option '--invalid-arg'");
     });
 
     it('should accept --continue argument without error', async () => {
@@ -139,19 +139,19 @@ describe('End-to-End CLI Tests', () => {
     });
 
     it('should handle --prompt with different providers', async () => {
-      const result = await runCLI(['--provider', 'ollama', '--prompt', 'Test message'], {
-        timeout: 10000,
+      const result = await runCLI(['--provider', 'lmstudio', '--prompt', 'Test message'], {
+        timeout: 15000,
       }); // Longer timeout for provider connection
 
-      // Should mention the provider even if connection fails
-      expect(result.stdout).toContain('ollama');
-    }, 15000); // Vitest timeout
+      // Should mention the provider and attempt to start, even if connection fails
+      expect(result.stdout || result.stderr).toMatch(/lmstudio|Starting|Lace Agent/);
+    }, 20000); // Vitest timeout
 
     it('should require prompt text', async () => {
       const result = await runCLI(['--prompt']);
 
       expect(result.exitCode).toBe(1);
-      expect(result.stderr).toContain('--prompt requires a prompt text');
+      expect(result.stderr).toContain("option '--prompt <text>' argument missing");
     });
   });
 

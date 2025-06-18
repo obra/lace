@@ -13,27 +13,14 @@ import { OpenAIProvider } from './providers/openai-provider.js';
 import { LMStudioProvider } from './providers/lmstudio-provider.js';
 import { OllamaProvider } from './providers/ollama-provider.js';
 import { AIProvider } from './providers/types.js';
-import { ToolRegistry } from './tools/registry.js';
 import { ToolExecutor } from './tools/executor.js';
-import { BashTool } from './tools/implementations/bash.js';
-import { FileReadTool } from './tools/implementations/file-read.js';
-import { FileWriteTool } from './tools/implementations/file-write.js';
-import { FileEditTool } from './tools/implementations/file-edit.js';
-import { FileInsertTool } from './tools/implementations/file-insert.js';
-import { FileListTool } from './tools/implementations/file-list.js';
-import { RipgrepSearchTool } from './tools/implementations/ripgrep-search.js';
-import { FileFindTool } from './tools/implementations/file-find.js';
-import {
-  TaskAddTool,
-  TaskListTool,
-  TaskCompleteTool,
-} from './tools/implementations/task-manager.js';
 import { DelegateTool } from './tools/implementations/delegate.js';
 import { startSession } from './threads/session.js';
 import { logger } from './utils/logger.js';
 import { loadPromptConfig, getPromptFilePaths } from './config/prompts.js';
 import { parseArgs, showHelp } from './cli/args.js';
 import { CLIInterface } from './cli/interface.js';
+import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
 
 // Create provider based on CLI option
 async function createProvider(
@@ -110,35 +97,19 @@ async function main() {
 
   const provider = await createProvider(options.provider, options.model);
 
-  const toolRegistry = new ToolRegistry();
-  const toolExecutor = new ToolExecutor(toolRegistry);
-
-  // Register tools
-  const delegateTool = new DelegateTool();
-
-  const tools = [
-    new BashTool(),
-    new FileReadTool(),
-    new FileWriteTool(),
-    new FileEditTool(),
-    new FileInsertTool(),
-    new FileListTool(),
-    new RipgrepSearchTool(),
-    new FileFindTool(),
-    new TaskAddTool(),
-    new TaskListTool(),
-    new TaskCompleteTool(),
-    delegateTool,
-  ];
-
-  tools.forEach((tool) => toolRegistry.registerTool(tool));
+  // Create and configure tool executor with all available tools
+  const toolExecutor = new ToolExecutor();
+  toolExecutor.registerAllAvailableTools();
 
   // Start or resume session using enhanced thread management
   const sessionInfo = await startSession(process.argv.slice(2));
   const { threadManager, threadId } = sessionInfo;
 
-  // Inject dependencies into delegate tool (after we have threadManager)
-  delegateTool.setDependencies(threadManager, toolRegistry);
+  // Set up delegate tool dependencies (after we have threadManager)
+  const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
+  if (delegateTool) {
+    delegateTool.setDependencies(threadManager, toolExecutor);
+  }
 
   // Display session status to user
   if (sessionInfo.isResumed) {
@@ -156,11 +127,15 @@ async function main() {
     toolExecutor,
     threadManager,
     threadId,
-    tools,
+    tools: toolExecutor.getAllTools(),
   });
 
-  // Create CLI interface
-  const cli = new CLIInterface(agent, threadManager);
+  // Create CLI interface - pass toolExecutor for tool property access
+  const cli = new CLIInterface(agent, threadManager, toolExecutor);
+
+  // Set up tool approval system: CLI policies apply globally
+  const policyCallback = createGlobalPolicyCallback(cli, options, toolExecutor);
+  toolExecutor.setApprovalCallback(policyCallback);
 
   // Handle single prompt mode (non-interactive)
   if (options.prompt) {

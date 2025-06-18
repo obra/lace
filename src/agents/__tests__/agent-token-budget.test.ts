@@ -6,7 +6,6 @@ import { Agent, AgentConfig } from '../agent.js';
 import { AIProvider, ProviderMessage, ProviderResponse } from '../../providers/types.js';
 import { Tool } from '../../tools/types.js';
 import { ToolExecutor } from '../../tools/executor.js';
-import { ToolRegistry } from '../../tools/registry.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 
 // Mock provider for testing token budget integration
@@ -58,8 +57,8 @@ describe('Agent Token Budget Integration', () => {
 
   beforeEach(() => {
     mockProvider = new MockProvider();
-    const toolRegistry = new ToolRegistry();
-    toolExecutor = new ToolExecutor(toolRegistry);
+    toolExecutor = new ToolExecutor();
+    toolExecutor.registerAllAvailableTools();
     threadManager = new ThreadManager(':memory:');
     threadManager.createThread(threadId);
 

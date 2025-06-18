@@ -6,7 +6,6 @@ import { Agent, AgentConfig } from '../agent.js';
 import { AIProvider, ProviderMessage, ProviderResponse } from '../../providers/types.js';
 import { Tool, ToolResult, ToolContext } from '../../tools/types.js';
 import { ToolExecutor } from '../../tools/executor.js';
-import { ToolRegistry } from '../../tools/registry.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 
 // Mock provider for testing
@@ -52,7 +51,6 @@ class MockTool implements Tool {
 
 describe('Enhanced Agent', () => {
   let mockProvider: MockProvider;
-  let toolRegistry: ToolRegistry;
   let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
   let threadId: string;
@@ -64,9 +62,8 @@ describe('Enhanced Agent', () => {
       toolCalls: [],
     });
 
-    toolRegistry = new ToolRegistry();
-    toolRegistry.clear(); // Ensure clean state
-    toolExecutor = new ToolExecutor(toolRegistry);
+    toolExecutor = new ToolExecutor();
+    toolExecutor.registerAllAvailableTools();
     threadManager = new ThreadManager(':memory:');
     threadId = 'test_thread_123';
     threadManager.createThread(threadId);
@@ -77,14 +74,8 @@ describe('Enhanced Agent', () => {
       agent.removeAllListeners(); // Prevent EventEmitter memory leaks
       agent.stop();
     }
-    // Clear tool registry to prevent accumulation
-    if (toolRegistry) {
-      toolRegistry.clear();
-    }
-
     // Clear mock references to prevent circular references
     mockProvider = null as any;
-    toolRegistry = null as any;
     toolExecutor = null as any;
 
     await threadManager.close();
@@ -265,7 +256,7 @@ describe('Enhanced Agent', () => {
         content: [{ type: 'text', text: 'Tool executed successfully' }],
       });
 
-      toolRegistry.registerTool(mockTool);
+      toolExecutor.registerTool(mockTool.name, mockTool);
 
       // Create a provider that stops after one tool call to prevent infinite recursion
       let callCount = 0;
@@ -373,7 +364,7 @@ describe('Enhanced Agent', () => {
         content: [{ type: 'text', text: 'Tool failed' }],
       });
 
-      toolRegistry.registerTool(failingTool);
+      toolExecutor.registerTool(failingTool.name, failingTool);
 
       // Mock tool executor to throw error
       const executeSpy = vi.spyOn(toolExecutor, 'executeTool');
@@ -566,8 +557,8 @@ describe('Enhanced Agent', () => {
       tool1.name = 'tool_1';
       tool2.name = 'tool_2';
 
-      toolRegistry.registerTool(tool1);
-      toolRegistry.registerTool(tool2);
+      toolExecutor.registerTool(tool1.name, tool1);
+      toolExecutor.registerTool(tool2.name, tool2);
 
       // Create provider that stops after tool calls to prevent infinite recursion
       let callCount = 0;

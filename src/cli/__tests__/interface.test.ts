@@ -8,7 +8,6 @@ import { ThreadManager } from '../../threads/thread-manager.js';
 import { AIProvider, ProviderMessage, ProviderResponse } from '../../providers/types.js';
 import { Tool } from '../../tools/types.js';
 import { ToolExecutor } from '../../tools/executor.js';
-import { ToolRegistry } from '../../tools/registry.js';
 import * as readline from 'readline';
 
 // Mock readline module
@@ -47,7 +46,6 @@ describe('CLIInterface', () => {
   let provider: MockProvider;
   let agent: Agent;
   let threadManager: ThreadManager;
-  let toolRegistry: ToolRegistry;
   let toolExecutor: ToolExecutor;
   let cli: CLIInterface;
   let mockRl: any;
@@ -56,8 +54,8 @@ describe('CLIInterface', () => {
 
   beforeEach(() => {
     provider = new MockProvider();
-    toolRegistry = new ToolRegistry();
-    toolExecutor = new ToolExecutor(toolRegistry);
+    toolExecutor = new ToolExecutor();
+    toolExecutor.registerAllAvailableTools();
     threadManager = new ThreadManager(':memory:');
 
     const threadId = 'test_thread';
@@ -68,7 +66,7 @@ describe('CLIInterface', () => {
       toolExecutor,
       threadManager,
       threadId,
-      tools: [],
+      tools: toolExecutor.getAllTools(),
     });
 
     // Mock readline interface

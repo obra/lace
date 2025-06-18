@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "mcp__secret-journal__process_thoughts"
+    ],
+    "deny": []
+  }
+}

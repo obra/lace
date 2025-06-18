@@ -85,10 +85,17 @@ describe('CLI Orchestration', () => {
 
       expect(result).toEqual({
         provider: 'lmstudio',
+        model: undefined,
         help: false,
         logLevel: 'debug',
         logFile: undefined,
         prompt: 'test prompt',
+        allowNonDestructiveTools: false,
+        autoApproveTools: [],
+        disableTools: [],
+        disableAllTools: false,
+        disableToolGuardrails: false,
+        listTools: false,
       });
     });
   });
@@ -166,13 +173,12 @@ describe('CLI Orchestration', () => {
       const { Agent } = await import('../agents/agent.js');
       const { CLIInterface } = await import('../cli/interface.js');
       const { ThreadManager } = await import('../threads/thread-manager.js');
-      const { ToolRegistry } = await import('../tools/registry.js');
       const { ToolExecutor } = await import('../tools/executor.js');
 
       // Create all components like CLI does
       const provider = new LMStudioProvider({ systemPrompt: 'test' });
-      const toolRegistry = new ToolRegistry();
-      const toolExecutor = new ToolExecutor(toolRegistry);
+      const toolExecutor = new ToolExecutor();
+      toolExecutor.registerAllAvailableTools();
       const threadManager = new ThreadManager(':memory:');
       const threadId = 'test_thread';
 
@@ -183,7 +189,7 @@ describe('CLI Orchestration', () => {
         toolExecutor,
         threadManager,
         threadId,
-        tools: [],
+        tools: toolExecutor.getAllTools(),
       });
 
       const cli = new CLIInterface(agent, threadManager);

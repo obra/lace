@@ -6,7 +6,6 @@ import { DelegateTool } from '../implementations/delegate.js';
 import { Agent } from '../../agents/agent.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 import { ToolExecutor } from '../executor.js';
-import { ToolRegistry } from '../registry.js';
 import { AnthropicProvider } from '../../providers/anthropic-provider.js';
 
 // Note: Tool approval is not yet implemented in lace
@@ -26,7 +25,6 @@ describe('DelegateTool', () => {
   let mockProvider: any;
   let mockThreadManager: ThreadManager;
   let mockToolExecutor: ToolExecutor;
-  let mockToolRegistry: ToolRegistry;
 
   beforeEach(() => {
     // Reset mocks
@@ -37,8 +35,8 @@ describe('DelegateTool', () => {
 
     // Create mock instances
     mockThreadManager = new ThreadManager(':memory:');
-    mockToolRegistry = new ToolRegistry();
-    mockToolExecutor = new ToolExecutor(mockToolRegistry);
+    mockToolExecutor = new ToolExecutor();
+    mockToolExecutor.registerAllAvailableTools();
 
     // Mock provider
     mockProvider = {
@@ -66,8 +64,7 @@ describe('DelegateTool', () => {
     // Create tool instance - it will get dependencies injected when needed
     tool = new DelegateTool();
     // Inject dependencies for testing
-    (tool as any).threadManager = mockThreadManager;
-    (tool as any).toolRegistry = mockToolRegistry;
+    tool.setDependencies(mockThreadManager, mockToolExecutor);
   });
 
   afterEach(() => {
@@ -114,9 +111,15 @@ describe('DelegateTool', () => {
     expect(Agent).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: mockProvider,
-        toolExecutor: mockToolExecutor,
+        toolExecutor: expect.any(Object),
         threadManager: mockThreadManager,
+        threadId: expect.stringMatching(/^delegate_/),
         tools: expect.any(Array),
+        tokenBudget: expect.objectContaining({
+          warningThreshold: 0.7,
+          maxTokens: 50000,
+          reserveTokens: 1000,
+        }),
       })
     );
 
@@ -235,8 +238,7 @@ describe('DelegateTool', () => {
 
     // Create a custom tool instance with short default timeout
     const quickTimeoutTool = new DelegateTool();
-    (quickTimeoutTool as any).threadManager = mockThreadManager;
-    (quickTimeoutTool as any).toolRegistry = mockToolRegistry;
+    quickTimeoutTool.setDependencies(mockThreadManager, mockToolExecutor);
     (quickTimeoutTool as any).defaultTimeout = 100; // 100ms default timeout
 
     const result = await quickTimeoutTool.executeTool({

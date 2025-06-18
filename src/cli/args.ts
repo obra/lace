@@ -1,5 +1,8 @@
-// ABOUTME: Command line argument parsing for Lace CLI
-// ABOUTME: Handles all CLI flags, validation, and help text generation
+// ABOUTME: Commander-based CLI argument parsing with tool approval flags
+// ABOUTME: Handles all CLI flags, validation, and help text generation with fail-early validation
+
+import { Command } from 'commander';
+import { ToolExecutor } from '../tools/executor.js';
 
 export interface CLIOptions {
   provider: 'anthropic' | 'openai' | 'lmstudio' | 'ollama';
@@ -8,146 +11,262 @@ export interface CLIOptions {
   logLevel: 'error' | 'warn' | 'info' | 'debug';
   logFile: string | undefined;
   prompt: string | undefined;
+  // Tool approval options
+  allowNonDestructiveTools: boolean;
+  autoApproveTools: string[];
+  disableTools: string[];
+  disableAllTools: boolean;
+  disableToolGuardrails: boolean;
+  listTools: boolean;
 }
 
-export function parseArgs(args: string[] = process.argv.slice(2)): CLIOptions {
-  const options: CLIOptions = {
-    provider: 'anthropic',
-    model: undefined,
-    help: false,
-    logLevel: 'info',
-    logFile: undefined,
-    prompt: undefined,
-  };
+function parseToolList(value: string): string[] {
+  if (!value || value.trim() === '') {
+    return [];
+  }
+  return value
+    .split(',')
+    .map((tool) => tool.trim())
+    .filter((tool) => tool.length > 0);
+}
 
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-
-    if (arg === '--help' || arg === '-h') {
-      options.help = true;
-    } else if (arg === '--provider' || arg === '-p') {
-      const providerValue = args[i + 1];
-      if (
-        !providerValue ||
-        !['anthropic', 'openai', 'lmstudio', 'ollama'].includes(providerValue)
-      ) {
-        console.error('Error: --provider must be "anthropic", "openai", "lmstudio", or "ollama"');
-        process.exit(1);
-      }
-      options.provider = providerValue as 'anthropic' | 'openai' | 'lmstudio' | 'ollama';
-      i++; // Skip next argument since we consumed it
-    } else if (arg.startsWith('--provider=')) {
-      const providerValue = arg.split('=')[1];
-      if (!['anthropic', 'openai', 'lmstudio', 'ollama'].includes(providerValue)) {
-        console.error('Error: --provider must be "anthropic", "openai", "lmstudio", or "ollama"');
-        process.exit(1);
-      }
-      options.provider = providerValue as 'anthropic' | 'openai' | 'lmstudio' | 'ollama';
-    } else if (arg === '--model' || arg === '-m') {
-      const modelValue = args[i + 1];
-      if (!modelValue) {
-        console.error('Error: --model requires a model name');
-        process.exit(1);
-      }
-      options.model = modelValue;
-      i++; // Skip next argument since we consumed it
-    } else if (arg.startsWith('--model=')) {
-      const modelValue = arg.split('=')[1];
-      if (!modelValue) {
-        console.error('Error: --model requires a model name');
-        process.exit(1);
-      }
-      options.model = modelValue;
-    } else if (arg === '--log-level') {
-      const levelValue = args[i + 1];
-      if (!levelValue || !['error', 'warn', 'info', 'debug'].includes(levelValue)) {
-        console.error('Error: --log-level must be "error", "warn", "info", or "debug"');
-        process.exit(1);
-      }
-      options.logLevel = levelValue as 'error' | 'warn' | 'info' | 'debug';
-      i++; // Skip next argument since we consumed it
-    } else if (arg.startsWith('--log-level=')) {
-      const levelValue = arg.split('=')[1];
-      if (!['error', 'warn', 'info', 'debug'].includes(levelValue)) {
-        console.error('Error: --log-level must be "error", "warn", "info", or "debug"');
-        process.exit(1);
-      }
-      options.logLevel = levelValue as 'error' | 'warn' | 'info' | 'debug';
-    } else if (arg === '--log-file') {
-      const fileValue = args[i + 1];
-      if (!fileValue) {
-        console.error('Error: --log-file requires a file path');
-        process.exit(1);
-      }
-      options.logFile = fileValue;
-      i++; // Skip next argument since we consumed it
-    } else if (arg.startsWith('--log-file=')) {
-      const fileValue = arg.split('=')[1];
-      if (!fileValue) {
-        console.error('Error: --log-file requires a file path');
-        process.exit(1);
-      }
-      options.logFile = fileValue;
-    } else if (arg === '--prompt') {
-      const promptValue = args[i + 1];
-      if (!promptValue) {
-        console.error('Error: --prompt requires a prompt text');
-        process.exit(1);
-      }
-      options.prompt = promptValue;
-      i++; // Skip next argument since we consumed it
-    } else if (arg.startsWith('--prompt=')) {
-      const promptValue = arg.split('=')[1];
-      if (!promptValue) {
-        console.error('Error: --prompt requires a prompt text');
-        process.exit(1);
-      }
-      options.prompt = promptValue;
-    } else if (arg === '--continue') {
-      // --continue is handled by startSession(), just allow it to pass through
-    } else if (arg.startsWith('lace_')) {
-      // Thread ID arguments are handled by startSession(), just allow them to pass through
-    } else {
-      console.error(`Error: Unknown argument "${arg}"`);
+function validateTools(tools: string[], availableTools: string[], flagName: string): void {
+  for (const tool of tools) {
+    if (!availableTools.includes(tool)) {
+      console.error(
+        `Error: Unknown tool '${tool}' in ${flagName}. Available tools: ${availableTools.join(', ')}`
+      );
       process.exit(1);
     }
   }
+}
 
-  return options;
+function validateFlagCombinations(options: CLIOptions): void {
+  // Check contradictory combinations
+  if (options.disableAllTools && options.autoApproveTools.length > 0) {
+    console.error(
+      'Error: Cannot auto-approve tools when all tools are disabled (--disable-all-tools conflicts with --auto-approve-tools)'
+    );
+    process.exit(1);
+  }
+
+  if (options.disableAllTools && options.allowNonDestructiveTools) {
+    console.error(
+      'Error: Cannot allow tools when all tools are disabled (--disable-all-tools conflicts with --allow-non-destructive-tools)'
+    );
+    process.exit(1);
+  }
+
+  if (options.disableToolGuardrails && options.disableAllTools) {
+    console.error(
+      'Error: Cannot disable guardrails and all tools simultaneously (--disable-tool-guardrails conflicts with --disable-all-tools)'
+    );
+    process.exit(1);
+  }
+
+  // Check for auto-approving disabled tools
+  const disabledTools = new Set(options.disableTools);
+  for (const tool of options.autoApproveTools) {
+    if (disabledTools.has(tool)) {
+      console.error(
+        `Error: Cannot auto-approve disabled tool '${tool}' (--disable-tools conflicts with --auto-approve-tools)`
+      );
+      process.exit(1);
+    }
+  }
+}
+
+function listToolsAndExit(toolExecutor: ToolExecutor): void {
+  console.log('Available tools:');
+
+  const tools = toolExecutor.getAllTools();
+
+  for (const tool of tools) {
+    // Extract first sentence from description
+    const firstSentence =
+      tool.description.split('.')[0] + (tool.description.includes('.') ? '' : '');
+
+    // Determine safety classification
+    const isReadOnly = tool.annotations?.readOnlyHint === true;
+    const isDestructive = tool.annotations?.destructiveHint === true;
+    let safetyTag = '';
+
+    if (isReadOnly) {
+      safetyTag = ' (read-only)';
+    } else if (isDestructive) {
+      safetyTag = ' (destructive)';
+    }
+
+    console.log(`  ${tool.name} - ${firstSentence}${safetyTag}`);
+  }
+
+  process.exit(0);
+}
+
+export function parseArgs(args: string[] = process.argv.slice(2)): CLIOptions {
+  const program = new Command();
+
+  program
+    .name('lace')
+    .description('Lace AI Coding Assistant')
+    .version('1.0.0')
+    .exitOverride() // Prevent Commander from calling process.exit directly
+    .helpOption(false) // Disable automatic help handling
+    .option('-h, --help', 'display help for command', false)
+    .option(
+      '-p, --provider <name>',
+      'Choose AI provider: "anthropic" (default), "openai", "lmstudio", or "ollama"',
+      'anthropic'
+    )
+    .option('-m, --model <name>', 'Override the default model for the selected provider')
+    .option(
+      '--log-level <level>',
+      'Set log level: "error", "warn", "info" (default), or "debug"',
+      'info'
+    )
+    .option('--log-file <path>', 'Write logs to file (no file = no logging)')
+    .option('--prompt <text>', 'Send a single prompt and exit (non-interactive mode)')
+    .option('--continue [session_id]', 'Continue previous conversation (latest if no ID provided)')
+    // Tool approval flags
+    .option(
+      '--allow-non-destructive-tools',
+      'Automatically approve tools marked as read-only',
+      false
+    )
+    .option(
+      '--auto-approve-tools <tools...>',
+      'Automatically approve specific tools (comma-separated, additive)'
+    )
+    .option(
+      '--disable-tools <tools...>',
+      'Disable specific tools entirely (comma-separated, additive)'
+    )
+    .option('--disable-all-tools', 'Disable all tool calling', false)
+    .option(
+      '--disable-tool-guardrails',
+      'Auto-approve all tools (DANGEROUS: tools may erase data)',
+      false
+    )
+    .option('--list-tools', 'Show available tools and their descriptions', false);
+
+  try {
+    program.parse(args, { from: 'user' });
+  } catch (error) {
+    // Commander throws CommanderError for unknown options when exitOverride is used
+    console.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    process.exit(1);
+  }
+
+  const options = program.opts();
+
+  // Validate provider
+  const validProviders = ['anthropic', 'openai', 'lmstudio', 'ollama'];
+  if (!validProviders.includes(options.provider)) {
+    console.error('Error: --provider must be "anthropic", "openai", "lmstudio", or "ollama"');
+    process.exit(1);
+  }
+
+  // Validate log level
+  const validLogLevels = ['error', 'warn', 'info', 'debug'];
+  if (!validLogLevels.includes(options.logLevel)) {
+    console.error('Error: --log-level must be "error", "warn", "info", or "debug"');
+    process.exit(1);
+  }
+
+  // Process tool arrays - handle comma-separated values and flatten
+  const processToolArray = (tools: string | string[] | undefined): string[] => {
+    if (!tools) return [];
+    if (typeof tools === 'string') {
+      return parseToolList(tools);
+    }
+    if (Array.isArray(tools)) {
+      return tools.flatMap((tool) => parseToolList(tool));
+    }
+    return [];
+  };
+
+  const finalAutoApproveTools = processToolArray(options.autoApproveTools);
+  const finalDisableTools = processToolArray(options.disableTools);
+
+  // Create temporary ToolExecutor for validation and --list-tools
+  const tempExecutor = new ToolExecutor();
+  tempExecutor.registerAllAvailableTools();
+  const availableTools = tempExecutor.getAvailableToolNames();
+
+  // Validate tools
+  if (finalAutoApproveTools.length > 0) {
+    validateTools(finalAutoApproveTools, availableTools, '--auto-approve-tools');
+  }
+  if (finalDisableTools.length > 0) {
+    validateTools(finalDisableTools, availableTools, '--disable-tools');
+  }
+
+  const result: CLIOptions = {
+    provider: options.provider,
+    model: options.model,
+    help: options.help || false,
+    logLevel: options.logLevel,
+    logFile: options.logFile,
+    prompt: options.prompt,
+    allowNonDestructiveTools: options.allowNonDestructiveTools || false,
+    autoApproveTools: finalAutoApproveTools,
+    disableTools: finalDisableTools,
+    disableAllTools: options.disableAllTools || false,
+    disableToolGuardrails: options.disableToolGuardrails || false,
+    listTools: options.listTools || false,
+  };
+
+  // Handle --help (exits after showing help)
+  if (result.help) {
+    program.outputHelp();
+    process.exit(0);
+  }
+
+  // Validate flag combinations
+  validateFlagCombinations(result);
+
+  // Handle --list-tools (exits after listing)
+  if (result.listTools) {
+    listToolsAndExit(tempExecutor);
+  }
+
+  return result;
 }
 
 export function showHelp(): void {
-  console.log(`
-Lace AI Coding Assistant
+  // Commander generates help automatically, just trigger it
+  const program = new Command();
 
-Usage: lace [options]
+  program
+    .name('lace')
+    .description('Lace AI Coding Assistant')
+    .option(
+      '-p, --provider <name>',
+      'Choose AI provider: "anthropic" (default), "openai", "lmstudio", or "ollama"',
+      'anthropic'
+    )
+    .option('-m, --model <name>', 'Override the default model for the selected provider')
+    .option(
+      '--log-level <level>',
+      'Set log level: "error", "warn", "info" (default), or "debug"',
+      'info'
+    )
+    .option('--log-file <path>', 'Write logs to file (no file = no logging)')
+    .option('--prompt <text>', 'Send a single prompt and exit (non-interactive mode)')
+    .option('--continue [session_id]', 'Continue previous conversation (latest if no ID provided)')
+    // Tool approval flags
+    .option('--allow-non-destructive-tools', 'Automatically approve tools marked as read-only')
+    .option(
+      '--auto-approve-tools <tools...>',
+      'Automatically approve specific tools (comma-separated, additive)'
+    )
+    .option(
+      '--disable-tools <tools...>',
+      'Disable specific tools entirely (comma-separated, additive)'
+    )
+    .option('--disable-all-tools', 'Disable all tool calling')
+    .option('--disable-tool-guardrails', 'Auto-approve all tools (DANGEROUS: tools may erase data)')
+    .option('--list-tools', 'Show available tools and their descriptions');
 
-Options:
-  -h, --help                Show this help message
-  -p, --provider <name>     Choose AI provider: "anthropic" (default), "openai", "lmstudio", or "ollama"
-  -m, --model <name>        Override the default model for the selected provider
-  --log-level <level>       Set log level: "error", "warn", "info" (default), or "debug"
-  --log-file <path>         Write logs to file (no file = no logging)
-  --prompt <text>           Send a single prompt and exit (non-interactive mode)
-  --continue [session_id]   Continue previous conversation (latest if no ID provided)
-
-Examples:
-  lace                      # Use Anthropic Claude (default)
-  lace --provider anthropic # Use Anthropic Claude explicitly
-  lace --provider openai    # Use OpenAI GPT models
-  lace --provider lmstudio  # Use local LMStudio server
-  lace --provider ollama    # Use local Ollama server
-  lace --model claude-haiku-3-20241022  # Use specific Anthropic model
-  lace --provider openai --model gpt-4o  # Use specific OpenAI model
-  lace --provider lmstudio --model mistralai/devstral-small-2505  # Use specific LMStudio model
-  lace --log-level debug --log-file debug.log  # Debug logging to file
-  lace --prompt "What files are in the current directory?"  # Single command
-  lace --continue           # Continue latest conversation
-  lace --continue lace_20250615_abc123  # Continue specific conversation
-  lace --continue --prompt "What number was that again?"  # Continue with new prompt
-
-Environment Variables:
-  ANTHROPIC_KEY            Required for Anthropic provider
-  OPENAI_API_KEY           Required for OpenAI provider (or OPENAI_KEY)
-`);
+  program.outputHelp();
 }

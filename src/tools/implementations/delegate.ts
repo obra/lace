@@ -2,10 +2,10 @@
 // ABOUTME: Enables efficient token usage by delegating to cheaper models
 
 import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import { ApprovalDecision } from '../approval-types.js';
 import { Agent } from '../../agents/agent.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 import { ToolExecutor } from '../executor.js';
-import { ToolRegistry } from '../registry.js';
 import { AnthropicProvider } from '../../providers/anthropic-provider.js';
 import { LMStudioProvider } from '../../providers/lmstudio-provider.js';
 import { OllamaProvider } from '../../providers/ollama-provider.js';
@@ -63,7 +63,7 @@ Examples:
 
   // Dependencies injected by the main agent's context
   private threadManager?: ThreadManager;
-  private toolRegistry?: ToolRegistry;
+  private parentToolExecutor?: ToolExecutor;
   private defaultTimeout: number = 300000; // 5 minutes default
 
   async executeTool(input: Record<string, unknown>, _context?: ToolContext): Promise<ToolResult> {
@@ -113,18 +113,14 @@ Examples:
       }
       const threadManager = this.threadManager;
 
-      // Clone tool registry and remove delegate to prevent recursion
-      const parentRegistry = this.toolRegistry || new ToolRegistry();
-      const toolRegistry = new ToolRegistry();
+      // Create restricted tool executor for subagent (remove delegate to prevent recursion)
+      if (!this.parentToolExecutor) {
+        return createErrorResult(
+          'Delegate tool not properly initialized - missing parent ToolExecutor'
+        );
+      }
 
-      // Copy all tools except delegate
-      parentRegistry
-        .getAllTools()
-        .filter((tool) => tool.name !== 'delegate')
-        .forEach((tool) => toolRegistry.registerTool(tool));
-
-      // Create isolated tool executor
-      const toolExecutor = new ToolExecutor(toolRegistry);
+      const toolExecutor = this.createRestrictedToolExecutor();
 
       // Create new thread for subagent with delegate prefix
       const subagentThreadId = `delegate_${generateThreadId()}`;
@@ -133,7 +129,7 @@ Examples:
       threadManager.createThread(subagentThreadId);
 
       // Get all tools for the subagent
-      const availableTools = toolRegistry.getAllTools();
+      const availableTools = toolExecutor.getAllTools();
 
       // Configure token budget for subagent (more conservative than parent)
       const tokenBudget: TokenBudgetConfig = {
@@ -256,8 +252,34 @@ Remember: You are optimized for efficiency. Get the job done and report back.`;
   }
 
   // Method to inject dependencies (called by main agent setup)
-  setDependencies(threadManager: ThreadManager, toolRegistry: ToolRegistry): void {
+  setDependencies(threadManager: ThreadManager, toolExecutor: ToolExecutor): void {
     this.threadManager = threadManager;
-    this.toolRegistry = toolRegistry;
+    this.parentToolExecutor = toolExecutor;
+  }
+
+  private createRestrictedToolExecutor(): ToolExecutor {
+    const childExecutor = new ToolExecutor();
+
+    // Get available tools from parent and filter out delegate to prevent recursion
+    const parentTools = this.parentToolExecutor?.getAllTools() || [];
+    const allowedTools = parentTools.filter((tool) => tool.name !== 'delegate');
+
+    childExecutor.registerTools(allowedTools);
+
+    // SECURITY: Pass through parent's approval callback or default to deny-all
+    const parentApprovalCallback = this.parentToolExecutor?.getApprovalCallback();
+    if (parentApprovalCallback) {
+      // Use same approval policy as parent
+      childExecutor.setApprovalCallback(parentApprovalCallback);
+    } else {
+      // SAFE DEFAULT: If no approval callback, deny all tools
+      childExecutor.setApprovalCallback({
+        async requestApproval(): Promise<ApprovalDecision> {
+          return ApprovalDecision.DENY;
+        },
+      });
+    }
+
+    return childExecutor;
   }
 }

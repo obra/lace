@@ -5,26 +5,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Agent } from '../agents/agent.js';
 import { LMStudioProvider } from '../providers/lmstudio-provider.js';
 import { ThreadManager } from '../threads/thread-manager.js';
-import { ToolRegistry } from '../tools/registry.js';
 import { ToolExecutor } from '../tools/executor.js';
-import { BashTool } from '../tools/implementations/bash.js';
-import { FileReadTool } from '../tools/implementations/file-read.js';
-import { FileWriteTool } from '../tools/implementations/file-write.js';
-import { FileListTool } from '../tools/implementations/file-list.js';
-import { RipgrepSearchTool } from '../tools/implementations/ripgrep-search.js';
-import { FileFindTool } from '../tools/implementations/file-find.js';
-import {
-  TaskAddTool,
-  TaskListTool,
-  TaskCompleteTool,
-} from '../tools/implementations/task-manager.js';
 
 // These tests use LMStudio heavily since it's local and free
 describe('Conversation State Management with Enhanced Agent', () => {
   let provider: LMStudioProvider;
   let agent: Agent;
   let threadManager: ThreadManager;
-  let toolRegistry: ToolRegistry;
   let toolExecutor: ToolExecutor;
   let threadId: string;
 
@@ -51,23 +38,8 @@ describe('Conversation State Management with Enhanced Agent', () => {
     }
 
     threadManager = new ThreadManager(':memory:'); // Use SQLite in-memory database for testing
-    toolRegistry = new ToolRegistry();
-    toolExecutor = new ToolExecutor(toolRegistry);
-
-    // Register all tools like the main agent
-    const tools = [
-      new BashTool(),
-      new FileReadTool(),
-      new FileWriteTool(),
-      new FileListTool(),
-      new RipgrepSearchTool(),
-      new FileFindTool(),
-      new TaskAddTool(),
-      new TaskListTool(),
-      new TaskCompleteTool(),
-    ];
-
-    tools.forEach((tool) => toolRegistry.registerTool(tool));
+    toolExecutor = new ToolExecutor();
+    toolExecutor.registerAllAvailableTools();
 
     threadId = `test_thread_${Date.now()}`;
     threadManager.createThread(threadId);
@@ -77,7 +49,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
       toolExecutor,
       threadManager,
       threadId,
-      tools,
+      tools: toolExecutor.getAllTools(),
     });
     agent.start();
   });
@@ -96,7 +68,6 @@ describe('Conversation State Management with Enhanced Agent', () => {
     }
     // Clear provider references
     provider = null as any;
-    toolRegistry = null as any;
     toolExecutor = null as any;
   });
 

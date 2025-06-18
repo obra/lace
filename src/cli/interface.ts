@@ -5,16 +5,20 @@ import * as readline from 'readline';
 import { Agent } from '../agents/agent.js';
 import { handleGracefulShutdown } from '../threads/session.js';
 import { ThreadManager } from '../threads/thread-manager.js';
+import { ApprovalCallback, ApprovalDecision } from '../tools/approval-types.js';
+import { ToolExecutor } from '../tools/executor.js';
 
-export class CLIInterface {
+export class CLIInterface implements ApprovalCallback {
   private agent: Agent;
   private threadManager: ThreadManager;
+  private toolExecutor?: ToolExecutor;
   private rl: readline.Interface | null = null;
   private isRunning = false;
 
-  constructor(agent: Agent, threadManager: ThreadManager) {
+  constructor(agent: Agent, threadManager: ThreadManager, toolExecutor?: ToolExecutor) {
     this.agent = agent;
     this.threadManager = threadManager;
+    this.toolExecutor = toolExecutor;
     this.setupEventHandlers();
   }
 
@@ -215,5 +219,102 @@ export class CLIInterface {
     }
 
     await handleGracefulShutdown(this.threadManager);
+  }
+
+  async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
+    // Create a temporary readline interface for approval prompts
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    try {
+      // Display tool information header
+      process.stdout.write('\n🛡️  Tool approval request\n');
+      process.stdout.write('═'.repeat(40) + '\n');
+
+      // Show tool name and safety indicator
+      const tool = this.toolExecutor?.getTool(toolName);
+      const isReadOnly = tool?.annotations?.readOnlyHint === true;
+      const safetyIndicator = isReadOnly ? '✅ read-only' : '⚠️  destructive';
+
+      process.stdout.write(`Tool: ${toolName} (${safetyIndicator})\n`);
+
+      // Format and display input parameters
+      if (input && typeof input === 'object' && input !== null) {
+        process.stdout.write('\nParameters:\n');
+        this.formatInputParameters(input as Record<string, unknown>);
+      } else if (input) {
+        process.stdout.write(`\nInput: ${JSON.stringify(input)}\n`);
+      }
+
+      // Show approval options
+      process.stdout.write('\nOptions:\n');
+      process.stdout.write('  y) Allow this time\n');
+      process.stdout.write('  a) Allow for this session\n');
+      process.stdout.write('  n) Deny\n');
+
+      // Prompt for user decision with retry logic
+      let decision: ApprovalDecision | null = null;
+      while (decision === null) {
+        const response = await new Promise<string>((resolve) => {
+          rl.question('\nYour choice (y/a/n): ', resolve);
+        });
+
+        const normalizedResponse = response.trim().toLowerCase();
+
+        switch (normalizedResponse) {
+          case 'y':
+            decision = ApprovalDecision.ALLOW_ONCE;
+            break;
+          case 'a':
+            decision = ApprovalDecision.ALLOW_SESSION;
+            break;
+          case 'n':
+            decision = ApprovalDecision.DENY;
+            break;
+          default:
+            process.stdout.write(
+              `\n❌ Invalid response: "${response}". Please enter y, a, or n.\n`
+            );
+            break;
+        }
+      }
+
+      return decision;
+    } finally {
+      rl.close();
+    }
+  }
+
+  private formatInputParameters(input: Record<string, unknown>): void {
+    for (const [key, value] of Object.entries(input)) {
+      const formattedValue = this.formatParameterValue(value);
+      process.stdout.write(`  ${key}: ${formattedValue}\n`);
+    }
+  }
+
+  private formatParameterValue(value: unknown): string {
+    if (typeof value === 'string') {
+      // Truncate very long strings
+      if (value.length > 200) {
+        return `"${value.substring(0, 200)}...[truncated]"`;
+      }
+      return `"${value}"`;
+    } else if (Array.isArray(value)) {
+      if (value.length === 0) {
+        return '[]';
+      }
+      const items = value.slice(0, 3).map((item) => this.formatParameterValue(item));
+      const suffix = value.length > 3 ? `, ...${value.length - 3} more` : '';
+      return `[${items.join(', ')}${suffix}]`;
+    } else if (typeof value === 'object' && value !== null) {
+      const entries = Object.entries(value).slice(0, 3);
+      const formatted = entries.map(([k, v]) => `${k}: ${this.formatParameterValue(v)}`);
+      const suffix = Object.keys(value).length > 3 ? ', ...' : '';
+      return `{ ${formatted.join(', ')}${suffix} }`;
+    } else {
+      return String(value);
+    }
   }
 }
