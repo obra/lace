@@ -151,7 +151,7 @@ describe('FileAutocomplete', () => {
       );
 
       const output = lastFrame();
-      const lines = output.split('\n').filter(line => line.trim());
+      const lines = output?.split('\n').filter(line => line.trim()) || [];
       
       // Should show 5 items by default
       expect(lines.length).toBeLessThanOrEqual(5);
@@ -170,7 +170,7 @@ describe('FileAutocomplete', () => {
       );
 
       const output = lastFrame();
-      const lines = output.split('\n').filter(line => line.trim());
+      const lines = output?.split('\n').filter(line => line.trim()) || [];
       
       // Should show only 2 items
       expect(lines.length).toBeLessThanOrEqual(2);

@@ -46,7 +46,7 @@ describe('ShellInput Autocomplete Integration', () => {
     });
 
     it('should handle Tab key to show autocomplete', async () => {
-      const { stdin, lastFrame, waitUntilExit } = render(
+      const { stdin, lastFrame } = render(
         <ShellInput
           onSubmit={mockOnSubmit}
           onChange={mockOnChange}
