@@ -144,19 +144,15 @@ export class FileScanner {
    * Get all files and directories in a path, with caching
    */
   public async getCompletions(partialPath: string = ''): Promise<string[]> {
-    let targetDir: string;
-    let searchTerm: string;
+    // Determine search directory - if partialPath ends with "/", search that directory
+    // Otherwise, search the parent directory of the partial path
+    const searchDir = partialPath.endsWith('/')
+      ? partialPath
+      : partialPath.includes('/')
+        ? path.dirname(partialPath)
+        : '.';
 
-    // Handle nested directory completion (e.g., "src/" should show contents of src/)
-    if (partialPath.endsWith('/')) {
-      targetDir = partialPath;
-      searchTerm = '';
-    } else {
-      targetDir = partialPath ? path.dirname(partialPath) : '.';
-      searchTerm = partialPath ? path.basename(partialPath) : '';
-    }
-
-    const absoluteDir = path.resolve(this.workingDirectory, targetDir);
+    const absoluteDir = path.resolve(this.workingDirectory, searchDir);
 
     // Check cache
     const cacheKey = absoluteDir;
@@ -184,33 +180,39 @@ export class FileScanner {
     );
     const filePaths = scanResult.files.map((file) => path.relative(this.workingDirectory, file));
 
-    // Filter by search term and sort
-    const filteredDirectories = directoryPaths
-      .filter((item) => searchTerm === '' || item.toLowerCase().includes(searchTerm.toLowerCase()))
+    // Filter by matching against the full partial path
+    const allPaths = [...directoryPaths, ...filePaths];
+
+    const filteredPaths = allPaths
+      .filter((item) => {
+        // Match against the full partial path (e.g., "src/a" should match "src/app/")
+        return partialPath === '' || item.toLowerCase().startsWith(partialPath.toLowerCase());
+      })
       .sort((a, b) => {
-        // Prioritize exact prefix matches, then alphabetical
-        const aStartsWith = a.toLowerCase().startsWith(searchTerm.toLowerCase());
-        const bStartsWith = b.toLowerCase().startsWith(searchTerm.toLowerCase());
+        // Sort by:
+        // 1. Directories before files
+        // 2. Exact prefix matches first
+        // 3. Alphabetical
+
+        const aIsDir = a.endsWith('/');
+        const bIsDir = b.endsWith('/');
+
+        // Directories first
+        if (aIsDir && !bIsDir) return -1;
+        if (!aIsDir && bIsDir) return 1;
+
+        // Then exact prefix matches
+        const aStartsWith = a.toLowerCase().startsWith(partialPath.toLowerCase());
+        const bStartsWith = b.toLowerCase().startsWith(partialPath.toLowerCase());
 
         if (aStartsWith && !bStartsWith) return -1;
         if (!aStartsWith && bStartsWith) return 1;
+
+        // Finally alphabetical
         return a.localeCompare(b);
       });
 
-    const filteredFiles = filePaths
-      .filter((item) => searchTerm === '' || item.toLowerCase().includes(searchTerm.toLowerCase()))
-      .sort((a, b) => {
-        // Prioritize exact prefix matches, then alphabetical
-        const aStartsWith = a.toLowerCase().startsWith(searchTerm.toLowerCase());
-        const bStartsWith = b.toLowerCase().startsWith(searchTerm.toLowerCase());
-
-        if (aStartsWith && !bStartsWith) return -1;
-        if (!aStartsWith && bStartsWith) return 1;
-        return a.localeCompare(b);
-      });
-
-    // Return directories first, then files
-    return [...filteredDirectories, ...filteredFiles];
+    return filteredPaths;
   }
 
   /**
