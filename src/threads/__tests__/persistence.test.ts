@@ -370,14 +370,11 @@ describe('Enhanced ThreadManager', () => {
   });
 
   describe('persistence integration', () => {
-    it('should auto-save events to database', async () => {
+    it('should save events to database immediately', async () => {
       threadManager.createThread('test_123');
       threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
 
-      // Give auto-save a moment
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      // Create new manager to verify persistence
+      // Create new manager to verify persistence (events saved immediately)
       await threadManager.close();
       const newManager = new ThreadManager(tempDbPath);
 
@@ -438,35 +435,6 @@ describe('Enhanced ThreadManager', () => {
 
       const latestId = await threadManager.getLatestThreadId();
       expect(latestId).toBe('test_new');
-    });
-  });
-
-  describe('auto-save functionality', () => {
-    it('should enable and disable auto-save', () => {
-      threadManager.enableAutoSave(100); // 100ms interval
-      threadManager.disableAutoSave();
-
-      // Should not throw
-      expect(true).toBe(true);
-    });
-
-    it('should auto-save current thread periodically', async () => {
-      threadManager.createThread('test_123');
-      threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
-
-      threadManager.enableAutoSave(50); // Very short interval for testing
-
-      // Wait for auto-save to trigger
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      threadManager.disableAutoSave();
-
-      // Verify thread was saved
-      const newManager = new ThreadManager(tempDbPath);
-      const loadedThread = await newManager.loadThread('test_123');
-      expect(loadedThread.events).toHaveLength(1);
-
-      await newManager.close();
     });
   });
 
@@ -639,7 +607,6 @@ describe('Integration Tests', () => {
     const threadManager = new ThreadManager(tempDbPath);
     const threadId = `lace_${Date.now()}_test`;
     threadManager.createThread(threadId);
-    threadManager.enableAutoSave(10); // Fast auto-save for testing
 
     // Simulate conversation
     threadManager.addEvent(threadId, 'USER_MESSAGE', 'List files in current directory');
@@ -656,8 +623,6 @@ describe('Integration Tests', () => {
     });
     threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Here are the files in your directory');
 
-    // Wait for auto-save
-    await new Promise((resolve) => setTimeout(resolve, 50));
     await threadManager.close();
 
     // Resume session

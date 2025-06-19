@@ -343,8 +343,8 @@ describe('CLI Integration', () => {
     });
   });
 
-  describe('auto-save functionality', () => {
-    it('should enable auto-save on session start', async () => {
+  describe('event persistence', () => {
+    it('should save events immediately', async () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
 
       const threadManager = new ThreadManager(tempDbPath);
@@ -352,16 +352,13 @@ describe('CLI Integration', () => {
       const { threadId } = sessionInfo;
 
       // Add an event
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Auto-save test');
+      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Immediate save test');
 
-      // Wait a moment for potential auto-save
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      // Verify data persists
+      // Verify data persists immediately (no waiting needed)
       const newManager = new ThreadManager(tempDbPath);
       const loadedThread = await newManager.loadThread(threadId);
       expect(loadedThread.events).toHaveLength(1);
-      expect(loadedThread.events[0].data).toBe('Auto-save test');
+      expect(loadedThread.events[0].data).toBe('Immediate save test');
 
       await threadManager.close();
       await newManager.close();

@@ -1,5 +1,5 @@
 // ABOUTME: Enhanced thread management with SQLite persistence support
-// ABOUTME: Maintains backward compatibility while adding session persistence and auto-save
+// ABOUTME: Maintains backward compatibility with immediate event persistence
 
 import { ThreadPersistence } from './persistence.js';
 import { Thread, ThreadEvent, EventType, ToolCallData, ToolResultData } from './types.js';
@@ -16,7 +16,6 @@ export interface ThreadSessionInfo {
 export class ThreadManager {
   private _currentThread: Thread | null = null;
   private _persistence: ThreadPersistence;
-  private _autoSaveInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(dbPath: string) {
     this._persistence = new ThreadPersistence(dbPath);
@@ -38,7 +37,6 @@ export class ThreadManager {
         const resumeError = error instanceof Error ? error.message : 'Unknown error';
         const newThreadId = this.generateThreadId();
         this.createThread(newThreadId);
-        this.enableAutoSave();
         return {
           threadId: newThreadId,
           isResumed: false,
@@ -50,7 +48,6 @@ export class ThreadManager {
     // Create new thread
     const newThreadId = this.generateThreadId();
     this.createThread(newThreadId);
-    this.enableAutoSave();
     return { threadId: newThreadId, isResumed: false };
   }
 
@@ -104,7 +101,7 @@ export class ThreadManager {
     thread.events.push(event);
     thread.updatedAt = new Date();
 
-    // Auto-save event to persistence
+    // Save event to persistence immediately
     try {
       this._persistence.saveEvent(event);
     } catch (error) {
@@ -230,35 +227,14 @@ export class ThreadManager {
     return this._currentThread?.id || null;
   }
 
-  // Auto-save management
-  enableAutoSave(intervalMs: number = 30000): void {
-    this.disableAutoSave();
-
-    this._autoSaveInterval = setInterval(async () => {
-      try {
-        await this.saveCurrentThread();
-      } catch (error) {
-        console.error('Auto-save failed:', error);
-      }
-    }, intervalMs);
-  }
-
-  disableAutoSave(): void {
-    if (this._autoSaveInterval) {
-      clearInterval(this._autoSaveInterval);
-      this._autoSaveInterval = null;
-    }
-  }
-
   // Cleanup
   async close(): Promise<void> {
-    this.disableAutoSave();
     try {
       await this.saveCurrentThread();
     } catch {
       // Ignore save errors on close
     }
-    this._persistence.close();
+    await this._persistence.close();
   }
 }
 
