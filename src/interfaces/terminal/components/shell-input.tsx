@@ -11,6 +11,7 @@ interface ShellInputProps {
   placeholder?: string;
   focusId?: string;
   autoFocus?: boolean;
+  disabled?: boolean;
   onSubmit?: (value: string) => void;
   onChange?: (value: string) => void;
 }
@@ -20,6 +21,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
   placeholder = "Type your message...",
   focusId = "text-editor",
   autoFocus = false,
+  disabled = false,
   onSubmit,
   onChange,
 }) => {
@@ -33,9 +35,9 @@ const ShellInput: React.FC<ShellInputProps> = ({
     process.stdin.isTTY;
 
   const focusResult = useRealFocus
-    ? useFocus({ id: focusId, autoFocus })
+    ? useFocus({ id: focusId, autoFocus: autoFocus && !disabled })
     : null;
-  const actualIsFocused = useRealFocus ? focusResult?.isFocused : isFocused;
+  const actualIsFocused = useRealFocus ? focusResult?.isFocused : isFocused && !disabled;
   const [bufferState, bufferOps] = useTextBuffer(value);
 
   // Only sync external value changes on first mount or significant changes
@@ -69,6 +71,10 @@ const ShellInput: React.FC<ShellInputProps> = ({
   // Input handler
   useInput(
     (input, key) => {
+      // Do nothing if disabled
+      if (disabled) {
+        return;
+      }
       // Handle Enter - submit or newline based on line ending
       if (key.return) {
         const currentLine = bufferState.lines[bufferState.cursorLine] || "";

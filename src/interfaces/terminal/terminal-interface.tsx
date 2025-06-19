@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Box, Text, render } from "ink";
 import ShellInput from "./components/shell-input.js";
+import ToolApprovalModal from "./components/tool-approval-modal.js";
 import { Agent } from "../../agents/agent.js";
 import { ThreadManager } from "../../threads/thread-manager.js";
 import { ToolExecutor } from "../../tools/executor.js";
@@ -20,28 +21,56 @@ interface TerminalInterfaceProps {
   agent: Agent;
   threadManager: ThreadManager;
   toolExecutor?: ToolExecutor;
+  approvalCallback?: ApprovalCallback;
 }
 
 const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   agent,
   threadManager,
   toolExecutor,
+  approvalCallback,
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentInput, setCurrentInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  
+  // Tool approval modal state
+  const [approvalRequest, setApprovalRequest] = useState<{
+    toolName: string;
+    input: unknown;
+    isReadOnly: boolean;
+    resolve: (decision: ApprovalDecision) => void;
+  } | null>(null);
 
   // Add a message to the conversation
   const addMessage = useCallback((message: Message) => {
     setMessages((prev) => [...prev, message]);
   }, []);
 
+  // Handle tool approval modal decision
+  const handleApprovalDecision = useCallback((decision: ApprovalDecision) => {
+    if (approvalRequest) {
+      approvalRequest.resolve(decision);
+      setApprovalRequest(null);
+    }
+  }, [approvalRequest]);
+
   // Setup event handlers for Agent events
   useEffect(() => {
     // Handle streaming tokens (real-time display)
     const handleToken = ({ token }: { token: string }) => {
       setStreamingContent((prev) => prev + token);
+    };
+
+    // Handle approval requests
+    const handleApprovalRequest = ({ toolName, input, isReadOnly, resolve }: any) => {
+      setApprovalRequest({
+        toolName,
+        input,
+        isReadOnly,
+        resolve,
+      });
     };
 
     // Handle agent thinking
@@ -155,6 +184,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     agent.on("agent_response_complete", handleResponseComplete);
     agent.on("tool_call_start", handleToolStart);
     agent.on("tool_call_complete", handleToolComplete);
+    agent.on("approval_request", handleApprovalRequest);
     agent.on("error", handleError);
 
     // Cleanup function
@@ -164,6 +194,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       agent.off("agent_response_complete", handleResponseComplete);
       agent.off("tool_call_start", handleToolStart);
       agent.off("tool_call_complete", handleToolComplete);
+      agent.off("approval_request", handleApprovalRequest);
       agent.off("error", handleError);
     };
   }, [agent, addMessage, streamingContent]);
@@ -312,14 +343,26 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         )}
       </Box>
 
-      {/* Input area */}
-      <Box borderStyle="single" borderColor="cyan" padding={1}>
+      {/* Tool approval modal */}
+      {approvalRequest && (
+        <ToolApprovalModal
+          toolName={approvalRequest.toolName}
+          input={approvalRequest.input}
+          isReadOnly={approvalRequest.isReadOnly}
+          onDecision={handleApprovalDecision}
+          isVisible={true}
+        />
+      )}
+
+      {/* Input area - disabled when modal is open */}
+      <Box borderStyle="single" borderColor={approvalRequest ? "gray" : "cyan"} padding={1}>
         <ShellInput
           value={currentInput}
-          placeholder="Type your message..."
+          placeholder={approvalRequest ? "Tool approval required..." : "Type your message..."}
           onSubmit={handleSubmit}
           onChange={setCurrentInput}
-          autoFocus={true}
+          autoFocus={!approvalRequest}
+          disabled={!!approvalRequest}
         />
       </Box>
     </Box>
@@ -332,6 +375,7 @@ export class TerminalInterface implements ApprovalCallback {
   private threadManager: ThreadManager;
   private toolExecutor?: ToolExecutor;
   private isRunning = false;
+  private pendingApprovalRequests = new Map<string, (decision: ApprovalDecision) => void>();
 
   constructor(agent: Agent, threadManager: ThreadManager, toolExecutor?: ToolExecutor) {
     this.agent = agent;
@@ -370,6 +414,7 @@ export class TerminalInterface implements ApprovalCallback {
         agent={this.agent}
         threadManager={this.threadManager}
         toolExecutor={this.toolExecutor}
+        approvalCallback={this}
       />
     );
 
@@ -394,38 +439,35 @@ export class TerminalInterface implements ApprovalCallback {
   }
 
   async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
-    // For now, implement basic console approval (we'll enhance this in Phase 2)
-    // TODO: Replace with visual ToolApprovalModal in Phase 2
-    
-    // Display tool information
-    console.log('\n🛡️  Tool approval request');
-    console.log('═'.repeat(40));
-
-    // Show tool name and safety indicator
+    // Get tool information for risk assessment
     const tool = this.toolExecutor?.getTool(toolName);
     const isReadOnly = tool?.annotations?.readOnlyHint === true;
-    const safetyIndicator = isReadOnly ? '✅ read-only' : '⚠️  destructive';
 
-    console.log(`Tool: ${toolName} (${safetyIndicator})`);
+    // Create a promise that will be resolved by the UI
+    return new Promise<ApprovalDecision>((resolve) => {
+      // Store the resolver with a unique key
+      const requestId = `${toolName}-${Date.now()}`;
+      this.pendingApprovalRequests.set(requestId, resolve);
 
-    // Format and display input parameters
-    if (input && typeof input === 'object' && input !== null) {
-      console.log('\nParameters:');
-      this.formatInputParameters(input as Record<string, unknown>);
-    } else if (input) {
-      console.log(`\nInput: ${JSON.stringify(input)}`);
-    }
-
-    // For now, auto-approve read-only tools and deny destructive ones
-    // TODO: Replace with interactive modal in Phase 2
-    if (isReadOnly) {
-      console.log('\n✅ Auto-approved (read-only tool)');
-      return ApprovalDecision.ALLOW_ONCE;
-    } else {
-      console.log('\n⚠️  Destructive tool - approval needed');
-      console.log('(Visual approval modal coming in Phase 2)');
-      return ApprovalDecision.DENY;
-    }
+      // Emit an event that the UI component can listen to
+      // Since we need React state updates, we'll use a different approach
+      // For now, let's use a more direct method by updating the component state
+      
+      // This is a bit of a hack - we'll improve this architecture later
+      // For now, use a global event emitter pattern
+      process.nextTick(() => {
+        this.agent.emit('approval_request', {
+          toolName,
+          input,
+          isReadOnly,
+          requestId,
+          resolve: (decision: ApprovalDecision) => {
+            this.pendingApprovalRequests.delete(requestId);
+            resolve(decision);
+          }
+        });
+      });
+    });
   }
 
   private formatInputParameters(input: Record<string, unknown>): void {

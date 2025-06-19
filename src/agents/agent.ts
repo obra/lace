@@ -45,6 +45,15 @@ export interface AgentEvents {
   error: [{ error: Error; context: object }];
   conversation_complete: [];
   token_budget_warning: [{ message: string; usage: object; recommendations: object }];
+  approval_request: [
+    {
+      toolName: string;
+      input: unknown;
+      isReadOnly: boolean;
+      requestId: string;
+      resolve: (decision: any) => void;
+    },
+  ];
 }
 
 export class Agent extends EventEmitter {
