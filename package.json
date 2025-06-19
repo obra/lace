@@ -2,6 +2,7 @@
   "name": "LACE - A lightweight agentic coding environment",
   "version": "0.0.1",
   "type": "module",
+  "author": "Jesse Vincent <jesse@fsck.com>",
   "bin": {
     "mini-agent": "./dist/cli.js"
   },
