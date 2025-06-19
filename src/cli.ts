@@ -18,6 +18,7 @@ import { loadPromptConfig, getPromptFilePaths } from './config/prompts.js';
 import { parseArgs, validateProvider } from './cli/args.js';
 import { CLIInterface } from './cli/interface.js';
 import { TerminalInterface } from './interfaces/terminal/terminal-interface.js';
+import { NonInteractiveInterface } from './interfaces/non-interactive-interface.js';
 import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
 
 // Create provider based on CLI option
@@ -157,7 +158,8 @@ async function main() {
 
   // Handle single prompt mode (non-interactive)
   if (options.prompt) {
-    await cli.handleSinglePrompt(options.prompt);
+    const nonInteractive = new NonInteractiveInterface(agent, threadManager, toolExecutor);
+    await nonInteractive.executePrompt(options.prompt);
     process.exit(0);
   }
 

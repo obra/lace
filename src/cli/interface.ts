@@ -102,17 +102,6 @@ export class CLIInterface implements ApprovalCallback {
     });
   }
 
-  async handleSinglePrompt(prompt: string): Promise<void> {
-    console.log(`🤖 Lace Agent using ${this.agent.providerName} provider.\n`);
-
-    // Start agent and process the prompt
-    this.agent.start();
-    await this.agent.sendMessage(prompt);
-
-    // Save and exit
-    await handleGracefulShutdown(this.threadManager);
-  }
-
   async startInteractive(): Promise<void> {
     if (this.isRunning) {
       throw new Error('CLI interface is already running');

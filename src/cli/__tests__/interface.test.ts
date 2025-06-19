@@ -259,28 +259,6 @@ describe('CLIInterface', () => {
     });
   });
 
-  describe('handleSinglePrompt', () => {
-    it('should process single prompt and exit', async () => {
-      const agentSendSpy = vi.spyOn(agent, 'sendMessage').mockResolvedValue();
-      const agentStartSpy = vi.spyOn(agent, 'start').mockImplementation(() => {});
-
-      await cli.handleSinglePrompt('Test prompt');
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('using mock-provider provider')
-      );
-      expect(agentStartSpy).toHaveBeenCalled();
-      expect(agentSendSpy).toHaveBeenCalledWith('Test prompt');
-    });
-
-    it('should handle errors in single prompt mode', async () => {
-      vi.spyOn(agent, 'sendMessage').mockRejectedValue(new Error('Test error'));
-      vi.spyOn(agent, 'start').mockImplementation(() => {});
-
-      await expect(cli.handleSinglePrompt('Test prompt')).rejects.toThrow('Test error');
-    });
-  });
-
   describe('startInteractive', () => {
     it('should throw error if already running', async () => {
       vi.spyOn(agent, 'start').mockImplementation(() => {});

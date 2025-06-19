@@ -4,7 +4,7 @@
   "type": "module",
   "author": "Jesse Vincent <jesse@fsck.com>",
   "bin": {
-    "mini-agent": "./dist/cli.js"
+    "lace": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
