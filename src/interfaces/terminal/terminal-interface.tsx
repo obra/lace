@@ -8,8 +8,6 @@ import ToolApprovalModal from "./components/tool-approval-modal.js";
 import MessageDisplay from "./components/message-display.js";
 import StatusBar from "./components/status-bar.js";
 import { Agent } from "../../agents/agent.js";
-import { ThreadManager } from "../../threads/thread-manager.js";
-import { ToolExecutor } from "../../tools/executor.js";
 import { ApprovalCallback, ApprovalDecision } from "../../tools/approval-types.js";
 
 interface Message {
@@ -20,15 +18,11 @@ interface Message {
 
 interface TerminalInterfaceProps {
   agent: Agent;
-  threadManager: ThreadManager;
-  toolExecutor?: ToolExecutor;
   approvalCallback?: ApprovalCallback;
 }
 
 const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   agent,
-  threadManager,
-  toolExecutor,
   approvalCallback,
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -260,7 +254,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
     switch (command) {
       case "/compact": {
-        const threadId = threadManager.getCurrentThreadId();
+        const threadId = agent.threadManager.getCurrentThreadId();
         if (!threadId) {
           addMessage({
             type: "system",
@@ -270,12 +264,12 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
           return;
         }
 
-        threadManager.compact(threadId);
+        agent.threadManager.compact(threadId);
 
         // Get the system message that was added
-        const events = threadManager.getEvents(threadId);
+        const events = agent.threadManager.getEvents(threadId);
         const systemMessage = events.find(
-          (e) =>
+          (e: any) =>
             e.type === "LOCAL_SYSTEM_MESSAGE" &&
             typeof e.data === "string" &&
             e.data.includes("Compacted")
@@ -315,7 +309,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         break;
       }
     }
-  }, [threadManager, addMessage]);
+  }, [agent.threadManager, addMessage]);
 
   // Initialize agent on mount
   useEffect(() => {
@@ -375,7 +369,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       <StatusBar 
         providerName={agent.providerName || 'unknown'}
         modelName={(agent as any)._provider?.defaultModel || undefined}
-        threadId={threadManager.getCurrentThreadId() || undefined}
+        threadId={agent.threadManager.getCurrentThreadId() || undefined}
         tokenUsage={tokenUsage}
         isProcessing={isProcessing}
         messageCount={messages.length}
@@ -399,15 +393,11 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 // Export the main terminal interface class
 export class TerminalInterface implements ApprovalCallback {
   private agent: Agent;
-  private threadManager: ThreadManager;
-  private toolExecutor?: ToolExecutor;
   private isRunning = false;
   private pendingApprovalRequests = new Map<string, (decision: ApprovalDecision) => void>();
 
-  constructor(agent: Agent, threadManager: ThreadManager, toolExecutor?: ToolExecutor) {
+  constructor(agent: Agent) {
     this.agent = agent;
-    this.threadManager = threadManager;
-    this.toolExecutor = toolExecutor;
   }
 
 
@@ -429,8 +419,6 @@ export class TerminalInterface implements ApprovalCallback {
     const { unmount } = render(
       <TerminalInterfaceComponent
         agent={this.agent}
-        threadManager={this.threadManager}
-        toolExecutor={this.toolExecutor}
         approvalCallback={this}
       />
     );
@@ -447,17 +435,12 @@ export class TerminalInterface implements ApprovalCallback {
     }
 
     this.isRunning = false;
-
-    if (this.agent) {
-      this.agent.stop();
-    }
-
-    await this.threadManager.close();
+    await this.agent?.stop();
   }
 
   async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
     // Get tool information for risk assessment
-    const tool = this.toolExecutor?.getTool(toolName);
+    const tool = this.agent.toolExecutor.getTool(toolName);
     const isReadOnly = tool?.annotations?.readOnlyHint === true;
 
     // Create a promise that will be resolved by the UI

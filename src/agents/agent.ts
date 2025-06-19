@@ -62,6 +62,16 @@ export class Agent extends EventEmitter {
   private readonly _threadManager: ThreadManager;
   private readonly _threadId: string;
   private readonly _tools: Tool[];
+
+  // Public access to tool executor for interfaces
+  get toolExecutor(): ToolExecutor {
+    return this._toolExecutor;
+  }
+
+  // Public access to thread manager for interfaces
+  get threadManager(): ThreadManager {
+    return this._threadManager;
+  }
   private readonly _stopReasonHandler: StopReasonHandler;
   private readonly _tokenBudgetManager: TokenBudgetManager | null;
   private _state: AgentState = 'idle';
@@ -117,9 +127,10 @@ export class Agent extends EventEmitter {
     });
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     this._isRunning = false;
     this._setState('idle');
+    await this._threadManager.close();
     logger.info('AGENT: Stopped', { threadId: this._threadId });
   }
 

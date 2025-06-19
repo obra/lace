@@ -2,8 +2,6 @@
 // ABOUTME: Handles --prompt flag execution without user interaction
 
 import type { Agent } from '../agents/agent.js';
-import type { ThreadManager } from '../threads/thread-manager.js';
-import type { ToolExecutor } from '../tools/executor.js';
 
 /**
  * Non-interactive interface for single prompt execution
@@ -11,13 +9,9 @@ import type { ToolExecutor } from '../tools/executor.js';
  */
 export class NonInteractiveInterface {
   private agent: Agent;
-  private threadManager: ThreadManager;
-  private toolExecutor?: ToolExecutor;
 
-  constructor(agent: Agent, threadManager: ThreadManager, toolExecutor?: ToolExecutor) {
+  constructor(agent: Agent) {
     this.agent = agent;
-    this.threadManager = threadManager;
-    this.toolExecutor = toolExecutor;
   }
 
   /**
@@ -31,6 +25,6 @@ export class NonInteractiveInterface {
     await this.agent.sendMessage(prompt);
 
     // Save and exit
-    await this.threadManager.close();
+    await this.agent.stop();
   }
 }

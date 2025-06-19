@@ -57,7 +57,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
   afterEach(async () => {
     if (agent) {
       agent.removeAllListeners(); // Prevent EventEmitter memory leaks
-      agent.stop();
+      await agent.stop();
     }
     if (threadManager) {
       // Clear events before closing to free memory

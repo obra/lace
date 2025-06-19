@@ -86,14 +86,14 @@ describe('CLIInterface Approval Callback', () => {
       tools: [],
     });
 
-    // Create CLI interface with tool executor
-    cli = new CLIInterface(agent, threadManager, toolExecutor);
+    // Create CLI interface
+    cli = new CLIInterface(agent);
   });
 
   afterEach(async () => {
     if (agent) {
       agent.removeAllListeners();
-      agent.stop();
+      await agent.stop();
     }
     if (threadManager) {
       await threadManager.close();

@@ -72,7 +72,7 @@ describe('Enhanced Agent', () => {
   afterEach(async () => {
     if (agent) {
       agent.removeAllListeners(); // Prevent EventEmitter memory leaks
-      agent.stop();
+      await agent.stop();
     }
     // Clear mock references to prevent circular references
     mockProvider = null as any;
@@ -119,13 +119,13 @@ describe('Enhanced Agent', () => {
   });
 
   describe('start/stop lifecycle', () => {
-    it('should start and stop correctly', () => {
+    it('should start and stop correctly', async () => {
       agent = createAgent();
 
       agent.start();
       expect(agent.getCurrentState()).toBe('idle');
 
-      agent.stop();
+      await agent.stop();
       expect(agent.getCurrentState()).toBe('idle');
     });
 

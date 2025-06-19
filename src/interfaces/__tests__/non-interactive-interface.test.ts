@@ -4,15 +4,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NonInteractiveInterface } from '../non-interactive-interface.js';
 import type { Agent } from '../../agents/agent.js';
-import type { ThreadManager } from '../../threads/thread-manager.js';
-import type { ToolExecutor } from '../../tools/executor.js';
 
 // Mock dependencies
 
 describe('NonInteractiveInterface', () => {
   let agent: Agent;
-  let threadManager: ThreadManager;
-  let toolExecutor: ToolExecutor;
   let nonInteractive: NonInteractiveInterface;
   let consoleSpy: ReturnType<typeof vi.spyOn>;
 
@@ -25,16 +21,10 @@ describe('NonInteractiveInterface', () => {
       providerName: 'mock-provider',
       start: vi.fn(),
       sendMessage: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn().mockResolvedValue(undefined),
     } as unknown as Agent;
 
-    threadManager = {
-      getCurrentThreadId: vi.fn(),
-      close: vi.fn().mockResolvedValue(undefined),
-    } as unknown as ThreadManager;
-
-    toolExecutor = {} as ToolExecutor;
-
-    nonInteractive = new NonInteractiveInterface(agent, threadManager, toolExecutor);
+    nonInteractive = new NonInteractiveInterface(agent);
   });
 
   afterEach(() => {
@@ -73,7 +63,7 @@ describe('NonInteractiveInterface', () => {
     });
 
     it('should work without tool executor', async () => {
-      const nonInteractiveWithoutTools = new NonInteractiveInterface(agent, threadManager);
+      const nonInteractiveWithoutTools = new NonInteractiveInterface(agent);
 
       vi.spyOn(agent, 'sendMessage').mockResolvedValue();
       vi.spyOn(agent, 'start').mockImplementation(() => {});

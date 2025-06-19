@@ -193,7 +193,7 @@ describe('CLI Orchestration', () => {
         tools: toolExecutor.getAllTools(),
       });
 
-      const cli = new CLIInterface(agent, threadManager);
+      const cli = new CLIInterface(agent);
 
       // Verify integration
       expect(agent.providerName).toBe('lmstudio');

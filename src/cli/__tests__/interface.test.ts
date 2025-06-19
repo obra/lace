@@ -80,13 +80,13 @@ describe('CLIInterface', () => {
     stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    cli = new CLIInterface(agent, threadManager);
+    cli = new CLIInterface(agent);
   });
 
   afterEach(async () => {
     if (agent) {
       agent.removeAllListeners();
-      agent.stop();
+      await agent.stop();
     }
     if (threadManager) {
       await threadManager.close();
@@ -243,7 +243,7 @@ describe('CLIInterface', () => {
         tools: [],
       });
 
-      new CLIInterface(lmAgent, threadManager);
+      new CLIInterface(lmAgent);
 
       lmAgent.emit('error', {
         error: new Error('Connection failed'),
@@ -340,7 +340,7 @@ describe('CLIInterface', () => {
 
   describe('stop', () => {
     it('should stop agent, close readline, and shutdown gracefully', async () => {
-      const agentStopSpy = vi.spyOn(agent, 'stop').mockImplementation(() => {});
+      const agentStopSpy = vi.spyOn(agent, 'stop').mockImplementation(async () => {});
 
       // Set the interface as running first
       vi.spyOn(agent, 'start').mockImplementation(() => {});

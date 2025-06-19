@@ -161,18 +161,15 @@ async function main() {
   });
 
   // Create interface based on --ui flag
-  const cli =
-    options.ui === 'terminal'
-      ? new TerminalInterface(agent, threadManager, toolExecutor)
-      : new CLIInterface(agent, threadManager, toolExecutor);
+  const cli = options.ui === 'terminal' ? new TerminalInterface(agent) : new CLIInterface(agent);
 
   // Set up tool approval system: CLI policies apply globally
-  const policyCallback = createGlobalPolicyCallback(cli, options, toolExecutor);
-  toolExecutor.setApprovalCallback(policyCallback);
+  const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);
+  agent.toolExecutor.setApprovalCallback(policyCallback);
 
   // Handle single prompt mode (non-interactive)
   if (options.prompt) {
-    const nonInteractive = new NonInteractiveInterface(agent, threadManager, toolExecutor);
+    const nonInteractive = new NonInteractiveInterface(agent);
     await nonInteractive.executePrompt(options.prompt);
     process.exit(0);
   }

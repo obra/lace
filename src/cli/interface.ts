@@ -3,21 +3,15 @@
 
 import * as readline from 'readline';
 import { Agent } from '../agents/agent.js';
-import { ThreadManager } from '../threads/thread-manager.js';
 import { ApprovalCallback, ApprovalDecision } from '../tools/approval-types.js';
-import { ToolExecutor } from '../tools/executor.js';
 
 export class CLIInterface implements ApprovalCallback {
   private agent: Agent;
-  private threadManager: ThreadManager;
-  private toolExecutor?: ToolExecutor;
   private rl: readline.Interface | null = null;
   private isRunning = false;
 
-  constructor(agent: Agent, threadManager: ThreadManager, toolExecutor?: ToolExecutor) {
+  constructor(agent: Agent) {
     this.agent = agent;
-    this.threadManager = threadManager;
-    this.toolExecutor = toolExecutor;
     this.setupEventHandlers();
   }
 
@@ -149,16 +143,16 @@ export class CLIInterface implements ApprovalCallback {
 
     switch (command) {
       case '/compact': {
-        const threadId = this.threadManager.getCurrentThreadId();
+        const threadId = this.agent.threadManager.getCurrentThreadId();
         if (!threadId) {
           console.log('❌ No active thread to compact');
           return;
         }
 
-        this.threadManager.compact(threadId);
+        this.agent.threadManager.compact(threadId);
 
         // Get the system message that was added
-        const events = this.threadManager.getEvents(threadId);
+        const events = this.agent.threadManager.getEvents(threadId);
         const systemMessage = events.find(
           (e) =>
             e.type === 'LOCAL_SYSTEM_MESSAGE' &&
@@ -197,16 +191,12 @@ export class CLIInterface implements ApprovalCallback {
 
     this.isRunning = false;
 
-    if (this.agent) {
-      this.agent.stop();
-    }
-
     if (this.rl) {
       this.rl.close();
       this.rl = null;
     }
 
-    await this.threadManager.close();
+    await this.agent?.stop();
   }
 
   async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
@@ -222,7 +212,7 @@ export class CLIInterface implements ApprovalCallback {
       process.stdout.write('═'.repeat(40) + '\n');
 
       // Show tool name and safety indicator
-      const tool = this.toolExecutor?.getTool(toolName);
+      const tool = this.agent.toolExecutor.getTool(toolName);
       const isReadOnly = tool?.annotations?.readOnlyHint === true;
       const safetyIndicator = isReadOnly ? '✅ read-only' : '⚠️  destructive';
 
