@@ -5,6 +5,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Box, Text, render } from "ink";
 import ShellInput from "./components/shell-input.js";
 import ToolApprovalModal from "./components/tool-approval-modal.js";
+import MessageDisplay from "./components/message-display.js";
+import StatusBar from "./components/status-bar.js";
 import { Agent } from "../../agents/agent.js";
 import { ThreadManager } from "../../threads/thread-manager.js";
 import { ToolExecutor } from "../../tools/executor.js";
@@ -34,6 +36,11 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   const [currentInput, setCurrentInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [tokenUsage, setTokenUsage] = useState<{
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  }>({});
   
   // Tool approval modal state
   const [approvalRequest, setApprovalRequest] = useState<{
@@ -160,6 +167,17 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     // Handle errors
+    // Handle token budget warnings and update token usage
+    const handleTokenBudgetWarning = ({ usage }: { usage: any }) => {
+      if (usage && typeof usage === 'object') {
+        setTokenUsage({
+          promptTokens: usage.promptTokens || usage.prompt_tokens,
+          completionTokens: usage.completionTokens || usage.completion_tokens,
+          totalTokens: usage.totalTokens || usage.total_tokens,
+        });
+      }
+    };
+
     const handleError = ({ error }: { error: Error }) => {
       addMessage({
         type: "system",
@@ -185,6 +203,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     agent.on("tool_call_start", handleToolStart);
     agent.on("tool_call_complete", handleToolComplete);
     agent.on("approval_request", handleApprovalRequest);
+    agent.on("token_budget_warning", handleTokenBudgetWarning);
     agent.on("error", handleError);
 
     // Cleanup function
@@ -195,6 +214,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       agent.off("tool_call_start", handleToolStart);
       agent.off("tool_call_complete", handleToolComplete);
       agent.off("approval_request", handleApprovalRequest);
+      agent.off("token_budget_warning", handleTokenBudgetWarning);
       agent.off("error", handleError);
     };
   }, [agent, addMessage, streamingContent]);
@@ -312,33 +332,31 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   return (
     <Box flexDirection="column" height="100%">
       {/* Message history */}
-      <Box flexDirection="column" flexGrow={1} paddingBottom={1}>
+      <Box flexDirection="column" flexGrow={1} paddingY={1}>
         {messages.map((message, index) => (
-          <Box key={index} marginBottom={1}>
-            <Text color={
-              message.type === "user" ? "cyan" :
-              message.type === "assistant" ? "white" :
-              message.type === "thinking" ? "dim" :
-              message.type === "tool" ? "yellow" :
-              "gray"
-            }>
-              {message.type === "thinking" && <Text italic>{message.content}</Text>}
-              {message.type !== "thinking" && message.content}
-            </Text>
-          </Box>
+          <MessageDisplay 
+            key={index} 
+            message={message}
+          />
         ))}
         
-        {/* Show streaming content */}
+        {/* Show streaming content with new MessageDisplay */}
         {streamingContent && (
-          <Box marginBottom={1}>
-            <Text color="white">{streamingContent}<Text inverse> </Text></Text>
-          </Box>
+          <MessageDisplay 
+            message={{
+              type: "assistant",
+              content: streamingContent,
+              timestamp: new Date(),
+            }}
+            isStreaming={true}
+            showCursor={true}
+          />
         )}
         
         {/* Show processing indicator */}
         {isProcessing && !streamingContent && (
           <Box marginBottom={1}>
-            <Text color="dim">Thinking...</Text>
+            <Text color="dim">💭 Thinking...</Text>
           </Box>
         )}
       </Box>
@@ -354,8 +372,18 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         />
       )}
 
+      {/* Status bar - right above input */}
+      <StatusBar 
+        providerName={agent.providerName || 'unknown'}
+        modelName={(agent as any)._provider?.defaultModel || undefined}
+        threadId={threadManager.getCurrentThreadId() || undefined}
+        tokenUsage={tokenUsage}
+        isProcessing={isProcessing}
+        messageCount={messages.length}
+      />
+
       {/* Input area - disabled when modal is open */}
-      <Box borderStyle="single" borderColor={approvalRequest ? "gray" : "cyan"} padding={1}>
+      <Box padding={1}>
         <ShellInput
           value={currentInput}
           placeholder={approvalRequest ? "Tool approval required..." : "Type your message..."}
