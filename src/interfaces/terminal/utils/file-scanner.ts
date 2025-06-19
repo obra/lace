@@ -144,8 +144,18 @@ export class FileScanner {
    * Get all files and directories in a path, with caching
    */
   public async getCompletions(partialPath: string = ''): Promise<string[]> {
-    const targetDir = partialPath ? path.dirname(partialPath) : '.';
-    const searchTerm = partialPath ? path.basename(partialPath) : '';
+    let targetDir: string;
+    let searchTerm: string;
+
+    // Handle nested directory completion (e.g., "src/" should show contents of src/)
+    if (partialPath.endsWith('/')) {
+      targetDir = partialPath;
+      searchTerm = '';
+    } else {
+      targetDir = partialPath ? path.dirname(partialPath) : '.';
+      searchTerm = partialPath ? path.basename(partialPath) : '';
+    }
+
     const absoluteDir = path.resolve(this.workingDirectory, targetDir);
 
     // Check cache
@@ -168,26 +178,39 @@ export class FileScanner {
       this.cache.set(cacheKey, scanResult);
     }
 
-    // Combine and filter results
-    const allItems = [...scanResult.directories.map((dir) => dir + '/'), ...scanResult.files];
+    // Combine results with directories first, then files
+    const directoryPaths = scanResult.directories.map(
+      (dir) => path.relative(this.workingDirectory, dir) + '/'
+    );
+    const filePaths = scanResult.files.map((file) => path.relative(this.workingDirectory, file));
 
-    // Convert to relative paths and filter by search term
-    const relativePaths = allItems
-      .map((item) => path.relative(this.workingDirectory, item))
-      .filter((item) => item.toLowerCase().includes(searchTerm.toLowerCase()))
+    // Filter by search term and sort
+    const filteredDirectories = directoryPaths
+      .filter((item) => searchTerm === '' || item.toLowerCase().includes(searchTerm.toLowerCase()))
       .sort((a, b) => {
-        // Prioritize exact prefix matches
+        // Prioritize exact prefix matches, then alphabetical
         const aStartsWith = a.toLowerCase().startsWith(searchTerm.toLowerCase());
         const bStartsWith = b.toLowerCase().startsWith(searchTerm.toLowerCase());
 
         if (aStartsWith && !bStartsWith) return -1;
         if (!aStartsWith && bStartsWith) return 1;
-
-        // Then alphabetical
         return a.localeCompare(b);
       });
 
-    return relativePaths;
+    const filteredFiles = filePaths
+      .filter((item) => searchTerm === '' || item.toLowerCase().includes(searchTerm.toLowerCase()))
+      .sort((a, b) => {
+        // Prioritize exact prefix matches, then alphabetical
+        const aStartsWith = a.toLowerCase().startsWith(searchTerm.toLowerCase());
+        const bStartsWith = b.toLowerCase().startsWith(searchTerm.toLowerCase());
+
+        if (aStartsWith && !bStartsWith) return -1;
+        if (!aStartsWith && bStartsWith) return 1;
+        return a.localeCompare(b);
+      });
+
+    // Return directories first, then files
+    return [...filteredDirectories, ...filteredFiles];
   }
 
   /**

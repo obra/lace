@@ -291,13 +291,17 @@ const ShellInput: React.FC<ShellInputProps> = ({
         </Box>
       </Box>
       
-      {/* File autocomplete dropdown */}
-      <FileAutocomplete
-        items={autocompleteItems}
-        selectedIndex={autocompleteSelectedIndex}
-        isVisible={autocompleteVisible}
-        maxItems={5}
-      />
+      {/* File autocomplete overlay - positioned inline below cursor line */}
+      {autocompleteVisible && (
+        <Box marginLeft={bufferState.cursorColumn + 2}>
+          <FileAutocomplete
+            items={autocompleteItems}
+            selectedIndex={autocompleteSelectedIndex}
+            isVisible={autocompleteVisible}
+            maxItems={5}
+          />
+        </Box>
+      )}
     </Box>
   );
 };
