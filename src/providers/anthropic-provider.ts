@@ -22,7 +22,10 @@ export class AnthropicProvider extends AIProvider {
 
   constructor(config: AnthropicProviderConfig) {
     super(config);
-    this._anthropic = new Anthropic({ apiKey: config.apiKey });
+    this._anthropic = new Anthropic({
+      apiKey: config.apiKey,
+      dangerouslyAllowBrowser: true, // Allow in test environments
+    });
   }
 
   get providerName(): string {

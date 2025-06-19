@@ -1,7 +1,7 @@
 // ABOUTME: Commander-based CLI argument parsing with tool approval flags
 // ABOUTME: Handles all CLI flags, validation, and help text generation with fail-early validation
 
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import { ToolExecutor } from '../tools/executor.js';
 import { ProviderRegistry } from '../providers/registry.js';
 
@@ -12,6 +12,7 @@ export interface CLIOptions {
   logLevel: 'error' | 'warn' | 'info' | 'debug';
   logFile: string | undefined;
   prompt: string | undefined;
+  ui: 'readline' | 'terminal';
   // Tool approval options
   allowNonDestructiveTools: boolean;
   autoApproveTools: string[];
@@ -124,6 +125,11 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
     .option('--log-file <path>', 'Write logs to file (no file = no logging)')
     .option('--prompt <text>', 'Send a single prompt and exit (non-interactive mode)')
     .option('--continue [session_id]', 'Continue previous conversation (latest if no ID provided)')
+    .addOption(
+      new Option('--ui <type>', 'Choose UI type')
+        .choices(['readline', 'terminal'])
+        .default('readline')
+    )
     // Tool approval flags
     .option(
       '--allow-non-destructive-tools',
@@ -198,6 +204,7 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
     logLevel: options.logLevel,
     logFile: options.logFile,
     prompt: options.prompt,
+    ui: options.ui,
     allowNonDestructiveTools: options.allowNonDestructiveTools || false,
     autoApproveTools: finalAutoApproveTools,
     disableTools: finalDisableTools,
@@ -259,6 +266,11 @@ export async function showHelp(): Promise<void> {
     .option('--log-file <path>', 'Write logs to file (no file = no logging)')
     .option('--prompt <text>', 'Send a single prompt and exit (non-interactive mode)')
     .option('--continue [session_id]', 'Continue previous conversation (latest if no ID provided)')
+    .addOption(
+      new Option('--ui <type>', 'Choose UI type')
+        .choices(['readline', 'terminal'])
+        .default('readline')
+    )
     // Tool approval flags
     .option('--allow-non-destructive-tools', 'Automatically approve tools marked as read-only')
     .option(

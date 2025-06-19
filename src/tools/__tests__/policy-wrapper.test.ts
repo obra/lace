@@ -54,6 +54,7 @@ describe('Global Policy Wrapper', () => {
       logLevel: 'info',
       logFile: undefined,
       prompt: undefined,
+      ui: 'readline',
       allowNonDestructiveTools: false,
       autoApproveTools: [],
       disableTools: [],

@@ -97,6 +97,7 @@ describe('Tool Approval System Integration', () => {
         logLevel: 'info',
         logFile: undefined,
         prompt: undefined,
+        ui: 'readline',
         allowNonDestructiveTools: false,
         autoApproveTools: ['bash'],
         disableTools: [],
@@ -123,6 +124,7 @@ describe('Tool Approval System Integration', () => {
         logLevel: 'info',
         logFile: undefined,
         prompt: undefined,
+        ui: 'readline',
         allowNonDestructiveTools: false,
         autoApproveTools: [],
         disableTools: ['bash'],
@@ -149,6 +151,7 @@ describe('Tool Approval System Integration', () => {
         logLevel: 'info',
         logFile: undefined,
         prompt: undefined,
+        ui: 'readline',
         allowNonDestructiveTools: true,
         autoApproveTools: [],
         disableTools: [],
@@ -184,6 +187,7 @@ describe('Tool Approval System Integration', () => {
         logLevel: 'info',
         logFile: undefined,
         prompt: undefined,
+        ui: 'readline',
         allowNonDestructiveTools: false, // Don't auto-approve read-only
         autoApproveTools: [], // No auto-approved tools
         disableTools: [], // No disabled tools
@@ -215,6 +219,7 @@ describe('Tool Approval System Integration', () => {
         logLevel: 'info',
         logFile: undefined,
         prompt: undefined,
+        ui: 'readline',
         allowNonDestructiveTools: false,
         autoApproveTools: [],
         disableTools: [],
@@ -251,6 +256,7 @@ describe('Tool Approval System Integration', () => {
         logLevel: 'info',
         logFile: undefined,
         prompt: undefined,
+        ui: 'readline',
         allowNonDestructiveTools: false,
         autoApproveTools: ['bash'], // Try to auto-approve
         disableTools: ['bash'], // But also disable
@@ -279,6 +285,7 @@ describe('Tool Approval System Integration', () => {
         logLevel: 'info',
         logFile: undefined,
         prompt: undefined,
+        ui: 'readline',
         allowNonDestructiveTools: true, // Try to allow read-only
         autoApproveTools: ['bash'], // Try to auto-approve
         disableTools: [],

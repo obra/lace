@@ -29,6 +29,7 @@ describe('CLI Arguments (Commander-based)', () => {
         logLevel: 'info',
         logFile: undefined,
         prompt: undefined,
+        ui: 'readline',
         // Tool approval defaults
         allowNonDestructiveTools: false,
         autoApproveTools: [],
@@ -197,6 +198,7 @@ describe('CLI Arguments (Commander-based)', () => {
         logLevel: 'debug',
         logFile: undefined,
         prompt: undefined,
+        ui: 'readline',
         allowNonDestructiveTools: true,
         autoApproveTools: ['bash'],
         disableTools: ['file_write'],

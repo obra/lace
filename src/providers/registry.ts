@@ -4,7 +4,7 @@
 import { glob } from 'glob';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { AIProvider } from './types.js';
+import { AIProvider, ProviderResponse } from './types.js';
 
 export class ProviderRegistry {
   private _providers = new Map<string, AIProvider>();
@@ -66,11 +66,29 @@ export class ProviderRegistry {
               try {
                 // For providers that require API keys, use placeholder values for discovery
                 const defaultConfig = {
-                  apiKey: 'discovery-mode', // Placeholder API key for auto-discovery
+                  apiKey: 'discovery-mode-placeholder',
+                  baseURL: 'https://api.placeholder.com',
                 };
                 provider = new ProviderClass(defaultConfig);
               } catch {
-                // Skip providers that can't be instantiated without proper config
+                // Create a minimal placeholder provider for discovery purposes
+                class PlaceholderProvider extends AIProvider {
+                  get providerName() {
+                    return ProviderClass.name.toLowerCase().replace('provider', '');
+                  }
+                  get defaultModel() {
+                    return 'discovery-model';
+                  }
+                  get supportsStreaming() {
+                    return true;
+                  }
+                  async createResponse(): Promise<ProviderResponse> {
+                    throw new Error('Provider not properly configured');
+                  }
+                }
+
+                const placeholderProvider = new PlaceholderProvider({});
+                registry.registerProvider(placeholderProvider);
                 continue;
               }
             }
@@ -78,9 +96,8 @@ export class ProviderRegistry {
             registry.registerProvider(provider);
           }
         }
-      } catch (error) {
+      } catch {
         // Skip files that can't be imported or have errors
-        console.warn(`Failed to import provider file ${file}:`, error);
       }
     }
 
@@ -89,42 +106,16 @@ export class ProviderRegistry {
 
   static isProviderClass(value: any): boolean {
     // Check if it's a constructor function/class
-    if (typeof value !== 'function') {
-      return false;
+    if (typeof value !== 'function') return false;
+    if (!value.prototype) return false;
+    // Check if the class name ends with "Provider" (simple heuristic)
+    if (!value.name || !value.name.endsWith('Provider')) return false;
+    // Check if it extends AIProvider by checking the prototype chain
+    let proto = value.prototype;
+    while (proto) {
+      if (proto.constructor.name === 'AIProvider') return true;
+      proto = Object.getPrototypeOf(proto);
     }
-
-    // Check if it has a prototype
-    if (!value.prototype) {
-      return false;
-    }
-
-    // Try to create an instance to check if it implements AIProvider interface
-    try {
-      let instance: any;
-      try {
-        // Try with empty config first
-        instance = new value({});
-      } catch {
-        // Try with minimal config for providers that require API keys
-        try {
-          const defaultConfig = {
-            apiKey: 'discovery-mode',
-          };
-          instance = new value(defaultConfig);
-        } catch {
-          return false;
-        }
-      }
-
-      // Check if instance has required AIProvider properties
-      return (
-        typeof instance.providerName === 'string' &&
-        typeof instance.defaultModel === 'string' &&
-        typeof instance.supportsStreaming === 'boolean' &&
-        typeof instance.createResponse === 'function'
-      );
-    } catch {
-      return false;
-    }
+    return false;
   }
 }

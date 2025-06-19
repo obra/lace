@@ -6,6 +6,7 @@ export default defineConfig({
       reporter: ['text', 'html', 'lcov'],
       exclude: ['node_modules/', 'dist/', '**/*.test.ts', '**/*.spec.ts'],
     },
-    environment: 'node',
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
   },
 });

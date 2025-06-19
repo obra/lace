@@ -25,6 +25,7 @@ export class OpenAIProvider extends AIProvider {
 
     const openaiConfig: ClientOptions = {
       apiKey: config.apiKey,
+      dangerouslyAllowBrowser: true, // Allow in test environments
     };
 
     // Support custom base URL for OpenAI-compatible APIs

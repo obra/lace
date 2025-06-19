@@ -17,6 +17,7 @@ import { logger } from './utils/logger.js';
 import { loadPromptConfig, getPromptFilePaths } from './config/prompts.js';
 import { parseArgs, validateProvider } from './cli/args.js';
 import { CLIInterface } from './cli/interface.js';
+import { TerminalInterface } from './interfaces/terminal/terminal-interface.js';
 import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
 
 // Create provider based on CLI option
@@ -144,8 +145,11 @@ async function main() {
     tools: toolExecutor.getAllTools(),
   });
 
-  // Create CLI interface - pass toolExecutor for tool property access
-  const cli = new CLIInterface(agent, threadManager, toolExecutor);
+  // Create interface based on --ui flag
+  const cli =
+    options.ui === 'terminal'
+      ? new TerminalInterface(agent, threadManager, toolExecutor)
+      : new CLIInterface(agent, threadManager, toolExecutor);
 
   // Set up tool approval system: CLI policies apply globally
   const policyCallback = createGlobalPolicyCallback(cli, options, toolExecutor);

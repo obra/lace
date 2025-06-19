@@ -90,6 +90,7 @@ describe('CLI Orchestration', () => {
         logLevel: 'debug',
         logFile: undefined,
         prompt: 'test prompt',
+        ui: 'readline',
         allowNonDestructiveTools: false,
         autoApproveTools: [],
         disableTools: [],
