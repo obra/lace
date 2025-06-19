@@ -9,8 +9,6 @@ import Database from 'better-sqlite3';
 import { ThreadPersistence } from '../persistence.js';
 import { ThreadManager } from '../thread-manager.js';
 import { Thread, ThreadEvent, EventType } from '../types.js';
-import { startSession, handleGracefulShutdown } from '../session.js';
-import * as laceDir from '../../config/lace-dir.js';
 
 describe('ThreadPersistence', () => {
   let tempDbPath: string;
@@ -510,90 +508,106 @@ describe('Session Management', () => {
     }
   });
 
-  describe('startSession', () => {
+  describe('ThreadManager session management', () => {
     it('should start new session by default', async () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
-      vi.spyOn(laceDir, 'getLaceDbPath').mockReturnValue(tempDbPath);
 
-      const { threadManager, threadId } = await startSession([]);
+      const threadManager = new ThreadManager(tempDbPath);
+      const sessionInfo = await threadManager.resumeOrCreate();
+      const { threadId } = sessionInfo;
 
       expect(threadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
       expect(threadManager.getCurrentThreadId()).toBe(threadId);
+      expect(sessionInfo.isResumed).toBe(false);
 
       await threadManager.close();
       vi.restoreAllMocks();
     });
 
-    it('should continue latest session with --continue', async () => {
+    it('should continue latest session', async () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
-      vi.spyOn(laceDir, 'getLaceDbPath').mockReturnValue(tempDbPath);
 
       // Create a session first
-      const { threadManager: firstManager, threadId: firstId } = await startSession([]);
+      const firstManager = new ThreadManager(tempDbPath);
+      const firstSessionInfo = await firstManager.resumeOrCreate();
+      const { threadId: firstId } = firstSessionInfo;
       firstManager.addEvent(firstId, 'USER_MESSAGE', 'First session');
       await firstManager.saveCurrentThread();
       await firstManager.close();
 
       // Continue session
-      const { threadManager, threadId } = await startSession(['--continue']);
+      const secondManager = new ThreadManager(tempDbPath);
+      const latestThreadId = await secondManager.getLatestThreadId();
+      const sessionInfo = await secondManager.resumeOrCreate(latestThreadId || undefined);
+      const { threadId } = sessionInfo;
 
       expect(threadId).toBe(firstId);
-      expect(threadManager.getEvents(threadId)).toHaveLength(1);
-      expect(threadManager.getEvents(threadId)[0].data).toBe('First session');
+      expect(sessionInfo.isResumed).toBe(true);
+      expect(secondManager.getEvents(threadId)).toHaveLength(1);
+      expect(secondManager.getEvents(threadId)[0].data).toBe('First session');
 
-      await threadManager.close();
+      await secondManager.close();
       vi.restoreAllMocks();
     });
 
-    it('should continue specific session with --continue and ID', async () => {
+    it('should continue specific session by ID', async () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
-      vi.spyOn(laceDir, 'getLaceDbPath').mockReturnValue(tempDbPath);
 
       // Create multiple sessions
-      const { threadManager: manager1, threadId: id1 } = await startSession([]);
+      const manager1 = new ThreadManager(tempDbPath);
+      const sessionInfo1 = await manager1.resumeOrCreate();
+      const { threadId: id1 } = sessionInfo1;
       manager1.addEvent(id1, 'USER_MESSAGE', 'First session');
       await manager1.saveCurrentThread();
       await manager1.close();
 
-      const { threadManager: manager2, threadId: id2 } = await startSession([]);
+      const manager2 = new ThreadManager(tempDbPath);
+      const sessionInfo2 = await manager2.resumeOrCreate();
+      const { threadId: id2 } = sessionInfo2;
       manager2.addEvent(id2, 'USER_MESSAGE', 'Second session');
       await manager2.saveCurrentThread();
       await manager2.close();
 
       // Continue first session specifically
-      const { threadManager, threadId } = await startSession(['--continue', id1]);
+      const manager3 = new ThreadManager(tempDbPath);
+      const sessionInfo3 = await manager3.resumeOrCreate(id1);
+      const { threadId } = sessionInfo3;
 
       expect(threadId).toBe(id1);
-      expect(threadManager.getEvents(threadId)[0].data).toBe('First session');
+      expect(sessionInfo3.isResumed).toBe(true);
+      expect(manager3.getEvents(threadId)[0].data).toBe('First session');
 
-      await threadManager.close();
+      await manager3.close();
       vi.restoreAllMocks();
     });
 
     it('should start new session if continue fails', async () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
       vi.spyOn(console, 'warn').mockImplementation(() => {});
-      vi.spyOn(laceDir, 'getLaceDbPath').mockReturnValue(tempDbPath);
 
       // Try to continue non-existent session
-      const { threadManager, threadId } = await startSession(['--continue', 'lace_invalid_id']);
+      const threadManager = new ThreadManager(tempDbPath);
+      const sessionInfo = await threadManager.resumeOrCreate('lace_invalid_id');
+      const { threadId } = sessionInfo;
 
       expect(threadId).not.toBe('lace_invalid_id');
       expect(threadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
+      expect(sessionInfo.isResumed).toBe(false);
+      expect(sessionInfo.resumeError).toContain('Could not resume lace_invalid_id');
 
       await threadManager.close();
       vi.restoreAllMocks();
     });
   });
 
-  describe('handleGracefulShutdown', () => {
+  describe('ThreadManager shutdown', () => {
     it('should save current session on shutdown', async () => {
-      vi.spyOn(laceDir, 'getLaceDbPath').mockReturnValue(tempDbPath);
-
-      const { threadManager, threadId } = await startSession([]);
+      const threadManager = new ThreadManager(tempDbPath);
+      const sessionInfo = await threadManager.resumeOrCreate();
+      const { threadId } = sessionInfo;
       threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test message');
 
-      await handleGracefulShutdown(threadManager);
+      await threadManager.close();
 
       // Verify session was saved
       const newManager = new ThreadManager(tempDbPath);

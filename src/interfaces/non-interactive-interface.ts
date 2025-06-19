@@ -4,7 +4,6 @@
 import type { Agent } from '../agents/agent.js';
 import type { ThreadManager } from '../threads/thread-manager.js';
 import type { ToolExecutor } from '../tools/executor.js';
-import { handleGracefulShutdown } from '../threads/session.js';
 
 /**
  * Non-interactive interface for single prompt execution
@@ -32,6 +31,6 @@ export class NonInteractiveInterface {
     await this.agent.sendMessage(prompt);
 
     // Save and exit
-    await handleGracefulShutdown(this.threadManager);
+    await this.threadManager.close();
   }
 }

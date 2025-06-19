@@ -11,7 +11,6 @@ import { LMStudioProvider } from '../../providers/lmstudio-provider.js';
 import { OllamaProvider } from '../../providers/ollama-provider.js';
 import { AIProvider } from '../../providers/types.js';
 import { TokenBudgetConfig } from '../../token-management/types.js';
-import { generateThreadId } from '../../threads/session.js';
 import { getEnvVar } from '../../config/env-loader.js';
 
 export class DelegateTool implements Tool {
@@ -123,7 +122,7 @@ Examples:
       const toolExecutor = this.createRestrictedToolExecutor();
 
       // Create new thread for subagent with delegate prefix
-      const subagentThreadId = `delegate_${generateThreadId()}`;
+      const subagentThreadId = `delegate_${this.threadManager.generateThreadId()}`;
 
       // Create the thread in ThreadManager
       threadManager.createThread(subagentThreadId);

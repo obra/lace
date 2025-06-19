@@ -12,7 +12,8 @@ import { ProviderRegistry } from './providers/registry.js';
 import { AIProvider } from './providers/types.js';
 import { ToolExecutor } from './tools/executor.js';
 import { DelegateTool } from './tools/implementations/delegate.js';
-import { startSession } from './threads/session.js';
+import { ThreadManager } from './threads/thread-manager.js';
+import { getLaceDbPath } from './config/lace-dir.js';
 import { logger } from './utils/logger.js';
 import { loadPromptConfig, getPromptFilePaths } from './config/prompts.js';
 import { parseArgs, validateProvider } from './cli/args.js';
@@ -117,9 +118,22 @@ async function main() {
   const toolExecutor = new ToolExecutor();
   toolExecutor.registerAllAvailableTools();
 
-  // Start or resume session using enhanced thread management
-  const sessionInfo = await startSession(process.argv.slice(2));
-  const { threadManager, threadId } = sessionInfo;
+  // Create thread manager and start/resume session
+  const threadManager = new ThreadManager(getLaceDbPath());
+
+  // Handle --continue logic from CLI options
+  let continueThreadId: string | undefined;
+  if (options.continue) {
+    if (typeof options.continue === 'string') {
+      continueThreadId = options.continue;
+    } else {
+      // --continue with no argument, get latest
+      continueThreadId = (await threadManager.getLatestThreadId()) || undefined;
+    }
+  }
+
+  const sessionInfo = await threadManager.resumeOrCreate(continueThreadId);
+  const { threadId } = sessionInfo;
 
   // Set up delegate tool dependencies (after we have threadManager)
   const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;

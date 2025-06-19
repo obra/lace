@@ -13,6 +13,7 @@ export interface CLIOptions {
   logFile: string | undefined;
   prompt: string | undefined;
   ui: 'readline' | 'terminal';
+  continue?: string | boolean;
   // Tool approval options
   allowNonDestructiveTools: boolean;
   autoApproveTools: string[];
@@ -205,6 +206,7 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
     logFile: options.logFile,
     prompt: options.prompt,
     ui: options.ui,
+    continue: options.continue,
     allowNonDestructiveTools: options.allowNonDestructiveTools || false,
     autoApproveTools: finalAutoApproveTools,
     disableTools: finalDisableTools,

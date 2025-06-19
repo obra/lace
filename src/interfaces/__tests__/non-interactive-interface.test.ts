@@ -8,9 +8,6 @@ import type { ThreadManager } from '../../threads/thread-manager.js';
 import type { ToolExecutor } from '../../tools/executor.js';
 
 // Mock dependencies
-vi.mock('../../threads/session.js', () => ({
-  handleGracefulShutdown: vi.fn().mockResolvedValue(undefined),
-}));
 
 describe('NonInteractiveInterface', () => {
   let agent: Agent;
@@ -32,6 +29,7 @@ describe('NonInteractiveInterface', () => {
 
     threadManager = {
       getCurrentThreadId: vi.fn(),
+      close: vi.fn().mockResolvedValue(undefined),
     } as unknown as ThreadManager;
 
     toolExecutor = {} as ToolExecutor;

@@ -7,6 +7,12 @@ import { buildConversationFromEvents } from './conversation-builder.js';
 import { ProviderMessage } from '../providers/types.js';
 import { logger } from '../utils/logger.js';
 
+export interface ThreadSessionInfo {
+  threadId: string;
+  isResumed: boolean;
+  resumeError?: string;
+}
+
 export class ThreadManager {
   private _currentThread: Thread | null = null;
   private _persistence: ThreadPersistence;
@@ -14,6 +20,38 @@ export class ThreadManager {
 
   constructor(dbPath: string) {
     this._persistence = new ThreadPersistence(dbPath);
+  }
+
+  generateThreadId(): string {
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const random = Math.random().toString(36).substring(2, 8);
+    return `lace_${date}_${random}`;
+  }
+
+  async resumeOrCreate(threadId?: string): Promise<ThreadSessionInfo> {
+    if (threadId) {
+      try {
+        await this.setCurrentThread(threadId);
+        return { threadId, isResumed: true };
+      } catch (error) {
+        // Fall through to create new
+        const resumeError = error instanceof Error ? error.message : 'Unknown error';
+        const newThreadId = this.generateThreadId();
+        this.createThread(newThreadId);
+        this.enableAutoSave();
+        return {
+          threadId: newThreadId,
+          isResumed: false,
+          resumeError: `Could not resume ${threadId}: ${resumeError}`,
+        };
+      }
+    }
+
+    // Create new thread
+    const newThreadId = this.generateThreadId();
+    this.createThread(newThreadId);
+    this.enableAutoSave();
+    return { threadId: newThreadId, isResumed: false };
   }
 
   // Existing API (preserved for backward compatibility)

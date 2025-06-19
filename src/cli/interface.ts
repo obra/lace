@@ -3,7 +3,6 @@
 
 import * as readline from 'readline';
 import { Agent } from '../agents/agent.js';
-import { handleGracefulShutdown } from '../threads/session.js';
 import { ThreadManager } from '../threads/thread-manager.js';
 import { ApprovalCallback, ApprovalDecision } from '../tools/approval-types.js';
 import { ToolExecutor } from '../tools/executor.js';
@@ -207,7 +206,7 @@ export class CLIInterface implements ApprovalCallback {
       this.rl = null;
     }
 
-    await handleGracefulShutdown(this.threadManager);
+    await this.threadManager.close();
   }
 
   async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {

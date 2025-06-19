@@ -11,7 +11,6 @@ import { Agent } from "../../agents/agent.js";
 import { ThreadManager } from "../../threads/thread-manager.js";
 import { ToolExecutor } from "../../tools/executor.js";
 import { ApprovalCallback, ApprovalDecision } from "../../tools/approval-types.js";
-import { handleGracefulShutdown } from "../../threads/session.js";
 
 interface Message {
   type: "user" | "assistant" | "system" | "tool" | "thinking";
@@ -453,7 +452,7 @@ export class TerminalInterface implements ApprovalCallback {
       this.agent.stop();
     }
 
-    await handleGracefulShutdown(this.threadManager);
+    await this.threadManager.close();
   }
 
   async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
