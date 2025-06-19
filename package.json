@@ -30,6 +30,7 @@
     "glob": "^11.0.3",
     "highlight.js": "^11.11.1",
     "ink": "^6.0.0",
+    "ink-autocomplete": "^0.0.0",
     "ollama": "^0.5.16",
     "openai": "^4.77.0",
     "pino": "^9.7.0",
