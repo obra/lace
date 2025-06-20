@@ -17,7 +17,6 @@ import { getLaceDbPath } from './config/lace-dir.js';
 import { logger } from './utils/logger.js';
 import { loadPromptConfig, getPromptFilePaths } from './config/prompts.js';
 import { parseArgs, validateProvider } from './cli/args.js';
-import { CLIInterface } from './cli/interface.js';
 import { TerminalInterface } from './interfaces/terminal/terminal-interface.js';
 import { NonInteractiveInterface } from './interfaces/non-interactive-interface.js';
 import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
@@ -160,8 +159,8 @@ async function main() {
     tools: toolExecutor.getAllTools(),
   });
 
-  // Create interface based on --ui flag
-  const cli = options.ui === 'terminal' ? new TerminalInterface(agent) : new CLIInterface(agent);
+  // Create interface (always use terminal interface since CLIInterface is removed)
+  const cli = new TerminalInterface(agent);
 
   // Set up tool approval system: CLI policies apply globally
   const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);

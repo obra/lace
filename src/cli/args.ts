@@ -12,7 +12,7 @@ export interface CLIOptions {
   logLevel: 'error' | 'warn' | 'info' | 'debug';
   logFile: string | undefined;
   prompt: string | undefined;
-  ui: 'readline' | 'terminal';
+  ui: 'terminal';
   continue?: string | boolean;
   // Tool approval options
   allowNonDestructiveTools: boolean;
@@ -128,8 +128,8 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
     .option('--continue [session_id]', 'Continue previous conversation (latest if no ID provided)')
     .addOption(
       new Option('--ui <type>', 'Choose UI type')
-        .choices(['readline', 'terminal'])
-        .default('readline')
+        .choices(['terminal'])
+        .default('terminal')
     )
     // Tool approval flags
     .option(
@@ -270,8 +270,8 @@ export async function showHelp(): Promise<void> {
     .option('--continue [session_id]', 'Continue previous conversation (latest if no ID provided)')
     .addOption(
       new Option('--ui <type>', 'Choose UI type')
-        .choices(['readline', 'terminal'])
-        .default('readline')
+        .choices(['terminal'])
+        .default('terminal')
     )
     // Tool approval flags
     .option('--allow-non-destructive-tools', 'Automatically approve tools marked as read-only')

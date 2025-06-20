@@ -6,19 +6,23 @@ Design and implement a clean command system with a simple UserInterface abstract
 
 ## Key Architectural Decisions
 
-### 1. Agent Contains ThreadManager
-**Current Problem**: Interfaces redundantly receive both agent and threadManager
+### 1. Agent is the Single Source of Truth
+**Previous Problem**: Interfaces redundantly received agent, threadManager, and toolExecutor
 ```typescript
-// Current - redundant
-TerminalInterface({ agent, threadManager, toolExecutor, approvalCallback })
+// Previous - redundant parameters
+TerminalInterface(agent, threadManager, toolExecutor)
 NonInteractiveInterface(agent, threadManager, toolExecutor)
 ```
 
-**Solution**: Agent is the primary interface to conversation state
+**Current Solution**: Agent exposes public getters for all dependencies
 ```typescript
-// Better - agent contains threadManager
-TerminalInterface({ agent, toolExecutor, approvalCallback })
-NonInteractiveInterface(agent, toolExecutor)
+// Current - agent contains everything
+TerminalInterface(agent)
+NonInteractiveInterface(agent)
+
+// Agent provides access to dependencies
+agent.threadManager  // Public getter
+agent.toolExecutor   // Public getter
 ```
 
 ### 2. Simple UserInterface Abstraction
@@ -26,9 +30,8 @@ Commands work against a minimal, clean interface:
 
 ```typescript
 interface UserInterface {
-  // Core state - agent contains threadManager
+  // Core state - agent contains threadManager and toolExecutor
   agent: Agent;
-  toolExecutor?: ToolExecutor;
   
   // Simple command interface
   displayMessage(message: string): void;
@@ -99,20 +102,32 @@ const exitCommand: Command = {
 };
 ```
 
+### Tool-Related Commands
+Commands can access tools through the agent:
+```typescript
+const statusCommand: Command = {
+  name: 'status',
+  description: 'Show current status',
+  async execute(args: string, ui: UserInterface) {
+    const threadId = ui.agent.threadManager.getCurrentThreadId();
+    const toolCount = ui.agent.toolExecutor.getAllTools().length;
+    ui.displayMessage(`Thread: ${threadId}, Tools: ${toolCount}`);
+  }
+};
+```
+
 ## Interface Implementations
 
 ### Terminal Interface (React Component)
 ```typescript
 const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   agent,
-  toolExecutor,
   approvalCallback,
 }) => {
   // ... existing component logic
 
   const userInterface: UserInterface = {
     agent,
-    toolExecutor,
     
     displayMessage(message: string) {
       addMessage({ type: 'system', content: message, timestamp: new Date() });
@@ -138,11 +153,9 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 ```typescript
 export class NonInteractiveInterface implements UserInterface {
   agent: Agent;
-  toolExecutor?: ToolExecutor;
 
-  constructor(agent: Agent, toolExecutor?: ToolExecutor) {
+  constructor(agent: Agent) {
     this.agent = agent;
-    this.toolExecutor = toolExecutor;
   }
   
   displayMessage(message: string): void {
@@ -156,6 +169,31 @@ export class NonInteractiveInterface implements UserInterface {
   }
   
   exit(): void {
+    process.exit(0);
+  }
+}
+```
+
+### CLI Interface (Class)
+```typescript
+export class CLIInterface implements UserInterface, ApprovalCallback {
+  private agent: Agent;
+
+  constructor(agent: Agent) {
+    this.agent = agent;
+  }
+  
+  displayMessage(message: string): void {
+    console.log(message);
+  }
+  
+  clearSession(): void {
+    const newThreadId = this.agent.threadManager.generateThreadId();
+    this.agent.threadManager.createThread(newThreadId);
+  }
+  
+  async exit(): void {
+    await this.agent?.stop();  // Agent.stop() is async
     process.exit(0);
   }
 }
@@ -228,6 +266,7 @@ class CommandExecutor {
 - **`/exit`** - Quit application
 - **`/status`** - Show current status (model, thread info, etc.)
 - **`/model <name>`** - Switch AI models
+- **`/compact`** - Compress thread history to save tokens
 
 ## User Commands (Future)
 
@@ -253,10 +292,11 @@ Focus on code quality, performance, and security.
 
 1. **Clean Separation**: Commands contain business logic, interfaces handle presentation
 2. **Interface Agnostic**: Same commands work in terminal, web, API, non-interactive
-3. **Simple Contract**: Minimal UserInterface abstraction
+3. **Simple Contract**: Minimal UserInterface abstraction with single agent dependency
 4. **Extensible**: Easy to add new commands and interfaces
 5. **Testable**: Mock UserInterface for testing commands
 6. **Future-Proof**: Foundation for user-defined commands
+7. **No Redundancy**: Agent is the single source of truth for all conversation state
 
 ## Implementation Plan
 
@@ -266,9 +306,9 @@ Focus on code quality, performance, and security.
 3. Update interfaces to provide UserInterface implementation
 
 ### Phase 2: Built-in Commands
-1. Implement system commands (help, clear, exit, status)
+1. Implement system commands (help, clear, exit, status, compact)
 2. Integrate command executor into interfaces
-3. Replace hardcoded command handling
+3. Replace hardcoded command handling (currently in TerminalInterface and CLIInterface)
 
 ### Phase 3: User Commands
 1. Design user command loading from `.lace/commands/`
@@ -280,10 +320,42 @@ Focus on code quality, performance, and security.
 2. Command aliases support
 3. Comprehensive testing
 
+## Current State
+
+### ✅ **Completed - Architecture Refactoring**
+- Agent now exposes public `toolExecutor` and `threadManager` getters
+- All interface constructors simplified to single `agent` parameter
+- Agent.stop() is async and handles cleanup of dependencies
+- Eliminates redundant parameter passing
+
+### Current Degenerate Implementation
+**Terminal Interface** (`src/interfaces/terminal/terminal-interface.tsx:256-312`):
+```typescript
+// Hardcoded switch-case in handleSlashCommand
+switch (command) {
+  case "/compact": /* ... */ break;
+  case "/help": /* ... */ break; 
+  case "/exit": /* ... */ break;
+  default: /* error */ break;
+}
+```
+
+**CLI Interface** (`src/cli/interface.ts:144-183`):
+```typescript
+// Hardcoded switch-case in handleSlashCommand
+switch (command) {
+  case "/compact": /* ... */ break;
+  case "/help": /* ... */ break; 
+  default: /* unknown command */ break;
+}
+```
+
 ## Success Criteria
 
 - [ ] All existing hardcoded commands work identically
-- [ ] Commands work across all interface types
+- [ ] Commands work across all interface types  
 - [ ] Clean, minimal UserInterface abstraction
 - [ ] Foundation ready for user-defined commands
 - [ ] Zero regressions in existing functionality
+- [x] Agent is single source of truth for conversation state
+- [x] No redundant parameter passing between components

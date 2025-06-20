@@ -9,6 +9,9 @@ import MessageDisplay from "./components/message-display.js";
 import StatusBar from "./components/status-bar.js";
 import { Agent } from "../../agents/agent.js";
 import { ApprovalCallback, ApprovalDecision } from "../../tools/approval-types.js";
+import { CommandRegistry } from "../../commands/registry.js";
+import { CommandExecutor } from "../../commands/executor.js";
+import type { UserInterface } from "../../commands/types.js";
 
 interface Message {
   type: "user" | "assistant" | "system" | "tool" | "thinking";
@@ -29,6 +32,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   const [currentInput, setCurrentInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [commandExecutor, setCommandExecutor] = useState<CommandExecutor | null>(null);
   const [tokenUsage, setTokenUsage] = useState<{
     promptTokens?: number;
     completionTokens?: number;
@@ -248,74 +252,64 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     }
   }, [agent, addMessage]);
 
-  // Handle slash commands
-  const handleSlashCommand = useCallback(async (input: string) => {
-    const command = input.toLowerCase().trim();
-
-    switch (command) {
-      case "/compact": {
-        const threadId = agent.threadManager.getCurrentThreadId();
-        if (!threadId) {
-          addMessage({
-            type: "system",
-            content: "❌ No active thread to compact",
-            timestamp: new Date(),
-          });
-          return;
-        }
-
-        agent.threadManager.compact(threadId);
-
-        // Get the system message that was added
-        const events = agent.threadManager.getEvents(threadId);
-        const systemMessage = events.find(
-          (e: any) =>
-            e.type === "LOCAL_SYSTEM_MESSAGE" &&
-            typeof e.data === "string" &&
-            e.data.includes("Compacted")
-        );
-
-        addMessage({
-          type: "system",
-          content: systemMessage ? systemMessage.data as string : "✅ Thread compaction completed",
-          timestamp: new Date(),
-        });
-        break;
-      }
-
-      case "/help": {
-        addMessage({
-          type: "system",
-          content: `Available commands:
-  /compact  - Compress tool results to save tokens
-  /help     - Show this help message
-  /exit     - Exit the application`,
-          timestamp: new Date(),
-        });
-        break;
-      }
-
-      case "/exit": {
-        process.exit(0);
-        break;
-      }
-
-      default: {
-        addMessage({
-          type: "system",
-          content: `❌ Unknown command: ${command}\nType /help for available commands`,
-          timestamp: new Date(),
-        });
-        break;
-      }
+  // Create UserInterface implementation
+  const userInterface: UserInterface = React.useMemo(() => ({
+    agent,
+    
+    displayMessage(message: string): void {
+      addMessage({
+        type: "system",
+        content: message,
+        timestamp: new Date(),
+      });
+    },
+    
+    clearSession(): void {
+      // Create new thread and agent
+      const newThreadId = agent.threadManager.generateThreadId();
+      agent.threadManager.createThread(newThreadId);
+      // Reset React state
+      setMessages([]);
+      addMessage({
+        type: "system",
+        content: `🤖 New conversation started using ${agent.providerName} provider.`,
+        timestamp: new Date(),
+      });
+    },
+    
+    exit(): void {
+      process.exit(0);
     }
-  }, [agent.threadManager, addMessage]);
+  }), [agent, addMessage, setMessages]);
+
+  // Handle slash commands using new command system
+  const handleSlashCommand = useCallback(async (input: string) => {
+    if (!commandExecutor) {
+      addMessage({
+        type: "system",
+        content: "Commands not yet loaded...",
+        timestamp: new Date(),
+      });
+      return;
+    }
+    await commandExecutor.execute(input, userInterface);
+  }, [commandExecutor, userInterface, addMessage]);
+
+  // Initialize command system
+  useEffect(() => {
+    const initCommands = async () => {
+      const registry = await CommandRegistry.createWithAutoDiscovery();
+      const executor = new CommandExecutor(registry);
+      setCommandExecutor(executor);
+    };
+    initCommands();
+  }, []);
 
   // Initialize agent on mount
   useEffect(() => {
     addMessage({
       type: "system",
-      content: `🤖 Lace Agent started using ${agent.providerName} provider. Type "/exit" to quit.`,
+      content: `🤖 Lace Agent started using ${agent.providerName} provider. Type "/help" to see available commands.`,
       timestamp: new Date(),
     });
     
