@@ -7,7 +7,7 @@
     "lace": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/config/prompts dist/config/",
     "start": "npm run build && node dist/cli.js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",

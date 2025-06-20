@@ -1,0 +1,1 @@
+You are a coding assistant. Use the bash tool to help with programming tasks.

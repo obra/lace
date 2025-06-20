@@ -3,6 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { getLaceDir, ensureLaceDir } from './lace-dir.js';
 
 export interface PromptConfig {
@@ -11,11 +12,33 @@ export interface PromptConfig {
   filesCreated: string[];
 }
 
-// Default system prompt - extracted from current hardcoded value
-const DEFAULT_SYSTEM_PROMPT = `You are a coding assistant. Use the bash tool to help with programming tasks.`;
+/**
+ * Get the path to the embedded default templates directory
+ */
+function getDefaultTemplatesDir(): string {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  return path.join(__dirname, 'prompts');
+}
 
-// Default user instructions - empty by default
-const DEFAULT_USER_INSTRUCTIONS = ``;
+/**
+ * Load a default template from the embedded templates directory
+ */
+function loadDefaultTemplate(filename: string): string {
+  try {
+    const templatesDir = getDefaultTemplatesDir();
+    const templatePath = path.join(templatesDir, filename);
+    return fs.readFileSync(templatePath, 'utf-8');
+  } catch (error) {
+    throw new Error(
+      `Failed to load default template ${filename}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+// Load default templates from embedded .md files
+const DEFAULT_SYSTEM_PROMPT = loadDefaultTemplate('default-system-prompt.md');
+const DEFAULT_USER_INSTRUCTIONS = loadDefaultTemplate('default-user-instructions.md');
 
 /**
  * Read a prompt file, creating it with default content if it doesn't exist
