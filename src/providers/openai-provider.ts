@@ -257,6 +257,15 @@ export class OpenAIProvider extends AIProvider {
         // Some providers include usage in streaming responses
         if (chunk.usage) {
           usage = chunk.usage;
+
+          // Emit token usage updates during streaming
+          this.emit('token_usage_update', {
+            usage: {
+              promptTokens: usage.prompt_tokens,
+              completionTokens: usage.completion_tokens,
+              totalTokens: usage.total_tokens,
+            },
+          });
         }
       }
 

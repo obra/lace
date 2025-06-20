@@ -234,6 +234,20 @@ export class OllamaProvider extends AIProvider {
           content += part.message.content;
         }
 
+        // Emit token usage updates if available (usually in final response)
+        if (part.prompt_eval_count !== undefined || part.eval_count !== undefined) {
+          const promptTokens = part.prompt_eval_count || 0;
+          const completionTokens = part.eval_count || 0;
+
+          this.emit('token_usage_update', {
+            usage: {
+              promptTokens,
+              completionTokens,
+              totalTokens: promptTokens + completionTokens,
+            },
+          });
+        }
+
         // Store the final message for tool calls
         if (part.done) {
           finalMessage = part.message;

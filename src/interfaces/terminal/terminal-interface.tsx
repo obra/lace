@@ -164,6 +164,17 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     // Handle errors
+    // Handle token usage updates
+    const handleTokenUsageUpdate = ({ usage }: { usage: any }) => {
+      if (usage && typeof usage === 'object') {
+        setTokenUsage({
+          promptTokens: usage.promptTokens || usage.prompt_tokens,
+          completionTokens: usage.completionTokens || usage.completion_tokens,
+          totalTokens: usage.totalTokens || usage.total_tokens,
+        });
+      }
+    };
+
     // Handle token budget warnings and update token usage
     const handleTokenBudgetWarning = ({ usage }: { usage: any }) => {
       if (usage && typeof usage === 'object') {
@@ -200,6 +211,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     agent.on("tool_call_start", handleToolStart);
     agent.on("tool_call_complete", handleToolComplete);
     agent.on("approval_request", handleApprovalRequest);
+    agent.on("token_usage_update", handleTokenUsageUpdate);
     agent.on("token_budget_warning", handleTokenBudgetWarning);
     agent.on("error", handleError);
 
@@ -211,6 +223,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       agent.off("tool_call_start", handleToolStart);
       agent.off("tool_call_complete", handleToolComplete);
       agent.off("approval_request", handleApprovalRequest);
+      agent.off("token_usage_update", handleTokenUsageUpdate);
       agent.off("token_budget_warning", handleTokenBudgetWarning);
       agent.off("error", handleError);
     };

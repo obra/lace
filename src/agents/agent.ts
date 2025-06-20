@@ -44,6 +44,7 @@ export interface AgentEvents {
   state_change: [{ from: AgentState; to: AgentState }];
   error: [{ error: Error; context: object }];
   conversation_complete: [];
+  token_usage_update: [{ usage: object }];
   token_budget_warning: [{ message: string; usage: object; recommendations: object }];
   approval_request: [
     {
@@ -316,6 +317,14 @@ export class Agent extends EventEmitter {
       this.emit('agent_token', { token });
     };
 
+    const tokenUsageListener = ({
+      usage,
+    }: {
+      usage: { promptTokens: number; completionTokens: number; totalTokens: number };
+    }) => {
+      this.emit('token_usage_update', { usage });
+    };
+
     const errorListener = ({ error }: { error: Error }) => {
       this.emit('error', {
         error,
@@ -325,6 +334,7 @@ export class Agent extends EventEmitter {
 
     // Subscribe to provider events
     this._provider.on('token', tokenListener);
+    this._provider.on('token_usage_update', tokenUsageListener);
     this._provider.on('error', errorListener);
 
     try {
@@ -348,6 +358,11 @@ export class Agent extends EventEmitter {
         }
       }
 
+      // Always emit token usage for UI updates
+      if (processedResponse.usage) {
+        this.emit('token_usage_update', { usage: processedResponse.usage });
+      }
+
       return {
         content: processedResponse.content,
         toolCalls: processedResponse.toolCalls,
@@ -355,6 +370,7 @@ export class Agent extends EventEmitter {
     } finally {
       // Clean up event listeners
       this._provider.removeListener('token', tokenListener);
+      this._provider.removeListener('token_usage_update', tokenUsageListener);
       this._provider.removeListener('error', errorListener);
     }
   }
@@ -381,6 +397,11 @@ export class Agent extends EventEmitter {
           recommendations,
         });
       }
+    }
+
+    // Always emit token usage for UI updates
+    if (processedResponse.usage) {
+      this.emit('token_usage_update', { usage: processedResponse.usage });
     }
 
     return {

@@ -436,6 +436,21 @@ export class LMStudioProvider extends AIProvider {
                   // Emit token events for streaming
                   this.emit('token', { token: fragment.content });
                 }
+
+                // Emit token usage updates if stats are available in fragment
+                if (msg.stats) {
+                  const promptTokens = msg.stats.promptTokensCount || msg.stats.promptTokens || 0;
+                  const completionTokens =
+                    msg.stats.predictedTokensCount || msg.stats.completionTokens || 0;
+
+                  this.emit('token_usage_update', {
+                    usage: {
+                      promptTokens,
+                      completionTokens,
+                      totalTokens: promptTokens + completionTokens,
+                    },
+                  });
+                }
                 break;
               }
 

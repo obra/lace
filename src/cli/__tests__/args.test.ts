@@ -253,7 +253,9 @@ describe('CLI Arguments (Commander-based)', () => {
 
       // The tool listing should have been called
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Available tools:'));
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('bash - Execute bash commands'));
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('bash - Use bash to execute unix commands')
+      );
       expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining('file_read - Read file contents')
       );

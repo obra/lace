@@ -10,12 +10,16 @@ import type { Command } from './types.js';
  * Check if an export is a valid Command
  */
 function isValidCommand(obj: unknown): obj is Command {
+  if (typeof obj !== 'object' || obj === null) {
+    return false;
+  }
+
+  const candidate = obj as Record<string, unknown>;
+
   return (
-    obj &&
-    typeof obj === 'object' &&
-    typeof obj.name === 'string' &&
-    typeof obj.description === 'string' &&
-    typeof obj.execute === 'function'
+    typeof candidate.name === 'string' &&
+    typeof candidate.description === 'string' &&
+    typeof candidate.execute === 'function'
   );
 }
 

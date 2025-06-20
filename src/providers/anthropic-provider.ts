@@ -176,6 +176,20 @@ export class AnthropicProvider extends AIProvider {
         this.emit('token', { token: text });
       });
 
+      // Listen for message completion to get token usage
+      stream.on('message', (message) => {
+        // This fires when the message is complete - provides final token usage
+        if (message.usage) {
+          this.emit('token_usage_update', {
+            usage: {
+              promptTokens: message.usage.input_tokens,
+              completionTokens: message.usage.output_tokens,
+              totalTokens: message.usage.input_tokens + message.usage.output_tokens,
+            },
+          });
+        }
+      });
+
       // Wait for the stream to complete and get the final message
       const finalMessage = await stream.finalMessage();
 

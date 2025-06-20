@@ -51,6 +51,9 @@ export interface ProviderConfig {
 
 export interface StreamingEvents {
   token: { token: string };
+  token_usage_update: {
+    usage: { promptTokens: number; completionTokens: number; totalTokens: number };
+  };
   error: { error: Error };
   complete: { response: ProviderResponse };
 }
