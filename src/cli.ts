@@ -15,7 +15,7 @@ import { DelegateTool } from './tools/implementations/delegate.js';
 import { ThreadManager } from './threads/thread-manager.js';
 import { getLaceDbPath } from './config/lace-dir.js';
 import { logger } from './utils/logger.js';
-import { loadPromptConfig, getPromptFilePaths } from './config/prompts.js';
+import { loadPromptConfig, getUserInstructionsFilePath } from './config/prompts.js';
 import { parseArgs, validateProvider } from './cli/args.js';
 import { TerminalInterface } from './interfaces/terminal/terminal-interface.js';
 import { NonInteractiveInterface } from './interfaces/non-interactive-interface.js';
@@ -34,8 +34,8 @@ async function createProvider(
     description: tool.description
   })) : undefined;
 
-  // Load configurable prompts from user's Lace directory (with template system support)
-  const promptConfig = await loadPromptConfig({ tools, useTemplateSystem: true });
+  // Load configurable prompts from user's Lace directory
+  const promptConfig = await loadPromptConfig({ tools });
   const { systemPrompt, filesCreated } = promptConfig;
 
   // Show helpful message if configuration files were created for the first time
@@ -105,11 +105,11 @@ async function main() {
   });
 
   // Show configuration file locations on first startup
-  const { systemPromptPath, userInstructionsPath } = getPromptFilePaths();
+  const userInstructionsPath = getUserInstructionsFilePath();
   logger.info('Lace configuration files', {
-    systemPromptPath,
     userInstructionsPath,
     laceDir: getEnvVar('LACE_DIR', '~/.lace'),
+    note: 'System prompts are generated from templates',
   });
 
   // Initialize provider registry

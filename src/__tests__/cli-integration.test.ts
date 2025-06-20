@@ -54,10 +54,7 @@ vi.mock('../config/prompts.js', () => ({
     userInstructions: '',
     filesCreated: [],
   }),
-  getPromptFilePaths: vi.fn().mockReturnValue({
-    systemPromptPath: '/test/system.txt',
-    userInstructionsPath: '/test/user.txt',
-  }),
+  getUserInstructionsFilePath: vi.fn().mockReturnValue('/test/user.txt'),
 }));
 
 describe('CLI Orchestration', () => {

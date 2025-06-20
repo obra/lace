@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { loadPromptConfig, getPromptFilePaths } from '../prompts.js';
+import { loadPromptConfig, getUserInstructionsFilePath } from '../prompts.js';
 
 describe('Prompt Configuration', () => {
   let tempDir: string;
@@ -35,54 +35,48 @@ describe('Prompt Configuration', () => {
   });
 
   describe('loadPromptConfig', () => {
-    it('should create default files when they do not exist', async () => {
+    it('should create instructions file when it does not exist and generate system prompt from templates', async () => {
       const config = await loadPromptConfig();
 
-      expect(config.systemPrompt).toBe(
-        'You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.'
-      );
+      // System prompt should come from templates, not be the old default
+      expect(config.systemPrompt).toContain('Lace');
+      expect(config.systemPrompt.length).toBeGreaterThan(50); // Templates generate longer prompts
       expect(config.userInstructions).toBe('');
-      expect(config.filesCreated).toHaveLength(2);
+      expect(config.filesCreated).toHaveLength(1);
 
-      const systemPromptPath = path.join(tempDir, 'system-prompt.md');
       const instructionsPath = path.join(tempDir, 'instructions.md');
-
-      expect(config.filesCreated).toContain(systemPromptPath);
       expect(config.filesCreated).toContain(instructionsPath);
 
-      // Verify files actually exist
-      expect(fs.existsSync(systemPromptPath)).toBe(true);
+      // Only instructions file should be created (not system-prompt.md)
       expect(fs.existsSync(instructionsPath)).toBe(true);
+      
+      const systemPromptPath = path.join(tempDir, 'system-prompt.md');
+      expect(fs.existsSync(systemPromptPath)).toBe(false);
     });
 
-    it('should read existing files without creating new ones', async () => {
-      // Pre-create files with custom content
-      const systemPromptPath = path.join(tempDir, 'system-prompt.md');
+    it('should read existing instructions file and generate system prompt from templates', async () => {
+      // Pre-create instructions file with custom content
       const instructionsPath = path.join(tempDir, 'instructions.md');
-
-      const customSystemPrompt = 'You are a specialized TypeScript assistant.';
       const customInstructions = 'Always use strict typing.';
-
-      fs.writeFileSync(systemPromptPath, customSystemPrompt);
       fs.writeFileSync(instructionsPath, customInstructions);
 
       const config = await loadPromptConfig();
 
-      expect(config.systemPrompt).toBe(customSystemPrompt);
+      // System prompt should come from templates (not from any file)
+      expect(config.systemPrompt).toContain('Lace');
+      expect(config.systemPrompt.length).toBeGreaterThan(50);
       expect(config.userInstructions).toBe(customInstructions);
       expect(config.filesCreated).toHaveLength(0);
     });
 
-    it('should handle mixed scenario where only one file exists', async () => {
-      // Pre-create only system prompt file
-      const systemPromptPath = path.join(tempDir, 'system-prompt.md');
-      const customSystemPrompt = 'Custom system prompt';
-
-      fs.writeFileSync(systemPromptPath, customSystemPrompt);
+    it('should create instructions file when it does not exist', async () => {
+      // No files exist initially
 
       const config = await loadPromptConfig();
 
-      expect(config.systemPrompt).toBe(customSystemPrompt);
+      // System prompt should come from templates
+      expect(config.systemPrompt).toContain('Lace');
+      expect(config.systemPrompt.length).toBeGreaterThan(50);
       expect(config.userInstructions).toBe(''); // Default empty
       expect(config.filesCreated).toHaveLength(1);
 
@@ -91,32 +85,27 @@ describe('Prompt Configuration', () => {
       expect(fs.existsSync(instructionsPath)).toBe(true);
     });
 
-    it('should trim whitespace from file contents', async () => {
-      const systemPromptPath = path.join(tempDir, 'system-prompt.md');
+    it('should trim whitespace from instructions file contents', async () => {
       const instructionsPath = path.join(tempDir, 'instructions.md');
-
-      const systemPromptWithWhitespace = '  \n  Custom system prompt  \n  ';
       const instructionsWithWhitespace = '  \n  Custom instructions  \n  ';
 
-      fs.writeFileSync(systemPromptPath, systemPromptWithWhitespace);
       fs.writeFileSync(instructionsPath, instructionsWithWhitespace);
 
       const config = await loadPromptConfig();
 
-      expect(config.systemPrompt).toBe('Custom system prompt');
+      // System prompt comes from templates
+      expect(config.systemPrompt).toContain('Lace');
       expect(config.userInstructions).toBe('Custom instructions');
     });
 
-    it('should handle empty files gracefully', async () => {
-      const systemPromptPath = path.join(tempDir, 'system-prompt.md');
+    it('should handle empty instructions file gracefully', async () => {
       const instructionsPath = path.join(tempDir, 'instructions.md');
-
-      fs.writeFileSync(systemPromptPath, '');
       fs.writeFileSync(instructionsPath, '');
 
       const config = await loadPromptConfig();
 
-      expect(config.systemPrompt).toBe('');
+      // System prompt comes from templates
+      expect(config.systemPrompt).toContain('Lace');
       expect(config.userInstructions).toBe('');
       expect(config.filesCreated).toHaveLength(0);
     });
@@ -130,44 +119,42 @@ describe('Prompt Configuration', () => {
       const config = await loadPromptConfig();
 
       expect(fs.existsSync(nestedTempDir)).toBe(true);
-      expect(config.filesCreated).toHaveLength(2);
+      expect(config.filesCreated).toHaveLength(1); // Only instructions.md
     });
 
-    it('should handle multiline prompts correctly', async () => {
-      const systemPromptPath = path.join(tempDir, 'system-prompt.md');
-      const multilinePrompt = `You are a coding assistant.
-
-Key responsibilities:
+    it('should handle multiline instructions correctly', async () => {
+      const instructionsPath = path.join(tempDir, 'instructions.md');
+      const multilineInstructions = `Key responsibilities:
 1. Help with programming tasks
 2. Use appropriate tools
 3. Provide clear explanations
 
 Remember to be helpful and accurate.`;
 
-      fs.writeFileSync(systemPromptPath, multilinePrompt);
+      fs.writeFileSync(instructionsPath, multilineInstructions);
 
       const config = await loadPromptConfig();
 
-      expect(config.systemPrompt).toBe(multilinePrompt);
+      // System prompt comes from templates
+      expect(config.systemPrompt).toContain('Lace');
+      expect(config.userInstructions).toBe(multilineInstructions);
     });
   });
 
-  describe('getPromptFilePaths', () => {
-    it('should return correct file paths based on LACE_DIR', () => {
-      const paths = getPromptFilePaths();
+  describe('getUserInstructionsFilePath', () => {
+    it('should return correct instructions file path based on LACE_DIR', () => {
+      const instructionsPath = getUserInstructionsFilePath();
 
-      expect(paths.systemPromptPath).toBe(path.join(tempDir, 'system-prompt.md'));
-      expect(paths.userInstructionsPath).toBe(path.join(tempDir, 'instructions.md'));
+      expect(instructionsPath).toBe(path.join(tempDir, 'instructions.md'));
     });
 
     it('should default to ~/.lace when LACE_DIR is not set', () => {
       delete process.env.LACE_DIR;
 
-      const paths = getPromptFilePaths();
-      const expectedDir = path.join(os.homedir(), '.lace');
+      const instructionsPath = getUserInstructionsFilePath();
+      const expectedPath = path.join(os.homedir(), '.lace', 'instructions.md');
 
-      expect(paths.systemPromptPath).toBe(path.join(expectedDir, 'system-prompt.md'));
-      expect(paths.userInstructionsPath).toBe(path.join(expectedDir, 'instructions.md'));
+      expect(instructionsPath).toBe(expectedPath);
     });
   });
 
@@ -181,48 +168,41 @@ Remember to be helpful and accurate.`;
       await expect(loadPromptConfig()).rejects.toThrow(/Failed to create Lace configuration directory/);
     });
 
-    it('should throw meaningful error if file cannot be created', async () => {
-      // Create a directory where the system prompt file should be
-      const systemPromptPath = path.join(tempDir, 'system-prompt.md');
-      fs.mkdirSync(systemPromptPath);
+    it('should throw meaningful error if instructions file cannot be created', async () => {
+      // Create a directory where the instructions file should be
+      const instructionsPath = path.join(tempDir, 'instructions.md');
+      fs.mkdirSync(instructionsPath);
 
       await expect(loadPromptConfig()).rejects.toThrow(/Failed to read\/create prompt file/);
     });
   });
 
   describe('file content validation', () => {
-    it('should handle files with only whitespace', async () => {
-      const systemPromptPath = path.join(tempDir, 'system-prompt.md');
-      fs.writeFileSync(systemPromptPath, '   \n\t\r\n   ');
+    it('should handle instructions files with only whitespace', async () => {
+      const instructionsPath = path.join(tempDir, 'instructions.md');
+      fs.writeFileSync(instructionsPath, '   \n\t\r\n   ');
 
       const config = await loadPromptConfig();
 
-      expect(config.systemPrompt).toBe('');
+      // System prompt comes from templates
+      expect(config.systemPrompt).toContain('Lace');
+      expect(config.userInstructions).toBe('');
     });
 
-    it('should preserve newlines within content after trimming edges', async () => {
-      const systemPromptPath = path.join(tempDir, 'system-prompt.md');
+    it('should preserve newlines within instructions content after trimming edges', async () => {
+      const instructionsPath = path.join(tempDir, 'instructions.md');
       const contentWithNewlines = `  First line\n\nSecond paragraph\n\nThird paragraph  `;
-      fs.writeFileSync(systemPromptPath, contentWithNewlines);
+      fs.writeFileSync(instructionsPath, contentWithNewlines);
 
       const config = await loadPromptConfig();
 
-      expect(config.systemPrompt).toBe('First line\n\nSecond paragraph\n\nThird paragraph');
+      // System prompt comes from templates
+      expect(config.systemPrompt).toContain('Lace');
+      expect(config.userInstructions).toBe('First line\n\nSecond paragraph\n\nThird paragraph');
     });
   });
 
   describe('default content', () => {
-    it('should create system prompt with expected default content', async () => {
-      await loadPromptConfig();
-
-      const systemPromptPath = path.join(tempDir, 'system-prompt.md');
-      const content = fs.readFileSync(systemPromptPath, 'utf-8');
-
-      expect(content).toBe(
-        'You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.'
-      );
-    });
-
     it('should create instructions file with empty default content', async () => {
       await loadPromptConfig();
 
