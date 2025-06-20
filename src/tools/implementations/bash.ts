@@ -15,9 +15,10 @@ interface BashOutput {
 
 export class BashTool implements Tool {
   name = 'bash';
-  description = 'Execute bash commands';
+  description =
+    "Use bash to execute unix commands to achieve the user's goals. Be smart and careful.";
   annotations = {
-    title: 'Shell Command Execution',
+    title: 'Run commands with bash',
     destructiveHint: true,
     openWorldHint: true,
   };

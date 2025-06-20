@@ -14,7 +14,9 @@ describe('BashTool', () => {
   describe('Tool metadata', () => {
     it('should have correct name and description', () => {
       expect(bashTool.name).toBe('bash');
-      expect(bashTool.description).toBe('Execute bash commands');
+      expect(bashTool.description).toBe(
+        "Use bash to execute unix commands to achieve the user's goals. Be smart and careful."
+      );
     });
 
     it('should have proper input schema', () => {
