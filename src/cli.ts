@@ -11,6 +11,7 @@ import { Agent } from './agents/agent.js';
 import { ProviderRegistry } from './providers/registry.js';
 import { AIProvider } from './providers/types.js';
 import { ToolExecutor } from './tools/executor.js';
+import { Tool } from './tools/types.js';
 import { DelegateTool } from './tools/implementations/delegate.js';
 import { ThreadManager } from './threads/thread-manager.js';
 import { getLaceDbPath } from './config/lace-dir.js';
@@ -25,10 +26,19 @@ import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
 async function createProvider(
   registry: ProviderRegistry,
   providerType: string,
-  model?: string
+  model?: string,
+  tools?: Tool[]
 ): Promise<AIProvider> {
   // Load configurable prompts from user's Lace directory
-  const promptConfig = loadPromptConfig();
+  const promptConfig = loadPromptConfig({
+    tools: tools || [],
+    workingDir: process.cwd(),
+    model: {
+      id: model || providerType,
+      provider: providerType
+    }
+  });
+  
   const { systemPrompt, filesCreated } = promptConfig;
 
   // Show helpful message if configuration files were created for the first time
@@ -111,11 +121,12 @@ async function main() {
   // Validate provider against registry
   validateProvider(options.provider, registry);
 
-  const provider = await createProvider(registry, options.provider, options.model);
-
-  // Create and configure tool executor with all available tools
+  // Create and configure tool executor with all available tools first
   const toolExecutor = new ToolExecutor();
   toolExecutor.registerAllAvailableTools();
+
+  // Create provider with tools and full context for prompt generation
+  const provider = await createProvider(registry, options.provider, options.model, toolExecutor.getAllTools());
 
   // Create thread manager and start/resume session
   const threadManager = new ThreadManager(getLaceDbPath());
