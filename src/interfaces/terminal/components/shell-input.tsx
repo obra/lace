@@ -253,6 +253,15 @@ const ShellInput: React.FC<ShellInputProps> = ({
         return;
       }
 
+      // Paste functionality
+      if ((key.ctrl && input === "v") || (key.meta && input === "v")) {
+        // Ctrl+V on non-Mac, Cmd+V on Mac
+        bufferOps.pasteFromClipboard().catch((error) => {
+          console.warn('Paste operation failed:', error);
+        });
+        return;
+      }
+
       // Deletion
       if (key.delete) {
         bufferOps.deleteChar("backward");

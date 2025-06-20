@@ -7,6 +7,7 @@ export interface TextBufferState {
   lines: string[];
   cursorLine: number;
   cursorColumn: number;
+  preferredColumn: number; // Remembers desired column for up/down movement
 }
 
 export interface TextBufferOperations {
@@ -19,6 +20,7 @@ export interface TextBufferOperations {
   getCurrentLine: () => string;
   killLine: () => void;
   killLineBackward: () => void;
+  pasteFromClipboard: () => Promise<void>;
 }
 
 export function useTextBuffer(initialText: string = ''): [TextBufferState, TextBufferOperations] {
@@ -26,6 +28,7 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
     lines: initialText.split('\n'),
     cursorLine: 0,
     cursorColumn: 0,
+    preferredColumn: 0,
   }));
 
   const insertText = useCallback((text: string) => {
@@ -58,6 +61,7 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
             lines: newLines,
             cursorLine: cursorLine + insertParts.length - 1,
             cursorColumn: lastPart.length,
+            preferredColumn: lastPart.length,
           };
         } else {
           // Single line with cursor after inserted text
@@ -65,6 +69,7 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
             lines: newLines,
             cursorLine: cursorLine,
             cursorColumn: cursorColumn + text.length,
+            preferredColumn: cursorColumn + text.length,
           };
         }
       } else {
@@ -79,6 +84,7 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
           lines: newLines,
           cursorLine: cursorLine,
           cursorColumn: cursorColumn + text.length,
+          preferredColumn: cursorColumn + text.length,
         };
       }
     });
@@ -99,6 +105,7 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
           lines: newLines,
           cursorLine,
           cursorColumn: cursorColumn - 1,
+          preferredColumn: cursorColumn - 1,
         };
       } else if (direction === 'backward' && cursorLine > 0) {
         // Merge with previous line
@@ -113,6 +120,7 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
           lines: newLines,
           cursorLine: cursorLine - 1,
           cursorColumn: prevLine.length,
+          preferredColumn: prevLine.length,
         };
       } else if (direction === 'forward') {
         const currentLine = lines[cursorLine] || '';
@@ -125,6 +133,7 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
             lines: newLines,
             cursorLine,
             cursorColumn, // Cursor doesn't move
+            preferredColumn: cursorColumn,
           };
         } else if (cursorLine < lines.length - 1) {
           // Merge with next line
@@ -138,6 +147,7 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
             lines: newLines,
             cursorLine,
             cursorColumn, // Cursor doesn't move
+            preferredColumn: cursorColumn,
           };
         }
       }
@@ -154,48 +164,57 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
       switch (direction) {
         case 'left':
           if (cursorColumn > 0) {
-            return { ...prevState, cursorColumn: cursorColumn - 1 };
+            const newColumn = cursorColumn - 1;
+            return { ...prevState, cursorColumn: newColumn, preferredColumn: newColumn };
           } else if (cursorLine > 0) {
+            const newColumn = lines[cursorLine - 1].length;
             return {
               ...prevState,
               cursorLine: cursorLine - 1,
-              cursorColumn: lines[cursorLine - 1].length,
+              cursorColumn: newColumn,
+              preferredColumn: newColumn,
             };
           }
           break;
         case 'right':
           if (cursorColumn < currentLine.length) {
-            return { ...prevState, cursorColumn: cursorColumn + 1 };
+            const newColumn = cursorColumn + 1;
+            return { ...prevState, cursorColumn: newColumn, preferredColumn: newColumn };
           } else if (cursorLine < lines.length - 1) {
             return {
               ...prevState,
               cursorLine: cursorLine + 1,
               cursorColumn: 0,
+              preferredColumn: 0,
             };
           }
           break;
         case 'up':
           if (cursorLine > 0) {
+            const targetColumn = Math.min(prevState.preferredColumn, lines[cursorLine - 1].length);
             return {
               ...prevState,
               cursorLine: cursorLine - 1,
-              cursorColumn: Math.min(cursorColumn, lines[cursorLine - 1].length),
+              cursorColumn: targetColumn,
+              // Keep preferredColumn unchanged
             };
           }
           break;
         case 'down':
           if (cursorLine < lines.length - 1) {
+            const targetColumn = Math.min(prevState.preferredColumn, lines[cursorLine + 1].length);
             return {
               ...prevState,
               cursorLine: cursorLine + 1,
-              cursorColumn: Math.min(cursorColumn, lines[cursorLine + 1].length),
+              cursorColumn: targetColumn,
+              // Keep preferredColumn unchanged
             };
           }
           break;
         case 'home':
-          return { ...prevState, cursorColumn: 0 };
+          return { ...prevState, cursorColumn: 0, preferredColumn: 0 };
         case 'end':
-          return { ...prevState, cursorColumn: currentLine.length };
+          return { ...prevState, cursorColumn: currentLine.length, preferredColumn: currentLine.length };
       }
 
       return prevState; // No change
@@ -209,6 +228,7 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
         lines: newLines,
         cursorLine: Math.min(newLines.length - 1, prevState.cursorLine),
         cursorColumn: 0,
+        preferredColumn: 0,
       };
     });
   }, []);
@@ -218,11 +238,15 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
   }, [state.lines]);
 
   const setCursorPosition = useCallback((line: number, column: number) => {
-    setState((prevState) => ({
-      ...prevState,
-      cursorLine: Math.max(0, Math.min(line, prevState.lines.length - 1)),
-      cursorColumn: Math.max(0, column),
-    }));
+    setState((prevState) => {
+      const newColumn = Math.max(0, column);
+      return {
+        ...prevState,
+        cursorLine: Math.max(0, Math.min(line, prevState.lines.length - 1)),
+        cursorColumn: newColumn,
+        preferredColumn: newColumn,
+      };
+    });
   }, []);
 
   const getCurrentLine = useCallback(() => {
@@ -243,7 +267,8 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
         return {
           ...prevState,
           lines: newLines,
-          // Cursor stays at same position
+          // Cursor stays at same position, update preferredColumn to match
+          preferredColumn: cursorColumn,
         };
       }
 
@@ -266,12 +291,36 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
           ...prevState,
           lines: newLines,
           cursorColumn: 0,
+          preferredColumn: 0,
         };
       }
 
       return prevState;
     });
   }, []);
+
+  const pasteFromClipboard = useCallback(async () => {
+    try {
+      // Check if clipboard API is available
+      if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') {
+        console.warn('Clipboard API not available');
+        return;
+      }
+
+      const clipboardText = await navigator.clipboard.readText();
+      
+      // Handle empty or null clipboard content
+      if (!clipboardText) {
+        return;
+      }
+
+      // Use the existing insertText method to handle the paste
+      insertText(clipboardText);
+    } catch (error) {
+      // Silently handle clipboard access errors
+      console.warn('Failed to read from clipboard:', error);
+    }
+  }, [insertText]);
 
   const operations: TextBufferOperations = {
     insertText,
@@ -283,6 +332,7 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
     getCurrentLine,
     killLine,
     killLineBackward,
+    pasteFromClipboard,
   };
 
   return [state, operations];
