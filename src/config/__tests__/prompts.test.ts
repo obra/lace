@@ -35,11 +35,11 @@ describe('Prompt Configuration', () => {
   });
 
   describe('loadPromptConfig', () => {
-    it('should create default files when they do not exist', () => {
-      const config = loadPromptConfig();
+    it('should create default files when they do not exist', async () => {
+      const config = await loadPromptConfig();
 
       expect(config.systemPrompt).toBe(
-        'You are a coding assistant. Use the bash tool to help with programming tasks.'
+        'You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.'
       );
       expect(config.userInstructions).toBe('');
       expect(config.filesCreated).toHaveLength(2);
@@ -55,7 +55,7 @@ describe('Prompt Configuration', () => {
       expect(fs.existsSync(instructionsPath)).toBe(true);
     });
 
-    it('should read existing files without creating new ones', () => {
+    it('should read existing files without creating new ones', async () => {
       // Pre-create files with custom content
       const systemPromptPath = path.join(tempDir, 'system-prompt.md');
       const instructionsPath = path.join(tempDir, 'instructions.md');
@@ -66,21 +66,21 @@ describe('Prompt Configuration', () => {
       fs.writeFileSync(systemPromptPath, customSystemPrompt);
       fs.writeFileSync(instructionsPath, customInstructions);
 
-      const config = loadPromptConfig();
+      const config = await loadPromptConfig();
 
       expect(config.systemPrompt).toBe(customSystemPrompt);
       expect(config.userInstructions).toBe(customInstructions);
       expect(config.filesCreated).toHaveLength(0);
     });
 
-    it('should handle mixed scenario where only one file exists', () => {
+    it('should handle mixed scenario where only one file exists', async () => {
       // Pre-create only system prompt file
       const systemPromptPath = path.join(tempDir, 'system-prompt.md');
       const customSystemPrompt = 'Custom system prompt';
 
       fs.writeFileSync(systemPromptPath, customSystemPrompt);
 
-      const config = loadPromptConfig();
+      const config = await loadPromptConfig();
 
       expect(config.systemPrompt).toBe(customSystemPrompt);
       expect(config.userInstructions).toBe(''); // Default empty
@@ -91,7 +91,7 @@ describe('Prompt Configuration', () => {
       expect(fs.existsSync(instructionsPath)).toBe(true);
     });
 
-    it('should trim whitespace from file contents', () => {
+    it('should trim whitespace from file contents', async () => {
       const systemPromptPath = path.join(tempDir, 'system-prompt.md');
       const instructionsPath = path.join(tempDir, 'instructions.md');
 
@@ -101,39 +101,39 @@ describe('Prompt Configuration', () => {
       fs.writeFileSync(systemPromptPath, systemPromptWithWhitespace);
       fs.writeFileSync(instructionsPath, instructionsWithWhitespace);
 
-      const config = loadPromptConfig();
+      const config = await loadPromptConfig();
 
       expect(config.systemPrompt).toBe('Custom system prompt');
       expect(config.userInstructions).toBe('Custom instructions');
     });
 
-    it('should handle empty files gracefully', () => {
+    it('should handle empty files gracefully', async () => {
       const systemPromptPath = path.join(tempDir, 'system-prompt.md');
       const instructionsPath = path.join(tempDir, 'instructions.md');
 
       fs.writeFileSync(systemPromptPath, '');
       fs.writeFileSync(instructionsPath, '');
 
-      const config = loadPromptConfig();
+      const config = await loadPromptConfig();
 
       expect(config.systemPrompt).toBe('');
       expect(config.userInstructions).toBe('');
       expect(config.filesCreated).toHaveLength(0);
     });
 
-    it('should create LACE_DIR if it does not exist', () => {
+    it('should create LACE_DIR if it does not exist', async () => {
       const nestedTempDir = path.join(tempDir, 'nested', 'directory');
       process.env.LACE_DIR = nestedTempDir;
 
       expect(fs.existsSync(nestedTempDir)).toBe(false);
 
-      const config = loadPromptConfig();
+      const config = await loadPromptConfig();
 
       expect(fs.existsSync(nestedTempDir)).toBe(true);
       expect(config.filesCreated).toHaveLength(2);
     });
 
-    it('should handle multiline prompts correctly', () => {
+    it('should handle multiline prompts correctly', async () => {
       const systemPromptPath = path.join(tempDir, 'system-prompt.md');
       const multilinePrompt = `You are a coding assistant.
 
@@ -146,7 +146,7 @@ Remember to be helpful and accurate.`;
 
       fs.writeFileSync(systemPromptPath, multilinePrompt);
 
-      const config = loadPromptConfig();
+      const config = await loadPromptConfig();
 
       expect(config.systemPrompt).toBe(multilinePrompt);
     });
@@ -172,59 +172,59 @@ Remember to be helpful and accurate.`;
   });
 
   describe('error handling', () => {
-    it('should throw meaningful error if directory creation fails', () => {
+    it('should throw meaningful error if directory creation fails', async () => {
       // Set LACE_DIR to a path that cannot be created (e.g., inside a file)
       const invalidPath = path.join(tempDir, 'file.txt', 'invalid');
       fs.writeFileSync(path.join(tempDir, 'file.txt'), 'content');
       process.env.LACE_DIR = invalidPath;
 
-      expect(() => loadPromptConfig()).toThrow(/Failed to create Lace configuration directory/);
+      await expect(loadPromptConfig()).rejects.toThrow(/Failed to create Lace configuration directory/);
     });
 
-    it('should throw meaningful error if file cannot be created', () => {
+    it('should throw meaningful error if file cannot be created', async () => {
       // Create a directory where the system prompt file should be
       const systemPromptPath = path.join(tempDir, 'system-prompt.md');
       fs.mkdirSync(systemPromptPath);
 
-      expect(() => loadPromptConfig()).toThrow(/Failed to read\/create prompt file/);
+      await expect(loadPromptConfig()).rejects.toThrow(/Failed to read\/create prompt file/);
     });
   });
 
   describe('file content validation', () => {
-    it('should handle files with only whitespace', () => {
+    it('should handle files with only whitespace', async () => {
       const systemPromptPath = path.join(tempDir, 'system-prompt.md');
       fs.writeFileSync(systemPromptPath, '   \n\t\r\n   ');
 
-      const config = loadPromptConfig();
+      const config = await loadPromptConfig();
 
       expect(config.systemPrompt).toBe('');
     });
 
-    it('should preserve newlines within content after trimming edges', () => {
+    it('should preserve newlines within content after trimming edges', async () => {
       const systemPromptPath = path.join(tempDir, 'system-prompt.md');
       const contentWithNewlines = `  First line\n\nSecond paragraph\n\nThird paragraph  `;
       fs.writeFileSync(systemPromptPath, contentWithNewlines);
 
-      const config = loadPromptConfig();
+      const config = await loadPromptConfig();
 
       expect(config.systemPrompt).toBe('First line\n\nSecond paragraph\n\nThird paragraph');
     });
   });
 
   describe('default content', () => {
-    it('should create system prompt with expected default content', () => {
-      loadPromptConfig();
+    it('should create system prompt with expected default content', async () => {
+      await loadPromptConfig();
 
       const systemPromptPath = path.join(tempDir, 'system-prompt.md');
       const content = fs.readFileSync(systemPromptPath, 'utf-8');
 
       expect(content).toBe(
-        'You are a coding assistant. Use the bash tool to help with programming tasks.'
+        'You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.'
       );
     });
 
-    it('should create instructions file with empty default content', () => {
-      loadPromptConfig();
+    it('should create instructions file with empty default content', async () => {
+      await loadPromptConfig();
 
       const instructionsPath = path.join(tempDir, 'instructions.md');
       const content = fs.readFileSync(instructionsPath, 'utf-8');
@@ -234,25 +234,25 @@ Remember to be helpful and accurate.`;
   });
 
   describe('filesystem edge cases', () => {
-    it('should handle readonly directory gracefully', () => {
+    it('should handle readonly directory gracefully', async () => {
       // Make the directory readonly
       fs.chmodSync(tempDir, 0o444);
 
       try {
-        expect(() => loadPromptConfig()).toThrow();
+        await expect(loadPromptConfig()).rejects.toThrow();
       } finally {
         // Restore write permissions for cleanup
         fs.chmodSync(tempDir, 0o755);
       }
     });
 
-    it('should handle very long file paths', () => {
+    it('should handle very long file paths', async () => {
       const longPath = path.join(tempDir, 'a'.repeat(100), 'b'.repeat(100));
       process.env.LACE_DIR = longPath;
 
       // This should either work or throw a meaningful error
-      expect(() => {
-        const config = loadPromptConfig();
+      await expect(async () => {
+        const config = await loadPromptConfig();
         expect(config).toBeDefined();
       }).not.toThrow(/undefined/);
     });

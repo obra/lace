@@ -25,10 +25,17 @@ import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
 async function createProvider(
   registry: ProviderRegistry,
   providerType: string,
-  model?: string
+  model?: string,
+  toolExecutor?: ToolExecutor
 ): Promise<AIProvider> {
-  // Load configurable prompts from user's Lace directory
-  const promptConfig = loadPromptConfig();
+  // Get tool information for template system
+  const tools = toolExecutor ? toolExecutor.getAllTools().map(tool => ({
+    name: tool.name,
+    description: tool.description
+  })) : undefined;
+
+  // Load configurable prompts from user's Lace directory (with template system support)
+  const promptConfig = await loadPromptConfig({ tools, useTemplateSystem: true });
   const { systemPrompt, filesCreated } = promptConfig;
 
   // Show helpful message if configuration files were created for the first time
@@ -111,11 +118,11 @@ async function main() {
   // Validate provider against registry
   validateProvider(options.provider, registry);
 
-  const provider = await createProvider(registry, options.provider, options.model);
-
   // Create and configure tool executor with all available tools
   const toolExecutor = new ToolExecutor();
   toolExecutor.registerAllAvailableTools();
+
+  const provider = await createProvider(registry, options.provider, options.model, toolExecutor);
 
   // Create thread manager and start/resume session
   const threadManager = new ThreadManager(getLaceDbPath());

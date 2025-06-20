@@ -49,8 +49,9 @@ vi.mock('../utils/logger.js', () => ({
 
 // Mock prompt config
 vi.mock('../config/prompts.js', () => ({
-  loadPromptConfig: vi.fn().mockReturnValue({
+  loadPromptConfig: vi.fn().mockResolvedValue({
     systemPrompt: 'Test system prompt',
+    userInstructions: '',
     filesCreated: [],
   }),
   getPromptFilePaths: vi.fn().mockReturnValue({
