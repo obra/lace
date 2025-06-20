@@ -14,13 +14,16 @@ export function AgentMessageDisplay({ event, isStreaming }: AgentMessageDisplayP
   const message = event.data as string;
   
   return (
-    <Box flexDirection="column" marginY={1}>
+    <Box flexDirection="column" marginBottom={1}>
       <Box>
-        <Text color="green" bold>🤖 Assistant</Text>
+        <Text color="white" bold>🤖 Assistant</Text>
+        <Text color="dim" dimColor>
+          {' '}({event.timestamp.toLocaleTimeString()})
+        </Text>
         {isStreaming && <Text color="gray"> (thinking...)</Text>}
       </Box>
-      <Box marginLeft={2}>
-        <Text wrap="wrap">{message}</Text>
+      <Box paddingLeft={2}>
+        <Text color="white" wrap="wrap">{message}</Text>
       </Box>
     </Box>
   );

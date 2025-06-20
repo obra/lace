@@ -14,12 +14,15 @@ export function UserMessageDisplay({ event, isStreaming }: UserMessageDisplayPro
   const message = event.data as string;
   
   return (
-    <Box flexDirection="column" marginY={1}>
+    <Box flexDirection="column" marginBottom={1}>
       <Box>
-        <Text color="blue" bold>👤 You</Text>
+        <Text color="cyan" bold>👤 User</Text>
+        <Text color="dim" dimColor>
+          {' '}({event.timestamp.toLocaleTimeString()})
+        </Text>
         {isStreaming && <Text color="gray"> (typing...)</Text>}
       </Box>
-      <Box marginLeft={2}>
+      <Box paddingLeft={2}>
         <Text wrap="wrap">{message}</Text>
       </Box>
     </Box>

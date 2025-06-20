@@ -18,7 +18,7 @@ describe('EventDisplay', () => {
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
-    expect(lastFrame()).toContain('👤 You');
+    expect(lastFrame()).toContain('👤 User');
     expect(lastFrame()).toContain('Hello, world!');
   });
 

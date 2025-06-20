@@ -108,16 +108,8 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
     // Handle agent response complete
     const handleResponseComplete = ({ content }: { content: string }) => {
-      if (agent.getCurrentState() === "streaming") {
-        if (streamingContent.trim()) {
-          addMessage({
-            type: "assistant",
-            content: streamingContent,
-            timestamp: new Date(),
-          });
-        }
-        setStreamingContent("");
-      }
+      // Clear streaming content - the final response will be in ThreadEvents
+      setStreamingContent("");
       setIsProcessing(false);
       syncEvents();
     };
@@ -235,19 +227,13 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       return;
     }
 
-    // Add user message as ephemeral (it will also be stored as a ThreadEvent by the agent)
-    addMessage({
-      type: "user",
-      content: trimmedInput,
-      timestamp: new Date(),
-    });
-
     setCurrentInput("");
     setIsProcessing(true);
 
-    // Send to agent
+    // Send to agent (it will create the USER_MESSAGE ThreadEvent)
     try {
       await agent.sendMessage(trimmedInput);
+      syncEvents(); // Ensure we have the latest events including the user message
     } catch (error) {
       addMessage({
         type: "system",
@@ -256,7 +242,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       });
       setIsProcessing(false);
     }
-  }, [agent, addMessage, handleSlashCommand]);
+  }, [agent, addMessage, handleSlashCommand, syncEvents]);
 
   // Initialize command system
   useEffect(() => {
