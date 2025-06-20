@@ -77,7 +77,6 @@ export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming }: To
       <CollapsibleBox 
         label="Input"
         defaultExpanded={false}
-        maxHeight={8}
         borderColor="yellow"
       >
         <CodeDisplay 

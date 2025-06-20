@@ -43,7 +43,6 @@ export function CollapsibleBox({
       {isExpanded && (
         <Box 
           flexDirection="column"
-          height={maxHeight}
           marginLeft={2}
         >
           {children}
