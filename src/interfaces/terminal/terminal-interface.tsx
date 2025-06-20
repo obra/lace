@@ -5,13 +5,20 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Box, Text, render } from "ink";
 import ShellInput from "./components/shell-input.js";
 import ToolApprovalModal from "./components/tool-approval-modal.js";
-import MessageDisplay from "./components/message-display.js";
+import { ConversationDisplay } from "./components/events/ConversationDisplay.js";
 import StatusBar from "./components/status-bar.js";
 import { Agent } from "../../agents/agent.js";
 import { ApprovalCallback, ApprovalDecision } from "../../tools/approval-types.js";
 import { CommandRegistry } from "../../commands/registry.js";
 import { CommandExecutor } from "../../commands/executor.js";
 import type { UserInterface } from "../../commands/types.js";
+import { ThreadEvent } from "../../threads/types.js";
+
+
+interface TerminalInterfaceProps {
+  agent: Agent;
+  approvalCallback?: ApprovalCallback;
+}
 
 interface Message {
   type: "user" | "assistant" | "system" | "tool" | "thinking";
@@ -19,16 +26,12 @@ interface Message {
   timestamp: Date;
 }
 
-interface TerminalInterfaceProps {
-  agent: Agent;
-  approvalCallback?: ApprovalCallback;
-}
-
 const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   agent,
   approvalCallback,
 }) => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [events, setEvents] = useState<ThreadEvent[]>([]);
+  const [ephemeralMessages, setEphemeralMessages] = useState<Message[]>([]);
   const [currentInput, setCurrentInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
@@ -47,9 +50,18 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     resolve: (decision: ApprovalDecision) => void;
   } | null>(null);
 
-  // Add a message to the conversation
+  // Sync events from agent's thread
+  const syncEvents = useCallback(() => {
+    const threadId = agent.threadManager.getCurrentThreadId();
+    if (threadId) {
+      const threadEvents = agent.threadManager.getEvents(threadId);
+      setEvents([...threadEvents]);
+    }
+  }, [agent]);
+
+  // Add an ephemeral message
   const addMessage = useCallback((message: Message) => {
-    setMessages((prev) => [...prev, message]);
+    setEphemeralMessages((prev) => [...prev, message]);
   }, []);
 
   // Handle tool approval modal decision
@@ -79,7 +91,6 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
     // Handle agent thinking
     const handleThinkingComplete = ({ content }: { content: string }) => {
-      // Extract think blocks and show them
       const thinkMatches = content.match(/<think>[\s\S]*?<\/think>/g);
       if (thinkMatches) {
         thinkMatches.forEach((thinkBlock) => {
@@ -98,7 +109,6 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     // Handle agent response complete
     const handleResponseComplete = ({ content }: { content: string }) => {
       if (agent.getCurrentState() === "streaming") {
-        // For streaming, use the accumulated streaming content
         if (streamingContent.trim()) {
           addMessage({
             type: "assistant",
@@ -107,63 +117,11 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
           });
         }
         setStreamingContent("");
-      } else {
-        // For non-streaming, use the complete content
-        if (content && content.length > 0) {
-          addMessage({
-            type: "assistant",
-            content: content,
-            timestamp: new Date(),
-          });
-        }
       }
       setIsProcessing(false);
+      syncEvents();
     };
 
-    // Handle tool execution
-    const handleToolStart = ({ toolName, input }: { toolName: string; input: unknown }) => {
-      const inputDisplay =
-        JSON.stringify(input).length > 100
-          ? JSON.stringify(input).substring(0, 100) + "..."
-          : JSON.stringify(input);
-
-      addMessage({
-        type: "tool",
-        content: `🔧 Running: ${toolName} with ${inputDisplay}`,
-        timestamp: new Date(),
-      });
-    };
-
-    const handleToolComplete = ({ result }: { result: any }) => {
-      const outputText = result.content[0]?.text || "";
-      
-      if (!result.isError) {
-        const outputLength = outputText.length;
-        if (outputLength > 500) {
-          const truncated = outputText.substring(0, 500);
-          addMessage({
-            type: "tool",
-            content: `✅ Tool completed (${outputLength} chars):\n${truncated}...`,
-            timestamp: new Date(),
-          });
-        } else {
-          addMessage({
-            type: "tool",
-            content: `✅ Tool completed:\n${outputText}`,
-            timestamp: new Date(),
-          });
-        }
-      } else {
-        const errorText = result.content[0]?.text || "Unknown error";
-        addMessage({
-          type: "tool",
-          content: `❌ Tool failed: ${errorText}`,
-          timestamp: new Date(),
-        });
-      }
-    };
-
-    // Handle errors
     // Handle token usage updates
     const handleTokenUsageUpdate = ({ usage }: { usage: any }) => {
       if (usage && typeof usage === 'object') {
@@ -187,19 +145,14 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     const handleError = ({ error }: { error: Error }) => {
-      addMessage({
-        type: "system",
-        content: `❌ Error: ${error.message}`,
-        timestamp: new Date(),
-      });
-
-      // Suggest alternatives based on the provider
-      if (agent.providerName === "lmstudio") {
-        addMessage({
-          type: "system",
-          content: "💡 Try using Anthropic Claude instead: node dist/cli.js --provider anthropic",
-          timestamp: new Date(),
-        });
+      const threadId = agent.threadManager.getCurrentThreadId();
+      if (threadId) {
+        agent.threadManager.addEvent(threadId, 'LOCAL_SYSTEM_MESSAGE', `❌ Error: ${error.message}`);
+        
+        if (agent.providerName === "lmstudio") {
+          agent.threadManager.addEvent(threadId, 'LOCAL_SYSTEM_MESSAGE', "💡 Try using Anthropic Claude instead: node dist/cli.js --provider anthropic");
+        }
+        syncEvents();
       }
       setIsProcessing(false);
     };
@@ -208,8 +161,6 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     agent.on("agent_token", handleToken);
     agent.on("agent_thinking_complete", handleThinkingComplete);
     agent.on("agent_response_complete", handleResponseComplete);
-    agent.on("tool_call_start", handleToolStart);
-    agent.on("tool_call_complete", handleToolComplete);
     agent.on("approval_request", handleApprovalRequest);
     agent.on("token_usage_update", handleTokenUsageUpdate);
     agent.on("token_budget_warning", handleTokenBudgetWarning);
@@ -220,14 +171,12 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       agent.off("agent_token", handleToken);
       agent.off("agent_thinking_complete", handleThinkingComplete);
       agent.off("agent_response_complete", handleResponseComplete);
-      agent.off("tool_call_start", handleToolStart);
-      agent.off("tool_call_complete", handleToolComplete);
       agent.off("approval_request", handleApprovalRequest);
       agent.off("token_usage_update", handleTokenUsageUpdate);
       agent.off("token_budget_warning", handleTokenBudgetWarning);
       agent.off("error", handleError);
     };
-  }, [agent, addMessage, streamingContent]);
+  }, [agent, addMessage, syncEvents, streamingContent]);
 
   // Create UserInterface implementation
   const userInterface: UserInterface = React.useMemo(() => ({
@@ -246,7 +195,8 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       const newThreadId = agent.threadManager.generateThreadId();
       agent.threadManager.createThread(newThreadId);
       // Reset React state
-      setMessages([]);
+      setEvents([]);
+      setEphemeralMessages([]);
       addMessage({
         type: "system",
         content: `🤖 New conversation started using ${agent.providerName} provider.`,
@@ -257,7 +207,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     exit(): void {
       process.exit(0);
     }
-  }), [agent, addMessage, setMessages]);
+  }), [agent, addMessage]);
 
   // Handle slash commands using new command system
   const handleSlashCommand = useCallback(async (input: string) => {
@@ -285,7 +235,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       return;
     }
 
-    // Add user message
+    // Add user message as ephemeral (it will also be stored as a ThreadEvent by the agent)
     addMessage({
       type: "user",
       content: trimmedInput,
@@ -330,6 +280,9 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
   // Initialize agent on mount
   useEffect(() => {
+    // Sync existing events from the thread
+    syncEvents();
+    
     addMessage({
       type: "system",
       content: `🤖 Lace Agent started using ${agent.providerName} provider. Type "/help" to see available commands.`,
@@ -337,39 +290,29 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     });
     
     agent.start();
-  }, [agent, addMessage]);
+  }, [agent, addMessage, syncEvents]);
 
   return (
     <Box flexDirection="column" height="100%">
-      {/* Message history */}
-      <Box flexDirection="column" flexGrow={1} paddingY={1}>
-        {messages.map((message, index) => (
-          <MessageDisplay 
-            key={index} 
-            message={message}
-          />
-        ))}
-        
-        {/* Show streaming content with new MessageDisplay */}
-        {streamingContent && (
-          <MessageDisplay 
-            message={{
-              type: "assistant",
-              content: streamingContent,
-              timestamp: new Date(),
-            }}
-            isStreaming={true}
-            showCursor={true}
-          />
-        )}
-        
-        {/* Show processing indicator */}
-        {isProcessing && !streamingContent && (
-          <Box marginBottom={1}>
-            <Text color="dim">💭 Thinking...</Text>
-          </Box>
-        )}
-      </Box>
+      {/* Conversation display with merged events and messages */}
+      <ConversationDisplay 
+        events={events}
+        ephemeralMessages={[
+          ...ephemeralMessages,
+          // Add streaming content as ephemeral message
+          ...(streamingContent ? [{
+            type: "assistant" as const,
+            content: streamingContent,
+            timestamp: new Date(),
+          }] : []),
+          // Add processing indicator as ephemeral message
+          ...(isProcessing && !streamingContent ? [{
+            type: "system" as const,
+            content: "💭 Thinking...",
+            timestamp: new Date(),
+          }] : [])
+        ]}
+      />
 
       {/* Tool approval modal */}
       {approvalRequest && (
@@ -389,7 +332,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         threadId={agent.threadManager.getCurrentThreadId() || undefined}
         tokenUsage={tokenUsage}
         isProcessing={isProcessing}
-        messageCount={messages.length}
+        messageCount={events.length + ephemeralMessages.length}
       />
 
       {/* Input area - disabled when modal is open */}
