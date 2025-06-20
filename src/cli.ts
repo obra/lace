@@ -15,7 +15,7 @@ import { DelegateTool } from './tools/implementations/delegate.js';
 import { ThreadManager } from './threads/thread-manager.js';
 import { getLaceDbPath } from './config/lace-dir.js';
 import { logger } from './utils/logger.js';
-import { loadPromptConfig, getPromptFilePaths } from './config/prompts.js';
+import { loadPromptConfig, getUserInstructionsFilePath } from './config/prompts.js';
 import { parseArgs, validateProvider } from './cli/args.js';
 import { TerminalInterface } from './interfaces/terminal/terminal-interface.js';
 import { NonInteractiveInterface } from './interfaces/non-interactive-interface.js';
@@ -25,10 +25,17 @@ import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
 async function createProvider(
   registry: ProviderRegistry,
   providerType: string,
-  model?: string
+  model?: string,
+  toolExecutor?: ToolExecutor
 ): Promise<AIProvider> {
+  // Get tool information for template system
+  const tools = toolExecutor ? toolExecutor.getAllTools().map(tool => ({
+    name: tool.name,
+    description: tool.description
+  })) : undefined;
+
   // Load configurable prompts from user's Lace directory
-  const promptConfig = loadPromptConfig();
+  const promptConfig = await loadPromptConfig({ tools });
   const { systemPrompt, filesCreated } = promptConfig;
 
   // Show helpful message if configuration files were created for the first time
@@ -98,11 +105,11 @@ async function main() {
   });
 
   // Show configuration file locations on first startup
-  const { systemPromptPath, userInstructionsPath } = getPromptFilePaths();
+  const userInstructionsPath = getUserInstructionsFilePath();
   logger.info('Lace configuration files', {
-    systemPromptPath,
     userInstructionsPath,
     laceDir: getEnvVar('LACE_DIR', '~/.lace'),
+    note: 'System prompts are generated from templates',
   });
 
   // Initialize provider registry
@@ -111,11 +118,11 @@ async function main() {
   // Validate provider against registry
   validateProvider(options.provider, registry);
 
-  const provider = await createProvider(registry, options.provider, options.model);
-
   // Create and configure tool executor with all available tools
   const toolExecutor = new ToolExecutor();
   toolExecutor.registerAllAvailableTools();
+
+  const provider = await createProvider(registry, options.provider, options.model, toolExecutor);
 
   // Create thread manager and start/resume session
   const threadManager = new ThreadManager(getLaceDbPath());

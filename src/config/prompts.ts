@@ -1,9 +1,11 @@
 // ABOUTME: Configuration management for system and user prompts
-// ABOUTME: Handles reading/writing prompt files from LACE_DIR with auto-creation and defaults
+// ABOUTME: Uses template system for system prompts and file-based user instructions
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { getLaceDir, ensureLaceDir } from './lace-dir.js';
+import { PromptManager } from './prompt-manager.js';
+import { logger } from '../utils/logger.js';
 
 export interface PromptConfig {
   systemPrompt: string;
@@ -11,8 +13,9 @@ export interface PromptConfig {
   filesCreated: string[];
 }
 
-// Default system prompt - extracted from current hardcoded value
-const DEFAULT_SYSTEM_PROMPT = `You are a coding assistant. Use the bash tool to help with programming tasks.`;
+export interface PromptOptions {
+  tools?: Array<{ name: string; description: string }>;
+}
 
 // Default user instructions - empty by default
 const DEFAULT_USER_INSTRUCTIONS = ``;
@@ -47,42 +50,45 @@ function readPromptFile(
 }
 
 /**
- * Load the system prompt and user instructions from configuration files
- * Auto-creates files with defaults if they don't exist
+ * Load the system prompt using the template system
  */
-export function loadPromptConfig(): PromptConfig {
-  const laceDir = ensureLaceDir();
-
-  const systemPromptPath = path.join(laceDir, 'system-prompt.md');
-  const userInstructionsPath = path.join(laceDir, 'instructions.md');
-
-  const systemPromptResult = readPromptFile(systemPromptPath, DEFAULT_SYSTEM_PROMPT);
-  const userInstructionsResult = readPromptFile(userInstructionsPath, DEFAULT_USER_INSTRUCTIONS);
-
-  const filesCreated: string[] = [];
-  if (systemPromptResult.wasCreated) {
-    filesCreated.push(systemPromptPath);
-  }
-  if (userInstructionsResult.wasCreated) {
-    filesCreated.push(userInstructionsPath);
-  }
-
+export async function loadPromptConfig(options: PromptOptions = {}): Promise<PromptConfig> {
+  logger.debug('Loading prompt config using template system');
+  
+  const promptManager = new PromptManager({ tools: options.tools });
+  const systemPrompt = await promptManager.generateSystemPrompt();
+  const userInstructions = await loadUserInstructions();
+  
+  logger.info('Loaded prompt config using template system');
   return {
-    systemPrompt: systemPromptResult.content.trim(),
-    userInstructions: userInstructionsResult.content.trim(),
-    filesCreated,
+    systemPrompt,
+    userInstructions: userInstructions.content,
+    filesCreated: userInstructions.wasCreated ? [getUserInstructionsPath()] : [],
   };
 }
 
-/**
- * Get the paths to the prompt configuration files
- * Useful for telling users where to edit their prompts
- */
-export function getPromptFilePaths(): { systemPromptPath: string; userInstructionsPath: string } {
-  const laceDir = getLaceDir();
 
-  return {
-    systemPromptPath: path.join(laceDir, 'system-prompt.md'),
-    userInstructionsPath: path.join(laceDir, 'instructions.md'),
-  };
+/**
+ * Load user instructions (always from file, not templated)
+ */
+function loadUserInstructions(): { content: string; wasCreated: boolean } {
+  const userInstructionsPath = getUserInstructionsPath();
+  return readPromptFile(userInstructionsPath, DEFAULT_USER_INSTRUCTIONS);
+}
+
+/**
+ * Get user instructions file path
+ */
+function getUserInstructionsPath(): string {
+  const laceDir = ensureLaceDir();
+  return path.join(laceDir, 'instructions.md');
+}
+
+/**
+ * Get the path to the user instructions file
+ * System prompts are generated from templates and not file-based
+ */
+export function getUserInstructionsFilePath(): string {
+  const laceDir = getLaceDir();
+  return path.join(laceDir, 'instructions.md');
 }
