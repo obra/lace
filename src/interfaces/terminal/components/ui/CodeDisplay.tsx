@@ -65,6 +65,14 @@ function renderHighlightedCode(highlightedHtml: string): React.ReactElement {
 }
 
 function parseHighlightedLine(line: string): React.ReactNode {
+  // Decode HTML entities first
+  let decodedLine = line
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#x27;/g, "'");
+  
   // Parse highlight.js HTML and convert to Ink colors
   const parts: React.ReactNode[] = [];
   let currentIndex = 0;
@@ -73,10 +81,10 @@ function parseHighlightedLine(line: string): React.ReactNode {
   const tagRegex = /<span class="([^"]*)"[^>]*>([^<]*)<\/span>/g;
   let match;
   
-  while ((match = tagRegex.exec(line)) !== null) {
+  while ((match = tagRegex.exec(decodedLine)) !== null) {
     // Add text before the tag
     if (match.index > currentIndex) {
-      const beforeText = line.slice(currentIndex, match.index);
+      const beforeText = decodedLine.slice(currentIndex, match.index);
       if (beforeText) {
         parts.push(
           <Text key={`before-${currentIndex}`} color="white">
@@ -101,8 +109,8 @@ function parseHighlightedLine(line: string): React.ReactNode {
   }
   
   // Add remaining text
-  if (currentIndex < line.length) {
-    const remainingText = line.slice(currentIndex);
+  if (currentIndex < decodedLine.length) {
+    const remainingText = decodedLine.slice(currentIndex);
     if (remainingText) {
       parts.push(
         <Text key={`remaining-${currentIndex}`} color="white">
@@ -112,7 +120,7 @@ function parseHighlightedLine(line: string): React.ReactNode {
     }
   }
   
-  return parts.length > 0 ? parts : line.replace(/<[^>]*>/g, ''); // Strip any remaining HTML
+  return parts.length > 0 ? parts : decodedLine.replace(/<[^>]*>/g, ''); // Strip any remaining HTML
 }
 
 function getColorForClass(className: string): string {
