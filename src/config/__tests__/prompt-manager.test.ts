@@ -42,8 +42,8 @@ describe('PromptManager', () => {
       expect(manager).toBeDefined();
     });
 
-    it('should initialize with custom template directory', () => {
-      const manager = new PromptManager({ templateDir: tempDir });
+    it('should initialize with custom template directories', () => {
+      const manager = new PromptManager({ templateDirs: [tempDir] });
       expect(manager).toBeDefined();
     });
 
@@ -53,7 +53,7 @@ describe('PromptManager', () => {
         { name: 'file-read', description: 'Read files' }
       ];
 
-      const manager = new PromptManager({ tools, templateDir: tempDir });
+      const manager = new PromptManager({ tools, templateDirs: [tempDir] });
       expect(manager).toBeDefined();
     });
   });
@@ -63,12 +63,12 @@ describe('PromptManager', () => {
       // Create required template files
       fs.writeFileSync(path.join(tempDir, 'system.md'), 'Test template');
 
-      const manager = new PromptManager({ templateDir: tempDir });
+      const manager = new PromptManager({ templateDirs: [tempDir] });
       expect(manager.isTemplateSystemAvailable()).toBe(true);
     });
 
     it('should detect when template system is not available', () => {
-      const manager = new PromptManager({ templateDir: tempDir });
+      const manager = new PromptManager({ templateDirs: [tempDir] });
       expect(manager.isTemplateSystemAvailable()).toBe(false);
     });
   });
@@ -113,7 +113,7 @@ describe('PromptManager', () => {
         { name: 'file-read', description: 'Read file contents' }
       ];
 
-      const manager = new PromptManager({ tools, templateDir: tempDir });
+      const manager = new PromptManager({ tools, templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toContain('You are Lace, an AI coding assistant.');
@@ -131,7 +131,7 @@ describe('PromptManager', () => {
         '{{include:sections/agent-personality.md}}\n\n{{#tools}}Tools available{{/tools}}{{^tools}}No tools available{{/tools}}'
       );
 
-      const manager = new PromptManager({ templateDir: tempDir });
+      const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toContain('You are Lace, an AI coding assistant.');
@@ -144,7 +144,7 @@ describe('PromptManager', () => {
         '{{include:sections/agent-personality.md}}\n\n{{include:sections/missing.md}}\n\nEnd of prompt'
       );
 
-      const manager = new PromptManager({ templateDir: tempDir });
+      const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toContain('You are Lace, an AI coding assistant.');
@@ -154,7 +154,7 @@ describe('PromptManager', () => {
 
     it('should return fallback prompt when template system fails', async () => {
       // Don't create system.md template
-      const manager = new PromptManager({ templateDir: tempDir });
+      const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toBe('You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.');
@@ -166,7 +166,7 @@ describe('PromptManager', () => {
         'Valid start {{#broken}} {{/different}} Invalid syntax'
       );
 
-      const manager = new PromptManager({ templateDir: tempDir });
+      const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toBe('You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.');
@@ -180,7 +180,7 @@ describe('PromptManager', () => {
       fs.chmodSync(tempDir, 0o000);
 
       try {
-        const manager = new PromptManager({ templateDir: tempDir });
+        const manager = new PromptManager({ templateDirs: [tempDir] });
         const prompt = await manager.generateSystemPrompt();
 
         expect(prompt).toBe('You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.');
@@ -201,7 +201,7 @@ describe('PromptManager', () => {
         throw new Error('Git command failed');
       });
 
-      const manager = new PromptManager({ templateDir: tempDir });
+      const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
 
       // Should still generate prompt with available variables
@@ -212,7 +212,7 @@ describe('PromptManager', () => {
     it('should handle empty template file', async () => {
       fs.writeFileSync(path.join(tempDir, 'system.md'), '');
 
-      const manager = new PromptManager({ templateDir: tempDir });
+      const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toBe('');
@@ -221,7 +221,7 @@ describe('PromptManager', () => {
     it('should handle template with only whitespace', async () => {
       fs.writeFileSync(path.join(tempDir, 'system.md'), '   \n\t\r\n   ');
 
-      const manager = new PromptManager({ templateDir: tempDir });
+      const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toBe('   \n\t\r\n   ');
@@ -260,7 +260,7 @@ describe('PromptManager', () => {
         { name: 'web-search', description: 'Search the web' }
       ];
 
-      const manager = new PromptManager({ tools, templateDir: tempDir });
+      const manager = new PromptManager({ tools, templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
 
       // Should contain all expected sections
@@ -282,10 +282,93 @@ describe('PromptManager', () => {
         'Hello {{name}}!'
       );
 
-      const manager = new PromptManager({ templateDir: tempDir });
+      const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toBe('Hello !'); // No name provided, mustache renders empty
+    });
+  });
+
+  describe('template overlay functionality', () => {
+    it('should use user template when available, fall back to default', async () => {
+      // Create two template directories
+      const userTemplateDir = path.join(tempDir, 'user');
+      const defaultTemplateDir = path.join(tempDir, 'default');
+      
+      fs.mkdirSync(userTemplateDir, { recursive: true });
+      fs.mkdirSync(defaultTemplateDir, { recursive: true });
+
+      // Create different templates in each directory
+      fs.writeFileSync(
+        path.join(userTemplateDir, 'system.md'),
+        'Custom user template: {{system.os}}'
+      );
+      
+      fs.writeFileSync(
+        path.join(defaultTemplateDir, 'system.md'),
+        'Default template: {{system.os}}'
+      );
+
+      // User template should take precedence
+      const manager = new PromptManager({ templateDirs: [userTemplateDir, defaultTemplateDir] });
+      const prompt = await manager.generateSystemPrompt();
+
+      expect(prompt).toContain('Custom user template:');
+      expect(prompt).not.toContain('Default template:');
+    });
+
+    it('should fall back to default template when user template is missing', async () => {
+      const userTemplateDir = path.join(tempDir, 'user');
+      const defaultTemplateDir = path.join(tempDir, 'default');
+      
+      fs.mkdirSync(userTemplateDir, { recursive: true });
+      fs.mkdirSync(defaultTemplateDir, { recursive: true });
+
+      // Only create template in default directory
+      fs.writeFileSync(
+        path.join(defaultTemplateDir, 'system.md'),
+        'Default fallback template: {{system.os}}'
+      );
+
+      const manager = new PromptManager({ templateDirs: [userTemplateDir, defaultTemplateDir] });
+      const prompt = await manager.generateSystemPrompt();
+
+      expect(prompt).toContain('Default fallback template:');
+    });
+
+    it('should handle overlay with includes correctly', async () => {
+      const userTemplateDir = path.join(tempDir, 'user');
+      const defaultTemplateDir = path.join(tempDir, 'default');
+      
+      fs.mkdirSync(userTemplateDir, { recursive: true });
+      fs.mkdirSync(defaultTemplateDir, { recursive: true });
+      
+      // Create sections directories
+      fs.mkdirSync(path.join(userTemplateDir, 'sections'), { recursive: true });
+      fs.mkdirSync(path.join(defaultTemplateDir, 'sections'), { recursive: true });
+
+      // User has custom personality, default has environment
+      fs.writeFileSync(
+        path.join(userTemplateDir, 'sections', 'agent-personality.md'),
+        'Custom AI Assistant'
+      );
+      
+      fs.writeFileSync(
+        path.join(defaultTemplateDir, 'sections', 'environment.md'),
+        'Environment: {{system.os}}'
+      );
+
+      // System template uses both includes
+      fs.writeFileSync(
+        path.join(userTemplateDir, 'system.md'),
+        '{{include:sections/agent-personality.md}}\n\n{{include:sections/environment.md}}'
+      );
+
+      const manager = new PromptManager({ templateDirs: [userTemplateDir, defaultTemplateDir] });
+      const prompt = await manager.generateSystemPrompt();
+
+      expect(prompt).toContain('Custom AI Assistant'); // From user directory
+      expect(prompt).toContain('Environment:'); // From default directory
     });
   });
 });

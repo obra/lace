@@ -14,7 +14,7 @@ describe('TemplateEngine', () => {
   beforeEach(() => {
     // Create a temporary directory for testing
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'template-test-'));
-    templateEngine = new TemplateEngine(tempDir);
+    templateEngine = new TemplateEngine([tempDir]);
   });
 
   afterEach(() => {
@@ -237,6 +237,66 @@ describe('TemplateEngine', () => {
       const result = templateEngine.render('whitespace.md', { name: 'test' });
 
       expect(result).toBe('   \n\t\r\n   ');
+    });
+  });
+
+  describe('multiple template directories', () => {
+    let secondTempDir: string;
+    let multiDirEngine: TemplateEngine;
+
+    beforeEach(() => {
+      secondTempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'template-test-2-'));
+      multiDirEngine = new TemplateEngine([tempDir, secondTempDir]);
+    });
+
+    afterEach(() => {
+      if (fs.existsSync(secondTempDir)) {
+        fs.rmSync(secondTempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should prioritize first directory in array', () => {
+      // Create same template in both directories
+      fs.writeFileSync(path.join(tempDir, 'priority.md'), 'First directory: {{name}}');
+      fs.writeFileSync(path.join(secondTempDir, 'priority.md'), 'Second directory: {{name}}');
+
+      const result = multiDirEngine.render('priority.md', { name: 'test' });
+
+      expect(result).toBe('First directory: test');
+    });
+
+    it('should fall back to second directory when file not in first', () => {
+      // Only create template in second directory
+      fs.writeFileSync(path.join(secondTempDir, 'fallback.md'), 'Fallback: {{name}}');
+
+      const result = multiDirEngine.render('fallback.md', { name: 'test' });
+
+      expect(result).toBe('Fallback: test');
+    });
+
+    it('should handle includes across multiple directories', () => {
+      // Create main template in first directory
+      fs.writeFileSync(path.join(tempDir, 'main.md'), 'Main: {{include:shared.md}}');
+      
+      // Create include file only in second directory
+      fs.writeFileSync(path.join(secondTempDir, 'shared.md'), 'Shared content: {{name}}');
+
+      const result = multiDirEngine.render('main.md', { name: 'test' });
+
+      expect(result).toBe('Main: Shared content: test');
+    });
+
+    it('should prioritize includes from first directory', () => {
+      // Create main template
+      fs.writeFileSync(path.join(tempDir, 'main.md'), 'Main: {{include:shared.md}}');
+      
+      // Create include file in both directories
+      fs.writeFileSync(path.join(tempDir, 'shared.md'), 'First: {{name}}');
+      fs.writeFileSync(path.join(secondTempDir, 'shared.md'), 'Second: {{name}}');
+
+      const result = multiDirEngine.render('main.md', { name: 'test' });
+
+      expect(result).toBe('Main: First: test');
     });
   });
 });

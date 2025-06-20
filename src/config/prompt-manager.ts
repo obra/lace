@@ -13,11 +13,12 @@ import {
   ToolVariableProvider,
   ContextDisclaimerProvider 
 } from './variable-providers.js';
+import { getLaceDir } from './lace-dir.js';
 import { logger } from '../utils/logger.js';
 
 export interface PromptManagerOptions {
   tools?: Array<{ name: string; description: string }>;
-  templateDir?: string;
+  templateDirs?: string[];
 }
 
 export class PromptManager {
@@ -25,10 +26,10 @@ export class PromptManager {
   private variableManager: VariableProviderManager;
 
   constructor(options: PromptManagerOptions = {}) {
-    // Determine template directory (embedded or external)
-    const templateDir = options.templateDir || this.getEmbeddedTemplateDir();
+    // Set up template directories with user overlay support
+    const templateDirs = options.templateDirs || this.getTemplateDirsWithOverlay();
     
-    this.templateEngine = new TemplateEngine(templateDir);
+    this.templateEngine = new TemplateEngine(templateDirs);
     this.variableManager = new VariableProviderManager();
 
     // Add default variable providers
@@ -41,6 +42,8 @@ export class PromptManager {
     if (options.tools && options.tools.length > 0) {
       this.variableManager.addProvider(new ToolVariableProvider(options.tools));
     }
+
+    logger.debug('PromptManager initialized with template directories', { templateDirs });
   }
 
   /**
@@ -68,6 +71,25 @@ export class PromptManager {
   }
 
   /**
+   * Get template directories with user overlay support
+   * User templates take priority over embedded templates
+   */
+  private getTemplateDirsWithOverlay(): string[] {
+    const userTemplateDir = this.getUserTemplateDir();
+    const embeddedTemplateDir = this.getEmbeddedTemplateDir();
+    
+    return [userTemplateDir, embeddedTemplateDir];
+  }
+
+  /**
+   * Get the user template directory path
+   */
+  private getUserTemplateDir(): string {
+    const laceDir = getLaceDir();
+    return path.join(laceDir, 'prompts');
+  }
+
+  /**
    * Get the embedded template directory path
    */
   private getEmbeddedTemplateDir(): string {
@@ -87,9 +109,17 @@ export class PromptManager {
    */
   isTemplateSystemAvailable(): boolean {
     try {
-      const templateDir = this.getEmbeddedTemplateDir();
-      const systemTemplatePath = path.join(templateDir, 'system.md');
-      return fs.existsSync(systemTemplatePath);
+      const templateDirs = this.getTemplateDirsWithOverlay();
+      
+      // Check if system.md exists in any of the template directories
+      for (const templateDir of templateDirs) {
+        const systemTemplatePath = path.join(templateDir, 'system.md');
+        if (fs.existsSync(systemTemplatePath)) {
+          return true;
+        }
+      }
+      
+      return false;
     } catch {
       return false;
     }

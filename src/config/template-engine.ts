@@ -11,11 +11,11 @@ export interface TemplateContext {
 }
 
 export class TemplateEngine {
-  private readonly templateDir: string;
+  private readonly templateDirs: string[];
   private readonly processedIncludes = new Set<string>();
 
-  constructor(templateDir: string) {
-    this.templateDir = templateDir;
+  constructor(templateDirs: string | string[]) {
+    this.templateDirs = Array.isArray(templateDirs) ? templateDirs : [templateDirs];
   }
 
   /**
@@ -34,16 +34,19 @@ export class TemplateEngine {
   }
 
   /**
-   * Load template content from file
+   * Load template content from file, checking directories in priority order
    */
   private loadTemplate(templatePath: string): string {
-    const fullPath = path.resolve(this.templateDir, templatePath);
-    
-    if (!fs.existsSync(fullPath)) {
-      throw new Error(`Template file not found: ${fullPath}`);
+    for (const templateDir of this.templateDirs) {
+      const fullPath = path.resolve(templateDir, templatePath);
+      
+      if (fs.existsSync(fullPath)) {
+        logger.debug('Loading template', { templatePath, templateDir });
+        return fs.readFileSync(fullPath, 'utf-8');
+      }
     }
-
-    return fs.readFileSync(fullPath, 'utf-8');
+    
+    throw new Error(`Template file not found in any directory: ${templatePath}`);
   }
 
   /**
@@ -53,37 +56,49 @@ export class TemplateEngine {
     const includeRegex = /\{\{include:([^}]+)\}\}/g;
     
     return content.replace(includeRegex, (match, includePath: string) => {
-      const fullIncludePath = path.resolve(this.templateDir, currentDir, includePath);
-      const normalizedPath = path.normalize(fullIncludePath);
+      // Try to find the include file in any of the template directories
+      let foundPath: string | null = null;
+      let foundTemplateDir = '';
+      
+      for (const templateDir of this.templateDirs) {
+        const fullIncludePath = path.resolve(templateDir, currentDir, includePath);
+        const normalizedPath = path.normalize(fullIncludePath);
+        
+        if (fs.existsSync(normalizedPath)) {
+          foundPath = normalizedPath;
+          foundTemplateDir = templateDir;
+          break;
+        }
+      }
+
+      if (!foundPath) {
+        logger.warn('Include file not found', { includePath, searchedDirs: this.templateDirs });
+        return `<!-- Include not found: ${includePath} -->`;
+      }
 
       // Prevent infinite recursion
-      if (this.processedIncludes.has(normalizedPath)) {
-        logger.warn('Circular include detected', { includePath, normalizedPath });
+      if (this.processedIncludes.has(foundPath)) {
+        logger.warn('Circular include detected', { includePath, foundPath });
         return `<!-- Circular include: ${includePath} -->`;
       }
 
       try {
-        this.processedIncludes.add(normalizedPath);
+        this.processedIncludes.add(foundPath);
         
-        if (!fs.existsSync(normalizedPath)) {
-          logger.warn('Include file not found', { includePath, normalizedPath });
-          return `<!-- Include not found: ${includePath} -->`;
-        }
-
-        const includeContent = fs.readFileSync(normalizedPath, 'utf-8');
-        const includeDir = path.dirname(path.relative(this.templateDir, normalizedPath));
+        const includeContent = fs.readFileSync(foundPath, 'utf-8');
+        const includeDir = path.dirname(path.relative(foundTemplateDir, foundPath));
         
         // Recursively process includes in the included content
         return this.processIncludes(includeContent, includeDir);
       } catch (error) {
         logger.error('Failed to process include', { 
           includePath, 
-          normalizedPath, 
+          foundPath, 
           error: error instanceof Error ? error.message : String(error) 
         });
         return `<!-- Include error: ${includePath} -->`;
       } finally {
-        this.processedIncludes.delete(normalizedPath);
+        this.processedIncludes.delete(foundPath);
       }
     });
   }
