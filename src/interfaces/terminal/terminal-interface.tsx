@@ -216,42 +216,6 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
   }, [agent, addMessage, streamingContent]);
 
-  // Handle message submission
-  const handleSubmit = useCallback(async (input: string) => {
-    const trimmedInput = input.trim();
-    
-    if (!trimmedInput) return;
-
-    // Handle slash commands
-    if (trimmedInput.startsWith("/")) {
-      await handleSlashCommand(trimmedInput);
-      setCurrentInput("");
-      return;
-    }
-
-    // Add user message
-    addMessage({
-      type: "user",
-      content: trimmedInput,
-      timestamp: new Date(),
-    });
-
-    setCurrentInput("");
-    setIsProcessing(true);
-
-    // Send to agent
-    try {
-      await agent.sendMessage(trimmedInput);
-    } catch (error) {
-      addMessage({
-        type: "system",
-        content: `❌ Failed to send message: ${error instanceof Error ? error.message : String(error)}`,
-        timestamp: new Date(),
-      });
-      setIsProcessing(false);
-    }
-  }, [agent, addMessage]);
-
   // Create UserInterface implementation
   const userInterface: UserInterface = React.useMemo(() => ({
     agent,
@@ -295,15 +259,61 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     await commandExecutor.execute(input, userInterface);
   }, [commandExecutor, userInterface, addMessage]);
 
+  // Handle message submission
+  const handleSubmit = useCallback(async (input: string) => {
+    const trimmedInput = input.trim();
+    
+    if (!trimmedInput) return;
+
+    // Handle slash commands
+    if (trimmedInput.startsWith("/")) {
+      await handleSlashCommand(trimmedInput);
+      setCurrentInput("");
+      return;
+    }
+
+    // Add user message
+    addMessage({
+      type: "user",
+      content: trimmedInput,
+      timestamp: new Date(),
+    });
+
+    setCurrentInput("");
+    setIsProcessing(true);
+
+    // Send to agent
+    try {
+      await agent.sendMessage(trimmedInput);
+    } catch (error) {
+      addMessage({
+        type: "system",
+        content: `❌ Failed to send message: ${error instanceof Error ? error.message : String(error)}`,
+        timestamp: new Date(),
+      });
+      setIsProcessing(false);
+    }
+  }, [agent, addMessage, handleSlashCommand]);
+
   // Initialize command system
   useEffect(() => {
     const initCommands = async () => {
-      const registry = await CommandRegistry.createWithAutoDiscovery();
-      const executor = new CommandExecutor(registry);
-      setCommandExecutor(executor);
+      try {
+        const registry = await CommandRegistry.createWithAutoDiscovery();
+        const executor = new CommandExecutor(registry);
+        setCommandExecutor(executor);
+      } catch (error) {
+        console.error('Terminal: Failed to initialize command system:', error);
+        addMessage({
+          type: "system",
+          content: `❌ Failed to initialize command system: ${error instanceof Error ? error.message : String(error)}`,
+          timestamp: new Date(),
+        });
+      }
     };
     initCommands();
-  }, []);
+  }, [addMessage]);
+
 
   // Initialize agent on mount
   useEffect(() => {

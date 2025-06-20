@@ -171,9 +171,9 @@ describe('CLI Orchestration', () => {
   });
 
   describe('component integration', () => {
-    it('should integrate Agent with CLIInterface correctly', async () => {
+    it('should integrate Agent with TerminalInterface correctly', async () => {
       const { Agent } = await import('../agents/agent.js');
-      const { CLIInterface } = await import('../cli/interface.js');
+      const { TerminalInterface } = await import('../interfaces/terminal/terminal-interface.js');
       const { ThreadManager } = await import('../threads/thread-manager.js');
       const { ToolExecutor } = await import('../tools/executor.js');
 
@@ -194,12 +194,12 @@ describe('CLI Orchestration', () => {
         tools: toolExecutor.getAllTools(),
       });
 
-      const cli = new CLIInterface(agent);
+      const cli = new TerminalInterface(agent);
 
       // Verify integration
       expect(agent.providerName).toBe('lmstudio');
       expect(agent.getThreadId()).toBe(threadId);
-      expect(cli).toBeInstanceOf(CLIInterface);
+      expect(cli).toBeInstanceOf(TerminalInterface);
 
       // Cleanup
       agent.removeAllListeners();

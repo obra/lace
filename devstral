@@ -1,0 +1,163 @@
+2025-06-20T03:01:10.396Z [INFO] Starting Lace Agent {"provider":"lmstudio","model":"mistralai/devstral-small-2505","logLevel":"debug"}
+2025-06-20T03:01:10.396Z [INFO] Lace configuration files {"systemPromptPath":"/Users/jesse/.lace/system-prompt.md","userInstructionsPath":"/Users/jesse/.lace/instructions.md","laceDir":"~/.lace"}
+2025-06-20T03:01:10.441Z [INFO] AGENT: Started {"threadId":"lace_20250620_skhu2m","provider":"lmstudio"}
+2025-06-20T03:01:40.304Z [DEBUG] AGENT: Processing user message {"threadId":"lace_20250620_skhu2m","contentLength":131,"currentState":"idle"}
+2025-06-20T03:01:40.312Z [DEBUG] AGENT: Requesting response from provider {"threadId":"lace_20250620_skhu2m","conversationLength":1,"availableToolCount":12,"availableToolNames":["bash","file_read","file_write","file_edit","file_insert","file_list","ripgrep_search","file_find","task_add","task_list","task_complete","delegate"]}
+2025-06-20T03:01:40.312Z [DEBUG] AGENT: State change {"threadId":"lace_20250620_skhu2m","from":"idle","to":"thinking"}
+2025-06-20T03:01:40.312Z [DEBUG] AGENT: State change {"threadId":"lace_20250620_skhu2m","from":"thinking","to":"streaming"}
+2025-06-20T03:01:40.313Z [INFO] Connecting to LMStudio {"baseUrl":"ws://localhost:1234"}
+2025-06-20T03:01:40.345Z [INFO] Connected to LMStudio successfully
+2025-06-20T03:01:40.345Z [INFO] Loaded models from LMStudio {"count":3,"models":["mistralai/devstral-small-2505","qwen/qwen3-1.7b","qwen/qwen3-30b-a3b"]}
+2025-06-20T03:01:40.345Z [INFO] Found already loaded model {"modelId":"mistralai/devstral-small-2505"}
+2025-06-20T03:01:40.346Z [INFO] Using existing model instance {"modelId":"mistralai/devstral-small-2505"}
+2025-06-20T03:01:40.346Z [DEBUG] Creating streaming LMStudio response with native tool calling {"provider":"lmstudio","model":"mistralai/devstral-small-2505","messageCount":1,"toolCount":12,"toolNames":["bash","file_read","file_write","file_edit","file_insert","file_list","ripgrep_search","file_find","task_add","task_list","task_complete","delegate"]}
+2025-06-20T03:01:40.347Z [DEBUG] LMStudio native tool calling request {"provider":"lmstudio","model":"mistralai/devstral-small-2505","messageCount":1,"toolCount":12,"toolNames":["bash","file_read","file_write","file_edit","file_insert","file_list","ripgrep_search","file_find","task_add","task_list","task_complete","delegate"]}
+2025-06-20T03:01:40.385Z [DEBUG] LMStudio channel message {"type":"promptProcessingProgress"}
+2025-06-20T03:01:40.386Z [DEBUG] LMStudio unhandled message type {"type":"promptProcessingProgress"}
+2025-06-20T03:01:40.654Z [DEBUG] LMStudio channel message {"type":"promptProcessingProgress"}
+2025-06-20T03:01:40.655Z [DEBUG] LMStudio unhandled message type {"type":"promptProcessingProgress"}
+2025-06-20T03:01:40.821Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:40.851Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:40.882Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:40.945Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:40.976Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.007Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.038Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.069Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.070Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.100Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.131Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.163Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.225Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.318Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.319Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.319Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.324Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.349Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.380Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.411Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.442Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.473Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.505Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.536Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.598Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.629Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.660Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.691Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.692Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.722Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.723Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.785Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.816Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.878Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:41.940Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.002Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.003Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.065Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.065Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.065Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.127Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.158Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.158Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.158Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.189Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.220Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.282Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.282Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.344Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.376Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.407Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.438Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.438Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.469Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.469Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.562Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.655Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:42.655Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:43.028Z [DEBUG] LMStudio channel message {"type":"toolCallGenerationStart"}
+2025-06-20T03:01:43.028Z [DEBUG] LMStudio tool call generation started
+2025-06-20T03:01:44.085Z [DEBUG] LMStudio channel message {"type":"toolCallGenerationEnd"}
+2025-06-20T03:01:44.085Z [DEBUG] LMStudio tool call generation ended {"toolCall":{"id":"784877010","type":"function","arguments":{"pattern":"*config*","path":"./","type":"both","caseSensitive":false,"includeHidden":true},"name":"file_find"}}
+2025-06-20T03:01:44.085Z [DEBUG] LMStudio tool call detected - returning immediately {"toolName":"file_find","arguments":{"pattern":"*config*","path":"./","type":"both","caseSensitive":false,"includeHidden":true}}
+2025-06-20T03:01:44.086Z [DEBUG] AGENT: Received response from provider {"threadId":"lace_20250620_skhu2m","hasContent":true,"contentLength":317,"toolCallCount":1}
+2025-06-20T03:01:44.089Z [DEBUG] AGENT: State change {"threadId":"lace_20250620_skhu2m","from":"streaming","to":"tool_execution"}
+2025-06-20T03:01:44.090Z [DEBUG] AGENT: Processing tool calls {"threadId":"lace_20250620_skhu2m","toolCallCount":1,"toolCalls":[{"id":"784877010","name":"file_find"}]}
+2025-06-20T03:01:44.090Z [DEBUG] AGENT: Executing individual tool call {"threadId":"lace_20250620_skhu2m","toolCallId":"784877010","toolName":"file_find"}
+2025-06-20T03:01:44.240Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:44.614Z [DEBUG] LMStudio channel message {"type":"toolCallGenerationStart"}
+2025-06-20T03:01:44.614Z [DEBUG] LMStudio tool call generation started
+2025-06-20T03:01:45.671Z [DEBUG] LMStudio channel message {"type":"toolCallGenerationEnd"}
+2025-06-20T03:01:45.672Z [DEBUG] LMStudio tool call generation ended {"toolCall":{"id":"213480278","type":"function","arguments":{"pattern":"*settings*","path":"./","type":"both","caseSensitive":false,"includeHidden":true},"name":"file_find"}}
+2025-06-20T03:01:45.672Z [DEBUG] LMStudio tool call detected - returning immediately {"toolName":"file_find","arguments":{"pattern":"*settings*","path":"./","type":"both","caseSensitive":false,"includeHidden":true}}
+2025-06-20T03:01:45.703Z [DEBUG] LMStudio channel message {"type":"success"}
+2025-06-20T03:01:45.704Z [DEBUG] LMStudio prediction finished {"contentLength":320,"toolCallCount":2,"chunkCount":59}
+2025-06-20T03:01:47.985Z [DEBUG] AGENT: Tool execution completed {"threadId":"lace_20250620_skhu2m","toolCallId":"784877010","toolName":"file_find","success":true,"outputLength":6970,"hasError":false}
+2025-06-20T03:01:47.986Z [DEBUG] AGENT: Executing individual tool call {"threadId":"lace_20250620_skhu2m","toolCallId":"213480278","toolName":"file_find"}
+2025-06-20T03:01:48.236Z [DEBUG] AGENT: Tool execution completed {"threadId":"lace_20250620_skhu2m","toolCallId":"213480278","toolName":"file_find","success":true,"outputLength":1049,"hasError":false}
+2025-06-20T03:01:48.237Z [DEBUG] AGENT: Requesting response from provider {"threadId":"lace_20250620_skhu2m","conversationLength":4,"availableToolCount":12,"availableToolNames":["bash","file_read","file_write","file_edit","file_insert","file_list","ripgrep_search","file_find","task_add","task_list","task_complete","delegate"]}
+2025-06-20T03:01:48.237Z [DEBUG] AGENT: State change {"threadId":"lace_20250620_skhu2m","from":"tool_execution","to":"thinking"}
+2025-06-20T03:01:48.237Z [DEBUG] AGENT: State change {"threadId":"lace_20250620_skhu2m","from":"thinking","to":"streaming"}
+2025-06-20T03:01:48.237Z [DEBUG] Using cached LMStudio model {"modelId":"mistralai/devstral-small-2505"}
+2025-06-20T03:01:48.237Z [DEBUG] Creating streaming LMStudio response with native tool calling {"provider":"lmstudio","model":"mistralai/devstral-small-2505","messageCount":4,"toolCount":12,"toolNames":["bash","file_read","file_write","file_edit","file_insert","file_list","ripgrep_search","file_find","task_add","task_list","task_complete","delegate"]}
+2025-06-20T03:01:48.237Z [DEBUG] LMStudio native tool calling request {"provider":"lmstudio","model":"mistralai/devstral-small-2505","messageCount":4,"toolCount":12,"toolNames":["bash","file_read","file_write","file_edit","file_insert","file_list","ripgrep_search","file_find","task_add","task_list","task_complete","delegate"]}
+2025-06-20T03:01:48.276Z [DEBUG] LMStudio channel message {"type":"promptProcessingProgress"}
+2025-06-20T03:01:48.276Z [DEBUG] LMStudio unhandled message type {"type":"promptProcessingProgress"}
+2025-06-20T03:01:50.139Z [DEBUG] LMStudio channel message {"type":"promptProcessingProgress"}
+2025-06-20T03:01:50.139Z [DEBUG] LMStudio unhandled message type {"type":"promptProcessingProgress"}
+2025-06-20T03:01:52.031Z [DEBUG] LMStudio channel message {"type":"promptProcessingProgress"}
+2025-06-20T03:01:52.032Z [DEBUG] LMStudio unhandled message type {"type":"promptProcessingProgress"}
+2025-06-20T03:01:54.084Z [DEBUG] LMStudio channel message {"type":"promptProcessingProgress"}
+2025-06-20T03:01:54.084Z [DEBUG] LMStudio unhandled message type {"type":"promptProcessingProgress"}
+2025-06-20T03:01:56.378Z [DEBUG] LMStudio channel message {"type":"promptProcessingProgress"}
+2025-06-20T03:01:56.378Z [DEBUG] LMStudio unhandled message type {"type":"promptProcessingProgress"}
+2025-06-20T03:01:57.003Z [DEBUG] LMStudio channel message {"type":"promptProcessingProgress"}
+2025-06-20T03:01:57.004Z [DEBUG] LMStudio unhandled message type {"type":"promptProcessingProgress"}
+2025-06-20T03:01:57.255Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:57.256Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:57.287Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:57.288Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:57.350Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:57.382Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:57.413Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:57.445Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:57.476Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:57.508Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:57.539Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:57.571Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:57.634Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:57.666Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:57.666Z [DEBUG] LMStudio channel message {"type":"fragment"}
+2025-06-20T03:01:59.407Z [DEBUG] LMStudio channel message {"type":"success"}
+2025-06-20T03:01:59.407Z [DEBUG] LMStudio prediction finished {"contentLength":69,"toolCallCount":0,"chunkCount":15}
+2025-06-20T03:01:59.408Z [DEBUG] AGENT: Received response from provider {"threadId":"lace_20250620_skhu2m","hasContent":true,"contentLength":69,"toolCallCount":0}
+2025-06-20T03:01:59.410Z [DEBUG] AGENT: State change {"threadId":"lace_20250620_skhu2m","from":"streaming","to":"idle"}
+2025-06-20T03:02:58.125Z [DEBUG] Loaded .gitignore patterns {"count":33,"patterns":["node_modules","npm-debug.log*","yarn-debug.log*","yarn-error.log*","dist","build","*.tsbuildinfo",".env",".env.local",".env.*.local",".vscode",".idea","*.swp","*.swo","*~",".DS_Store",".DS_Store?","._*",".Spotlight-V100",".Trashes","ehthumbs.db","Thumbs.db","coverage",".nyc_output","logs","*.log","debug-log*","debug.log*","pids","*.pid","*.seed",".claude/settings.local.json","temp"]}
+2025-06-20T03:02:59.008Z [DEBUG] Loaded .gitignore patterns {"count":33,"patterns":["node_modules","npm-debug.log*","yarn-debug.log*","yarn-error.log*","dist","build","*.tsbuildinfo",".env",".env.local",".env.*.local",".vscode",".idea","*.swp","*.swo","*~",".DS_Store",".DS_Store?","._*",".Spotlight-V100",".Trashes","ehthumbs.db","Thumbs.db","coverage",".nyc_output","logs","*.log","debug-log*","debug.log*","pids","*.pid","*.seed",".claude/settings.local.json","temp"]}
+2025-06-20T03:03:01.024Z [DEBUG] Loaded .gitignore patterns {"count":33,"patterns":["node_modules","npm-debug.log*","yarn-debug.log*","yarn-error.log*","dist","build","*.tsbuildinfo",".env",".env.local",".env.*.local",".vscode",".idea","*.swp","*.swo","*~",".DS_Store",".DS_Store?","._*",".Spotlight-V100",".Trashes","ehthumbs.db","Thumbs.db","coverage",".nyc_output","logs","*.log","debug-log*","debug.log*","pids","*.pid","*.seed",".claude/settings.local.json","temp"]}
+2025-06-20T03:36:07.194Z [INFO] Starting Lace Agent {"provider":"lmstudio","model":"mistralai/devstral-small-2505","logLevel":"debug"}
+2025-06-20T03:36:07.195Z [INFO] Lace configuration files {"systemPromptPath":"/Users/jesse/.lace/system-prompt.md","userInstructionsPath":"/Users/jesse/.lace/instructions.md","laceDir":"~/.lace"}
+2025-06-20T03:36:07.245Z [INFO] AGENT: Started {"threadId":"lace_20250620_ifgddh","provider":"lmstudio"}
+2025-06-20T03:37:09.217Z [INFO] Starting Lace Agent {"provider":"lmstudio","model":"mistralai/devstral-small-2505","logLevel":"debug"}
+2025-06-20T03:37:09.217Z [INFO] Lace configuration files {"systemPromptPath":"/Users/jesse/.lace/system-prompt.md","userInstructionsPath":"/Users/jesse/.lace/instructions.md","laceDir":"~/.lace"}
+2025-06-20T03:37:09.255Z [INFO] AGENT: Started {"threadId":"lace_20250620_tmcayg","provider":"lmstudio"}
+2025-06-20T03:38:22.019Z [INFO] Starting Lace Agent {"provider":"lmstudio","model":"mistralai/devstral-small-2505","logLevel":"debug"}
+2025-06-20T03:38:22.019Z [INFO] Lace configuration files {"systemPromptPath":"/Users/jesse/.lace/system-prompt.md","userInstructionsPath":"/Users/jesse/.lace/instructions.md","laceDir":"~/.lace"}
+2025-06-20T03:38:22.059Z [INFO] AGENT: Started {"threadId":"lace_20250620_chs7ho","provider":"lmstudio"}
+2025-06-20T03:39:04.548Z [INFO] Starting Lace Agent {"provider":"lmstudio","model":"mistralai/devstral-small-2505","logLevel":"debug"}
+2025-06-20T03:39:04.549Z [INFO] Lace configuration files {"systemPromptPath":"/Users/jesse/.lace/system-prompt.md","userInstructionsPath":"/Users/jesse/.lace/instructions.md","laceDir":"~/.lace"}
+2025-06-20T03:39:04.585Z [INFO] AGENT: Started {"threadId":"lace_20250620_r5jpge","provider":"lmstudio"}
+2025-06-20T03:39:43.512Z [INFO] Starting Lace Agent {"provider":"lmstudio","model":"mistralai/devstral-small-2505","logLevel":"debug"}
+2025-06-20T03:39:43.513Z [INFO] Lace configuration files {"systemPromptPath":"/Users/jesse/.lace/system-prompt.md","userInstructionsPath":"/Users/jesse/.lace/instructions.md","laceDir":"~/.lace"}
+2025-06-20T03:39:43.549Z [INFO] AGENT: Started {"threadId":"lace_20250620_zb3kzs","provider":"lmstudio"}
+2025-06-20T03:40:19.042Z [INFO] Starting Lace Agent {"provider":"lmstudio","model":"mistralai/devstral-small-2505","logLevel":"debug"}
+2025-06-20T03:40:19.042Z [INFO] Lace configuration files {"systemPromptPath":"/Users/jesse/.lace/system-prompt.md","userInstructionsPath":"/Users/jesse/.lace/instructions.md","laceDir":"~/.lace"}
+2025-06-20T03:40:19.081Z [INFO] AGENT: Started {"threadId":"lace_20250620_1nhsoa","provider":"lmstudio"}
+2025-06-20T03:41:03.747Z [INFO] Starting Lace Agent {"provider":"lmstudio","model":"mistralai/devstral-small-2505","logLevel":"debug"}
+2025-06-20T03:41:03.748Z [INFO] Lace configuration files {"systemPromptPath":"/Users/jesse/.lace/system-prompt.md","userInstructionsPath":"/Users/jesse/.lace/instructions.md","laceDir":"~/.lace"}
+2025-06-20T03:41:03.784Z [INFO] AGENT: Started {"threadId":"lace_20250620_1vecw3","provider":"lmstudio"}
+2025-06-20T03:43:32.325Z [INFO] Starting Lace Agent {"provider":"lmstudio","model":"mistralai/devstral-small-2505","logLevel":"debug"}
+2025-06-20T03:43:32.325Z [INFO] Lace configuration files {"systemPromptPath":"/Users/jesse/.lace/system-prompt.md","userInstructionsPath":"/Users/jesse/.lace/instructions.md","laceDir":"~/.lace"}
+2025-06-20T03:43:32.362Z [INFO] AGENT: Started {"threadId":"lace_20250620_3so7de","provider":"lmstudio"}
+2025-06-20T03:57:49.667Z [INFO] Starting Lace Agent {"provider":"lmstudio","model":"mistralai/devstral-small-2505","logLevel":"debug"}
+2025-06-20T03:57:49.668Z [INFO] Lace configuration files {"systemPromptPath":"/Users/jesse/.lace/system-prompt.md","userInstructionsPath":"/Users/jesse/.lace/instructions.md","laceDir":"~/.lace"}
+2025-06-20T03:57:49.713Z [INFO] AGENT: Started {"threadId":"lace_20250620_t598c6","provider":"lmstudio"}

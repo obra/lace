@@ -10,10 +10,10 @@ import type { Agent } from '../agents/agent.js';
 export interface UserInterface {
   // Core state - agent contains threadManager and toolExecutor
   agent: Agent;
-  
+
   // Simple command interface
   displayMessage(message: string): void;
-  clearSession(): void;  // Recreate agent + thread
+  clearSession(): void; // Recreate agent + thread
   exit(): void;
 }
 

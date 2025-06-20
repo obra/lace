@@ -9,7 +9,7 @@ import type { Command } from './types.js';
 /**
  * Check if an export is a valid Command
  */
-function isValidCommand(obj: any): obj is Command {
+function isValidCommand(obj: unknown): obj is Command {
   return (
     obj &&
     typeof obj === 'object' &&
@@ -26,19 +26,19 @@ function isValidCommand(obj: any): obj is Command {
 export class CommandRegistry {
   private commands = new Map<string, Command>();
   private aliases = new Map<string, string>();
-  
+
   /**
    * Register a command and its aliases
    */
   register(command: Command): void {
     this.commands.set(command.name, command);
-    
+
     // Register aliases
-    command.aliases?.forEach(alias => {
+    command.aliases?.forEach((alias) => {
       this.aliases.set(alias, command.name);
     });
   }
-  
+
   /**
    * Get a command by name or alias
    */
@@ -46,7 +46,7 @@ export class CommandRegistry {
     const commandName = this.aliases.get(name) || name;
     return this.commands.get(commandName);
   }
-  
+
   /**
    * Get all registered commands
    */
@@ -60,27 +60,28 @@ export class CommandRegistry {
   static async createWithAutoDiscovery(): Promise<CommandRegistry> {
     const registry = new CommandRegistry();
 
-    // Get the directory path for the commands/system folder
+    // Get the directory path for the commands folder
     const currentFile = fileURLToPath(import.meta.url);
     const commandsDir = dirname(currentFile);
     const systemDir = `${commandsDir}/system`;
 
-    // Find all command files
+    // Find all command files matching *.js pattern
     const commandFiles = await glob('*.js', {
       cwd: systemDir.replace('/src/', '/dist/'),
       absolute: true,
     });
 
-    // Also check for TypeScript files in development
+    // Also check for TypeScript files in development (exclude .d.ts files)
     const tsCommandFiles = await glob('*.ts', {
       cwd: systemDir,
       absolute: true,
+      ignore: ['**/*.d.ts'],
     });
 
     // Use TS files if available (development), otherwise use JS files (production)
     const filesToProcess = tsCommandFiles.length > 0 ? tsCommandFiles : commandFiles;
 
-    let helpCommandFactory: ((registry: CommandRegistry) => any) | null = null;
+    let helpCommandFactory: ((registry: CommandRegistry) => Command) | null = null;
 
     // First pass: register all direct command exports
     for (const file of filesToProcess) {
@@ -93,11 +94,14 @@ export class CommandRegistry {
             registry.register(exportedValue);
           } else if (exportName === 'createHelpCommand' && typeof exportedValue === 'function') {
             // Store help command factory for later
-            helpCommandFactory = exportedValue as (registry: CommandRegistry) => any;
+            helpCommandFactory = exportedValue as (registry: CommandRegistry) => Command;
           }
         }
       } catch (error) {
-        console.warn(`Warning: Failed to load command from ${file}:`, error instanceof Error ? error.message : String(error));
+        console.warn(
+          `Warning: Failed to load command from ${file}:`,
+          error instanceof Error ? error.message : String(error)
+        );
       }
     }
 
@@ -107,7 +111,10 @@ export class CommandRegistry {
         const helpCommand = helpCommandFactory(registry);
         registry.register(helpCommand);
       } catch (error) {
-        console.warn(`Warning: Failed to create help command:`, error instanceof Error ? error.message : String(error));
+        console.warn(
+          `Warning: Failed to create help command:`,
+          error instanceof Error ? error.message : String(error)
+        );
       }
     }
 

@@ -1,7 +1,7 @@
 // ABOUTME: Unit tests for CommandRegistry with auto-discovery and lookup functionality
 // ABOUTME: Tests command registration, alias resolution, and auto-discovery patterns
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { CommandRegistry } from '../registry.js';
 import type { Command } from '../types.js';
 
@@ -17,7 +17,7 @@ describe('CommandRegistry', () => {
       const testCommand: Command = {
         name: 'test',
         description: 'Test command',
-        async execute() {}
+        async execute() {},
       };
 
       registry.register(testCommand);
@@ -36,7 +36,7 @@ describe('CommandRegistry', () => {
         name: 'test',
         description: 'Test command',
         aliases: ['t', 'testing'],
-        async execute() {}
+        async execute() {},
       };
 
       registry.register(testCommand);
@@ -50,7 +50,7 @@ describe('CommandRegistry', () => {
       const testCommand: Command = {
         name: 'simple',
         description: 'Simple command',
-        async execute() {}
+        async execute() {},
       };
 
       registry.register(testCommand);
@@ -68,13 +68,13 @@ describe('CommandRegistry', () => {
       const command1: Command = {
         name: 'cmd1',
         description: 'Command 1',
-        async execute() {}
+        async execute() {},
       };
 
       const command2: Command = {
         name: 'cmd2',
         description: 'Command 2',
-        async execute() {}
+        async execute() {},
       };
 
       registry.register(command1);
@@ -91,7 +91,7 @@ describe('CommandRegistry', () => {
         name: 'test',
         description: 'Test command',
         aliases: ['t'],
-        async execute() {}
+        async execute() {},
       };
 
       registry.register(command);
@@ -104,11 +104,6 @@ describe('CommandRegistry', () => {
 
   describe('auto-discovery', () => {
     it('should create registry with auto-discovery', async () => {
-      // Mock glob to return our test files
-      const globMock = vi.doMock('glob', () => ({
-        glob: vi.fn().mockResolvedValue([])
-      }));
-
       const registry = await CommandRegistry.createWithAutoDiscovery();
       expect(registry).toBeInstanceOf(CommandRegistry);
     });
@@ -117,7 +112,7 @@ describe('CommandRegistry', () => {
       // This test verifies the registry still works even if some command files fail to load
       const registry = await CommandRegistry.createWithAutoDiscovery();
       expect(registry).toBeInstanceOf(CommandRegistry);
-      
+
       // Should have at least some commands loaded (the actual system commands)
       const commands = registry.getAllCommands();
       expect(commands.length).toBeGreaterThan(0);
@@ -129,13 +124,13 @@ describe('CommandRegistry', () => {
       const command1: Command = {
         name: 'test',
         description: 'First test command',
-        async execute() {}
+        async execute() {},
       };
 
       const command2: Command = {
         name: 'test',
         description: 'Second test command',
-        async execute() {}
+        async execute() {},
       };
 
       registry.register(command1);
@@ -149,14 +144,14 @@ describe('CommandRegistry', () => {
         name: 'test1',
         description: 'Test command 1',
         aliases: ['t'],
-        async execute() {}
+        async execute() {},
       };
 
       const command2: Command = {
-        name: 'test2', 
+        name: 'test2',
         description: 'Test command 2',
         aliases: ['t'], // Same alias
-        async execute() {}
+        async execute() {},
       };
 
       registry.register(command1);
@@ -171,7 +166,7 @@ describe('CommandRegistry', () => {
         name: 'test',
         description: 'Test command',
         aliases: [],
-        async execute() {}
+        async execute() {},
       };
 
       registry.register(command);
