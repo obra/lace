@@ -30,10 +30,10 @@ interface CodeDisplayProps {
 export function CodeDisplay({ code, language = 'text', compact = false }: CodeDisplayProps) {
   // Format JSON if it's JSON and not compact
   let displayCode = code;
-  if (language === 'json' && !compact) {
+  if (language === 'json') {
     try {
       const parsed = JSON.parse(code);
-      displayCode = JSON.stringify(parsed, null, 2);
+      displayCode = JSON.stringify(parsed, null, compact ? 0 : 2);
     } catch {
       // Keep original if not valid JSON
     }
