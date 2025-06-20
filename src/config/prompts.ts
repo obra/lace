@@ -1,9 +1,12 @@
 // ABOUTME: Configuration management for system and user prompts
 // ABOUTME: Handles reading/writing prompt files from LACE_DIR with auto-creation and defaults
+// ABOUTME: Supports both template-based prompts and simple markdown files for backward compatibility
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { getLaceDir, ensureLaceDir } from './lace-dir.js';
+import { PromptManager, PromptManagerConfig } from './prompt-manager.js';
+import { logger } from '../utils/logger.js';
 
 export interface PromptConfig {
   systemPrompt: string;
@@ -49,17 +52,65 @@ function readPromptFile(
 /**
  * Load the system prompt and user instructions from configuration files
  * Auto-creates files with defaults if they don't exist
+ * Enhanced version that supports both template system and legacy files
  */
-export function loadPromptConfig(): PromptConfig {
+export function loadPromptConfig(config?: PromptManagerConfig): PromptConfig {
   const laceDir = ensureLaceDir();
+  const filesCreated: string[] = [];
 
+  try {
+    // Try template-based system first
+    const promptManager = new PromptManager(config);
+    
+    // Check if template system should be used
+    const templateDir = path.join(laceDir, 'prompts');
+    const hasTemplateSystem = fs.existsSync(path.join(templateDir, 'system.md'));
+    
+    if (hasTemplateSystem) {
+      logger.debug('Using template-based prompt system');
+      
+      const systemPrompt = promptManager.generateSystemPrompt();
+      const userInstructions = promptManager.generateUserInstructions();
+      
+      return {
+        systemPrompt,
+        userInstructions,
+        filesCreated, // Templates create their own files as needed
+      };
+    }
+
+    // Check if user wants to initialize template system
+    const shouldCreateTemplates = config && (config.tools || config.model);
+    if (shouldCreateTemplates) {
+      logger.info('Creating default template system');
+      const templateFiles = promptManager.createDefaultTemplates();
+      filesCreated.push(...templateFiles);
+      
+      const systemPrompt = promptManager.generateSystemPrompt();
+      const userInstructions = promptManager.generateUserInstructions();
+      
+      return {
+        systemPrompt,
+        userInstructions,
+        filesCreated,
+      };
+    }
+
+  } catch (error) {
+    logger.error('Template system failed, falling back to legacy system', { 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+  }
+
+  // Fallback to legacy simple file system
+  logger.debug('Using legacy prompt system');
+  
   const systemPromptPath = path.join(laceDir, 'system-prompt.md');
   const userInstructionsPath = path.join(laceDir, 'instructions.md');
 
   const systemPromptResult = readPromptFile(systemPromptPath, DEFAULT_SYSTEM_PROMPT);
   const userInstructionsResult = readPromptFile(userInstructionsPath, DEFAULT_USER_INSTRUCTIONS);
 
-  const filesCreated: string[] = [];
   if (systemPromptResult.wasCreated) {
     filesCreated.push(systemPromptPath);
   }

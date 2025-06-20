@@ -55,6 +55,41 @@ describe('Prompt Configuration', () => {
       expect(fs.existsSync(instructionsPath)).toBe(true);
     });
 
+    it('should use template system when tools or model config provided', () => {
+      const tools = [{ name: 'bash', description: 'Execute shell commands' }];
+      const model = { id: 'claude-3', provider: 'anthropic' };
+      
+      const config = loadPromptConfig({ tools, model });
+
+      // Should create template files
+      expect(config.filesCreated.length).toBeGreaterThan(2);
+      
+      // Should include template-generated content
+      expect(config.systemPrompt).toContain('coding assistant');
+      expect(config.systemPrompt).toContain('conversation start');
+      
+      // Verify template structure was created
+      const templateDir = path.join(tempDir, 'prompts');
+      expect(fs.existsSync(templateDir)).toBe(true);
+      expect(fs.existsSync(path.join(templateDir, 'system.md'))).toBe(true);
+      expect(fs.existsSync(path.join(templateDir, 'sections'))).toBe(true);
+    });
+
+    it('should use existing template system when system.md exists', () => {
+      // Create template system first
+      const promptsDir = path.join(tempDir, 'prompts');
+      fs.mkdirSync(promptsDir);
+      
+      const systemTemplate = path.join(promptsDir, 'system.md');
+      fs.writeFileSync(systemTemplate, 'Custom template with {{system.os}}');
+      
+      const config = loadPromptConfig();
+      
+      expect(config.systemPrompt).toContain('Custom template with');
+      expect(config.systemPrompt).toContain(os.platform());
+      expect(config.filesCreated).toHaveLength(0); // No new files created
+    });
+
     it('should read existing files without creating new ones', () => {
       // Pre-create files with custom content
       const systemPromptPath = path.join(tempDir, 'system-prompt.md');
