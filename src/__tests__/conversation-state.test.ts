@@ -88,7 +88,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
       await agent.sendMessage(turns[i]);
 
       const events = threadManager.getEvents(threadId);
-      const conversation = threadManager.buildConversation(threadId);
+      const conversation = agent.buildThreadMessages();
 
       if (process.env.VITEST_VERBOSE) {
         console.log(
@@ -113,7 +113,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
     }
 
     // Final verification of conversation history preservation
-    const finalConversation = threadManager.buildConversation(threadId);
+    const finalConversation = agent.buildThreadMessages();
     const fullConversationText = finalConversation.map((msg) => msg.content).join(' ');
     expect(fullConversationText).toContain('List the files');
     expect(fullConversationText).toContain('programming language');
@@ -137,12 +137,13 @@ describe('Conversation State Management with Enhanced Agent', () => {
       'TOOL_CALL',
       'TOOL_RESULT',
       'LOCAL_SYSTEM_MESSAGE',
+      'THINKING',
     ];
     const allEventsValid = events.every((e) => validEventTypes.includes(e.type));
     expect(allEventsValid).toBe(true);
 
     // Conversation building should work normally
-    const conversation = threadManager.buildConversation(threadId);
+    const conversation = agent.buildThreadMessages();
     expect(conversation.length).toBeGreaterThan(0);
   }, 10000);
 

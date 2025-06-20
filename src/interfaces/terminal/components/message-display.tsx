@@ -76,12 +76,24 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
   // Get message prefix
   const getMessagePrefix = (type: string) => {
     switch (type) {
-      case "user": return "👤 ";
-      case "assistant": return "🤖 ";
+      case "user": return "> ";
+      case "assistant": return "❦ ";
       case "thinking": return "💭 ";
       case "tool": return "🔧 ";
       case "system": return "ℹ️  ";
       default: return "";
+    }
+  };
+
+  // Get prefix color
+  const getPrefixColor = (type: string) => {
+    switch (type) {
+      case "user": return "dim";
+      case "assistant": return "green";
+      case "thinking": return "gray";
+      case "tool": return "yellow";
+      case "system": return "gray";
+      default: return "white";
     }
   };
 
@@ -97,29 +109,17 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
   const contentParts = parseContent(displayContent);
   const messageColor = getMessageColor(message.type);
   const prefix = getMessagePrefix(message.type);
+  const prefixColor = getPrefixColor(message.type);
 
   return (
     <Box flexDirection="column" marginBottom={1}>
-      {/* Message header with type indicator and timestamp */}
-      <Box>
-        <Text color={messageColor} bold>
-          {prefix}
-          {message.type.charAt(0).toUpperCase() + message.type.slice(1)}
-        </Text>
-        <Text color="dim" dimColor>
-          {' '}({message.timestamp.toLocaleTimeString()})
-        </Text>
-        {shouldShowCollapse && (
-          <Text color="dim"> 
-            {isCollapsed ? ' [+]' : ' [-]'}
-          </Text>
-        )}
-      </Box>
-
-      {/* Message content with syntax highlighting */}
-      <Box flexDirection="column" paddingLeft={2}>
+      {/* Inline prefix with content */}
+      <Box flexDirection="column">
         {message.type === "thinking" ? (
-          <Text italic color={messageColor}>{displayContent}</Text>
+          <Box>
+            <Text color={prefixColor}>{prefix}</Text>
+            <Text italic color={messageColor}>{displayContent}</Text>
+          </Box>
         ) : (
           contentParts.map((part, index) => (
             <Box key={index} flexDirection="column">
@@ -141,12 +141,22 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
                   </Text>
                 </Box>
               ) : (
-                <Text color={messageColor} wrap="wrap">
-                  {part.content}
-                  {isStreaming && index === contentParts.length - 1 && showCursor && (
-                    <Text inverse> </Text>
+                <Box>
+                  {index === 0 && (
+                    <Text color={prefixColor}>{prefix}</Text>
                   )}
-                </Text>
+                  <Text color={messageColor} wrap="wrap">
+                    {part.content}
+                    {isStreaming && index === contentParts.length - 1 && showCursor && (
+                      <Text inverse> </Text>
+                    )}
+                  </Text>
+                  {shouldShowCollapse && index === 0 && (
+                    <Text color="dim"> 
+                      {isCollapsed ? ' [+]' : ' [-]'}
+                    </Text>
+                  )}
+                </Box>
               )}
             </Box>
           ))

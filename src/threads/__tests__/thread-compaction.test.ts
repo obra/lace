@@ -89,11 +89,12 @@ describe('Thread Compaction', () => {
 
     threadManager.compact(threadId); // Adds system message
 
-    const conversation = threadManager.buildConversation(threadId);
+    const events = threadManager.getEvents(threadId);
 
-    // Should only have user message and tool result, no system message
-    expect(conversation.length).toBe(2); // user message + tool result message
-    expect(conversation.some((msg) => msg.content?.includes('Compacted'))).toBe(false);
+    // Should have added a LOCAL_SYSTEM_MESSAGE about compaction
+    const compactionMessage = events.find((e) => e.type === 'LOCAL_SYSTEM_MESSAGE');
+    expect(compactionMessage).toBeDefined();
+    expect(compactionMessage?.data).toContain('Compacted');
   });
 
   it('should handle multiple tool results', () => {

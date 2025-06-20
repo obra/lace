@@ -23,6 +23,7 @@
     "@lmstudio/sdk": "^1.2.1",
     "@types/glob": "^8.1.0",
     "@types/react": "^19.1.8",
+    "@types/sax": "^1.2.7",
     "better-sqlite3": "^11.10.0",
     "cli-highlight": "^2.1.11",
     "commander": "^14.0.0",
@@ -36,7 +37,8 @@
     "openai": "^4.77.0",
     "pino": "^9.7.0",
     "pino-pretty": "^13.0.0",
-    "react": "^19.1.0"
+    "react": "^19.1.0",
+    "sax": "^1.4.1"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.0",

@@ -213,12 +213,15 @@ describe('Enhanced Agent', () => {
 
       await agent.sendMessage('Test');
 
-      expect(thinkingComplete).toHaveBeenCalledWith({
-        content: '<think>I need to process this</think>This is my response',
-      });
+      expect(thinkingComplete).toHaveBeenCalled();
       expect(responseComplete).toHaveBeenCalledWith({
         content: 'This is my response',
       });
+
+      // Verify that raw content (with thinking blocks) is stored in thread for model context
+      const events = threadManager.getEvents(threadId);
+      const agentMessage = events.find((e) => e.type === 'AGENT_MESSAGE');
+      expect(agentMessage?.data).toBe('<think>I need to process this</think>This is my response');
     });
 
     it('should handle empty message correctly', async () => {
@@ -478,7 +481,7 @@ describe('Enhanced Agent', () => {
       await agent.sendMessage('First message');
       await agent.sendMessage('Second message');
 
-      const history = threadManager.buildConversation(threadId);
+      const history = agent.buildThreadMessages();
 
       expect(history.length).toBeGreaterThanOrEqual(4); // 2 user + 2 agent messages minimum
 
@@ -489,12 +492,72 @@ describe('Enhanced Agent', () => {
     });
 
     it('should return current conversation state', async () => {
-      const historyBefore = threadManager.buildConversation(threadId);
+      const historyBefore = agent.buildThreadMessages();
 
       await agent.sendMessage('Test message');
 
-      const historyAfter = threadManager.buildConversation(threadId);
+      const historyAfter = agent.buildThreadMessages();
       expect(historyAfter.length).toBeGreaterThan(historyBefore.length);
+    });
+
+    it('should ignore THINKING events in conversation for model context', () => {
+      // Add THINKING event directly to thread
+      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test question');
+      threadManager.addEvent(threadId, 'THINKING', 'I need to think about this...');
+      threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Here is my response');
+
+      const history = agent.buildThreadMessages();
+
+      // Should only have user and agent messages, no THINKING
+      expect(history).toHaveLength(2);
+      expect(history[0].role).toBe('user');
+      expect(history[0].content).toBe('Test question');
+      expect(history[1].role).toBe('assistant');
+      expect(history[1].content).toBe('Here is my response');
+    });
+
+    it('should ignore LOCAL_SYSTEM_MESSAGE events in conversation', () => {
+      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test');
+      threadManager.addEvent(threadId, 'LOCAL_SYSTEM_MESSAGE', 'System info message');
+      threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Response');
+
+      const history = agent.buildThreadMessages();
+
+      // Should only have user and agent messages, no LOCAL_SYSTEM_MESSAGE
+      expect(history).toHaveLength(2);
+      expect(history[0].content).toBe('Test');
+      expect(history[1].content).toBe('Response');
+    });
+
+    it('should handle orphaned tool results gracefully', () => {
+      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test');
+      threadManager.addEvent(threadId, 'TOOL_RESULT', {
+        callId: 'missing-call-id',
+        output: 'Some output',
+        success: true,
+      });
+
+      // Should not throw error
+      const history = agent.buildThreadMessages();
+      expect(history).toHaveLength(2); // user message + tool result as user message
+      expect(history[1].role).toBe('user');
+      expect(history[1].toolResults).toBeDefined();
+    });
+
+    it('should handle orphaned tool calls gracefully', () => {
+      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test');
+      threadManager.addEvent(threadId, 'TOOL_CALL', {
+        toolName: 'bash',
+        input: { command: 'ls' },
+        callId: 'orphaned-call',
+      });
+
+      // Should not throw error
+      const history = agent.buildThreadMessages();
+      expect(history).toHaveLength(2); // user message + tool call as assistant message
+      expect(history[1].role).toBe('assistant');
+      expect(history[1].toolCalls).toBeDefined();
+      expect(history[1].toolCalls).toHaveLength(1);
     });
   });
 

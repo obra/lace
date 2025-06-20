@@ -89,21 +89,9 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       });
     };
 
-    // Handle agent thinking
-    const handleThinkingComplete = ({ content }: { content: string }) => {
-      const thinkMatches = content.match(/<think>[\s\S]*?<\/think>/g);
-      if (thinkMatches) {
-        thinkMatches.forEach((thinkBlock) => {
-          const thinkContent = thinkBlock.replace(/<\/?think>/g, "").trim();
-          if (thinkContent) {
-            addMessage({
-              type: "thinking",
-              content: thinkContent,
-              timestamp: new Date(),
-            });
-          }
-        });
-      }
+    // Handle agent thinking complete
+    const handleThinkingComplete = () => {
+      // Thinking indicator can be hidden - thinking content is handled via THINKING ThreadEvents
     };
 
     // Handle agent response complete

@@ -51,18 +51,20 @@ const parseContent = (content: string) => {
 
 export function AgentMessageDisplay({ event, isStreaming }: AgentMessageDisplayProps) {
   const message = event.data as string;
-  const contentParts = parseContent(message);
+  
+  // Strip thinking blocks since they're displayed separately as ephemeral messages
+  const messageWithoutThinking = message.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  
+  // Don't render if message is empty after stripping thinking blocks
+  if (!messageWithoutThinking) {
+    return null;
+  }
+  
+  const contentParts = parseContent(messageWithoutThinking);
   
   return (
     <Box flexDirection="column" marginBottom={1}>
-      <Box>
-        <Text color="white" bold>🤖 Assistant</Text>
-        <Text color="dim" dimColor>
-          {' '}({event.timestamp.toLocaleTimeString()})
-        </Text>
-        {isStreaming && <Text color="gray"> (thinking...)</Text>}
-      </Box>
-      <Box flexDirection="column" paddingLeft={2}>
+      <Box flexDirection="column">
         {contentParts.map((part, index) => (
           <Box key={index} flexDirection="column">
             {part.type === 'code' ? (
@@ -81,9 +83,15 @@ export function AgentMessageDisplay({ event, isStreaming }: AgentMessageDisplayP
                 <CodeDisplay code={part.content} language={part.language} />
               </Box>
             ) : (
-              <Text color="white" wrap="wrap">
-                {part.content}
-              </Text>
+              <Box>
+                {index === 0 && (
+                  <Text color="green">{'❦ '}</Text>
+                )}
+                <Text color="white" wrap="wrap">
+                  {part.content}
+                </Text>
+                {index === 0 && isStreaming && <Text color="gray"> (thinking...)</Text>}
+              </Box>
             )}
           </Box>
         ))}

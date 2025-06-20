@@ -9,6 +9,7 @@ import { ToolResultDisplay } from './ToolResultDisplay.js';
 import { UserMessageDisplay } from './UserMessageDisplay.js';
 import { AgentMessageDisplay } from './AgentMessageDisplay.js';
 import { SystemMessageDisplay } from './SystemMessageDisplay.js';
+import { ThinkingDisplay } from './ThinkingDisplay.js';
 
 interface EventDisplayProps {
   event: ThreadEvent;
@@ -22,6 +23,7 @@ export function EventDisplay({ event, isStreaming }: EventDisplayProps) {
     'USER_MESSAGE': UserMessageDisplay,
     'AGENT_MESSAGE': AgentMessageDisplay,
     'LOCAL_SYSTEM_MESSAGE': SystemMessageDisplay,
+    'THINKING': ThinkingDisplay,
   } as const;
 
   const Component = componentMap[event.type];

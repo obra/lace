@@ -2,14 +2,22 @@
 // ABOUTME: Core conversation engine that emits events instead of direct I/O for multiple interface support
 
 import { EventEmitter } from 'events';
-import { AIProvider, ProviderMessage } from '../providers/types.js';
+import {
+  AIProvider,
+  ProviderMessage,
+  ProviderToolCall,
+  ProviderToolResult,
+} from '../providers/types.js';
 import { Tool, ToolResult } from '../tools/types.js';
 import { ToolExecutor } from '../tools/executor.js';
+import { ApprovalDecision } from '../tools/approval-types.js';
 import { ThreadManager } from '../threads/thread-manager.js';
+import { ThreadEvent, ToolCallData, ToolResultData } from '../threads/types.js';
 import { logger } from '../utils/logger.js';
 import { StopReasonHandler } from '../token-management/stop-reason-handler.js';
 import { TokenBudgetManager } from '../token-management/token-budget-manager.js';
 import { TokenBudgetConfig } from '../token-management/types.js';
+import sax from 'sax';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -37,7 +45,7 @@ export type AgentState = 'idle' | 'thinking' | 'tool_execution' | 'streaming';
 export interface AgentEvents {
   agent_thinking_start: [];
   agent_token: [{ token: string }];
-  agent_thinking_complete: [{ content: string }];
+  agent_thinking_complete: [];
   agent_response_complete: [{ content: string }];
   tool_call_start: [{ toolName: string; input: Record<string, unknown>; callId: string }];
   tool_call_complete: [{ toolName: string; result: ToolResult; callId: string }];
@@ -52,7 +60,7 @@ export interface AgentEvents {
       input: unknown;
       isReadOnly: boolean;
       requestId: string;
-      resolve: (decision: any) => void;
+      resolve: (decision: ApprovalDecision) => void;
     },
   ];
 }
@@ -176,11 +184,17 @@ export class Agent extends EventEmitter {
     this._tokenBudgetManager?.reset();
   }
 
+  // Thread message processing for agent-facing conversation
+  buildThreadMessages(): ProviderMessage[] {
+    const events = this._threadManager.getEvents(this._threadId);
+    return this._buildConversationFromEvents(events);
+  }
+
   // Private implementation methods
   private async _processConversation(): Promise<void> {
     try {
       // Rebuild conversation from thread events
-      const conversation = this._threadManager.buildConversation(this._threadId);
+      const conversation = this.buildThreadMessages();
 
       logger.debug('AGENT: Requesting response from provider', {
         threadId: this._threadId,
@@ -250,18 +264,15 @@ export class Agent extends EventEmitter {
 
       // Process agent response
       if (response.content) {
-        // Extract think blocks and regular content
-        const cleanedContent = response.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-
-        // Add agent message to thread
+        // Store raw content (with thinking blocks) for model context
         this._threadManager.addEvent(this._threadId, 'AGENT_MESSAGE', response.content);
 
-        this.emit('agent_thinking_complete', { content: response.content });
+        // Extract clean content for UI display and events
+        const cleanedContent = response.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 
-        // Emit cleaned response if there's meaningful content
-        if (cleanedContent && cleanedContent.length > 0) {
-          this.emit('agent_response_complete', { content: cleanedContent });
-        }
+        // Emit thinking complete and response complete
+        this.emit('agent_thinking_complete');
+        this.emit('agent_response_complete', { content: cleanedContent });
       }
 
       // Handle tool calls
@@ -312,8 +323,38 @@ export class Agent extends EventEmitter {
     // Set to streaming state
     this._setState('streaming');
 
+    // Set up streaming thinking block parser
+    const parser = sax.createStream(false, { lowercase: true });
+    let insideThinkTag = false;
+    let thinkContent = '';
+
+    parser.on('opentagstart', (tag) => {
+      if (tag.name === 'think') {
+        insideThinkTag = true;
+        thinkContent = '';
+      }
+    });
+
+    parser.on('text', (text) => {
+      if (insideThinkTag) {
+        thinkContent += text;
+      }
+    });
+
+    parser.on('closetag', (tagName) => {
+      if (tagName === 'think' && thinkContent.trim()) {
+        // Add completed thinking block to thread
+        this._threadManager.addEvent(this._threadId, 'THINKING', thinkContent.trim());
+        insideThinkTag = false;
+        thinkContent = '';
+      }
+    });
+
     // Set up provider event listeners
     const tokenListener = ({ token }: { token: string }) => {
+      // Feed token to thinking parser
+      parser.write(token);
+
       this.emit('agent_token', { token });
     };
 
@@ -514,6 +555,133 @@ export class Agent extends EventEmitter {
         to: newState,
       });
     }
+  }
+
+  // Agent-specific conversation building (preserves thinking blocks for model context)
+  private _buildConversationFromEvents(events: ThreadEvent[]): ProviderMessage[] {
+    const messages: ProviderMessage[] = [];
+
+    // Track which events have been processed to avoid duplicates
+    const processedEventIndices = new Set<number>();
+
+    for (let i = 0; i < events.length; i++) {
+      if (processedEventIndices.has(i)) {
+        continue;
+      }
+
+      const event = events[i];
+      if (event.type === 'USER_MESSAGE') {
+        messages.push({
+          role: 'user',
+          content: event.data as string,
+        });
+      } else if (event.type === 'AGENT_MESSAGE') {
+        // Look ahead to see if there are immediate tool calls after this message
+        const toolCallsForThisMessage: ProviderToolCall[] = [];
+
+        // Find tool calls that should be grouped with this agent message
+        let nextIndex = i + 1;
+        while (nextIndex < events.length) {
+          const nextEvent = events[nextIndex];
+
+          // If we hit another AGENT_MESSAGE or USER_MESSAGE, stop looking
+          if (nextEvent.type === 'AGENT_MESSAGE' || nextEvent.type === 'USER_MESSAGE') {
+            break;
+          }
+
+          // If we find a TOOL_CALL, it belongs to this agent message
+          if (nextEvent.type === 'TOOL_CALL') {
+            const toolCall = nextEvent.data as ToolCallData;
+            toolCallsForThisMessage.push({
+              id: toolCall.callId,
+              name: toolCall.toolName,
+              input: toolCall.input,
+            });
+            processedEventIndices.add(nextIndex); // Mark as processed
+          }
+
+          nextIndex++;
+        }
+
+        // Create the assistant message with tool calls if any
+        // IMPORTANT: Keep raw content (including thinking blocks) for model context
+        const message: ProviderMessage = {
+          role: 'assistant',
+          content: event.data as string,
+        };
+
+        if (toolCallsForThisMessage.length > 0) {
+          message.toolCalls = toolCallsForThisMessage;
+        }
+
+        messages.push(message);
+      } else if (event.type === 'TOOL_CALL') {
+        // If we reach here, it's an orphaned tool call (no preceding AGENT_MESSAGE)
+        const toolCall = event.data as ToolCallData;
+
+        // Create an assistant message with just the tool call
+        messages.push({
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            {
+              id: toolCall.callId,
+              name: toolCall.toolName,
+              input: toolCall.input,
+            },
+          ],
+        });
+      } else if (event.type === 'TOOL_RESULT') {
+        const toolResult = event.data as ToolResultData;
+
+        // Look ahead to see if there are more tool results to group together
+        const toolResultsForThisMessage: ProviderToolResult[] = [];
+
+        // Add this tool result
+        toolResultsForThisMessage.push({
+          id: toolResult.callId,
+          output: toolResult.output || '',
+          success: toolResult.success,
+          error: toolResult.error,
+        });
+
+        // Look for consecutive tool results
+        let nextIndex = i + 1;
+        while (nextIndex < events.length) {
+          const nextEvent = events[nextIndex];
+
+          // If we hit a non-TOOL_RESULT event, stop looking
+          if (nextEvent.type !== 'TOOL_RESULT') {
+            break;
+          }
+
+          const nextToolResult = nextEvent.data as ToolResultData;
+          toolResultsForThisMessage.push({
+            id: nextToolResult.callId,
+            output: nextToolResult.output || '',
+            success: nextToolResult.success,
+            error: nextToolResult.error,
+          });
+
+          processedEventIndices.add(nextIndex); // Mark as processed
+          nextIndex++;
+        }
+
+        // Create user message with tool results
+        messages.push({
+          role: 'user',
+          content: '', // No text content for pure tool results
+          toolResults: toolResultsForThisMessage,
+        });
+      } else if (event.type === 'LOCAL_SYSTEM_MESSAGE' || event.type === 'THINKING') {
+        // Skip local system messages and thinking events - they're not sent to model
+        continue;
+      } else {
+        throw new Error(`Unknown event type: ${event.type}`);
+      }
+    }
+
+    return messages;
   }
 
   // Override emit to provide type safety

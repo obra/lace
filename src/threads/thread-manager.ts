@@ -3,8 +3,6 @@
 
 import { ThreadPersistence } from './persistence.js';
 import { Thread, ThreadEvent, EventType, ToolCallData, ToolResultData } from './types.js';
-import { buildConversationFromEvents } from './conversation-builder.js';
-import { ProviderMessage } from '../providers/types.js';
 import { logger } from '../utils/logger.js';
 
 export interface ThreadSessionInfo {
@@ -114,11 +112,6 @@ export class ThreadManager {
   getEvents(threadId: string): ThreadEvent[] {
     const thread = this.getThread(threadId);
     return thread?.events || [];
-  }
-
-  buildConversation(threadId: string): ProviderMessage[] {
-    const events = this.getEvents(threadId);
-    return buildConversationFromEvents(events);
   }
 
   compact(threadId: string): void {
