@@ -38,7 +38,8 @@ describe('ShellInput Component', () => {
   const defaultBufferState = {
     lines: [''],
     cursorLine: 0,
-    cursorColumn: 0
+    cursorColumn: 0,
+    preferredColumn: 0
   };
 
   const defaultBufferOps = {
@@ -50,7 +51,8 @@ describe('ShellInput Component', () => {
     moveCursor: vi.fn(),
     killLine: vi.fn(),
     killLineBackward: vi.fn(),
-    getCurrentLine: vi.fn(() => '')
+    getCurrentLine: vi.fn(() => ''),
+    pasteFromClipboard: vi.fn(() => Promise.resolve())
   };
 
   beforeEach(() => {
@@ -93,7 +95,8 @@ describe('ShellInput Component', () => {
         {
           lines: ['Hello world'],
           cursorLine: 0,
-          cursorColumn: 11
+          cursorColumn: 11,
+          preferredColumn: 0
         },
         {
           ...defaultBufferOps,
@@ -147,7 +150,8 @@ describe('ShellInput Component', () => {
         {
           lines: ['Line 1', 'Line 2', 'Line 3'],
           cursorLine: 1,
-          cursorColumn: 3
+          cursorColumn: 3,
+          preferredColumn: 0
         },
         {
           ...defaultBufferOps,
@@ -174,7 +178,8 @@ describe('ShellInput Component', () => {
         {
           lines: ['Changed text'],
           cursorLine: 0,
-          cursorColumn: 12
+          cursorColumn: 12,
+          preferredColumn: 0
         },
         {
           ...defaultBufferOps,
@@ -289,7 +294,8 @@ describe('ShellInput Component', () => {
         {
           lines: ['Buffer content'],
           cursorLine: 0,
-          cursorColumn: 5
+          cursorColumn: 5,
+          preferredColumn: 0
         },
         {
           ...defaultBufferOps,
@@ -371,7 +377,8 @@ describe('ShellInput Component', () => {
         {
           lines: ['Some text content'],
           cursorLine: 0,
-          cursorColumn: 17
+          cursorColumn: 17,
+          preferredColumn: 0
         },
         {
           ...defaultBufferOps,
