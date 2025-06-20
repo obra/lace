@@ -4,10 +4,19 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent, ToolResultData } from '../../../../threads/types.js';
+import { CodeDisplay } from '../ui/CodeDisplay.js';
 
 interface ToolResultDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
+}
+
+function isJsonOutput(output: string): boolean {
+  if (!output || typeof output !== 'string') return false;
+  
+  const trimmed = output.trim();
+  return (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+         (trimmed.startsWith('[') && trimmed.endsWith(']'));
 }
 
 export function ToolResultDisplay({ event, isStreaming }: ToolResultDisplayProps) {
@@ -26,7 +35,11 @@ export function ToolResultDisplay({ event, isStreaming }: ToolResultDisplayProps
       
       <Box marginLeft={2} flexDirection="column">
         {success ? (
-          <Text wrap="wrap">{output}</Text>
+          isJsonOutput(output) ? (
+            <CodeDisplay code={output} language="json" />
+          ) : (
+            <Text wrap="wrap">{output}</Text>
+          )
         ) : (
           <Text color="red">{error || 'Unknown error'}</Text>
         )}

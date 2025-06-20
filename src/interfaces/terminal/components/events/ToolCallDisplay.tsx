@@ -5,6 +5,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent, ToolCallData } from '../../../../threads/types.js';
 import { CollapsibleBox } from '../ui/CollapsibleBox.js';
+import { CodeDisplay } from '../ui/CodeDisplay.js';
 
 interface ToolCallDisplayProps {
   event: ThreadEvent;
@@ -30,9 +31,7 @@ export function ToolCallDisplay({ event, isStreaming }: ToolCallDisplayProps) {
         maxHeight={10}
         borderColor="yellow"
       >
-        <Box paddingX={1}>
-          <Text>{JSON.stringify(input, null, 2)}</Text>
-        </Box>
+        <CodeDisplay code={JSON.stringify(input)} language="json" />
       </CollapsibleBox>
     </Box>
   );
