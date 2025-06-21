@@ -74,7 +74,13 @@ TOOL_RESULT events → Agent continues or responds
 ## Event Types and Data Model
 
 ```typescript
-type EventType = 'USER_MESSAGE' | 'AGENT_MESSAGE' | 'TOOL_CALL' | 'TOOL_RESULT';
+type EventType = 
+  | 'USER_MESSAGE' 
+  | 'AGENT_MESSAGE' 
+  | 'TOOL_CALL' 
+  | 'TOOL_RESULT'
+  | 'LOCAL_SYSTEM_MESSAGE'
+  | 'THINKING';
 
 interface ThreadEvent {
   id: string;
@@ -86,6 +92,8 @@ interface ThreadEvent {
 ```
 
 Events are stored in sequence and converted to conversation format when needed. This pattern is critical for the stateless architecture.
+
+**Note**: For detailed information about thinking block processing architecture, see `docs/thinking-blocks.md`.
 
 ## Tool Development
 

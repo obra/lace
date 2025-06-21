@@ -91,7 +91,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
     // Handle agent thinking complete
     const handleThinkingComplete = () => {
-      // Thinking indicator can be hidden - thinking content is handled via THINKING ThreadEvents
+      // No action needed - thinking blocks are handled via ThreadProcessor from ThreadEvents
     };
 
     // Handle agent response complete

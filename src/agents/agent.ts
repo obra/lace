@@ -43,9 +43,9 @@ export type AgentState = 'idle' | 'thinking' | 'tool_execution' | 'streaming';
 // Event type definitions for TypeScript
 export interface AgentEvents {
   agent_thinking_start: [];
-  agent_token: [{ token: string }];
+  agent_token: [{ token: string }]; // Raw tokens including thinking block content during streaming
   agent_thinking_complete: [];
-  agent_response_complete: [{ content: string }];
+  agent_response_complete: [{ content: string }]; // Clean content with thinking blocks removed
   tool_call_start: [{ toolName: string; input: Record<string, unknown>; callId: string }];
   tool_call_complete: [{ toolName: string; result: ToolResult; callId: string }];
   state_change: [{ from: AgentState; to: AgentState }];

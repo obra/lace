@@ -52,7 +52,7 @@ const parseContent = (content: string) => {
 export function AgentMessageDisplay({ event, isStreaming }: AgentMessageDisplayProps) {
   const message = event.data as string;
   
-  // Strip thinking blocks since they're displayed separately as ephemeral messages
+  // Strip thinking blocks since they're displayed separately as thinking timeline items
   const messageWithoutThinking = message.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   
   // Don't render if message is empty after stripping thinking blocks
