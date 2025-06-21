@@ -7,34 +7,47 @@ import { useTextBuffer } from "../hooks/use-text-buffer.js";
 import TextRenderer from "./text-renderer.js";
 import FileAutocomplete from "./file-autocomplete.js";
 
-// Keyboard shortcut system
-interface KeyboardShortcut {
-  key: string;
-  ctrl?: boolean;
-  meta?: boolean;
-  alt?: boolean;
-  shift?: boolean;
-}
+// Keyboard shortcut system - list-based approach
+type KeyboardShortcut = string[];  // e.g., ['ctrl', 'a'] or ['meta', 'shift', 'z']
 
 const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcut | KeyboardShortcut[]> = {
-  MOVE_TO_START: { key: 'a', ctrl: true },
-  MOVE_TO_END: { key: 'e', ctrl: true },
-  KILL_LINE: { key: 'k', ctrl: true },
-  KILL_LINE_BACKWARD: { key: 'u', ctrl: true },
-  DELETE_FORWARD: { key: 'd', ctrl: true },
-  DELETE_BACKWARD: { key: 'h', ctrl: true },
+  MOVE_TO_START: ['ctrl', 'a'],
+  MOVE_TO_END: ['ctrl', 'e'],
+  KILL_LINE: ['ctrl', 'k'],
+  KILL_LINE_BACKWARD: ['ctrl', 'u'],
+  DELETE_FORWARD: ['ctrl', 'd'],
+  DELETE_BACKWARD: ['ctrl', 'h'],
   PASTE: [
-    { key: 'v', ctrl: true },   // Non-Mac
-    { key: 'v', meta: true }    // Mac  
+    ['ctrl', 'v'],   // Non-Mac
+    ['meta', 'v']    // Mac  
   ]
 };
 
 const matchesShortcut = (input: string, key: any, shortcut: KeyboardShortcut): boolean => {
-  return input === shortcut.key &&
-         (key.ctrl || false) === (shortcut.ctrl || false) &&
-         (key.meta || false) === (shortcut.meta || false) &&
-         (key.alt || false) === (shortcut.alt || false) &&
-         (key.shift || false) === (shortcut.shift || false);
+  // Last element is the key, everything else are modifiers
+  const keyChar = shortcut[shortcut.length - 1];
+  const modifiers = shortcut.slice(0, -1);
+  
+  if (input !== keyChar) {
+    return false;
+  }
+  
+  // Check that all required modifiers are pressed
+  for (const modifier of modifiers) {
+    if (!key[modifier]) {
+      return false;
+    }
+  }
+  
+  // Check that no extra modifiers are pressed
+  const allModifiers = ['ctrl', 'meta', 'alt', 'shift'];
+  for (const modifier of allModifiers) {
+    if (!modifiers.includes(modifier) && key[modifier]) {
+      return false;
+    }
+  }
+  
+  return true;
 };
 
 const matchesAction = (input: string, key: any, action: string): boolean => {
