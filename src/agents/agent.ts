@@ -80,6 +80,11 @@ export class Agent extends EventEmitter {
   get threadManager(): ThreadManager {
     return this._threadManager;
   }
+
+  // Public access to thread ID for delegation
+  get threadId(): string {
+    return this._threadId;
+  }
   private readonly _stopReasonHandler: StopReasonHandler;
   private readonly _tokenBudgetManager: TokenBudgetManager | null;
   private _state: AgentState = 'idle';

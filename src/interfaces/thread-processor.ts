@@ -3,6 +3,7 @@
 
 import { ThreadEvent, ToolCallData, ToolResultData } from '../threads/types.js';
 import sax from 'sax';
+import { logger } from '../utils/logger.js';
 
 export interface Timeline {
   items: TimelineItem[];
@@ -11,6 +12,11 @@ export interface Timeline {
     messageCount: number;
     lastActivity: Date;
   };
+}
+
+export interface ProcessedThreads {
+  mainTimeline: Timeline;
+  delegateTimelines: Map<string, Timeline>;
 }
 
 export type TimelineItem =
@@ -43,27 +49,68 @@ export interface EphemeralMessage {
 }
 
 export class ThreadProcessor {
-  // Cache for processed thread events - only recompute when events change
-  private _cachedProcessedItems: ProcessedThreadItems | null = null;
-  private _cachedEventsHash: string | null = null;
+  // Cache individual parsed events (expensive operations like thinking block extraction)
+  private _eventCache = new Map<string, TimelineItem[]>();
 
   /**
-   * Process persisted ThreadEvents into timeline items (cacheable)
-   * Only call when thread events actually change
+   * Process multiple threads from mixed events into separate timelines (primary API)
    */
-  processEvents(events: ThreadEvent[]): ProcessedThreadItems {
-    // Check if we can use cached results
-    const eventsHash = this._hashEvents(events);
-    if (this._cachedEventsHash === eventsHash && this._cachedProcessedItems) {
-      return this._cachedProcessedItems;
+  processThreads(events: ThreadEvent[]): ProcessedThreads {
+    logger.debug('ThreadProcessor.processThreads received events', {
+      eventCount: events.length,
+      events: events.map((e) => ({ type: e.type, threadId: e.threadId, id: e.id })),
+    });
+
+    // Group events by threadId
+    const threadGroups = this._groupEventsByThread(events);
+    logger.debug('Thread groups created', {
+      groups: threadGroups.map((g) => ({ threadId: g.threadId, eventCount: g.events.length })),
+    });
+
+    // Separate main thread from delegates
+    const mainThreadGroup = threadGroups.find((g) => !g.threadId.includes('.'));
+    const mainEvents = mainThreadGroup?.events || [];
+    const mainThreadId = mainThreadGroup?.threadId || 'main';
+    const delegateGroups = threadGroups.filter((g) => g.threadId.includes('.'));
+
+    logger.debug('Thread separation complete', {
+      mainThreadId,
+      mainEventCount: mainEvents.length,
+      delegateThreads: delegateGroups.map((g) => ({
+        threadId: g.threadId,
+        eventCount: g.events.length,
+      })),
+    });
+
+    // Process main thread with incremental caching
+    const mainProcessedItems = this._processThreadIncremental(mainThreadId, mainEvents);
+    const mainTimeline = this.buildTimeline(mainProcessedItems, []);
+
+    // Process each delegate thread with incremental caching
+    const delegateTimelines = new Map<string, Timeline>();
+    for (const group of delegateGroups) {
+      logger.debug('Processing delegate thread', {
+        threadId: group.threadId,
+        eventCount: group.events.length,
+      });
+      const processedItems = this._processThreadIncremental(group.threadId, group.events);
+      const timeline = this.buildTimeline(processedItems, []);
+      delegateTimelines.set(group.threadId, timeline);
+      logger.debug('Delegate timeline created', {
+        threadId: group.threadId,
+        itemCount: timeline.items.length,
+      });
     }
 
-    // Process events and cache result
-    const processedItems = this._processThreadEvents(events);
-    this._cachedProcessedItems = processedItems;
-    this._cachedEventsHash = eventsHash;
+    logger.debug('processThreads complete', {
+      mainTimelineItems: mainTimeline.items.length,
+      delegateTimelineCount: delegateTimelines.size,
+    });
 
-    return processedItems;
+    return {
+      mainTimeline,
+      delegateTimelines,
+    };
   }
 
   /**
@@ -148,21 +195,43 @@ export class ThreadProcessor {
   }
 
   /**
-   * Convenience method for full processing (when caching not needed)
+   * Process events for backward compatibility with tests
+   */
+  processEvents(events: ThreadEvent[]): ProcessedThreadItems {
+    // For backward compatibility, process as single thread
+    const threadId = events[0]?.threadId || 'main';
+    return this._processThreadIncremental(threadId, events);
+  }
+
+  /**
+   * Process single thread for backward compatibility
    */
   processThread(events: ThreadEvent[], ephemeralMessages: EphemeralMessage[] = []): Timeline {
-    const processedEvents = this.processEvents(events);
+    const threadId = events[0]?.threadId || 'main';
+    const processedEvents = this._processThreadIncremental(threadId, events);
     const ephemeralItems = this.processEphemeralEvents(ephemeralMessages);
     return this.buildTimeline(processedEvents, ephemeralItems);
   }
 
-  private _processThreadEvents(events: ThreadEvent[]): ProcessedThreadItems {
+  private _processEventGroupWithState(
+    events: ThreadEvent[],
+    initialPendingToolCalls: Map<string, { event: ThreadEvent; call: ToolCallData }>
+  ): {
+    items: TimelineItem[];
+    pendingToolCalls: Map<string, { event: ThreadEvent; call: ToolCallData }>;
+  } {
     const items: TimelineItem[] = [];
-    const pendingToolCalls = new Map<string, { event: ThreadEvent; call: ToolCallData }>();
+    const pendingToolCalls = new Map(initialPendingToolCalls);
+
+    logger.debug('Processing event group with state', {
+      eventCount: events.length,
+      initialPendingCallCount: initialPendingToolCalls.size,
+      initialPendingCallIds: Array.from(initialPendingToolCalls.keys()),
+    });
 
     for (const event of events) {
       switch (event.type) {
-        case 'USER_MESSAGE':
+        case 'USER_MESSAGE': {
           items.push({
             type: 'user_message',
             content: event.data as string,
@@ -170,14 +239,24 @@ export class ThreadProcessor {
             id: event.id,
           });
           break;
+        }
 
         case 'AGENT_MESSAGE': {
+          // Check cache first for this event
+          const cached = this._eventCache.get(event.id);
+          if (cached) {
+            items.push(...cached);
+            break;
+          }
+
           const rawContent = event.data as string;
           const { content: cleanContent, thinkingBlocks } = this.extractThinkingBlocks(rawContent);
 
+          const eventItems: TimelineItem[] = [];
+
           // Add thinking blocks first (they come before the message)
           thinkingBlocks.forEach((thinking, index) => {
-            items.push({
+            eventItems.push({
               type: 'thinking',
               content: thinking,
               timestamp: new Date(event.timestamp.getTime() - (thinkingBlocks.length - index) * 10), // Slight offset for ordering
@@ -187,26 +266,41 @@ export class ThreadProcessor {
 
           // Add cleaned agent message
           if (cleanContent.trim()) {
-            items.push({
+            eventItems.push({
               type: 'agent_message',
               content: cleanContent,
               timestamp: event.timestamp,
               id: event.id,
             });
           }
+
+          // Cache the processed items for this event
+          this._eventCache.set(event.id, eventItems);
+          items.push(...eventItems);
           break;
         }
 
-        case 'THINKING':
-          items.push({
-            type: 'thinking',
+        case 'THINKING': {
+          // Check cache first
+          const cachedThinking = this._eventCache.get(event.id);
+          if (cachedThinking) {
+            items.push(...cachedThinking);
+            break;
+          }
+
+          const thinkingItem = {
+            type: 'thinking' as const,
             content: event.data as string,
             timestamp: event.timestamp,
             id: event.id,
-          });
-          break;
+          };
 
-        case 'LOCAL_SYSTEM_MESSAGE':
+          this._eventCache.set(event.id, [thinkingItem]);
+          items.push(thinkingItem);
+          break;
+        }
+
+        case 'LOCAL_SYSTEM_MESSAGE': {
           items.push({
             type: 'system_message',
             content: event.data as string,
@@ -214,9 +308,14 @@ export class ThreadProcessor {
             id: event.id,
           });
           break;
+        }
 
         case 'TOOL_CALL': {
           const toolCallData = event.data as ToolCallData;
+          logger.debug('Processing TOOL_CALL', {
+            callId: toolCallData.callId,
+            toolName: toolCallData.toolName,
+          });
           pendingToolCalls.set(toolCallData.callId, { event, call: toolCallData });
           break;
         }
@@ -224,6 +323,12 @@ export class ThreadProcessor {
         case 'TOOL_RESULT': {
           const toolResultData = event.data as ToolResultData;
           const pendingCall = pendingToolCalls.get(toolResultData.callId);
+
+          logger.debug('Processing TOOL_RESULT', {
+            callId: toolResultData.callId,
+            foundPendingCall: !!pendingCall,
+            pendingCallIds: Array.from(pendingToolCalls.keys()),
+          });
 
           if (pendingCall) {
             // Add combined tool execution
@@ -237,6 +342,14 @@ export class ThreadProcessor {
             pendingToolCalls.delete(toolResultData.callId);
           } else {
             // Orphaned result - treat as system message
+            logger.warn('Orphaned tool result found', {
+              callId: toolResultData.callId,
+              availablePendingCallIds: Array.from(pendingToolCalls.keys()),
+              output:
+                typeof toolResultData.output === 'string'
+                  ? toolResultData.output.slice(0, 100)
+                  : 'non-string output',
+            });
             items.push({
               type: 'system_message',
               content: `Tool result (orphaned): ${toolResultData.output}`,
@@ -260,7 +373,15 @@ export class ThreadProcessor {
       });
     }
 
-    return items as ProcessedThreadItems;
+    return {
+      items: items.filter((item) => item.type !== 'ephemeral_message'),
+      pendingToolCalls,
+    };
+  }
+
+  private _processEventGroup(events: ThreadEvent[]): TimelineItem[] {
+    const { items } = this._processEventGroupWithState(events, new Map());
+    return items;
   }
 
   private extractThinkingBlocks(content: string): { content: string; thinkingBlocks: string[] } {
@@ -343,18 +464,6 @@ export class ThreadProcessor {
   }
 
   /**
-   * Create hash of events for caching comparison
-   */
-  private _hashEvents(events: ThreadEvent[]): string {
-    // Simple hash based on event count and last event timestamp
-    // More sophisticated hashing could be added if needed
-    if (events.length === 0) return 'empty';
-
-    const lastEvent = events[events.length - 1];
-    return `${events.length}-${lastEvent.timestamp.getTime()}-${lastEvent.id}`;
-  }
-
-  /**
    * Deduplicate thinking blocks that appear in both THINKING events and extracted from AGENT_MESSAGE
    * Keeps the THINKING events (streaming source) over extracted blocks for chronological accuracy
    */
@@ -391,10 +500,60 @@ export class ThreadProcessor {
   }
 
   /**
+   * Process events for a specific thread (fresh thread organization, cached event parsing)
+   */
+  private _processThreadIncremental(threadId: string, events: ThreadEvent[]): ProcessedThreadItems {
+    // Always do fresh thread organization and tool pairing to avoid duplication
+    // But cache individual event parsing (the expensive part)
+    const { items } = this._processEventGroupWithState(events, new Map());
+    return items.filter((item) => item.type !== 'ephemeral_message') as ProcessedThreadItems;
+  }
+
+  /**
    * Clear cache (useful for testing or manual cache invalidation)
    */
   clearCache(): void {
-    this._cachedProcessedItems = null;
-    this._cachedEventsHash = null;
+    this._eventCache.clear();
+  }
+
+  /**
+   * Check if setA is a superset of setB (contains all elements of setB)
+   */
+  private _isSuperset(setA: Set<string>, setB: Set<string>): boolean {
+    for (const elem of setB) {
+      if (!setA.has(elem)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Group all events by threadId (not just consecutive)
+   */
+  private _groupEventsByThread(
+    events: ThreadEvent[]
+  ): Array<{ threadId: string; events: ThreadEvent[] }> {
+    const groupMap = new Map<string, ThreadEvent[]>();
+
+    // Group all events by threadId
+    for (const event of events) {
+      if (!groupMap.has(event.threadId)) {
+        groupMap.set(event.threadId, []);
+      }
+      groupMap.get(event.threadId)!.push(event);
+    }
+
+    // Convert to array format and sort each group by timestamp
+    const groups: Array<{ threadId: string; events: ThreadEvent[] }> = [];
+    for (const [threadId, events] of groupMap.entries()) {
+      groups.push({
+        threadId,
+        events: events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()),
+      });
+    }
+
+    // Sort groups by timestamp of first event in each group
+    return groups.sort((a, b) => a.events[0].timestamp.getTime() - b.events[0].timestamp.getTime());
   }
 }

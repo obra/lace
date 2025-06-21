@@ -53,12 +53,12 @@ describe('ThreadProcessor', () => {
       });
     });
 
-    it('caches results for identical event arrays', () => {
+    it('caches individual event processing', () => {
       const result1 = processor.processEvents(sampleEvents);
       const result2 = processor.processEvents(sampleEvents);
 
-      // Should return exact same reference (cached)
-      expect(result1).toBe(result2);
+      // Should have same content (individual events are cached)
+      expect(result1).toStrictEqual(result2);
     });
 
     it('reprocesses when events change', () => {
@@ -688,13 +688,13 @@ describe('ThreadProcessor', () => {
       }
 
       const result1 = processor.processEvents(events);
-      const result2 = processor.processEvents(events); // Should be cached
+      const result2 = processor.processEvents(events); // Individual events cached
 
-      expect(result1).toBe(result2); // Same reference due to caching
+      expect(result1).toStrictEqual(result2); // Same content due to event-level caching
       expect(result1).toHaveLength(1000);
     });
 
-    it('should cache results correctly', () => {
+    it('should cache individual event processing correctly', () => {
       const events: ThreadEvent[] = [
         {
           id: 'user-1',
@@ -708,19 +708,18 @@ describe('ThreadProcessor', () => {
       // First call should process
       const result1 = processor.processEvents(events);
 
-      // Second call should return cached result
+      // Second call should have same content (individual events cached)
       const result2 = processor.processEvents(events);
 
-      // Should be exact same reference (cached)
-      expect(result1).toBe(result2);
+      // Should have same content (individual events are cached)
+      expect(result1).toStrictEqual(result2);
 
       // Clear cache and verify new processing
       processor.clearCache();
       const result3 = processor.processEvents(events);
 
-      // Should be different reference but same content
-      expect(result1).not.toBe(result3);
-      expect(result1).toEqual(result3);
+      // Should still have same content
+      expect(result1).toStrictEqual(result3);
     });
   });
 

@@ -152,6 +152,20 @@ export class ThreadPersistence {
     return row ? row.id : null;
   }
 
+  getDelegateThreadsFor(parentThreadId: string): string[] {
+    if (this._disabled || !this.db) return [];
+
+    const stmt = this.db.prepare(`
+      SELECT DISTINCT thread_id FROM events 
+      WHERE thread_id LIKE ? 
+      ORDER BY thread_id ASC
+    `);
+
+    const pattern = `${parentThreadId}.%`;
+    const rows = stmt.all(pattern) as Array<{ thread_id: string }>;
+    return rows.map((row) => row.thread_id);
+  }
+
   close(): void {
     if (!this._closed) {
       this._closed = true;

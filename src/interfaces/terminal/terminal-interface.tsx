@@ -1,7 +1,7 @@
 // ABOUTME: Ink-based terminal interface for interactive chat with Agent
 // ABOUTME: Provides rich UI components with multi-line editing and visual feedback
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, createContext, useContext } from "react";
 import { Box, Text, render } from "ink";
 import ShellInput from "./components/shell-input.js";
 import ToolApprovalModal from "./components/tool-approval-modal.js";
@@ -13,7 +13,18 @@ import { CommandRegistry } from "../../commands/registry.js";
 import { CommandExecutor } from "../../commands/executor.js";
 import type { UserInterface } from "../../commands/types.js";
 import { ThreadEvent } from "../../threads/types.js";
+import { ThreadProcessor } from "../thread-processor.js";
 
+// ThreadProcessor context for interface-level caching
+const ThreadProcessorContext = createContext<ThreadProcessor | null>(null);
+
+export const useThreadProcessor = (): ThreadProcessor => {
+  const processor = useContext(ThreadProcessorContext);
+  if (!processor) {
+    throw new Error('useThreadProcessor must be used within ThreadProcessorContext.Provider');
+  }
+  return processor;
+};
 
 interface TerminalInterfaceProps {
   agent: Agent;
@@ -30,6 +41,8 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   agent,
   approvalCallback,
 }) => {
+  // Create one ThreadProcessor instance per interface
+  const threadProcessor = useMemo(() => new ThreadProcessor(), []);
   const [events, setEvents] = useState<ThreadEvent[]>([]);
   const [ephemeralMessages, setEphemeralMessages] = useState<Message[]>([]);
   const [currentInput, setCurrentInput] = useState("");
@@ -42,6 +55,9 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     totalTokens?: number;
   }>({});
   
+  // Delegation tracking state
+  const [isDelegating, setIsDelegating] = useState(false);
+  
   // Tool approval modal state
   const [approvalRequest, setApprovalRequest] = useState<{
     toolName: string;
@@ -50,11 +66,11 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     resolve: (decision: ApprovalDecision) => void;
   } | null>(null);
 
-  // Sync events from agent's thread
+  // Sync events from agent's thread (including delegate threads)
   const syncEvents = useCallback(() => {
     const threadId = agent.threadManager.getCurrentThreadId();
     if (threadId) {
-      const threadEvents = agent.threadManager.getEvents(threadId);
+      const threadEvents = agent.threadManager.getMainAndDelegateEvents(threadId);
       setEvents([...threadEvents]);
     }
   }, [agent]);
@@ -102,6 +118,34 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       syncEvents();
     };
 
+    // Handle tool execution events to show delegation boxes immediately
+    const handleToolCallStart = ({ toolName }: { toolName: string }) => {
+      // Sync events when delegation tool starts to show delegation box immediately
+      if (toolName === 'delegate') {
+        syncEvents();
+      }
+    };
+
+    const handleToolCallComplete = ({ toolName }: { toolName: string }) => {
+      // Sync events after any tool completes (including during delegation)
+      syncEvents();
+    };
+
+    // Handle delegation lifecycle events
+    const handleDelegationStart = ({ toolName }: { toolName: string }) => {
+      if (toolName === 'delegate') {
+        setIsDelegating(true);
+        syncEvents();
+      }
+    };
+
+    const handleDelegationEnd = ({ toolName }: { toolName: string }) => {
+      if (toolName === 'delegate') {
+        setIsDelegating(false);
+        syncEvents();
+      }
+    };
+
     // Handle token usage updates
     const handleTokenUsageUpdate = ({ usage }: { usage: any }) => {
       if (usage && typeof usage === 'object') {
@@ -137,6 +181,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       setIsProcessing(false);
     };
 
+
     // Register event listeners
     agent.on("agent_token", handleToken);
     agent.on("agent_thinking_complete", handleThinkingComplete);
@@ -144,6 +189,8 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     agent.on("approval_request", handleApprovalRequest);
     agent.on("token_usage_update", handleTokenUsageUpdate);
     agent.on("token_budget_warning", handleTokenBudgetWarning);
+    agent.on("tool_call_start", handleToolCallStart);
+    agent.on("tool_call_complete", handleToolCallComplete);
     agent.on("error", handleError);
 
     // Cleanup function
@@ -154,9 +201,25 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       agent.off("approval_request", handleApprovalRequest);
       agent.off("token_usage_update", handleTokenUsageUpdate);
       agent.off("token_budget_warning", handleTokenBudgetWarning);
+      agent.off("tool_call_start", handleToolCallStart);
+      agent.off("tool_call_complete", handleToolCallComplete);
       agent.off("error", handleError);
     };
   }, [agent, addMessage, syncEvents, streamingContent]);
+
+  // Listen to ThreadManager events for real-time delegation updates
+  useEffect(() => {
+    const handleThreadUpdated = ({ threadId, eventType }: { threadId: string; eventType: string }) => {
+      // Sync events whenever ANY thread is updated (main or delegate)
+      syncEvents();
+    };
+
+    agent.threadManager.on('thread_updated', handleThreadUpdated);
+    
+    return () => {
+      agent.threadManager.off('thread_updated', handleThreadUpdated);
+    };
+  }, [agent.threadManager, syncEvents]);
 
   // Create UserInterface implementation
   const userInterface: UserInterface = React.useMemo(() => ({
@@ -267,60 +330,62 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   }, [agent, addMessage, syncEvents]);
 
   return (
-    <Box flexDirection="column" height="100%">
-      {/* Conversation display with merged events and messages */}
-      <ConversationDisplay 
-        events={events}
-        ephemeralMessages={[
-          ...ephemeralMessages,
-          // Add streaming content as ephemeral message
-          ...(streamingContent ? [{
-            type: "assistant" as const,
-            content: streamingContent,
-            timestamp: new Date(),
-          }] : []),
-          // Add processing indicator as ephemeral message
-          ...(isProcessing && !streamingContent ? [{
-            type: "system" as const,
-            content: "💭 Thinking...",
-            timestamp: new Date(),
-          }] : [])
-        ]}
-      />
-
-      {/* Tool approval modal */}
-      {approvalRequest && (
-        <ToolApprovalModal
-          toolName={approvalRequest.toolName}
-          input={approvalRequest.input}
-          isReadOnly={approvalRequest.isReadOnly}
-          onDecision={handleApprovalDecision}
-          isVisible={true}
+    <ThreadProcessorContext.Provider value={threadProcessor}>
+      <Box flexDirection="column" height="100%">
+        {/* Conversation display with merged events and messages */}
+        <ConversationDisplay 
+          events={events}
+          ephemeralMessages={[
+            ...ephemeralMessages,
+            // Add streaming content as ephemeral message
+            ...(streamingContent ? [{
+              type: "assistant" as const,
+              content: streamingContent,
+              timestamp: new Date(),
+            }] : []),
+            // Add processing indicator as ephemeral message
+            ...(isProcessing && !streamingContent ? [{
+              type: "system" as const,
+              content: "💭 Thinking...",
+              timestamp: new Date(),
+            }] : [])
+          ]}
         />
-      )}
 
-      {/* Status bar - right above input */}
-      <StatusBar 
-        providerName={agent.providerName || 'unknown'}
-        modelName={(agent as any)._provider?.defaultModel || undefined}
-        threadId={agent.threadManager.getCurrentThreadId() || undefined}
-        tokenUsage={tokenUsage}
-        isProcessing={isProcessing}
-        messageCount={events.length + ephemeralMessages.length}
-      />
+        {/* Tool approval modal */}
+        {approvalRequest && (
+          <ToolApprovalModal
+            toolName={approvalRequest.toolName}
+            input={approvalRequest.input}
+            isReadOnly={approvalRequest.isReadOnly}
+            onDecision={handleApprovalDecision}
+            isVisible={true}
+          />
+        )}
 
-      {/* Input area - disabled when modal is open */}
-      <Box padding={1}>
-        <ShellInput
-          value={currentInput}
-          placeholder={approvalRequest ? "Tool approval required..." : "Type your message..."}
-          onSubmit={handleSubmit}
-          onChange={setCurrentInput}
-          autoFocus={!approvalRequest}
-          disabled={!!approvalRequest}
+        {/* Status bar - right above input */}
+        <StatusBar 
+          providerName={agent.providerName || 'unknown'}
+          modelName={(agent as any)._provider?.defaultModel || undefined}
+          threadId={agent.threadManager.getCurrentThreadId() || undefined}
+          tokenUsage={tokenUsage}
+          isProcessing={isProcessing}
+          messageCount={events.length + ephemeralMessages.length}
         />
+
+        {/* Input area - disabled when modal is open */}
+        <Box padding={1}>
+          <ShellInput
+            value={currentInput}
+            placeholder={approvalRequest ? "Tool approval required..." : "Type your message..."}
+            onSubmit={handleSubmit}
+            onChange={setCurrentInput}
+            autoFocus={!approvalRequest}
+            disabled={!!approvalRequest}
+          />
+        </Box>
       </Box>
-    </Box>
+    </ThreadProcessorContext.Provider>
   );
 };
 

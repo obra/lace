@@ -4,7 +4,8 @@
 import React, { useMemo, useRef } from 'react';
 import { Box } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
-import { ThreadProcessor, Timeline } from '../../../thread-processor.js';
+import { ThreadProcessor, Timeline, ProcessedThreads } from '../../../thread-processor.js';
+import { useThreadProcessor } from '../../terminal-interface.js';
 import TimelineDisplay from './TimelineDisplay.js';
 
 interface Message {
@@ -19,42 +20,33 @@ interface ConversationDisplayProps {
 }
 
 export function ConversationDisplay({ events, ephemeralMessages }: ConversationDisplayProps) {
-  const processorRef = useRef<ThreadProcessor | undefined>(undefined);
-  const eventsHashRef = useRef<string | undefined>(undefined);
-  const processedEventsRef = useRef<any>(undefined);
+  // Use shared ThreadProcessor from context
+  const threadProcessor = useThreadProcessor();
 
-  // Initialize processor if needed
-  if (!processorRef.current) {
-    processorRef.current = new ThreadProcessor();
-  }
+  // Process all threads
+  const processedThreads = useMemo(() => {
+    return threadProcessor.processThreads(events);
+  }, [events, threadProcessor]);
 
-  // Cache events processing - only reprocess when events change
-  const processedEvents = useMemo(() => {
-    const eventsHash = JSON.stringify(events.map(e => ({ id: e.id, type: e.type, timestamp: e.timestamp })));
-    
-    if (eventsHashRef.current === eventsHash && processedEventsRef.current) {
-      return processedEventsRef.current;
-    }
-    
-    eventsHashRef.current = eventsHash;
-    const processed = processorRef.current!.processEvents(events);
-    processedEventsRef.current = processed;
-    return processed;
-  }, [events]);
-
-  // Process ephemeral messages on every render (frequent updates during streaming)
+  // Process ephemeral messages (main thread only)
   const ephemeralItems = useMemo(() => {
-    return processorRef.current!.processEphemeralEvents(ephemeralMessages);
-  }, [ephemeralMessages]);
+    return threadProcessor.processEphemeralEvents(ephemeralMessages);
+  }, [ephemeralMessages, threadProcessor]);
 
-  // Build final timeline 
-  const timeline: Timeline = useMemo(() => {
-    return processorRef.current!.buildTimeline(processedEvents, ephemeralItems);
-  }, [processedEvents, ephemeralItems]);
+  // Build main timeline with ephemeral messages
+  const mainTimeline = useMemo(() => {
+    return threadProcessor.buildTimeline(
+      processedThreads.mainTimeline.items as any,
+      ephemeralItems
+    );
+  }, [processedThreads.mainTimeline, ephemeralItems, threadProcessor]);
 
   return (
     <Box flexDirection="column" flexGrow={1} paddingY={1}>
-      <TimelineDisplay timeline={timeline} />
+      <TimelineDisplay 
+        timeline={mainTimeline} 
+        delegateTimelines={processedThreads.delegateTimelines}
+      />
     </Box>
   );
 }

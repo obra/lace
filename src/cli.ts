@@ -29,10 +29,12 @@ async function createProvider(
   toolExecutor?: ToolExecutor
 ): Promise<AIProvider> {
   // Get tool information for template system
-  const tools = toolExecutor ? toolExecutor.getAllTools().map(tool => ({
-    name: tool.name,
-    description: tool.description
-  })) : undefined;
+  const tools = toolExecutor
+    ? toolExecutor.getAllTools().map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+      }))
+    : undefined;
 
   // Load configurable prompts from user's Lace directory
   const promptConfig = await loadPromptConfig({ tools });
@@ -141,12 +143,6 @@ async function main() {
   const sessionInfo = await threadManager.resumeOrCreate(continueThreadId);
   const { threadId } = sessionInfo;
 
-  // Set up delegate tool dependencies (after we have threadManager)
-  const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
-  if (delegateTool) {
-    delegateTool.setDependencies(threadManager, toolExecutor);
-  }
-
   // Display session status to user
   if (sessionInfo.isResumed) {
     console.log(`📖 Continuing conversation ${threadId}`);
@@ -165,6 +161,12 @@ async function main() {
     threadId,
     tools: toolExecutor.getAllTools(),
   });
+
+  // Set up delegate tool dependencies
+  const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
+  if (delegateTool) {
+    delegateTool.setDependencies(threadManager, toolExecutor);
+  }
 
   // Create interface (always use terminal interface since CLIInterface is removed)
   const cli = new TerminalInterface(agent);

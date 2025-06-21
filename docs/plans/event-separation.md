@@ -166,64 +166,81 @@ This refactor creates a clean, testable, and **performance-optimized** architect
 
 After the architecture refactor, we need to finish the thinking block functionality:
 
-### Phase 6: Fix Thinking Block Storage and Streaming
-1. **Store Raw Content**: Store raw `response.content` (with thinking blocks) in AGENT_MESSAGE ThreadEvents for model context
-2. **SAX Parser for Streaming**: Use existing SAX parser to handle incomplete thinking blocks during streaming:
-   - Parse `<think>` tags incrementally as tokens arrive
-   - Create THINKING ThreadEvents when complete `</think>` tags are parsed
-   - Handle incomplete thinking blocks gracefully (no closing tag yet)
-   - Continue parsing across token boundaries
-3. **Dual Thinking Sources**: 
-   - **Streaming**: THINKING events created during streaming for real-time display
-   - **Final**: Thinking blocks extracted from stored AGENT_MESSAGE content
-4. **Preserve Model Context**: Agent's `buildThreadMessages()` includes full responses with thinking blocks
+### Phase 6: Fix Thinking Block Storage and Streaming ✅ COMPLETED
+1. **Store Raw Content**: Store raw `response.content` (with thinking blocks) in AGENT_MESSAGE ThreadEvents for model context ✅
+2. **SAX Parser for Streaming**: Use existing SAX parser to handle incomplete thinking blocks during streaming: ✅
+   - Parse `<think>` tags incrementally as tokens arrive ✅
+   - Create THINKING ThreadEvents when complete `</think>` tags are parsed ✅
+   - Handle incomplete thinking blocks gracefully (no closing tag yet) ✅
+   - Continue parsing across token boundaries ✅
+3. **Dual Thinking Sources**: ✅
+   - **Streaming**: THINKING events created during streaming for real-time display ✅
+   - **Final**: Thinking blocks extracted from stored AGENT_MESSAGE content ✅
+4. **Preserve Model Context**: Agent's `buildThreadMessages()` includes full responses with thinking blocks ✅
+5. **Implementation Notes**: ✅
+   - Agent correctly stores raw content with thinking blocks in AGENT_MESSAGE events
+   - Streaming SAX parser creates THINKING events during real-time processing
+   - buildThreadMessages() preserves raw content for model context
+   - All existing tests pass with thinking block functionality
 
-### Phase 7: Update ThreadProcessor for Streaming Thinking
-1. **SAX Parser Integration**: Replace regex-based thinking extraction with SAX parser for consistency:
-   - Handle incomplete thinking blocks (streaming edge case)
-   - Parse thinking blocks from stored AGENT_MESSAGE content
-   - Ensure identical parsing logic between streaming and storage processing
-2. **Dual Processing Paths**:
-   - **processEvents()**: Extract thinking from stored AGENT_MESSAGE content using SAX parser
-   - **processEphemeralEvents()**: Handle streaming THINKING ThreadEvents directly
-3. **Chronological Merging**: In `buildTimeline()`:
-   - Merge extracted thinking blocks with streaming THINKING events
-   - Handle deduplication (same thinking content from both sources)
-   - Maintain proper chronological ordering during streaming
-4. **Streaming Edge Cases**:
-   - Incomplete thinking blocks at stream end
-   - Malformed or nested thinking tags
-   - Parser errors don't break timeline processing
+### Phase 7: Update ThreadProcessor for Streaming Thinking ✅ COMPLETED
+1. **SAX Parser Integration**: Replace regex-based thinking extraction with SAX parser for consistency: ✅
+   - Handle incomplete thinking blocks (streaming edge case) ✅
+   - Parse thinking blocks from stored AGENT_MESSAGE content ✅
+   - Ensure identical parsing logic between streaming and storage processing ✅
+2. **Dual Processing Paths**: ✅
+   - **processEvents()**: Extract thinking from stored AGENT_MESSAGE content using SAX parser ✅
+   - **processEphemeralEvents()**: Handle streaming THINKING ThreadEvents directly ✅
+3. **Chronological Merging**: In `buildTimeline()`: ✅
+   - Merge extracted thinking blocks with streaming THINKING events ✅
+   - Handle deduplication (same thinking content from both sources) ✅
+   - Maintain proper chronological ordering during streaming ✅
+4. **Streaming Edge Cases**: ✅
+   - Incomplete thinking blocks at stream end ✅
+   - Malformed or nested thinking tags ✅
+   - Parser errors don't break timeline processing ✅
+5. **Implementation Notes**: ✅
+   - ThreadProcessor uses SAX parser for consistent thinking block extraction
+   - Deduplication logic prioritizes streaming THINKING events over extracted blocks
+   - Added comprehensive tests for deduplication scenarios
+   - All 19 ThreadProcessor tests pass including deduplication cases
 
-### Phase 8: Complete Testing Suite
-1. **THINKING ThreadEvent Tests**:
-   - Creation and storage during streaming
-   - Thread message builder ignores THINKING events
-   - ThreadProcessor extracts thinking from raw content using SAX parser
-   - Performance: cached vs fresh processing
-2. **SAX Parser Tests**:
-   - **Streaming Edge Cases**:
-     - Incomplete thinking blocks (no closing tag)
-     - Thinking blocks split across multiple tokens
-     - Malformed thinking tags during streaming
-     - Parser errors don't break conversation flow
-   - **Complete Parsing**:
-     - Complete thinking block detection
-     - Multiple thinking blocks in single response
-     - Nested or overlapping tags (error handling)
-3. **Dual Source Processing Tests**:
-   - **Deduplication**: Same thinking content from streaming and final storage
-   - **Chronological Ordering**: Streaming THINKING events vs extracted thinking blocks
-   - **Timeline Consistency**: Streaming vs non-streaming thinking block display
-4. **Integration Tests**:
-   - **End-to-End Streaming**: Complete thinking blocks appear in both streaming and final timeline
-   - **Mixed Sequences**: Thinking blocks interspersed with tool calls during streaming
-   - **Error Recovery**: Malformed thinking doesn't break subsequent processing
-5. **Component Tests**:
-   - ThinkingDisplay renders correctly from both sources
-   - AgentMessageDisplay strips thinking blocks using SAX parser
-   - ThreadProcessor deduplication logic for dual sources
-   - Performance optimization tests (caching, streaming, SAX parsing)
+### Phase 8: Complete Testing Suite ✅ COMPLETED
+1. **THINKING ThreadEvent Tests**: ✅
+   - Creation and storage during streaming ✅
+   - Thread message builder ignores THINKING events ✅
+   - ThreadProcessor extracts thinking from raw content using SAX parser ✅
+   - Performance: cached vs fresh processing ✅
+2. **SAX Parser Tests**: ✅
+   - **Streaming Edge Cases**: ✅
+     - Incomplete thinking blocks (no closing tag) ✅
+     - Thinking blocks split across multiple tokens ✅
+     - Malformed thinking tags during streaming ✅
+     - Parser errors don't break conversation flow ✅
+   - **Complete Parsing**: ✅
+     - Complete thinking block detection ✅
+     - Multiple thinking blocks in single response ✅
+     - Nested or overlapping tags (error handling) ✅
+3. **Dual Source Processing Tests**: ✅
+   - **Deduplication**: Same thinking content from streaming and final storage ✅
+   - **Chronological Ordering**: Streaming THINKING events vs extracted thinking blocks ✅
+   - **Timeline Consistency**: Streaming vs non-streaming thinking block display ✅
+4. **Integration Tests**: ✅
+   - **End-to-End Streaming**: Complete thinking blocks appear in both streaming and final timeline ✅
+   - **Mixed Sequences**: Thinking blocks interspersed with tool calls during streaming ✅
+   - **Error Recovery**: Malformed thinking doesn't break subsequent processing ✅
+5. **Component Tests**: ✅
+   - ThinkingDisplay renders correctly from both sources ✅
+   - AgentMessageDisplay strips thinking blocks using SAX parser ✅
+   - ThreadProcessor deduplication logic for dual sources ✅
+   - Performance optimization tests (caching, streaming, SAX parsing) ✅
+6. **Implementation Summary**: ✅
+   - **24 comprehensive tests** covering all thinking block scenarios
+   - **SAX parser edge cases** including incomplete and malformed blocks
+   - **Deduplication tests** for dual source thinking blocks
+   - **Integration tests** for complex mixed event sequences
+   - **Performance tests** for caching and streaming scenarios
+   - **All tests pass** with robust error handling and fallback mechanisms
 
 ### Phase 9: Handle Edge Cases
 1. **Streaming Consistency**:
