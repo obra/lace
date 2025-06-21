@@ -7,22 +7,59 @@ import { useTextBuffer } from "../hooks/use-text-buffer.js";
 import TextRenderer from "./text-renderer.js";
 import FileAutocomplete from "./file-autocomplete.js";
 
-// Keyboard shortcut constants
-const KEYBOARD_SHORTCUTS = {
-  // Navigation shortcuts
-  CTRL_A: 'a', // Move to beginning of line
-  CTRL_E: 'e', // Move to end of line
-  
-  // Editing shortcuts  
-  CTRL_K: 'k', // Kill line (delete to end)
-  CTRL_U: 'u', // Kill line backward (delete to beginning)
-  CTRL_D: 'd', // Delete character forward
-  CTRL_H: 'h', // Delete character backward
-  
-  // Clipboard shortcuts
-  CTRL_V: 'v', // Paste (non-Mac)
-  CMD_V: 'v',  // Paste (Mac)
+// Keyboard shortcut system
+interface KeyboardShortcut {
+  key: string;
+  ctrl?: boolean;
+  meta?: boolean;
+  alt?: boolean;
+  shift?: boolean;
+}
+
+type ShortcutAction = 
+  | 'MOVE_TO_START'
+  | 'MOVE_TO_END' 
+  | 'KILL_LINE'
+  | 'KILL_LINE_BACKWARD'
+  | 'DELETE_FORWARD'
+  | 'DELETE_BACKWARD'
+  | 'PASTE';
+
+const KEYBOARD_SHORTCUTS: Record<ShortcutAction, KeyboardShortcut | KeyboardShortcut[]> = {
+  MOVE_TO_START: { key: 'a', ctrl: true },
+  MOVE_TO_END: { key: 'e', ctrl: true },
+  KILL_LINE: { key: 'k', ctrl: true },
+  KILL_LINE_BACKWARD: { key: 'u', ctrl: true },
+  DELETE_FORWARD: { key: 'd', ctrl: true },
+  DELETE_BACKWARD: { key: 'h', ctrl: true },
+  PASTE: [
+    { key: 'v', ctrl: true }, // Non-Mac
+    { key: 'v', meta: true }  // Mac
+  ]
 } as const;
+
+// Helper function to check if input matches a keyboard shortcut
+const matchesShortcut = (input: string, key: any, shortcut: KeyboardShortcut): boolean => {
+  if (input !== shortcut.key) return false;
+  if (shortcut.ctrl && !key.ctrl) return false;
+  if (shortcut.meta && !key.meta) return false;
+  if (shortcut.alt && !key.alt) return false;
+  if (shortcut.shift && !key.shift) return false;
+  if (!shortcut.ctrl && key.ctrl) return false;
+  if (!shortcut.meta && key.meta) return false;
+  if (!shortcut.alt && key.alt) return false;
+  if (!shortcut.shift && key.shift) return false;
+  return true;
+};
+
+// Helper function to check if input matches any of the shortcuts for an action
+const matchesAction = (input: string, key: any, action: ShortcutAction): boolean => {
+  const shortcuts = KEYBOARD_SHORTCUTS[action];
+  if (Array.isArray(shortcuts)) {
+    return shortcuts.some(shortcut => matchesShortcut(input, key, shortcut));
+  }
+  return matchesShortcut(input, key, shortcuts);
+};
 
 interface ShellInputProps {
   value?: string;
@@ -305,8 +342,9 @@ const ShellInput: React.FC<ShellInputProps> = ({
 
       // Navigation - these keys cancel autocomplete
       if (key.leftArrow || 
-          (key.ctrl && (input === KEYBOARD_SHORTCUTS.CTRL_A || input === KEYBOARD_SHORTCUTS.CTRL_E)) ||
-          (key.ctrl && (input === KEYBOARD_SHORTCUTS.CTRL_K || input === KEYBOARD_SHORTCUTS.CTRL_U || input === KEYBOARD_SHORTCUTS.CTRL_D || input === KEYBOARD_SHORTCUTS.CTRL_H))) {
+          matchesAction(input, key, 'MOVE_TO_START') || matchesAction(input, key, 'MOVE_TO_END') ||
+          matchesAction(input, key, 'KILL_LINE') || matchesAction(input, key, 'KILL_LINE_BACKWARD') || 
+          matchesAction(input, key, 'DELETE_FORWARD') || matchesAction(input, key, 'DELETE_BACKWARD')) {
         
         if (autocompleteVisible) {
           hideAutocomplete();
@@ -315,17 +353,17 @@ const ShellInput: React.FC<ShellInputProps> = ({
         // Execute the original navigation/editing command
         if (key.leftArrow) {
           bufferOps.moveCursor("left");
-        } else if (key.ctrl && input === KEYBOARD_SHORTCUTS.CTRL_A) {
+        } else if (matchesAction(input, key, 'MOVE_TO_START')) {
           bufferOps.moveCursor("home");
-        } else if (key.ctrl && input === KEYBOARD_SHORTCUTS.CTRL_E) {
+        } else if (matchesAction(input, key, 'MOVE_TO_END')) {
           bufferOps.moveCursor("end");
-        } else if (key.ctrl && input === KEYBOARD_SHORTCUTS.CTRL_K) {
+        } else if (matchesAction(input, key, 'KILL_LINE')) {
           bufferOps.killLine();
-        } else if (key.ctrl && input === KEYBOARD_SHORTCUTS.CTRL_U) {
+        } else if (matchesAction(input, key, 'KILL_LINE_BACKWARD')) {
           bufferOps.killLineBackward();
-        } else if (key.ctrl && input === KEYBOARD_SHORTCUTS.CTRL_D) {
+        } else if (matchesAction(input, key, 'DELETE_FORWARD')) {
           bufferOps.deleteChar("forward");
-        } else if (key.ctrl && input === KEYBOARD_SHORTCUTS.CTRL_H) {
+        } else if (matchesAction(input, key, 'DELETE_BACKWARD')) {
           bufferOps.deleteChar("backward");
         }
         return;
@@ -350,7 +388,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
       }
 
       // Paste functionality
-      if ((key.ctrl && input === KEYBOARD_SHORTCUTS.CTRL_V) || (key.meta && input === KEYBOARD_SHORTCUTS.CMD_V)) {
+      if (matchesAction(input, key, 'PASTE')) {
         // Ctrl+V on non-Mac, Cmd+V on Mac
         bufferOps.pasteFromClipboard().catch((error) => {
           console.warn('Paste operation failed:', error);
