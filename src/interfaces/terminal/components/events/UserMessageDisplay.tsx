@@ -16,14 +16,9 @@ export function UserMessageDisplay({ event, isStreaming }: UserMessageDisplayPro
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box>
-        <Text color="cyan" bold>👤 User</Text>
-        <Text color="dim" dimColor>
-          {' '}({event.timestamp.toLocaleTimeString()})
-        </Text>
-        {isStreaming && <Text color="gray"> (typing...)</Text>}
-      </Box>
-      <Box paddingLeft={2}>
+        <Text color="dim">{'> '}</Text>
         <Text wrap="wrap">{message}</Text>
+        {isStreaming && <Text color="gray"> (typing...)</Text>}
       </Box>
     </Box>
   );

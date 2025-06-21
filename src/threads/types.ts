@@ -6,7 +6,8 @@ export type EventType =
   | 'AGENT_MESSAGE'
   | 'TOOL_CALL'
   | 'TOOL_RESULT'
-  | 'LOCAL_SYSTEM_MESSAGE';
+  | 'LOCAL_SYSTEM_MESSAGE'
+  | 'THINKING';
 
 export interface ThreadEvent {
   id: string;

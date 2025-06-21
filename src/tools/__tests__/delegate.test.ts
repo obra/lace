@@ -38,6 +38,10 @@ describe('DelegateTool', () => {
     mockToolExecutor = new ToolExecutor();
     mockToolExecutor.registerAllAvailableTools();
 
+    // Create and set active thread for delegation tests
+    const testThreadId = mockThreadManager.generateThreadId();
+    mockThreadManager.createThread(testThreadId);
+
     // Mock provider
     mockProvider = {
       providerName: 'anthropic',
@@ -113,7 +117,7 @@ describe('DelegateTool', () => {
         provider: mockProvider,
         toolExecutor: expect.any(Object),
         threadManager: mockThreadManager,
-        threadId: expect.stringMatching(/^delegate_/),
+        threadId: expect.stringMatching(/\.\d+$/), // Delegate threads end with .1, .2, etc.
         tools: expect.any(Array),
         tokenBudget: expect.objectContaining({
           warningThreshold: 0.7,
@@ -158,61 +162,38 @@ describe('DelegateTool', () => {
     );
   });
 
-  it('should forward tool call events from subagent', async () => {
-    // Track tool events
-    const toolEvents: any[] = [];
-
-    // Mock subagent making a tool call
+  it('should create delegate thread and execute subagent', async () => {
+    // Mock subagent behavior
     mockAgent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      if (event === 'tool_call_start') {
-        // Simulate tool call from subagent
-        setTimeout(() => {
-          toolEvents.push({
-            event: 'tool_call_start',
-            data: {
-              toolName: 'bash',
-              input: { command: 'ls -la' },
-              callId: 'test-call-123',
-            },
-          });
-          handler({
-            toolName: 'bash',
-            input: { command: 'ls -la' },
-            callId: 'test-call-123',
-          });
-        }, 0);
-      } else if (event === 'agent_response_complete') {
-        setTimeout(() => handler({ content: 'Directory listed' }), 20);
+      if (event === 'agent_response_complete') {
+        setTimeout(() => handler({ content: 'Directory listed successfully' }), 10);
       }
       return mockAgent;
     });
 
     mockAgent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'conversation_complete') {
-        setTimeout(() => handler(), 30);
+        setTimeout(() => handler(), 20);
       }
       return mockAgent;
     });
 
-    await tool.executeTool({
+    const result = await tool.executeTool({
       title: 'List files',
       prompt: 'Show directory contents',
       expected_response: 'File list',
     });
 
-    // Verify tool events were captured
-    expect(toolEvents).toHaveLength(1);
-    expect(toolEvents[0]).toEqual({
-      event: 'tool_call_start',
-      data: {
-        toolName: 'bash',
-        input: { command: 'ls -la' },
-        callId: 'test-call-123',
-      },
-    });
+    // Verify delegation succeeded
+    expect(result.isError).toBe(false);
+    expect(result.content[0]?.text).toContain('Directory listed successfully');
 
-    // Note: When tool approval is implemented, this is where we'd verify
-    // that the subagent's tool calls go through the same approval flow
+    // Verify Agent was created with delegate thread ID
+    const agentConfig = vi.mocked(Agent).mock.calls[0][0];
+    expect(agentConfig.threadId).toMatch(/\.\d+$/); // Delegate thread format
+
+    // Note: Tool calls from subagent are now captured in the delegate thread
+    // and displayed in the delegation box UI, not forwarded as events
   });
 
   it('should handle subagent errors gracefully', async () => {

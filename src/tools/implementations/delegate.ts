@@ -121,11 +121,16 @@ Examples:
 
       const toolExecutor = this.createRestrictedToolExecutor();
 
-      // Create new thread for subagent with delegate prefix
-      const subagentThreadId = `delegate_${this.threadManager.generateThreadId()}`;
+      // Create new delegate thread for subagent
+      const parentThreadId = this.threadManager.getCurrentThreadId();
+      if (!parentThreadId) {
+        throw new Error('No active thread for delegation');
+      }
 
-      // Create the thread in ThreadManager
-      threadManager.createThread(subagentThreadId);
+      const delegateThread = this.threadManager.createDelegateThreadFor(parentThreadId);
+      const subagentThreadId = delegateThread.id;
+
+      // Note: Delegation metadata is now shown in the delegation box UI
 
       // Get all tools for the subagent
       const availableTools = toolExecutor.getAllTools();
@@ -138,70 +143,84 @@ Examples:
       };
 
       // Create subagent
-      const subagent = new Agent({
-        provider,
-        toolExecutor,
-        threadManager,
-        threadId: subagentThreadId,
-        tools: availableTools,
-        tokenBudget,
-      });
+      let subagent: Agent | null = null;
 
-      // Collect responses
-      const responses: string[] = [];
+      try {
+        subagent = new Agent({
+          provider,
+          toolExecutor,
+          threadManager,
+          threadId: subagentThreadId,
+          tools: availableTools,
+          tokenBudget,
+        });
 
-      // Set up event handlers
-      subagent.on('agent_response_complete', ({ content }) => {
-        responses.push(content);
-      });
+        // Collect responses
+        const responses: string[] = [];
 
-      // Forward tool events (for future approval mechanism)
-      subagent.on('tool_call_start', (_data) => {
-        // When tool approval is implemented, this will forward to main agent's approval flow
-        // For now, just log that a tool was called
-      });
+        // Set up event handlers
+        subagent.on('agent_response_complete', ({ content }) => {
+          responses.push(content);
+        });
 
-      // Start subagent
-      subagent.start();
+        // Start subagent
+        subagent.start();
 
-      // Send the task
-      const taskMessage = `Task: ${title}\n\n${prompt}`;
+        // Send the task
+        const taskMessage = `Task: ${title}\n\n${prompt}`;
 
-      // Create promise that resolves when conversation completes or times out
-      const resultPromise = new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error(`Subagent timeout after ${this.defaultTimeout}ms`));
-        }, this.defaultTimeout);
+        // Create promise that resolves when conversation completes or times out
+        const resultPromise = new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            console.log(`⏰ Subagent timeout after ${this.defaultTimeout}ms`);
+            reject(new Error(`Subagent timeout after ${this.defaultTimeout}ms`));
+          }, this.defaultTimeout);
 
-        const completeHandler = () => {
-          clearTimeout(timeout);
-          resolve();
-        };
+          const completeHandler = () => {
+            console.log(`✅ Subagent completed: ${subagentThreadId}`);
+            clearTimeout(timeout);
+            resolve();
+          };
 
-        const errorHandler = ({ error }: { error: Error }) => {
-          clearTimeout(timeout);
-          reject(error);
-        };
+          const errorHandler = ({ error }: { error: Error }) => {
+            clearTimeout(timeout);
+            reject(error);
+          };
 
-        subagent.once('conversation_complete', completeHandler);
-        subagent.once('error', errorHandler);
-      });
+          subagent!.once('conversation_complete', completeHandler);
+          subagent!.once('error', errorHandler);
+        });
 
-      // Send message and wait for completion
-      await subagent.sendMessage(taskMessage);
-      await resultPromise;
+        // Send message and wait for completion
+        await subagent.sendMessage(taskMessage);
+        await resultPromise;
 
-      // Return collected responses
-      const combinedResponse = responses.join('\n\n');
-      return createSuccessResult([
-        {
-          type: 'text',
-          text: combinedResponse || 'Subagent completed without response',
-        },
-      ]);
+        // CLEANUP: Remove event listeners to prevent memory leaks
+        subagent.removeAllListeners();
+        console.log(`🧹 Cleaned up subagent listeners: ${subagentThreadId}`);
+
+        // Return collected responses
+        const combinedResponse = responses.join('\n\n');
+        return createSuccessResult([
+          {
+            type: 'text',
+            text: combinedResponse || 'Subagent completed without response',
+          },
+        ]);
+      } catch (error) {
+        // CLEANUP: Remove event listeners even on error to prevent memory leaks
+        if (subagent) {
+          subagent.removeAllListeners();
+          console.log(`🧹 Cleaned up subagent listeners on error: ${subagentThreadId}`);
+        }
+
+        return createErrorResult(
+          error instanceof Error ? `Subagent error: ${error.message}` : 'Unknown error occurred'
+        );
+      }
     } catch (error) {
       return createErrorResult(
-        error instanceof Error ? `Subagent error: ${error.message}` : 'Unknown error occurred'
+        error instanceof Error ? `Provider setup error: ${error.message}` : 'Unknown error occurred'
       );
     }
   }
@@ -218,12 +237,13 @@ Your instructions:
 - Complete ONLY the task described in the prompt
 - Return results in the format specified in "expected response"
 - Be concise and direct - no pleasantries or meta-commentary
-- Use tools as needed to complete the task
+- Use tools as needed to gather information, but STOP using tools once you have enough information to answer
+- After gathering sufficient data, provide your final answer WITHOUT using more tools
 - If you cannot complete the task, explain why briefly
 
 Expected response format: ${expectedResponse}
 
-Remember: You are optimized for efficiency. Get the job done and report back.`;
+IMPORTANT: Once you have gathered enough information to provide the expected response, STOP using tools and give your final answer. Do not continue exploring or gathering more data indefinitely.`;
 
     const config = {
       model: modelName,

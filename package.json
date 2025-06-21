@@ -7,7 +7,7 @@
     "lace": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/config/prompts dist/config/ 2>/dev/null || true",
     "start": "npm run build && node dist/cli.js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
@@ -23,6 +23,7 @@
     "@lmstudio/sdk": "^1.2.1",
     "@types/glob": "^8.1.0",
     "@types/react": "^19.1.8",
+    "@types/sax": "^1.2.7",
     "better-sqlite3": "^11.10.0",
     "cli-highlight": "^2.1.11",
     "commander": "^14.0.0",
@@ -31,15 +32,18 @@
     "highlight.js": "^11.11.1",
     "ink": "^6.0.0",
     "ink-autocomplete": "^0.0.0",
+    "mustache": "^4.2.0",
     "ollama": "^0.5.16",
     "openai": "^4.77.0",
     "pino": "^9.7.0",
     "pino-pretty": "^13.0.0",
-    "react": "^19.1.0"
+    "react": "^19.1.0",
+    "sax": "^1.4.1"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.0",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/mustache": "^4.2.5",
     "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^8.34.0",
     "@typescript-eslint/parser": "^8.34.0",
