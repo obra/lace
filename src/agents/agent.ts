@@ -17,7 +17,6 @@ import { logger } from '../utils/logger.js';
 import { StopReasonHandler } from '../token-management/stop-reason-handler.js';
 import { TokenBudgetManager } from '../token-management/token-budget-manager.js';
 import { TokenBudgetConfig } from '../token-management/types.js';
-import sax from 'sax';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -323,38 +322,9 @@ export class Agent extends EventEmitter {
     // Set to streaming state
     this._setState('streaming');
 
-    // Set up streaming thinking block parser
-    const parser = sax.createStream(false, { lowercase: true });
-    let insideThinkTag = false;
-    let thinkContent = '';
-
-    parser.on('opentagstart', (tag) => {
-      if (tag.name === 'think') {
-        insideThinkTag = true;
-        thinkContent = '';
-      }
-    });
-
-    parser.on('text', (text) => {
-      if (insideThinkTag) {
-        thinkContent += text;
-      }
-    });
-
-    parser.on('closetag', (tagName) => {
-      if (tagName === 'think' && thinkContent.trim()) {
-        // Add completed thinking block to thread
-        this._threadManager.addEvent(this._threadId, 'THINKING', thinkContent.trim());
-        insideThinkTag = false;
-        thinkContent = '';
-      }
-    });
-
     // Set up provider event listeners
     const tokenListener = ({ token }: { token: string }) => {
-      // Feed token to thinking parser
-      parser.write(token);
-
+      // Simple pass-through - emit all tokens as received
       this.emit('agent_token', { token });
     };
 

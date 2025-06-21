@@ -817,6 +817,57 @@ describe('Enhanced Agent', () => {
         const finalListenerCount = streamingProvider.listenerCount('token');
         expect(finalListenerCount).toBe(initialListenerCount);
       });
+
+      it('should emit all tokens during streaming, thinking block extraction handled by UI layer', async () => {
+        // Override the streaming provider to return content with thinking blocks
+        streamingProvider.createStreamingResponse = vi.fn().mockImplementation(async (..._args) => {
+          // Simulate streaming tokens that include thinking blocks
+          const tokens = [
+            '<think>',
+            'I need to',
+            ' think about',
+            ' this</think>',
+            'Here is',
+            ' my response',
+          ];
+
+          for (const token of tokens) {
+            streamingProvider.emit('token', { token });
+          }
+
+          return {
+            content: '<think>I need to think about this</think>Here is my response',
+            toolCalls: [],
+          };
+        });
+
+        const streamingTokens: string[] = [];
+
+        agent.on('agent_token', ({ token }) => {
+          streamingTokens.push(token);
+        });
+
+        await agent.sendMessage('Test thinking blocks in streaming');
+
+        // Agent should emit all tokens as received (thinking blocks are handled in UI layer)
+        const allTokens = streamingTokens.join('');
+        expect(allTokens).toContain('<think>');
+        expect(allTokens).toContain('I need to think about this');
+        expect(allTokens).toContain('</think>');
+        expect(allTokens).toContain('Here is my response');
+
+        // Thread should contain raw agent message with thinking blocks for model context
+        const events = threadManager.getEvents(threadId);
+        const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
+        expect(agentMessages).toHaveLength(1);
+        expect(agentMessages[0].data).toBe(
+          '<think>I need to think about this</think>Here is my response'
+        );
+
+        // No THINKING events should be created by the Agent - that's UI layer responsibility
+        const thinkingEvents = events.filter((e) => e.type === 'THINKING');
+        expect(thinkingEvents).toHaveLength(0);
+      });
     });
 
     describe('with non-streaming provider', () => {

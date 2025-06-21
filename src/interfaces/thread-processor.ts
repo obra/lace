@@ -30,8 +30,11 @@ export type TimelineItem =
 // Cached processed events (from persisted ThreadEvents)
 export type ProcessedThreadItems = Exclude<TimelineItem, { type: 'ephemeral_message' }>[];
 
-// Fast processing for streaming messages
-export type EphemeralTimelineItems = Extract<TimelineItem, { type: 'ephemeral_message' }>[];
+// Fast processing for streaming messages (can include thinking blocks from streaming)
+export type EphemeralTimelineItems = (
+  | Extract<TimelineItem, { type: 'ephemeral_message' }>
+  | Extract<TimelineItem, { type: 'thinking' }>
+)[];
 
 export interface EphemeralMessage {
   type: 'user' | 'assistant' | 'system' | 'tool' | 'thinking';
@@ -65,14 +68,47 @@ export class ThreadProcessor {
 
   /**
    * Process ephemeral messages (called frequently during streaming)
+   * Extracts thinking blocks from streaming assistant messages
    */
   processEphemeralEvents(ephemeralMessages: EphemeralMessage[]): EphemeralTimelineItems {
-    return ephemeralMessages.map((msg) => ({
-      type: 'ephemeral_message' as const,
-      messageType: msg.type,
-      content: msg.content,
-      timestamp: msg.timestamp,
-    }));
+    const items: EphemeralTimelineItems = [];
+
+    for (const msg of ephemeralMessages) {
+      if (msg.type === 'assistant' && msg.content) {
+        // Extract thinking blocks from streaming assistant content
+        const { content: cleanContent, thinkingBlocks } = this.extractThinkingBlocks(msg.content);
+
+        // Add thinking blocks as separate items
+        thinkingBlocks.forEach((thinkingContent, index) => {
+          items.push({
+            type: 'thinking' as const,
+            content: thinkingContent,
+            timestamp: new Date(msg.timestamp.getTime() + index), // Slight offset for ordering
+            id: `${msg.timestamp.getTime()}_thinking_${index}`,
+          });
+        });
+
+        // Add clean content if there's any
+        if (cleanContent.trim()) {
+          items.push({
+            type: 'ephemeral_message' as const,
+            messageType: msg.type,
+            content: cleanContent,
+            timestamp: new Date(msg.timestamp.getTime() + thinkingBlocks.length), // After thinking blocks
+          });
+        }
+      } else {
+        // Non-assistant messages or messages without content - pass through unchanged
+        items.push({
+          type: 'ephemeral_message' as const,
+          messageType: msg.type,
+          content: msg.content,
+          timestamp: msg.timestamp,
+        });
+      }
+    }
+
+    return items;
   }
 
   /**
@@ -82,14 +118,17 @@ export class ThreadProcessor {
     processedEvents: ProcessedThreadItems,
     ephemeralItems: EphemeralTimelineItems
   ): Timeline {
+    // Deduplicate thinking blocks that appear in both sources
+    const deduplicatedEvents = this._deduplicateThinkingBlocks(processedEvents);
+
     // Merge and sort chronologically
-    const allItems: TimelineItem[] = [...processedEvents, ...ephemeralItems].sort(
+    const allItems: TimelineItem[] = [...deduplicatedEvents, ...ephemeralItems].sort(
       (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
     );
 
     // Calculate metadata
-    const eventCount = processedEvents.length;
-    const messageCount = processedEvents.filter(
+    const eventCount = deduplicatedEvents.length;
+    const messageCount = deduplicatedEvents.filter(
       (item) => item.type === 'user_message' || item.type === 'agent_message'
     ).length;
 
@@ -313,6 +352,42 @@ export class ThreadProcessor {
 
     const lastEvent = events[events.length - 1];
     return `${events.length}-${lastEvent.timestamp.getTime()}-${lastEvent.id}`;
+  }
+
+  /**
+   * Deduplicate thinking blocks that appear in both THINKING events and extracted from AGENT_MESSAGE
+   * Keeps the THINKING events (streaming source) over extracted blocks for chronological accuracy
+   */
+  private _deduplicateThinkingBlocks(items: ProcessedThreadItems): ProcessedThreadItems {
+    const seenThinkingContent = new Set<string>();
+    const deduplicatedItems: ProcessedThreadItems = [];
+
+    // First pass: collect content from THINKING events (streaming source - preferred)
+    for (const item of items) {
+      if (item.type === 'thinking' && !item.id.includes('_thinking_')) {
+        // This is from a THINKING ThreadEvent (streaming) - doesn't have _thinking_ pattern
+        seenThinkingContent.add(item.content.trim());
+        deduplicatedItems.push(item);
+      }
+    }
+
+    // Second pass: add other items, skipping extracted thinking blocks that duplicate streaming ones
+    for (const item of items) {
+      if (item.type === 'thinking' && item.id.includes('_thinking_')) {
+        // This is an extracted thinking block from AGENT_MESSAGE content
+        if (!seenThinkingContent.has(item.content.trim())) {
+          // Not a duplicate, add it
+          deduplicatedItems.push(item);
+        }
+        // Skip duplicates - streaming version already added
+      } else if (item.type !== 'thinking' || item.id.includes('_thinking_')) {
+        // Not a thinking block, or is an extracted one (handled above), add non-thinking items
+        deduplicatedItems.push(item);
+      }
+    }
+
+    // Sort by timestamp to maintain chronological order
+    return deduplicatedItems.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
   }
 
   /**
