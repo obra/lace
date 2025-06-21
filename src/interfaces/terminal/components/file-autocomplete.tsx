@@ -21,8 +21,8 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
     return null;
   }
 
-  // Calculate visible window for scrolling
-  const startIndex = Math.max(0, Math.min(selectedIndex - Math.floor(maxItems / 2), items.length - maxItems));
+  // Calculate visible window for scrolling - keep selected item at top
+  const startIndex = Math.max(0, Math.min(selectedIndex, items.length - maxItems));
   const endIndex = Math.min(items.length, startIndex + maxItems);
   const visibleItems = items.slice(startIndex, endIndex);
   const hasMore = items.length > maxItems;
@@ -33,13 +33,17 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
         const actualIndex = startIndex + index;
         const isSelected = actualIndex === selectedIndex;
         
+        // Skip the selected item - it appears inline only
+        if (isSelected) {
+          return null;
+        }
+        
         return (
           <Text 
             key={`${actualIndex}-${item}`}
-            color={isSelected ? "black" : "white"}
-            backgroundColor={isSelected ? "white" : undefined}
+            color="dim"
           >
-            {isSelected ? '> ' : '  '}{item}
+            {item.trim()}
           </Text>
         );
       })}

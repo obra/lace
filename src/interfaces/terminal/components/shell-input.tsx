@@ -1,7 +1,7 @@
 // ABOUTME: Simple text editor input with multi-line editing capabilities
 // ABOUTME: Handles keyboard input and manages text buffer state
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Box, Text, useInput, useFocus } from "ink";
 import { useTextBuffer } from "../hooks/use-text-buffer.js";
 import TextRenderer from "./text-renderer.js";
@@ -106,13 +106,14 @@ const ShellInput: React.FC<ShellInputProps> = ({
     const { start, end } = getCurrentWord();
     const currentLine = bufferState.lines[bufferState.cursorLine] || '';
     
-    // Replace the current word with the completion
-    const newLine = currentLine.slice(0, start) + completion + currentLine.slice(end);
+    // Replace the current word with the completion (trim any extra spaces)
+    const cleanCompletion = completion.trim();
+    const newLine = currentLine.slice(0, start) + cleanCompletion + currentLine.slice(end);
     const newLines = [...bufferState.lines];
     newLines[bufferState.cursorLine] = newLine;
     
     bufferOps.setText(newLines.join('\n'));
-    bufferOps.setCursorPosition(bufferState.cursorLine, start + completion.length);
+    bufferOps.setCursorPosition(bufferState.cursorLine, start + cleanCompletion.length);
     
     setAutocompleteVisible(false);
   }, [bufferState, bufferOps, getCurrentWord]);
@@ -152,9 +153,14 @@ const ShellInput: React.FC<ShellInputProps> = ({
 
       // Handle Tab key for autocomplete
       if (key.tab) {
-        if (autocompleteVisible) {
-          hideAutocomplete();
+        if (autocompleteVisible && autocompleteItems.length > 0) {
+          // Apply the selected completion
+          const selectedItem = autocompleteItems[autocompleteSelectedIndex];
+          if (selectedItem) {
+            handleAutocompleteSelect(selectedItem);
+          }
         } else {
+          // Show autocomplete
           showAutocomplete();
         }
         return;
@@ -285,6 +291,30 @@ const ShellInput: React.FC<ShellInputProps> = ({
     { isActive: actualIsFocused },
   );
 
+  // Calculate inline completion preview
+  const inlineCompletion = useMemo(() => {
+    if (!autocompleteVisible || autocompleteItems.length === 0) {
+      return undefined;
+    }
+    
+    const selectedItem = autocompleteItems[autocompleteSelectedIndex];
+    if (!selectedItem) {
+      return undefined;
+    }
+    
+    const { beforeCursor } = getCurrentWord();
+    // Show the remaining part of the completion after what's already typed
+    const cleanSelectedItem = selectedItem.trim();
+    const cleanBeforeCursor = beforeCursor.trim();
+    
+    if (cleanSelectedItem.startsWith(cleanBeforeCursor)) {
+      const remaining = cleanSelectedItem.slice(cleanBeforeCursor.length);
+      return remaining;
+    }
+    
+    return undefined;
+  }, [autocompleteVisible, autocompleteItems, autocompleteSelectedIndex, getCurrentWord]);
+
   return (
     <Box flexDirection="column">
       <Box>
@@ -296,13 +326,14 @@ const ShellInput: React.FC<ShellInputProps> = ({
             cursorColumn={bufferState.cursorColumn}
             isFocused={actualIsFocused ?? false}
             placeholder={placeholder}
+            inlineCompletion={inlineCompletion}
           />
         </Box>
       </Box>
       
-      {/* File autocomplete overlay - positioned inline below cursor line */}
+      {/* File autocomplete overlay - positioned aligned with prompt */}
       {autocompleteVisible && (
-        <Box marginLeft={bufferState.cursorColumn + 2}>
+        <Box marginLeft={2}>
           <FileAutocomplete
             items={autocompleteItems}
             selectedIndex={autocompleteSelectedIndex}
