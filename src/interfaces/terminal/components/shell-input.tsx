@@ -1,11 +1,63 @@
 // ABOUTME: Simple text editor input with multi-line editing capabilities
 // ABOUTME: Handles keyboard input and manages text buffer state
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Box, Text, useInput, useFocus } from "ink";
 import { useTextBuffer } from "../hooks/use-text-buffer.js";
 import TextRenderer from "./text-renderer.js";
 import FileAutocomplete from "./file-autocomplete.js";
+
+// Keyboard shortcut system - list-based approach
+type KeyboardShortcut = string[];  // e.g., ['ctrl', 'a'] or ['meta', 'shift', 'z']
+
+const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcut | KeyboardShortcut[]> = {
+  MOVE_TO_START: ['ctrl', 'a'],
+  MOVE_TO_END: ['ctrl', 'e'],
+  KILL_LINE: ['ctrl', 'k'],
+  KILL_LINE_BACKWARD: ['ctrl', 'u'],
+  DELETE_FORWARD: ['ctrl', 'd'],
+  DELETE_BACKWARD: ['ctrl', 'h'],
+  PASTE: [
+    ['ctrl', 'v'],   // Non-Mac
+    ['meta', 'v']    // Mac  
+  ]
+};
+
+const matchesShortcut = (input: string, key: any, shortcut: KeyboardShortcut): boolean => {
+  // Last element is the key, everything else are modifiers
+  const keyChar = shortcut[shortcut.length - 1];
+  const modifiers = shortcut.slice(0, -1);
+  
+  if (input !== keyChar) {
+    return false;
+  }
+  
+  // Check that all required modifiers are pressed
+  for (const modifier of modifiers) {
+    if (!key[modifier]) {
+      return false;
+    }
+  }
+  
+  // Check that no extra modifiers are pressed
+  const allModifiers = ['ctrl', 'meta', 'alt', 'shift'];
+  for (const modifier of allModifiers) {
+    if (!modifiers.includes(modifier) && key[modifier]) {
+      return false;
+    }
+  }
+  
+  return true;
+};
+
+const matchesAction = (input: string, key: any, action: string): boolean => {
+  const shortcuts = KEYBOARD_SHORTCUTS[action];
+  if (Array.isArray(shortcuts)) {
+    return shortcuts.some(shortcut => matchesShortcut(input, key, shortcut));
+  } else {
+    return matchesShortcut(input, key, shortcuts);
+  }
+};
 
 interface ShellInputProps {
   value?: string;
@@ -46,6 +98,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
   const [autocompleteQuery, setAutocompleteQuery] = useState("");
   const [autocompleteSelectedIndex, setAutocompleteSelectedIndex] = useState(0);
   const [autocompleteItems, setAutocompleteItems] = useState<string[]>([]);
+  const [autocompleteOriginalItems, setAutocompleteOriginalItems] = useState<string[]>([]);
 
   // Only sync external value changes on first mount or significant changes
   const [lastExternalValue, setLastExternalValue] = useState(value);
@@ -106,40 +159,109 @@ const ShellInput: React.FC<ShellInputProps> = ({
     const { start, end } = getCurrentWord();
     const currentLine = bufferState.lines[bufferState.cursorLine] || '';
     
-    // Replace the current word with the completion
-    const newLine = currentLine.slice(0, start) + completion + currentLine.slice(end);
+    // Replace the current word with the completion (trim any extra spaces)
+    const cleanCompletion = completion.trim();
+    const newLine = currentLine.slice(0, start) + cleanCompletion + currentLine.slice(end);
     const newLines = [...bufferState.lines];
     newLines[bufferState.cursorLine] = newLine;
     
     bufferOps.setText(newLines.join('\n'));
-    bufferOps.setCursorPosition(bufferState.cursorLine, start + completion.length);
+    bufferOps.setCursorPosition(bufferState.cursorLine, start + cleanCompletion.length);
     
     setAutocompleteVisible(false);
   }, [bufferState, bufferOps, getCurrentWord]);
 
   const showAutocomplete = useCallback(async () => {
     const { beforeCursor } = getCurrentWord();
+    const currentLine = bufferState.lines[bufferState.cursorLine] || '';
+    const trimmedLine = currentLine.trim();
+    
     setAutocompleteQuery(beforeCursor);
     setAutocompleteSelectedIndex(0);
     setAutocompleteVisible(true);
     
-    // Load completions
     try {
-      const { FileScanner } = await import('../utils/file-scanner.js');
-      const scanner = new FileScanner();
-      const completions = await scanner.getCompletions(beforeCursor);
+      let completions: string[] = [];
+      
+      // Context-aware completion logic
+      if (trimmedLine.startsWith('/') && bufferState.cursorLine === 0) {
+        // Command completion at start of prompt
+        const { CommandRegistry } = await import('../../../commands/registry.js');
+        const registry = await CommandRegistry.createWithAutoDiscovery();
+        const commands = registry.getAllCommands();
+        
+        const commandPrefix = beforeCursor.startsWith('/') ? beforeCursor.slice(1) : beforeCursor;
+        completions = commands
+          .filter(cmd => cmd.name.startsWith(commandPrefix))
+          .map(cmd => `/${cmd.name}`);
+      } else {
+        // File/directory completion
+        const { FileScanner } = await import('../utils/file-scanner.js');
+        const scanner = new FileScanner();
+        
+        if (beforeCursor.startsWith('./')) {
+          // Relative path from current directory
+          const relativePath = beforeCursor.slice(2);
+          completions = await scanner.getCompletions(relativePath);
+          completions = completions.map(item => `./${item}`);
+        } else if (beforeCursor.includes('/') || beforeCursor === '') {
+          // Standard path completion
+          completions = await scanner.getCompletions(beforeCursor);
+        } else {
+          // Substring search across all project files
+          completions = await scanner.findBySubstring(beforeCursor);
+        }
+      }
+      
       setAutocompleteItems(completions);
+      setAutocompleteOriginalItems(completions);
     } catch (error) {
       console.error('Failed to load completions:', error);
       setAutocompleteItems([]);
+      setAutocompleteOriginalItems([]);
     }
-  }, [getCurrentWord]);
+  }, [getCurrentWord, bufferState.cursorLine, bufferState.lines]);
+
+  const filterAutocompleteWithText = useCallback((beforeCursor: string) => {
+    if (!autocompleteVisible || autocompleteOriginalItems.length === 0) {
+      return;
+    }
+    
+    // For directory completion, extract the directory prefix and the filter query
+    const lastSlash = beforeCursor.lastIndexOf('/');
+    const directoryPrefix = lastSlash >= 0 ? beforeCursor.slice(0, lastSlash + 1) : '';
+    const filterQuery = lastSlash >= 0 ? beforeCursor.slice(lastSlash + 1) : beforeCursor;
+    
+    // Filter original items based on the query
+    const filtered = autocompleteOriginalItems.filter(item => {
+      // Extract the name part after the directory prefix
+      let itemName = item;
+      if (directoryPrefix && item.startsWith(directoryPrefix)) {
+        itemName = item.slice(directoryPrefix.length);
+        // Remove trailing slash for directory names when filtering
+        if (itemName.endsWith('/')) {
+          itemName = itemName.slice(0, -1);
+        }
+      }
+      
+      const matches = itemName.toLowerCase().includes(filterQuery.toLowerCase());
+      return matches;
+    });
+    setAutocompleteItems(filtered);
+    setAutocompleteSelectedIndex(0);
+  }, [autocompleteVisible, autocompleteOriginalItems]);
+
+  const filterAutocomplete = useCallback(() => {
+    const { beforeCursor } = getCurrentWord();
+    filterAutocompleteWithText(beforeCursor);
+  }, [getCurrentWord, filterAutocompleteWithText]);
 
   const hideAutocomplete = useCallback(() => {
     setAutocompleteVisible(false);
     setAutocompleteQuery('');
     setAutocompleteSelectedIndex(0);
     setAutocompleteItems([]);
+    setAutocompleteOriginalItems([]);
   }, []);
 
   // Input handler
@@ -152,9 +274,14 @@ const ShellInput: React.FC<ShellInputProps> = ({
 
       // Handle Tab key for autocomplete
       if (key.tab) {
-        if (autocompleteVisible) {
-          hideAutocomplete();
+        if (autocompleteVisible && autocompleteItems.length > 0) {
+          // Apply the selected completion
+          const selectedItem = autocompleteItems[autocompleteSelectedIndex];
+          if (selectedItem) {
+            handleAutocompleteSelect(selectedItem);
+          }
         } else {
+          // Show autocomplete
           showAutocomplete();
         }
         return;
@@ -197,15 +324,49 @@ const ShellInput: React.FC<ShellInputProps> = ({
         return;
       }
 
-      // Navigation
-      if (key.leftArrow) {
-        bufferOps.moveCursor("left");
-        return;
-      }
+      // Right arrow applies completion like Tab
       if (key.rightArrow) {
-        bufferOps.moveCursor("right");
+        if (autocompleteVisible && autocompleteItems.length > 0) {
+          // Apply the selected completion
+          const selectedItem = autocompleteItems[autocompleteSelectedIndex];
+          if (selectedItem) {
+            handleAutocompleteSelect(selectedItem);
+          }
+        } else {
+          bufferOps.moveCursor("right");
+        }
         return;
       }
+
+      // Navigation - these keys cancel autocomplete
+      if (key.leftArrow || matchesAction(input, key, 'MOVE_TO_START') || matchesAction(input, key, 'MOVE_TO_END') ||
+          matchesAction(input, key, 'KILL_LINE') || matchesAction(input, key, 'KILL_LINE_BACKWARD') || 
+          matchesAction(input, key, 'DELETE_FORWARD') || matchesAction(input, key, 'DELETE_BACKWARD')) {
+        
+        if (autocompleteVisible) {
+          hideAutocomplete();
+        }
+        
+        // Execute the original navigation/editing command
+        if (key.leftArrow) {
+          bufferOps.moveCursor("left");
+        } else if (matchesAction(input, key, 'MOVE_TO_START')) {
+          bufferOps.moveCursor("home");
+        } else if (matchesAction(input, key, 'MOVE_TO_END')) {
+          bufferOps.moveCursor("end");
+        } else if (matchesAction(input, key, 'KILL_LINE')) {
+          bufferOps.killLine();
+        } else if (matchesAction(input, key, 'KILL_LINE_BACKWARD')) {
+          bufferOps.killLineBackward();
+        } else if (matchesAction(input, key, 'DELETE_FORWARD')) {
+          bufferOps.deleteChar("forward");
+        } else if (matchesAction(input, key, 'DELETE_BACKWARD')) {
+          bufferOps.deleteChar("backward");
+        }
+        return;
+      }
+      
+      // Up/Down arrows for autocomplete navigation or cursor movement
       if (key.upArrow) {
         if (autocompleteVisible && autocompleteItems.length > 0) {
           setAutocompleteSelectedIndex(prev => Math.max(0, prev - 1));
@@ -222,59 +383,91 @@ const ShellInput: React.FC<ShellInputProps> = ({
         }
         return;
       }
-      if (key.ctrl && input === "a") {
-        bufferOps.moveCursor("home");
-        return;
-      }
-      if (key.ctrl && input === "e") {
-        bufferOps.moveCursor("end");
+
+      // Paste functionality
+      if (matchesAction(input, key, 'PASTE')) {
+        // Ctrl+V on non-Mac, Cmd+V on Mac
+        bufferOps.pasteFromClipboard().catch((error) => {
+          console.warn('Paste operation failed:', error);
+        });
         return;
       }
 
-      // Emacs-style editing commands
-      if (key.ctrl && input === "k") {
-        // Kill line (delete from cursor to end of line)
-        bufferOps.killLine();
-        return;
-      }
-      if (key.ctrl && input === "u") {
-        // Kill line backward (delete from beginning of line to cursor)
-        bufferOps.killLineBackward();
-        return;
-      }
-      if (key.ctrl && input === "d") {
-        // Delete character forward (like Delete key)
-        bufferOps.deleteChar("forward");
-        return;
-      }
-      if (key.ctrl && input === "h") {
-        // Delete character backward (like Backspace key)
-        bufferOps.deleteChar("backward");
+      // Deletion - filter autocomplete instead of canceling
+      if (key.delete || key.backspace) {
+        // Get the expected new text before performing deletion
+        let newBeforeCursor = '';
+        if (autocompleteVisible) {
+          const { beforeCursor } = getCurrentWord();
+          if (key.delete && beforeCursor.length > 0) {
+            // Backspace: remove last character
+            newBeforeCursor = beforeCursor.slice(0, -1);
+          } else if (key.backspace) {
+            // Forward delete: more complex, just use setTimeout for now
+            newBeforeCursor = beforeCursor;
+          }
+        }
+        
+        if (key.delete) {
+          bufferOps.deleteChar("backward");
+        } else {
+          bufferOps.deleteChar("forward");
+        }
+        
+        // Filter autocomplete after deletion
+        if (autocompleteVisible) {
+          if (key.delete && newBeforeCursor !== '') {
+            filterAutocompleteWithText(newBeforeCursor);
+          } else {
+            // For forward delete or edge cases, use requestAnimationFrame for better performance
+            requestAnimationFrame(() => {
+              filterAutocomplete();
+            });
+          }
+        }
         return;
       }
 
-      // Deletion
-      if (key.delete) {
-        bufferOps.deleteChar("backward");
-        return;
-      }
-      if (key.backspace) {
-        bufferOps.deleteChar("forward");
-        return;
-      }
-
-      // Regular character input
+      // Regular character input - filter autocomplete instead of hiding
       if (input && input.length === 1 && !key.ctrl && !key.meta) {
         bufferOps.insertText(input);
-        // Hide autocomplete when typing
+        
+        // Filter autocomplete when typing
         if (autocompleteVisible) {
-          hideAutocomplete();
+          // Get the expected new text and filter with it
+          const { beforeCursor } = getCurrentWord();
+          const newBeforeCursor = beforeCursor + input;
+          filterAutocompleteWithText(newBeforeCursor);
         }
         return;
       }
     },
     { isActive: actualIsFocused },
   );
+
+  // Calculate inline completion preview
+  const inlineCompletion = useMemo(() => {
+    if (!autocompleteVisible || autocompleteItems.length === 0) {
+      return undefined;
+    }
+    
+    const selectedItem = autocompleteItems[autocompleteSelectedIndex];
+    if (!selectedItem) {
+      return undefined;
+    }
+    
+    const { beforeCursor } = getCurrentWord();
+    // Show the remaining part of the completion after what's already typed
+    const cleanSelectedItem = selectedItem.trim();
+    const cleanBeforeCursor = beforeCursor.trim();
+    
+    if (cleanSelectedItem.startsWith(cleanBeforeCursor)) {
+      const remaining = cleanSelectedItem.slice(cleanBeforeCursor.length);
+      return remaining;
+    }
+    
+    return undefined;
+  }, [autocompleteVisible, autocompleteItems, autocompleteSelectedIndex, getCurrentWord]);
 
   return (
     <Box flexDirection="column">
@@ -287,13 +480,14 @@ const ShellInput: React.FC<ShellInputProps> = ({
             cursorColumn={bufferState.cursorColumn}
             isFocused={actualIsFocused ?? false}
             placeholder={placeholder}
+            inlineCompletion={inlineCompletion}
           />
         </Box>
       </Box>
       
-      {/* File autocomplete overlay - positioned inline below cursor line */}
+      {/* File autocomplete overlay - positioned aligned with prompt */}
       {autocompleteVisible && (
-        <Box marginLeft={bufferState.cursorColumn + 2}>
+        <Box marginLeft={2}>
           <FileAutocomplete
             items={autocompleteItems}
             selectedIndex={autocompleteSelectedIndex}

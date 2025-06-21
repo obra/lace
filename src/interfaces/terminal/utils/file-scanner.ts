@@ -223,6 +223,84 @@ export class FileScanner {
   }
 
   /**
+   * Find all files and directories containing a substring
+   */
+  public async findBySubstring(substring: string): Promise<string[]> {
+    if (!substring || substring.length < 2) {
+      return [];
+    }
+
+    const searchLower = substring.toLowerCase();
+    const results: string[] = [];
+
+    // Recursively scan all directories
+    const scanRecursively = async (dirPath: string, depth: number = 0): Promise<void> => {
+      // Limit recursion depth to prevent infinite loops
+      if (depth > 10) return;
+
+      try {
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+
+        for (const entry of entries) {
+          const fullPath = path.join(dirPath, entry.name);
+
+          // Skip if ignored
+          if (this.isIgnored(fullPath)) {
+            continue;
+          }
+
+          const relativePath = path.relative(this.workingDirectory, fullPath);
+
+          // Check if path contains substring
+          if (relativePath.toLowerCase().includes(searchLower)) {
+            if (entry.isDirectory()) {
+              results.push(relativePath + '/');
+            } else {
+              results.push(relativePath);
+            }
+          }
+
+          // Recurse into directories
+          if (entry.isDirectory()) {
+            await scanRecursively(fullPath, depth + 1);
+          }
+        }
+      } catch (error) {
+        // Skip directories we can't read
+        logger.debug('Failed to scan directory for substring search', {
+          dirPath,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+
+    await scanRecursively(this.workingDirectory);
+
+    // Sort results with directories first, then by relevance
+    return results
+      .sort((a, b) => {
+        const aIsDir = a.endsWith('/');
+        const bIsDir = b.endsWith('/');
+
+        // Directories first
+        if (aIsDir && !bIsDir) return -1;
+        if (!aIsDir && bIsDir) return 1;
+
+        // Then by how early the substring appears
+        const aIndex = a.toLowerCase().indexOf(searchLower);
+        const bIndex = b.toLowerCase().indexOf(searchLower);
+
+        if (aIndex !== bIndex) {
+          return aIndex - bIndex;
+        }
+
+        // Finally alphabetical
+        return a.localeCompare(b);
+      })
+      .slice(0, 50); // Limit results to prevent overwhelming UI
+  }
+
+  /**
    * Update working directory and reload gitignore
    */
   public setWorkingDirectory(newDir: string): void {
