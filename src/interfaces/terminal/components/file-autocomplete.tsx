@@ -33,17 +33,12 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
         const actualIndex = startIndex + index;
         const isSelected = actualIndex === selectedIndex;
         
-        // Skip the selected item - it appears inline only
-        if (isSelected) {
-          return null;
-        }
-        
         return (
           <Text 
             key={`${actualIndex}-${item}`}
-            color="dim"
+            color={isSelected ? "yellow" : "dim"}
           >
-            {item.trim()}
+            {isSelected ? '> ' : '  '}{item.trim()}
           </Text>
         );
       })}
