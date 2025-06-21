@@ -7,6 +7,23 @@ import { useTextBuffer } from "../hooks/use-text-buffer.js";
 import TextRenderer from "./text-renderer.js";
 import FileAutocomplete from "./file-autocomplete.js";
 
+// Keyboard shortcut constants
+const KEYBOARD_SHORTCUTS = {
+  // Navigation shortcuts
+  CTRL_A: 'a', // Move to beginning of line
+  CTRL_E: 'e', // Move to end of line
+  
+  // Editing shortcuts  
+  CTRL_K: 'k', // Kill line (delete to end)
+  CTRL_U: 'u', // Kill line backward (delete to beginning)
+  CTRL_D: 'd', // Delete character forward
+  CTRL_H: 'h', // Delete character backward
+  
+  // Clipboard shortcuts
+  CTRL_V: 'v', // Paste (non-Mac)
+  CMD_V: 'v',  // Paste (Mac)
+} as const;
+
 interface ShellInputProps {
   value?: string;
   placeholder?: string;
@@ -288,8 +305,8 @@ const ShellInput: React.FC<ShellInputProps> = ({
 
       // Navigation - these keys cancel autocomplete
       if (key.leftArrow || 
-          (key.ctrl && (input === "a" || input === "e")) ||
-          (key.ctrl && (input === "k" || input === "u" || input === "d" || input === "h"))) {
+          (key.ctrl && (input === KEYBOARD_SHORTCUTS.CTRL_A || input === KEYBOARD_SHORTCUTS.CTRL_E)) ||
+          (key.ctrl && (input === KEYBOARD_SHORTCUTS.CTRL_K || input === KEYBOARD_SHORTCUTS.CTRL_U || input === KEYBOARD_SHORTCUTS.CTRL_D || input === KEYBOARD_SHORTCUTS.CTRL_H))) {
         
         if (autocompleteVisible) {
           hideAutocomplete();
@@ -298,17 +315,17 @@ const ShellInput: React.FC<ShellInputProps> = ({
         // Execute the original navigation/editing command
         if (key.leftArrow) {
           bufferOps.moveCursor("left");
-        } else if (key.ctrl && input === "a") {
+        } else if (key.ctrl && input === KEYBOARD_SHORTCUTS.CTRL_A) {
           bufferOps.moveCursor("home");
-        } else if (key.ctrl && input === "e") {
+        } else if (key.ctrl && input === KEYBOARD_SHORTCUTS.CTRL_E) {
           bufferOps.moveCursor("end");
-        } else if (key.ctrl && input === "k") {
+        } else if (key.ctrl && input === KEYBOARD_SHORTCUTS.CTRL_K) {
           bufferOps.killLine();
-        } else if (key.ctrl && input === "u") {
+        } else if (key.ctrl && input === KEYBOARD_SHORTCUTS.CTRL_U) {
           bufferOps.killLineBackward();
-        } else if (key.ctrl && input === "d") {
+        } else if (key.ctrl && input === KEYBOARD_SHORTCUTS.CTRL_D) {
           bufferOps.deleteChar("forward");
-        } else if (key.ctrl && input === "h") {
+        } else if (key.ctrl && input === KEYBOARD_SHORTCUTS.CTRL_H) {
           bufferOps.deleteChar("backward");
         }
         return;
@@ -333,7 +350,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
       }
 
       // Paste functionality
-      if ((key.ctrl && input === "v") || (key.meta && input === "v")) {
+      if ((key.ctrl && input === KEYBOARD_SHORTCUTS.CTRL_V) || (key.meta && input === KEYBOARD_SHORTCUTS.CMD_V)) {
         // Ctrl+V on non-Mac, Cmd+V on Mac
         bufferOps.pasteFromClipboard().catch((error) => {
           console.warn('Paste operation failed:', error);
@@ -367,10 +384,10 @@ const ShellInput: React.FC<ShellInputProps> = ({
           if (key.delete && newBeforeCursor !== '') {
             filterAutocompleteWithText(newBeforeCursor);
           } else {
-            // For forward delete or edge cases, use setTimeout
-            setTimeout(() => {
+            // For forward delete or edge cases, use requestAnimationFrame for better performance
+            requestAnimationFrame(() => {
               filterAutocomplete();
-            }, 0);
+            });
           }
         }
         return;

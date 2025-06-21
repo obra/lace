@@ -3,26 +3,60 @@
 
 import { useState, useCallback } from 'react';
 
+/**
+ * Represents the current state of the text buffer.
+ */
 export interface TextBufferState {
+  /** Array of text lines in the buffer */
   lines: string[];
+  /** Current line index (0-based) where the cursor is positioned */
   cursorLine: number;
+  /** Current column index (0-based) where the cursor is positioned */
   cursorColumn: number;
-  preferredColumn: number; // Remembers desired column for up/down movement
+  /** Remembers desired column for up/down movement to prevent cursor drift */
+  preferredColumn: number;
 }
 
+/**
+ * Operations available for manipulating the text buffer.
+ */
 export interface TextBufferOperations {
+  /** Insert text at the current cursor position, handling newlines appropriately */
   insertText: (text: string) => void;
+  /** Delete a character in the specified direction from the cursor position */
   deleteChar: (direction: 'forward' | 'backward') => void;
+  /** Move the cursor in the specified direction, maintaining preferred column for vertical movement */
   moveCursor: (direction: 'left' | 'right' | 'up' | 'down' | 'home' | 'end') => void;
+  /** Replace the entire buffer content with new text */
   setText: (text: string) => void;
+  /** Get the complete buffer content as a single string with newlines */
   getText: () => string;
+  /** Set the cursor to a specific line and column position */
   setCursorPosition: (line: number, column: number) => void;
+  /** Get the text content of the current line */
   getCurrentLine: () => string;
+  /** Delete from cursor position to end of current line (Ctrl+K behavior) */
   killLine: () => void;
+  /** Delete from beginning of current line to cursor position (Ctrl+U behavior) */
   killLineBackward: () => void;
+  /** Paste text from system clipboard at cursor position */
   pasteFromClipboard: () => Promise<void>;
 }
 
+/**
+ * Custom React hook for managing text buffer state and operations.
+ * 
+ * Provides a complete text editing experience with multi-line support, cursor positioning,
+ * and common text manipulation operations. Features include:
+ * - Multi-line text editing with proper newline handling
+ * - Cursor positioning with preferred column memory for vertical navigation
+ * - Standard editing operations (insertion, deletion, cursor movement)
+ * - Clipboard integration for paste operations
+ * - Line manipulation commands (kill line, kill line backward)
+ * 
+ * @param initialText - Initial text content for the buffer (defaults to empty string)
+ * @returns A tuple containing [current state, operations object]
+ */
 export function useTextBuffer(initialText: string = ''): [TextBufferState, TextBufferOperations] {
   const [state, setState] = useState<TextBufferState>(() => ({
     lines: initialText.split('\n'),
