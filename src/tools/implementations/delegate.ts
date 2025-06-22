@@ -172,12 +172,10 @@ Examples:
         // Create promise that resolves when conversation completes or times out
         const resultPromise = new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => {
-            console.log(`⏰ Subagent timeout after ${this.defaultTimeout}ms`);
             reject(new Error(`Subagent timeout after ${this.defaultTimeout}ms`));
           }, this.defaultTimeout);
 
           const completeHandler = () => {
-            console.log(`✅ Subagent completed: ${subagentThreadId}`);
             clearTimeout(timeout);
             resolve();
           };
@@ -197,7 +195,6 @@ Examples:
 
         // CLEANUP: Remove event listeners to prevent memory leaks
         subagent.removeAllListeners();
-        console.log(`🧹 Cleaned up subagent listeners: ${subagentThreadId}`);
 
         // Return collected responses
         const combinedResponse = responses.join('\n\n');
@@ -211,7 +208,6 @@ Examples:
         // CLEANUP: Remove event listeners even on error to prevent memory leaks
         if (subagent) {
           subagent.removeAllListeners();
-          console.log(`🧹 Cleaned up subagent listeners on error: ${subagentThreadId}`);
         }
 
         return createErrorResult(

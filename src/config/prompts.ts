@@ -54,19 +54,18 @@ function readPromptFile(
  */
 export async function loadPromptConfig(options: PromptOptions = {}): Promise<PromptConfig> {
   logger.debug('Loading prompt config using template system');
-  
+
   const promptManager = new PromptManager({ tools: options.tools });
   const systemPrompt = await promptManager.generateSystemPrompt();
   const userInstructions = await loadUserInstructions();
-  
+
   logger.info('Loaded prompt config using template system');
   return {
     systemPrompt,
-    userInstructions: userInstructions.content,
+    userInstructions: userInstructions.content.trim(),
     filesCreated: userInstructions.wasCreated ? [getUserInstructionsPath()] : [],
   };
 }
-
 
 /**
  * Load user instructions (always from file, not templated)

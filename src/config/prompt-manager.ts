@@ -5,13 +5,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { TemplateEngine } from './template-engine.js';
-import { 
-  VariableProviderManager, 
-  SystemVariableProvider, 
-  GitVariableProvider, 
-  ProjectVariableProvider, 
+import {
+  VariableProviderManager,
+  SystemVariableProvider,
+  GitVariableProvider,
+  ProjectVariableProvider,
   ToolVariableProvider,
-  ContextDisclaimerProvider 
+  ContextDisclaimerProvider,
 } from './variable-providers.js';
 import { getLaceDir } from './lace-dir.js';
 import { logger } from '../utils/logger.js';
@@ -24,12 +24,13 @@ export interface PromptManagerOptions {
 export class PromptManager {
   private templateEngine: TemplateEngine;
   private variableManager: VariableProviderManager;
+  private templateDirs: string[];
 
   constructor(options: PromptManagerOptions = {}) {
     // Set up template directories with user overlay support
-    const templateDirs = options.templateDirs || this.getTemplateDirsWithOverlay();
-    
-    this.templateEngine = new TemplateEngine(templateDirs);
+    this.templateDirs = options.templateDirs || this.getTemplateDirsWithOverlay();
+
+    this.templateEngine = new TemplateEngine(this.templateDirs);
     this.variableManager = new VariableProviderManager();
 
     // Add default variable providers
@@ -43,7 +44,9 @@ export class PromptManager {
       this.variableManager.addProvider(new ToolVariableProvider(options.tools));
     }
 
-    logger.debug('PromptManager initialized with template directories', { templateDirs });
+    logger.debug('PromptManager initialized with template directories', {
+      templateDirs: this.templateDirs,
+    });
   }
 
   /**
@@ -52,19 +55,19 @@ export class PromptManager {
   async generateSystemPrompt(): Promise<string> {
     try {
       logger.debug('Generating system prompt using template system');
-      
+
       const context = await this.variableManager.getTemplateContext();
       const prompt = this.templateEngine.render('system.md', context);
-      
-      logger.debug('System prompt generated successfully', { 
+
+      logger.debug('System prompt generated successfully', {
         contextKeys: Object.keys(context),
-        promptLength: prompt.length 
+        promptLength: prompt.length,
       });
-      
+
       return prompt;
     } catch (error) {
-      logger.error('Failed to generate system prompt', { 
-        error: error instanceof Error ? error.message : String(error) 
+      logger.error('Failed to generate system prompt', {
+        error: error instanceof Error ? error.message : String(error),
       });
       return this.getFallbackPrompt();
     }
@@ -77,7 +80,7 @@ export class PromptManager {
   private getTemplateDirsWithOverlay(): string[] {
     const userTemplateDir = this.getUserTemplateDir();
     const embeddedTemplateDir = this.getEmbeddedTemplateDir();
-    
+
     return [userTemplateDir, embeddedTemplateDir];
   }
 
@@ -109,16 +112,14 @@ export class PromptManager {
    */
   isTemplateSystemAvailable(): boolean {
     try {
-      const templateDirs = this.getTemplateDirsWithOverlay();
-      
-      // Check if system.md exists in any of the template directories
-      for (const templateDir of templateDirs) {
+      // Check if system.md exists in any of the configured template directories
+      for (const templateDir of this.templateDirs) {
         const systemTemplatePath = path.join(templateDir, 'system.md');
         if (fs.existsSync(systemTemplatePath)) {
           return true;
         }
       }
-      
+
       return false;
     } catch {
       return false;

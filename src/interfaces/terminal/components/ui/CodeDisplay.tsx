@@ -39,6 +39,11 @@ export function CodeDisplay({ code, language = 'text', compact = false }: CodeDi
     }
   }
   
+  // Handle plain text directly without highlighting to avoid stderr output
+  if (language === 'text' || language === 'plain') {
+    return <Text color="white">{displayCode}</Text>;
+  }
+  
   try {
     const highlighted = hljs.highlight(displayCode, { language });
     return renderHighlightedCode(highlighted.value);

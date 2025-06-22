@@ -4,29 +4,56 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { execSync } from 'child_process';
+import { execSync, type StdioOptions } from 'child_process';
 import { logger } from '../utils/logger.js';
 import { TemplateContext } from './template-engine.js';
 
 export interface VariableProvider {
-  getVariables(): Promise<Record<string, any>>;
+  getVariables(): Promise<Record<string, unknown>>;
+}
+
+/**
+ * Command runner - easier to mock than execSync directly
+ */
+export class CommandRunner {
+  runCommand(
+    command: string,
+    args: string[],
+    options?: { encoding?: 'utf8' | 'utf-8' | 'ascii' | 'base64' | 'hex'; stdio?: StdioOptions }
+  ): string {
+    const fullCommand = `${command} ${args.join(' ')}`;
+    return execSync(fullCommand, { encoding: 'utf-8', ...options })
+      .toString()
+      .trim();
+  }
+
+  isGitRepository(): boolean {
+    try {
+      this.runCommand('git', ['rev-parse', '--git-dir'], { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 /**
  * Provides system-level context variables
  */
 export class SystemVariableProvider implements VariableProvider {
-  async getVariables(): Promise<Record<string, any>> {
+  async getVariables(): Promise<Record<string, unknown>> {
     try {
       return {
         system: {
           os: os.platform(),
           arch: os.arch(),
           sessionTime: new Date().toISOString(),
-        }
+        },
       };
     } catch (error) {
-      logger.error('Failed to get system variables', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Failed to get system variables', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return { system: {} };
     }
   }
@@ -36,47 +63,59 @@ export class SystemVariableProvider implements VariableProvider {
  * Provides Git repository context variables
  */
 export class GitVariableProvider implements VariableProvider {
-  async getVariables(): Promise<Record<string, any>> {
+  private commandRunner: CommandRunner;
+
+  constructor(commandRunner?: CommandRunner) {
+    this.commandRunner = commandRunner || new CommandRunner();
+  }
+
+  async getVariables(): Promise<Record<string, unknown>> {
     try {
-      const gitVars: Record<string, any> = {};
+      const gitVars: Record<string, unknown> = {};
 
       // Check if we're in a git repository
-      try {
-        execSync('git rev-parse --git-dir', { stdio: 'ignore' });
-      } catch {
+      if (!this.commandRunner.isGitRepository()) {
         return { git: {} };
       }
 
       // Get current branch
       try {
-        const branch = execSync('git branch --show-current', { encoding: 'utf-8' }).trim();
+        const branch = this.commandRunner.runCommand('git', ['branch', '--show-current']);
         if (branch) gitVars.branch = branch;
       } catch (error) {
-        logger.debug('Could not get git branch', { error: error instanceof Error ? error.message : String(error) });
+        logger.debug('Could not get git branch', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
 
       // Get repository status
       try {
-        const status = execSync('git status --porcelain', { encoding: 'utf-8' }).trim();
+        const status = this.commandRunner.runCommand('git', ['status', '--porcelain']);
         gitVars.status = status ? 'dirty' : 'clean';
       } catch (error) {
-        logger.debug('Could not get git status', { error: error instanceof Error ? error.message : String(error) });
+        logger.debug('Could not get git status', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
 
       // Get user info
       try {
-        const userName = execSync('git config user.name', { encoding: 'utf-8' }).trim();
-        const userEmail = execSync('git config user.email', { encoding: 'utf-8' }).trim();
+        const userName = this.commandRunner.runCommand('git', ['config', 'user.name']);
+        const userEmail = this.commandRunner.runCommand('git', ['config', 'user.email']);
         if (userName || userEmail) {
           gitVars.user = { name: userName, email: userEmail };
         }
       } catch (error) {
-        logger.debug('Could not get git user info', { error: error instanceof Error ? error.message : String(error) });
+        logger.debug('Could not get git user info', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
 
       return { git: gitVars };
     } catch (error) {
-      logger.error('Failed to get git variables', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Failed to get git variables', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return { git: {} };
     }
   }
@@ -86,21 +125,23 @@ export class GitVariableProvider implements VariableProvider {
  * Provides project context variables
  */
 export class ProjectVariableProvider implements VariableProvider {
-  async getVariables(): Promise<Record<string, any>> {
+  async getVariables(): Promise<Record<string, unknown>> {
     try {
       const cwd = process.cwd();
-      
+
       // Generate a simple project tree (limit depth to avoid too much content)
       const tree = this.generateProjectTree(cwd, 2);
 
       return {
         project: {
           cwd,
-          tree
-        }
+          tree,
+        },
       };
     } catch (error) {
-      logger.error('Failed to get project variables', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Failed to get project variables', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return { project: { cwd: process.cwd(), tree: '' } };
     }
   }
@@ -109,8 +150,9 @@ export class ProjectVariableProvider implements VariableProvider {
     if (currentDepth >= maxDepth) return '';
 
     try {
-      const items = fs.readdirSync(dir, { withFileTypes: true })
-        .filter(item => !item.name.startsWith('.') && item.name !== 'node_modules')
+      const items = fs
+        .readdirSync(dir, { withFileTypes: true })
+        .filter((item) => !item.name.startsWith('.') && item.name !== 'node_modules')
         .slice(0, 20); // Limit number of items
 
       const indent = '  '.repeat(currentDepth);
@@ -118,16 +160,23 @@ export class ProjectVariableProvider implements VariableProvider {
 
       for (const item of items) {
         tree += `${indent}- ${item.name}${item.isDirectory() ? '/' : ''}\n`;
-        
+
         if (item.isDirectory() && currentDepth < maxDepth - 1) {
-          const subtree = this.generateProjectTree(path.join(dir, item.name), maxDepth, currentDepth + 1);
+          const subtree = this.generateProjectTree(
+            path.join(dir, item.name),
+            maxDepth,
+            currentDepth + 1
+          );
           tree += subtree;
         }
       }
 
       return tree;
     } catch (error) {
-      logger.debug('Could not generate project tree', { dir, error: error instanceof Error ? error.message : String(error) });
+      logger.debug('Could not generate project tree', {
+        dir,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return '';
     }
   }
@@ -139,16 +188,18 @@ export class ProjectVariableProvider implements VariableProvider {
 export class ToolVariableProvider implements VariableProvider {
   constructor(private tools: Array<{ name: string; description: string }> = []) {}
 
-  async getVariables(): Promise<Record<string, any>> {
+  async getVariables(): Promise<Record<string, unknown>> {
     try {
       return {
-        tools: this.tools.map(tool => ({
+        tools: this.tools.map((tool) => ({
           name: tool.name,
-          description: tool.description
-        }))
+          description: tool.description,
+        })),
       };
     } catch (error) {
-      logger.error('Failed to get tool variables', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Failed to get tool variables', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return { tools: [] };
     }
   }
@@ -158,11 +209,12 @@ export class ToolVariableProvider implements VariableProvider {
  * Provides context disclaimer about conversation start timing
  */
 export class ContextDisclaimerProvider implements VariableProvider {
-  async getVariables(): Promise<Record<string, any>> {
+  async getVariables(): Promise<Record<string, unknown>> {
     return {
       context: {
-        disclaimer: '\n\n**Note:** All project context information above is captured at the start of our conversation and will not be updated during our interaction.'
-      }
+        disclaimer:
+          '\n\n**Note:** All project context information above is captured at the start of our conversation and will not be updated during our interaction.',
+      },
     };
   }
 }
@@ -185,9 +237,9 @@ export class VariableProviderManager {
         const variables = await provider.getVariables();
         Object.assign(context, variables);
       } catch (error) {
-        logger.error('Variable provider failed', { 
-          provider: provider.constructor.name, 
-          error: error instanceof Error ? error.message : String(error) 
+        logger.error('Variable provider failed', {
+          provider: provider.constructor.name,
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }

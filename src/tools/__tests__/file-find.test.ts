@@ -28,7 +28,7 @@ describe('FileFindTool', () => {
     await writeFile(join(testDir, 'src', 'components', 'Button.tsx'), 'content');
 
     await mkdir(join(testDir, 'test'));
-    await writeFile(join(testDir, 'test', 'app.test.ts'), 'content');
+    await writeFile(join(testDir, 'test', 'app.testing.ts'), 'content');
 
     await mkdir(join(testDir, 'node_modules'));
     await writeFile(join(testDir, 'node_modules', 'package.js'), 'content');
@@ -90,7 +90,7 @@ describe('FileFindTool', () => {
       expect(output).toContain('test.ts');
       expect(output).toContain('app.ts');
       expect(output).toContain('utils.ts');
-      expect(output).toContain('app.test.ts');
+      expect(output).toContain('app.testing.ts');
       expect(output).not.toContain('test.js');
       expect(output).not.toContain('Button.tsx');
     });
@@ -120,7 +120,7 @@ describe('FileFindTool', () => {
       const output = result.content[0].text!;
 
       expect(output).toContain('app.ts');
-      expect(output).toContain('app.test.ts');
+      expect(output).toContain('app.testing.ts');
       expect(output).not.toContain(join(testDir, 'test.ts'));
     });
 
@@ -377,7 +377,7 @@ describe('FileFindTool', () => {
 
       expect(output).toContain('test.ts');
       expect(output).toContain('app.ts');
-      expect(output).toContain('app.test.ts');
+      expect(output).toContain('app.testing.ts');
       expect(output).toContain('secret.txt');
       expect(output).not.toContain('test.js');
     });

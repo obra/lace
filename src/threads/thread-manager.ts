@@ -278,12 +278,6 @@ export class ThreadManager extends EventEmitter {
   }
 
   async setCurrentThread(threadId: string): Promise<void> {
-    const previousThreadId = this._currentThread?.id || 'none';
-
-    // DEBUG: Log thread switches to track delegation issues
-    console.log(`🔄 ThreadManager.setCurrentThread: ${previousThreadId} -> ${threadId}`);
-    console.trace(); // Show call stack to identify who's switching threads
-
     // Save current thread before switching
     await this.saveCurrentThread();
 
@@ -297,11 +291,6 @@ export class ThreadManager extends EventEmitter {
 
   getCurrentThreadId(): string | null {
     const threadId = this._currentThread?.id || null;
-    // DEBUG: Log getCurrentThreadId calls to track when thread ID changes
-    if (threadId && threadId.includes('.')) {
-      console.log(`🔍 getCurrentThreadId returning delegate thread: ${threadId}`);
-      console.trace(); // Show who's asking for the thread ID
-    }
     return threadId;
   }
 

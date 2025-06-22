@@ -2,6 +2,7 @@
 // ABOUTME: Handles lines, cursor position, and text manipulation without UI concerns
 
 import { useState, useCallback } from 'react';
+import { logger } from '../../../utils/logger.js';
 
 /**
  * Represents the current state of the text buffer.
@@ -45,7 +46,7 @@ export interface TextBufferOperations {
 
 /**
  * Custom React hook for managing text buffer state and operations.
- * 
+ *
  * Provides a complete text editing experience with multi-line support, cursor positioning,
  * and common text manipulation operations. Features include:
  * - Multi-line text editing with proper newline handling
@@ -53,7 +54,7 @@ export interface TextBufferOperations {
  * - Standard editing operations (insertion, deletion, cursor movement)
  * - Clipboard integration for paste operations
  * - Line manipulation commands (kill line, kill line backward)
- * 
+ *
  * @param initialText - Initial text content for the buffer (defaults to empty string)
  * @returns A tuple containing [current state, operations object]
  */
@@ -248,7 +249,11 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
         case 'home':
           return { ...prevState, cursorColumn: 0, preferredColumn: 0 };
         case 'end':
-          return { ...prevState, cursorColumn: currentLine.length, preferredColumn: currentLine.length };
+          return {
+            ...prevState,
+            cursorColumn: currentLine.length,
+            preferredColumn: currentLine.length,
+          };
       }
 
       return prevState; // No change
@@ -342,7 +347,7 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
       }
 
       const clipboardText = await navigator.clipboard.readText();
-      
+
       // Handle empty or null clipboard content
       if (!clipboardText) {
         return;
@@ -351,8 +356,10 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
       // Use the existing insertText method to handle the paste
       insertText(clipboardText);
     } catch (error) {
-      // Silently handle clipboard access errors
-      console.warn('Failed to read from clipboard:', error);
+      // Handle clipboard access errors gracefully
+      logger.debug('Failed to read from clipboard', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }, [insertText]);
 

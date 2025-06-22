@@ -52,10 +52,12 @@ const matchesShortcut = (input: string, key: any, shortcut: KeyboardShortcut): b
 
 const matchesAction = (input: string, key: any, action: string): boolean => {
   const shortcuts = KEYBOARD_SHORTCUTS[action];
-  if (Array.isArray(shortcuts)) {
-    return shortcuts.some(shortcut => matchesShortcut(input, key, shortcut));
+  if (Array.isArray(shortcuts) && Array.isArray(shortcuts[0])) {
+    // Multiple shortcuts (KeyboardShortcut[])
+    return shortcuts.some(shortcut => matchesShortcut(input, key, shortcut as KeyboardShortcut));
   } else {
-    return matchesShortcut(input, key, shortcuts);
+    // Single shortcut (KeyboardShortcut)
+    return matchesShortcut(input, key, shortcuts as KeyboardShortcut);
   }
 };
 

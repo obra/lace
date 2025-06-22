@@ -3,39 +3,134 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Agent } from '../agents/agent.js';
-import { LMStudioProvider } from '../providers/lmstudio-provider.js';
 import { ThreadManager } from '../threads/thread-manager.js';
 import { ToolExecutor } from '../tools/executor.js';
+import { AIProvider, ProviderResponse } from '../providers/types.js';
 
-// These tests use LMStudio heavily since it's local and free
+// Mock provider that returns predictable responses for stable testing
+class MockConversationProvider extends AIProvider {
+  private responseMap = new Map<string, ProviderResponse>();
+
+  constructor() {
+    super({});
+    this.setupResponses();
+  }
+
+  private setupResponses() {
+    // Response for "List the files in the current directory"
+    this.responseMap.set('list_files', {
+      content: "I'll list the files in the current directory for you.",
+      toolCalls: [
+        {
+          id: 'call_1',
+          name: 'file_list',
+          input: { path: '.' },
+        },
+      ],
+      stopReason: 'tool_use',
+    });
+
+    // Response after tool results
+    this.responseMap.set('list_files_result', {
+      content:
+        'I can see the files in the directory. The project contains package.json, source files, and other project artifacts.',
+      toolCalls: [],
+      stopReason: 'stop',
+    });
+
+    // Response for programming language question
+    this.responseMap.set('programming_language', {
+      content: 'Based on the files I can see, this appears to be a TypeScript/Node.js project.',
+      toolCalls: [],
+      stopReason: 'stop',
+    });
+
+    // Response for package.json lookup
+    this.responseMap.set('package_json', {
+      content: 'Let me read the package.json file to understand the project better.',
+      toolCalls: [
+        {
+          id: 'call_2',
+          name: 'file_read',
+          input: { file_path: 'package.json' },
+        },
+      ],
+      stopReason: 'tool_use',
+    });
+
+    // Echo command response
+    this.responseMap.set('echo_command', {
+      content: "I'll run the echo command for you.",
+      toolCalls: [
+        {
+          id: 'call_3',
+          name: 'bash',
+          input: { command: 'echo hello world' },
+        },
+      ],
+      stopReason: 'tool_use',
+    });
+  }
+
+  get providerName() {
+    return 'mock';
+  }
+  get defaultModel() {
+    return 'mock-model';
+  }
+  get supportsStreaming() {
+    return true;
+  }
+
+  async diagnose() {
+    return { connected: true, models: ['mock-model'] };
+  }
+
+  private getResponseKey(messages: any[]): string {
+    const lastMessage = messages[messages.length - 1];
+    const content = lastMessage?.content?.toLowerCase() || '';
+
+    if (content.includes('list') && content.includes('files')) {
+      // Check if this is after tool results
+      const hasToolResults = messages.some((msg) => msg.toolResults);
+      return hasToolResults ? 'list_files_result' : 'list_files';
+    }
+    if (content.includes('programming language')) return 'programming_language';
+    if (content.includes('package.json')) return 'package_json';
+    if (content.includes('echo')) return 'echo_command';
+
+    // Default response
+    return 'list_files_result';
+  }
+
+  async createResponse(messages: any[], _tools: any[] = []) {
+    const key = this.getResponseKey(messages);
+    return this.responseMap.get(key) || this.responseMap.get('list_files_result')!;
+  }
+
+  async createStreamingResponse(messages: any[], _tools: any[] = []) {
+    const response = await this.createResponse(messages, _tools);
+
+    // Emit streaming events
+    if (response.content) {
+      this.emit('token', { token: response.content });
+    }
+    this.emit('complete', { response });
+
+    return response;
+  }
+}
+
+// Mock-based tests for stable, fast execution
 describe('Conversation State Management with Enhanced Agent', () => {
-  let provider: LMStudioProvider;
+  let provider: MockConversationProvider;
   let agent: Agent;
   let threadManager: ThreadManager;
   let toolExecutor: ToolExecutor;
   let threadId: string;
 
   beforeEach(async () => {
-    provider = new LMStudioProvider({
-      model: 'qwen/qwen3-1.7b',
-      systemPrompt: 'You are a helpful coding assistant. Use tools when appropriate.',
-    });
-
-    // Skip tests if LMStudio is not available
-    try {
-      const diagnostics = await provider.diagnose();
-      if (!diagnostics.connected) {
-        if (process.env.VITEST_VERBOSE) {
-          console.log('Skipping LMStudio tests - server not available');
-        }
-        return;
-      }
-    } catch (error) {
-      if (process.env.VITEST_VERBOSE) {
-        console.log('Skipping LMStudio tests - connection failed:', error);
-      }
-      return;
-    }
+    provider = new MockConversationProvider();
 
     threadManager = new ThreadManager(':memory:'); // Use SQLite in-memory database for testing
     toolExecutor = new ToolExecutor();

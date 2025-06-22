@@ -14,6 +14,10 @@ describe('CLI Integration', () => {
   beforeEach(() => {
     tempDbPath = path.join(os.tmpdir(), `lace-cli-test-${Date.now()}.db`);
     vi.spyOn(laceDir, 'getLaceDbPath').mockReturnValue(tempDbPath);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
 
   afterEach(() => {

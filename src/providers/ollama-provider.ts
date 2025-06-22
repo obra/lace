@@ -11,6 +11,23 @@ export interface OllamaProviderConfig extends ProviderConfig {
   verbose?: boolean;
 }
 
+interface OllamaToolCall {
+  function: {
+    name: string;
+    arguments: Record<string, unknown>;
+  };
+}
+
+interface OllamaMessage {
+  content?: string;
+  tool_calls?: OllamaToolCall[];
+  prompt_eval_count?: number;
+  eval_count?: number;
+  prompt_eval_duration?: number;
+  eval_duration?: number;
+  total_duration?: number;
+}
+
 export class OllamaProvider extends AIProvider {
   private readonly _ollama: Ollama;
   private readonly _host: string;
@@ -223,7 +240,7 @@ export class OllamaProvider extends AIProvider {
 
     let content = '';
     let toolCalls: { id: string; name: string; input: Record<string, unknown> }[] = [];
-    let finalMessage: any = null;
+    let finalMessage: OllamaMessage | null = null;
 
     try {
       // Process streaming response
@@ -256,7 +273,7 @@ export class OllamaProvider extends AIProvider {
 
       // Extract tool calls from final message
       if (finalMessage?.tool_calls) {
-        toolCalls = finalMessage.tool_calls.map((tc: any, index: number) => ({
+        toolCalls = finalMessage.tool_calls.map((tc: OllamaToolCall, index: number) => ({
           id: `call_${index + 1}`,
           name: tc.function.name,
           input: tc.function.arguments,
@@ -292,7 +309,7 @@ export class OllamaProvider extends AIProvider {
   }
 
   private _extractUsage(
-    response: any
+    response: OllamaMessage
   ): { promptTokens: number; completionTokens: number; totalTokens: number } | undefined {
     if (!response.prompt_eval_count && !response.eval_count) return undefined;
 
@@ -307,18 +324,19 @@ export class OllamaProvider extends AIProvider {
   }
 
   private _extractUsageFromMessage(
-    message: any
+    message: OllamaMessage
   ): { promptTokens: number; completionTokens: number; totalTokens: number } | undefined {
     // For streaming, token counts might be in different locations
     return this._extractUsage(message);
   }
 
   private _extractPerformance(
-    response: any
+    response: OllamaMessage
   ): { tokensPerSecond?: number; timeToFirstToken?: number; totalDuration?: number } | undefined {
     if (!response.total_duration && !response.eval_duration) return undefined;
 
-    const result: any = {};
+    const result: { tokensPerSecond?: number; timeToFirstToken?: number; totalDuration?: number } =
+      {};
 
     if (response.total_duration) {
       result.totalDuration = response.total_duration / 1_000_000; // Convert nanoseconds to milliseconds
@@ -337,8 +355,8 @@ export class OllamaProvider extends AIProvider {
   }
 
   private _extractPerformanceFromStream(
-    finalMessage: any
+    finalMessage: OllamaMessage | null
   ): { tokensPerSecond?: number; timeToFirstToken?: number; totalDuration?: number } | undefined {
-    return this._extractPerformance(finalMessage);
+    return finalMessage ? this._extractPerformance(finalMessage) : undefined;
   }
 }

@@ -54,7 +54,7 @@ export class ProviderRegistry {
         // Check all exports in the module
         for (const exportedValue of Object.values(module)) {
           if (ProviderRegistry.isProviderClass(exportedValue)) {
-            const ProviderClass = exportedValue as new (...args: any[]) => AIProvider;
+            const ProviderClass = exportedValue as new (...args: unknown[]) => AIProvider;
 
             // Create instance with default configuration
             let provider: AIProvider;
@@ -104,7 +104,7 @@ export class ProviderRegistry {
     return registry;
   }
 
-  static isProviderClass(value: any): boolean {
+  static isProviderClass(value: unknown): boolean {
     // Check if it's a constructor function/class
     if (typeof value !== 'function') return false;
     if (!value.prototype) return false;

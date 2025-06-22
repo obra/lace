@@ -25,7 +25,7 @@ describe('RipgrepSearchTool', () => {
       'This is a text file\nwith multiple lines\nand some content'
     );
     await writeFile(
-      join(testDir, 'test.spec.ts'),
+      join(testDir, 'example.test.txt'),
       'describe("hello test", () => {\n  it("should work", () => {});\n});'
     );
 
@@ -134,7 +134,7 @@ describe('RipgrepSearchTool', () => {
       const result = await tool.executeTool({
         pattern: 'hello',
         path: testDir,
-        excludePattern: '*.spec.ts',
+        excludePattern: '*.test.txt',
       });
 
       expect(result.isError).toBe(false);
@@ -142,7 +142,7 @@ describe('RipgrepSearchTool', () => {
 
       expect(output).toContain('file1.ts');
       expect(output).toContain('file2.js');
-      expect(output).not.toContain('test.spec.ts');
+      expect(output).not.toContain('example.test.txt');
     });
 
     it('should respect max results limit', async () => {

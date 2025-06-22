@@ -13,23 +13,38 @@ vi.mock('../../utils/logger.js', () => ({
     debug: vi.fn(),
     info: vi.fn(),
     error: vi.fn(),
-    warn: vi.fn()
-  }
+    warn: vi.fn(),
+  },
 }));
 
 // Mock child_process for git commands
-vi.mock('child_process', () => ({
-  execSync: vi.fn().mockReturnValue(Buffer.from(''))
-}));
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    execSync: vi.fn().mockReturnValue(Buffer.from('')),
+  };
+});
 
 describe('PromptManager', () => {
   let tempDir: string;
+  let originalLaceDir: string | undefined;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prompt-manager-test-'));
+    // Override LACE_DIR to use our test directory
+    originalLaceDir = process.env.LACE_DIR;
+    process.env.LACE_DIR = tempDir;
   });
 
   afterEach(() => {
+    // Restore original LACE_DIR
+    if (originalLaceDir !== undefined) {
+      process.env.LACE_DIR = originalLaceDir;
+    } else {
+      delete process.env.LACE_DIR;
+    }
+
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
@@ -50,7 +65,7 @@ describe('PromptManager', () => {
     it('should initialize with tool information', () => {
       const tools = [
         { name: 'bash', description: 'Execute bash commands' },
-        { name: 'file-read', description: 'Read files' }
+        { name: 'file-read', description: 'Read files' },
       ];
 
       const manager = new PromptManager({ tools, templateDirs: [tempDir] });
@@ -110,7 +125,7 @@ describe('PromptManager', () => {
 
       const tools = [
         { name: 'bash', description: 'Execute bash commands' },
-        { name: 'file-read', description: 'Read file contents' }
+        { name: 'file-read', description: 'Read file contents' },
       ];
 
       const manager = new PromptManager({ tools, templateDirs: [tempDir] });
@@ -122,7 +137,7 @@ describe('PromptManager', () => {
       expect(prompt).toContain('Tool: bash - Execute bash commands');
       expect(prompt).toContain('Tool: file-read - Read file contents');
       expect(prompt).toContain('Follow best practices and be helpful.');
-      expect(prompt).toContain('conversation start');
+      expect(prompt).toContain('start of our conversation');
     });
 
     it('should generate prompt without tools when none provided', async () => {
@@ -157,7 +172,9 @@ describe('PromptManager', () => {
       const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
 
-      expect(prompt).toBe('You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.');
+      expect(prompt).toBe(
+        'You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.'
+      );
     });
 
     it('should handle template syntax errors with fallback', async () => {
@@ -169,7 +186,9 @@ describe('PromptManager', () => {
       const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
 
-      expect(prompt).toBe('You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.');
+      expect(prompt).toBe(
+        'You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.'
+      );
     });
   });
 
@@ -183,7 +202,9 @@ describe('PromptManager', () => {
         const manager = new PromptManager({ templateDirs: [tempDir] });
         const prompt = await manager.generateSystemPrompt();
 
-        expect(prompt).toBe('You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.');
+        expect(prompt).toBe(
+          'You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.'
+        );
       } finally {
         fs.chmodSync(tempDir, 0o755);
       }
@@ -257,7 +278,7 @@ describe('PromptManager', () => {
       const tools = [
         { name: 'bash', description: 'Execute shell commands' },
         { name: 'file-edit', description: 'Edit files' },
-        { name: 'web-search', description: 'Search the web' }
+        { name: 'web-search', description: 'Search the web' },
       ];
 
       const manager = new PromptManager({ tools, templateDirs: [tempDir] });
@@ -273,14 +294,11 @@ describe('PromptManager', () => {
       expect(prompt).toContain('- **bash**: Execute shell commands');
       expect(prompt).toContain('- **file-edit**: Edit files');
       expect(prompt).toContain('- **web-search**: Search the web');
-      expect(prompt).toContain('conversation start');
+      expect(prompt).toContain('start of our conversation');
     });
 
     it('should work with minimal template', async () => {
-      fs.writeFileSync(
-        path.join(tempDir, 'system.md'),
-        'Hello {{name}}!'
-      );
+      fs.writeFileSync(path.join(tempDir, 'system.md'), 'Hello {{name}}!');
 
       const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
@@ -294,7 +312,7 @@ describe('PromptManager', () => {
       // Create two template directories
       const userTemplateDir = path.join(tempDir, 'user');
       const defaultTemplateDir = path.join(tempDir, 'default');
-      
+
       fs.mkdirSync(userTemplateDir, { recursive: true });
       fs.mkdirSync(defaultTemplateDir, { recursive: true });
 
@@ -303,7 +321,7 @@ describe('PromptManager', () => {
         path.join(userTemplateDir, 'system.md'),
         'Custom user template: {{system.os}}'
       );
-      
+
       fs.writeFileSync(
         path.join(defaultTemplateDir, 'system.md'),
         'Default template: {{system.os}}'
@@ -320,7 +338,7 @@ describe('PromptManager', () => {
     it('should fall back to default template when user template is missing', async () => {
       const userTemplateDir = path.join(tempDir, 'user');
       const defaultTemplateDir = path.join(tempDir, 'default');
-      
+
       fs.mkdirSync(userTemplateDir, { recursive: true });
       fs.mkdirSync(defaultTemplateDir, { recursive: true });
 
@@ -339,10 +357,10 @@ describe('PromptManager', () => {
     it('should handle overlay with includes correctly', async () => {
       const userTemplateDir = path.join(tempDir, 'user');
       const defaultTemplateDir = path.join(tempDir, 'default');
-      
+
       fs.mkdirSync(userTemplateDir, { recursive: true });
       fs.mkdirSync(defaultTemplateDir, { recursive: true });
-      
+
       // Create sections directories
       fs.mkdirSync(path.join(userTemplateDir, 'sections'), { recursive: true });
       fs.mkdirSync(path.join(defaultTemplateDir, 'sections'), { recursive: true });
@@ -352,7 +370,7 @@ describe('PromptManager', () => {
         path.join(userTemplateDir, 'sections', 'agent-personality.md'),
         'Custom AI Assistant'
       );
-      
+
       fs.writeFileSync(
         path.join(defaultTemplateDir, 'sections', 'environment.md'),
         'Environment: {{system.os}}'

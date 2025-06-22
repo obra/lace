@@ -7,7 +7,7 @@ import mustache from 'mustache';
 import { logger } from '../utils/logger.js';
 
 export interface TemplateContext {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export class TemplateEngine {
@@ -28,7 +28,10 @@ export class TemplateEngine {
       const processedContent = this.processIncludes(templateContent, path.dirname(templatePath));
       return mustache.render(processedContent, context);
     } catch (error) {
-      logger.error('Failed to render template', { templatePath, error: error instanceof Error ? error.message : String(error) });
+      logger.error('Failed to render template', {
+        templatePath,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return this.getFallbackContent(templatePath);
     }
   }
@@ -39,13 +42,13 @@ export class TemplateEngine {
   private loadTemplate(templatePath: string): string {
     for (const templateDir of this.templateDirs) {
       const fullPath = path.resolve(templateDir, templatePath);
-      
+
       if (fs.existsSync(fullPath)) {
         logger.debug('Loading template', { templatePath, templateDir });
         return fs.readFileSync(fullPath, 'utf-8');
       }
     }
-    
+
     throw new Error(`Template file not found in any directory: ${templatePath}`);
   }
 
@@ -54,16 +57,16 @@ export class TemplateEngine {
    */
   private processIncludes(content: string, currentDir: string): string {
     const includeRegex = /\{\{include:([^}]+)\}\}/g;
-    
+
     return content.replace(includeRegex, (match, includePath: string) => {
       // Try to find the include file in any of the template directories
       let foundPath: string | null = null;
       let foundTemplateDir = '';
-      
+
       for (const templateDir of this.templateDirs) {
         const fullIncludePath = path.resolve(templateDir, currentDir, includePath);
         const normalizedPath = path.normalize(fullIncludePath);
-        
+
         if (fs.existsSync(normalizedPath)) {
           foundPath = normalizedPath;
           foundTemplateDir = templateDir;
@@ -84,17 +87,17 @@ export class TemplateEngine {
 
       try {
         this.processedIncludes.add(foundPath);
-        
+
         const includeContent = fs.readFileSync(foundPath, 'utf-8');
         const includeDir = path.dirname(path.relative(foundTemplateDir, foundPath));
-        
+
         // Recursively process includes in the included content
         return this.processIncludes(includeContent, includeDir);
       } catch (error) {
-        logger.error('Failed to process include', { 
-          includePath, 
-          foundPath, 
-          error: error instanceof Error ? error.message : String(error) 
+        logger.error('Failed to process include', {
+          includePath,
+          foundPath,
+          error: error instanceof Error ? error.message : String(error),
         });
         return `<!-- Include error: ${includePath} -->`;
       } finally {
@@ -108,6 +111,6 @@ export class TemplateEngine {
    */
   private getFallbackContent(templatePath: string): string {
     logger.warn('Using fallback content for template', { templatePath });
-    return 'You are a coding assistant. Use the available tools to help with programming tasks.';
+    return 'You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.';
   }
 }

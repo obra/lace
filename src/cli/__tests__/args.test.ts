@@ -9,6 +9,9 @@ describe('CLI Arguments (Commander-based)', () => {
 
   beforeEach(() => {
     consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
@@ -105,8 +108,12 @@ describe('CLI Arguments (Commander-based)', () => {
     });
 
     it('should parse --list-tools flag', async () => {
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
       // --list-tools triggers exit after listing tools
       await expect(() => parseArgs(['--list-tools'])).rejects.toThrow('process.exit called');
+
+      logSpy.mockRestore();
     });
   });
 

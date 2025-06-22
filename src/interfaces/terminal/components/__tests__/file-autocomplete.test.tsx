@@ -101,7 +101,7 @@ describe('FileAutocomplete', () => {
       expect(output).not.toContain('item4.ts');
     });
 
-    it('should scroll to show selected item in middle', () => {
+    it('should scroll to show selected item at top', () => {
       const { lastFrame } = render(
         <FileAutocomplete
           items={manyItems}
@@ -112,11 +112,11 @@ describe('FileAutocomplete', () => {
       );
 
       const output = lastFrame();
-      // Should show items around the selected one
+      // Should show selected item at top of visible window
       expect(output).toContain('> item5.ts');
-      // Should show context around selection
-      expect(output).toContain('item4.ts');
+      // Should show items after selection
       expect(output).toContain('item6.ts');
+      expect(output).toContain('item7.ts');
     });
 
     it('should handle selection at the end of list', () => {

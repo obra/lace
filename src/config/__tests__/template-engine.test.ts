@@ -38,8 +38,8 @@ describe('TemplateEngine', () => {
       const templatePath = path.join(tempDir, 'object.md');
       fs.writeFileSync(templatePath, 'User: {{user.name}} <{{user.email}}>');
 
-      const result = templateEngine.render('object.md', { 
-        user: { name: 'John Doe', email: 'john@example.com' }
+      const result = templateEngine.render('object.md', {
+        user: { name: 'John Doe', email: 'john@example.com' },
       });
 
       expect(result).toBe('User: John Doe <john@example.com>');
@@ -58,8 +58,8 @@ describe('TemplateEngine', () => {
       const templatePath = path.join(tempDir, 'array.md');
       fs.writeFileSync(templatePath, '{{#items}}- {{name}}\n{{/items}}');
 
-      const result = templateEngine.render('array.md', { 
-        items: [{ name: 'Item 1' }, { name: 'Item 2' }]
+      const result = templateEngine.render('array.md', {
+        items: [{ name: 'Item 1' }, { name: 'Item 2' }],
       });
 
       expect(result).toBe('- Item 1\n- Item 2\n');
@@ -67,7 +67,10 @@ describe('TemplateEngine', () => {
 
     it('should handle conditional sections', () => {
       const templatePath = path.join(tempDir, 'conditional.md');
-      fs.writeFileSync(templatePath, '{{#isVisible}}This is visible{{/isVisible}}{{^isVisible}}This is hidden{{/isVisible}}');
+      fs.writeFileSync(
+        templatePath,
+        '{{#isVisible}}This is visible{{/isVisible}}{{^isVisible}}This is hidden{{/isVisible}}'
+      );
 
       const visibleResult = templateEngine.render('conditional.md', { isVisible: true });
       const hiddenResult = templateEngine.render('conditional.md', { isVisible: false });
@@ -148,8 +151,8 @@ describe('TemplateEngine', () => {
 
       const result = templateEngine.render('file1.md', {});
 
-      expect(result).toContain('File 1: File 2: <!-- Circular include:');
-      expect(result).toContain('file1.md -->');
+      expect(result).toContain('File 1: File 2: File 1: <!-- Circular include:');
+      expect(result).toContain('file2.md -->');
     });
 
     it('should handle missing include files gracefully', () => {
@@ -166,7 +169,9 @@ describe('TemplateEngine', () => {
     it('should return fallback content when template file is missing', () => {
       const result = templateEngine.render('nonexistent.md', {});
 
-      expect(result).toBe('You are a coding assistant. Use the available tools to help with programming tasks.');
+      expect(result).toBe(
+        'You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.'
+      );
     });
 
     it('should handle template with syntax errors gracefully', () => {
@@ -176,7 +181,9 @@ describe('TemplateEngine', () => {
       const result = templateEngine.render('broken.md', {});
 
       // Should return fallback content on mustache syntax errors
-      expect(result).toBe('You are a coding assistant. Use the available tools to help with programming tasks.');
+      expect(result).toBe(
+        'You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.'
+      );
     });
 
     it('should handle permission errors on include files', () => {
@@ -209,16 +216,21 @@ describe('TemplateEngine', () => {
 
       // Create main template
       const mainPath = path.join(tempDir, 'main.md');
-      fs.writeFileSync(mainPath, '{{include:header.md}}\n\nMain content here.\n\n{{include:footer.md}}');
+      fs.writeFileSync(
+        mainPath,
+        '{{include:header.md}}\n\nMain content here.\n\n{{include:footer.md}}'
+      );
 
       const result = templateEngine.render('main.md', {
         title: 'My App',
         user: { name: 'John' },
         year: 2024,
-        company: 'Acme Corp'
+        company: 'Acme Corp',
       });
 
-      expect(result).toBe('# My App\n\nWelcome John!\n\nMain content here.\n\n\n---\n2024 Acme Corp');
+      expect(result).toBe(
+        '# My App\n\nWelcome John!\n\nMain content here.\n\n\n---\n2024 Acme Corp'
+      );
     });
 
     it('should handle empty template files', () => {
@@ -277,7 +289,7 @@ describe('TemplateEngine', () => {
     it('should handle includes across multiple directories', () => {
       // Create main template in first directory
       fs.writeFileSync(path.join(tempDir, 'main.md'), 'Main: {{include:shared.md}}');
-      
+
       // Create include file only in second directory
       fs.writeFileSync(path.join(secondTempDir, 'shared.md'), 'Shared content: {{name}}');
 
@@ -289,7 +301,7 @@ describe('TemplateEngine', () => {
     it('should prioritize includes from first directory', () => {
       // Create main template
       fs.writeFileSync(path.join(tempDir, 'main.md'), 'Main: {{include:shared.md}}');
-      
+
       // Create include file in both directories
       fs.writeFileSync(path.join(tempDir, 'shared.md'), 'First: {{name}}');
       fs.writeFileSync(path.join(secondTempDir, 'shared.md'), 'Second: {{name}}');

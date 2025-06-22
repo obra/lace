@@ -19,10 +19,8 @@ describe('MessageDisplay', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('🤖 Assistant');
+    expect(frame).toContain('❦ '); // Assistant prefix
     expect(frame).toContain('Hello world');
-    // Just check that some time is displayed, timezone may vary
-    expect(frame).toMatch(/\d{1,2}:\d{2}:\d{2} [AP]M/);
   });
 
   it('renders user message with correct styling', () => {
@@ -37,7 +35,7 @@ describe('MessageDisplay', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('👤 User');
+    expect(frame).toContain('> '); // User prefix
     expect(frame).toContain('Hi there');
   });
 
@@ -69,7 +67,7 @@ describe('MessageDisplay', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('💭 Thinking');
+    expect(frame).toContain('💭 '); // Thinking prefix
     expect(frame).toContain('Let me think about this...');
   });
 
