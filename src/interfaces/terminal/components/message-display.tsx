@@ -1,8 +1,9 @@
-// ABOUTME: Message display component with syntax highlighting and collapsible content
+// ABOUTME: Message display component with markdown rendering and collapsible content
 // ABOUTME: Shows conversation messages with proper formatting for code blocks and tool outputs
 
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
+import { MarkdownDisplay } from './ui/MarkdownDisplay.js';
 
 interface Message {
   type: "user" | "assistant" | "system" | "tool" | "thinking";
@@ -121,6 +122,19 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
           <Box>
             <Text color={prefixColor}>{prefix}</Text>
             <Text italic color={messageColor}>{displayContent}</Text>
+          </Box>
+        ) : message.type === "assistant" ? (
+          // Use markdown rendering for assistant messages (streaming and final)
+          <Box flexDirection="column">
+            <MarkdownDisplay content={displayContent} showIcon={true} />
+            {isStreaming && showCursor && (
+              <Text inverse> </Text>
+            )}
+            {shouldShowCollapse && (
+              <Text color="dim"> 
+                {isCollapsed ? ' [+]' : ' [-]'}
+              </Text>
+            )}
           </Box>
         ) : (
           contentParts.map((part, index) => (

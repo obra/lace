@@ -51,7 +51,9 @@ describe('MessageDisplay', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('javascript');
+    // With markdown rendering, the language label is handled by marked-terminal
+    // We should still see the code content and the assistant icon
+    expect(frame).toContain('❦ '); // Assistant prefix
     expect(frame).toContain("console.log('hello');");
   });
 
@@ -129,9 +131,10 @@ describe('MessageDisplay', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('bash');
+    // With markdown rendering, language labels are handled by marked-terminal
+    // We should see the code content and assistant icon
+    expect(frame).toContain('❦ '); // Assistant prefix
     expect(frame).toContain('ls -la');
-    expect(frame).toContain('python');
     expect(frame).toContain("print('hello')");
   });
 });
