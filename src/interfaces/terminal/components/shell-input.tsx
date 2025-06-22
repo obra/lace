@@ -206,12 +206,9 @@ const ShellInput: React.FC<ShellInputProps> = ({
           const relativePath = beforeCursor.slice(2);
           completions = await scanner.getCompletions(relativePath);
           completions = completions.map(item => `./${item}`);
-        } else if (beforeCursor.includes('/') || beforeCursor === '') {
-          // Standard path completion
-          completions = await scanner.getCompletions(beforeCursor);
         } else {
-          // Substring search across all project files
-          completions = await scanner.findBySubstring(beforeCursor);
+          // Standard path completion (works for paths with "/", empty string, and prefix matching)
+          completions = await scanner.getCompletions(beforeCursor);
         }
       }
       
@@ -283,8 +280,16 @@ const ShellInput: React.FC<ShellInputProps> = ({
             handleAutocompleteSelect(selectedItem);
           }
         } else {
-          // Show autocomplete
-          showAutocomplete();
+          // Only show autocomplete if there's meaningful content to complete
+          const { beforeCursor } = getCurrentWord();
+          const currentLine = bufferState.lines[bufferState.cursorLine] || '';
+          const trimmedLine = currentLine.trim();
+          
+          // Don't trigger autocomplete if we're in completely empty content or just whitespace
+          // Allow autocomplete if there's text before cursor OR if the line has any content
+          if (beforeCursor.trim().length > 0 || trimmedLine.length > 0) {
+            showAutocomplete();
+          }
         }
         return;
       }
@@ -421,10 +426,10 @@ const ShellInput: React.FC<ShellInputProps> = ({
           if (key.delete && newBeforeCursor !== '') {
             filterAutocompleteWithText(newBeforeCursor);
           } else {
-            // For forward delete or edge cases, use requestAnimationFrame for better performance
-            requestAnimationFrame(() => {
+            // For forward delete or edge cases, use setTimeout for deferred execution in Node.js
+            setTimeout(() => {
               filterAutocomplete();
-            });
+            }, 0);
           }
         }
         return;

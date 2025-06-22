@@ -45,12 +45,12 @@ describe('ShellInput Autocomplete Integration', () => {
       expect(output).not.toContain('package.json');
     });
 
-    it('should handle Tab key to show autocomplete', async () => {
+    it('should handle Tab key to show autocomplete when there is content', async () => {
       const { stdin, lastFrame } = render(
         <ShellInput
           onSubmit={mockOnSubmit}
           onChange={mockOnChange}
-          value=""
+          value="s"
           autoFocus={true}
         />
       );
@@ -62,7 +62,7 @@ describe('ShellInput Autocomplete Integration', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const output = lastFrame();
-      // Should show autocomplete items after Tab
+      // Should show autocomplete items after Tab when there's content
       expect(output).toContain('src/');
       expect(output).toContain('package.json');
       expect(output).toContain('README.md');
@@ -73,7 +73,7 @@ describe('ShellInput Autocomplete Integration', () => {
         <ShellInput
           onSubmit={mockOnSubmit}
           onChange={mockOnChange}
-          value=""
+          value="s"
           autoFocus={true}
         />
       );
@@ -82,12 +82,12 @@ describe('ShellInput Autocomplete Integration', () => {
       stdin.write('\t');
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Second Tab to hide
+      // Second Tab to hide (but this actually applies the completion since there are items)
       stdin.write('\t');
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const output = lastFrame();
-      // Should not show autocomplete items after second Tab
+      // Should not show autocomplete items after second Tab (completion was applied)
       expect(output).not.toContain('src/');
       expect(output).not.toContain('package.json');
     });
@@ -97,7 +97,7 @@ describe('ShellInput Autocomplete Integration', () => {
         <ShellInput
           onSubmit={mockOnSubmit}
           onChange={mockOnChange}
-          value=""
+          value="s"
           autoFocus={true}
         />
       );
@@ -122,7 +122,7 @@ describe('ShellInput Autocomplete Integration', () => {
         <ShellInput
           onSubmit={mockOnSubmit}
           onChange={mockOnChange}
-          value=""
+          value="p"
           autoFocus={true}
         />
       );
@@ -145,7 +145,7 @@ describe('ShellInput Autocomplete Integration', () => {
         <ShellInput
           onSubmit={mockOnSubmit}
           onChange={mockOnChange}
-          value=""
+          value="s"
           autoFocus={true}
         />
       );
@@ -176,7 +176,7 @@ describe('ShellInput Autocomplete Integration', () => {
         <ShellInput
           onSubmit={mockOnSubmit}
           onChange={mockOnChange}
-          value=""
+          value="s"
           autoFocus={true}
         />
       );
@@ -318,6 +318,98 @@ describe('ShellInput Autocomplete Integration', () => {
     });
   });
 
+  describe('tab completion constraints', () => {
+    it('should not trigger autocomplete on Tab when input is completely empty', async () => {
+      const { stdin, lastFrame } = render(
+        <ShellInput
+          onSubmit={mockOnSubmit}
+          onChange={mockOnChange}
+          value=""
+          autoFocus={true}
+        />
+      );
+
+      // Simulate Tab key press on empty input
+      stdin.write('\t');
+      
+      // Wait a bit to ensure no async operations trigger
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const output = lastFrame();
+      // Should NOT show autocomplete items since input is completely empty
+      expect(output).not.toContain('src/');
+      expect(output).not.toContain('package.json');
+      expect(output).not.toContain('README.md');
+      // Should just show the prompt
+      expect(output).toContain('>');
+    });
+
+    it('should not trigger autocomplete on Tab when input is only whitespace', async () => {
+      const { stdin, lastFrame } = render(
+        <ShellInput
+          onSubmit={mockOnSubmit}
+          onChange={mockOnChange}
+          value="   "
+          autoFocus={true}
+        />
+      );
+
+      // Simulate Tab key press on whitespace-only input
+      stdin.write('\t');
+      
+      // Wait a bit to ensure no async operations trigger
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const output = lastFrame();
+      // Should NOT show autocomplete items since input is only whitespace
+      expect(output).not.toContain('src/');
+      expect(output).not.toContain('package.json');
+      expect(output).not.toContain('README.md');
+    });
+
+    it('should trigger autocomplete on Tab when there is content to complete', async () => {
+      const { stdin, lastFrame } = render(
+        <ShellInput
+          onSubmit={mockOnSubmit}
+          onChange={mockOnChange}
+          value="s"
+          autoFocus={true}
+        />
+      );
+
+      // Simulate Tab key press with content
+      stdin.write('\t');
+      
+      // Wait a bit for async autocomplete loading
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const output = lastFrame();
+      // Should show autocomplete items since there's content to complete
+      expect(output).toContain('src/');
+    });
+
+    it('should trigger autocomplete on Tab when cursor is after whitespace but line has content', async () => {
+      const { stdin, lastFrame } = render(
+        <ShellInput
+          onSubmit={mockOnSubmit}
+          onChange={mockOnChange}
+          value="ls "
+          autoFocus={true}
+        />
+      );
+
+      // Simulate Tab key press after space (but line has content)
+      stdin.write('\t');
+      
+      // Wait a bit for async autocomplete loading
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const output = lastFrame();
+      // Should show autocomplete items since line has content even though beforeCursor is empty
+      expect(output).toContain('src/');
+    });
+  });
+
   describe('error handling', () => {
     it('should handle autocomplete loading errors gracefully', async () => {
       // Mock FileScanner to throw an error
@@ -332,7 +424,7 @@ describe('ShellInput Autocomplete Integration', () => {
         <ShellInput
           onSubmit={mockOnSubmit}
           onChange={mockOnChange}
-          value=""
+          value="test"
           autoFocus={true}
         />
       );
@@ -342,8 +434,8 @@ describe('ShellInput Autocomplete Integration', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const output = lastFrame();
-      // Should still render the input without autocomplete
-      expect(output).toContain('> ');
+      // Should still render the input without autocomplete (even if file system error occurred)
+      expect(output).toContain('>');
     });
   });
 });
