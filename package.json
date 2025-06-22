@@ -26,6 +26,7 @@
     "@types/sax": "^1.2.7",
     "better-sqlite3": "^11.10.0",
     "cli-highlight": "^2.1.11",
+    "clipboardy": "^4.0.0",
     "commander": "^14.0.0",
     "dotenv": "^16.5.0",
     "glob": "^11.0.3",

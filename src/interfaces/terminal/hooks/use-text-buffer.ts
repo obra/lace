@@ -340,13 +340,9 @@ export function useTextBuffer(initialText: string = ''): [TextBufferState, TextB
 
   const pasteFromClipboard = useCallback(async () => {
     try {
-      // Check if clipboard API is available
-      if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') {
-        console.warn('Clipboard API not available');
-        return;
-      }
-
-      const clipboardText = await navigator.clipboard.readText();
+      // Use clipboardy for cross-platform clipboard access
+      const clipboardy = await import('clipboardy');
+      const clipboardText = clipboardy.default.readSync();
 
       // Handle empty or null clipboard content
       if (!clipboardText) {
