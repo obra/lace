@@ -14,9 +14,10 @@ import { ThinkingDisplay } from './ThinkingDisplay.js';
 interface EventDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
+  isFocused?: boolean;
 }
 
-export function EventDisplay({ event, isStreaming }: EventDisplayProps) {
+export function EventDisplay({ event, isStreaming, isFocused }: EventDisplayProps) {
   const componentMap = {
     'TOOL_CALL': ToolCallDisplay,
     'TOOL_RESULT': ToolResultDisplay,
@@ -41,7 +42,7 @@ export function EventDisplay({ event, isStreaming }: EventDisplayProps) {
 
   return (
     <Box flexDirection="column">
-      <Component event={event} isStreaming={isStreaming} />
+      <Component event={event} isStreaming={isStreaming} isFocused={isFocused} />
     </Box>
   );
 }

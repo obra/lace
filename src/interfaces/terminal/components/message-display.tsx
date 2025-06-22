@@ -14,12 +14,14 @@ interface MessageDisplayProps {
   message: Message;
   isStreaming?: boolean;
   showCursor?: boolean;
+  isFocused?: boolean;
 }
 
 const MessageDisplay: React.FC<MessageDisplayProps> = ({
   message,
   isStreaming = false,
   showCursor = false,
+  isFocused = false,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 

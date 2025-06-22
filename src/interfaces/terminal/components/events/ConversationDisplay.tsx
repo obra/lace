@@ -17,9 +17,10 @@ interface Message {
 interface ConversationDisplayProps {
   events: ThreadEvent[];
   ephemeralMessages: Message[];
+  focusId?: string;
 }
 
-export function ConversationDisplay({ events, ephemeralMessages }: ConversationDisplayProps) {
+export function ConversationDisplay({ events, ephemeralMessages, focusId }: ConversationDisplayProps) {
   // Use shared ThreadProcessor from context
   const threadProcessor = useThreadProcessor();
 
@@ -46,6 +47,7 @@ export function ConversationDisplay({ events, ephemeralMessages }: ConversationD
       <TimelineDisplay 
         timeline={mainTimeline} 
         delegateTimelines={processedThreads.delegateTimelines}
+        focusId={focusId}
       />
     </Box>
   );

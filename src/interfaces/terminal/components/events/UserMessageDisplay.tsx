@@ -8,9 +8,10 @@ import { ThreadEvent } from '../../../../threads/types.js';
 interface UserMessageDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
+  isFocused?: boolean;
 }
 
-export function UserMessageDisplay({ event, isStreaming }: UserMessageDisplayProps) {
+export function UserMessageDisplay({ event, isStreaming, isFocused }: UserMessageDisplayProps) {
   const message = event.data as string;
   
   return (

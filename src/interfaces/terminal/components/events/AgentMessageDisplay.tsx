@@ -9,6 +9,7 @@ import { CodeDisplay } from '../ui/CodeDisplay.js';
 interface AgentMessageDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
+  isFocused?: boolean;
 }
 
 // Parse code blocks and apply syntax highlighting
@@ -49,7 +50,7 @@ const parseContent = (content: string) => {
   return parts.length > 0 ? parts : [{ type: 'text' as const, content }];
 };
 
-export function AgentMessageDisplay({ event, isStreaming }: AgentMessageDisplayProps) {
+export function AgentMessageDisplay({ event, isStreaming, isFocused }: AgentMessageDisplayProps) {
   const message = event.data as string;
   
   // Strip thinking blocks since they're displayed separately as thinking timeline items

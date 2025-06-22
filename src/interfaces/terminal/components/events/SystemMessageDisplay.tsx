@@ -8,9 +8,10 @@ import { ThreadEvent } from '../../../../threads/types.js';
 interface SystemMessageDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
+  isFocused?: boolean;
 }
 
-export function SystemMessageDisplay({ event, isStreaming }: SystemMessageDisplayProps) {
+export function SystemMessageDisplay({ event, isStreaming, isFocused }: SystemMessageDisplayProps) {
   const message = event.data as string;
   
   return (

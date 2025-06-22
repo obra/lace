@@ -1,8 +1,8 @@
-// ABOUTME: Display component for processed timeline items from ThreadProcessor
-// ABOUTME: Renders timeline items in chronological order with appropriate UI components
+// ABOUTME: Display component for processed timeline items from ThreadProcessor with navigation
+// ABOUTME: Renders timeline items in chronological order with keyboard navigation and focus management
 
-import React from 'react';
-import { Box } from 'ink';
+import React, { useState, useCallback } from 'react';
+import { Box, useInput, useFocus, Text } from 'ink';
 import { Timeline, TimelineItem } from '../../../thread-processor.js';
 import { EventDisplay } from './EventDisplay.js';
 import { ToolExecutionDisplay } from './ToolExecutionDisplay.js';
@@ -14,67 +14,120 @@ import { logger } from '../../../../utils/logger.js';
 interface TimelineDisplayProps {
   timeline: Timeline;
   delegateTimelines?: Map<string, Timeline>;
+  focusId?: string;
 }
 
-export default function TimelineDisplay({ timeline, delegateTimelines }: TimelineDisplayProps) {
+export default function TimelineDisplay({ timeline, delegateTimelines, focusId }: TimelineDisplayProps) {
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1); // -1 means no focus
+  const { isFocused } = useFocus({ id: focusId });
+  
   // Debug: Log delegate timelines info
   logger.debug('TimelineDisplay rendering', {
     timelineItems: timeline.items.length,
     delegateTimelineCount: delegateTimelines?.size || 0,
-    delegateThreads: delegateTimelines ? Array.from(delegateTimelines.keys()) : []
+    delegateThreads: delegateTimelines ? Array.from(delegateTimelines.keys()) : [],
+    focusedIndex,
+    componentIsFocused: isFocused
   });
+  
+  // Handle keyboard navigation - only when this component has focus
+  useInput(useCallback((input, key) => {
+    if (!isFocused || timeline.items.length === 0) return;
+    
+    if (key.upArrow) {
+      setFocusedIndex(prev => {
+        if (prev <= 0) {
+          // Wrap to last item
+          return timeline.items.length - 1;
+        }
+        return prev - 1;
+      });
+    } else if (key.downArrow) {
+      setFocusedIndex(prev => {
+        if (prev >= timeline.items.length - 1) {
+          // Wrap to first item
+          return 0;
+        }
+        return prev + 1;
+      });
+    }
+  }, [isFocused, timeline.items.length]));
   
   return (
     <Box flexDirection="column">
-      {timeline.items.map((item, index) => (
-        <Box key={`timeline-item-${index}`}>
-          <TimelineItemDisplay item={item} delegateTimelines={delegateTimelines} />
-        </Box>
-      ))}
+      {timeline.items.map((item, index) => {
+        const isFocused = index === focusedIndex;
+        return (
+          <Box key={`timeline-item-${index}`} flexDirection="row">
+            {/* Focus indicator */}
+            <Text color="cyan">{isFocused ? '> ' : '  '}</Text>
+            <Box flexGrow={1}>
+              <TimelineItemDisplay 
+                item={item} 
+                delegateTimelines={delegateTimelines}
+                isFocused={isFocused}
+              />
+            </Box>
+          </Box>
+        );
+      })}
     </Box>
   );
 }
 
-function TimelineItemDisplay({ item, delegateTimelines }: { 
+function TimelineItemDisplay({ item, delegateTimelines, isFocused }: { 
   item: TimelineItem; 
   delegateTimelines?: Map<string, Timeline>;
+  isFocused: boolean;
 }) {
   switch (item.type) {
     case 'user_message':
-      return <EventDisplay event={{
-        id: item.id,
-        threadId: '',
-        type: 'USER_MESSAGE',
-        timestamp: item.timestamp,
-        data: item.content
-      }} />;
+      return <EventDisplay 
+        event={{
+          id: item.id,
+          threadId: '',
+          type: 'USER_MESSAGE',
+          timestamp: item.timestamp,
+          data: item.content
+        }} 
+        isFocused={isFocused}
+      />;
       
     case 'agent_message':
-      return <EventDisplay event={{
-        id: item.id,
-        threadId: '',
-        type: 'AGENT_MESSAGE',
-        timestamp: item.timestamp,
-        data: item.content
-      }} />;
+      return <EventDisplay 
+        event={{
+          id: item.id,
+          threadId: '',
+          type: 'AGENT_MESSAGE',
+          timestamp: item.timestamp,
+          data: item.content
+        }} 
+        isFocused={isFocused}
+      />;
       
     case 'thinking':
-      return <EventDisplay event={{
-        id: item.id,
-        threadId: '',
-        type: 'THINKING',
-        timestamp: item.timestamp,
-        data: item.content
-      }} />;
+      return <EventDisplay 
+        event={{
+          id: item.id,
+          threadId: '',
+          type: 'THINKING',
+          timestamp: item.timestamp,
+          data: item.content
+        }} 
+        isFocused={isFocused}
+      />;
       
     case 'system_message':
-      return <EventDisplay event={{
-        id: item.id,
-        threadId: '',
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        timestamp: item.timestamp,
-        data: item.content
-      }} />;
+      return <EventDisplay 
+        event={{
+          id: item.id,
+          threadId: '',
+          type: 'LOCAL_SYSTEM_MESSAGE',
+          timestamp: item.timestamp,
+          data: item.content
+        }} 
+        isFocused={isFocused}
+      />;
       
     case 'tool_execution':
       const callEvent = {
@@ -113,6 +166,7 @@ function TimelineItemDisplay({ item, delegateTimelines }: {
                 <ToolExecutionDisplay 
                   callEvent={callEvent} 
                   resultEvent={resultEvent}
+                  isFocused={isFocused}
                 />
                 <DelegationBox 
                   threadId={delegateThreadId}
@@ -136,14 +190,18 @@ function TimelineItemDisplay({ item, delegateTimelines }: {
       return <ToolExecutionDisplay 
         callEvent={callEvent} 
         resultEvent={resultEvent}
+        isFocused={isFocused}
       />;
       
     case 'ephemeral_message':
-      return <MessageDisplay message={{
-        type: item.messageType as any,
-        content: item.content,
-        timestamp: item.timestamp
-      }} />;
+      return <MessageDisplay 
+        message={{
+          type: item.messageType as any,
+          content: item.content,
+          timestamp: item.timestamp
+        }} 
+        isFocused={isFocused}
+      />;
       
       
     default:

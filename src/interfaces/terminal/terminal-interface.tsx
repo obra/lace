@@ -2,7 +2,7 @@
 // ABOUTME: Provides rich UI components with multi-line editing and visual feedback
 
 import React, { useState, useEffect, useCallback, useMemo, createContext, useContext } from "react";
-import { Box, Text, render } from "ink";
+import { Box, Text, render, useFocusManager, useInput } from "ink";
 import ShellInput from "./components/shell-input.js";
 import ToolApprovalModal from "./components/tool-approval-modal.js";
 import { ConversationDisplay } from "./components/events/ConversationDisplay.js";
@@ -65,6 +65,21 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     isReadOnly: boolean;
     resolve: (decision: ApprovalDecision) => void;
   } | null>(null);
+  
+  // Focus management
+  const { focus, focusNext, focusPrevious } = useFocusManager();
+  
+  // Global keyboard shortcuts for focus switching
+  useInput(useCallback((input, key) => {
+    // Don't handle global shortcuts when approval modal is open
+    if (approvalRequest) return;
+    
+    if (key.escape) {
+      // Escape toggles between shell input and timeline
+      // This gives us a simple way to switch focus contexts
+      focusNext();
+    }
+  }, [approvalRequest, focusNext]));
 
   // Sync events from agent's thread (including delegate threads)
   const syncEvents = useCallback(() => {
@@ -85,8 +100,10 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     if (approvalRequest) {
       approvalRequest.resolve(decision);
       setApprovalRequest(null);
+      // Return focus to shell input when modal closes (for typing)
+      focus('shell-input');
     }
-  }, [approvalRequest]);
+  }, [approvalRequest, focus]);
 
   // Setup event handlers for Agent events
   useEffect(() => {
@@ -327,7 +344,21 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     });
     
     agent.start();
-  }, [agent, addMessage, syncEvents]);
+    
+    // Set initial focus to shell input (for typing)
+    focus('shell-input');
+  }, [agent, addMessage, syncEvents, focus]);
+
+  // Focus approval modal when it appears
+  useEffect(() => {
+    if (approvalRequest) {
+      // Use setTimeout to ensure the modal is rendered before focusing
+      const timeoutId = setTimeout(() => {
+        focus('approval-modal');
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [approvalRequest, focus]);
 
   return (
     <ThreadProcessorContext.Provider value={threadProcessor}>
@@ -350,6 +381,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               timestamp: new Date(),
             }] : [])
           ]}
+          focusId="timeline"
         />
 
         {/* Tool approval modal */}
@@ -360,6 +392,7 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             isReadOnly={approvalRequest.isReadOnly}
             onDecision={handleApprovalDecision}
             isVisible={true}
+            focusId="approval-modal"
           />
         )}
 
@@ -380,7 +413,8 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             placeholder={approvalRequest ? "Tool approval required..." : "Type your message..."}
             onSubmit={handleSubmit}
             onChange={setCurrentInput}
-            autoFocus={!approvalRequest}
+            focusId="shell-input"
+            autoFocus={false}
             disabled={!!approvalRequest}
           />
         </Box>

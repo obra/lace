@@ -2,7 +2,7 @@
 // ABOUTME: Shows tool information, risk level, and parameters with clear approval options
 
 import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text, useInput, useFocus } from 'ink';
 import { ApprovalDecision } from '../../../tools/approval-types.js';
 
 export interface ToolApprovalModalProps {
@@ -11,6 +11,7 @@ export interface ToolApprovalModalProps {
   isReadOnly?: boolean;
   onDecision: (decision: ApprovalDecision) => void;
   isVisible: boolean;
+  focusId?: string;
 }
 
 const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
@@ -19,8 +20,10 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
   isReadOnly = false,
   onDecision,
   isVisible,
+  focusId,
 }) => {
   const [selectedOption, setSelectedOption] = useState(0);
+  const { isFocused } = useFocus({ id: focusId, autoFocus: true });
 
   // Reset selection when modal becomes visible
   useEffect(() => {
@@ -30,7 +33,7 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
   }, [isVisible]);
 
   useInput((inputChar, key) => {
-    if (!isVisible) return;
+    if (!isVisible || !isFocused) return;
 
     if (key.upArrow || inputChar === 'k') {
       setSelectedOption((prev) => Math.max(0, prev - 1));

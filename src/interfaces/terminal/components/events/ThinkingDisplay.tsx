@@ -8,9 +8,10 @@ import { ThreadEvent } from '../../../../threads/types.js';
 interface ThinkingDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
+  isFocused?: boolean;
 }
 
-export function ThinkingDisplay({ event, isStreaming }: ThinkingDisplayProps) {
+export function ThinkingDisplay({ event, isStreaming, isFocused }: ThinkingDisplayProps) {
   const thinkingContent = event.data as string;
   
   return (
