@@ -435,16 +435,19 @@ const ShellInput: React.FC<ShellInputProps> = ({
         return;
       }
 
-      // Regular character input - filter autocomplete instead of hiding
-      if (input && input.length === 1 && !key.ctrl && !key.meta) {
+      // Regular character input - handle both single characters and paste (multi-character)
+      if (input && input.length >= 1 && !key.ctrl && !key.meta) {
         bufferOps.insertText(input);
         
-        // Filter autocomplete when typing
-        if (autocompleteVisible) {
+        // For single character input, filter autocomplete when typing
+        if (input.length === 1 && autocompleteVisible) {
           // Get the expected new text and filter with it
           const { beforeCursor } = getCurrentWord();
           const newBeforeCursor = beforeCursor + input;
           filterAutocompleteWithText(newBeforeCursor);
+        } else if (input.length > 1) {
+          // For multi-character input (like paste), hide autocomplete
+          hideAutocomplete();
         }
         return;
       }
