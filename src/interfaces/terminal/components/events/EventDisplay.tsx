@@ -15,9 +15,11 @@ interface EventDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
   isFocused?: boolean;
+  focusedLine?: number;
+  itemStartLine?: number;
 }
 
-export function EventDisplay({ event, isStreaming, isFocused }: EventDisplayProps) {
+export function EventDisplay({ event, isStreaming, isFocused, focusedLine, itemStartLine }: EventDisplayProps) {
   const componentMap = {
     'TOOL_CALL': ToolCallDisplay,
     'TOOL_RESULT': ToolResultDisplay,

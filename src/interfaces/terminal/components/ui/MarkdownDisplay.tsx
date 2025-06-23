@@ -9,9 +9,10 @@ import TerminalRenderer from 'marked-terminal';
 interface MarkdownDisplayProps {
   content: string;
   showIcon?: boolean;
+  dimmed?: boolean;
 }
 
-export function MarkdownDisplay({ content, showIcon = true }: MarkdownDisplayProps) {
+export function MarkdownDisplay({ content, showIcon = true, dimmed = false }: MarkdownDisplayProps) {
   try {
     // Configure marked with terminal renderer for ANSI formatting
     marked.setOptions({
@@ -19,13 +20,15 @@ export function MarkdownDisplay({ content, showIcon = true }: MarkdownDisplayPro
     });
     
     // Parse markdown to terminal-formatted text with ANSI colors
-    const renderedContent = marked.parse(content) as string;
+    const renderedContent = marked.parse(content.trim()) as string;
+    // Remove trailing whitespace from each line and the overall content
+    const cleanedContent = renderedContent.trim().split('\n').map(line => line.trimEnd()).join('\n');
     
     return (
       <Box flexDirection="column" marginBottom={1}>
-        <Box>
-          {showIcon && <Text color="green">❦ </Text>}
-          <Text wrap="wrap">{renderedContent}</Text>
+        <Box flexDirection="row">
+          <Box><Text color={dimmed ? "dim" : "green"}>❦ </Text></Box>
+	  <Box><Text wrap="wrap" dimColor={dimmed}>{cleanedContent}</Text></Box>
         </Box>
       </Box>
     );
@@ -33,9 +36,9 @@ export function MarkdownDisplay({ content, showIcon = true }: MarkdownDisplayPro
     // Fallback to plain text if markdown parsing fails
     return (
       <Box flexDirection="column" marginBottom={1}>
-        <Box>
-          {showIcon && <Text color="green">❦ </Text>}
-          <Text color="white" wrap="wrap">{content}</Text>
+        <Box flexDirection="row">
+          {showIcon && <Text color={dimmed ? "dim" : "green"}>❦</Text>}
+          <Text color={dimmed ? "dim" : "white"} wrap="wrap">{content.trim()}</Text>
         </Box>
       </Box>
     );

@@ -1,8 +1,9 @@
 // ABOUTME: Status bar component showing system information and current state
 // ABOUTME: Displays provider, model, token usage, thread ID and other key metrics
 
-import React, { useState, useEffect } from 'react';
-import { Box, Text } from 'ink';
+import React from 'react';
+import { Text } from 'ink';
+import useStdoutDimensions from '../../../utils/use-stdout-dimensions.js';
 
 interface TokenUsage {
   promptTokens?: number;
@@ -47,24 +48,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
   };
 
 
-  // Track terminal width with proper SIGWINCH event handling
-  const [terminalWidth, setTerminalWidth] = useState(process.stdout.columns || 80);
-  
-  useEffect(() => {
-    const updateWidth = () => {
-      setTerminalWidth(process.stdout.columns || 80);
-    };
-    
-    // Listen for SIGWINCH (window change) signal
-    process.on('SIGWINCH', updateWidth);
-    
-    return () => {
-      process.off('SIGWINCH', updateWidth);
-    };
-  }, []);
-  
-  // Use the tracked width
-  const currentWidth = terminalWidth;
+  // Use proper terminal dimensions hook
+  const [currentWidth] = useStdoutDimensions();
   
   // Create content strings
   const leftContent = `🧠 ${providerName}${modelName ? `:${modelName}` : ''} • 📁 ${formatThreadId(threadId)}`;

@@ -1,8 +1,10 @@
 // ABOUTME: Ink-based terminal interface for interactive chat with Agent
 // ABOUTME: Provides rich UI components with multi-line editing and visual feedback
 
-import React, { useState, useEffect, useCallback, useMemo, createContext, useContext } from "react";
-import { Box, Text, render, useFocusManager, useInput } from "ink";
+import React, { useState, useEffect, useCallback, useMemo, createContext, useContext, useRef } from "react";
+import { Box, Text, render, useFocusManager, useInput, measureElement } from "ink";
+import { withFullScreen } from "fullscreen-ink";
+import useStdoutDimensions from "../../utils/use-stdout-dimensions.js";
 import ShellInput from "./components/shell-input.js";
 import ToolApprovalModal from "./components/tool-approval-modal.js";
 import { ConversationDisplay } from "./components/events/ConversationDisplay.js";
@@ -43,6 +45,11 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 }) => {
   // Create one ThreadProcessor instance per interface
   const threadProcessor = useMemo(() => new ThreadProcessor(), []);
+  const bottomSectionRef = useRef<any>(null);
+  const timelineContainerRef = useRef<any>(null);
+  const [bottomSectionHeight, setBottomSectionHeight] = useState<number>(0);
+  const [timelineContainerHeight, setTimelineContainerHeight] = useState<number>(0);
+  const [, terminalHeight] = useStdoutDimensions();
   const [events, setEvents] = useState<ThreadEvent[]>([]);
   const [ephemeralMessages, setEphemeralMessages] = useState<Message[]>([]);
   const [currentInput, setCurrentInput] = useState("");
@@ -66,20 +73,22 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     resolve: (decision: ApprovalDecision) => void;
   } | null>(null);
   
-  // Focus management
-  const { focus, focusNext, focusPrevious } = useFocusManager();
+  // Focus management with disabled automatic cycling
+  const { focus, focusNext, focusPrevious, disableFocus } = useFocusManager();
   
-  // Global keyboard shortcuts for focus switching
+  // Disable automatic Tab cycling to prevent conflicts with autocomplete
+  useEffect(() => {
+    disableFocus();
+  }, [disableFocus]);
+  
+  // Global keyboard shortcuts for manual focus switching  
   useInput(useCallback((input, key) => {
-    // Don't handle global shortcuts when approval modal is open
-    if (approvalRequest) return;
-    
     if (key.escape) {
       // Escape toggles between shell input and timeline
-      // This gives us a simple way to switch focus contexts
       focusNext();
     }
-  }, [approvalRequest, focusNext]));
+    // Tab is NOT handled here - let ShellInput handle it for autocomplete
+  }, [focusNext]), { isActive: !approvalRequest });
 
   // Sync events from agent's thread (including delegate threads)
   const syncEvents = useCallback(() => {
@@ -360,29 +369,44 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     }
   }, [approvalRequest, focus]);
 
+  // Measure bottom section height for viewport calculations
+  useEffect(() => {
+    if (bottomSectionRef.current) {
+      const { height } = measureElement(bottomSectionRef.current);
+      setBottomSectionHeight(height);
+    }
+    if (timelineContainerRef.current) {
+      const { height } = measureElement(timelineContainerRef.current);
+      setTimelineContainerHeight(height);
+    }
+  }, [events.length, ephemeralMessages.length, currentInput]); // Re-measure when content or input changes
+
   return (
     <ThreadProcessorContext.Provider value={threadProcessor}>
       <Box flexDirection="column" height="100%">
-        {/* Conversation display with merged events and messages */}
-        <ConversationDisplay 
-          events={events}
-          ephemeralMessages={[
-            ...ephemeralMessages,
-            // Add streaming content as ephemeral message
-            ...(streamingContent ? [{
-              type: "assistant" as const,
-              content: streamingContent,
-              timestamp: new Date(),
-            }] : []),
-            // Add processing indicator as ephemeral message
-            ...(isProcessing && !streamingContent ? [{
-              type: "system" as const,
-              content: "💭 Thinking...",
-              timestamp: new Date(),
-            }] : [])
-          ]}
-          focusId="timeline"
-        />
+        {/* Timeline - takes remaining space */}
+        <Box flexGrow={1} ref={timelineContainerRef}>
+          <ConversationDisplay 
+            events={events}
+            ephemeralMessages={[
+              ...ephemeralMessages,
+              // Add streaming content as ephemeral message
+              ...(streamingContent ? [{
+                type: "assistant" as const,
+                content: streamingContent,
+                timestamp: new Date(),
+              }] : []),
+              // Add processing indicator as ephemeral message
+              ...(isProcessing && !streamingContent ? [{
+                type: "system" as const,
+                content: "💭 Thinking...",
+                timestamp: new Date(),
+              }] : [])
+            ]}
+            focusId="timeline"
+            bottomSectionHeight={bottomSectionHeight}
+          />
+        </Box>
 
         {/* Tool approval modal */}
         {approvalRequest && (
@@ -396,27 +420,31 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
           />
         )}
 
-        {/* Status bar - right above input */}
-        <StatusBar 
-          providerName={agent.providerName || 'unknown'}
-          modelName={(agent as any)._provider?.defaultModel || undefined}
-          threadId={agent.threadManager.getCurrentThreadId() || undefined}
-          tokenUsage={tokenUsage}
-          isProcessing={isProcessing}
-          messageCount={events.length + ephemeralMessages.length}
-        />
-
-        {/* Input area - disabled when modal is open */}
-        <Box padding={1}>
-          <ShellInput
-            value={currentInput}
-            placeholder={approvalRequest ? "Tool approval required..." : "Type your message..."}
-            onSubmit={handleSubmit}
-            onChange={setCurrentInput}
-            focusId="shell-input"
-            autoFocus={false}
-            disabled={!!approvalRequest}
+        {/* Bottom section - status bar, input anchored to bottom */}
+        <Box flexDirection="column" flexShrink={0} ref={bottomSectionRef}>
+          {/* Status bar - takes natural height */}
+          <StatusBar 
+            providerName={agent.providerName || 'unknown'}
+            modelName={(agent as any)._provider?.defaultModel || undefined}
+            threadId={agent.threadManager.getCurrentThreadId() || undefined}
+            tokenUsage={tokenUsage}
+            isProcessing={isProcessing}
+            messageCount={events.length + ephemeralMessages.length}
           />
+
+          {/* Input area - takes natural height */}
+          <Box padding={1}>
+            <ShellInput
+              value={currentInput}
+              placeholder={approvalRequest ? "Tool approval required..." : "Type your message..."}
+              onSubmit={handleSubmit}
+              onChange={setCurrentInput}
+              focusId="shell-input"
+              autoFocus={false}
+              disabled={!!approvalRequest}
+            />
+          </Box>
+
         </Box>
       </Box>
     </ThreadProcessorContext.Provider>
@@ -448,13 +476,13 @@ export class TerminalInterface implements ApprovalCallback {
       process.exit(0);
     });
 
-    // Render the Ink app
-    const { unmount } = render(
+    // Render the Ink app with fullscreen support
+    withFullScreen(
       <TerminalInterfaceComponent
         agent={this.agent}
         approvalCallback={this}
       />
-    );
+    ).start();
 
     // Keep the process running
     await new Promise<void>((resolve) => {

@@ -25,7 +25,7 @@ export function AgentMessageDisplay({ event, isStreaming, isFocused }: AgentMess
   
   return (
     <Box flexDirection="column">
-      <MarkdownDisplay content={messageWithoutThinking} showIcon={true} />
+      <MarkdownDisplay content={messageWithoutThinking} showIcon={true} dimmed={!isFocused} />
       {isStreaming && (
         <Box marginTop={1}>
           <Text color="gray"> (thinking...)</Text>
