@@ -18,9 +18,10 @@ interface ConversationDisplayProps {
   events: ThreadEvent[];
   ephemeralMessages: Message[];
   focusId?: string;
+  bottomSectionHeight?: number;
 }
 
-export function ConversationDisplay({ events, ephemeralMessages, focusId }: ConversationDisplayProps) {
+export function ConversationDisplay({ events, ephemeralMessages, focusId, bottomSectionHeight }: ConversationDisplayProps) {
   // Use shared ThreadProcessor from context
   const threadProcessor = useThreadProcessor();
 
@@ -43,11 +44,12 @@ export function ConversationDisplay({ events, ephemeralMessages, focusId }: Conv
   }, [processedThreads.mainTimeline, ephemeralItems, threadProcessor]);
 
   return (
-    <Box flexDirection="column" flexGrow={1} paddingY={1}>
+    <Box flexDirection="column" flexGrow={1} overflow="hidden">
       <TimelineDisplay 
         timeline={mainTimeline} 
         delegateTimelines={processedThreads.delegateTimelines}
         focusId={focusId}
+        bottomSectionHeight={bottomSectionHeight}
       />
     </Box>
   );

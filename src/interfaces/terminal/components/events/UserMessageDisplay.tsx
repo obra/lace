@@ -9,6 +9,8 @@ interface UserMessageDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
   isFocused?: boolean;
+  focusedLine?: number;
+  itemStartLine?: number;
 }
 
 export function UserMessageDisplay({ event, isStreaming, isFocused }: UserMessageDisplayProps) {
@@ -16,9 +18,9 @@ export function UserMessageDisplay({ event, isStreaming, isFocused }: UserMessag
   
   return (
     <Box flexDirection="column" marginBottom={1}>
-      <Box>
-        <Text color="dim">{'> '}</Text>
-        <Text wrap="wrap">{message}</Text>
+      <Box flexDirection="row">
+        <Text color="dim">&gt; </Text>
+        <Text wrap="wrap" dimColor={!isFocused}>{message.trim()}</Text>
         {isStreaming && <Text color="gray"> (typing...)</Text>}
       </Box>
     </Box>

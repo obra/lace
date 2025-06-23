@@ -23,16 +23,17 @@
     "@lmstudio/sdk": "^1.2.1",
     "@types/glob": "^8.1.0",
     "@types/marked": "^5.0.2",
-    "@types/react": "^19.1.8",
+    "@types/react": "^18.3.1",
     "@types/sax": "^1.2.7",
     "better-sqlite3": "^11.10.0",
     "cli-highlight": "^2.1.11",
     "clipboardy": "^4.0.0",
     "commander": "^14.0.0",
     "dotenv": "^16.5.0",
+    "fullscreen-ink": "^0.0.2",
     "glob": "^11.0.3",
     "highlight.js": "^11.11.1",
-    "ink": "^6.0.0",
+    "ink": "^5.2.1",
     "ink-autocomplete": "^0.0.0",
     "marked": "^15.0.12",
     "marked-terminal": "^7.3.0",
@@ -41,7 +42,8 @@
     "openai": "^4.77.0",
     "pino": "^9.7.0",
     "pino-pretty": "^13.0.0",
-    "react": "^19.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "sax": "^1.4.1"
   },
   "devDependencies": {
@@ -62,6 +64,7 @@
     "jsdom": "^26.1.0",
     "lint-staged": "^16.1.1",
     "prettier": "^3.5.3",
+    "react-devtools-core": "^4.28.5",
     "typescript": "^5.6.0",
     "vitest": "^3.2.3"
   }
