@@ -10,7 +10,8 @@ import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult }
 
 export class UrlFetchTool implements Tool {
   name = 'url_fetch';
-  description = 'Fetch content from web URLs with intelligent content handling';
+  description =
+    'Fetch content from web URLs with intelligent content handling. WARNING: Returned content can be very large and may exceed token limits. Consider delegating URL fetching to a subtask to avoid overwhelming the main conversation.';
   annotations = {
     title: 'URL Fetcher',
     readOnlyHint: true,
@@ -60,6 +61,12 @@ export class UrlFetchTool implements Tool {
         description: 'Follow HTTP redirects (default: true, max 10 redirects)',
         default: true,
       },
+      returnContent: {
+        type: 'boolean',
+        description:
+          'Whether to return the processed content in the tool result (default: true). Set to false to only save to temp file without returning content.',
+        default: true,
+      },
     },
     required: ['url'],
   };
@@ -86,7 +93,7 @@ export class UrlFetchTool implements Tool {
       'header',
       'nav',
       'footer',
-    ] as any);
+    ] as string[]);
   }
 
   validateUrl(url: string): void {
@@ -138,6 +145,7 @@ export class UrlFetchTool implements Tool {
       timeout = 30000,
       maxSize = 33554432, // 32MB
       followRedirects = true,
+      returnContent = true,
     } = input as {
       url: string;
       method?: string;
@@ -146,6 +154,7 @@ export class UrlFetchTool implements Tool {
       timeout?: number;
       maxSize?: number;
       followRedirects?: boolean;
+      returnContent?: boolean;
     };
 
     // Validate parameters
@@ -228,11 +237,11 @@ export class UrlFetchTool implements Tool {
       // Handle small responses inline (≤ 32KB)
       const inlineLimit = 32 * 1024;
       if (actualSize <= inlineLimit) {
-        return this.handleInlineContent(buffer, contentType, url);
+        return this.handleInlineContent(buffer, contentType, url, returnContent);
       }
 
       // Handle large responses with temp files
-      return await this.handleLargeContent(buffer, contentType, url, actualSize);
+      return await this.handleLargeContent(buffer, contentType, url, actualSize, returnContent);
     } catch (error) {
       clearTimeout(timeoutId);
       if (error instanceof Error) {
@@ -245,8 +254,22 @@ export class UrlFetchTool implements Tool {
     }
   }
 
-  private handleInlineContent(buffer: ArrayBuffer, contentType: string, url: string): ToolResult {
+  private handleInlineContent(
+    buffer: ArrayBuffer,
+    contentType: string,
+    url: string,
+    returnContent: boolean
+  ): ToolResult {
     try {
+      if (!returnContent) {
+        return createSuccessResult([
+          {
+            type: 'text',
+            text: `Content fetched from ${url}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\nContent not returned (returnContent=false). Use file tools to access if needed.`,
+          },
+        ]);
+      }
+
       const processedContent = this.processContent(buffer, contentType);
 
       return createSuccessResult([
@@ -311,7 +334,8 @@ export class UrlFetchTool implements Tool {
     buffer: ArrayBuffer,
     contentType: string,
     url: string,
-    size: number
+    size: number,
+    returnContent: boolean
   ): Promise<ToolResult> {
     try {
       // Create temp directory if it doesn't exist
@@ -334,12 +358,21 @@ export class UrlFetchTool implements Tool {
       // Track for cleanup
       UrlFetchTool.tempFiles.push(tempFilePath);
 
+      const sizeInMB = (size / (1024 * 1024)).toFixed(1);
+
+      if (!returnContent) {
+        return createSuccessResult([
+          {
+            type: 'text',
+            text: `Large file fetched from ${url}:\n\nContent-Type: ${contentType}\nSize: ${size} bytes (${sizeInMB}MB)\nSaved to: ${tempFilePath}\n\nContent not returned (returnContent=false). Use file tools to access the temp file.`,
+          },
+        ]);
+      }
+
       // Process the full content and provide that as the main response
       const processedContent = this.isTextContent(contentType.split(';')[0].trim().toLowerCase())
         ? this.processContent(buffer, contentType)
         : `[Binary content - ${contentType}]`;
-
-      const sizeInMB = (size / (1024 * 1024)).toFixed(1);
 
       return createSuccessResult([
         {
