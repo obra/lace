@@ -13,6 +13,7 @@ import { RipgrepSearchTool } from './implementations/ripgrep-search.js';
 import { FileFindTool } from './implementations/file-find.js';
 import { TaskAddTool, TaskListTool, TaskCompleteTool } from './implementations/task-manager.js';
 import { DelegateTool } from './implementations/delegate.js';
+import { UrlFetchTool } from './implementations/url-fetch.js';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
@@ -62,6 +63,7 @@ export class ToolExecutor {
       new TaskListTool(),
       new TaskCompleteTool(),
       new DelegateTool(),
+      new UrlFetchTool(),
     ];
 
     this.registerTools(tools);

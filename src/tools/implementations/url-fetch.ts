@@ -4,6 +4,7 @@
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import TurndownService from 'turndown';
 import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
 
 export class UrlFetchTool implements Tool {
@@ -64,9 +65,15 @@ export class UrlFetchTool implements Tool {
 
   private static tempFiles: string[] = [];
   private static cleanupRegistered = false;
+  private turndownService: TurndownService;
 
   constructor() {
     this.registerCleanup();
+    this.turndownService = new TurndownService({
+      headingStyle: 'atx',
+      codeBlockStyle: 'fenced',
+      emDelimiter: '_'
+    });
   }
 
   validateUrl(url: string): void {
@@ -224,17 +231,56 @@ export class UrlFetchTool implements Tool {
 
   private handleInlineContent(buffer: ArrayBuffer, contentType: string, url: string): ToolResult {
     try {
-      const text = new TextDecoder('utf-8').decode(buffer);
+      const processedContent = this.processContent(buffer, contentType);
       
       return createSuccessResult([
         {
           type: 'text',
-          text: `Content from ${url}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\n${text}`
+          text: `Content from ${url}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\n${processedContent}`
         }
       ]);
     } catch (error) {
-      return createErrorResult(`Failed to decode content: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return createErrorResult(`Failed to process content: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  processContent(buffer: ArrayBuffer, contentType: string): string {
+    const cleanType = contentType.split(';')[0].trim().toLowerCase();
+    
+    // Only handle known text types, everything else is binary
+    if (!this.isTextContent(cleanType)) {
+      return `Binary content detected (${cleanType})\nSize: ${buffer.byteLength} bytes\n\nUse temp file for full content access.`;
+    }
+
+    const text = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
+
+    // Convert HTML to markdown for better readability
+    if (cleanType === 'text/html') {
+      try {
+        return this.turndownService.turndown(text);
+      } catch {
+        return text; // Fallback to raw HTML
+      }
+    }
+
+    // Pretty-print JSON
+    if (cleanType === 'application/json') {
+      try {
+        const parsed = JSON.parse(text);
+        return JSON.stringify(parsed, null, 2);
+      } catch {
+        return text; // Fallback to raw text if parsing fails
+      }
+    }
+
+    return text;
+  }
+
+  isTextContent(contentType: string): boolean {
+    return contentType.startsWith('text/') || 
+           contentType === 'application/json' ||
+           contentType === 'application/xml' ||
+           contentType === 'application/javascript';
   }
 
   private async handleLargeContent(
@@ -267,7 +313,9 @@ export class UrlFetchTool implements Tool {
       // Generate preview (first 32KB)
       const previewSize = Math.min(32 * 1024, size);
       const previewBuffer = buffer.slice(0, previewSize);
-      const preview = new TextDecoder('utf-8', { fatal: false }).decode(previewBuffer);
+      const preview = this.isTextContent(contentType.split(';')[0].trim().toLowerCase()) 
+        ? new TextDecoder('utf-8', { fatal: false }).decode(previewBuffer)
+        : `[Binary content preview not available - ${contentType}]`;
 
       const sizeInMB = (size / (1024 * 1024)).toFixed(1);
       

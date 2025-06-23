@@ -189,4 +189,41 @@ describe('UrlFetchTool', () => {
       expect(result.content[0].text).toContain('Network error');
     }, 10000);
   });
+
+  describe('content processing', () => {
+    it('should detect text content types correctly', () => {
+      expect(tool.isTextContent('text/plain')).toBe(true);
+      expect(tool.isTextContent('text/html')).toBe(true);
+      expect(tool.isTextContent('application/json')).toBe(true);
+      expect(tool.isTextContent('application/xml')).toBe(true);
+      expect(tool.isTextContent('application/javascript')).toBe(true);
+      
+      expect(tool.isTextContent('image/jpeg')).toBe(false);
+      expect(tool.isTextContent('application/pdf')).toBe(false);
+      expect(tool.isTextContent('application/octet-stream')).toBe(false);
+    });
+
+    it('should process HTML content to markdown', () => {
+      const html = '<h1>Test</h1><p>This is a <strong>test</strong>.</p>';
+      const result = tool.processContent(new TextEncoder().encode(html).buffer, 'text/html');
+      
+      expect(result).toContain('# Test');
+      expect(result).toContain('**test**');
+    });
+
+    it('should pretty-print JSON content', () => {
+      const json = '{"name":"test","value":123}';
+      const result = tool.processContent(new TextEncoder().encode(json).buffer, 'application/json');
+      
+      expect(result).toContain('{\n  "name": "test",\n  "value": 123\n}');
+    });
+
+    it('should handle binary content appropriately', () => {
+      const binaryData = new Uint8Array([0x89, 0x50, 0x4E, 0x47]); // PNG header
+      const result = tool.processContent(binaryData.buffer, 'image/png');
+      
+      expect(result).toContain('Binary content detected');
+      expect(result).toContain('image/png');
+    });
+  });
 });
