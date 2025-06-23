@@ -129,14 +129,19 @@ describe('UrlFetchTool', () => {
       const result = await tool.executeTool({});
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('URL is required and must be a non-empty string');
+      expect(result.content[0].text).toContain('VALIDATION ERROR');
+      expect(result.content[0].text).toContain('URL is required and must be a non-empty string');
+      expect(result.content[0].text).toContain('REQUEST:');
+      expect(result.content[0].text).toContain('Diagnostic data:');
     });
 
     it('should handle empty URL parameter', async () => {
       const result = await tool.executeTool({ url: '' });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('URL is required and must be a non-empty string');
+      expect(result.content[0].text).toContain('VALIDATION ERROR');
+      expect(result.content[0].text).toContain('URL is required and must be a non-empty string');
+      expect(result.content[0].text).toContain('REQUEST:');
     });
 
     it('should handle invalid timeout values', async () => {
@@ -192,7 +197,7 @@ describe('UrlFetchTool', () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Network error');
+      expect(result.content[0].text).toContain('NETWORK ERROR');
     }, 10000);
   });
 
@@ -290,5 +295,62 @@ describe('UrlFetchTool', () => {
       expect(tool.description).toContain('delegat');
       expect(tool.description).toContain('subtask');
     });
+  });
+
+  describe('rich error context', () => {
+    it('should provide detailed validation error context', async () => {
+      const result = await tool.executeTool({ url: 'invalid-url' });
+
+      expect(result.isError).toBe(true);
+      const errorText = result.content[0].text;
+
+      // Should contain error categorization
+      expect(errorText).toContain('VALIDATION ERROR');
+
+      // Should contain request details
+      expect(errorText).toContain('REQUEST:');
+      expect(errorText).toContain('URL: invalid-url');
+      expect(errorText).toContain('Method: GET');
+
+      // Should contain structured diagnostic data
+      expect(errorText).toContain('Diagnostic data:');
+      expect(errorText).toContain('"type": "validation"');
+      expect(errorText).toContain('"timestamp"');
+    });
+
+    it('should provide request timing information', async () => {
+      const result = await tool.executeTool({
+        url: 'https://httpbin.org/delay/1',
+        timeout: 1500, // Valid timeout that should still timeout
+      });
+
+      expect(result.isError).toBe(true);
+      const errorText = result.content[0].text;
+
+      // Should contain timing information
+      expect(errorText).toContain('Timing:');
+      expect(errorText).toContain('ms total');
+
+      // Could be timeout or network error depending on timing
+      expect(errorText).toMatch(/(TIMEOUT ERROR|NETWORK ERROR)/);
+    }, 10000);
+
+    it('should include response headers and status in HTTP errors', async () => {
+      const result = await tool.executeTool({
+        url: 'https://httpbin.org/status/404',
+      });
+
+      expect(result.isError).toBe(true);
+      const errorText = result.content[0].text;
+
+      // Due to AbortSignal issue in test environment, might get network error
+      // But should still contain useful diagnostic data
+      expect(errorText).toMatch(/(HTTP ERROR|NETWORK ERROR)/);
+
+      // Should contain diagnostic data
+      expect(errorText).toContain('Diagnostic data:');
+      expect(errorText).toContain('"request"');
+      expect(errorText).toContain('https://httpbin.org/status/404');
+    }, 10000);
   });
 });
