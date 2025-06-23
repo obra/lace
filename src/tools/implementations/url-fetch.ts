@@ -16,7 +16,7 @@ const MIN_TIMEOUT = 1000; // 1 second
 const MIN_SIZE = 1024; // 1KB
 const MAX_SIZE_LIMIT = 104857600; // 100MB
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
-const VALID_HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS'] as const;
+const VALID_HTTP_METHODS = ['GET', 'POST'] as const;
 const MAX_TEMP_FILES = 1000; // Limit temp files array to prevent memory leaks
 
 type HttpMethod = typeof VALID_HTTP_METHODS[number];
@@ -94,7 +94,7 @@ export class UrlFetchTool implements Tool {
       },
       body: {
         type: 'string',
-        description: 'Request body for POST/PUT requests',
+        description: 'Request body for POST requests',
       },
       timeout: {
         type: 'number',
@@ -305,7 +305,7 @@ export class UrlFetchTool implements Tool {
       signal: controller.signal,
     };
 
-    if (body && ['POST', 'PUT'].includes(method)) {
+    if (body && method === 'POST') {
       fetchOptions.body = body;
     }
 
