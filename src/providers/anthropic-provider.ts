@@ -40,7 +40,11 @@ export class AnthropicProvider extends AIProvider {
     return true;
   }
 
-  async createResponse(messages: ProviderMessage[], tools: Tool[] = []): Promise<ProviderResponse> {
+  async createResponse(
+    messages: ProviderMessage[],
+    tools: Tool[] = [],
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> {
     // Convert our enhanced generic messages to Anthropic format
     const anthropicMessages = convertToAnthropicFormat(messages);
 
@@ -79,7 +83,9 @@ export class AnthropicProvider extends AIProvider {
       payload: JSON.stringify(requestPayload, null, 2),
     });
 
-    const response = await this._anthropic.messages.create(requestPayload);
+    const response = await this._anthropic.messages.create(requestPayload, {
+      signal,
+    });
 
     // Log full response for debugging
     logger.debug('Anthropic response payload', {
@@ -124,7 +130,8 @@ export class AnthropicProvider extends AIProvider {
 
   async createStreamingResponse(
     messages: ProviderMessage[],
-    tools: Tool[] = []
+    tools: Tool[] = [],
+    signal?: AbortSignal
   ): Promise<ProviderResponse> {
     // Convert our enhanced generic messages to Anthropic format
     const anthropicMessages = convertToAnthropicFormat(messages);
@@ -165,7 +172,9 @@ export class AnthropicProvider extends AIProvider {
     });
 
     // Use the streaming API
-    const stream = this._anthropic.messages.stream(requestPayload);
+    const stream = this._anthropic.messages.stream(requestPayload, {
+      signal,
+    });
 
     let toolCalls: ProviderToolCall[] = [];
 

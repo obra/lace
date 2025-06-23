@@ -50,7 +50,11 @@ export class OpenAIProvider extends AIProvider {
     return true;
   }
 
-  async createResponse(messages: ProviderMessage[], tools: Tool[] = []): Promise<ProviderResponse> {
+  async createResponse(
+    messages: ProviderMessage[],
+    tools: Tool[] = [],
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> {
     // Convert our enhanced generic messages to OpenAI format
     const openaiMessages = convertToOpenAIFormat(
       messages
@@ -99,9 +103,9 @@ export class OpenAIProvider extends AIProvider {
       payload: JSON.stringify(requestPayload, null, 2),
     });
 
-    const response = (await this._openai.chat.completions.create(
-      requestPayload
-    )) as OpenAI.Chat.ChatCompletion;
+    const response = (await this._openai.chat.completions.create(requestPayload, {
+      signal,
+    })) as OpenAI.Chat.ChatCompletion;
 
     // Log full response for debugging
     logger.debug('OpenAI response payload', {
@@ -147,7 +151,8 @@ export class OpenAIProvider extends AIProvider {
 
   async createStreamingResponse(
     messages: ProviderMessage[],
-    tools: Tool[] = []
+    tools: Tool[] = [],
+    signal?: AbortSignal
   ): Promise<ProviderResponse> {
     // Convert our enhanced generic messages to OpenAI format
     const openaiMessages = convertToOpenAIFormat(
@@ -200,9 +205,9 @@ export class OpenAIProvider extends AIProvider {
 
     try {
       // Use the streaming API
-      const stream = (await this._openai.chat.completions.create(
-        requestPayload
-      )) as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
+      const stream = (await this._openai.chat.completions.create(requestPayload, {
+        signal,
+      })) as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
 
       let content = '';
       let toolCalls: ProviderToolCall[] = [];

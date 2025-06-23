@@ -65,6 +65,7 @@ export interface AgentEvents {
   turn_start: [{ turnId: string; userInput: string; metrics: CurrentTurnMetrics }];
   turn_progress: [{ metrics: CurrentTurnMetrics }];
   turn_complete: [{ turnId: string; metrics: CurrentTurnMetrics }];
+  turn_aborted: [{ turnId: string; metrics: CurrentTurnMetrics }];
   approval_request: [
     {
       toolName: string;
@@ -103,6 +104,7 @@ export class Agent extends EventEmitter {
   private _isRunning = false;
   private _currentTurnMetrics: CurrentTurnMetrics | null = null;
   private _progressTimer: number | null = null;
+  private _abortController: AbortController | null = null;
 
   constructor(config: AgentConfig) {
     super();
@@ -175,6 +177,25 @@ export class Agent extends EventEmitter {
     throw new Error('Pause/resume not yet implemented');
   }
 
+  abort(): boolean {
+    if (this._abortController && this._currentTurnMetrics) {
+      this._abortController.abort();
+      this._clearProgressTimer();
+      
+      // Emit abort event with current metrics
+      this.emit('turn_aborted', { 
+        turnId: this._currentTurnMetrics.turnId, 
+        metrics: { ...this._currentTurnMetrics } 
+      });
+      
+      this._currentTurnMetrics = null;
+      this._abortController = null;
+      this._setState('idle');
+      return true; // Successfully aborted
+    }
+    return false; // Nothing to abort
+  }
+
   // State access (read-only)
 
   getCurrentState(): AgentState {
@@ -214,6 +235,8 @@ export class Agent extends EventEmitter {
 
   // Private implementation methods
   private async _processConversation(): Promise<void> {
+    this._abortController = new AbortController();
+    
     try {
       // Rebuild conversation from thread events
       const conversation = this.buildThreadMessages();
@@ -259,7 +282,7 @@ export class Agent extends EventEmitter {
       let response: AgentResponse;
 
       try {
-        response = await this._createResponse(conversation, this._tools);
+        response = await this._createResponse(conversation, this._tools, this._abortController?.signal);
 
         logger.debug('AGENT: Received response from provider', {
           threadId: this._threadId,
@@ -269,6 +292,16 @@ export class Agent extends EventEmitter {
         });
       } catch (error: unknown) {
         this._setState('idle');
+
+        // Handle abort errors differently from regular errors
+        if (error instanceof Error && error.name === 'AbortError') {
+          logger.debug('AGENT: Request was aborted', {
+            threadId: this._threadId,
+            providerName: this._provider.providerName,
+          });
+          // Abort was called - don't treat as error, metrics already emitted by abort()
+          return;
+        }
 
         logger.error('AGENT: Provider error', {
           threadId: this._threadId,
@@ -321,27 +354,31 @@ export class Agent extends EventEmitter {
         error: error instanceof Error ? error : new Error(String(error)),
         context: { phase: 'conversation_processing', threadId: this._threadId },
       });
+    } finally {
+      this._abortController = null;
     }
   }
 
   private async _createResponse(
     messages: ProviderMessage[],
-    tools: Tool[]
+    tools: Tool[],
+    signal?: AbortSignal
   ): Promise<AgentResponse> {
     // Default to streaming if provider supports it (unless explicitly disabled)
     const useStreaming =
       this._provider.supportsStreaming && this._provider.config?.streaming !== false;
 
     if (useStreaming) {
-      return this._createStreamingResponse(messages, tools);
+      return this._createStreamingResponse(messages, tools, signal);
     } else {
-      return this._createNonStreamingResponse(messages, tools);
+      return this._createNonStreamingResponse(messages, tools, signal);
     }
   }
 
   private async _createStreamingResponse(
     messages: ProviderMessage[],
-    tools: Tool[]
+    tools: Tool[],
+    signal?: AbortSignal
   ): Promise<AgentResponse> {
     // Set to streaming state
     this._setState('streaming');
@@ -373,7 +410,7 @@ export class Agent extends EventEmitter {
     this._provider.on('error', errorListener);
 
     try {
-      const response = await this._provider.createStreamingResponse(messages, tools);
+      const response = await this._provider.createStreamingResponse(messages, tools, signal);
 
       // Apply stop reason handling to filter incomplete tool calls
       const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
@@ -412,9 +449,10 @@ export class Agent extends EventEmitter {
 
   private async _createNonStreamingResponse(
     messages: ProviderMessage[],
-    tools: Tool[]
+    tools: Tool[],
+    signal?: AbortSignal
   ): Promise<AgentResponse> {
-    const response = await this._provider.createResponse(messages, tools);
+    const response = await this._provider.createResponse(messages, tools, signal);
 
     // Apply stop reason handling to filter incomplete tool calls
     const processedResponse = this._stopReasonHandler.handleResponse(response, tools);

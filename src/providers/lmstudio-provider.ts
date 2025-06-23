@@ -79,7 +79,11 @@ export class LMStudioProvider extends AIProvider {
     }
   }
 
-  async createResponse(messages: ProviderMessage[], tools: Tool[] = []): Promise<ProviderResponse> {
+  async createResponse(
+    messages: ProviderMessage[],
+    tools: Tool[] = [],
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> {
     const modelId = this._config.model || this.defaultModel;
     await this._ensureModelLoaded(modelId);
 
@@ -91,7 +95,7 @@ export class LMStudioProvider extends AIProvider {
       toolNames: tools.map((t) => t.name),
     });
 
-    return this._createResponseWithNativeToolCalling(messages, tools, modelId);
+    return this._createResponseWithNativeToolCalling(messages, tools, modelId, signal);
   }
 
   private async _ensureModelLoaded(modelId: string): Promise<void> {
@@ -221,7 +225,8 @@ export class LMStudioProvider extends AIProvider {
   private async _createResponseWithNativeToolCalling(
     messages: ProviderMessage[],
     tools: Tool[],
-    modelId: string
+    modelId: string,
+    signal?: AbortSignal
   ): Promise<ProviderResponse> {
     // Convert tools to LMStudio format
     let rawTools;
@@ -396,6 +401,11 @@ export class LMStudioProvider extends AIProvider {
       let resolved = false;
 
       try {
+        // Handle abort signal
+        if (signal?.aborted) {
+          throw new Error('Request aborted');
+        }
+
         // Create the low-level prediction channel
         this._cachedModel!.port.createChannel(
           'predict',
@@ -558,7 +568,8 @@ export class LMStudioProvider extends AIProvider {
 
   async createStreamingResponse(
     messages: ProviderMessage[],
-    tools: Tool[] = []
+    tools: Tool[] = [],
+    signal?: AbortSignal
   ): Promise<ProviderResponse> {
     const modelId = this._config.model || this.defaultModel;
     await this._ensureModelLoaded(modelId);
@@ -572,7 +583,7 @@ export class LMStudioProvider extends AIProvider {
     });
 
     // Use the same native tool calling method
-    return this._createResponseWithNativeToolCalling(messages, tools, modelId);
+    return this._createResponseWithNativeToolCalling(messages, tools, modelId, signal);
   }
 
   private _estimateUsage(

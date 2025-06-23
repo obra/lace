@@ -68,7 +68,11 @@ export class OllamaProvider extends AIProvider {
     }
   }
 
-  async createResponse(messages: ProviderMessage[], tools: Tool[] = []): Promise<ProviderResponse> {
+  async createResponse(
+    messages: ProviderMessage[],
+    tools: Tool[] = [],
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> {
     const modelId = this._config.model || this.defaultModel;
 
     // First check if we can connect and if the model exists
@@ -133,7 +137,19 @@ export class OllamaProvider extends AIProvider {
     };
 
     // Make the request
+    // Handle abort signal
+    if (signal?.aborted) {
+      throw new Error('Request aborted');
+    }
+
     const response: ChatResponse = await this._ollama.chat(requestPayload);
+
+    // If the response is an AbortableAsyncIterator and signal is provided, set up abort handling
+    if (signal && (response as any).abort && typeof (response as any).abort === 'function') {
+      signal.addEventListener('abort', () => {
+        (response as any).abort();
+      });
+    }
 
     logger.debug('Received response from Ollama', {
       provider: 'ollama',
@@ -170,7 +186,8 @@ export class OllamaProvider extends AIProvider {
 
   async createStreamingResponse(
     messages: ProviderMessage[],
-    tools: Tool[] = []
+    tools: Tool[] = [],
+    signal?: AbortSignal
   ): Promise<ProviderResponse> {
     const modelId = this._config.model || this.defaultModel;
 
@@ -235,8 +252,20 @@ export class OllamaProvider extends AIProvider {
           : undefined,
     };
 
+    // Handle abort signal
+    if (signal?.aborted) {
+      throw new Error('Request aborted');
+    }
+
     // Make the streaming request
     const response = await this._ollama.chat(requestPayload);
+
+    // If the response is an AbortableAsyncIterator and signal is provided, set up abort handling
+    if (signal && (response as any).abort && typeof (response as any).abort === 'function') {
+      signal.addEventListener('abort', () => {
+        (response as any).abort();
+      });
+    }
 
     let content = '';
     let toolCalls: { id: string; name: string; input: Record<string, unknown> }[] = [];
