@@ -29,7 +29,7 @@ describe('UrlFetchTool', () => {
           method: {
             type: 'string',
             description: 'HTTP method (default: GET)',
-            enum: ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS'],
+            enum: ['GET', 'POST'],
             default: 'GET',
           },
           headers: {
@@ -39,7 +39,7 @@ describe('UrlFetchTool', () => {
           },
           body: {
             type: 'string',
-            description: 'Request body for POST/PUT requests',
+            description: 'Request body for POST requests',
           },
           timeout: {
             type: 'number',
@@ -174,7 +174,7 @@ describe('UrlFetchTool', () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain(
-        'Method must be one of: GET, POST, PUT, DELETE, HEAD, OPTIONS'
+        'Method must be one of: GET, POST'
       );
     });
   });
