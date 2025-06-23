@@ -75,6 +75,18 @@ export class UrlFetchTool implements Tool {
       codeBlockStyle: 'fenced',
       emDelimiter: '_',
     });
+
+    // Configure turndown to strip noise and focus on content (like lynx)
+    this.turndownService.remove([
+      'script',
+      'style',
+      'noscript',
+      'meta',
+      'link',
+      'header',
+      'nav',
+      'footer',
+    ] as any);
   }
 
   validateUrl(url: string): void {
@@ -263,7 +275,11 @@ export class UrlFetchTool implements Tool {
     // Convert HTML to markdown for better readability
     if (cleanType === 'text/html') {
       try {
-        return this.turndownService.turndown(text);
+        const markdown = this.turndownService.turndown(text);
+        // Clean up excessive whitespace
+        return markdown
+          .replace(/\n\s*\n\s*\n/g, '\n\n') // Remove excessive line breaks
+          .trim();
       } catch {
         return text; // Fallback to raw HTML
       }
