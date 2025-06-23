@@ -20,7 +20,7 @@ const DEFAULT_TIMEOUT = 30000; // 30 seconds
 const VALID_HTTP_METHODS = ['GET', 'POST'] as const;
 const MAX_TEMP_FILES = 1000; // Limit temp files array to prevent memory leaks
 
-type HttpMethod = typeof VALID_HTTP_METHODS[number];
+type HttpMethod = (typeof VALID_HTTP_METHODS)[number];
 
 interface UrlFetchInput {
   url: string;
@@ -173,11 +173,11 @@ export class UrlFetchTool implements Tool {
   private registerCleanup(): void {
     // Use a more robust singleton pattern to prevent race conditions
     if (UrlFetchTool.cleanupRegistered) return;
-    
+
     // Double-check locking pattern for thread safety
     if ((globalThis as any)[UrlFetchTool.cleanupLock]) return;
     (globalThis as any)[UrlFetchTool.cleanupLock] = true;
-    
+
     UrlFetchTool.cleanupRegistered = true;
 
     const cleanup = () => {
@@ -198,6 +198,22 @@ export class UrlFetchTool implements Tool {
   }
 
   async executeTool(input: Record<string, unknown>, _context?: ToolContext): Promise<ToolResult> {
+    // Validate required properties before destructuring
+    if (!input.url || typeof input.url !== 'string') {
+      return this.createRichError({
+        error: {
+          type: 'validation',
+          message: 'URL is required and must be a non-empty string',
+        },
+        request: {
+          url: String(input.url || 'undefined'),
+          method: 'GET',
+          headers: {},
+          timing: { start: Date.now() },
+        },
+      });
+    }
+
     const {
       url,
       method = 'GET',
@@ -207,26 +223,11 @@ export class UrlFetchTool implements Tool {
       maxSize = DEFAULT_MAX_SIZE,
       followRedirects = true,
       returnContent = true,
-    } = input as UrlFetchInput;
+    } = input as unknown as UrlFetchInput;
 
     const timing: RequestTiming = {
       start: Date.now(),
     };
-
-    // Validate parameters
-    if (!url || typeof url !== 'string') {
-      return this.createRichError({
-        error: {
-          type: 'validation',
-          message: 'URL is required and must be a non-empty string',
-        },
-        request: {
-          url: url || '<missing>',
-          method,
-          headers,
-        },
-      });
-    }
 
     try {
       this.validateUrl(url);
@@ -539,7 +540,7 @@ export class UrlFetchTool implements Tool {
         logger.warn('HTML to markdown conversion failed, falling back to raw HTML', {
           error: error instanceof Error ? error.message : 'Unknown error',
           contentType: cleanType,
-          contentLength: text.length
+          contentLength: text.length,
         });
         return text; // Fallback to raw HTML
       }
@@ -650,13 +651,13 @@ export class UrlFetchTool implements Tool {
 
       // Track for cleanup with size limit to prevent memory leaks
       UrlFetchTool.tempFiles.push(tempFilePath);
-      
+
       // Prevent memory leaks by limiting temp files array size
       if (UrlFetchTool.tempFiles.length > MAX_TEMP_FILES) {
         // Remove oldest entries while keeping the cleanup array manageable
         const excess = UrlFetchTool.tempFiles.length - MAX_TEMP_FILES;
         const removedFiles = UrlFetchTool.tempFiles.splice(0, excess);
-        
+
         // Attempt to clean up the oldest files immediately
         for (const oldFile of removedFiles) {
           try {
