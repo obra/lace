@@ -8,6 +8,30 @@ import { existsSync } from 'fs';
 import TurndownService from 'turndown';
 import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
 
+// Constants for configuration and validation
+const INLINE_CONTENT_LIMIT = 32 * 1024; // 32KB
+const DEFAULT_MAX_SIZE = 33554432; // 32MB
+const MAX_TIMEOUT = 120000; // 2 minutes
+const MIN_TIMEOUT = 1000; // 1 second
+const MIN_SIZE = 1024; // 1KB
+const MAX_SIZE_LIMIT = 104857600; // 100MB
+const DEFAULT_TIMEOUT = 30000; // 30 seconds
+const VALID_HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS'] as const;
+const MAX_TEMP_FILES = 1000; // Limit temp files array to prevent memory leaks
+
+type HttpMethod = typeof VALID_HTTP_METHODS[number];
+
+interface UrlFetchInput {
+  url: string;
+  method?: HttpMethod;
+  headers?: Record<string, string>;
+  body?: string;
+  timeout?: number;
+  maxSize?: number;
+  followRedirects?: boolean;
+  returnContent?: boolean;
+}
+
 interface RequestTiming {
   start: number;
   dns?: number;
@@ -60,7 +84,7 @@ export class UrlFetchTool implements Tool {
       method: {
         type: 'string',
         description: 'HTTP method (default: GET)',
-        enum: ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS'],
+        enum: [...VALID_HTTP_METHODS],
         default: 'GET',
       },
       headers: {
@@ -74,17 +98,17 @@ export class UrlFetchTool implements Tool {
       },
       timeout: {
         type: 'number',
-        description: 'Request timeout in milliseconds (default: 30000, max: 120000)',
-        minimum: 1000,
-        maximum: 120000,
-        default: 30000,
+        description: `Request timeout in milliseconds (default: ${DEFAULT_TIMEOUT}, max: ${MAX_TIMEOUT})`,
+        minimum: MIN_TIMEOUT,
+        maximum: MAX_TIMEOUT,
+        default: DEFAULT_TIMEOUT,
       },
       maxSize: {
         type: 'number',
-        description: 'Maximum response size in bytes (default: 33554432 = 32MB)',
-        minimum: 1024,
-        maximum: 104857600,
-        default: 33554432,
+        description: `Maximum response size in bytes (default: ${DEFAULT_MAX_SIZE} = 32MB)`,
+        minimum: MIN_SIZE,
+        maximum: MAX_SIZE_LIMIT,
+        default: DEFAULT_MAX_SIZE,
       },
       followRedirects: {
         type: 'boolean',
@@ -103,6 +127,7 @@ export class UrlFetchTool implements Tool {
 
   private static tempFiles: string[] = [];
   private static cleanupRegistered = false;
+  private static readonly cleanupLock = Symbol('cleanup-lock');
   private turndownService: TurndownService;
 
   constructor() {
@@ -145,8 +170,13 @@ export class UrlFetchTool implements Tool {
   }
 
   private registerCleanup(): void {
+    // Use a more robust singleton pattern to prevent race conditions
     if (UrlFetchTool.cleanupRegistered) return;
-
+    
+    // Double-check locking pattern for thread safety
+    if ((globalThis as any)[UrlFetchTool.cleanupLock]) return;
+    (globalThis as any)[UrlFetchTool.cleanupLock] = true;
+    
     UrlFetchTool.cleanupRegistered = true;
 
     const cleanup = () => {
@@ -172,20 +202,11 @@ export class UrlFetchTool implements Tool {
       method = 'GET',
       headers = {},
       body,
-      timeout = 30000,
-      maxSize = 33554432, // 32MB
+      timeout = DEFAULT_TIMEOUT,
+      maxSize = DEFAULT_MAX_SIZE,
       followRedirects = true,
       returnContent = true,
-    } = input as {
-      url: string;
-      method?: string;
-      headers?: Record<string, string>;
-      body?: string;
-      timeout?: number;
-      maxSize?: number;
-      followRedirects?: boolean;
-      returnContent?: boolean;
-    };
+    } = input as UrlFetchInput;
 
     const timing: RequestTiming = {
       start: Date.now(),
@@ -222,11 +243,11 @@ export class UrlFetchTool implements Tool {
       });
     }
 
-    if (typeof timeout !== 'number' || timeout < 1000 || timeout > 120000) {
+    if (typeof timeout !== 'number' || timeout < MIN_TIMEOUT || timeout > MAX_TIMEOUT) {
       return this.createRichError({
         error: {
           type: 'validation',
-          message: 'Timeout must be between 1000 and 120000 milliseconds',
+          message: `Timeout must be between ${MIN_TIMEOUT} and ${MAX_TIMEOUT} milliseconds`,
         },
         request: {
           url,
@@ -236,11 +257,11 @@ export class UrlFetchTool implements Tool {
       });
     }
 
-    if (typeof maxSize !== 'number' || maxSize < 1024 || maxSize > 104857600) {
+    if (typeof maxSize !== 'number' || maxSize < MIN_SIZE || maxSize > MAX_SIZE_LIMIT) {
       return this.createRichError({
         error: {
           type: 'validation',
-          message: 'Max size must be between 1024 and 104857600 bytes',
+          message: `Max size must be between ${MIN_SIZE} and ${MAX_SIZE_LIMIT} bytes`,
         },
         request: {
           url,
@@ -250,12 +271,11 @@ export class UrlFetchTool implements Tool {
       });
     }
 
-    const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS'];
-    if (!validMethods.includes(method)) {
+    if (!VALID_HTTP_METHODS.includes(method as HttpMethod)) {
       return this.createRichError({
         error: {
           type: 'validation',
-          message: `Method must be one of: ${validMethods.join(', ')}`,
+          message: `Method must be one of: ${VALID_HTTP_METHODS.join(', ')}`,
         },
         request: {
           url,
@@ -398,9 +418,8 @@ export class UrlFetchTool implements Tool {
         });
       }
 
-      // Handle small responses inline (≤ 32KB)
-      const inlineLimit = 32 * 1024;
-      if (actualSize <= inlineLimit) {
+      // Handle small responses inline
+      if (actualSize <= INLINE_CONTENT_LIMIT) {
         return this.handleInlineContent(buffer, contentType, url, returnContent);
       }
 
@@ -514,7 +533,9 @@ export class UrlFetchTool implements Tool {
         return markdown
           .replace(/\n\s*\n\s*\n/g, '\n\n') // Remove excessive line breaks
           .trim();
-      } catch {
+      } catch (error) {
+        // Log the HTML parsing error for debugging while falling back to raw HTML
+        console.warn('HTML to markdown conversion failed:', error instanceof Error ? error.message : 'Unknown error');
         return text; // Fallback to raw HTML
       }
     }
@@ -622,8 +643,26 @@ export class UrlFetchTool implements Tool {
       const uint8Array = new Uint8Array(buffer);
       await writeFile(tempFilePath, uint8Array);
 
-      // Track for cleanup
+      // Track for cleanup with size limit to prevent memory leaks
       UrlFetchTool.tempFiles.push(tempFilePath);
+      
+      // Prevent memory leaks by limiting temp files array size
+      if (UrlFetchTool.tempFiles.length > MAX_TEMP_FILES) {
+        // Remove oldest entries while keeping the cleanup array manageable
+        const excess = UrlFetchTool.tempFiles.length - MAX_TEMP_FILES;
+        const removedFiles = UrlFetchTool.tempFiles.splice(0, excess);
+        
+        // Attempt to clean up the oldest files immediately
+        for (const oldFile of removedFiles) {
+          try {
+            if (existsSync(oldFile)) {
+              unlinkSync(oldFile);
+            }
+          } catch {
+            // Ignore errors during proactive cleanup
+          }
+        }
+      }
 
       const sizeInMB = (size / (1024 * 1024)).toFixed(1);
 
