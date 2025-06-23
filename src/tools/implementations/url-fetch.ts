@@ -7,6 +7,7 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import TurndownService from 'turndown';
 import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import { logger } from '../../utils/logger.js';
 
 // Constants for configuration and validation
 const INLINE_CONTENT_LIMIT = 32 * 1024; // 32KB
@@ -535,7 +536,11 @@ export class UrlFetchTool implements Tool {
           .trim();
       } catch (error) {
         // Log the HTML parsing error for debugging while falling back to raw HTML
-        console.warn('HTML to markdown conversion failed:', error instanceof Error ? error.message : 'Unknown error');
+        logger.warn('HTML to markdown conversion failed, falling back to raw HTML', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          contentType: cleanType,
+          contentLength: text.length
+        });
         return text; // Fallback to raw HTML
       }
     }
