@@ -2,6 +2,7 @@
 // ABOUTME: Handles various content types and provides temp file management for large responses
 
 import { writeFile, mkdir } from 'fs/promises';
+import { unlinkSync } from 'fs';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import TurndownService from 'turndown';
@@ -23,44 +24,44 @@ export class UrlFetchTool implements Tool {
       url: {
         type: 'string',
         description: 'URL to fetch (must be http:// or https://)',
-        pattern: '^https?://.+'
+        pattern: '^https?://.+',
       },
       method: {
         type: 'string',
         description: 'HTTP method (default: GET)',
         enum: ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS'],
-        default: 'GET'
+        default: 'GET',
       },
       headers: {
         type: 'object',
         description: 'Custom HTTP headers',
-        additionalProperties: { type: 'string' }
+        additionalProperties: { type: 'string' },
       },
       body: {
         type: 'string',
-        description: 'Request body for POST/PUT requests'
+        description: 'Request body for POST/PUT requests',
       },
       timeout: {
         type: 'number',
         description: 'Request timeout in milliseconds (default: 30000, max: 120000)',
         minimum: 1000,
         maximum: 120000,
-        default: 30000
+        default: 30000,
       },
       maxSize: {
         type: 'number',
         description: 'Maximum response size in bytes (default: 33554432 = 32MB)',
         minimum: 1024,
         maximum: 104857600,
-        default: 33554432
+        default: 33554432,
       },
       followRedirects: {
         type: 'boolean',
         description: 'Follow HTTP redirects (default: true, max 10 redirects)',
-        default: true
-      }
+        default: true,
+      },
     },
-    required: ['url']
+    required: ['url'],
   };
 
   private static tempFiles: string[] = [];
@@ -72,7 +73,7 @@ export class UrlFetchTool implements Tool {
     this.turndownService = new TurndownService({
       headingStyle: 'atx',
       codeBlockStyle: 'fenced',
-      emDelimiter: '_'
+      emDelimiter: '_',
     });
   }
 
@@ -96,16 +97,16 @@ export class UrlFetchTool implements Tool {
 
   private registerCleanup(): void {
     if (UrlFetchTool.cleanupRegistered) return;
-    
+
     UrlFetchTool.cleanupRegistered = true;
-    
+
     const cleanup = () => {
       for (const tempFile of UrlFetchTool.tempFiles) {
         try {
           if (existsSync(tempFile)) {
-            require('fs').unlinkSync(tempFile);
+            unlinkSync(tempFile);
           }
-        } catch (error) {
+        } catch {
           // Ignore cleanup errors during exit
         }
       }
@@ -124,7 +125,7 @@ export class UrlFetchTool implements Tool {
       body,
       timeout = 30000,
       maxSize = 33554432, // 32MB
-      followRedirects = true
+      followRedirects = true,
     } = input as {
       url: string;
       method?: string;
@@ -162,15 +163,21 @@ export class UrlFetchTool implements Tool {
     // Set up fetch options with timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
-    
-    const fetchOptions: RequestInit = {
+
+    const fetchOptions: {
+      method: string;
+      headers: Record<string, string>;
+      redirect: 'follow' | 'manual';
+      signal: AbortSignal;
+      body?: string;
+    } = {
       method,
       headers: {
         'User-Agent': 'Lace/1.0 (AI Assistant)',
-        ...headers
+        ...headers,
       },
       redirect: followRedirects ? 'follow' : 'manual',
-      signal: controller.signal
+      signal: controller.signal,
     };
 
     if (body && ['POST', 'PUT'].includes(method)) {
@@ -182,9 +189,7 @@ export class UrlFetchTool implements Tool {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        return createErrorResult(
-          `HTTP ${response.status} ${response.statusText}: ${url}`
-        );
+        return createErrorResult(`HTTP ${response.status} ${response.statusText}: ${url}`);
       }
 
       const contentType = response.headers.get('content-type') || 'application/octet-stream';
@@ -216,7 +221,6 @@ export class UrlFetchTool implements Tool {
 
       // Handle large responses with temp files
       return await this.handleLargeContent(buffer, contentType, url, actualSize);
-
     } catch (error) {
       clearTimeout(timeoutId);
       if (error instanceof Error) {
@@ -232,21 +236,23 @@ export class UrlFetchTool implements Tool {
   private handleInlineContent(buffer: ArrayBuffer, contentType: string, url: string): ToolResult {
     try {
       const processedContent = this.processContent(buffer, contentType);
-      
+
       return createSuccessResult([
         {
           type: 'text',
-          text: `Content from ${url}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\n${processedContent}`
-        }
+          text: `Content from ${url}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\n${processedContent}`,
+        },
       ]);
     } catch (error) {
-      return createErrorResult(`Failed to process content: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return createErrorResult(
+        `Failed to process content: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
   processContent(buffer: ArrayBuffer, contentType: string): string {
     const cleanType = contentType.split(';')[0].trim().toLowerCase();
-    
+
     // Only handle known text types, everything else is binary
     if (!this.isTextContent(cleanType)) {
       return `Binary content detected (${cleanType})\nSize: ${buffer.byteLength} bytes\n\nUse temp file for full content access.`;
@@ -277,10 +283,12 @@ export class UrlFetchTool implements Tool {
   }
 
   isTextContent(contentType: string): boolean {
-    return contentType.startsWith('text/') || 
-           contentType === 'application/json' ||
-           contentType === 'application/xml' ||
-           contentType === 'application/javascript';
+    return (
+      contentType.startsWith('text/') ||
+      contentType === 'application/json' ||
+      contentType === 'application/xml' ||
+      contentType === 'application/javascript'
+    );
   }
 
   private async handleLargeContent(
@@ -306,27 +314,27 @@ export class UrlFetchTool implements Tool {
       // Write full content to temp file
       const uint8Array = new Uint8Array(buffer);
       await writeFile(tempFilePath, uint8Array);
-      
+
       // Track for cleanup
       UrlFetchTool.tempFiles.push(tempFilePath);
 
-      // Generate preview (first 32KB)
-      const previewSize = Math.min(32 * 1024, size);
-      const previewBuffer = buffer.slice(0, previewSize);
-      const preview = this.isTextContent(contentType.split(';')[0].trim().toLowerCase()) 
-        ? new TextDecoder('utf-8', { fatal: false }).decode(previewBuffer)
-        : `[Binary content preview not available - ${contentType}]`;
+      // Process the full content and provide that as the main response
+      const processedContent = this.isTextContent(contentType.split(';')[0].trim().toLowerCase())
+        ? this.processContent(buffer, contentType)
+        : `[Binary content - ${contentType}]`;
 
       const sizeInMB = (size / (1024 * 1024)).toFixed(1);
-      
+
       return createSuccessResult([
         {
           type: 'text',
-          text: `Large file from ${url}:\n\nContent-Type: ${contentType}\nTotal Size: ${size} bytes (${sizeInMB}MB)\nSaved to: ${tempFilePath}\n\nPreview (first ${previewSize} bytes):\n\n${preview}\n\n--- End of preview. Full content saved to temp file ---`
-        }
+          text: `Content from ${url}:\n\nContent-Type: ${contentType}\nSize: ${size} bytes (${sizeInMB}MB)\nFull content saved to: ${tempFilePath}\n\n${processedContent}`,
+        },
       ]);
     } catch (error) {
-      return createErrorResult(`Failed to save large content: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return createErrorResult(
+        `Failed to save large content: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -346,7 +354,7 @@ export class UrlFetchTool implements Tool {
       'image/jpeg': '.jpg',
       'image/png': '.png',
       'image/gif': '.gif',
-      'image/svg+xml': '.svg'
+      'image/svg+xml': '.svg',
     };
 
     const cleanType = contentType.split(';')[0].trim().toLowerCase();
