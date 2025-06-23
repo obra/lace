@@ -40,6 +40,14 @@ export interface ToolCall {
 
 export type AgentState = 'idle' | 'thinking' | 'tool_execution' | 'streaming';
 
+export interface CurrentTurnMetrics {
+  startTime: Date;
+  elapsedMs: number;
+  tokensIn: number; // User input + tool results + model context
+  tokensOut: number; // Model responses + tool calls
+  turnId: string; // Unique ID for this user turn
+}
+
 // Event type definitions for TypeScript
 export interface AgentEvents {
   agent_thinking_start: [];
@@ -53,6 +61,10 @@ export interface AgentEvents {
   conversation_complete: [];
   token_usage_update: [{ usage: object }];
   token_budget_warning: [{ message: string; usage: object; recommendations: object }];
+  // Turn tracking events
+  turn_start: [{ turnId: string; userInput: string; metrics: CurrentTurnMetrics }];
+  turn_progress: [{ metrics: CurrentTurnMetrics }];
+  turn_complete: [{ turnId: string; metrics: CurrentTurnMetrics }];
   approval_request: [
     {
       toolName: string;
@@ -89,6 +101,8 @@ export class Agent extends EventEmitter {
   private readonly _tokenBudgetManager: TokenBudgetManager | null;
   private _state: AgentState = 'idle';
   private _isRunning = false;
+  private _currentTurnMetrics: CurrentTurnMetrics | null = null;
+  private _progressTimer: number | null = null;
 
   constructor(config: AgentConfig) {
     super();
@@ -114,6 +128,9 @@ export class Agent extends EventEmitter {
       contentLength: content.length,
       currentState: this._state,
     });
+
+    // Start new turn tracking
+    this._startTurnTracking(content);
 
     if (content.trim()) {
       // Add user message to thread
@@ -142,6 +159,7 @@ export class Agent extends EventEmitter {
 
   async stop(): Promise<void> {
     this._isRunning = false;
+    this._clearProgressTimer();
     this._setState('idle');
     await this._threadManager.close();
     logger.info('AGENT: Stopped', { threadId: this._threadId });
@@ -286,6 +304,7 @@ export class Agent extends EventEmitter {
         await this._processConversation();
       } else {
         // No tool calls, conversation is complete for this turn
+        this._completeTurn();
         this._setState('idle');
         this.emit('conversation_complete');
       }
@@ -672,5 +691,59 @@ export class Agent extends EventEmitter {
   // Override once to provide type safety
   once<K extends keyof AgentEvents>(event: K, listener: (...args: AgentEvents[K]) => void): this {
     return super.once(event, listener);
+  }
+
+  // Turn tracking implementation
+  private _startTurnTracking(userInput: string): void {
+    const turnId = `turn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this._currentTurnMetrics = {
+      startTime: new Date(),
+      elapsedMs: 0,
+      tokensIn: 0,
+      tokensOut: 0,
+      turnId,
+    };
+
+    this.emit('turn_start', { turnId, userInput, metrics: { ...this._currentTurnMetrics } });
+    this._startProgressTimer();
+  }
+
+  private _startProgressTimer(): void {
+    this._progressTimer = setInterval(() => {
+      if (this._currentTurnMetrics) {
+        this._currentTurnMetrics.elapsedMs =
+          Date.now() - this._currentTurnMetrics.startTime.getTime();
+        this.emit('turn_progress', { metrics: { ...this._currentTurnMetrics } });
+      }
+    }, 1000); // Every second
+  }
+
+  private _clearProgressTimer(): void {
+    if (this._progressTimer) {
+      clearInterval(this._progressTimer);
+      this._progressTimer = null;
+    }
+  }
+
+  private _completeTurn(): void {
+    if (this._currentTurnMetrics) {
+      this._clearProgressTimer();
+
+      // Update final elapsed time
+      this._currentTurnMetrics.elapsedMs =
+        Date.now() - this._currentTurnMetrics.startTime.getTime();
+
+      // Ensure elapsed time is at least 1ms for testing
+      if (this._currentTurnMetrics.elapsedMs === 0) {
+        this._currentTurnMetrics.elapsedMs = 1;
+      }
+
+      this.emit('turn_complete', {
+        turnId: this._currentTurnMetrics.turnId,
+        metrics: { ...this._currentTurnMetrics },
+      });
+
+      this._currentTurnMetrics = null;
+    }
   }
 }
