@@ -4,7 +4,6 @@
 import React, { useState, useEffect, useCallback, useMemo, createContext, useContext, useRef } from "react";
 import { Box, Text, render, useFocusManager, useInput, measureElement } from "ink";
 import { Alert } from "@inkjs/ui";
-import { withFullScreen } from "fullscreen-ink";
 import useStdoutDimensions from "../../utils/use-stdout-dimensions.js";
 import ShellInput from "./components/shell-input.js";
 import ToolApprovalModal from "./components/tool-approval-modal.js";
@@ -60,8 +59,9 @@ const SigintHandler: React.FC<{ agent: Agent; showAlert: (alert: any) => void }>
   const [ctrlCCount, setCtrlCCount] = useState(0);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    const handleSigint = () => {
+  // Handle Ctrl+C through Ink's input system
+  useInput(useCallback((input, key) => {
+    if (input === 'c' && key.ctrl) {
       // Try to abort current operation first
       const wasAborted = agent.abort();
       
@@ -106,17 +106,17 @@ const SigintHandler: React.FC<{ agent: Agent; showAlert: (alert: any) => void }>
         
         return newCount;
       });
-    };
+    }
+  }, [agent, showAlert, ctrlCCount]));
 
-    process.on("SIGINT", handleSigint);
-    
+  // Cleanup timer on unmount
+  useEffect(() => {
     return () => {
-      process.off("SIGINT", handleSigint);
       if (ctrlCTimerRef.current) {
         clearTimeout(ctrlCTimerRef.current);
       }
     };
-  }, [agent, showAlert]);
+  }, []);
 
   return null; // This component doesn't render anything
 };
@@ -476,6 +476,16 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     const trimmedInput = input.trim();
     
     if (!trimmedInput) return;
+    
+    // Prevent submission during processing (but allow typing)
+    if (isTurnActive || approvalRequest) {
+      addMessage({
+        type: "system",
+        content: isTurnActive ? "⚠️ Please wait for current operation to complete" : "⚠️ Tool approval required",
+        timestamp: new Date(),
+      });
+      return;
+    }
 
     // Handle slash commands
     if (trimmedInput.startsWith("/")) {
@@ -499,7 +509,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       });
       setIsProcessing(false);
     }
-  }, [agent, addMessage, handleSlashCommand, syncEvents]);
+  }, [agent, addMessage, handleSlashCommand, syncEvents, isTurnActive, approvalRequest]);
 
   // Initialize command system
   useEffect(() => {
@@ -648,7 +658,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
                 onChange={setCurrentInput}
                 focusId="shell-input"
                 autoFocus={false}
-                disabled={!!approvalRequest || isTurnActive}
+                disabled={false} // Allow typing during processing, submission is controlled in handleSubmit
               />
             </Box>
 
@@ -676,13 +686,16 @@ export class TerminalInterface implements ApprovalCallback {
 
     this.isRunning = true;
 
-    // Render the Ink app with fullscreen support
-    withFullScreen(
+    // Render the Ink app with custom Ctrl+C handling
+    render(
       <TerminalInterfaceComponent
         agent={this.agent}
         approvalCallback={this}
-      />
-    ).start();
+      />,
+      {
+        exitOnCtrlC: false, // Disable Ink's default Ctrl+C exit behavior
+      }
+    );
 
     // Keep the process running
     await new Promise<void>((resolve) => {
