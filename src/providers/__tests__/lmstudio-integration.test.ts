@@ -65,6 +65,7 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
     // Check if LMStudio is available once for all tests
     try {
       const diagnostics = await provider.diagnose();
+
       if (diagnostics.connected && diagnostics.models.length > 0) {
         isLMStudioAvailable = true;
         logger.info('LMStudio integration tests enabled - server available with models');
@@ -199,11 +200,13 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
   }, 30000);
 
   it('should handle mixed tool and text responses', async () => {
+    if (!isLMStudioAvailable) return;
+
     const messages = [
       {
         role: 'user' as const,
         content:
-          'We\'re testing tool usage. Explain what you\'re doing in prose, then use the tool mock_tool with action "explain", then summarize the results. (We want to make sure a tool call happens in the middle of your process.)',
+          'We\'re testing tool usage. You MUST use the tool `mock_tool` with action "explain", then summarize the results. (We want to make sure a tool call happens in the middle of your process.) /nothink',
       },
     ];
 
