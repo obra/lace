@@ -18,6 +18,7 @@ interface StatusBarProps {
   tokenUsage?: TokenUsage;
   isProcessing?: boolean;
   messageCount?: number;
+  isTurnActive?: boolean;
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({
@@ -27,6 +28,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   tokenUsage,
   isProcessing = false,
   messageCount = 0,
+  isTurnActive = false,
 }) => {
   // Format token usage for display
   const formatTokenUsage = (usage?: TokenUsage) => {

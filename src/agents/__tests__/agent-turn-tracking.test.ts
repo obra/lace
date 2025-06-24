@@ -56,7 +56,7 @@ describe('Agent Turn Tracking', () => {
 
     provider = new MockProvider(mockResponse);
     toolExecutor = new ToolExecutor();
-    threadManager = new ThreadManager();
+    threadManager = new ThreadManager(':memory:'); // Use in-memory SQLite for tests
     threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
 

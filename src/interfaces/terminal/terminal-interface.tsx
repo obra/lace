@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, createContext, useContext, useRef } from "react";
 import { Box, Text, render, useFocusManager, useInput, measureElement } from "ink";
+import { Alert } from "@inkjs/ui";
 import { withFullScreen } from "fullscreen-ink";
 import useStdoutDimensions from "../../utils/use-stdout-dimensions.js";
 import ShellInput from "./components/shell-input.js";
@@ -28,9 +29,24 @@ export const useThreadProcessor = (): ThreadProcessor => {
   return processor;
 };
 
+// Interface context for SIGINT communication
+const InterfaceContext = createContext<{
+  showAlert: (alert: { variant: 'info' | 'warning' | 'error' | 'success'; title: string; children?: React.ReactNode }) => void;
+  clearAlert: () => void;
+} | null>(null);
+
+export const useInterface = () => {
+  const context = useContext(InterfaceContext);
+  if (!context) {
+    throw new Error('useInterface must be used within InterfaceContext.Provider');
+  }
+  return context;
+};
+
 interface TerminalInterfaceProps {
   agent: Agent;
   approvalCallback?: ApprovalCallback;
+  interfaceContext?: { showAlert: (alert: any) => void; clearAlert: () => void };
 }
 
 interface Message {
@@ -39,9 +55,76 @@ interface Message {
   timestamp: Date;
 }
 
-const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
+// SIGINT Handler Component
+const SigintHandler: React.FC<{ agent: Agent; showAlert: (alert: any) => void }> = ({ agent, showAlert }) => {
+  const [ctrlCCount, setCtrlCCount] = useState(0);
+  const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const handleSigint = () => {
+      // Try to abort current operation first
+      const wasAborted = agent.abort();
+      
+      if (wasAborted) {
+        showAlert({
+          variant: 'warning' as const,
+          title: 'Operation aborted. Progress saved.'
+        });
+        setCtrlCCount(0); // Reset double-ctrl-c counter
+        if (ctrlCTimerRef.current) {
+          clearTimeout(ctrlCTimerRef.current);
+          ctrlCTimerRef.current = null;
+        }
+        return;
+      }
+      
+      // No operation to abort - handle double Ctrl+C for exit
+      setCtrlCCount(prev => {
+        const newCount = prev + 1;
+        
+        if (newCount === 1) {
+          showAlert({
+            variant: 'info' as const,
+            title: 'Press Ctrl+C again to exit Lace.'
+          });
+          ctrlCTimerRef.current = setTimeout(() => {
+            setCtrlCCount(0); // Reset after 2 seconds
+            ctrlCTimerRef.current = null;
+          }, 2000);
+        } else if (newCount >= 2) {
+          showAlert({
+            variant: 'info' as const,
+            title: 'Exiting Lace...'
+          });
+          if (ctrlCTimerRef.current) {
+            clearTimeout(ctrlCTimerRef.current);
+            ctrlCTimerRef.current = null;
+          }
+          // Exit after a brief delay to show the message
+          setTimeout(() => process.exit(0), 500);
+        }
+        
+        return newCount;
+      });
+    };
+
+    process.on("SIGINT", handleSigint);
+    
+    return () => {
+      process.off("SIGINT", handleSigint);
+      if (ctrlCTimerRef.current) {
+        clearTimeout(ctrlCTimerRef.current);
+      }
+    };
+  }, [agent, showAlert]);
+
+  return null; // This component doesn't render anything
+};
+
+export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   agent,
   approvalCallback,
+  interfaceContext,
 }) => {
   // Create one ThreadProcessor instance per interface
   const threadProcessor = useMemo(() => new ThreadProcessor(), []);
@@ -62,6 +145,17 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     totalTokens?: number;
   }>({});
   
+  // Turn tracking state
+  const [isTurnActive, setIsTurnActive] = useState(false);
+  const [currentTurnId, setCurrentTurnId] = useState<string | null>(null);
+  
+  // Alert state for SIGINT and other system messages
+  const [alert, setAlert] = useState<{
+    variant: 'info' | 'warning' | 'error' | 'success';
+    title: string;
+    children?: React.ReactNode;
+  } | null>(null);
+  
   // Delegation tracking state
   const [isDelegating, setIsDelegating] = useState(false);
   
@@ -76,6 +170,17 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   // Focus management with disabled automatic cycling
   const { focus, focusNext, focusPrevious, disableFocus } = useFocusManager();
   
+  // Interface context functions
+  const showAlert = useCallback((alertData: { variant: 'info' | 'warning' | 'error' | 'success'; title: string; children?: React.ReactNode }) => {
+    setAlert(alertData);
+    // Auto-clear alerts after 3 seconds
+    setTimeout(() => setAlert(null), 3000);
+  }, []);
+
+  const clearAlert = useCallback(() => {
+    setAlert(null);
+  }, []);
+
   // Disable automatic Tab cycling to prevent conflicts with autocomplete
   useEffect(() => {
     disableFocus();
@@ -207,6 +312,25 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       setIsProcessing(false);
     };
 
+    // Handle turn lifecycle events
+    const handleTurnStart = ({ turnId }: { turnId: string }) => {
+      setIsTurnActive(true);
+      setCurrentTurnId(turnId);
+      setIsProcessing(true);
+    };
+    
+    const handleTurnComplete = ({ turnId }: { turnId: string }) => {
+      setIsTurnActive(false);
+      setCurrentTurnId(null);
+      setIsProcessing(false);
+    };
+    
+    const handleTurnAborted = ({ turnId }: { turnId: string }) => {
+      setIsTurnActive(false);
+      setCurrentTurnId(null);
+      setIsProcessing(false);
+    };
+
 
     // Register event listeners
     agent.on("agent_token", handleToken);
@@ -218,6 +342,10 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     agent.on("tool_call_start", handleToolCallStart);
     agent.on("tool_call_complete", handleToolCallComplete);
     agent.on("error", handleError);
+    // Turn tracking events
+    agent.on("turn_start", handleTurnStart);
+    agent.on("turn_complete", handleTurnComplete);
+    agent.on("turn_aborted", handleTurnAborted);
 
     // Cleanup function
     return () => {
@@ -230,6 +358,10 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       agent.off("tool_call_start", handleToolCallStart);
       agent.off("tool_call_complete", handleToolCallComplete);
       agent.off("error", handleError);
+      // Turn tracking cleanup
+      agent.off("turn_start", handleTurnStart);
+      agent.off("turn_complete", handleTurnComplete);
+      agent.off("turn_aborted", handleTurnAborted);
     };
   }, [agent, addMessage, syncEvents, streamingContent]);
 
@@ -383,70 +515,85 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
   return (
     <ThreadProcessorContext.Provider value={threadProcessor}>
-      <Box flexDirection="column" height="100%">
-        {/* Timeline - takes remaining space */}
-        <Box flexGrow={1} ref={timelineContainerRef}>
-          <ConversationDisplay 
-            events={events}
-            ephemeralMessages={[
-              ...ephemeralMessages,
-              // Add streaming content as ephemeral message
-              ...(streamingContent ? [{
-                type: "assistant" as const,
-                content: streamingContent,
-                timestamp: new Date(),
-              }] : []),
-              // Add processing indicator as ephemeral message
-              ...(isProcessing && !streamingContent ? [{
-                type: "system" as const,
-                content: "💭 Thinking...",
-                timestamp: new Date(),
-              }] : [])
-            ]}
-            focusId="timeline"
-            bottomSectionHeight={bottomSectionHeight}
-          />
-        </Box>
+      <InterfaceContext.Provider value={{ showAlert, clearAlert }}>
+        {/* SIGINT Handler */}
+        <SigintHandler agent={agent} showAlert={showAlert} />
+        
+        <Box flexDirection="column" height="100%">
+          {/* Alert overlay */}
+          {alert && (
+            <Box position="absolute" paddingTop={1} paddingLeft={1} paddingRight={1}>
+              <Alert variant={alert.variant} title={alert.title}>
+                {alert.children}
+              </Alert>
+            </Box>
+          )}
 
-        {/* Tool approval modal */}
-        {approvalRequest && (
-          <ToolApprovalModal
-            toolName={approvalRequest.toolName}
-            input={approvalRequest.input}
-            isReadOnly={approvalRequest.isReadOnly}
-            onDecision={handleApprovalDecision}
-            isVisible={true}
-            focusId="approval-modal"
-          />
-        )}
-
-        {/* Bottom section - status bar, input anchored to bottom */}
-        <Box flexDirection="column" flexShrink={0} ref={bottomSectionRef}>
-          {/* Status bar - takes natural height */}
-          <StatusBar 
-            providerName={agent.providerName || 'unknown'}
-            modelName={(agent as any)._provider?.defaultModel || undefined}
-            threadId={agent.threadManager.getCurrentThreadId() || undefined}
-            tokenUsage={tokenUsage}
-            isProcessing={isProcessing}
-            messageCount={events.length + ephemeralMessages.length}
-          />
-
-          {/* Input area - takes natural height */}
-          <Box padding={1}>
-            <ShellInput
-              value={currentInput}
-              placeholder={approvalRequest ? "Tool approval required..." : "Type your message..."}
-              onSubmit={handleSubmit}
-              onChange={setCurrentInput}
-              focusId="shell-input"
-              autoFocus={false}
-              disabled={!!approvalRequest}
+          {/* Timeline - takes remaining space */}
+          <Box flexGrow={1} ref={timelineContainerRef}>
+            <ConversationDisplay 
+              events={events}
+              ephemeralMessages={[
+                ...ephemeralMessages,
+                // Add streaming content as ephemeral message
+                ...(streamingContent ? [{
+                  type: "assistant" as const,
+                  content: streamingContent,
+                  timestamp: new Date(),
+                }] : []),
+                // Add processing indicator as ephemeral message
+                ...(isProcessing && !streamingContent ? [{
+                  type: "system" as const,
+                  content: "💭 Thinking...",
+                  timestamp: new Date(),
+                }] : [])
+              ]}
+              focusId="timeline"
+              bottomSectionHeight={bottomSectionHeight}
             />
           </Box>
 
+          {/* Tool approval modal */}
+          {approvalRequest && (
+            <ToolApprovalModal
+              toolName={approvalRequest.toolName}
+              input={approvalRequest.input}
+              isReadOnly={approvalRequest.isReadOnly}
+              onDecision={handleApprovalDecision}
+              isVisible={true}
+              focusId="approval-modal"
+            />
+          )}
+
+          {/* Bottom section - status bar, input anchored to bottom */}
+          <Box flexDirection="column" flexShrink={0} ref={bottomSectionRef}>
+            {/* Status bar - takes natural height */}
+            <StatusBar 
+              providerName={agent.providerName || 'unknown'}
+              modelName={(agent as any)._provider?.defaultModel || undefined}
+              threadId={agent.threadManager.getCurrentThreadId() || undefined}
+              tokenUsage={tokenUsage}
+              isProcessing={isProcessing}
+              messageCount={events.length + ephemeralMessages.length}
+              isTurnActive={isTurnActive}
+            />
+
+            {/* Input area - takes natural height */}
+            <Box padding={1}>
+              <ShellInput
+                value={currentInput}
+                placeholder={approvalRequest ? "Tool approval required..." : "Type your message..."}
+                onSubmit={handleSubmit}
+                onChange={setCurrentInput}
+                focusId="shell-input"
+                autoFocus={false}
+                disabled={!!approvalRequest || isTurnActive}
+              />
+            </Box>
+
+          </Box>
         </Box>
-      </Box>
+      </InterfaceContext.Provider>
     </ThreadProcessorContext.Provider>
   );
 };
@@ -461,20 +608,12 @@ export class TerminalInterface implements ApprovalCallback {
     this.agent = agent;
   }
 
-
   async startInteractive(): Promise<void> {
     if (this.isRunning) {
       throw new Error("Terminal interface is already running");
     }
 
     this.isRunning = true;
-
-    // Handle graceful shutdown on Ctrl+C
-    process.on("SIGINT", async () => {
-      console.log("\n\nShutting down gracefully...");
-      await this.stop();
-      process.exit(0);
-    });
 
     // Render the Ink app with fullscreen support
     withFullScreen(

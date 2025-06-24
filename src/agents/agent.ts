@@ -753,7 +753,7 @@ export class Agent extends EventEmitter {
           Date.now() - this._currentTurnMetrics.startTime.getTime();
         this.emit('turn_progress', { metrics: { ...this._currentTurnMetrics } });
       }
-    }, 1000); // Every second
+    }, 1000) as unknown as number; // Every second
   }
 
   private _clearProgressTimer(): void {

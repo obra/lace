@@ -85,7 +85,7 @@ describe('Agent Abort Functionality', () => {
 
     provider = new MockAbortableProvider(mockResponse, 100); // 100ms delay
     toolExecutor = new ToolExecutor();
-    threadManager = new ThreadManager();
+    threadManager = new ThreadManager(':memory:'); // Use in-memory SQLite for tests
     threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
 
@@ -120,7 +120,7 @@ describe('Agent Abort Functionality', () => {
       let wasAborted = false;
       let turnAbortedEvent: { turnId: string; metrics: CurrentTurnMetrics } | null = null;
       
-      agent.on('turn_aborted', (data) => {
+      agent.on('turn_aborted', (data: { turnId: string; metrics: CurrentTurnMetrics }) => {
         turnAbortedEvent = data;
         wasAborted = true;
       });
@@ -141,8 +141,8 @@ describe('Agent Abort Functionality', () => {
       expect(result).toBe(true);
       expect(wasAborted).toBe(true);
       expect(turnAbortedEvent).not.toBeNull();
-      expect(turnAbortedEvent?.turnId).toMatch(/^turn_\d+_[a-z0-9]+$/);
-      expect(turnAbortedEvent?.metrics.elapsedMs).toBeGreaterThanOrEqual(0);
+      expect(turnAbortedEvent!.turnId).toMatch(/^turn_\d+_[a-z0-9]+$/);
+      expect(turnAbortedEvent!.metrics.elapsedMs).toBeGreaterThanOrEqual(0);
       expect(agent.getCurrentState()).toBe('idle');
     });
 
