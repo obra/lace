@@ -203,7 +203,7 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
       {
         role: 'user' as const,
         content:
-          'Explain what you\'re doing, then use mock_tool with action "explain", then summarize',
+          'We\'re testing tool usage. Explain what you\'re doing in prose, then use the tool mock_tool with action "explain", then summarize the results. (We want to make sure a tool call happens in the middle of your process.)',
       },
     ];
 

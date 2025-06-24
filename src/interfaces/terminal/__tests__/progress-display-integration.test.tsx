@@ -214,7 +214,7 @@ describe('Progress Display Integration Tests', () => {
         threadId,
         tools: []
       });
-      slowAgent.start();
+      await slowAgent.start();
       slowAgent.on('turn_aborted', (data) => turnAbortedEvents.push(data));
 
       // Act - Start operation and abort quickly
