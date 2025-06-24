@@ -1,8 +1,8 @@
 // ABOUTME: Unified display component for TOOL_CALL and TOOL_RESULT events with navigation
 // ABOUTME: Shows tool execution with compact output, input/output truncation, and expansion controls
 
-import React, { useState, useCallback } from 'react';
-import { Box, Text, useInput } from 'ink';
+import React from 'react';
+import { Box, Text } from 'ink';
 import { ThreadEvent, ToolCallData, ToolResultData } from '../../../../threads/types.js';
 import { CompactOutput } from '../ui/CompactOutput.js';
 import { CodeDisplay } from '../ui/CodeDisplay.js';
@@ -12,6 +12,7 @@ interface ToolExecutionDisplayProps {
   resultEvent?: ThreadEvent;
   isStreaming?: boolean;
   isFocused?: boolean;
+  isExpanded?: boolean;
 }
 
 function isJsonOutput(output: string): boolean {
@@ -23,7 +24,7 @@ function isJsonOutput(output: string): boolean {
 }
 
 
-export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFocused }: ToolExecutionDisplayProps) {
+export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFocused, isExpanded = false }: ToolExecutionDisplayProps) {
   const toolCallData = callEvent.data as ToolCallData;
   const { toolName, input } = toolCallData;
   
@@ -31,21 +32,6 @@ export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFo
   const success = toolResultData?.success ?? true;
   const output = toolResultData?.output;
   const error = toolResultData?.error;
-  
-  const [isExpanded, setIsExpanded] = useState(false);
-  
-  // Handle left/right arrow expansion when focused
-  // Note: We rely on the parent TimelineDisplay's focus management
-  // Only respond to left/right when this specific item is timeline-focused
-  useInput(useCallback((inputKey, key) => {
-    if (!isFocused) return;
-    
-    if (key.rightArrow) {
-      setIsExpanded(true);
-    } else if (key.leftArrow) {
-      setIsExpanded(false);
-    }
-  }, [isFocused]));
   
   // Determine tool command for compact header
   const getToolCommand = (toolName: string, input: Record<string, unknown>): string => {
@@ -73,7 +59,7 @@ export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFo
   };
   
   const toolCommand = getToolCommand(toolName, input);
-  const statusIcon = success ? '✅' : (resultEvent ? '❌' : '⏳');
+  const statusIcon = success ? '✔' : (resultEvent ? '✘' : '⧖');
   const expansionIcon = isExpanded ? '↓' : '→';
   
   return (

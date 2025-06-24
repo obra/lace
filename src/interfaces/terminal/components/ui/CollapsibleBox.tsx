@@ -1,40 +1,30 @@
 // ABOUTME: Interactive collapsible content component for terminal interface
 // ABOUTME: Supports keyboard navigation and customizable styling for event details
 
-import React, { useState } from 'react';
-import { Box, Text, useInput } from 'ink';
+import React from 'react';
+import { Box, Text } from 'ink';
 
 interface CollapsibleBoxProps {
   children: React.ReactNode;
   label?: string;
   summary?: React.ReactNode; // Content to show when collapsed
-  defaultExpanded?: boolean;
+  isExpanded: boolean; // Controlled state from parent
   maxHeight?: number;
-  borderStyle?: 'single' | 'double' | 'round';
+  borderStyle?: 'single' | 'double' | 'round' | 'classic' | 'bold' | 'arrow';
   borderColor?: string;
-  isFocused?: boolean; // Whether this specific box is focused
-  onToggle?: () => void; // Called when expanded/collapsed to trigger height re-measurement
+  isFocused?: boolean; // Whether this specific box is focused (for visual indication)
 }
 
 export function CollapsibleBox({ 
   children, 
   label, 
   summary,
-  defaultExpanded = true,
+  isExpanded,
   maxHeight,
-  borderStyle = 'single',
+  borderStyle = 'round',
   borderColor = 'gray',
-  isFocused = false,
-  onToggle
+  isFocused = false
 }: CollapsibleBoxProps) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-  
-  useInput((input, key) => {
-    if (key.return && label) {
-      setIsExpanded(!isExpanded);
-      onToggle?.(); // Notify parent of height change
-    }
-  }, { isActive: isFocused });
   
   return (
     <Box flexDirection="column">
@@ -43,7 +33,9 @@ export function CollapsibleBox({
           <Text color={borderColor}>
             {isExpanded ? '▼' : '▶'} {label}
           </Text>
-          <Text color="gray"> (press Enter to toggle)</Text>
+          {isFocused && (
+            <Text color="gray"> (← → to toggle)</Text>
+          )}
         </Box>
       )}
       

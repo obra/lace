@@ -16,15 +16,18 @@ interface TimelineDisplayProps {
   timeline: Timeline;
   delegateTimelines?: Map<string, Timeline>;
   focusId?: string;
+  parentFocusId?: string; // Focus target when pressing escape
   bottomSectionHeight?: number;
 }
 
-export default function TimelineDisplay({ timeline, delegateTimelines, focusId, bottomSectionHeight }: TimelineDisplayProps) {
+export default function TimelineDisplay({ timeline, delegateTimelines, focusId, parentFocusId, bottomSectionHeight }: TimelineDisplayProps) {
   const [focusedLine, setFocusedLine] = useState<number>(0); // Absolute line position in content
   const [lineScrollOffset, setLineScrollOffset] = useState<number>(0); // Line-based scrolling
+  const [delegationExpandState, setDelegationExpandState] = useState<Map<string, boolean>>(new Map()); // Track expand/collapse state by callId
+  const [toolExpandState, setToolExpandState] = useState<Map<string, boolean>>(new Map()); // Track tool expand/collapse state by callId
   // Use focus manager with disabled automatic cycling
   const { isFocused } = useFocus({ id: focusId || 'timeline' });
-  const { focusNext } = useFocusManager();
+  const { focusNext, focus } = useFocusManager();
   const [, terminalHeight] = useStdoutDimensions();
   const containerRef = useRef<any>(null);
   
@@ -155,11 +158,40 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
     }
   }, [totalContentHeight, viewportLines, itemToRefocusAfterMeasurement, timeline.items.length, lastTimelineItemCount]); // When content height changes, scroll to bottom
   
+  // Calculate which item contains the focused line
+  const getFocusedItemIndex = useCallback(() => {
+    if (itemPositions.length === 0) return -1;
+    
+    for (let i = 0; i < itemPositions.length; i++) {
+      const itemStart = itemPositions[i];
+      const itemEnd = i + 1 < itemPositions.length ? itemPositions[i + 1] : totalContentHeight;
+      
+      if (focusedLine >= itemStart && focusedLine < itemEnd) {
+        return i;
+      }
+    }
+    
+    return -1;
+  }, [focusedLine, itemPositions, totalContentHeight]);
+
   // Handle keyboard navigation - only register when focused and has content
   useInput(useCallback((input, key) => {
     if (key.escape) {
-      // Escape switches back to shell input mode
-      focusNext();
+      // Handle escape based on focus hierarchy
+      const currentFocusId = focusId || 'timeline';
+      logger.debug('TimelineDisplay: Escape key pressed', {
+        currentFocusId,
+        parentFocusId,
+        action: parentFocusId ? `focus(${parentFocusId})` : 'focusNext()'
+      });
+      
+      if (parentFocusId) {
+        // We're in a nested timeline - go back to parent focus
+        focus(parentFocusId);
+      } else {
+        // We're in the main timeline - go to shell input
+        focusNext();
+      }
       return;
     }
     
@@ -181,25 +213,53 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
     } else if (input === 'G') {
       // Go to bottom (last line)
       setFocusedLine(Math.max(0, totalContentHeight - 1));
-    }
-  }, [totalContentHeight, viewportLines, focusNext]), { isActive: isFocused && totalContentHeight > 0 });
-  
-  
-  // Calculate which item contains the focused line
-  const getFocusedItemIndex = useCallback(() => {
-    if (itemPositions.length === 0) return -1;
-    
-    for (let i = 0; i < itemPositions.length; i++) {
-      const itemStart = itemPositions[i];
-      const itemEnd = i + 1 < itemPositions.length ? itemPositions[i + 1] : totalContentHeight;
-      
-      if (focusedLine >= itemStart && focusedLine < itemEnd) {
-        return i;
+    } else if (key.leftArrow || key.rightArrow || key.return) {
+      // Handle timeline item interactions
+      const focusedItemIndex = getFocusedItemIndex();
+      if (focusedItemIndex >= 0 && focusedItemIndex < timeline.items.length) {
+        const item = timeline.items[focusedItemIndex];
+        
+        if (item.type === 'tool_execution') {
+          if (item.call?.toolName === 'delegate') {
+            // Handle delegation items
+            if (key.leftArrow || key.rightArrow) {
+              // Toggle expand/collapse delegation box
+              setDelegationExpandState(prev => {
+                const newState = new Map(prev);
+                const currentExpanded = newState.get(item.callId) ?? true;
+                newState.set(item.callId, !currentExpanded);
+                return newState;
+              });
+            } else if (key.return && delegateTimelines) {
+              // Focus the delegation timeline
+              const delegateThreadId = extractDelegateThreadId(item, delegateTimelines);
+              if (delegateThreadId) {
+                const targetFocusId = `delegate-${delegateThreadId}`;
+                logger.debug('TimelineDisplay: Return key pressed - focusing delegation timeline', {
+                  currentFocusId: focusId || 'timeline',
+                  targetFocusId,
+                  delegateThreadId
+                });
+                focus(targetFocusId);
+              }
+            }
+          } else {
+            // Handle regular tool execution items
+            if (key.leftArrow || key.rightArrow) {
+              // Toggle expand/collapse tool execution
+              setToolExpandState(prev => {
+                const newState = new Map(prev);
+                const currentExpanded = newState.get(item.callId) ?? false;
+                newState.set(item.callId, !currentExpanded);
+                return newState;
+              });
+            }
+          }
+        }
       }
     }
-    
-    return -1;
-  }, [focusedLine, itemPositions, totalContentHeight]);
+  }, [totalContentHeight, viewportLines, focusNext, focus, timeline.items, delegateTimelines, getFocusedItemIndex, parentFocusId]), { isActive: isFocused && totalContentHeight > 0 });
+  
   
   const focusedItemIndex = getFocusedItemIndex();
   
@@ -272,6 +332,9 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
                   focusedLine={focusedLine}
                   itemStartLine={itemPositions[index] || 0}
                   onToggle={triggerRemeasurement}
+                  delegationExpandState={delegationExpandState}
+                  toolExpandState={toolExpandState}
+                  currentFocusId={focusId}
                 />
               </Box>
             );
@@ -286,7 +349,7 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
         >
           {/* Only render cursor on the focused line */}
           <Text backgroundColor="white" color="black">
-            {' '}
+            {'>'}
           </Text>
         </Box>
       </Box>
@@ -302,13 +365,16 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
   );
 }
 
-function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, itemStartLine, onToggle }: { 
+function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, itemStartLine, onToggle, delegationExpandState, toolExpandState, currentFocusId }: { 
   item: TimelineItem; 
   delegateTimelines?: Map<string, Timeline>;
   isFocused: boolean;
   focusedLine: number;
   itemStartLine: number;
   onToggle?: () => void;
+  delegationExpandState: Map<string, boolean>;
+  toolExpandState: Map<string, boolean>;
+  currentFocusId?: string;
 }) {
   switch (item.type) {
     case 'user_message':
@@ -390,49 +456,73 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
       
       // Check if this is a delegate tool call
       if (item.call.toolName === 'delegate') {
-        logger.debug('Found delegate tool call', { callId: item.callId });
+        logger.debug('TimelineDisplay: Processing delegate tool call', { 
+          callId: item.callId,
+          toolName: item.call.toolName,
+          hasDelegateTimelines: !!delegateTimelines,
+          delegateTimelineCount: delegateTimelines?.size || 0
+        });
         
         if (delegateTimelines) {
           const delegateThreadId = extractDelegateThreadId(item, delegateTimelines);
-          logger.debug('Delegate thread ID extraction', {
+          logger.debug('TimelineDisplay: Delegate thread ID extraction result', {
+            callId: item.callId,
             extractedThreadId: delegateThreadId,
-            availableThreads: Array.from(delegateTimelines.keys())
+            availableThreads: Array.from(delegateTimelines.keys()),
+            toolResult: item.result?.output ? item.result.output.substring(0, 100) + '...' : 'no result'
           });
           
           const delegateTimeline = delegateThreadId ? delegateTimelines.get(delegateThreadId) : null;
           
           if (delegateTimeline && delegateThreadId) {
-            logger.debug('Rendering delegation box', { threadId: delegateThreadId });
+            const isExpanded = delegationExpandState.get(item.callId) ?? true;
+            logger.debug('TimelineDisplay: RENDERING delegation box', { 
+              threadId: delegateThreadId,
+              callId: item.callId,
+              isExpanded,
+              timelineItemCount: delegateTimeline.items.length
+            });
             return (
               <Box flexDirection="column">
                 <ToolExecutionDisplay 
                   callEvent={callEvent} 
                   resultEvent={resultEvent}
                   isFocused={isFocused}
+                  isExpanded={false} // Tool part always collapsed for delegate calls
                 />
                 <DelegationBox 
                   threadId={delegateThreadId}
                   timeline={delegateTimeline}
                   delegateTimelines={delegateTimelines}
+                  expanded={isExpanded}
+                  parentFocusId={currentFocusId || 'timeline'}
                 />
               </Box>
             );
           } else {
-            logger.debug('NOT rendering delegation box', {
+            logger.debug('TimelineDisplay: NOT rendering delegation box', {
               reason: 'missing timeline or threadId',
+              callId: item.callId,
               delegateThreadId,
-              hasTimeline: !!delegateTimeline
+              hasTimeline: !!delegateTimeline,
+              hasDelegateTimelines: !!delegateTimelines,
+              delegateTimelineKeys: delegateTimelines ? Array.from(delegateTimelines.keys()) : []
             });
           }
         } else {
-          logger.debug('No delegate timelines provided to TimelineDisplay');
+          logger.debug('TimelineDisplay: No delegate timelines provided', {
+            callId: item.callId,
+            toolName: item.call.toolName
+          });
         }
       }
       
+      const isToolExpanded = toolExpandState.get(item.callId) ?? false;
       return <ToolExecutionDisplay 
         callEvent={callEvent} 
         resultEvent={resultEvent}
         isFocused={isFocused}
+        isExpanded={isToolExpanded}
       />;
       
     case 'ephemeral_message':

@@ -1,25 +1,42 @@
 // ABOUTME: Collapsible delegation box component for displaying delegate thread conversations
 // ABOUTME: Shows delegation progress, events, and provides expand/collapse functionality
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
 import { Timeline } from '../../../thread-processor.js';
 import TimelineDisplay from './TimelineDisplay.js';
+import { logger } from '../../../../utils/logger.js';
 
 interface DelegationBoxProps {
   threadId: string;
   timeline: Timeline;
   delegateTimelines?: Map<string, Timeline>;
+  expanded: boolean;
+  parentFocusId?: string; // Focus ID of the parent timeline for escape hierarchy
 }
 
-export function DelegationBox({ threadId, timeline, delegateTimelines }: DelegationBoxProps) {
-  const [expanded, setExpanded] = useState(true);
+export function DelegationBox({ threadId, timeline, delegateTimelines, expanded, parentFocusId }: DelegationBoxProps) {
+  
+  logger.debug('DelegationBox: Rendering', {
+    threadId,
+    expanded,
+    timelineItemCount: timeline.items.length,
+    hasDelegateTimelines: !!delegateTimelines
+  });
   
   // Determine delegation status
   const isComplete = isThreadComplete(timeline);
   const taskDescription = extractTaskFromTimeline(timeline);
   const duration = calculateDuration(timeline);
   const tokens = calculateTokens(timeline);
+  
+  logger.debug('DelegationBox: Status calculated', {
+    threadId,
+    isComplete,
+    taskDescription,
+    duration,
+    tokens: `↑${tokens.tokensIn} ↓${tokens.tokensOut}`
+  });
   
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={isComplete ? "green" : "yellow"} padding={1} marginY={1}>
@@ -49,6 +66,8 @@ export function DelegationBox({ threadId, timeline, delegateTimelines }: Delegat
           <TimelineDisplay 
             timeline={timeline} 
             delegateTimelines={delegateTimelines}
+            focusId={`delegate-${threadId}`}
+            parentFocusId={parentFocusId}
           />
         </Box>
       )}

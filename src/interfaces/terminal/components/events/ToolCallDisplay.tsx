@@ -1,7 +1,7 @@
 // ABOUTME: Specialized display component for TOOL_CALL events with expandable input parameters
 // ABOUTME: Shows tool name, call ID, and collapsible JSON input for debugging
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent, ToolCallData } from '../../../../threads/types.js';
 import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
@@ -15,6 +15,7 @@ interface ToolCallDisplayProps {
 export function ToolCallDisplay({ event, isStreaming }: ToolCallDisplayProps) {
   const toolCallData = event.data as ToolCallData;
   const { toolName, input, callId } = toolCallData;
+  const [isExpanded, setIsExpanded] = useState(false);
   
   const headerSummary = (
     <Box>
@@ -29,7 +30,8 @@ export function ToolCallDisplay({ event, isStreaming }: ToolCallDisplayProps) {
     <TimelineEntryCollapsibleBox 
       label="Input Parameters"
       summary={headerSummary}
-      defaultExpanded={false}
+      isExpanded={isExpanded}
+      onExpandedChange={setIsExpanded}
       maxHeight={10}
       borderColor="yellow"
     >

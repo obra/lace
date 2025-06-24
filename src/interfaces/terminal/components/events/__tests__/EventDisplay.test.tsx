@@ -73,7 +73,7 @@ describe('EventDisplay', () => {
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
-    expect(lastFrame()).toContain('✅ Tool Result');
+    expect(lastFrame()).toContain('Tool Result');
     expect(lastFrame()).toContain('File listing complete');
   });
 
