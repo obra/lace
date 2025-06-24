@@ -4,6 +4,7 @@
 import React from 'react';
 import { Text } from 'ink';
 import useStdoutDimensions from '../../../utils/use-stdout-dimensions.js';
+import { CurrentTurnMetrics } from '../../../agents/agent.js';
 
 interface TokenUsage {
   promptTokens?: number;
@@ -19,6 +20,7 @@ interface StatusBarProps {
   isProcessing?: boolean;
   messageCount?: number;
   isTurnActive?: boolean;
+  turnMetrics?: CurrentTurnMetrics | null;
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({
@@ -29,6 +31,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   isProcessing = false,
   messageCount = 0,
   isTurnActive = false,
+  turnMetrics = null,
 }) => {
   // Format token usage for display
   const formatTokenUsage = (usage?: TokenUsage) => {
@@ -43,19 +46,35 @@ const StatusBar: React.FC<StatusBarProps> = ({
     return `${usage.totalTokens} tokens`;
   };
 
+  // Format turn metrics for display
+  const formatTurnMetrics = (metrics?: CurrentTurnMetrics | null) => {
+    if (!metrics) return null;
+    
+    const elapsedSeconds = Math.floor(metrics.elapsedMs / 1000);
+    const tokenDisplay = `↑${metrics.tokensIn} ↓${metrics.tokensOut}`;
+    
+    return `⏱️ ${elapsedSeconds}s • ${tokenDisplay}`;
+  };
+
   // Format thread ID for display (don't truncate)
   const formatThreadId = (id?: string) => {
     if (!id) return "no-thread";
     return id;
   };
 
-
   // Use proper terminal dimensions hook
   const [currentWidth] = useStdoutDimensions();
   
-  // Create content strings
+  // Create content strings with turn-aware display
   const leftContent = `🧠 ${providerName}${modelName ? `:${modelName}` : ''} • 📁 ${formatThreadId(threadId)}`;
-  const rightContent = `💬 ${messageCount} • ${formatTokenUsage(tokenUsage)} • ${isProcessing ? '⚡ Processing' : '✓ Ready'}`;
+  
+  // Right content shows turn progress when active, otherwise session info
+  let rightContent: string;
+  if (isTurnActive && turnMetrics) {
+    rightContent = `${formatTurnMetrics(turnMetrics)} • ⚡ Processing`;
+  } else {
+    rightContent = `💬 ${messageCount} • ${formatTokenUsage(tokenUsage)} • ${isProcessing ? '⚡ Processing' : '✓ Ready'}`;
+  }
   
   // Calculate padding needed to fill the terminal width
   const totalContentLength = leftContent.length + rightContent.length;

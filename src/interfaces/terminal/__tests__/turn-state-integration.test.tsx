@@ -163,6 +163,7 @@ describe('Turn State Integration Tests', () => {
         toolName: 'test_tool',
         input: {},
         isReadOnly: false,
+        requestId: 'test-request-1',
         resolve: vi.fn(),
       });
 
@@ -183,6 +184,7 @@ describe('Turn State Integration Tests', () => {
           toolName: 'test_tool',
           input: { param: 'value' },
           isReadOnly: false,
+          requestId: 'test-request-2',
           resolve: (decision: any) => {
             // Mock resolve
           },
@@ -201,7 +203,10 @@ describe('Turn State Integration Tests', () => {
       });
 
       // Act
-      agent.emit('error', { error: new Error('Test error') });
+      agent.emit('error', { 
+        error: new Error('Test error'),
+        context: { phase: 'test', threadId: 'test-thread' }
+      });
 
       // Assert
       expect(errorCaught).toBe(true);

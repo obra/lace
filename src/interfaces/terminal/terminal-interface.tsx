@@ -10,7 +10,7 @@ import ShellInput from "./components/shell-input.js";
 import ToolApprovalModal from "./components/tool-approval-modal.js";
 import { ConversationDisplay } from "./components/events/ConversationDisplay.js";
 import StatusBar from "./components/status-bar.js";
-import { Agent } from "../../agents/agent.js";
+import { Agent, CurrentTurnMetrics } from "../../agents/agent.js";
 import { ApprovalCallback, ApprovalDecision } from "../../tools/approval-types.js";
 import { CommandRegistry } from "../../commands/registry.js";
 import { CommandExecutor } from "../../commands/executor.js";
@@ -148,6 +148,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   // Turn tracking state
   const [isTurnActive, setIsTurnActive] = useState(false);
   const [currentTurnId, setCurrentTurnId] = useState<string | null>(null);
+  const [currentTurnMetrics, setCurrentTurnMetrics] = useState<CurrentTurnMetrics | null>(null);
   
   // Alert state for SIGINT and other system messages
   const [alert, setAlert] = useState<{
@@ -313,22 +314,43 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     // Handle turn lifecycle events
-    const handleTurnStart = ({ turnId }: { turnId: string }) => {
+    const handleTurnStart = ({ turnId, metrics }: { turnId: string; userInput: string; metrics: CurrentTurnMetrics }) => {
       setIsTurnActive(true);
       setCurrentTurnId(turnId);
+      setCurrentTurnMetrics(metrics);
       setIsProcessing(true);
     };
     
-    const handleTurnComplete = ({ turnId }: { turnId: string }) => {
-      setIsTurnActive(false);
-      setCurrentTurnId(null);
-      setIsProcessing(false);
+    const handleTurnProgress = ({ metrics }: { metrics: CurrentTurnMetrics }) => {
+      setCurrentTurnMetrics(metrics);
     };
     
-    const handleTurnAborted = ({ turnId }: { turnId: string }) => {
+    const handleTurnComplete = ({ turnId, metrics }: { turnId: string; metrics: CurrentTurnMetrics }) => {
       setIsTurnActive(false);
       setCurrentTurnId(null);
+      setCurrentTurnMetrics(null);
       setIsProcessing(false);
+      
+      // Show completion message with turn summary
+      addMessage({
+        type: "system",
+        content: `✅ Turn completed in ${Math.floor(metrics.elapsedMs / 1000)}s (↑${metrics.tokensIn} ↓${metrics.tokensOut} tokens)`,
+        timestamp: new Date(),
+      });
+    };
+    
+    const handleTurnAborted = ({ turnId, metrics }: { turnId: string; metrics: CurrentTurnMetrics }) => {
+      setIsTurnActive(false);
+      setCurrentTurnId(null);
+      setCurrentTurnMetrics(null);
+      setIsProcessing(false);
+      
+      // Show abort message with partial progress
+      addMessage({
+        type: "system",
+        content: `⚠️ Turn aborted after ${Math.floor(metrics.elapsedMs / 1000)}s (↑${metrics.tokensIn} ↓${metrics.tokensOut} tokens)`,
+        timestamp: new Date(),
+      });
     };
 
 
@@ -344,6 +366,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     agent.on("error", handleError);
     // Turn tracking events
     agent.on("turn_start", handleTurnStart);
+    agent.on("turn_progress", handleTurnProgress);
     agent.on("turn_complete", handleTurnComplete);
     agent.on("turn_aborted", handleTurnAborted);
 
@@ -360,6 +383,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       agent.off("error", handleError);
       // Turn tracking cleanup
       agent.off("turn_start", handleTurnStart);
+      agent.off("turn_progress", handleTurnProgress);
       agent.off("turn_complete", handleTurnComplete);
       agent.off("turn_aborted", handleTurnAborted);
     };
@@ -576,13 +600,20 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               isProcessing={isProcessing}
               messageCount={events.length + ephemeralMessages.length}
               isTurnActive={isTurnActive}
+              turnMetrics={currentTurnMetrics}
             />
 
             {/* Input area - takes natural height */}
             <Box padding={1}>
               <ShellInput
                 value={currentInput}
-                placeholder={approvalRequest ? "Tool approval required..." : "Type your message..."}
+                placeholder={
+                  approvalRequest 
+                    ? "Tool approval required..." 
+                    : isTurnActive && currentTurnMetrics
+                      ? `Processing... ⏱️ ${Math.floor(currentTurnMetrics.elapsedMs / 1000)}s | Press Ctrl+C to abort`
+                      : "Type your message..."
+                }
                 onSubmit={handleSubmit}
                 onChange={setCurrentInput}
                 focusId="shell-input"

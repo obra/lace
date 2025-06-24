@@ -171,9 +171,9 @@ describe('Agent Turn Tracking', () => {
       // Assert
       expect(progressEvents.length).toBeGreaterThanOrEqual(2); // Should have at least 2 progress events
 
-      // Check that elapsed time increases
+      // Check that elapsed time increases (allowing for equal values in fast tests)
       for (let i = 1; i < progressEvents.length; i++) {
-        expect(progressEvents[i].metrics.elapsedMs).toBeGreaterThan(
+        expect(progressEvents[i].metrics.elapsedMs).toBeGreaterThanOrEqual(
           progressEvents[i - 1].metrics.elapsedMs
         );
       }
