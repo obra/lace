@@ -270,6 +270,7 @@ export class OllamaProvider extends AIProvider {
     let content = '';
     let toolCalls: { id: string; name: string; input: Record<string, unknown> }[] = [];
     let finalMessage: OllamaMessage | null = null;
+    let estimatedOutputTokens = 0;
 
     try {
       // Process streaming response
@@ -278,6 +279,20 @@ export class OllamaProvider extends AIProvider {
           // Emit token events for real-time display
           this.emit('token', { token: part.message.content });
           content += part.message.content;
+          
+          // If no token counts available yet, estimate progressively
+          if (part.prompt_eval_count === undefined && part.eval_count === undefined) {
+            const newTokens = Math.ceil(part.message.content.length / 4);
+            estimatedOutputTokens += newTokens;
+            
+            this.emit('token_usage_update', {
+              usage: {
+                promptTokens: 0, // Unknown during streaming
+                completionTokens: estimatedOutputTokens,
+                totalTokens: estimatedOutputTokens,
+              },
+            });
+          }
         }
 
         // Emit token usage updates if available (usually in final response)

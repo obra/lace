@@ -19,6 +19,7 @@ export function DelegationBox({ threadId, timeline, delegateTimelines }: Delegat
   const isComplete = isThreadComplete(timeline);
   const taskDescription = extractTaskFromTimeline(timeline);
   const duration = calculateDuration(timeline);
+  const tokens = calculateTokens(timeline);
   
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={isComplete ? "green" : "yellow"} padding={1} marginY={1}>
@@ -31,11 +32,11 @@ export function DelegationBox({ threadId, timeline, delegateTimelines }: Delegat
         </Box>
         <Box>
           {isComplete ? (
-            <Text color="green">✅ Complete ({duration})</Text>
+            <Text color="green">✅ Complete ({duration}) </Text>
           ) : (
-            <Text color="yellow">⚡ Working... ({duration})</Text>
+            <Text color="yellow">⚡ Working... ({duration}) </Text>
           )}
-          <Text color="gray"> </Text>
+          <Text color="gray">↑{formatTokenCount(tokens.tokensIn)} ↓{formatTokenCount(tokens.tokensOut)} </Text>
           <Text color="cyan">
             {expanded ? '[▼ Collapse]' : '[▶ Expand]'}
           </Text>
@@ -108,4 +109,34 @@ function calculateDuration(timeline: Timeline): string {
     const minutes = Math.floor((seconds % 3600) / 60);
     return `${hours}h ${minutes}m`;
   }
+}
+
+function calculateTokens(timeline: Timeline): { tokensIn: number; tokensOut: number } {
+  let tokensIn = 0;
+  let tokensOut = 0;
+  
+  timeline.items.forEach(item => {
+    if (item.type === 'user_message' && 'content' in item) {
+      // Estimate tokens for user input (~4 chars per token)
+      tokensIn += Math.ceil(item.content.length / 4);
+    } else if (item.type === 'agent_message' && 'content' in item) {
+      // Estimate tokens for agent output (~4 chars per token)
+      tokensOut += Math.ceil(item.content.length / 4);
+    } else if (item.type === 'tool_execution' && 'result' in item && item.result && 'content' in item.result) {
+      // Tool results count as input to the agent
+      const content = item.result.content;
+      if (typeof content === 'string') {
+        tokensIn += Math.ceil(content.length / 4);
+      }
+    }
+  });
+  
+  return { tokensIn, tokensOut };
+}
+
+function formatTokenCount(count: number): string {
+  if (count >= 1000) {
+    return `${(count / 1000).toFixed(1)}k`;
+  }
+  return count.toString();
 }

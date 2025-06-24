@@ -139,11 +139,19 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [commandExecutor, setCommandExecutor] = useState<CommandExecutor | null>(null);
-  const [tokenUsage, setTokenUsage] = useState<{
-    promptTokens?: number;
-    completionTokens?: number;
-    totalTokens?: number;
-  }>({});
+  // Cumulative session token tracking
+  const [cumulativeTokens, setCumulativeTokens] = useState<{
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  }>({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+  
+  // Track the final token usage from provider for accurate cumulative totals
+  const [lastProviderUsage, setLastProviderUsage] = useState<{
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  } | null>(null);
   
   // Turn tracking state
   const [isTurnActive, setIsTurnActive] = useState(false);
@@ -278,26 +286,29 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       }
     };
 
-    // Handle token usage updates
+    // Handle token usage updates - track the latest for accurate cumulative totals
     const handleTokenUsageUpdate = ({ usage }: { usage: any }) => {
       if (usage && typeof usage === 'object') {
-        setTokenUsage({
-          promptTokens: usage.promptTokens || usage.prompt_tokens,
-          completionTokens: usage.completionTokens || usage.completion_tokens,
-          totalTokens: usage.totalTokens || usage.total_tokens,
-        });
+        // Keep track of the most recent provider usage data
+        // This includes system prompts and full context that turn metrics miss
+        const newUsage = {
+          promptTokens: usage.promptTokens || usage.prompt_tokens || 0,
+          completionTokens: usage.completionTokens || usage.completion_tokens || 0,
+          totalTokens: usage.totalTokens || usage.total_tokens || 
+            (usage.promptTokens || usage.prompt_tokens || 0) + 
+            (usage.completionTokens || usage.completion_tokens || 0),
+        };
+        
+        // Only update if we have meaningful token counts (avoid progressive estimates)
+        if (newUsage.promptTokens > 0 || newUsage.totalTokens > 0) {
+          setLastProviderUsage(newUsage);
+        }
       }
     };
 
-    // Handle token budget warnings and update token usage
+    // Handle token budget warnings - these don't affect cumulative tracking
     const handleTokenBudgetWarning = ({ usage }: { usage: any }) => {
-      if (usage && typeof usage === 'object') {
-        setTokenUsage({
-          promptTokens: usage.promptTokens || usage.prompt_tokens,
-          completionTokens: usage.completionTokens || usage.completion_tokens,
-          totalTokens: usage.totalTokens || usage.total_tokens,
-        });
-      }
+      // Token budget warnings are just for display, don't need to track them
     };
 
     const handleError = ({ error }: { error: Error }) => {
@@ -331,7 +342,20 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       setCurrentTurnMetrics(null);
       setIsProcessing(false);
       
-      // Show completion message with turn summary
+      // Use provider's final token counts for accurate cumulative totals (includes system prompts, context, etc.)
+      if (lastProviderUsage) {
+        setCumulativeTokens(prev => ({
+          // Provider promptTokens includes entire conversation context, so accumulate completions only
+          promptTokens: lastProviderUsage.promptTokens, // This is the total input context
+          completionTokens: prev.completionTokens + lastProviderUsage.completionTokens, // Accumulate outputs
+          totalTokens: lastProviderUsage.promptTokens + (prev.completionTokens + lastProviderUsage.completionTokens),
+        }));
+        
+        // Clear the provider usage after using it
+        setLastProviderUsage(null);
+      }
+      
+      // Show completion message with turn summary (still use turn metrics for per-turn display)
       addMessage({
         type: "system",
         content: `✅ Turn completed in ${Math.floor(metrics.elapsedMs / 1000)}s (↑${metrics.tokensIn} ↓${metrics.tokensOut} tokens)`,
@@ -596,7 +620,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               providerName={agent.providerName || 'unknown'}
               modelName={(agent as any)._provider?.defaultModel || undefined}
               threadId={agent.threadManager.getCurrentThreadId() || undefined}
-              tokenUsage={tokenUsage}
+              cumulativeTokens={cumulativeTokens}
               isProcessing={isProcessing}
               messageCount={events.length + ephemeralMessages.length}
               isTurnActive={isTurnActive}

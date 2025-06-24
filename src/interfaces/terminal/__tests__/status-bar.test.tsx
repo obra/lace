@@ -58,11 +58,11 @@ describe('StatusBar', () => {
     expect(frame).toContain('📁 abc123');
   });
 
-  it('formats token usage in k format for large numbers', () => {
+  it('formats cumulative tokens in k format for large numbers', () => {
     const { lastFrame } = renderInkComponent(
       <StatusBar 
         {...basicProps}
-        tokenUsage={{
+        cumulativeTokens={{
           totalTokens: 2500,
           promptTokens: 1000,
           completionTokens: 1500,
@@ -71,14 +71,14 @@ describe('StatusBar', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('2.5k tokens');
+    expect(frame).toContain('↑1.0k ↓1.5k');
   });
 
-  it('formats token usage as exact number for small numbers', () => {
+  it('formats cumulative tokens as exact numbers for small numbers', () => {
     const { lastFrame } = renderInkComponent(
       <StatusBar 
         {...basicProps}
-        tokenUsage={{
+        cumulativeTokens={{
           totalTokens: 250,
           promptTokens: 100,
           completionTokens: 150,
@@ -87,16 +87,16 @@ describe('StatusBar', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('250 tokens');
+    expect(frame).toContain('↑100 ↓150');
   });
 
-  it('shows 0 tokens when no usage provided', () => {
+  it('shows 0 tokens when no cumulative tokens provided', () => {
     const { lastFrame } = renderInkComponent(
       <StatusBar {...basicProps} />
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('0 tokens');
+    expect(frame).toContain('↑0 ↓0');
   });
 
   it('shows processing status when isProcessing is true', () => {

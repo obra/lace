@@ -185,7 +185,41 @@ export class AnthropicProvider extends AIProvider {
         this.emit('token', { token: text });
       });
 
-      // Listen for message completion to get token usage
+      // Track progressive token estimation
+      let estimatedOutputTokens = 0;
+      
+      // Listen for progressive token usage updates during streaming
+      stream.on('streamEvent', (event) => {
+        // Handle message_delta events that contain final token usage
+        if (event.type === 'message_delta' && (event as any).usage) {
+          const usage = (event as any).usage;
+          this.emit('token_usage_update', {
+            usage: {
+              promptTokens: usage.input_tokens || 0,
+              completionTokens: usage.output_tokens || 0,
+              totalTokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
+            },
+          });
+        }
+      });
+      
+      // Estimate progressive tokens from text chunks
+      stream.on('text', (text) => {
+        // Rough token estimation: ~4 characters per token
+        const newTokens = Math.ceil(text.length / 4);
+        estimatedOutputTokens += newTokens;
+        
+        // Emit progressive token estimate
+        this.emit('token_usage_update', {
+          usage: {
+            promptTokens: 0, // Unknown during streaming
+            completionTokens: estimatedOutputTokens,
+            totalTokens: estimatedOutputTokens,
+          },
+        });
+      });
+
+      // Listen for message completion to get final token usage
       stream.on('message', (message) => {
         // This fires when the message is complete - provides final token usage
         if (message.usage) {

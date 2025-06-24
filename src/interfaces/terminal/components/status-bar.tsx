@@ -6,17 +6,17 @@ import { Text } from 'ink';
 import useStdoutDimensions from '../../../utils/use-stdout-dimensions.js';
 import { CurrentTurnMetrics } from '../../../agents/agent.js';
 
-interface TokenUsage {
-  promptTokens?: number;
-  completionTokens?: number;
-  totalTokens?: number;
+interface CumulativeTokens {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
 }
 
 interface StatusBarProps {
   providerName: string;
   modelName?: string;
   threadId?: string;
-  tokenUsage?: TokenUsage;
+  cumulativeTokens?: CumulativeTokens;
   isProcessing?: boolean;
   messageCount?: number;
   isTurnActive?: boolean;
@@ -27,23 +27,26 @@ const StatusBar: React.FC<StatusBarProps> = ({
   providerName,
   modelName,
   threadId,
-  tokenUsage,
+  cumulativeTokens,
   isProcessing = false,
   messageCount = 0,
   isTurnActive = false,
   turnMetrics = null,
 }) => {
-  // Format token usage for display
-  const formatTokenUsage = (usage?: TokenUsage) => {
-    if (!usage || !usage.totalTokens) {
-      return "0 tokens";
+  // Format cumulative session tokens for display
+  const formatCumulativeTokens = (tokens?: CumulativeTokens) => {
+    if (!tokens || tokens.totalTokens === 0) {
+      return "↑0 ↓0";
     }
     
-    if (usage.totalTokens > 1000) {
-      return `${(usage.totalTokens / 1000).toFixed(1)}k tokens`;
-    }
+    const formatCount = (count: number) => {
+      if (count >= 1000) {
+        return `${(count / 1000).toFixed(1)}k`;
+      }
+      return count.toString();
+    };
     
-    return `${usage.totalTokens} tokens`;
+    return `↑${formatCount(tokens.promptTokens)} ↓${formatCount(tokens.completionTokens)}`;
   };
 
   // Format turn metrics for display
@@ -87,12 +90,12 @@ const StatusBar: React.FC<StatusBarProps> = ({
   // Create content strings with turn-aware display
   const leftContent = `🧠 ${providerName}${modelName ? `:${modelName}` : ''} • 📁 ${formatThreadId(threadId)}`;
   
-  // Right content shows turn progress when active, otherwise session info
+  // Right content shows turn progress when active, otherwise session info with cumulative tokens
   let rightContent: string;
   if (isTurnActive && turnMetrics) {
     rightContent = `${formatTurnMetrics(turnMetrics)} • ⚡ Processing`;
   } else {
-    rightContent = `💬 ${messageCount} • ${formatTokenUsage(tokenUsage)} • ${isProcessing ? '⚡ Processing' : '✓ Ready'}`;
+    rightContent = `💬 ${messageCount} • ${formatCumulativeTokens(cumulativeTokens)} • ${isProcessing ? '⚡ Processing' : '✓ Ready'}`;
   }
   
   // Calculate padding needed to fill the terminal width

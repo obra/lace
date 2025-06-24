@@ -399,6 +399,7 @@ export class LMStudioProvider extends AIProvider {
       const toolCalls: Array<{ id: string; name: string; input: Record<string, unknown> }> = [];
       let chunkCount = 0;
       let resolved = false;
+      let estimatedOutputTokens = 0;
 
       try {
         // Handle abort signal
@@ -445,6 +446,20 @@ export class LMStudioProvider extends AIProvider {
                   allContent += fragment.content;
                   // Emit token events for streaming
                   this.emit('token', { token: fragment.content });
+                  
+                  // If no stats available, estimate tokens progressively
+                  if (!msg.stats) {
+                    const newTokens = Math.ceil(fragment.content.length / 4);
+                    estimatedOutputTokens += newTokens;
+                    
+                    this.emit('token_usage_update', {
+                      usage: {
+                        promptTokens: 0, // Unknown during streaming
+                        completionTokens: estimatedOutputTokens,
+                        totalTokens: estimatedOutputTokens,
+                      },
+                    });
+                  }
                 }
 
                 // Emit token usage updates if stats are available in fragment

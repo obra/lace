@@ -105,6 +105,7 @@ export class Agent extends EventEmitter {
   private _currentTurnMetrics: CurrentTurnMetrics | null = null;
   private _progressTimer: number | null = null;
   private _abortController: AbortController | null = null;
+  private _lastStreamingTokenCount = 0; // Track last cumulative token count from streaming
 
   constructor(config: AgentConfig) {
     super();
@@ -401,9 +402,14 @@ export class Agent extends EventEmitter {
     }: {
       usage: { promptTokens: number; completionTokens: number; totalTokens: number };
     }) => {
-      // Add streaming token updates to current turn metrics
-      if (usage.completionTokens) {
-        this._addTokensToCurrentTurn('out', usage.completionTokens);
+      // For streaming updates, we need to track only the delta
+      // The completionTokens from streaming events are cumulative
+      if (this._currentTurnMetrics && usage.completionTokens) {
+        const deltaTokens = usage.completionTokens - this._lastStreamingTokenCount;
+        if (deltaTokens > 0) {
+          this._addTokensToCurrentTurn('out', deltaTokens);
+          this._lastStreamingTokenCount = usage.completionTokens;
+        }
       }
       this.emit('token_usage_update', { usage });
     };
@@ -762,6 +768,9 @@ export class Agent extends EventEmitter {
       turnId,
     };
 
+    // Reset streaming token count for new turn
+    this._lastStreamingTokenCount = 0;
+
     this.emit('turn_start', { turnId, userInput, metrics: { ...this._currentTurnMetrics } });
     this._startProgressTimer();
   }
@@ -842,12 +851,8 @@ export class Agent extends EventEmitter {
 
     // Use native token counts if available, otherwise estimate
     if (response.usage) {
-      // Add input tokens (context/prompt)
-      if (response.usage.promptTokens) {
-        this._addTokensToCurrentTurn('in', response.usage.promptTokens);
-      }
-
-      // Add output tokens (completion)
+      // Only add completion tokens to turn metrics
+      // promptTokens include entire conversation context, not just current turn
       if (response.usage.completionTokens) {
         this._addTokensToCurrentTurn('out', response.usage.completionTokens);
       }

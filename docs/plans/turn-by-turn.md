@@ -694,6 +694,30 @@ export class Agent extends EventEmitter {
 
 **Verify:** All integration tests pass, manual testing across all providers works smoothly
 
+### Phase 7: Enhanced Token Tracking
+
+**Goals:**
+- Show cumulative session token counts in status bar 
+- Display per-agent token totals in delegate boxes
+- Add progressive token estimation for all providers during streaming
+
+**Implementation:**
+1. Update status bar to show cumulative ↑↓ tokens across all turns
+2. Add token calculation and display to delegation boxes  
+3. Implement progressive token estimation in Anthropic provider
+4. Implement progressive token estimation in OpenAI provider
+5. Implement progressive token estimation in LMStudio provider
+6. Implement progressive token estimation in Ollama provider
+
+**Technical Details:**
+- Status bar tracks cumulative session tokens, updated on turn completion
+- Delegation boxes estimate tokens from timeline content (~4 chars per token)
+- Progressive estimation provides real-time ↑↓ updates during streaming
+- Final provider token counts correct estimates when available
+- All providers now emit `token_usage_update` events progressively
+
+**Verify:** Real-time token updates work across all providers, cumulative counts persist across turns, delegate boxes show accurate per-agent totals
+
 ## Testing Requirements
 
 - **Unit tests**: Every new method and event must have corresponding tests
