@@ -49,7 +49,7 @@ describe('Prompt Configuration', () => {
 
       // Only instructions file should be created (not system-prompt.md)
       expect(fs.existsSync(instructionsPath)).toBe(true);
-      
+
       const systemPromptPath = path.join(tempDir, 'system-prompt.md');
       expect(fs.existsSync(systemPromptPath)).toBe(false);
     });
@@ -165,7 +165,9 @@ Remember to be helpful and accurate.`;
       fs.writeFileSync(path.join(tempDir, 'file.txt'), 'content');
       process.env.LACE_DIR = invalidPath;
 
-      await expect(loadPromptConfig()).rejects.toThrow(/Failed to create Lace configuration directory/);
+      await expect(loadPromptConfig()).rejects.toThrow(
+        /Failed to create Lace configuration directory/
+      );
     });
 
     it('should throw meaningful error if instructions file cannot be created', async () => {

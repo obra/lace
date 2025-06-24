@@ -3,40 +3,44 @@
 
 import { describe, it, expect } from 'vitest';
 import { ProviderMessage } from '../types.js';
-import { 
-  convertToAnthropicFormat, 
-  convertToOpenAIFormat, 
-  convertToTextOnlyFormat 
+import {
+  convertToAnthropicFormat,
+  convertToOpenAIFormat,
+  convertToTextOnlyFormat,
 } from '../format-converters.js';
 
 describe('Provider-Specific Format Conversion', () => {
   const enhancedMessages: ProviderMessage[] = [
-    { 
-      role: 'user', 
-      content: 'Read a file' 
-    },
-    { 
-      role: 'assistant', 
-      content: 'I will read the file for you.',
-      toolCalls: [{
-        id: 'toolu_123',
-        name: 'file_read',
-        input: { path: 'src/tools/types.ts' }
-      }]
-    },
-    { 
-      role: 'user', 
-      content: '',
-      toolResults: [{
-        id: 'toolu_123',
-        output: 'export interface Tool { ... }',
-        success: true
-      }]
+    {
+      role: 'user',
+      content: 'Read a file',
     },
     {
       role: 'assistant',
-      content: 'Here is the content of the file.'
-    }
+      content: 'I will read the file for you.',
+      toolCalls: [
+        {
+          id: 'toolu_123',
+          name: 'file_read',
+          input: { path: 'src/tools/types.ts' },
+        },
+      ],
+    },
+    {
+      role: 'user',
+      content: '',
+      toolResults: [
+        {
+          id: 'toolu_123',
+          output: 'export interface Tool { ... }',
+          success: true,
+        },
+      ],
+    },
+    {
+      role: 'assistant',
+      content: 'Here is the content of the file.',
+    },
   ];
 
   describe('Anthropic format conversion', () => {
@@ -45,137 +49,143 @@ describe('Provider-Specific Format Conversion', () => {
 
       // Expected Anthropic format with content blocks
       expect(anthropicMessages).toEqual([
-        { 
-          role: 'user', 
-          content: 'Read a file' 
+        {
+          role: 'user',
+          content: 'Read a file',
         },
-        { 
-          role: 'assistant', 
+        {
+          role: 'assistant',
           content: [
-            { 
-              type: 'text', 
-              text: 'I will read the file for you.' 
+            {
+              type: 'text',
+              text: 'I will read the file for you.',
             },
-            { 
-              type: 'tool_use', 
+            {
+              type: 'tool_use',
               id: 'toolu_123',
               name: 'file_read',
-              input: { path: 'src/tools/types.ts' }
-            }
-          ]
+              input: { path: 'src/tools/types.ts' },
+            },
+          ],
         },
-        { 
-          role: 'user', 
+        {
+          role: 'user',
           content: [
             {
               type: 'tool_result',
               tool_use_id: 'toolu_123',
-              content: 'export interface Tool { ... }'
-            }
-          ]
+              content: 'export interface Tool { ... }',
+            },
+          ],
         },
-        { 
-          role: 'assistant', 
-          content: 'Here is the content of the file.' 
-        }
+        {
+          role: 'assistant',
+          content: 'Here is the content of the file.',
+        },
       ]);
     });
 
     it('should handle assistant message with only tool calls (no text)', () => {
       const messagesWithToolCallsOnly: ProviderMessage[] = [
-        { 
-          role: 'user', 
-          content: 'Run command' 
+        {
+          role: 'user',
+          content: 'Run command',
         },
-        { 
-          role: 'assistant', 
+        {
+          role: 'assistant',
           content: '', // No text content, just tool call
-          toolCalls: [{
-            id: 'toolu_456',
-            name: 'bash',
-            input: { command: 'ls -la' }
-          }]
-        }
+          toolCalls: [
+            {
+              id: 'toolu_456',
+              name: 'bash',
+              input: { command: 'ls -la' },
+            },
+          ],
+        },
       ];
 
       const anthropicMessages = convertToAnthropicFormat(messagesWithToolCallsOnly);
 
       expect(anthropicMessages).toEqual([
-        { 
-          role: 'user', 
-          content: 'Run command' 
+        {
+          role: 'user',
+          content: 'Run command',
         },
-        { 
-          role: 'assistant', 
+        {
+          role: 'assistant',
           content: [
-            { 
-              type: 'tool_use', 
+            {
+              type: 'tool_use',
               id: 'toolu_456',
               name: 'bash',
-              input: { command: 'ls -la' }
-            }
-          ]
-        }
+              input: { command: 'ls -la' },
+            },
+          ],
+        },
       ]);
     });
 
     it('should handle user message with only tool results (no text)', () => {
       const messagesWithToolResultsOnly: ProviderMessage[] = [
-        { 
-          role: 'user', 
+        {
+          role: 'user',
           content: '', // No text content, just tool result
-          toolResults: [{
-            id: 'toolu_789',
-            output: 'total 24\ndrwxr-xr-x  5 user  staff  160 ...',
-            success: true
-          }]
-        }
+          toolResults: [
+            {
+              id: 'toolu_789',
+              output: 'total 24\ndrwxr-xr-x  5 user  staff  160 ...',
+              success: true,
+            },
+          ],
+        },
       ];
 
       const anthropicMessages = convertToAnthropicFormat(messagesWithToolResultsOnly);
 
       expect(anthropicMessages).toEqual([
-        { 
-          role: 'user', 
+        {
+          role: 'user',
           content: [
             {
               type: 'tool_result',
               tool_use_id: 'toolu_789',
-              content: 'total 24\ndrwxr-xr-x  5 user  staff  160 ...'
-            }
-          ]
-        }
+              content: 'total 24\ndrwxr-xr-x  5 user  staff  160 ...',
+            },
+          ],
+        },
       ]);
     });
 
     it('should handle tool results with errors', () => {
       const messagesWithErrors: ProviderMessage[] = [
-        { 
-          role: 'user', 
+        {
+          role: 'user',
           content: '',
-          toolResults: [{
-            id: 'toolu_error',
-            output: '',
-            success: false,
-            error: 'Permission denied'
-          }]
-        }
+          toolResults: [
+            {
+              id: 'toolu_error',
+              output: '',
+              success: false,
+              error: 'Permission denied',
+            },
+          ],
+        },
       ];
 
       const anthropicMessages = convertToAnthropicFormat(messagesWithErrors);
 
       expect(anthropicMessages).toEqual([
-        { 
-          role: 'user', 
+        {
+          role: 'user',
           content: [
             {
               type: 'tool_result',
               tool_use_id: 'toolu_error',
               content: '',
-              is_error: true
-            }
-          ]
-        }
+              is_error: true,
+            },
+          ],
+        },
       ]);
     });
   });
@@ -186,12 +196,12 @@ describe('Provider-Specific Format Conversion', () => {
 
       // Expected OpenAI format
       expect(openaiMessages).toEqual([
-        { 
-          role: 'user', 
-          content: 'Read a file' 
+        {
+          role: 'user',
+          content: 'Read a file',
         },
-        { 
-          role: 'assistant', 
+        {
+          role: 'assistant',
           content: 'I will read the file for you.',
           tool_calls: [
             {
@@ -199,20 +209,20 @@ describe('Provider-Specific Format Conversion', () => {
               type: 'function',
               function: {
                 name: 'file_read',
-                arguments: JSON.stringify({ path: 'src/tools/types.ts' })
-              }
-            }
-          ]
+                arguments: JSON.stringify({ path: 'src/tools/types.ts' }),
+              },
+            },
+          ],
         },
-        { 
+        {
           role: 'tool',
           tool_call_id: 'toolu_123',
-          content: 'export interface Tool { ... }'
+          content: 'export interface Tool { ... }',
         },
-        { 
-          role: 'assistant', 
-          content: 'Here is the content of the file.' 
-        }
+        {
+          role: 'assistant',
+          content: 'Here is the content of the file.',
+        },
       ]);
     });
   });
@@ -223,59 +233,64 @@ describe('Provider-Specific Format Conversion', () => {
 
       // For providers that don't support tool calling, we fall back to text descriptions
       expect(textMessages).toEqual([
-        { 
-          role: 'user', 
-          content: 'Read a file' 
+        {
+          role: 'user',
+          content: 'Read a file',
         },
-        { 
-          role: 'assistant', 
-          content: 'I will read the file for you.\n\n[Called tool: file_read with input: {"path":"src/tools/types.ts"}]'
+        {
+          role: 'assistant',
+          content:
+            'I will read the file for you.\n\n[Called tool: file_read with input: {"path":"src/tools/types.ts"}]',
         },
-        { 
-          role: 'user', 
-          content: '[Tool result: SUCCESS - export interface Tool { ... }]'
+        {
+          role: 'user',
+          content: '[Tool result: SUCCESS - export interface Tool { ... }]',
         },
-        { 
-          role: 'assistant', 
-          content: 'Here is the content of the file.' 
-        }
+        {
+          role: 'assistant',
+          content: 'Here is the content of the file.',
+        },
       ]);
     });
 
     it('should handle tool results with errors in text format', () => {
       const messagesWithErrors: ProviderMessage[] = [
-        { 
-          role: 'assistant', 
+        {
+          role: 'assistant',
           content: '',
-          toolCalls: [{
-            id: 'toolu_error',
-            name: 'bash',
-            input: { command: 'invalid-cmd' }
-          }]
+          toolCalls: [
+            {
+              id: 'toolu_error',
+              name: 'bash',
+              input: { command: 'invalid-cmd' },
+            },
+          ],
         },
-        { 
-          role: 'user', 
+        {
+          role: 'user',
           content: '',
-          toolResults: [{
-            id: 'toolu_error',
-            output: '',
-            success: false,
-            error: 'Command not found'
-          }]
-        }
+          toolResults: [
+            {
+              id: 'toolu_error',
+              output: '',
+              success: false,
+              error: 'Command not found',
+            },
+          ],
+        },
       ];
 
       const textMessages = convertToTextOnlyFormat(messagesWithErrors);
 
       expect(textMessages).toEqual([
-        { 
-          role: 'assistant', 
-          content: '[Called tool: bash with input: {"command":"invalid-cmd"}]'
+        {
+          role: 'assistant',
+          content: '[Called tool: bash with input: {"command":"invalid-cmd"}]',
         },
-        { 
-          role: 'user', 
-          content: '[Tool result: ERROR -  (Error: Command not found)]'
-        }
+        {
+          role: 'user',
+          content: '[Tool result: ERROR -  (Error: Command not found)]',
+        },
       ]);
     });
   });
@@ -283,79 +298,79 @@ describe('Provider-Specific Format Conversion', () => {
   describe('Multiple tool calls and results grouping', () => {
     it('should handle multiple tool calls in single assistant message', () => {
       const multiToolMessages: ProviderMessage[] = [
-        { 
-          role: 'assistant', 
+        {
+          role: 'assistant',
           content: 'I will read both files.',
           toolCalls: [
             {
               id: 'toolu_file1',
               name: 'file_read',
-              input: { path: 'file1.txt' }
+              input: { path: 'file1.txt' },
             },
             {
               id: 'toolu_file2',
               name: 'file_read',
-              input: { path: 'file2.txt' }
-            }
-          ]
+              input: { path: 'file2.txt' },
+            },
+          ],
         },
-        { 
-          role: 'user', 
+        {
+          role: 'user',
           content: '',
           toolResults: [
             {
               id: 'toolu_file1',
               output: 'Content 1',
-              success: true
+              success: true,
             },
             {
               id: 'toolu_file2',
               output: 'Content 2',
-              success: true
-            }
-          ]
-        }
+              success: true,
+            },
+          ],
+        },
       ];
 
       const anthropicMessages = convertToAnthropicFormat(multiToolMessages);
 
       expect(anthropicMessages).toEqual([
-        { 
-          role: 'assistant', 
+        {
+          role: 'assistant',
           content: [
-            { 
-              type: 'text', 
-              text: 'I will read both files.' 
+            {
+              type: 'text',
+              text: 'I will read both files.',
             },
-            { 
-              type: 'tool_use', 
+            {
+              type: 'tool_use',
               id: 'toolu_file1',
               name: 'file_read',
-              input: { path: 'file1.txt' }
+              input: { path: 'file1.txt' },
             },
-            { 
-              type: 'tool_use', 
+            {
+              type: 'tool_use',
               id: 'toolu_file2',
               name: 'file_read',
-              input: { path: 'file2.txt' }
-            }
-          ]
+              input: { path: 'file2.txt' },
+            },
+          ],
         },
-        { 
-          role: 'user', 
+        {
+          role: 'user',
           content: [
             {
               type: 'tool_result',
               tool_use_id: 'toolu_file1',
-              content: 'Content 1'
+              content: 'Content 1',
             },
             {
               type: 'tool_result',
               tool_use_id: 'toolu_file2',
-              content: 'Content 2'
-            }
-          ]
-        }
+              content: 'Content 2',
+            },
+          ],
+        },
       ]);
     });
   });

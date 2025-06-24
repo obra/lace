@@ -15,7 +15,6 @@ import { DelegateTool } from './tools/implementations/delegate.js';
 import { ThreadManager } from './threads/thread-manager.js';
 import { getLaceDbPath } from './config/lace-dir.js';
 import { logger } from './utils/logger.js';
-import { loadPromptConfig, getUserInstructionsFilePath } from './config/prompts.js';
 import { parseArgs, validateProvider } from './cli/args.js';
 import { TerminalInterface } from './interfaces/terminal/terminal-interface.js';
 import { NonInteractiveInterface } from './interfaces/non-interactive-interface.js';
@@ -25,10 +24,8 @@ import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
 async function createProvider(
   registry: ProviderRegistry,
   providerType: string,
-  model?: string,
-  toolExecutor?: ToolExecutor
+  model?: string
 ): Promise<AIProvider> {
-
   // Get base provider from registry
   const baseProvider = registry.getProvider(providerType);
   if (!baseProvider) {
@@ -87,9 +84,7 @@ async function main() {
   });
 
   // Show configuration file locations on first startup
-  const userInstructionsPath = getUserInstructionsFilePath();
   logger.info('Lace configuration files', {
-    userInstructionsPath,
     laceDir: getEnvVar('LACE_DIR', '~/.lace'),
     note: 'System prompts are generated from templates',
   });
@@ -104,7 +99,7 @@ async function main() {
   const toolExecutor = new ToolExecutor();
   toolExecutor.registerAllAvailableTools();
 
-  const provider = await createProvider(registry, options.provider, options.model, toolExecutor);
+  const provider = await createProvider(registry, options.provider, options.model);
 
   // Create thread manager and start/resume session
   const threadManager = new ThreadManager(getLaceDbPath());
@@ -132,7 +127,6 @@ async function main() {
   } else {
     console.log(`🆕 Starting conversation ${threadId}`);
   }
-
 
   // Create the enhanced Agent
   const agent = new Agent({

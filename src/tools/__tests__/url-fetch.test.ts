@@ -173,9 +173,7 @@ describe('UrlFetchTool', () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain(
-        'Method must be one of: GET, POST'
-      );
+      expect(result.content[0].text).toContain('Method must be one of: GET, POST');
     });
   });
 

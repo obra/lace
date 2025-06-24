@@ -6,7 +6,7 @@ import type { Command, UserInterface } from '../types.js';
 export const compactCommand: Command = {
   name: 'compact',
   description: 'Compress thread history to save tokens',
-  
+
   async execute(args: string, ui: UserInterface): Promise<void> {
     const threadId = ui.agent.threadManager.getCurrentThreadId();
     if (!threadId) {
@@ -30,5 +30,5 @@ export const compactCommand: Command = {
     } else {
       ui.displayMessage(`✅ Compacted thread ${threadId}`);
     }
-  }
+  },
 };

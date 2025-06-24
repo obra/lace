@@ -961,10 +961,10 @@ describe('Enhanced Agent', () => {
       // Manually add system prompt events to thread (simulating what Agent.start() does)
       threadManager.addEvent(threadId, 'SYSTEM_PROMPT', 'You are a helpful AI assistant.');
       threadManager.addEvent(threadId, 'USER_SYSTEM_PROMPT', 'Always be concise.');
-      
+
       // Add a user message
       threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello, how are you?');
-      
+
       // Mock the provider to capture what messages it receives
       const mockCreateResponse = vi.spyOn(mockProvider, 'createResponse');
       mockCreateResponse.mockResolvedValue({
@@ -978,19 +978,19 @@ describe('Enhanced Agent', () => {
 
       // Verify the provider was called
       expect(mockCreateResponse).toHaveBeenCalledTimes(1);
-      
+
       // Get the messages that were sent to the provider
       const [messages] = mockCreateResponse.mock.calls[0];
-      
+
       // Should only contain user messages, not system prompt events
       expect(messages).toHaveLength(2); // Two user messages: existing + new one
       expect(messages[0].role).toBe('user');
       expect(messages[0].content).toBe('Hello, how are you?');
       expect(messages[1].role).toBe('user');
       expect(messages[1].content).toBe('Hello, how are you?');
-      
+
       // Verify no assistant messages from system prompts made it through
-      const assistantMessages = messages.filter(m => m.role === 'assistant');
+      const assistantMessages = messages.filter((m) => m.role === 'assistant');
       expect(assistantMessages).toHaveLength(0);
     });
   });

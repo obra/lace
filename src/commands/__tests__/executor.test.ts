@@ -15,21 +15,21 @@ describe('CommandExecutor', () => {
   beforeEach(() => {
     registry = new CommandRegistry();
     executor = new CommandExecutor(registry);
-    
+
     mockAgent = {
       threadManager: {
         getCurrentThreadId: vi.fn().mockReturnValue('test-thread'),
         generateThreadId: vi.fn().mockReturnValue('new-thread'),
-        createThread: vi.fn()
+        createThread: vi.fn(),
       },
-      providerName: 'test-provider'
+      providerName: 'test-provider',
     };
 
     mockUI = {
       agent: mockAgent,
       displayMessage: vi.fn(),
       clearSession: vi.fn(),
-      exit: vi.fn()
+      exit: vi.fn(),
     };
   });
 
@@ -39,7 +39,7 @@ describe('CommandExecutor', () => {
       expect(result).toEqual({
         command: 'help',
         args: '',
-        argv: []
+        argv: [],
       });
     });
 
@@ -48,7 +48,7 @@ describe('CommandExecutor', () => {
       expect(result).toEqual({
         command: 'test',
         args: 'arg1 arg2',
-        argv: ['arg1', 'arg2']
+        argv: ['arg1', 'arg2'],
       });
     });
 
@@ -57,7 +57,7 @@ describe('CommandExecutor', () => {
       expect(result).toEqual({
         command: 'help',
         args: '',
-        argv: []
+        argv: [],
       });
     });
 
@@ -66,7 +66,7 @@ describe('CommandExecutor', () => {
       expect(result).toEqual({
         command: 'test',
         args: 'arg1 arg2',
-        argv: ['arg1', 'arg2']
+        argv: ['arg1', 'arg2'],
       });
     });
 
@@ -85,7 +85,7 @@ describe('CommandExecutor', () => {
       expect(result).toEqual({
         command: '',
         args: '',
-        argv: []
+        argv: [],
       });
     });
   });
@@ -96,7 +96,7 @@ describe('CommandExecutor', () => {
       const testCommand: Command = {
         name: 'test',
         description: 'Test command',
-        execute: mockExecute
+        execute: mockExecute,
       };
 
       registry.register(testCommand);
@@ -110,7 +110,7 @@ describe('CommandExecutor', () => {
       const testCommand: Command = {
         name: 'test',
         description: 'Test command',
-        execute: mockExecute
+        execute: mockExecute,
       };
 
       registry.register(testCommand);
@@ -125,7 +125,7 @@ describe('CommandExecutor', () => {
         name: 'test',
         description: 'Test command',
         aliases: ['t'],
-        execute: mockExecute
+        execute: mockExecute,
       };
 
       registry.register(testCommand);
@@ -151,7 +151,7 @@ describe('CommandExecutor', () => {
       const testCommand: Command = {
         name: 'test',
         description: 'Test command',
-        execute: vi.fn().mockRejectedValue(error)
+        execute: vi.fn().mockRejectedValue(error),
       };
 
       registry.register(testCommand);
@@ -166,7 +166,7 @@ describe('CommandExecutor', () => {
         description: 'Test command',
         execute: vi.fn().mockImplementation(() => {
           throw new Error('Sync error');
-        })
+        }),
       };
 
       registry.register(testCommand);
@@ -191,7 +191,7 @@ describe('CommandExecutor', () => {
       const testCommand: Command = {
         name: 'test',
         description: '',
-        execute: vi.fn()
+        execute: vi.fn(),
       };
 
       registry.register(testCommand);
@@ -205,7 +205,7 @@ describe('CommandExecutor', () => {
       const testCommand: Command = {
         name: 'test',
         description: 'Test command',
-        execute: mockExecute
+        execute: mockExecute,
       };
 
       registry.register(testCommand);

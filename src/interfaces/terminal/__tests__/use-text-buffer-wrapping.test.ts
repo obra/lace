@@ -14,17 +14,24 @@ describe('useTextBuffer Text Wrapping and Cursor Positioning', () => {
       act(() => {
         const [, ops] = result.current;
         ops.setCursorPosition(0, 5); // After "Short"
-        ops.insertText(' very long text that would wrap in a terminal with limited width like this one here');
+        ops.insertText(
+          ' very long text that would wrap in a terminal with limited width like this one here'
+        );
       });
 
       const [state] = result.current;
       // Should maintain logical cursor position despite potential wrapping
       expect(state.cursorLine).toBe(0);
-      expect(state.cursorColumn).toBe(5 + ' very long text that would wrap in a terminal with limited width like this one here'.length);
+      expect(state.cursorColumn).toBe(
+        5 +
+          ' very long text that would wrap in a terminal with limited width like this one here'
+            .length
+      );
     });
 
     it('should handle cursor movement on very long single lines', () => {
-      const longLine = 'This is a very long line that would definitely wrap in most terminal displays and we need to ensure cursor movement works correctly even when the visual presentation wraps to multiple rows';
+      const longLine =
+        'This is a very long line that would definitely wrap in most terminal displays and we need to ensure cursor movement works correctly even when the visual presentation wraps to multiple rows';
       const { result } = renderHook(() => useTextBuffer(longLine));
 
       act(() => {
@@ -43,7 +50,8 @@ describe('useTextBuffer Text Wrapping and Cursor Positioning', () => {
     });
 
     it('should handle cursor at end of long line', () => {
-      const longLine = 'Another very long line that exceeds typical terminal width and should test edge cases';
+      const longLine =
+        'Another very long line that exceeds typical terminal width and should test edge cases';
       const { result } = renderHook(() => useTextBuffer(longLine));
 
       act(() => {
@@ -81,7 +89,9 @@ describe('useTextBuffer Text Wrapping and Cursor Positioning', () => {
 
   describe('cursor behavior during text insertion in long lines', () => {
     it('should maintain cursor position when inserting in middle of long line', () => {
-      const { result } = renderHook(() => useTextBuffer('Beginning very long content that continues for a while here end'));
+      const { result } = renderHook(() =>
+        useTextBuffer('Beginning very long content that continues for a while here end')
+      );
 
       act(() => {
         const [, ops] = result.current;
@@ -110,7 +120,9 @@ describe('useTextBuffer Text Wrapping and Cursor Positioning', () => {
 
       const [state] = result.current;
       expect(state.cursorLine).toBe(0);
-      expect(state.lines[0]).toBe('Start adding more and more text to make this line extremely long so it would wrap in terminal display');
+      expect(state.lines[0]).toBe(
+        'Start adding more and more text to make this line extremely long so it would wrap in terminal display'
+      );
       expect(state.cursorColumn).toBe(state.lines[0].length);
     });
 
@@ -127,13 +139,16 @@ describe('useTextBuffer Text Wrapping and Cursor Positioning', () => {
       const [state] = result.current;
       expect(state.cursorLine).toBe(0);
       expect(state.cursorColumn).toBe(9);
-      expect(state.lines[0]).toBe('This is along line with multiple words that we will test deletion on');
+      expect(state.lines[0]).toBe(
+        'This is along line with multiple words that we will test deletion on'
+      );
     });
   });
 
   describe('cursor behavior with mixed long and short lines', () => {
     it('should handle cursor movement between long and short lines', () => {
-      const text = 'Short\nThis is a very long line that would wrap in most terminals\nAnother short line';
+      const text =
+        'Short\nThis is a very long line that would wrap in most terminals\nAnother short line';
       const { result } = renderHook(() => useTextBuffer(text));
 
       act(() => {
@@ -160,7 +175,8 @@ describe('useTextBuffer Text Wrapping and Cursor Positioning', () => {
     });
 
     it('should handle cursor wrapping at line boundaries with mixed lengths', () => {
-      const text = 'Short line\nVery long line that extends far beyond normal terminal width and keeps going\nShort';
+      const text =
+        'Short line\nVery long line that extends far beyond normal terminal width and keeps going\nShort';
       const { result } = renderHook(() => useTextBuffer(text));
 
       act(() => {
@@ -255,7 +271,9 @@ describe('useTextBuffer Text Wrapping and Cursor Positioning', () => {
     });
 
     it('should maintain cursor bounds when line shortens due to deletion', () => {
-      const { result } = renderHook(() => useTextBuffer('Very long line with lots of content here'));
+      const { result } = renderHook(() =>
+        useTextBuffer('Very long line with lots of content here')
+      );
 
       act(() => {
         const [, ops] = result.current;

@@ -12,7 +12,7 @@ describe('CLI Auto-Discovery Integration', () => {
   describe('Provider Creation with Auto-Discovery', () => {
     it('should create providers using auto-discovered registry', async () => {
       const registry = await ProviderRegistry.createWithAutoDiscovery();
-      
+
       // Should be able to get all current providers
       expect(registry.getProvider('anthropic')).toBeDefined();
       expect(registry.getProvider('openai')).toBeDefined();
@@ -22,7 +22,7 @@ describe('CLI Auto-Discovery Integration', () => {
 
     it('should handle provider creation with proper configuration', async () => {
       const registry = await ProviderRegistry.createWithAutoDiscovery();
-      
+
       // Test that providers can be retrieved and have correct names
       const anthropicProvider = registry.getProvider('anthropic');
       const openaiProvider = registry.getProvider('openai');
@@ -38,7 +38,7 @@ describe('CLI Auto-Discovery Integration', () => {
     it('should provide list of available provider names', async () => {
       const registry = await ProviderRegistry.createWithAutoDiscovery();
       const providerNames = registry.getProviderNames();
-      
+
       expect(providerNames).toContain('anthropic');
       expect(providerNames).toContain('openai');
       expect(providerNames).toContain('lmstudio');
@@ -48,7 +48,7 @@ describe('CLI Auto-Discovery Integration', () => {
 
     it('should handle unknown provider names gracefully', async () => {
       const registry = await ProviderRegistry.createWithAutoDiscovery();
-      
+
       expect(registry.getProvider('nonexistent')).toBeUndefined();
       expect(registry.getProvider('invalid')).toBeUndefined();
     });
@@ -58,12 +58,12 @@ describe('CLI Auto-Discovery Integration', () => {
     it('should validate provider names against auto-discovered providers', async () => {
       const registry = await ProviderRegistry.createWithAutoDiscovery();
       const availableProviders = registry.getProviderNames();
-      
+
       // Valid providers should be accepted
       for (const providerName of availableProviders) {
         expect(availableProviders).toContain(providerName);
       }
-      
+
       // Invalid providers should be rejected
       expect(availableProviders).not.toContain('nonexistent');
       expect(availableProviders).not.toContain('invalid');
@@ -72,10 +72,10 @@ describe('CLI Auto-Discovery Integration', () => {
     it('should generate dynamic help text from available providers', async () => {
       const registry = await ProviderRegistry.createWithAutoDiscovery();
       const providerNames = registry.getProviderNames();
-      
+
       // Help text should include all discovered providers
       const helpText = `Available providers: ${providerNames.join(', ')}`;
-      
+
       expect(helpText).toContain('anthropic');
       expect(helpText).toContain('openai');
       expect(helpText).toContain('lmstudio');
@@ -85,13 +85,13 @@ describe('CLI Auto-Discovery Integration', () => {
     it('should handle provider validation errors with helpful messages', async () => {
       const registry = await ProviderRegistry.createWithAutoDiscovery();
       const availableProviders = registry.getProviderNames();
-      
+
       // Simulate validation error for unknown provider
       const unknownProvider = 'unknown-provider';
       const isValidProvider = availableProviders.includes(unknownProvider);
-      
+
       expect(isValidProvider).toBe(false);
-      
+
       // Error message should list available providers
       if (!isValidProvider) {
         const errorMessage = `Unknown provider '${unknownProvider}'. Available providers: ${availableProviders.join(', ')}`;
@@ -107,11 +107,11 @@ describe('CLI Auto-Discovery Integration', () => {
     it('should support adding new providers without CLI changes', async () => {
       const registry = await ProviderRegistry.createWithAutoDiscovery();
       const initialProviderCount = registry.getProviderNames().length;
-      
+
       // This test demonstrates that new providers can be discovered
       // without any CLI code changes - they just need to follow the naming convention
       expect(initialProviderCount).toBe(4); // Current providers
-      
+
       // If a new provider file was added, it would be automatically discovered
       // This test verifies the foundation for that capability
     });
@@ -119,11 +119,11 @@ describe('CLI Auto-Discovery Integration', () => {
     it('should maintain provider consistency across registry operations', async () => {
       const registry1 = await ProviderRegistry.createWithAutoDiscovery();
       const registry2 = await ProviderRegistry.createWithAutoDiscovery();
-      
+
       // Both registries should discover the same providers
       const names1 = registry1.getProviderNames().sort();
       const names2 = registry2.getProviderNames().sort();
-      
+
       expect(names1).toEqual(names2);
       expect(names1).toHaveLength(4);
     });

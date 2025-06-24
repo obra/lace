@@ -22,7 +22,7 @@ describe('System Commands', () => {
     registry.register(exitCommand);
     registry.register(clearCommand);
     helpCommand = createHelpCommand(registry);
-    
+
     mockAgent = {
       threadManager: {
         getCurrentThreadId: vi.fn().mockReturnValue('test-thread-123'),
@@ -32,21 +32,21 @@ describe('System Commands', () => {
         getEvents: vi.fn().mockReturnValue([
           {
             type: 'LOCAL_SYSTEM_MESSAGE',
-            data: 'Compacted 5 tool results to save tokens'
-          }
-        ])
+            data: 'Compacted 5 tool results to save tokens',
+          },
+        ]),
       },
       providerName: 'test-provider',
       toolExecutor: {
-        getAllTools: vi.fn().mockReturnValue([])
-      }
+        getAllTools: vi.fn().mockReturnValue([]),
+      },
     };
 
     mockUI = {
       agent: mockAgent,
       displayMessage: vi.fn(),
       clearSession: vi.fn(),
-      exit: vi.fn()
+      exit: vi.fn(),
     };
   });
 
@@ -138,9 +138,7 @@ describe('System Commands', () => {
 
       await statusCommand.execute('', mockUI);
 
-      expect(mockUI.displayMessage).toHaveBeenCalledWith(
-        expect.stringContaining('Thread: none')
-      );
+      expect(mockUI.displayMessage).toHaveBeenCalledWith(expect.stringContaining('Thread: none'));
     });
 
     it('should ignore arguments', async () => {
@@ -164,7 +162,9 @@ describe('System Commands', () => {
 
       expect(mockAgent.threadManager.compact).toHaveBeenCalledWith('test-thread-123');
       expect(mockAgent.threadManager.getEvents).toHaveBeenCalledWith('test-thread-123');
-      expect(mockUI.displayMessage).toHaveBeenCalledWith('✅ Compacted 5 tool results to save tokens');
+      expect(mockUI.displayMessage).toHaveBeenCalledWith(
+        '✅ Compacted 5 tool results to save tokens'
+      );
     });
 
     it('should handle no active thread', async () => {
@@ -188,7 +188,7 @@ describe('System Commands', () => {
     it('should handle events without system message', async () => {
       mockAgent.threadManager.getEvents.mockReturnValue([
         { type: 'USER_MESSAGE', data: 'Hello' },
-        { type: 'AGENT_MESSAGE', data: 'Hi there' }
+        { type: 'AGENT_MESSAGE', data: 'Hi there' },
       ]);
 
       await compactCommand.execute('', mockUI);
@@ -206,16 +206,16 @@ describe('System Commands', () => {
   describe('command structure validation', () => {
     it('should have all required fields for each command', () => {
       const commands = [helpCommand, exitCommand, clearCommand, statusCommand, compactCommand];
-      
-      commands.forEach(command => {
+
+      commands.forEach((command) => {
         expect(command.name).toBeDefined();
         expect(typeof command.name).toBe('string');
         expect(command.name.length).toBeGreaterThan(0);
-        
+
         expect(command.description).toBeDefined();
         expect(typeof command.description).toBe('string');
         expect(command.description.length).toBeGreaterThan(0);
-        
+
         expect(command.execute).toBeDefined();
         expect(typeof command.execute).toBe('function');
       });
@@ -223,14 +223,14 @@ describe('System Commands', () => {
 
     it('should have unique command names', () => {
       const commands = [helpCommand, exitCommand, clearCommand, statusCommand, compactCommand];
-      const names = commands.map(cmd => cmd.name);
+      const names = commands.map((cmd) => cmd.name);
       const uniqueNames = new Set(names);
       expect(uniqueNames.size).toBe(names.length);
     });
 
     it('should not have aliases defined (per YAGNI)', () => {
       const commands = [helpCommand, exitCommand, clearCommand, statusCommand, compactCommand];
-      commands.forEach(command => {
+      commands.forEach((command) => {
         expect(command.aliases).toBeUndefined();
       });
     });

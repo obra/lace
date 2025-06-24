@@ -96,7 +96,7 @@ describe('ProviderRegistry', () => {
     it('should discover and register all existing provider files', async () => {
       const registry = await ProviderRegistry.createWithAutoDiscovery();
       const providerNames = registry.getProviderNames();
-      
+
       expect(providerNames).toContain('anthropic');
       expect(providerNames).toContain('openai');
       expect(providerNames).toContain('lmstudio');
@@ -106,7 +106,7 @@ describe('ProviderRegistry', () => {
 
     it('should register providers with correct instances', async () => {
       const registry = await ProviderRegistry.createWithAutoDiscovery();
-      
+
       const anthropicProvider = registry.getProvider('anthropic');
       const openaiProvider = registry.getProvider('openai');
       const lmstudioProvider = registry.getProvider('lmstudio');
@@ -126,7 +126,7 @@ describe('ProviderRegistry', () => {
     it('should only discover files matching *-provider.ts pattern', async () => {
       const registry = await ProviderRegistry.createWithAutoDiscovery();
       const providerNames = registry.getProviderNames();
-      
+
       // Should not include non-provider files like types.ts, registry.ts, etc.
       expect(providerNames).not.toContain('types');
       expect(providerNames).not.toContain('registry');
@@ -153,7 +153,7 @@ describe('ProviderRegistry', () => {
       class AlmostProvider {
         providerName = 'test';
       }
-      
+
       expect(ProviderRegistry.isProviderClass(NotAProvider)).toBe(false);
       expect(ProviderRegistry.isProviderClass(AlmostProvider)).toBe(false);
     });
