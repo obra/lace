@@ -87,7 +87,7 @@ jobs:
 
       - name: Run integration tests
         if: matrix.test-group == 'integration'
-        run: npm run test:run -- --include "**/integration.test.ts" --include "**/cli-integration*" --include "**/delegation-integration*" --include "**/turn-tracking-integration*" --include "**/sigint-integration*" --include "**/progress-display-integration*" --include "**/turn-state-integration*" --include "**/auto-discovery-integration*" --include "**/help-integration*" --include "**/tool-approval-integration*"
+        run: npm run test:run -- "**/integration.test.ts" "**/cli-integration*" "**/delegation-integration*" "**/turn-tracking-integration*" "**/sigint-integration*" "**/progress-display-integration*" "**/turn-state-integration*" "**/auto-discovery-integration*" "**/help-integration*" "**/tool-approval-integration*"
 
   test-coverage:
     name: Test Coverage
