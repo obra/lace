@@ -8,6 +8,7 @@ import useStdoutDimensions from "../../utils/use-stdout-dimensions.js";
 import ShellInput from "./components/shell-input.js";
 import ToolApprovalModal from "./components/tool-approval-modal.js";
 import { ConversationDisplay } from "./components/events/ConversationDisplay.js";
+import { withFullScreen } from "fullscreen-ink";
 import StatusBar from "./components/status-bar.js";
 import { Agent, CurrentTurnMetrics } from "../../agents/agent.js";
 import { ApprovalCallback, ApprovalDecision } from "../../tools/approval-types.js";
@@ -648,7 +649,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             />
 
             {/* Input area - takes natural height */}
-            <Box padding={1}>
+            <Box>
               <ShellInput
                 value={currentInput}
                 placeholder={
@@ -697,7 +698,7 @@ export class TerminalInterface implements ApprovalCallback {
     this.isRunning = true;
 
     // Render the Ink app with custom Ctrl+C handling
-    render(
+    withFullScreen(
       <TerminalInterfaceComponent
         agent={this.agent}
         approvalCallback={this}
@@ -705,7 +706,7 @@ export class TerminalInterface implements ApprovalCallback {
       {
         exitOnCtrlC: false, // Disable Ink's default Ctrl+C exit behavior
       }
-    );
+    ).start();
 
     // Keep the process running
     await new Promise<void>((resolve) => {
