@@ -99,10 +99,23 @@ export class OllamaProvider extends AIProvider {
     }
 
     // Convert messages to Ollama format
-    const ollamaMessages = messages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
+    const ollamaMessages = [];
+
+    // Add system prompt if configured
+    if (this._systemPrompt) {
+      ollamaMessages.push({
+        role: 'system',
+        content: this._systemPrompt,
+      });
+    }
+
+    // Add conversation messages
+    ollamaMessages.push(
+      ...messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }))
+    );
 
     logger.debug('Sending request to Ollama', {
       provider: 'ollama',
@@ -202,10 +215,23 @@ export class OllamaProvider extends AIProvider {
     }
 
     // Convert messages to Ollama format
-    const ollamaMessages = messages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
+    const ollamaMessages = [];
+
+    // Add system prompt if configured
+    if (this._systemPrompt) {
+      ollamaMessages.push({
+        role: 'system',
+        content: this._systemPrompt,
+      });
+    }
+
+    // Add conversation messages
+    ollamaMessages.push(
+      ...messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }))
+    );
 
     logger.debug('Sending streaming request to Ollama', {
       provider: 'ollama',

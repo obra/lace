@@ -220,6 +220,8 @@ describe('Delegation Integration Tests', () => {
       tools: toolExecutor.getAllTools(),
     });
 
+    await agent.start();
+
     // Add initial user message
     threadManager.addEvent(agent.threadId, 'USER_MESSAGE', 'Please analyze the code structure');
 

@@ -33,6 +33,11 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
   const [itemPositions, setItemPositions] = useState<number[]>([]);
   const [totalContentHeight, setTotalContentHeight] = useState<number>(0);
   
+  // Force re-measurement when CollapsibleBox components expand/collapse
+  const [measurementTrigger, setMeasurementTrigger] = useState<number>(0);
+  const [itemToRefocusAfterMeasurement, setItemToRefocusAfterMeasurement] = useState<number>(-1);
+  const [lastTimelineItemCount, setLastTimelineItemCount] = useState<number>(0);
+  
   // Measure scroll indicator heights
   const topIndicatorRef = useRef<any>(null);
   const bottomIndicatorRef = useRef<any>(null);
@@ -67,7 +72,27 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
     
     setItemPositions(positions);
     setTotalContentHeight(currentPosition);
-  }, [timeline.items, itemRefs]);
+  }, [timeline.items, itemRefs, measurementTrigger]);
+  
+  // After re-measurement, refocus on the first line of the remembered item
+  useEffect(() => {
+    if (itemToRefocusAfterMeasurement >= 0 && itemPositions.length > 0) {
+      const newItemStart = itemPositions[itemToRefocusAfterMeasurement];
+      logger.debug('CollapsibleBox toggle - after remeasurement', {
+        itemToRefocusAfterMeasurement,
+        newItemStart,
+        itemPositions: itemPositions.slice(0, 5),
+        willSetFocusedLine: newItemStart
+      });
+      if (newItemStart !== undefined) {
+        setFocusedLine(newItemStart);
+        // Reset flag after a delay
+        setTimeout(() => {
+          setItemToRefocusAfterMeasurement(-1);
+        }, 50);
+      }
+    }
+  }, [itemPositions, itemToRefocusAfterMeasurement]);
   
   // Measure scroll indicator heights
   useEffect(() => {
@@ -90,18 +115,45 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
     }
   }, [focusedLine, viewportLines]);
   
-  // Initialize to bottom when content changes
+  // Track timeline item count changes to distinguish new content vs. height changes
   useEffect(() => {
-    if (totalContentHeight > 0) {
-      // Start at the bottom of content
+    setLastTimelineItemCount(timeline.items.length);
+  }, [timeline.items.length]);
+  
+  // Initialize to bottom when NEW CONTENT is added (but not during refocus after toggle)
+  useEffect(() => {
+    const hasNewContent = timeline.items.length > lastTimelineItemCount;
+    
+    if (totalContentHeight > 0 && itemToRefocusAfterMeasurement === -1 && hasNewContent) {
+      // Only scroll to bottom for NEW timeline items, not height changes due to expansion
       const bottomLine = Math.max(0, totalContentHeight - 1);
+      logger.debug('Auto-scroll to bottom triggered', {
+        totalContentHeight,
+        bottomLine,
+        itemToRefocusAfterMeasurement,
+        hasNewContent,
+        timelineItemCount: timeline.items.length,
+        lastTimelineItemCount,
+        willSetFocusedLine: bottomLine
+      });
       setFocusedLine(bottomLine);
       
       // Scroll to show the bottom
       const maxScroll = Math.max(0, totalContentHeight - viewportLines);
       setLineScrollOffset(maxScroll);
+    } else {
+      logger.debug('Auto-scroll to bottom skipped', {
+        totalContentHeight,
+        itemToRefocusAfterMeasurement,
+        hasNewContent,
+        timelineItemCount: timeline.items.length,
+        lastTimelineItemCount,
+        reason: totalContentHeight <= 0 ? 'no content' : 
+                !hasNewContent ? 'no new content (height change only)' :
+                'refocus in progress'
+      });
     }
-  }, [totalContentHeight, viewportLines]); // When content height changes, scroll to bottom
+  }, [totalContentHeight, viewportLines, itemToRefocusAfterMeasurement, timeline.items.length, lastTimelineItemCount]); // When content height changes, scroll to bottom
   
   // Handle keyboard navigation - only register when focused and has content
   useInput(useCallback((input, key) => {
@@ -150,6 +202,20 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
   }, [focusedLine, itemPositions, totalContentHeight]);
   
   const focusedItemIndex = getFocusedItemIndex();
+  
+  // Define triggerRemeasurement after getFocusedItemIndex is available
+  const triggerRemeasurement = useCallback(() => {
+    // Remember which item is currently focused before re-measurement
+    const currentFocusedItemIndex = getFocusedItemIndex();
+    logger.debug('CollapsibleBox toggle - before remeasurement', {
+      currentFocusedItemIndex,
+      focusedLine,
+      totalContentHeight,
+      itemPositions: itemPositions.slice(0, 5) // First 5 to avoid spam
+    });
+    setItemToRefocusAfterMeasurement(currentFocusedItemIndex);
+    setMeasurementTrigger(prev => prev + 1);
+  }, [getFocusedItemIndex, focusedLine, totalContentHeight, itemPositions]);
   
   // Debug: Log delegate timelines info
   logger.debug('TimelineDisplay rendering', {
@@ -205,6 +271,7 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
                   isFocused={isItemFocused}
                   focusedLine={focusedLine}
                   itemStartLine={itemPositions[index] || 0}
+                  onToggle={triggerRemeasurement}
                 />
               </Box>
             );
@@ -235,12 +302,13 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
   );
 }
 
-function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, itemStartLine }: { 
+function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, itemStartLine, onToggle }: { 
   item: TimelineItem; 
   delegateTimelines?: Map<string, Timeline>;
   isFocused: boolean;
   focusedLine: number;
   itemStartLine: number;
+  onToggle?: () => void;
 }) {
   switch (item.type) {
     case 'user_message':
@@ -255,6 +323,7 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
         isFocused={isFocused}
         focusedLine={focusedLine}
         itemStartLine={itemStartLine}
+        onToggle={onToggle}
       />;
       
     case 'agent_message':
@@ -269,6 +338,7 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
         isFocused={isFocused}
         focusedLine={focusedLine}
         itemStartLine={itemStartLine}
+        onToggle={onToggle}
       />;
       
     case 'thinking':
@@ -283,6 +353,7 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
         isFocused={isFocused}
         focusedLine={focusedLine}
         itemStartLine={itemStartLine}
+        onToggle={onToggle}
       />;
       
     case 'system_message':
@@ -290,13 +361,14 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
         event={{
           id: item.id,
           threadId: '',
-          type: 'LOCAL_SYSTEM_MESSAGE',
+          type: (item.originalEventType || 'LOCAL_SYSTEM_MESSAGE') as any,
           timestamp: item.timestamp,
           data: item.content
         }} 
         isFocused={isFocused}
         focusedLine={focusedLine}
         itemStartLine={itemStartLine}
+        onToggle={onToggle}
       />;
       
     case 'tool_execution':

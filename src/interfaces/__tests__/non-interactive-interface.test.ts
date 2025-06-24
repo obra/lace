@@ -35,7 +35,7 @@ describe('NonInteractiveInterface', () => {
   describe('executePrompt', () => {
     it('should execute single prompt and exit gracefully', async () => {
       const agentSendSpy = vi.spyOn(agent, 'sendMessage').mockResolvedValue();
-      const agentStartSpy = vi.spyOn(agent, 'start').mockImplementation(() => {});
+      const agentStartSpy = vi.spyOn(agent, 'start').mockImplementation(async () => {});
 
       await nonInteractive.executePrompt('Test prompt');
 
@@ -48,14 +48,14 @@ describe('NonInteractiveInterface', () => {
 
     it('should handle errors during prompt execution', async () => {
       vi.spyOn(agent, 'sendMessage').mockRejectedValue(new Error('Test error'));
-      vi.spyOn(agent, 'start').mockImplementation(() => {});
+      vi.spyOn(agent, 'start').mockImplementation(async () => {});
 
       await expect(nonInteractive.executePrompt('Test prompt')).rejects.toThrow('Test error');
     });
 
     it('should display provider information', async () => {
       vi.spyOn(agent, 'sendMessage').mockResolvedValue();
-      vi.spyOn(agent, 'start').mockImplementation(() => {});
+      vi.spyOn(agent, 'start').mockImplementation(async () => {});
 
       await nonInteractive.executePrompt('Test prompt');
 
@@ -66,7 +66,7 @@ describe('NonInteractiveInterface', () => {
       const nonInteractiveWithoutTools = new NonInteractiveInterface(agent);
 
       vi.spyOn(agent, 'sendMessage').mockResolvedValue();
-      vi.spyOn(agent, 'start').mockImplementation(() => {});
+      vi.spyOn(agent, 'start').mockImplementation(async () => {});
 
       await nonInteractiveWithoutTools.executePrompt('Test prompt');
 

@@ -10,6 +10,8 @@ import { UserMessageDisplay } from './UserMessageDisplay.js';
 import { AgentMessageDisplay } from './AgentMessageDisplay.js';
 import { SystemMessageDisplay } from './SystemMessageDisplay.js';
 import { ThinkingDisplay } from './ThinkingDisplay.js';
+import { SystemPromptDisplay } from './SystemPromptDisplay.js';
+import { UserSystemPromptDisplay } from './UserSystemPromptDisplay.js';
 
 interface EventDisplayProps {
   event: ThreadEvent;
@@ -17,9 +19,10 @@ interface EventDisplayProps {
   isFocused?: boolean;
   focusedLine?: number;
   itemStartLine?: number;
+  onToggle?: () => void;
 }
 
-export function EventDisplay({ event, isStreaming, isFocused, focusedLine, itemStartLine }: EventDisplayProps) {
+export function EventDisplay({ event, isStreaming, isFocused, focusedLine, itemStartLine, onToggle }: EventDisplayProps) {
   const componentMap = {
     'TOOL_CALL': ToolCallDisplay,
     'TOOL_RESULT': ToolResultDisplay,
@@ -27,6 +30,8 @@ export function EventDisplay({ event, isStreaming, isFocused, focusedLine, itemS
     'AGENT_MESSAGE': AgentMessageDisplay,
     'LOCAL_SYSTEM_MESSAGE': SystemMessageDisplay,
     'THINKING': ThinkingDisplay,
+    'SYSTEM_PROMPT': SystemPromptDisplay,
+    'USER_SYSTEM_PROMPT': UserSystemPromptDisplay,
   } as const;
 
   const Component = componentMap[event.type];
@@ -44,7 +49,7 @@ export function EventDisplay({ event, isStreaming, isFocused, focusedLine, itemS
 
   return (
     <Box flexDirection="column">
-      <Component event={event} isStreaming={isStreaming} isFocused={isFocused} />
+      <Component event={event} isStreaming={isStreaming} isFocused={isFocused} onToggle={onToggle} />
     </Box>
   );
 }

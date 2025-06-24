@@ -36,7 +36,7 @@ export class NonInteractiveInterface implements UserInterface {
     console.log(`🤖 Lace Agent using ${this.agent.providerName} provider.\n`);
 
     // Start agent and process the prompt
-    this.agent.start();
+    await this.agent.start();
     await this.agent.sendMessage(prompt);
 
     // Save and exit

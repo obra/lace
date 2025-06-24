@@ -1,5 +1,3 @@
-# Lace AI Coding Assistant
-
 {{include:sections/agent-personality.md}}
 
 {{include:sections/environment.md}}

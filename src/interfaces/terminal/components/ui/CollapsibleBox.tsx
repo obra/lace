@@ -11,6 +11,8 @@ interface CollapsibleBoxProps {
   maxHeight?: number;
   borderStyle?: 'single' | 'double' | 'round';
   borderColor?: string;
+  isFocused?: boolean; // Whether this specific box is focused
+  onToggle?: () => void; // Called when expanded/collapsed to trigger height re-measurement
 }
 
 export function CollapsibleBox({ 
@@ -19,15 +21,18 @@ export function CollapsibleBox({
   defaultExpanded = true,
   maxHeight,
   borderStyle = 'single',
-  borderColor = 'gray'
+  borderColor = 'gray',
+  isFocused = false,
+  onToggle
 }: CollapsibleBoxProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   
   useInput((input, key) => {
     if (key.return && label) {
       setIsExpanded(!isExpanded);
+      onToggle?.(); // Notify parent of height change
     }
-  });
+  }, { isActive: isFocused });
   
   return (
     <Box flexDirection="column">

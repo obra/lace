@@ -55,7 +55,7 @@ describe('Agent Token Budget Integration', () => {
   let threadManager: ThreadManager;
   const threadId = 'test-thread-budget';
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockProvider = new MockProvider();
     toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
@@ -76,7 +76,7 @@ describe('Agent Token Budget Integration', () => {
     };
 
     agent = new Agent(config);
-    agent.start();
+    await agent.start();
   });
 
   it('should track token usage from provider responses', async () => {
@@ -233,7 +233,7 @@ describe('Agent Token Budget Integration', () => {
     };
 
     const agentNoBudget = new Agent(configWithoutBudget);
-    agentNoBudget.start();
+    await agentNoBudget.start();
 
     mockProvider.setNextResponse({
       content: 'Response',

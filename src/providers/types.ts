@@ -60,6 +60,7 @@ export interface StreamingEvents {
 
 export abstract class AIProvider extends EventEmitter {
   protected readonly _config: ProviderConfig;
+  protected _systemPrompt: string = '';
 
   constructor(config: ProviderConfig) {
     super();
@@ -85,6 +86,15 @@ export abstract class AIProvider extends EventEmitter {
   // Access to configuration for streaming checks
   get config(): ProviderConfig {
     return this._config;
+  }
+
+  // System prompt management
+  setSystemPrompt(systemPrompt: string): void {
+    this._systemPrompt = systemPrompt;
+  }
+
+  get systemPrompt(): string {
+    return this._systemPrompt;
   }
 
   abstract get providerName(): string;
