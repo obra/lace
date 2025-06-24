@@ -70,6 +70,14 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
+      - name: Install system dependencies
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update && sudo apt-get install -y ripgrep
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew install ripgrep
+          fi
+
       - name: Install dependencies
         run: npm ci
 
@@ -93,6 +101,14 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+
+      - name: Install system dependencies
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update && sudo apt-get install -y ripgrep
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew install ripgrep
+          fi
 
       - name: Install dependencies
         run: npm ci
@@ -156,6 +172,14 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+
+      - name: Install system dependencies
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update && sudo apt-get install -y ripgrep
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew install ripgrep
+          fi
 
       - name: Install dependencies
         run: npm ci
