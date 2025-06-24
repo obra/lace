@@ -105,7 +105,7 @@ describe('AnthropicProvider', () => {
           description: 'A test tool',
           input_schema: mockTool.input_schema,
         }],
-      });
+      }, { signal: undefined });
     });
 
     it('should handle tool calls in response', async () => {
@@ -196,7 +196,7 @@ describe('AnthropicProvider', () => {
           description: 'A test tool',
           input_schema: mockTool.input_schema,
         }],
-      });
+      }, { signal: undefined });
     });
 
     it('should emit token events during streaming', async () => {

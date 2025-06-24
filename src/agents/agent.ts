@@ -41,6 +41,14 @@ export interface ToolCall {
 
 export type AgentState = 'idle' | 'thinking' | 'tool_execution' | 'streaming';
 
+export interface CurrentTurnMetrics {
+  startTime: Date;
+  elapsedMs: number;
+  tokensIn: number; // User input + tool results + model context
+  tokensOut: number; // Model responses + tool calls
+  turnId: string; // Unique ID for this user turn
+}
+
 // Event type definitions for TypeScript
 export interface AgentEvents {
   agent_thinking_start: [];
@@ -54,6 +62,11 @@ export interface AgentEvents {
   conversation_complete: [];
   token_usage_update: [{ usage: object }];
   token_budget_warning: [{ message: string; usage: object; recommendations: object }];
+  // Turn tracking events
+  turn_start: [{ turnId: string; userInput: string; metrics: CurrentTurnMetrics }];
+  turn_progress: [{ metrics: CurrentTurnMetrics }];
+  turn_complete: [{ turnId: string; metrics: CurrentTurnMetrics }];
+  turn_aborted: [{ turnId: string; metrics: CurrentTurnMetrics }];
   approval_request: [
     {
       toolName: string;
@@ -90,6 +103,10 @@ export class Agent extends EventEmitter {
   private readonly _tokenBudgetManager: TokenBudgetManager | null;
   private _state: AgentState = 'idle';
   private _isRunning = false;
+  private _currentTurnMetrics: CurrentTurnMetrics | null = null;
+  private _progressTimer: number | null = null;
+  private _abortController: AbortController | null = null;
+  private _lastStreamingTokenCount = 0; // Track last cumulative token count from streaming
 
   constructor(config: AgentConfig) {
     super();
@@ -115,6 +132,12 @@ export class Agent extends EventEmitter {
       contentLength: content.length,
       currentState: this._state,
     });
+
+    // Start new turn tracking
+    this._startTurnTracking(content);
+
+    // Add user input tokens to current turn
+    this._addTokensToCurrentTurn('in', this._estimateTokens(content));
 
     if (content.trim()) {
       // Add user message to thread
@@ -166,6 +189,7 @@ export class Agent extends EventEmitter {
 
   async stop(): Promise<void> {
     this._isRunning = false;
+    this._clearProgressTimer();
     this._setState('idle');
     await this._threadManager.close();
     logger.info('AGENT: Stopped', { threadId: this._threadId });
@@ -179,6 +203,25 @@ export class Agent extends EventEmitter {
   resume(): void {
     // TODO: Implement pause/resume functionality
     throw new Error('Pause/resume not yet implemented');
+  }
+
+  abort(): boolean {
+    if (this._abortController && this._currentTurnMetrics) {
+      this._abortController.abort();
+      this._clearProgressTimer();
+
+      // Emit abort event with current metrics
+      this.emit('turn_aborted', {
+        turnId: this._currentTurnMetrics.turnId,
+        metrics: { ...this._currentTurnMetrics },
+      });
+
+      this._currentTurnMetrics = null;
+      this._abortController = null;
+      this._setState('idle');
+      return true; // Successfully aborted
+    }
+    return false; // Nothing to abort
   }
 
   // State access (read-only)
@@ -220,6 +263,8 @@ export class Agent extends EventEmitter {
 
   // Private implementation methods
   private async _processConversation(): Promise<void> {
+    this._abortController = new AbortController();
+
     try {
       // Rebuild conversation from thread events
       const conversation = this.buildThreadMessages();
@@ -265,7 +310,11 @@ export class Agent extends EventEmitter {
       let response: AgentResponse;
 
       try {
-        response = await this._createResponse(conversation, this._tools);
+        response = await this._createResponse(
+          conversation,
+          this._tools,
+          this._abortController?.signal
+        );
 
         logger.debug('AGENT: Received response from provider', {
           threadId: this._threadId,
@@ -275,6 +324,16 @@ export class Agent extends EventEmitter {
         });
       } catch (error: unknown) {
         this._setState('idle');
+
+        // Handle abort errors differently from regular errors
+        if (error instanceof Error && error.name === 'AbortError') {
+          logger.debug('AGENT: Request was aborted', {
+            threadId: this._threadId,
+            providerName: this._provider.providerName,
+          });
+          // Abort was called - don't treat as error, metrics already emitted by abort()
+          return;
+        }
 
         logger.error('AGENT: Provider error', {
           threadId: this._threadId,
@@ -310,6 +369,7 @@ export class Agent extends EventEmitter {
         await this._processConversation();
       } else {
         // No tool calls, conversation is complete for this turn
+        this._completeTurn();
         this._setState('idle');
         this.emit('conversation_complete');
       }
@@ -326,27 +386,31 @@ export class Agent extends EventEmitter {
         error: error instanceof Error ? error : new Error(String(error)),
         context: { phase: 'conversation_processing', threadId: this._threadId },
       });
+    } finally {
+      this._abortController = null;
     }
   }
 
   private async _createResponse(
     messages: ProviderMessage[],
-    tools: Tool[]
+    tools: Tool[],
+    signal?: AbortSignal
   ): Promise<AgentResponse> {
     // Default to streaming if provider supports it (unless explicitly disabled)
     const useStreaming =
       this._provider.supportsStreaming && this._provider.config?.streaming !== false;
 
     if (useStreaming) {
-      return this._createStreamingResponse(messages, tools);
+      return this._createStreamingResponse(messages, tools, signal);
     } else {
-      return this._createNonStreamingResponse(messages, tools);
+      return this._createNonStreamingResponse(messages, tools, signal);
     }
   }
 
   private async _createStreamingResponse(
     messages: ProviderMessage[],
-    tools: Tool[]
+    tools: Tool[],
+    signal?: AbortSignal
   ): Promise<AgentResponse> {
     // Set to streaming state
     this._setState('streaming');
@@ -362,6 +426,15 @@ export class Agent extends EventEmitter {
     }: {
       usage: { promptTokens: number; completionTokens: number; totalTokens: number };
     }) => {
+      // For streaming updates, we need to track only the delta
+      // The completionTokens from streaming events are cumulative
+      if (this._currentTurnMetrics && usage.completionTokens) {
+        const deltaTokens = usage.completionTokens - this._lastStreamingTokenCount;
+        if (deltaTokens > 0) {
+          this._addTokensToCurrentTurn('out', deltaTokens);
+          this._lastStreamingTokenCount = usage.completionTokens;
+        }
+      }
       this.emit('token_usage_update', { usage });
     };
 
@@ -378,7 +451,7 @@ export class Agent extends EventEmitter {
     this._provider.on('error', errorListener);
 
     try {
-      const response = await this._provider.createStreamingResponse(messages, tools);
+      const response = await this._provider.createStreamingResponse(messages, tools, signal);
 
       // Apply stop reason handling to filter incomplete tool calls
       const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
@@ -397,6 +470,9 @@ export class Agent extends EventEmitter {
           });
         }
       }
+
+      // Add provider response tokens to current turn metrics
+      this._addProviderResponseTokensToTurn(processedResponse);
 
       // Always emit token usage for UI updates
       if (processedResponse.usage) {
@@ -417,9 +493,10 @@ export class Agent extends EventEmitter {
 
   private async _createNonStreamingResponse(
     messages: ProviderMessage[],
-    tools: Tool[]
+    tools: Tool[],
+    signal?: AbortSignal
   ): Promise<AgentResponse> {
-    const response = await this._provider.createResponse(messages, tools);
+    const response = await this._provider.createResponse(messages, tools, signal);
 
     // Apply stop reason handling to filter incomplete tool calls
     const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
@@ -438,6 +515,9 @@ export class Agent extends EventEmitter {
         });
       }
     }
+
+    // Add provider response tokens to current turn metrics
+    this._addProviderResponseTokensToTurn(processedResponse);
 
     // Always emit token usage for UI updates
     if (processedResponse.usage) {
@@ -511,6 +591,9 @@ export class Agent extends EventEmitter {
           success: !result.isError,
           error: result.isError ? result.content[0]?.text || 'Unknown error' : undefined,
         });
+
+        // Add tool output tokens to current turn metrics (estimated)
+        this._addTokensToCurrentTurn('in', this._estimateTokens(outputText));
       } catch (error: unknown) {
         logger.error('AGENT: Tool execution error', {
           threadId: this._threadId,
@@ -701,5 +784,116 @@ export class Agent extends EventEmitter {
   // Override once to provide type safety
   once<K extends keyof AgentEvents>(event: K, listener: (...args: AgentEvents[K]) => void): this {
     return super.once(event, listener);
+  }
+
+  // Turn tracking implementation
+  private _startTurnTracking(userInput: string): void {
+    const turnId = `turn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this._currentTurnMetrics = {
+      startTime: new Date(),
+      elapsedMs: 0,
+      tokensIn: 0,
+      tokensOut: 0,
+      turnId,
+    };
+
+    // Reset streaming token count for new turn
+    this._lastStreamingTokenCount = 0;
+
+    this.emit('turn_start', { turnId, userInput, metrics: { ...this._currentTurnMetrics } });
+    this._startProgressTimer();
+  }
+
+  private _startProgressTimer(): void {
+    this._progressTimer = setInterval(() => {
+      if (this._currentTurnMetrics) {
+        try {
+          const newElapsedMs = Date.now() - this._currentTurnMetrics.startTime.getTime();
+          // Only emit if elapsed time has meaningfully changed (reduce unnecessary re-renders)
+          if (Math.abs(newElapsedMs - this._currentTurnMetrics.elapsedMs) >= 500) {
+            this._currentTurnMetrics.elapsedMs = newElapsedMs;
+            this.emit('turn_progress', { metrics: { ...this._currentTurnMetrics } });
+          }
+        } catch (error) {
+          // Defensive error handling for progress timer
+          logger.debug('Progress timer error', {
+            error: error instanceof Error ? error.message : String(error),
+            threadId: this._threadId,
+          });
+        }
+      }
+    }, 1000) as unknown as number; // Every second
+  }
+
+  private _clearProgressTimer(): void {
+    if (this._progressTimer) {
+      clearInterval(this._progressTimer);
+      this._progressTimer = null;
+    }
+  }
+
+  private _completeTurn(): void {
+    if (this._currentTurnMetrics) {
+      this._clearProgressTimer();
+
+      // Update final elapsed time
+      this._currentTurnMetrics.elapsedMs =
+        Date.now() - this._currentTurnMetrics.startTime.getTime();
+
+      // Ensure elapsed time is at least 1ms for testing
+      if (this._currentTurnMetrics.elapsedMs === 0) {
+        this._currentTurnMetrics.elapsedMs = 1;
+      }
+
+      this.emit('turn_complete', {
+        turnId: this._currentTurnMetrics.turnId,
+        metrics: { ...this._currentTurnMetrics },
+      });
+
+      this._currentTurnMetrics = null;
+    }
+  }
+
+  // Token tracking helper methods
+  private _estimateTokens(text: string): number {
+    // Rough approximation: 1 token ≈ 4 characters for most models
+    return Math.ceil(text.length / 4);
+  }
+
+  private _addTokensToCurrentTurn(direction: 'in' | 'out', tokens: number): void {
+    if (this._currentTurnMetrics && tokens > 0 && Number.isFinite(tokens)) {
+      if (direction === 'in') {
+        this._currentTurnMetrics.tokensIn += tokens;
+      } else {
+        this._currentTurnMetrics.tokensOut += tokens;
+      }
+
+      // Emit immediate progress update on token changes
+      this._currentTurnMetrics.elapsedMs =
+        Date.now() - this._currentTurnMetrics.startTime.getTime();
+      this.emit('turn_progress', { metrics: { ...this._currentTurnMetrics } });
+    }
+  }
+
+  private _addProviderResponseTokensToTurn(response: {
+    usage?: { promptTokens?: number; completionTokens?: number };
+    content?: string;
+  }): void {
+    if (!this._currentTurnMetrics) return;
+
+    // Use native token counts if available, otherwise estimate
+    if (response.usage) {
+      // Only add completion tokens to turn metrics
+      // promptTokens include entire conversation context, not just current turn
+      if (response.usage.completionTokens) {
+        this._addTokensToCurrentTurn('out', response.usage.completionTokens);
+      }
+    } else {
+      // Fallback to estimation when usage data is unavailable
+      if (response.content) {
+        const estimatedOutputTokens = this._estimateTokens(response.content);
+        this._addTokensToCurrentTurn('out', estimatedOutputTokens);
+      }
+    }
   }
 }

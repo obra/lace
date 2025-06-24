@@ -50,7 +50,11 @@ export class OpenAIProvider extends AIProvider {
     return true;
   }
 
-  async createResponse(messages: ProviderMessage[], tools: Tool[] = []): Promise<ProviderResponse> {
+  async createResponse(
+    messages: ProviderMessage[],
+    tools: Tool[] = [],
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> {
     // Convert our enhanced generic messages to OpenAI format
     const openaiMessages = convertToOpenAIFormat(
       messages
@@ -99,9 +103,9 @@ export class OpenAIProvider extends AIProvider {
       payload: JSON.stringify(requestPayload, null, 2),
     });
 
-    const response = (await this._openai.chat.completions.create(
-      requestPayload
-    )) as OpenAI.Chat.ChatCompletion;
+    const response = (await this._openai.chat.completions.create(requestPayload, {
+      signal,
+    })) as OpenAI.Chat.ChatCompletion;
 
     // Log full response for debugging
     logger.debug('OpenAI response payload', {
@@ -147,7 +151,8 @@ export class OpenAIProvider extends AIProvider {
 
   async createStreamingResponse(
     messages: ProviderMessage[],
-    tools: Tool[] = []
+    tools: Tool[] = [],
+    signal?: AbortSignal
   ): Promise<ProviderResponse> {
     // Convert our enhanced generic messages to OpenAI format
     const openaiMessages = convertToOpenAIFormat(
@@ -200,9 +205,9 @@ export class OpenAIProvider extends AIProvider {
 
     try {
       // Use the streaming API
-      const stream = (await this._openai.chat.completions.create(
-        requestPayload
-      )) as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
+      const stream = (await this._openai.chat.completions.create(requestPayload, {
+        signal,
+      })) as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
 
       let content = '';
       let toolCalls: ProviderToolCall[] = [];
@@ -219,6 +224,9 @@ export class OpenAIProvider extends AIProvider {
         }
       > = new Map();
 
+      // Track progressive token estimation
+      let estimatedOutputTokens = 0;
+
       // Process stream chunks
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta;
@@ -227,6 +235,19 @@ export class OpenAIProvider extends AIProvider {
           content += delta.content;
           // Emit token events for real-time display
           this.emit('token', { token: delta.content });
+          
+          // Estimate progressive tokens from text chunks
+          const newTokens = Math.ceil(delta.content.length / 4);
+          estimatedOutputTokens += newTokens;
+          
+          // Emit progressive token estimate
+          this.emit('token_usage_update', {
+            usage: {
+              promptTokens: 0, // Unknown during streaming
+              completionTokens: estimatedOutputTokens,
+              totalTokens: estimatedOutputTokens,
+            },
+          });
         }
 
         // Handle tool calls

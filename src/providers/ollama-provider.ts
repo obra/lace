@@ -68,7 +68,11 @@ export class OllamaProvider extends AIProvider {
     }
   }
 
-  async createResponse(messages: ProviderMessage[], tools: Tool[] = []): Promise<ProviderResponse> {
+  async createResponse(
+    messages: ProviderMessage[],
+    tools: Tool[] = [],
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> {
     const modelId = this._config.model || this.defaultModel;
 
     // First check if we can connect and if the model exists
@@ -146,7 +150,19 @@ export class OllamaProvider extends AIProvider {
     };
 
     // Make the request
+    // Handle abort signal
+    if (signal?.aborted) {
+      throw new Error('Request aborted');
+    }
+
     const response: ChatResponse = await this._ollama.chat(requestPayload);
+
+    // If the response is an AbortableAsyncIterator and signal is provided, set up abort handling
+    if (signal && (response as any).abort && typeof (response as any).abort === 'function') {
+      signal.addEventListener('abort', () => {
+        (response as any).abort();
+      });
+    }
 
     logger.debug('Received response from Ollama', {
       provider: 'ollama',
@@ -183,7 +199,8 @@ export class OllamaProvider extends AIProvider {
 
   async createStreamingResponse(
     messages: ProviderMessage[],
-    tools: Tool[] = []
+    tools: Tool[] = [],
+    signal?: AbortSignal
   ): Promise<ProviderResponse> {
     const modelId = this._config.model || this.defaultModel;
 
@@ -261,12 +278,25 @@ export class OllamaProvider extends AIProvider {
           : undefined,
     };
 
+    // Handle abort signal
+    if (signal?.aborted) {
+      throw new Error('Request aborted');
+    }
+
     // Make the streaming request
     const response = await this._ollama.chat(requestPayload);
+
+    // If the response is an AbortableAsyncIterator and signal is provided, set up abort handling
+    if (signal && (response as any).abort && typeof (response as any).abort === 'function') {
+      signal.addEventListener('abort', () => {
+        (response as any).abort();
+      });
+    }
 
     let content = '';
     let toolCalls: { id: string; name: string; input: Record<string, unknown> }[] = [];
     let finalMessage: OllamaMessage | null = null;
+    let estimatedOutputTokens = 0;
 
     try {
       // Process streaming response
@@ -275,6 +305,20 @@ export class OllamaProvider extends AIProvider {
           // Emit token events for real-time display
           this.emit('token', { token: part.message.content });
           content += part.message.content;
+          
+          // If no token counts available yet, estimate progressively
+          if (part.prompt_eval_count === undefined && part.eval_count === undefined) {
+            const newTokens = Math.ceil(part.message.content.length / 4);
+            estimatedOutputTokens += newTokens;
+            
+            this.emit('token_usage_update', {
+              usage: {
+                promptTokens: 0, // Unknown during streaming
+                completionTokens: estimatedOutputTokens,
+                totalTokens: estimatedOutputTokens,
+              },
+            });
+          }
         }
 
         // Emit token usage updates if available (usually in final response)

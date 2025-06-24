@@ -48,3 +48,13 @@ pids
 
 # Temp dir
 temp/
+
+# Database files
+*.db
+lace-memory.db
+
+# Lace runtime data
+.lace/
+
+# Model output files
+anthropic*
