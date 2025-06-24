@@ -2,9 +2,9 @@
 // ABOUTME: Shows the generated system prompt sent to AI model with expandable content
 
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
-import { CollapsibleBox } from '../ui/CollapsibleBox.js';
+import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
 
 interface SystemPromptDisplayProps {
   event: ThreadEvent;
@@ -17,18 +17,15 @@ export function SystemPromptDisplay({ event, isStreaming, isFocused, onToggle }:
   const systemPrompt = event.data as string;
   
   return (
-    <Box flexDirection="column" marginY={1} key={`system-prompt-${event.id}`}>
-      <CollapsibleBox 
-        label="🔧 System Prompt" 
-        defaultExpanded={false}
-        borderColor="blue"
-        isFocused={isFocused}
-        onToggle={onToggle}
-      >
-        <Box flexDirection="column">
-          <Text color="blue" wrap="wrap">{systemPrompt}</Text>
-        </Box>
-      </CollapsibleBox>
-    </Box>
+    <TimelineEntryCollapsibleBox 
+      key={`system-prompt-${event.id}`}
+      label="🔧 System Prompt" 
+      defaultExpanded={false}
+      borderColor="blue"
+      isFocused={isFocused}
+      onToggle={onToggle}
+    >
+      <Text color="blue" wrap="wrap">{systemPrompt}</Text>
+    </TimelineEntryCollapsibleBox>
   );
 }

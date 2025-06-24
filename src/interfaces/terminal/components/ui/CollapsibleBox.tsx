@@ -7,6 +7,7 @@ import { Box, Text, useInput } from 'ink';
 interface CollapsibleBoxProps {
   children: React.ReactNode;
   label?: string;
+  summary?: React.ReactNode; // Content to show when collapsed
   defaultExpanded?: boolean;
   maxHeight?: number;
   borderStyle?: 'single' | 'double' | 'round';
@@ -18,6 +19,7 @@ interface CollapsibleBoxProps {
 export function CollapsibleBox({ 
   children, 
   label, 
+  summary,
   defaultExpanded = true,
   maxHeight,
   borderStyle = 'single',
@@ -45,13 +47,22 @@ export function CollapsibleBox({
         </Box>
       )}
       
-      {isExpanded && (
+      {isExpanded ? (
         <Box 
           flexDirection="column"
           marginLeft={2}
         >
           {children}
         </Box>
+      ) : (
+        summary && (
+          <Box 
+            flexDirection="column"
+            marginLeft={2}
+          >
+            {summary}
+          </Box>
+        )
       )}
     </Box>
   );
