@@ -43,9 +43,19 @@ export class NonInteractiveInterface implements UserInterface {
       this.agent.once('conversation_complete', () => {
         resolve();
       });
-      
+
       this.agent.once('error', ({ error }: { error: Error }) => {
         reject(error);
+      });
+
+      // Stream response tokens to stdout for real-time display
+      this.agent.on('agent_token', ({ token }: { token: string }) => {
+        process.stdout.write(token);
+      });
+
+      // Add newline after response completes
+      this.agent.once('agent_response_complete', () => {
+        console.log('\n');
       });
     });
 

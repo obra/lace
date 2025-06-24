@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NonInteractiveInterface } from '../non-interactive-interface.js';
 import type { Agent } from '../../agents/agent.js';
+import { EventEmitter } from 'events';
 
 // Mock dependencies
 
@@ -11,17 +12,33 @@ describe('NonInteractiveInterface', () => {
   let agent: Agent;
   let nonInteractive: NonInteractiveInterface;
   let consoleSpy: ReturnType<typeof vi.spyOn>;
+  let mockEventEmitter: EventEmitter;
 
   beforeEach(() => {
     // Mock console.log to capture output
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    // Create mock dependencies
+    // Create event emitter for agent events
+    mockEventEmitter = new EventEmitter();
+
+    // Create mock dependencies with EventEmitter methods
     agent = {
       providerName: 'mock-provider',
       start: vi.fn(),
-      sendMessage: vi.fn().mockResolvedValue(undefined),
+      sendMessage: vi.fn().mockImplementation(async () => {
+        // Simulate agent events during sendMessage
+        setTimeout(() => {
+          mockEventEmitter.emit('agent_token', { token: 'Test response' });
+          mockEventEmitter.emit('agent_response_complete', { content: 'Test response' });
+          mockEventEmitter.emit('conversation_complete');
+        }, 10);
+      }),
       stop: vi.fn().mockResolvedValue(undefined),
+      // EventEmitter methods
+      once: mockEventEmitter.once.bind(mockEventEmitter),
+      on: mockEventEmitter.on.bind(mockEventEmitter),
+      off: mockEventEmitter.off.bind(mockEventEmitter),
+      emit: mockEventEmitter.emit.bind(mockEventEmitter),
     } as unknown as Agent;
 
     nonInteractive = new NonInteractiveInterface(agent);
@@ -34,7 +51,6 @@ describe('NonInteractiveInterface', () => {
 
   describe('executePrompt', () => {
     it('should execute single prompt and exit gracefully', async () => {
-      const agentSendSpy = vi.spyOn(agent, 'sendMessage').mockResolvedValue();
       const agentStartSpy = vi.spyOn(agent, 'start').mockImplementation(async () => {});
 
       await nonInteractive.executePrompt('Test prompt');
@@ -43,7 +59,7 @@ describe('NonInteractiveInterface', () => {
         expect.stringContaining('using mock-provider provider')
       );
       expect(agentStartSpy).toHaveBeenCalled();
-      expect(agentSendSpy).toHaveBeenCalledWith('Test prompt');
+      expect(agent.sendMessage).toHaveBeenCalledWith('Test prompt');
     });
 
     it('should handle errors during prompt execution', async () => {
@@ -54,7 +70,6 @@ describe('NonInteractiveInterface', () => {
     });
 
     it('should display provider information', async () => {
-      vi.spyOn(agent, 'sendMessage').mockResolvedValue();
       vi.spyOn(agent, 'start').mockImplementation(async () => {});
 
       await nonInteractive.executePrompt('Test prompt');
@@ -64,8 +79,6 @@ describe('NonInteractiveInterface', () => {
 
     it('should work without tool executor', async () => {
       const nonInteractiveWithoutTools = new NonInteractiveInterface(agent);
-
-      vi.spyOn(agent, 'sendMessage').mockResolvedValue();
       vi.spyOn(agent, 'start').mockImplementation(async () => {});
 
       await nonInteractiveWithoutTools.executePrompt('Test prompt');
