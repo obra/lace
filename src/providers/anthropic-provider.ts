@@ -187,12 +187,12 @@ export class AnthropicProvider extends AIProvider {
 
       // Track progressive token estimation
       let estimatedOutputTokens = 0;
-      
+
       // Listen for progressive token usage updates during streaming
       stream.on('streamEvent', (event) => {
         // Handle message_delta events that contain final token usage
-        if (event.type === 'message_delta' && (event as any).usage) {
-          const usage = (event as any).usage;
+        if (event.type === 'message_delta' && event?.usage) {
+          const usage = event.usage;
           this.emit('token_usage_update', {
             usage: {
               promptTokens: usage.input_tokens || 0,
@@ -202,13 +202,13 @@ export class AnthropicProvider extends AIProvider {
           });
         }
       });
-      
+
       // Estimate progressive tokens from text chunks
       stream.on('text', (text) => {
         // Rough token estimation: ~4 characters per token
         const newTokens = Math.ceil(text.length / 4);
         estimatedOutputTokens += newTokens;
-        
+
         // Emit progressive token estimate
         this.emit('token_usage_update', {
           usage: {

@@ -235,11 +235,11 @@ export class OpenAIProvider extends AIProvider {
           content += delta.content;
           // Emit token events for real-time display
           this.emit('token', { token: delta.content });
-          
+
           // Estimate progressive tokens from text chunks
           const newTokens = Math.ceil(delta.content.length / 4);
           estimatedOutputTokens += newTokens;
-          
+
           // Emit progressive token estimate
           this.emit('token_usage_update', {
             usage: {

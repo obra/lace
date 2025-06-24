@@ -158,9 +158,13 @@ export class OllamaProvider extends AIProvider {
     const response: ChatResponse = await this._ollama.chat(requestPayload);
 
     // If the response is an AbortableAsyncIterator and signal is provided, set up abort handling
-    if (signal && (response as any).abort && typeof (response as any).abort === 'function') {
+    if (
+      signal &&
+      'abort' in response &&
+      typeof (response as unknown as { abort?: () => void }).abort === 'function'
+    ) {
       signal.addEventListener('abort', () => {
-        (response as any).abort();
+        (response as unknown as { abort: () => void }).abort();
       });
     }
 
@@ -287,9 +291,13 @@ export class OllamaProvider extends AIProvider {
     const response = await this._ollama.chat(requestPayload);
 
     // If the response is an AbortableAsyncIterator and signal is provided, set up abort handling
-    if (signal && (response as any).abort && typeof (response as any).abort === 'function') {
+    if (
+      signal &&
+      'abort' in response &&
+      typeof (response as unknown as { abort?: () => void }).abort === 'function'
+    ) {
       signal.addEventListener('abort', () => {
-        (response as any).abort();
+        (response as unknown as { abort: () => void }).abort();
       });
     }
 
@@ -305,12 +313,12 @@ export class OllamaProvider extends AIProvider {
           // Emit token events for real-time display
           this.emit('token', { token: part.message.content });
           content += part.message.content;
-          
+
           // If no token counts available yet, estimate progressively
           if (part.prompt_eval_count === undefined && part.eval_count === undefined) {
             const newTokens = Math.ceil(part.message.content.length / 4);
             estimatedOutputTokens += newTokens;
-            
+
             this.emit('token_usage_update', {
               usage: {
                 promptTokens: 0, // Unknown during streaming

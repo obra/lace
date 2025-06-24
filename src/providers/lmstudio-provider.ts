@@ -454,12 +454,12 @@ export class LMStudioProvider extends AIProvider {
                   allContent += fragment.content;
                   // Emit token events for streaming
                   this.emit('token', { token: fragment.content });
-                  
+
                   // If no stats available, estimate tokens progressively
                   if (!msg.stats) {
                     const newTokens = Math.ceil(fragment.content.length / 4);
                     estimatedOutputTokens += newTokens;
-                    
+
                     this.emit('token_usage_update', {
                       usage: {
                         promptTokens: 0, // Unknown during streaming
