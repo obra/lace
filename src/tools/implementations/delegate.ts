@@ -164,7 +164,7 @@ Examples:
         });
 
         // Start subagent
-        subagent.start();
+        await subagent.start();
 
         // Send the task
         const taskMessage = `Task: ${title}\n\n${prompt}`;

@@ -37,7 +37,21 @@ export class NonInteractiveInterface implements UserInterface {
 
     // Start agent and process the prompt
     await this.agent.start();
+
+    // Create promise that resolves when conversation completes or errors
+    const conversationComplete = new Promise<void>((resolve, reject) => {
+      this.agent.once('conversation_complete', () => {
+        resolve();
+      });
+      
+      this.agent.once('error', ({ error }: { error: Error }) => {
+        reject(error);
+      });
+    });
+
+    // Send message and wait for conversation to complete
     await this.agent.sendMessage(prompt);
+    await conversationComplete;
 
     // Save and exit
     await this.agent.stop();
