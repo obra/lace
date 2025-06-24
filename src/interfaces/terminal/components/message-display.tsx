@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import { MarkdownDisplay } from './ui/MarkdownDisplay.js';
+import { UI_SYMBOLS } from '../theme.js';
 
 interface Message {
   type: "user" | "assistant" | "system" | "tool" | "thinking";
@@ -81,8 +82,8 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
     switch (type) {
       case "user": return "> ";
       case "assistant": return "❦ ";
-      case "thinking": return "💭 ";
-      case "tool": return "🔧 ";
+      case "thinking": return `${UI_SYMBOLS.THINKING} `;
+      case "tool": return `${UI_SYMBOLS.TOOL} `;
       case "system": return "ℹ️  ";
       default: return "";
     }

@@ -6,6 +6,7 @@ import { Box, Text } from 'ink';
 import { ThreadEvent, ToolCallData, ToolResultData } from '../../../../threads/types.js';
 import { CompactOutput } from '../ui/CompactOutput.js';
 import { CodeDisplay } from '../ui/CodeDisplay.js';
+import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
 
 interface ToolExecutionDisplayProps {
   callEvent: ThreadEvent;
@@ -59,15 +60,15 @@ export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFo
   };
   
   const toolCommand = getToolCommand(toolName, input);
-  const statusIcon = success ? '✔' : (resultEvent ? '✘' : '⧖');
-  const expansionIcon = isExpanded ? '↓' : '→';
+  const statusIcon = success ? UI_SYMBOLS.SUCCESS : (resultEvent ? UI_SYMBOLS.ERROR : UI_SYMBOLS.PENDING);
+  const expansionIcon = isExpanded ? UI_SYMBOLS.ARROW_DOWN : UI_SYMBOLS.ARROW_RIGHT;
   
   return (
     <Box flexDirection="column" marginY={1}>
       {/* Compact tool header */}
       <Box>
-        <Text color="yellow">🔧 </Text>
-        <Text color="yellow" bold>{toolName}</Text>
+        <Text color={UI_COLORS.TOOL}>{UI_SYMBOLS.TOOL} </Text>
+        <Text color={UI_COLORS.TOOL} bold>{toolName}</Text>
         {toolCommand && (
           <React.Fragment>
             <Text color="gray"> </Text>
@@ -75,7 +76,7 @@ export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFo
           </React.Fragment>
         )}
         <Text color="gray"> </Text>
-        <Text color={success ? 'green' : (resultEvent ? 'red' : 'yellow')}>{statusIcon}</Text>
+        <Text color={success ? UI_COLORS.SUCCESS : (resultEvent ? UI_COLORS.ERROR : UI_COLORS.PENDING)}>{statusIcon}</Text>
         {isStreaming && <Text color="gray"> (running...)</Text>}
         {isFocused && resultEvent && (
           <Text color="gray"> {expansionIcon}</Text>

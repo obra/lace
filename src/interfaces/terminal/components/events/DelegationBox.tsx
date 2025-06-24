@@ -6,6 +6,7 @@ import { Box, Text } from 'ink';
 import { Timeline } from '../../../thread-processor.js';
 import TimelineDisplay from './TimelineDisplay.js';
 import { logger } from '../../../../utils/logger.js';
+import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
 
 interface DelegationBoxProps {
   threadId: string;
@@ -43,19 +44,19 @@ export function DelegationBox({ threadId, timeline, delegateTimelines, expanded,
       {/* Header */}
       <Box justifyContent="space-between" marginBottom={expanded ? 1 : 0}>
         <Box>
-          <Text color="blue">🤖 </Text>
+          <Text color={UI_COLORS.DELEGATE}>{UI_SYMBOLS.DELEGATE} </Text>
           <Text color="gray">{threadId}</Text>
           <Text color="white"> ({taskDescription})</Text>
         </Box>
         <Box>
           {isComplete ? (
-            <Text color="green">✅ Complete ({duration}) </Text>
+            <Text color={UI_COLORS.SUCCESS}>{UI_SYMBOLS.SUCCESS} Complete ({duration}) </Text>
           ) : (
-            <Text color="yellow">⚡ Working... ({duration}) </Text>
+            <Text color={UI_COLORS.PENDING}>{UI_SYMBOLS.WORKING} Working... ({duration}) </Text>
           )}
-          <Text color="gray">↑{formatTokenCount(tokens.tokensIn)} ↓{formatTokenCount(tokens.tokensOut)} </Text>
+          <Text color="gray">{UI_SYMBOLS.TOKEN_IN}{formatTokenCount(tokens.tokensIn)} {UI_SYMBOLS.TOKEN_OUT}{formatTokenCount(tokens.tokensOut)} </Text>
           <Text color="cyan">
-            {expanded ? '[▼ Collapse]' : '[▶ Expand]'}
+            {expanded ? `[${UI_SYMBOLS.COLLAPSE_HINT} Collapse]` : `[${UI_SYMBOLS.EXPAND_HINT} Expand]`}
           </Text>
         </Box>
       </Box>

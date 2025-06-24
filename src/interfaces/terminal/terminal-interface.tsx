@@ -361,7 +361,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       // Show completion message with turn summary (still use turn metrics for per-turn display)
       addMessage({
         type: "system",
-        content: `✅ Turn completed in ${Math.floor(metrics.elapsedMs / 1000)}s (↑${metrics.tokensIn} ↓${metrics.tokensOut} tokens)`,
+        content: `Turn completed in ${Math.floor(metrics.elapsedMs / 1000)}s (↑${metrics.tokensIn} ↓${metrics.tokensOut} tokens)`,
         timestamp: new Date(),
       });
     };

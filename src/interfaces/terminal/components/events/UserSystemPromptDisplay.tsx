@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
 import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
+import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
 
 interface UserSystemPromptDisplayProps {
   event: ThreadEvent;
@@ -20,10 +21,10 @@ export function UserSystemPromptDisplay({ event, isStreaming, isFocused, onToggl
   return (
     <TimelineEntryCollapsibleBox 
       key={`user-prompt-${event.id}`}
-      label="📋 User Instructions" 
+      label={`${UI_SYMBOLS.USER} User Instructions`}
       isExpanded={isExpanded}
       onExpandedChange={setIsExpanded}
-      borderColor="cyan"
+      borderColor={UI_COLORS.USER}
       isFocused={isFocused}
       onToggle={onToggle}
     >

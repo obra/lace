@@ -6,6 +6,7 @@ import { Box, Text } from 'ink';
 import { ThreadEvent, ToolCallData } from '../../../../threads/types.js';
 import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
 import { CodeDisplay } from '../ui/CodeDisplay.js';
+import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
 
 interface ToolCallDisplayProps {
   event: ThreadEvent;
@@ -19,8 +20,8 @@ export function ToolCallDisplay({ event, isStreaming }: ToolCallDisplayProps) {
   
   const headerSummary = (
     <Box>
-      <Text color="yellow">🔧 </Text>
-      <Text color="yellow" bold>{toolName}</Text>
+      <Text color={UI_COLORS.TOOL}>{UI_SYMBOLS.TOOL} </Text>
+      <Text color={UI_COLORS.TOOL} bold>{toolName}</Text>
       <Text color="gray"> #{callId.slice(-6)}</Text>
       {isStreaming && <Text color="gray"> (streaming...)</Text>}
     </Box>
@@ -33,7 +34,7 @@ export function ToolCallDisplay({ event, isStreaming }: ToolCallDisplayProps) {
       isExpanded={isExpanded}
       onExpandedChange={setIsExpanded}
       maxHeight={10}
-      borderColor="yellow"
+      borderColor={UI_COLORS.TOOL}
     >
       <CodeDisplay code={JSON.stringify(input)} language="json" />
     </TimelineEntryCollapsibleBox>

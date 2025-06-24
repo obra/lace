@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
+import { UI_SYMBOLS } from '../../theme.js';
 
 interface CollapsibleBoxProps {
   children: React.ReactNode;
@@ -31,10 +32,10 @@ export function CollapsibleBox({
       {label && (
         <Box>
           <Text color={borderColor}>
-            {isExpanded ? '▼' : '▶'} {label}
+            {isExpanded ? UI_SYMBOLS.EXPANDED : UI_SYMBOLS.COLLAPSED} {label}
           </Text>
           {isFocused && (
-            <Text color="gray"> (← → to toggle)</Text>
+            <Text color="gray"> ({UI_SYMBOLS.ARROW_LEFT} {UI_SYMBOLS.ARROW_RIGHT} to toggle)</Text>
           )}
         </Box>
       )}

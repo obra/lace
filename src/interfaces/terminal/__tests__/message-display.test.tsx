@@ -5,6 +5,7 @@ import React from 'react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { renderInkComponent, stripAnsi } from './helpers/ink-test-utils.js';
 import MessageDisplay from '../components/message-display.js';
+import { UI_SYMBOLS } from '../theme.js';
 
 describe('MessageDisplay', () => {
   const mockMessage = {
@@ -69,7 +70,7 @@ describe('MessageDisplay', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('💭 '); // Thinking prefix
+    expect(frame).toContain(`${UI_SYMBOLS.THINKING} `); // Thinking prefix
     expect(frame).toContain('Let me think about this...');
   });
 
@@ -99,7 +100,7 @@ describe('MessageDisplay', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('🔧 Tool');
+    expect(frame).toContain(`${UI_SYMBOLS.TOOL}`);
     expect(frame).toContain('Tool execution completed');
   });
 

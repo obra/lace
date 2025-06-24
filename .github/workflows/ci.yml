@@ -83,11 +83,11 @@ jobs:
 
       - name: Run unit tests
         if: matrix.test-group == 'unit'
-        run: npm run test:run -- --exclude "**/*integration*" --exclude "**/e2e-cli*"
+        run: npm run test:unit
 
       - name: Run integration tests
         if: matrix.test-group == 'integration'
-        run: npm run test:run -- "**/*integration*"
+        run: npm run test:integration
 
   test-coverage:
     name: Test Coverage

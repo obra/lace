@@ -5,6 +5,7 @@ import React from 'react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { renderInkComponent, stripAnsi } from './helpers/ink-test-utils.js';
 import StatusBar from '../components/status-bar.js';
+import { UI_SYMBOLS } from '../theme.js';
 
 describe('StatusBar', () => {
   const basicProps = {
@@ -71,7 +72,7 @@ describe('StatusBar', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('↑1.0k ↓1.5k');
+    expect(frame).toContain(`${UI_SYMBOLS.TOKEN_IN}1.0k ${UI_SYMBOLS.TOKEN_OUT}1.5k`);
   });
 
   it('formats cumulative tokens as exact numbers for small numbers', () => {
@@ -87,7 +88,7 @@ describe('StatusBar', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('↑100 ↓150');
+    expect(frame).toContain(`${UI_SYMBOLS.TOKEN_IN}100 ${UI_SYMBOLS.TOKEN_OUT}150`);
   });
 
   it('shows 0 tokens when no cumulative tokens provided', () => {
@@ -96,7 +97,7 @@ describe('StatusBar', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('↑0 ↓0');
+    expect(frame).toContain(`${UI_SYMBOLS.TOKEN_IN}0 ${UI_SYMBOLS.TOKEN_OUT}0`);
   });
 
   it('shows processing status when isProcessing is true', () => {

@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
 import { EventDisplay } from '../EventDisplay.js';
 import { ThreadEvent, ToolCallData, ToolResultData } from '../../../../../threads/types.js';
+import { UI_SYMBOLS } from '../../../theme.js';
 
 describe('EventDisplay', () => {
   it('should render USER_MESSAGE events', () => {
@@ -52,7 +53,7 @@ describe('EventDisplay', () => {
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
-    expect(lastFrame()).toContain('🔧');
+    expect(lastFrame()).toContain(UI_SYMBOLS.TOOL);
     expect(lastFrame()).toContain('bash');
     expect(lastFrame()).toContain('#ll-123'); // Last 6 chars of call-123
   });
@@ -114,8 +115,8 @@ describe('EventDisplay', () => {
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
-    expect(lastFrame()).toContain('🔧 System Prompt');
-    expect(lastFrame()).toContain('(press Enter to toggle)');
+    expect(lastFrame()).toContain(`${UI_SYMBOLS.TOOL} System Prompt`);
+    // The toggle hint only appears when isFocused={true}
   });
 
   it('should render USER_SYSTEM_PROMPT events', () => {
@@ -128,7 +129,7 @@ describe('EventDisplay', () => {
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
-    expect(lastFrame()).toContain('📋 User Instructions');
-    expect(lastFrame()).toContain('(press Enter to toggle)');
+    expect(lastFrame()).toContain(`${UI_SYMBOLS.USER} User Instructions`);
+    // The toggle hint only appears when isFocused={true}
   });
 });
