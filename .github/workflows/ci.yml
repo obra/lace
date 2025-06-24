@@ -83,11 +83,11 @@ jobs:
 
       - name: Run unit tests
         if: matrix.test-group == 'unit'
-        run: npm run test:run -- --exclude "**/integration.test.ts" --exclude "**/lmstudio-integration*" --exclude "**/ollama-integration*" --exclude "**/e2e-cli*"
+        run: npm run test:run -- --exclude "**/*integration*" --exclude "**/e2e-cli*"
 
       - name: Run integration tests
         if: matrix.test-group == 'integration'
-        run: npm run test:run -- "**/integration.test.ts" "**/cli-integration*" "**/delegation-integration*" "**/turn-tracking-integration*" "**/sigint-integration*" "**/progress-display-integration*" "**/turn-state-integration*" "**/auto-discovery-integration*" "**/help-integration*" "**/tool-approval-integration*"
+        run: npm run test:run -- "**/*integration*"
 
   test-coverage:
     name: Test Coverage
@@ -114,7 +114,7 @@ jobs:
         run: npm ci
 
       - name: Run tests with coverage
-        run: npm run test:coverage -- --exclude "**/lmstudio-integration*" --exclude "**/ollama-integration*" --exclude "**/e2e-cli*"
+        run: npm run test:coverage -- --exclude "**/*lmstudio-integration*" --exclude "**/*ollama-integration*" --exclude "**/e2e-cli*"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -185,7 +185,7 @@ jobs:
         run: npm ci
 
       - name: Run core tests
-        run: npm run test:run -- --exclude "**/lmstudio-integration*" --exclude "**/ollama-integration*" --exclude "**/e2e-cli*" --exclude "**/sigint-integration*"
+        run: npm run test:run -- --exclude "**/*lmstudio-integration*" --exclude "**/*ollama-integration*" --exclude "**/e2e-cli*" --exclude "**/*sigint-integration*"
 
       - name: Build and test CLI
         run: |
