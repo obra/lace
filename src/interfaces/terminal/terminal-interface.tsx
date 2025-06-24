@@ -147,7 +147,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   }>({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
   
   // Track the final token usage from provider for accurate cumulative totals
-  const [lastProviderUsage, setLastProviderUsage] = useState<{
+  // Use ref to avoid race conditions with rapid requests
+  const lastProviderUsageRef = useRef<{
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
@@ -301,7 +302,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         
         // Only update if we have meaningful token counts (avoid progressive estimates)
         if (newUsage.promptTokens > 0 || newUsage.totalTokens > 0) {
-          setLastProviderUsage(newUsage);
+          lastProviderUsageRef.current = newUsage;
         }
       }
     };
@@ -343,16 +344,17 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       setIsProcessing(false);
       
       // Use provider's final token counts for accurate cumulative totals (includes system prompts, context, etc.)
-      if (lastProviderUsage) {
+      const providerUsage = lastProviderUsageRef.current;
+      if (providerUsage) {
         setCumulativeTokens(prev => ({
           // Provider promptTokens includes entire conversation context, so accumulate completions only
-          promptTokens: lastProviderUsage.promptTokens, // This is the total input context
-          completionTokens: prev.completionTokens + lastProviderUsage.completionTokens, // Accumulate outputs
-          totalTokens: lastProviderUsage.promptTokens + (prev.completionTokens + lastProviderUsage.completionTokens),
+          promptTokens: providerUsage.promptTokens, // This is the total input context
+          completionTokens: prev.completionTokens + providerUsage.completionTokens, // Accumulate outputs
+          totalTokens: providerUsage.promptTokens + (prev.completionTokens + providerUsage.completionTokens),
         }));
         
         // Clear the provider usage after using it
-        setLastProviderUsage(null);
+        lastProviderUsageRef.current = null;
       }
       
       // Show completion message with turn summary (still use turn metrics for per-turn display)

@@ -111,22 +111,29 @@ function calculateDuration(timeline: Timeline): string {
   }
 }
 
+// Shared token estimation function to match main agent logic
+function estimateTokens(text: string): number {
+  // Rough approximation: 1 token ≈ 4 characters for most models
+  return Math.ceil(text.length / 4);
+}
+
 function calculateTokens(timeline: Timeline): { tokensIn: number; tokensOut: number } {
   let tokensIn = 0;
   let tokensOut = 0;
   
   timeline.items.forEach(item => {
-    if (item.type === 'user_message' && 'content' in item) {
-      // Estimate tokens for user input (~4 chars per token)
-      tokensIn += Math.ceil(item.content.length / 4);
-    } else if (item.type === 'agent_message' && 'content' in item) {
-      // Estimate tokens for agent output (~4 chars per token)
-      tokensOut += Math.ceil(item.content.length / 4);
-    } else if (item.type === 'tool_execution' && 'result' in item && item.result && 'content' in item.result) {
+    // Use proper type guards instead of runtime 'content' checks
+    if (item.type === 'user_message') {
+      const userItem = item as Extract<Timeline['items'][0], { type: 'user_message' }>;
+      tokensIn += estimateTokens(userItem.content);
+    } else if (item.type === 'agent_message') {
+      const agentItem = item as Extract<Timeline['items'][0], { type: 'agent_message' }>;
+      tokensOut += estimateTokens(agentItem.content);
+    } else if (item.type === 'tool_execution') {
+      const toolItem = item as Extract<Timeline['items'][0], { type: 'tool_execution' }>;
       // Tool results count as input to the agent
-      const content = item.result.content;
-      if (typeof content === 'string') {
-        tokensIn += Math.ceil(content.length / 4);
+      if (toolItem.result?.content && typeof toolItem.result.content === 'string') {
+        tokensIn += estimateTokens(toolItem.result.content);
       }
     }
   });

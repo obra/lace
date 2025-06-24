@@ -779,9 +779,12 @@ export class Agent extends EventEmitter {
     this._progressTimer = setInterval(() => {
       if (this._currentTurnMetrics) {
         try {
-          this._currentTurnMetrics.elapsedMs =
-            Date.now() - this._currentTurnMetrics.startTime.getTime();
-          this.emit('turn_progress', { metrics: { ...this._currentTurnMetrics } });
+          const newElapsedMs = Date.now() - this._currentTurnMetrics.startTime.getTime();
+          // Only emit if elapsed time has meaningfully changed (reduce unnecessary re-renders)
+          if (Math.abs(newElapsedMs - this._currentTurnMetrics.elapsedMs) >= 500) {
+            this._currentTurnMetrics.elapsedMs = newElapsedMs;
+            this.emit('turn_progress', { metrics: { ...this._currentTurnMetrics } });
+          }
         } catch (error) {
           // Defensive error handling for progress timer
           logger.debug('Progress timer error', {
