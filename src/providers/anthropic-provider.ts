@@ -47,7 +47,7 @@ export class AnthropicProvider extends AIProvider {
     // Extract system message if present
     const systemMessage = messages.find((msg) => msg.role === 'system');
     const systemPrompt =
-      systemMessage?.content || this._config.systemPrompt || 'You are a helpful assistant.';
+      systemMessage?.content || this._systemPrompt || 'You are a helpful assistant.';
 
     // Convert tools to Anthropic format
     const anthropicTools: Anthropic.Tool[] = tools.map((tool) => ({
@@ -132,7 +132,7 @@ export class AnthropicProvider extends AIProvider {
     // Extract system message if present
     const systemMessage = messages.find((msg) => msg.role === 'system');
     const systemPrompt =
-      systemMessage?.content || this._config.systemPrompt || 'You are a helpful assistant.';
+      systemMessage?.content || this._systemPrompt || 'You are a helpful assistant.';
 
     // Convert tools to Anthropic format
     const anthropicTools: Anthropic.Tool[] = tools.map((tool) => ({

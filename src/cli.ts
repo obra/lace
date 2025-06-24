@@ -28,26 +28,6 @@ async function createProvider(
   model?: string,
   toolExecutor?: ToolExecutor
 ): Promise<AIProvider> {
-  // Get tool information for template system
-  const tools = toolExecutor
-    ? toolExecutor.getAllTools().map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-      }))
-    : undefined;
-
-  // Load configurable prompts from user's Lace directory
-  const promptConfig = await loadPromptConfig({ tools });
-  const { systemPrompt, filesCreated } = promptConfig;
-
-  // Show helpful message if configuration files were created for the first time
-  if (filesCreated.length > 0) {
-    console.log('\n📝 Created default Lace configuration files:');
-    filesCreated.forEach((filePath) => {
-      console.log(`   ${filePath}`);
-    });
-    console.log("\n💡 Edit these files to customize your AI assistant's behavior.\n");
-  }
 
   // Get base provider from registry
   const baseProvider = registry.getProvider(providerType);
@@ -68,7 +48,7 @@ async function createProvider(
         process.exit(1);
       }
       const { AnthropicProvider } = await import('./providers/anthropic-provider.js');
-      return new AnthropicProvider({ apiKey, systemPrompt, model });
+      return new AnthropicProvider({ apiKey, model });
     }
     case 'openai': {
       const apiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_KEY;
@@ -79,15 +59,15 @@ async function createProvider(
         process.exit(1);
       }
       const { OpenAIProvider } = await import('./providers/openai-provider.js');
-      return new OpenAIProvider({ apiKey, systemPrompt, model });
+      return new OpenAIProvider({ apiKey, model });
     }
     case 'lmstudio': {
       const { LMStudioProvider } = await import('./providers/lmstudio-provider.js');
-      return new LMStudioProvider({ systemPrompt, model });
+      return new LMStudioProvider({ model });
     }
     case 'ollama': {
       const { OllamaProvider } = await import('./providers/ollama-provider.js');
-      return new OllamaProvider({ systemPrompt, model });
+      return new OllamaProvider({ model });
     }
     default:
       throw new Error(`Unknown provider: ${providerType}`);
@@ -152,6 +132,7 @@ async function main() {
   } else {
     console.log(`🆕 Starting conversation ${threadId}`);
   }
+
 
   // Create the enhanced Agent
   const agent = new Agent({

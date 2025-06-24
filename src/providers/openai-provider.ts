@@ -59,7 +59,7 @@ export class OpenAIProvider extends AIProvider {
     // Extract system message if present
     const systemMessage = messages.find((msg) => msg.role === 'system');
     const systemPrompt =
-      systemMessage?.content || this._config.systemPrompt || 'You are a helpful assistant.';
+      systemMessage?.content || this._systemPrompt || 'You are a helpful assistant.';
 
     // Add system message at the beginning if not already present
     const messagesWithSystem = [
@@ -157,7 +157,7 @@ export class OpenAIProvider extends AIProvider {
     // Extract system message if present
     const systemMessage = messages.find((msg) => msg.role === 'system');
     const systemPrompt =
-      systemMessage?.content || this._config.systemPrompt || 'You are a helpful assistant.';
+      systemMessage?.content || this._systemPrompt || 'You are a helpful assistant.';
 
     // Add system message at the beginning if not already present
     const messagesWithSystem = [

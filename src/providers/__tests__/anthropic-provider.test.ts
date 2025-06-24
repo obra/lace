@@ -37,8 +37,8 @@ describe('AnthropicProvider', () => {
     
     provider = new AnthropicProvider({
       apiKey: 'test-key',
-      systemPrompt: 'Test system prompt',
     });
+    provider.setSystemPrompt('Test system prompt');
 
     mockTool = {
       name: 'test_tool',
@@ -71,9 +71,8 @@ describe('AnthropicProvider', () => {
       expect(provider.supportsStreaming).toBe(true);
     });
 
-    it('should expose configuration', () => {
-      const config = provider.config;
-      expect(config.systemPrompt).toBe('Test system prompt');
+    it('should expose system prompt', () => {
+      expect(provider.systemPrompt).toBe('Test system prompt');
     });
   });
 

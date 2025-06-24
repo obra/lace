@@ -146,7 +146,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
       threadId,
       tools: toolExecutor.getAllTools(),
     });
-    agent.start();
+    await agent.start();
   });
 
   afterEach(async () => {
@@ -233,6 +233,8 @@ describe('Conversation State Management with Enhanced Agent', () => {
       'TOOL_RESULT',
       'LOCAL_SYSTEM_MESSAGE',
       'THINKING',
+      'SYSTEM_PROMPT',
+      'USER_SYSTEM_PROMPT',
     ];
     const allEventsValid = events.every((e) => validEventTypes.includes(e.type));
     expect(allEventsValid).toBe(true);

@@ -122,19 +122,19 @@ describe('Enhanced Agent', () => {
     it('should start and stop correctly', async () => {
       agent = createAgent();
 
-      agent.start();
+      await agent.start();
       expect(agent.getCurrentState()).toBe('idle');
 
       await agent.stop();
       expect(agent.getCurrentState()).toBe('idle');
     });
 
-    it('should emit state change events', () => {
+    it('should emit state change events', async () => {
       agent = createAgent();
       const stateChangeSpy = vi.fn();
       agent.on('state_change', stateChangeSpy);
 
-      agent.start();
+      await agent.start();
       // Start doesn't change state (already idle), so no emission
       expect(stateChangeSpy).not.toHaveBeenCalled();
     });
@@ -153,9 +153,9 @@ describe('Enhanced Agent', () => {
   });
 
   describe('conversation processing', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       agent = createAgent();
-      agent.start();
+      await agent.start();
     });
 
     it('should process simple message and emit events', async () => {
@@ -203,7 +203,7 @@ describe('Enhanced Agent', () => {
         toolCalls: [],
       });
       agent = createAgent({ provider: mockProvider });
-      agent.start();
+      await agent.start();
 
       const thinkingComplete = vi.fn();
       const responseComplete = vi.fn();
@@ -253,7 +253,7 @@ describe('Enhanced Agent', () => {
   describe('tool execution', () => {
     let mockTool: MockTool;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       mockTool = new MockTool({
         isError: false,
         content: [{ type: 'text', text: 'Tool executed successfully' }],
@@ -297,7 +297,7 @@ describe('Enhanced Agent', () => {
       });
 
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
-      agent.start();
+      await agent.start();
     });
 
     it('should execute tools and emit events', async () => {
@@ -423,9 +423,9 @@ describe('Enhanced Agent', () => {
   });
 
   describe('error handling', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       agent = createAgent();
-      agent.start();
+      await agent.start();
     });
 
     it('should emit error event when provider fails', async () => {
@@ -437,7 +437,7 @@ describe('Enhanced Agent', () => {
       vi.spyOn(errorProvider, 'createResponse').mockRejectedValue(new Error('Provider error'));
 
       agent = createAgent({ provider: errorProvider });
-      agent.start();
+      await agent.start();
 
       const errorEvents: any[] = [];
       agent.on('error', (data) => errorEvents.push(data));
@@ -458,7 +458,7 @@ describe('Enhanced Agent', () => {
       vi.spyOn(errorProvider, 'createResponse').mockRejectedValue(new Error('Provider error'));
 
       agent = createAgent({ provider: errorProvider });
-      agent.start();
+      await agent.start();
 
       // Add error listener to prevent unhandled error
       agent.on('error', () => {
@@ -472,9 +472,9 @@ describe('Enhanced Agent', () => {
   });
 
   describe('conversation history', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       agent = createAgent();
-      agent.start();
+      await agent.start();
     });
 
     it('should build conversation history from thread events', async () => {
@@ -576,9 +576,9 @@ describe('Enhanced Agent', () => {
   });
 
   describe('event type safety', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       agent = createAgent();
-      agent.start();
+      await agent.start();
     });
 
     it('should provide type-safe event listeners', async () => {
@@ -607,7 +607,7 @@ describe('Enhanced Agent', () => {
   });
 
   describe('multiple tool calls', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       const tool1 = new MockTool({
         isError: false,
         content: [{ type: 'text', text: 'Tool 1 result' }],
@@ -656,7 +656,7 @@ describe('Enhanced Agent', () => {
         provider: mockProvider,
         tools: [tool1, tool2],
       });
-      agent.start();
+      await agent.start();
     });
 
     it('should execute multiple tools in sequence', async () => {
@@ -753,10 +753,10 @@ describe('Enhanced Agent', () => {
     describe('with streaming provider', () => {
       let streamingProvider: MockStreamingProvider;
 
-      beforeEach(() => {
+      beforeEach(async () => {
         streamingProvider = new MockStreamingProvider({ streaming: true });
         agent = createAgent({ provider: streamingProvider });
-        agent.start();
+        await agent.start();
       });
 
       afterEach(() => {
@@ -873,10 +873,10 @@ describe('Enhanced Agent', () => {
     describe('with non-streaming provider', () => {
       let nonStreamingProvider: MockNonStreamingProvider;
 
-      beforeEach(() => {
+      beforeEach(async () => {
         nonStreamingProvider = new MockNonStreamingProvider({ streaming: false });
         agent = createAgent({ provider: nonStreamingProvider });
-        agent.start();
+        await agent.start();
       });
 
       afterEach(() => {
@@ -926,7 +926,7 @@ describe('Enhanced Agent', () => {
         const createResponseSpy = vi.spyOn(streamingProvider, 'createResponse');
 
         agent = createAgent({ provider: streamingProvider });
-        agent.start();
+        await agent.start();
 
         await agent.sendMessage('Test streaming preference');
 
@@ -943,7 +943,7 @@ describe('Enhanced Agent', () => {
         const createResponseSpy = vi.spyOn(streamingProvider, 'createResponse');
 
         agent = createAgent({ provider: streamingProvider });
-        agent.start();
+        await agent.start();
 
         await agent.sendMessage('Test non-streaming when disabled');
 
@@ -953,6 +953,45 @@ describe('Enhanced Agent', () => {
         agent.removeAllListeners();
         streamingProvider.removeAllListeners();
       });
+    });
+  });
+
+  describe('System prompt event handling', () => {
+    it('should skip SYSTEM_PROMPT and USER_SYSTEM_PROMPT events in conversation building', async () => {
+      // Manually add system prompt events to thread (simulating what Agent.start() does)
+      threadManager.addEvent(threadId, 'SYSTEM_PROMPT', 'You are a helpful AI assistant.');
+      threadManager.addEvent(threadId, 'USER_SYSTEM_PROMPT', 'Always be concise.');
+      
+      // Add a user message
+      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello, how are you?');
+      
+      // Mock the provider to capture what messages it receives
+      const mockCreateResponse = vi.spyOn(mockProvider, 'createResponse');
+      mockCreateResponse.mockResolvedValue({
+        content: 'I am doing well, thank you for asking!',
+        toolCalls: [],
+      });
+
+      agent = createAgent();
+      await agent.start();
+      await agent.sendMessage('Hello, how are you?');
+
+      // Verify the provider was called
+      expect(mockCreateResponse).toHaveBeenCalledTimes(1);
+      
+      // Get the messages that were sent to the provider
+      const [messages] = mockCreateResponse.mock.calls[0];
+      
+      // Should only contain user messages, not system prompt events
+      expect(messages).toHaveLength(2); // Two user messages: existing + new one
+      expect(messages[0].role).toBe('user');
+      expect(messages[0].content).toBe('Hello, how are you?');
+      expect(messages[1].role).toBe('user');
+      expect(messages[1].content).toBe('Hello, how are you?');
+      
+      // Verify no assistant messages from system prompts made it through
+      const assistantMessages = messages.filter(m => m.role === 'assistant');
+      expect(assistantMessages).toHaveLength(0);
     });
   });
 });

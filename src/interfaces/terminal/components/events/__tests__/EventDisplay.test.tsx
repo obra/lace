@@ -103,4 +103,32 @@ describe('EventDisplay', () => {
     const { lastFrame } = render(<EventDisplay event={event} isStreaming={true} />);
     expect(lastFrame()).toContain('thinking...');
   });
+
+  it('should render SYSTEM_PROMPT events', () => {
+    const event: ThreadEvent = {
+      id: 'evt-7',
+      threadId: 'thread-1',
+      type: 'SYSTEM_PROMPT',
+      timestamp: new Date(),
+      data: 'You are a helpful AI assistant.'
+    };
+
+    const { lastFrame } = render(<EventDisplay event={event} />);
+    expect(lastFrame()).toContain('🔧 System Prompt');
+    expect(lastFrame()).toContain('(press Enter to toggle)');
+  });
+
+  it('should render USER_SYSTEM_PROMPT events', () => {
+    const event: ThreadEvent = {
+      id: 'evt-8',
+      threadId: 'thread-1',
+      type: 'USER_SYSTEM_PROMPT',
+      timestamp: new Date(),
+      data: 'Always be concise and helpful.'
+    };
+
+    const { lastFrame } = render(<EventDisplay event={event} />);
+    expect(lastFrame()).toContain('📋 User Instructions');
+    expect(lastFrame()).toContain('(press Enter to toggle)');
+  });
 });

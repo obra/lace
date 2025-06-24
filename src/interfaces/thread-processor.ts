@@ -30,7 +30,13 @@ export type TimelineItem =
       timestamp: Date;
       callId: string;
     }
-  | { type: 'system_message'; content: string; timestamp: Date; id: string }
+  | {
+      type: 'system_message';
+      content: string;
+      timestamp: Date;
+      id: string;
+      originalEventType?: string;
+    }
   | { type: 'ephemeral_message'; messageType: string; content: string; timestamp: Date };
 
 // Cached processed events (from persisted ThreadEvents)
@@ -306,6 +312,29 @@ export class ThreadProcessor {
             content: event.data as string,
             timestamp: event.timestamp,
             id: event.id,
+            originalEventType: 'LOCAL_SYSTEM_MESSAGE',
+          });
+          break;
+        }
+
+        case 'SYSTEM_PROMPT': {
+          items.push({
+            type: 'system_message',
+            content: event.data as string,
+            timestamp: event.timestamp,
+            id: event.id,
+            originalEventType: 'SYSTEM_PROMPT',
+          });
+          break;
+        }
+
+        case 'USER_SYSTEM_PROMPT': {
+          items.push({
+            type: 'system_message',
+            content: event.data as string,
+            timestamp: event.timestamp,
+            id: event.id,
+            originalEventType: 'USER_SYSTEM_PROMPT',
           });
           break;
         }

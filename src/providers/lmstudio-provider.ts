@@ -260,6 +260,14 @@ export class LMStudioProvider extends AIProvider {
 
     const lmMessages: OpenAIStyleMessage[] = [];
 
+    // Add system prompt if configured
+    if (this._systemPrompt) {
+      lmMessages.push({
+        role: 'system',
+        content: this._systemPrompt,
+      });
+    }
+
     for (const msg of messages) {
       // For assistant messages with tool calls, add the assistant message with tool_calls array
       if (msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0) {

@@ -352,7 +352,15 @@ const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       timestamp: new Date(),
     });
     
-    agent.start();
+    // Start agent asynchronously
+    agent.start().catch((error) => {
+      console.error('Failed to start agent:', error);
+      addMessage({
+        type: "system",
+        content: `❌ Failed to start agent: ${error.message}`,
+        timestamp: new Date(),
+      });
+    });
     
     // Set initial focus to shell input (for typing)
     focus('shell-input');

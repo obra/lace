@@ -17,6 +17,7 @@ import { logger } from '../utils/logger.js';
 import { StopReasonHandler } from '../token-management/stop-reason-handler.js';
 import { TokenBudgetManager } from '../token-management/token-budget-manager.js';
 import { TokenBudgetConfig } from '../token-management/types.js';
+import { loadPromptConfig } from '../config/prompts.js';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -132,7 +133,30 @@ export class Agent extends EventEmitter {
   }
 
   // Control methods
-  start(): void {
+  async start(): Promise<void> {
+    // Load prompts when starting
+    const promptConfig = await loadPromptConfig({
+      tools: this._tools.map((tool) => ({ name: tool.name, description: tool.description })),
+    });
+
+    // Configure provider with loaded system prompt
+    this._provider.setSystemPrompt(promptConfig.systemPrompt);
+
+    // Record events for new conversations only
+    const events = this._threadManager.getEvents(this._threadId);
+    const hasConversationStarted = events.some(
+      (e) => e.type === 'USER_MESSAGE' || e.type === 'AGENT_MESSAGE'
+    );
+
+    if (!hasConversationStarted) {
+      this._threadManager.addEvent(this._threadId, 'SYSTEM_PROMPT', promptConfig.systemPrompt);
+      this._threadManager.addEvent(
+        this._threadId,
+        'USER_SYSTEM_PROMPT',
+        promptConfig.userInstructions
+      );
+    }
+
     this._isRunning = true;
     logger.info('AGENT: Started', {
       threadId: this._threadId,
@@ -648,8 +672,13 @@ export class Agent extends EventEmitter {
           content: '', // No text content for pure tool results
           toolResults: toolResultsForThisMessage,
         });
-      } else if (event.type === 'LOCAL_SYSTEM_MESSAGE' || event.type === 'THINKING') {
-        // Skip local system messages and thinking events - they're not sent to model
+      } else if (
+        event.type === 'LOCAL_SYSTEM_MESSAGE' ||
+        event.type === 'THINKING' ||
+        event.type === 'SYSTEM_PROMPT' ||
+        event.type === 'USER_SYSTEM_PROMPT'
+      ) {
+        // Skip UI-only events - they're not sent to model
         continue;
       } else {
         throw new Error(`Unknown event type: ${event.type}`);
