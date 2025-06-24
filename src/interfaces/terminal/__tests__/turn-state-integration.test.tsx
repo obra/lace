@@ -66,7 +66,7 @@ describe('Turn State Integration Tests', () => {
   let threadId: string;
   let terminalInterface: TerminalInterface;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     const mockResponse: ProviderResponse = {
       content: 'Test response',
       toolCalls: [],
@@ -91,7 +91,7 @@ describe('Turn State Integration Tests', () => {
       tools: []
     });
 
-    agent.start();
+    await agent.start();
     terminalInterface = new TerminalInterface(agent);
   });
 

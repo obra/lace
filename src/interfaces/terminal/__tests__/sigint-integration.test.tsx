@@ -64,7 +64,7 @@ describe('SIGINT Integration Tests', () => {
   let threadManager: ThreadManager;
   let threadId: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     const mockResponse: ProviderResponse = {
       content: 'Test response',
       toolCalls: [],
@@ -89,7 +89,7 @@ describe('SIGINT Integration Tests', () => {
       tools: []
     });
 
-    agent.start();
+    await agent.start();
   });
 
   afterEach(() => {

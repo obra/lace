@@ -28,8 +28,8 @@ class MockAbortableProvider extends AIProvider {
   }
 
   async createResponse(
-    _messages: ProviderMessage[], 
-    _tools: Tool[], 
+    _messages: ProviderMessage[],
+    _tools: Tool[],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     // Check if aborted before starting
@@ -56,8 +56,8 @@ class MockAbortableProvider extends AIProvider {
   }
 
   async createStreamingResponse(
-    _messages: ProviderMessage[], 
-    _tools: Tool[], 
+    _messages: ProviderMessage[],
+    _tools: Tool[],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     return this.createResponse(_messages, _tools, signal);
@@ -71,7 +71,7 @@ describe('Agent Abort Functionality', () => {
   let threadManager: ThreadManager;
   let threadId: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Create mock response
     const mockResponse: ProviderResponse = {
       content: 'Test response',
@@ -79,8 +79,8 @@ describe('Agent Abort Functionality', () => {
       usage: {
         promptTokens: 10,
         completionTokens: 5,
-        totalTokens: 15
-      }
+        totalTokens: 15,
+      },
     };
 
     provider = new MockAbortableProvider(mockResponse, 100); // 100ms delay
@@ -94,11 +94,11 @@ describe('Agent Abort Functionality', () => {
       toolExecutor,
       threadManager,
       threadId,
-      tools: []
+      tools: [],
     };
 
     agent = new Agent(config);
-    agent.start();
+    await agent.start();
   });
 
   afterEach(() => {
@@ -119,7 +119,7 @@ describe('Agent Abort Functionality', () => {
       // Arrange
       let wasAborted = false;
       let turnAbortedEvent: { turnId: string; metrics: CurrentTurnMetrics } | null = null;
-      
+
       agent.on('turn_aborted', (data: { turnId: string; metrics: CurrentTurnMetrics }) => {
         turnAbortedEvent = data;
         wasAborted = true;
@@ -127,9 +127,9 @@ describe('Agent Abort Functionality', () => {
 
       // Start a slow operation
       const messagePromise = agent.sendMessage('This should be aborted');
-      
+
       // Wait a bit to ensure the operation starts
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Act - abort the operation
       const result = agent.abort();
@@ -149,7 +149,7 @@ describe('Agent Abort Functionality', () => {
     it('should handle abort during provider response', async () => {
       // Arrange
       const events: string[] = [];
-      
+
       agent.on('turn_start', () => events.push('turn_start'));
       agent.on('turn_aborted', () => events.push('turn_aborted'));
       agent.on('turn_complete', () => events.push('turn_complete'));
@@ -157,9 +157,9 @@ describe('Agent Abort Functionality', () => {
 
       // Start a slow operation
       const messagePromise = agent.sendMessage('Slow operation');
-      
+
       // Wait a bit to ensure the operation starts
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Act - abort the operation
       agent.abort();
@@ -177,7 +177,7 @@ describe('Agent Abort Functionality', () => {
     it('should clean up progress timer when aborted', async () => {
       // Arrange
       const progressEvents: { metrics: CurrentTurnMetrics }[] = [];
-      
+
       agent.on('turn_progress', (data) => {
         progressEvents.push(data);
       });
@@ -185,18 +185,18 @@ describe('Agent Abort Functionality', () => {
       // Start operation with fake timers to control progress updates
       vi.useFakeTimers();
       const messagePromise = agent.sendMessage('Operation to abort');
-      
+
       // Advance time to get some progress events
       await vi.advanceTimersByTimeAsync(1000); // 1 second
-      
+
       const progressEventsBefore = progressEvents.length;
 
       // Act - abort
       agent.abort();
-      
+
       // Advance time more - should not get more progress events
       await vi.advanceTimersByTimeAsync(2000); // 2 more seconds
-      
+
       await messagePromise;
 
       // Assert
@@ -209,10 +209,10 @@ describe('Agent Abort Functionality', () => {
     it('should pass abort signal to provider methods', async () => {
       // Arrange
       const createResponseSpy = vi.spyOn(provider, 'createResponse');
-      
+
       // Start operation and immediately abort
       const messagePromise = agent.sendMessage('Test message');
-      await new Promise(resolve => setTimeout(resolve, 10)); // Let it start
+      await new Promise((resolve) => setTimeout(resolve, 10)); // Let it start
       agent.abort();
       await messagePromise;
 
@@ -227,7 +227,7 @@ describe('Agent Abort Functionality', () => {
       // Arrange - provider that immediately throws AbortError
       const abortingProvider = new MockAbortableProvider({
         content: 'Should not see this',
-        toolCalls: []
+        toolCalls: [],
       });
 
       // Mock to always throw AbortError
@@ -242,9 +242,9 @@ describe('Agent Abort Functionality', () => {
         toolExecutor,
         threadManager,
         threadId,
-        tools: []
+        tools: [],
       });
-      abortAgent.start();
+      await abortAgent.start();
 
       const errorEvents: any[] = [];
       abortAgent.on('error', (data) => errorEvents.push(data));
@@ -263,28 +263,28 @@ describe('Agent Abort Functionality', () => {
       // Arrange
       const streamingProvider = new MockAbortableProvider({
         content: 'Streaming response',
-        toolCalls: []
+        toolCalls: [],
       });
-      
+
       // Make it support streaming
       Object.defineProperty(streamingProvider, 'supportsStreaming', {
-        get: () => true
+        get: () => true,
       });
-      
+
       const createStreamingSpy = vi.spyOn(streamingProvider, 'createStreamingResponse');
-      
+
       const streamingAgent = new Agent({
         provider: streamingProvider,
         toolExecutor,
         threadManager,
         threadId,
-        tools: []
+        tools: [],
       });
-      streamingAgent.start();
+      await streamingAgent.start();
 
       // Act
       const messagePromise = streamingAgent.sendMessage('Streaming test');
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       streamingAgent.abort();
       await messagePromise;
 

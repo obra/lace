@@ -33,35 +33,40 @@ class MockTokenProvider extends AIProvider {
     if (this.delay > 0) {
       await new Promise((resolve) => setTimeout(resolve, this.delay));
     }
-    
+
     // Return response with or without usage data based on configuration
     return {
       ...this.mockResponse,
-      usage: this.shouldReturnUsage ? this.mockResponse.usage : undefined
+      usage: this.shouldReturnUsage ? this.mockResponse.usage : undefined,
     };
   }
 
-  async createStreamingResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+  async createStreamingResponse(
+    _messages: ProviderMessage[],
+    _tools: Tool[]
+  ): Promise<ProviderResponse> {
     // Simulate streaming with token events
     if (this.mockResponse.usage) {
       // Emit streaming token events during processing
       setTimeout(() => {
-        this.emit('token_usage_update', { 
+        this.emit('token_usage_update', {
           usage: {
             promptTokens: this.mockResponse.usage!.promptTokens,
             completionTokens: Math.floor(this.mockResponse.usage!.completionTokens! / 2),
-            totalTokens: this.mockResponse.usage!.promptTokens! + Math.floor(this.mockResponse.usage!.completionTokens! / 2)
-          }
+            totalTokens:
+              this.mockResponse.usage!.promptTokens! +
+              Math.floor(this.mockResponse.usage!.completionTokens! / 2),
+          },
         });
       }, 10);
-      
+
       setTimeout(() => {
-        this.emit('token_usage_update', { 
-          usage: this.mockResponse.usage 
+        this.emit('token_usage_update', {
+          usage: this.mockResponse.usage,
         });
       }, 20);
     }
-    
+
     return this.createResponse(_messages, _tools);
   }
 }
@@ -73,7 +78,7 @@ describe('Agent Token Tracking Integration', () => {
   let threadManager: ThreadManager;
   let threadId: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Create mock response with token usage
     const mockResponse: ProviderResponse = {
       content: 'Test response with tokens',
@@ -81,8 +86,8 @@ describe('Agent Token Tracking Integration', () => {
       usage: {
         promptTokens: 50,
         completionTokens: 30,
-        totalTokens: 80
-      }
+        totalTokens: 80,
+      },
     };
 
     provider = new MockTokenProvider(mockResponse);
@@ -96,11 +101,11 @@ describe('Agent Token Tracking Integration', () => {
       toolExecutor,
       threadManager,
       threadId,
-      tools: []
+      tools: [],
     };
 
     agent = new Agent(config);
-    agent.start();
+    await agent.start();
   });
 
   afterEach(() => {
@@ -113,7 +118,7 @@ describe('Agent Token Tracking Integration', () => {
       // Arrange
       const progressEvents: Array<{ metrics: CurrentTurnMetrics }> = [];
       const completeEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
-      
+
       agent.on('turn_progress', (data) => progressEvents.push(data));
       agent.on('turn_complete', (data) => completeEvents.push(data));
 
@@ -123,15 +128,15 @@ describe('Agent Token Tracking Integration', () => {
       // Assert
       expect(completeEvents).toHaveLength(1);
       const finalMetrics = completeEvents[0].metrics;
-      
+
       // Should track input tokens from user message
       expect(finalMetrics.tokensIn).toBeGreaterThan(0);
-      
+
       // Should include estimated tokens for user input (~4 chars per token)
       const userMessage = 'This is a test message that should have input tokens counted';
       const estimatedUserTokens = Math.ceil(userMessage.length / 4);
       expect(finalMetrics.tokensIn).toBeGreaterThanOrEqual(estimatedUserTokens);
-      
+
       // Turn metrics track only current turn input, not full conversation context
       // Provider's promptTokens (50) include entire conversation context and aren't part of turn metrics
     });
@@ -144,14 +149,14 @@ describe('Agent Token Tracking Integration', () => {
           {
             id: 'call_1',
             name: 'test_tool',
-            input: { test: 'value' }
-          }
+            input: { test: 'value' },
+          },
         ],
         usage: {
           promptTokens: 30,
           completionTokens: 20,
-          totalTokens: 50
-        }
+          totalTokens: 50,
+        },
       };
 
       const followUpResponse: ProviderResponse = {
@@ -160,8 +165,8 @@ describe('Agent Token Tracking Integration', () => {
         usage: {
           promptTokens: 40,
           completionTokens: 25,
-          totalTokens: 65
-        }
+          totalTokens: 65,
+        },
       };
 
       // Mock tool that returns a result
@@ -171,15 +176,15 @@ describe('Agent Token Tracking Integration', () => {
         input_schema: {
           type: 'object',
           properties: {
-            test: { type: 'string' }
+            test: { type: 'string' },
           },
-          required: []
+          required: [],
         },
         executeTool: vi.fn().mockResolvedValue({
           success: true,
           output: 'Tool executed successfully',
-          metadata: {}
-        })
+          metadata: {},
+        }),
       };
 
       // Create new agent with tool and multi-response provider
@@ -189,9 +194,9 @@ describe('Agent Token Tracking Integration', () => {
         toolExecutor,
         threadManager,
         threadId,
-        tools: [mockTool]
+        tools: [mockTool],
       });
-      multiCallAgent.start();
+      await multiCallAgent.start();
 
       // Setup provider to return different responses on subsequent calls
       let callCount = 0;
@@ -209,7 +214,7 @@ describe('Agent Token Tracking Integration', () => {
       // Assert
       expect(completeEvents).toHaveLength(1);
       const finalMetrics = completeEvents[0].metrics;
-      
+
       // Turn metrics track only user input estimation, not provider context tokens
       // Provider promptTokens include conversation context and aren't part of turn metrics
       expect(finalMetrics.tokensIn).toBeGreaterThan(0);
@@ -228,7 +233,7 @@ describe('Agent Token Tracking Integration', () => {
       // Assert
       expect(completeEvents).toHaveLength(1);
       const finalMetrics = completeEvents[0].metrics;
-      
+
       // Should track output tokens from provider response
       expect(finalMetrics.tokensOut).toBeGreaterThan(0);
       expect(finalMetrics.tokensOut).toBe(30); // Provider reported 30 completion tokens
@@ -242,14 +247,14 @@ describe('Agent Token Tracking Integration', () => {
           {
             id: 'call_1',
             name: 'test_tool',
-            input: { test: 'value' }
-          }
+            input: { test: 'value' },
+          },
         ],
         usage: {
           promptTokens: 30,
           completionTokens: 15,
-          totalTokens: 45
-        }
+          totalTokens: 45,
+        },
       };
 
       const followUpResponse: ProviderResponse = {
@@ -258,8 +263,8 @@ describe('Agent Token Tracking Integration', () => {
         usage: {
           promptTokens: 40,
           completionTokens: 35,
-          totalTokens: 75
-        }
+          totalTokens: 75,
+        },
       };
 
       const mockTool: Tool = {
@@ -269,8 +274,8 @@ describe('Agent Token Tracking Integration', () => {
         executeTool: vi.fn().mockResolvedValue({
           success: true,
           output: 'Tool result',
-          metadata: {}
-        })
+          metadata: {},
+        }),
       };
 
       const multiCallProvider = new MockTokenProvider(toolCallResponse);
@@ -279,9 +284,9 @@ describe('Agent Token Tracking Integration', () => {
         toolExecutor,
         threadManager,
         threadId,
-        tools: [mockTool]
+        tools: [mockTool],
       });
-      multiCallAgent.start();
+      await multiCallAgent.start();
 
       let callCount = 0;
       vi.spyOn(multiCallProvider, 'createResponse').mockImplementation(async () => {
@@ -298,7 +303,7 @@ describe('Agent Token Tracking Integration', () => {
       // Assert
       expect(completeEvents).toHaveLength(1);
       const finalMetrics = completeEvents[0].metrics;
-      
+
       // Should accumulate output tokens (15 + 35 = 50)
       expect(finalMetrics.tokensOut).toBe(50);
     });
@@ -317,13 +322,13 @@ describe('Agent Token Tracking Integration', () => {
         usage: {
           promptTokens: 60,
           completionTokens: 40,
-          totalTokens: 100
-        }
+          totalTokens: 100,
+        },
       });
 
       // Mock to support streaming
       Object.defineProperty(streamingProvider, 'supportsStreaming', {
-        get: () => true
+        get: () => true,
       });
 
       const streamingAgent = new Agent({
@@ -331,29 +336,27 @@ describe('Agent Token Tracking Integration', () => {
         toolExecutor,
         threadManager,
         threadId,
-        tools: []
+        tools: [],
       });
-      streamingAgent.start();
+      await streamingAgent.start();
 
       streamingAgent.on('turn_progress', (data) => progressEvents.push(data));
 
       // Act
       await streamingAgent.sendMessage('Stream some tokens');
-      
+
       // Wait for streaming events to process
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Assert
       // Should have received multiple progress events with increasing token counts
       expect(progressEvents.length).toBeGreaterThan(0);
-      
+
       // Find events that have token updates (some might just be timer-based)
-      const tokenProgressEvents = progressEvents.filter(event => 
-        event.metrics.tokensOut > 0
-      );
-      
+      const tokenProgressEvents = progressEvents.filter((event) => event.metrics.tokensOut > 0);
+
       expect(tokenProgressEvents.length).toBeGreaterThan(0);
-      
+
       // Final token count should match the complete response
       const lastEvent = progressEvents[progressEvents.length - 1];
       expect(lastEvent.metrics.tokensOut).toBeGreaterThan(0);
@@ -367,7 +370,7 @@ describe('Agent Token Tracking Integration', () => {
         {
           content: 'Response without usage data',
           toolCalls: [],
-          usage: undefined
+          usage: undefined,
         },
         0,
         false // shouldReturnUsage = false
@@ -378,9 +381,9 @@ describe('Agent Token Tracking Integration', () => {
         toolExecutor,
         threadManager,
         threadId,
-        tools: []
+        tools: [],
       });
-      noUsageAgent.start();
+      await noUsageAgent.start();
 
       const completeEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
       noUsageAgent.on('turn_complete', (data) => completeEvents.push(data));
@@ -391,16 +394,16 @@ describe('Agent Token Tracking Integration', () => {
       // Assert
       expect(completeEvents).toHaveLength(1);
       const finalMetrics = completeEvents[0].metrics;
-      
+
       // Should still have token counts using estimation
       expect(finalMetrics.tokensIn).toBeGreaterThan(0);
       expect(finalMetrics.tokensOut).toBeGreaterThan(0);
-      
+
       // Estimated input tokens (~4 chars per token)
       const userMessage = 'Message requiring token estimation';
       const estimatedUserTokens = Math.ceil(userMessage.length / 4);
       expect(finalMetrics.tokensIn).toBeGreaterThanOrEqual(estimatedUserTokens);
-      
+
       // Estimated output tokens
       const responseContent = 'Response without usage data';
       const estimatedOutputTokens = Math.ceil(responseContent.length / 4);
@@ -418,10 +421,10 @@ describe('Agent Token Tracking Integration', () => {
       // Assert
       expect(completeEvents).toHaveLength(1);
       const finalMetrics = completeEvents[0].metrics;
-      
+
       // Should use exact token counts from provider, not estimation
       expect(finalMetrics.tokensOut).toBe(30); // Exact count from mock provider
-      
+
       // Turn metrics track only user input estimation, not provider prompt tokens
       // Provider's promptTokens (50) are for session tracking, not turn metrics
       expect(finalMetrics.tokensIn).toBeGreaterThan(0);
@@ -433,7 +436,7 @@ describe('Agent Token Tracking Integration', () => {
       // Arrange
       const firstCompleteEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
       const secondCompleteEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
-      
+
       let eventCount = 0;
       agent.on('turn_complete', (data) => {
         eventCount++;
@@ -451,20 +454,20 @@ describe('Agent Token Tracking Integration', () => {
       // Assert
       expect(firstCompleteEvents).toHaveLength(1);
       expect(secondCompleteEvents).toHaveLength(1);
-      
+
       const firstMetrics = firstCompleteEvents[0].metrics;
       const secondMetrics = secondCompleteEvents[0].metrics;
-      
+
       // Both turns should have similar token counts (not accumulated)
       expect(firstMetrics.tokensIn).toBeGreaterThan(0);
       expect(firstMetrics.tokensOut).toBeGreaterThan(0);
       expect(secondMetrics.tokensIn).toBeGreaterThan(0);
       expect(secondMetrics.tokensOut).toBeGreaterThan(0);
-      
+
       // Second turn shouldn't accumulate from first turn
       expect(secondMetrics.tokensIn).toBeLessThan(firstMetrics.tokensIn * 2);
       expect(secondMetrics.tokensOut).toBeLessThan(firstMetrics.tokensOut * 2);
-      
+
       // Turn IDs should be different
       expect(firstMetrics.turnId).not.toBe(secondMetrics.turnId);
     });

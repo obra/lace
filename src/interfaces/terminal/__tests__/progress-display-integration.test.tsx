@@ -68,7 +68,7 @@ describe('Progress Display Integration Tests', () => {
   let threadManager: ThreadManager;
   let threadId: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Create mock response with comprehensive token usage
     const mockResponse: ProviderResponse = {
       content: 'Test response with progress tracking',
@@ -93,7 +93,7 @@ describe('Progress Display Integration Tests', () => {
       threadId,
       tools: []
     });
-    agent.start();
+    await agent.start();
   });
 
   afterEach(() => {

@@ -42,7 +42,7 @@ describe('Agent Turn Tracking', () => {
   let threadManager: ThreadManager;
   let threadId: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Create mock response without tool calls
     const mockResponse: ProviderResponse = {
       content: 'Test response',
@@ -69,7 +69,7 @@ describe('Agent Turn Tracking', () => {
     };
 
     agent = new Agent(config);
-    agent.start();
+    await agent.start();
   });
 
   afterEach(() => {
@@ -153,7 +153,7 @@ describe('Agent Turn Tracking', () => {
         threadId,
         tools: [],
       });
-      slowAgent.start();
+      await slowAgent.start();
       slowAgent.on('turn_progress', (data) => {
         progressEvents.push(data);
       });

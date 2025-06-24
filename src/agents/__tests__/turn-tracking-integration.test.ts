@@ -176,7 +176,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
         threadId,
         tools: [],
       });
-      agent.start();
+      await agent.start();
 
       // Track turn lifecycle events
       const turnEvents: Array<{ type: string; metrics?: CurrentTurnMetrics }> = [];
@@ -221,7 +221,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
         threadId,
         tools: [],
       });
-      agent.start();
+      await agent.start();
 
       // Track token usage updates
       const tokenUpdates: Array<{ usage: any }> = [];
@@ -255,7 +255,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
         threadId,
         tools: [],
       });
-      agent.start();
+      await agent.start();
 
       // Track state changes
       const stateChanges: Array<{ from: string; to: string }> = [];
@@ -290,7 +290,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
         threadId,
         tools: [],
       });
-      agent.start();
+      await agent.start();
 
       // Track streaming tokens
       const streamingTokens: string[] = [];
@@ -325,7 +325,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
         threadId,
         tools: [],
       });
-      agent.start();
+      await agent.start();
 
       // Track abort events
       const abortEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
@@ -407,7 +407,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
         threadId,
         tools: [mockTool],
       });
-      agent.start();
+      await agent.start();
 
       // Track turn lifecycle events
       const turnEvents: Array<{ type: string; metrics?: CurrentTurnMetrics }> = [];
@@ -450,7 +450,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
         threadId,
         tools: [],
       });
-      agent.start();
+      await agent.start();
 
       // Track all progress events and measure timing
       const progressEvents: Array<{ timestamp: number; metrics: CurrentTurnMetrics }> = [];
@@ -501,7 +501,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
         threadId,
         tools: [],
       });
-      agent.start();
+      await agent.start();
 
       // Track progress and token updates
       const progressEvents: Array<{ metrics: CurrentTurnMetrics }> = [];
@@ -552,7 +552,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
         threadId,
         tools: [],
       });
-      agent.start();
+      await agent.start();
 
       // Track error and turn events
       const errorEvents: Array<{ error: Error }> = [];
@@ -590,7 +590,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
         threadId,
         tools: [],
       });
-      agent.start();
+      await agent.start();
 
       // Act
       const messagePromise = agent.sendMessage('Test without abort signal');
