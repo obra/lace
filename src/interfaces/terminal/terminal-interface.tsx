@@ -611,7 +611,13 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
                   approvalRequest 
                     ? "Tool approval required..." 
                     : isTurnActive && currentTurnMetrics
-                      ? `Processing... ⏱️ ${Math.floor(currentTurnMetrics.elapsedMs / 1000)}s | Press Ctrl+C to abort`
+                      ? (() => {
+                          const elapsedSeconds = Math.floor(currentTurnMetrics.elapsedMs / 1000);
+                          const duration = elapsedSeconds >= 60 
+                            ? `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s`
+                            : `${elapsedSeconds}s`;
+                          return `Processing... ⏱️ ${duration} | Press Ctrl+C to abort`;
+                        })()
                       : "Type your message..."
                 }
                 onSubmit={handleSubmit}

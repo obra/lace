@@ -769,9 +769,17 @@ export class Agent extends EventEmitter {
   private _startProgressTimer(): void {
     this._progressTimer = setInterval(() => {
       if (this._currentTurnMetrics) {
-        this._currentTurnMetrics.elapsedMs =
-          Date.now() - this._currentTurnMetrics.startTime.getTime();
-        this.emit('turn_progress', { metrics: { ...this._currentTurnMetrics } });
+        try {
+          this._currentTurnMetrics.elapsedMs =
+            Date.now() - this._currentTurnMetrics.startTime.getTime();
+          this.emit('turn_progress', { metrics: { ...this._currentTurnMetrics } });
+        } catch (error) {
+          // Defensive error handling for progress timer
+          logger.debug('Progress timer error', {
+            error: error instanceof Error ? error.message : String(error),
+            threadId: this._threadId,
+          });
+        }
       }
     }, 1000) as unknown as number; // Every second
   }
@@ -812,7 +820,7 @@ export class Agent extends EventEmitter {
   }
 
   private _addTokensToCurrentTurn(direction: 'in' | 'out', tokens: number): void {
-    if (this._currentTurnMetrics && tokens > 0) {
+    if (this._currentTurnMetrics && tokens > 0 && Number.isFinite(tokens)) {
       if (direction === 'in') {
         this._currentTurnMetrics.tokensIn += tokens;
       } else {

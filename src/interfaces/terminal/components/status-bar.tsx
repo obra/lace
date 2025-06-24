@@ -51,9 +51,28 @@ const StatusBar: React.FC<StatusBarProps> = ({
     if (!metrics) return null;
     
     const elapsedSeconds = Math.floor(metrics.elapsedMs / 1000);
-    const tokenDisplay = `↑${metrics.tokensIn} ↓${metrics.tokensOut}`;
     
-    return `⏱️ ${elapsedSeconds}s • ${tokenDisplay}`;
+    // Format duration for readability
+    let duration: string;
+    if (elapsedSeconds >= 60) {
+      const minutes = Math.floor(elapsedSeconds / 60);
+      const remainingSeconds = elapsedSeconds % 60;
+      duration = `${minutes}m ${remainingSeconds}s`;
+    } else {
+      duration = `${elapsedSeconds}s`;
+    }
+    
+    // Format tokens with k suffix for large numbers
+    const formatTokenCount = (count: number) => {
+      if (count >= 1000) {
+        return `${(count / 1000).toFixed(1)}k`;
+      }
+      return count.toString();
+    };
+    
+    const tokenDisplay = `↑${formatTokenCount(metrics.tokensIn)} ↓${formatTokenCount(metrics.tokensOut)}`;
+    
+    return `⏱️ ${duration} • ${tokenDisplay}`;
   };
 
   // Format thread ID for display (don't truncate)

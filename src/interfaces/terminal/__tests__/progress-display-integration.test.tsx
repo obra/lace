@@ -1,4 +1,4 @@
-// ABOUTME: Tests for Phase 5 enhanced progress display and UI improvements
+// ABOUTME: Tests for enhanced progress display and UI improvements
 // ABOUTME: Validates real-time progress tracking, token display, and user experience enhancements
 
 import React from 'react';
@@ -61,7 +61,7 @@ class MockProgressProvider extends AIProvider {
   }
 }
 
-describe('Phase 5: Progress Display Integration Tests', () => {
+describe('Progress Display Integration Tests', () => {
   let agent: Agent;
   let provider: MockProgressProvider;
   let toolExecutor: ToolExecutor;
