@@ -104,4 +104,8 @@ export abstract class AIProvider extends EventEmitter {
 
   abstract get providerName(): string;
   abstract get defaultModel(): string;
+
+  get modelName(): string {
+    return this._config.model || this.defaultModel;
+  }
 }

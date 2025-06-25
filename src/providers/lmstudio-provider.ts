@@ -84,18 +84,17 @@ export class LMStudioProvider extends AIProvider {
     tools: Tool[] = [],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    const modelId = this._config.model || this.defaultModel;
-    await this._ensureModelLoaded(modelId);
+    await this._ensureModelLoaded(this.modelName);
 
     logger.debug('Creating LMStudio response with native tool calling', {
       provider: 'lmstudio',
-      model: modelId,
+      model: this.modelName,
       messageCount: messages.length,
       toolCount: tools.length,
       toolNames: tools.map((t) => t.name),
     });
 
-    return this._createResponseWithNativeToolCalling(messages, tools, modelId, signal);
+    return this._createResponseWithNativeToolCalling(messages, tools, this.modelName, signal);
   }
 
   private async _ensureModelLoaded(modelId: string): Promise<void> {
@@ -594,7 +593,7 @@ export class LMStudioProvider extends AIProvider {
     tools: Tool[] = [],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    const modelId = this._config.model || this.defaultModel;
+    const modelId = this.modelName;
     await this._ensureModelLoaded(modelId);
 
     logger.debug('Creating streaming LMStudio response with native tool calling', {
