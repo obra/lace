@@ -192,8 +192,10 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     setAlert(null);
   }, []);
 
-  // Note: Removed disableFocus() to allow proper Ink focus management
-  // ShellInput will handle Tab explicitly to prevent unwanted focus cycling
+  // Disable Tab cycling completely - we want manual focus control only
+  useEffect(() => {
+    disableFocus();
+  }, [disableFocus]);
   
   // Note: Removed global escape handler to let focused components handle escape properly
   // Each component (TimelineDisplay, ShellInput) handles its own escape behavior
