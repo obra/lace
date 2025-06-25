@@ -24,6 +24,7 @@ describe('NonInteractiveInterface', () => {
     // Create mock dependencies with EventEmitter methods
     agent = {
       providerName: 'mock-provider',
+      provider: { defaultModel: 'mock-model'},
       start: vi.fn(),
       sendMessage: vi.fn().mockImplementation(async () => {
         // Simulate agent events during sendMessage
@@ -74,7 +75,7 @@ describe('NonInteractiveInterface', () => {
 
       await nonInteractive.executePrompt('Test prompt');
 
-      expect(consoleSpy).toHaveBeenCalledWith('🤖 Lace Agent using mock-provider provider.\n');
+      expect(consoleSpy).toHaveBeenCalledWith('Lace with mock-provider mock-model.\n');
     });
 
     it('should work without tool executor', async () => {

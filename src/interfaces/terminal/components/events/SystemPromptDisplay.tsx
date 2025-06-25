@@ -10,11 +10,12 @@ import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
 interface SystemPromptDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
-  isFocused?: boolean;
+  focusId?: string;
   onToggle?: () => void;
+  onEscape?: () => void;
 }
 
-export function SystemPromptDisplay({ event, isStreaming, isFocused, onToggle }: SystemPromptDisplayProps) {
+export function SystemPromptDisplay({ event, isStreaming, focusId, onToggle, onEscape }: SystemPromptDisplayProps) {
   const systemPrompt = event.data as string;
   const [isExpanded, setIsExpanded] = useState(false);
   
@@ -24,9 +25,10 @@ export function SystemPromptDisplay({ event, isStreaming, isFocused, onToggle }:
       label={`${UI_SYMBOLS.TOOL} System Prompt`}
       isExpanded={isExpanded}
       onExpandedChange={setIsExpanded}
-      borderColor={UI_COLORS.INFO}
-      isFocused={isFocused}
+      expandedBorderColor={UI_COLORS.INFO}
+      focusId={focusId}
       onToggle={onToggle}
+      onEscape={onEscape}
     >
       <Text color="blue" wrap="wrap">{systemPrompt}</Text>
     </TimelineEntryCollapsibleBox>

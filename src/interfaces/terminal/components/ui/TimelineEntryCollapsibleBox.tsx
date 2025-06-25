@@ -2,7 +2,7 @@
 // ABOUTME: Provides standardized bottom padding for timeline event displays
 
 import React, { useCallback } from 'react';
-import { Box, useInput } from 'ink';
+import { Box, useInput, useFocus } from 'ink';
 import { CollapsibleBox } from './CollapsibleBox.js';
 
 interface TimelineEntryCollapsibleBoxProps {
@@ -12,10 +12,11 @@ interface TimelineEntryCollapsibleBoxProps {
   isExpanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   maxHeight?: number;
-  borderStyle?: 'single' | 'double' | 'round';
-  borderColor?: string;
-  isFocused?: boolean;
+  expandedBorderStyle?: 'single' | 'double' | 'round';
+  expandedBorderColor?: string;
+  focusId?: string; // Unique focus ID for this component
   onToggle?: () => void; // Called when expanded/collapsed to trigger height re-measurement
+  onEscape?: () => void; // Called when escape key is pressed
 }
 
 export function TimelineEntryCollapsibleBox({ 
@@ -25,24 +26,30 @@ export function TimelineEntryCollapsibleBox({
   isExpanded,
   onExpandedChange,
   maxHeight,
-  borderStyle,
-  borderColor,
-  isFocused = false,
-  onToggle
+  expandedBorderStyle,
+  expandedBorderColor,
+  focusId,
+  onToggle,
+  onEscape
 }: TimelineEntryCollapsibleBoxProps) {
   
-  // Handle left/right arrow expansion when focused
+  // Get focus state using the focus hook
+  const { isFocused } = useFocus({ id: focusId });
+  
+  // Handle keyboard input when focused
   useInput(useCallback((input, key) => {
     if (!isFocused) return;
     
-    if (key.rightArrow) {
+    if (key.escape) {
+      onEscape?.();
+    } else if (key.rightArrow) {
       onExpandedChange(true);
       onToggle?.(); // Notify parent of height change
     } else if (key.leftArrow) {
       onExpandedChange(false);
       onToggle?.(); // Notify parent of height change
     }
-  }, [isFocused, onExpandedChange, onToggle]));
+  }, [isFocused, onExpandedChange, onToggle, onEscape]));
   
   return (
     <Box paddingBottom={1}>
@@ -52,8 +59,8 @@ export function TimelineEntryCollapsibleBox({
         summary={summary}
         isExpanded={isExpanded}
         maxHeight={maxHeight}
-        borderStyle={borderStyle}
-        borderColor={borderColor}
+        expandedBorderStyle={expandedBorderStyle}
+        expandedBorderColor={expandedBorderColor}
         isFocused={isFocused}
       />
     </Box>

@@ -2,7 +2,7 @@
 // ABOUTME: Handles keyboard input and manages text buffer state
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { Box, Text, useInput, useFocus } from "ink";
+import { Box, Text, useInput, useFocus, useFocusManager } from "ink";
 import { useTextBuffer } from "../hooks/use-text-buffer.js";
 import TextRenderer from "./text-renderer.js";
 import FileAutocomplete from "./file-autocomplete.js";
@@ -93,6 +93,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
     ? useFocus({ id: focusId, autoFocus: autoFocus && !disabled })
     : null;
   const actualIsFocused = useRealFocus ? focusResult?.isFocused : isFocused && !disabled;
+  const { focus } = useFocusManager();
   const [bufferState, bufferOps] = useTextBuffer(value);
 
   // Autocomplete state
@@ -294,10 +295,16 @@ const ShellInput: React.FC<ShellInputProps> = ({
         return;
       }
 
-      // Handle Escape to close autocomplete
-      if (key.escape && autocompleteVisible) {
-        hideAutocomplete();
-        return;
+      // Handle Escape to close autocomplete or focus timeline
+      if (key.escape) {
+        if (autocompleteVisible) {
+          hideAutocomplete();
+          return;
+        } else {
+          // Focus timeline component explicitly
+          focus('timeline');
+          return;
+        }
       }
       // Handle Enter - autocomplete selection or submit/newline
       if (key.return) {

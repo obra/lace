@@ -192,19 +192,12 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     setAlert(null);
   }, []);
 
-  // Disable automatic Tab cycling to prevent conflicts with autocomplete
-  useEffect(() => {
-    disableFocus();
-  }, [disableFocus]);
+  // Note: Removed disableFocus() to allow proper Ink focus management
+  // ShellInput will handle Tab explicitly to prevent unwanted focus cycling
   
-  // Global keyboard shortcuts for manual focus switching  
-  useInput(useCallback((input, key) => {
-    if (key.escape) {
-      // Escape toggles between shell input and timeline
-      focusNext();
-    }
-    // Tab is NOT handled here - let ShellInput handle it for autocomplete
-  }, [focusNext]), { isActive: !approvalRequest });
+  // Note: Removed global escape handler to let focused components handle escape properly
+  // Each component (TimelineDisplay, ShellInput) handles its own escape behavior
+  // Tab is NOT handled here - let ShellInput handle it for autocomplete
 
   // Sync events from agent's thread (including delegate threads)
   const syncEvents = useCallback(() => {
@@ -451,7 +444,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       setEphemeralMessages([]);
       addMessage({
         type: "system",
-        content: `🤖 New conversation started using ${agent.providerName} provider.`,
+        content: `New conversation started with ${agent.providerName} ${agent.provider.modelName}.`,
         timestamp: new Date(),
       });
     },
@@ -668,7 +661,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
                 onSubmit={handleSubmit}
                 onChange={setCurrentInput}
                 focusId="shell-input"
-                autoFocus={false}
+                autoFocus={true}
                 disabled={false} // Allow typing during processing, submission is controlled in handleSubmit
               />
             </Box>

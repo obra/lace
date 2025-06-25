@@ -1,10 +1,11 @@
 // ABOUTME: Collapsible delegation box component for displaying delegate thread conversations
 // ABOUTME: Shows delegation progress, events, and provides expand/collapse functionality
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import { Timeline } from '../../../thread-processor.js';
 import TimelineDisplay from './TimelineDisplay.js';
+import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
 import { logger } from '../../../../utils/logger.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
 
@@ -12,15 +13,26 @@ interface DelegationBoxProps {
   threadId: string;
   timeline: Timeline;
   delegateTimelines?: Map<string, Timeline>;
-  expanded: boolean;
   parentFocusId?: string; // Focus ID of the parent timeline for escape hierarchy
+  focusId?: string; // Unique focus ID for this delegation box
+  onToggle?: () => void;
+  onEscape?: () => void;
 }
 
-export function DelegationBox({ threadId, timeline, delegateTimelines, expanded, parentFocusId }: DelegationBoxProps) {
+export function DelegationBox({ 
+  threadId, 
+  timeline, 
+  delegateTimelines, 
+  parentFocusId,
+  focusId,
+  onToggle,
+  onEscape
+}: DelegationBoxProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   
   logger.debug('DelegationBox: Rendering', {
     threadId,
-    expanded,
+    isExpanded,
     timelineItemCount: timeline.items.length,
     hasDelegateTimelines: !!delegateTimelines
   });
@@ -39,40 +51,41 @@ export function DelegationBox({ threadId, timeline, delegateTimelines, expanded,
     tokens: `↑${tokens.tokensIn} ↓${tokens.tokensOut}`
   });
   
-  return (
-    <Box flexDirection="column" borderStyle="round" borderColor={isComplete ? "green" : "yellow"} padding={1} marginY={1}>
-      {/* Header */}
-      <Box justifyContent="space-between" marginBottom={expanded ? 1 : 0}>
-        <Box>
-          <Text color={UI_COLORS.DELEGATE}>{UI_SYMBOLS.DELEGATE} </Text>
-          <Text color="gray">{threadId}</Text>
-          <Text color="white"> ({taskDescription})</Text>
-        </Box>
-        <Box>
-          {isComplete ? (
-            <Text color={UI_COLORS.SUCCESS}>{UI_SYMBOLS.SUCCESS} Complete ({duration}) </Text>
-          ) : (
-            <Text color={UI_COLORS.PENDING}>{UI_SYMBOLS.WORKING} Working... ({duration}) </Text>
-          )}
-          <Text color="gray">{UI_SYMBOLS.TOKEN_IN}{formatTokenCount(tokens.tokensIn)} {UI_SYMBOLS.TOKEN_OUT}{formatTokenCount(tokens.tokensOut)} </Text>
-          <Text color="cyan">
-            {expanded ? `[${UI_SYMBOLS.COLLAPSE_HINT} Collapse]` : `[${UI_SYMBOLS.EXPAND_HINT} Expand]`}
-          </Text>
-        </Box>
+  // Create label and summary for the collapsible box
+  const label = `${UI_SYMBOLS.DELEGATE} ${threadId} (${taskDescription})`;
+
+  const summary = (
+    <Box justifyContent="space-between">
+      <Box>
+        {isComplete ? (
+          <Text color={UI_COLORS.SUCCESS}>{UI_SYMBOLS.SUCCESS} Complete ({duration}) </Text>
+        ) : (
+          <Text color={UI_COLORS.PENDING}>{UI_SYMBOLS.WORKING} Working... ({duration}) </Text>
+        )}
+        <Text color="gray">{UI_SYMBOLS.TOKEN_IN}{formatTokenCount(tokens.tokensIn)} {UI_SYMBOLS.TOKEN_OUT}{formatTokenCount(tokens.tokensOut)}</Text>
       </Box>
-      
-      {/* Content */}
-      {expanded && (
-        <Box flexDirection="column" paddingLeft={2}>
-          <TimelineDisplay 
-            timeline={timeline} 
-            delegateTimelines={delegateTimelines}
-            focusId={`delegate-${threadId}`}
-            parentFocusId={parentFocusId}
-          />
-        </Box>
-      )}
     </Box>
+  );
+
+  return (
+    <TimelineEntryCollapsibleBox
+      label={label}
+      summary={summary}
+      isExpanded={isExpanded}
+      onExpandedChange={setIsExpanded}
+      expandedBorderStyle="round"
+      expandedBorderColor={isComplete ? "green" : "yellow"}
+      focusId={focusId}
+      onToggle={onToggle}
+      onEscape={onEscape}
+    >
+      <TimelineDisplay 
+        timeline={timeline} 
+        delegateTimelines={delegateTimelines}
+        focusId={`delegate-${threadId}`}
+        parentFocusId={parentFocusId}
+      />
+    </TimelineEntryCollapsibleBox>
   );
 }
 

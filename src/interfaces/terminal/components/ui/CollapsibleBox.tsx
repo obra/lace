@@ -11,8 +11,8 @@ interface CollapsibleBoxProps {
   summary?: React.ReactNode; // Content to show when collapsed
   isExpanded: boolean; // Controlled state from parent
   maxHeight?: number;
-  borderStyle?: 'single' | 'double' | 'round' | 'classic' | 'bold' | 'arrow';
-  borderColor?: string;
+  expandedBorderStyle?: 'single' | 'double' | 'round' | 'classic' | 'bold' | 'arrow';
+  expandedBorderColor?: string;
   isFocused?: boolean; // Whether this specific box is focused (for visual indication)
 }
 
@@ -22,8 +22,8 @@ export function CollapsibleBox({
   summary,
   isExpanded,
   maxHeight,
-  borderStyle = 'round',
-  borderColor = 'gray',
+  expandedBorderStyle = 'round',
+  expandedBorderColor = 'gray',
   isFocused = false
 }: CollapsibleBoxProps) {
   
@@ -31,11 +31,15 @@ export function CollapsibleBox({
     <Box flexDirection="column">
       {label && (
         <Box>
-          <Text color={borderColor}>
+          <Text color={expandedBorderColor}>
             {isExpanded ? UI_SYMBOLS.EXPANDED : UI_SYMBOLS.COLLAPSED} {label}
           </Text>
           {isFocused && (
-            <Text color="gray"> ({UI_SYMBOLS.ARROW_LEFT} {UI_SYMBOLS.ARROW_RIGHT} to toggle)</Text>
+		isExpanded ? 
+            <Text color="gray"> ({UI_SYMBOLS.ARROW_LEFT} to close)</Text>
+		:
+            <Text color="gray"> ({UI_SYMBOLS.ARROW_RIGHT} to open)</Text>
+		
           )}
         </Box>
       )}
@@ -43,6 +47,8 @@ export function CollapsibleBox({
       {isExpanded ? (
         <Box 
           flexDirection="column"
+	  borderStyle={expandedBorderStyle}
+          borderColor={expandedBorderColor}
           marginLeft={2}
         >
           {children}

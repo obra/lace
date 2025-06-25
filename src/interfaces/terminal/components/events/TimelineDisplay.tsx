@@ -23,8 +23,9 @@ interface TimelineDisplayProps {
 export default function TimelineDisplay({ timeline, delegateTimelines, focusId, parentFocusId, bottomSectionHeight }: TimelineDisplayProps) {
   const [focusedLine, setFocusedLine] = useState<number>(0); // Absolute line position in content
   const [lineScrollOffset, setLineScrollOffset] = useState<number>(0); // Line-based scrolling
-  const [delegationExpandState, setDelegationExpandState] = useState<Map<string, boolean>>(new Map()); // Track expand/collapse state by callId
-  const [toolExpandState, setToolExpandState] = useState<Map<string, boolean>>(new Map()); // Track tool expand/collapse state by callId
+  const [componentExpandState, setComponentExpandState] = useState<Map<string, boolean>>(new Map()); // Track expand/collapse state for all timeline components
+  // Track which component is currently focused (null = timeline selection mode)
+  const [focusedComponentId, setFocusedComponentId] = React.useState<string | null>(null);
   // Use focus manager with disabled automatic cycling
   const { isFocused } = useFocus({ id: focusId || 'timeline' });
   const { focusNext, focus } = useFocusManager();
@@ -190,7 +191,7 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
         focus(parentFocusId);
       } else {
         // We're in the main timeline - go to shell input
-        focusNext();
+        focus('shell-input');
       }
       return;
     }
@@ -219,49 +220,55 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
       if (focusedItemIndex >= 0 && focusedItemIndex < timeline.items.length) {
         const item = timeline.items[focusedItemIndex];
         
-        if (item.type === 'tool_execution') {
-          if (item.call?.toolName === 'delegate') {
-            // Handle delegation items
-            if (key.leftArrow || key.rightArrow) {
-              // Toggle expand/collapse delegation box
-              setDelegationExpandState(prev => {
-                const newState = new Map(prev);
-                const currentExpanded = newState.get(item.callId) ?? true;
-                newState.set(item.callId, !currentExpanded);
-                return newState;
-              });
-            } else if (key.return && delegateTimelines) {
-              // Focus the delegation timeline
-              const delegateThreadId = extractDelegateThreadId(item, delegateTimelines);
-              if (delegateThreadId) {
-                const targetFocusId = `delegate-${delegateThreadId}`;
-                logger.debug('TimelineDisplay: Return key pressed - focusing delegation timeline', {
-                  currentFocusId: focusId || 'timeline',
-                  targetFocusId,
-                  delegateThreadId
-                });
-                focus(targetFocusId);
-              }
-            }
-          } else {
-            // Handle regular tool execution items
-            if (key.leftArrow || key.rightArrow) {
-              // Toggle expand/collapse tool execution
-              setToolExpandState(prev => {
-                const newState = new Map(prev);
-                const currentExpanded = newState.get(item.callId) ?? false;
-                newState.set(item.callId, !currentExpanded);
-                return newState;
-              });
-            }
-          }
+        // Generate component ID for this timeline item
+        let componentId: string;
+        if (item.type === 'tool_execution' && item.call?.toolName === 'delegate') {
+          componentId = `delegation-${item.callId}`;
+        } else if (item.type === 'tool_execution') {
+          componentId = `tool-${item.callId}`;
+        } else {
+          const itemId = 'id' in item ? item.id : `${item.type}-${focusedItemIndex}`;
+          const type = item.type === 'user_message' || item.type === 'agent_message' ? 'message' :
+                      item.type === 'thinking' ? 'thinking' :
+                      item.type === 'system_message' ? 'system' : 'item';
+          componentId = `${type}-${itemId}`;
+        }
+        
+        if (key.leftArrow || key.rightArrow) {
+          // Toggle expand/collapse for any timeline component
+          setComponentExpandState(prev => {
+            const newState = new Map(prev);
+            const currentExpanded = newState.get(componentId) ?? false;
+            newState.set(componentId, !currentExpanded);
+            return newState;
+          });
+        } else if (key.return) {
+          // Focus into the selected component
+          const currentFocusId = focusId || 'timeline';
+          const targetComponentId = `${currentFocusId}-${componentId}`;
+          setFocusedComponentId(targetComponentId);
+          focus(targetComponentId);
         }
       }
     }
-  }, [totalContentHeight, viewportLines, focusNext, focus, timeline.items, delegateTimelines, getFocusedItemIndex, parentFocusId]), { isActive: isFocused && totalContentHeight > 0 });
+  }, [totalContentHeight, viewportLines, focusNext, focus, timeline.items, delegateTimelines, getFocusedItemIndex, parentFocusId]), { isActive: totalContentHeight > 0 });
   
   
   const focusedItemIndex = getFocusedItemIndex();
+  
+  // Handle escape key from focused components
+  const handleEscape = useCallback(() => {
+    if (focusedComponentId) {
+      // We're focused on a component - go back to timeline selection
+      setFocusedComponentId(null);
+    } else if (parentFocusId) {
+      // We're in a nested timeline - go back to parent focus
+      focus(parentFocusId);
+    } else {
+      // We're in the main timeline - go to shell input
+      focusNext();
+    }
+  }, [focusedComponentId, parentFocusId, focus, focusNext]);
   
   // Define triggerRemeasurement after getFocusedItemIndex is available
   const triggerRemeasurement = useCallback(() => {
@@ -332,9 +339,9 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
                   focusedLine={focusedLine}
                   itemStartLine={itemPositions[index] || 0}
                   onToggle={triggerRemeasurement}
-                  delegationExpandState={delegationExpandState}
-                  toolExpandState={toolExpandState}
+                  componentExpandState={componentExpandState}
                   currentFocusId={focusId}
+                  onEscape={handleEscape}
                 />
               </Box>
             );
@@ -342,6 +349,7 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
         </Box>
         
         {/* Cursor overlay - inverts first character of focused line */}
+	{ isFocused &&
         <Box 
           position="absolute"
           flexDirection="column"
@@ -352,8 +360,8 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
             {'>'}
           </Text>
         </Box>
+      } 
       </Box>
-      
       {/* Scroll indicator - more content below */}
       {hasMoreBelow && (
         <Box justifyContent="center" ref={bottomIndicatorRef}>
@@ -365,16 +373,16 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
   );
 }
 
-function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, itemStartLine, onToggle, delegationExpandState, toolExpandState, currentFocusId }: { 
+function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, itemStartLine, onToggle, componentExpandState, currentFocusId, onEscape }: { 
   item: TimelineItem; 
   delegateTimelines?: Map<string, Timeline>;
   isFocused: boolean;
   focusedLine: number;
   itemStartLine: number;
   onToggle?: () => void;
-  delegationExpandState: Map<string, boolean>;
-  toolExpandState: Map<string, boolean>;
+  componentExpandState: Map<string, boolean>;
   currentFocusId?: string;
+  onEscape?: () => void;
 }) {
   switch (item.type) {
     case 'user_message':
@@ -386,10 +394,11 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
           timestamp: item.timestamp,
           data: item.content
         }} 
-        isFocused={isFocused}
+        focusId={`${currentFocusId || 'timeline'}-message-${item.id}`}
         focusedLine={focusedLine}
         itemStartLine={itemStartLine}
         onToggle={onToggle}
+        onEscape={onEscape}
       />;
       
     case 'agent_message':
@@ -401,10 +410,11 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
           timestamp: item.timestamp,
           data: item.content
         }} 
-        isFocused={isFocused}
+        focusId={`${currentFocusId || 'timeline'}-message-${item.id}`}
         focusedLine={focusedLine}
         itemStartLine={itemStartLine}
         onToggle={onToggle}
+        onEscape={onEscape}
       />;
       
     case 'thinking':
@@ -416,10 +426,11 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
           timestamp: item.timestamp,
           data: item.content
         }} 
-        isFocused={isFocused}
+        focusId={`${currentFocusId || 'timeline'}-thinking-${item.id}`}
         focusedLine={focusedLine}
         itemStartLine={itemStartLine}
         onToggle={onToggle}
+        onEscape={onEscape}
       />;
       
     case 'system_message':
@@ -431,10 +442,11 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
           timestamp: item.timestamp,
           data: item.content
         }} 
-        isFocused={isFocused}
+        focusId={`${currentFocusId || 'timeline'}-system-${item.id}`}
         focusedLine={focusedLine}
         itemStartLine={itemStartLine}
         onToggle={onToggle}
+        onEscape={onEscape}
       />;
       
     case 'tool_execution':
@@ -475,7 +487,7 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
           const delegateTimeline = delegateThreadId ? delegateTimelines.get(delegateThreadId) : null;
           
           if (delegateTimeline && delegateThreadId) {
-            const isExpanded = delegationExpandState.get(item.callId) ?? true;
+            const isExpanded = componentExpandState.get(item.callId) ?? true;
             logger.debug('TimelineDisplay: RENDERING delegation box', { 
               threadId: delegateThreadId,
               callId: item.callId,
@@ -483,21 +495,15 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
               timelineItemCount: delegateTimeline.items.length
             });
             return (
-              <Box flexDirection="column">
-                <ToolExecutionDisplay 
-                  callEvent={callEvent} 
-                  resultEvent={resultEvent}
-                  isFocused={isFocused}
-                  isExpanded={false} // Tool part always collapsed for delegate calls
-                />
-                <DelegationBox 
-                  threadId={delegateThreadId}
-                  timeline={delegateTimeline}
-                  delegateTimelines={delegateTimelines}
-                  expanded={isExpanded}
-                  parentFocusId={currentFocusId || 'timeline'}
-                />
-              </Box>
+              <DelegationBox 
+                threadId={delegateThreadId}
+                timeline={delegateTimeline}
+                delegateTimelines={delegateTimelines}
+                parentFocusId={currentFocusId || 'timeline'}
+                focusId={`${currentFocusId || 'timeline'}-delegation-${item.callId}`}
+                onToggle={onToggle}
+                onEscape={onEscape}
+              />
             );
           } else {
             logger.debug('TimelineDisplay: NOT rendering delegation box', {
@@ -517,12 +523,12 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
         }
       }
       
-      const isToolExpanded = toolExpandState.get(item.callId) ?? false;
       return <ToolExecutionDisplay 
         callEvent={callEvent} 
         resultEvent={resultEvent}
-        isFocused={isFocused}
-        isExpanded={isToolExpanded}
+        focusId={`${currentFocusId || 'timeline'}-tool-${item.callId}`}
+        onToggle={onToggle}
+        onEscape={onEscape}
       />;
       
     case 'ephemeral_message':

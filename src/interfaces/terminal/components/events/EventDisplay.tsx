@@ -16,13 +16,14 @@ import { UserSystemPromptDisplay } from './UserSystemPromptDisplay.js';
 interface EventDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
-  isFocused?: boolean;
+  focusId?: string;
   focusedLine?: number;
   itemStartLine?: number;
   onToggle?: () => void;
+  onEscape?: () => void;
 }
 
-export function EventDisplay({ event, isStreaming, isFocused, focusedLine, itemStartLine, onToggle }: EventDisplayProps) {
+export function EventDisplay({ event, isStreaming, focusId, focusedLine, itemStartLine, onToggle, onEscape }: EventDisplayProps) {
   const componentMap = {
     'TOOL_CALL': ToolCallDisplay,
     'TOOL_RESULT': ToolResultDisplay,
@@ -49,7 +50,7 @@ export function EventDisplay({ event, isStreaming, isFocused, focusedLine, itemS
 
   return (
     <Box flexDirection="column">
-      <Component event={event} isStreaming={isStreaming} isFocused={isFocused} onToggle={onToggle} />
+      <Component event={event} isStreaming={isStreaming} focusId={focusId} onToggle={onToggle} onEscape={onEscape} />
     </Box>
   );
 }
