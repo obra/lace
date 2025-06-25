@@ -47,7 +47,7 @@ export const UI_SYMBOLS = {
   COLLAPSE_HINT: '▾', // Collapse hint
 
   // Status bar symbols
-  PROVIDER: '◉', // Provider/brain indicator  
+  PROVIDER: '◉', // Provider/brain indicator
   FOLDER: '▣', // Thread/folder indicator
   MESSAGE: '◈', // Message count indicator
   LIGHTNING: '⚡', // Processing indicator

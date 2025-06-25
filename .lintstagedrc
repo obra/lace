@@ -2,6 +2,6 @@
   "*.ts": [
     "eslint --fix",
     "prettier --write",
-    "vitest related --run --exclude \"**/lmstudio-integration*\" --exclude \"**/conversation-state*\" --exclude \"**/e2e-cli*\""
+    "npx vitest related --run --exclude \"**/lmstudio-integration*\" --exclude \"**/conversation-state*\" --exclude \"**/e2e-cli*\""
   ]
 }
