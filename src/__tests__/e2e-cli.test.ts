@@ -217,7 +217,7 @@ describe('End-to-End CLI Tests', () => {
       // Run without the fake API key to test the error case
       const result = await runCLI(
         ['--provider', 'anthropic', '--prompt', 'Test'],
-        { env: { ANTHROPIC_KEY: undefined } } // Explicitly unset the key
+        { env: { ...process.env, ANTHROPIC_KEY: '' } } // Explicitly unset the key
       );
 
       // Should exit with error when no API key
