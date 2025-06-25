@@ -4,42 +4,50 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Lace is a modular AI coding assistant built with TypeScript and Node.js. The architecture follows event-sourcing patterns with clean separation of concerns, designed to support multiple AI models and interfaces.
+Lace is a sophisticated AI coding assistant built with TypeScript and Node.js. It uses event-sourcing architecture with immutable conversation sequences that enable resumable conversations across process restarts and support for multiple interface types (CLI, web, API).
 
 ## Development Commands
 
 ### Build and Run
 ```bash
-npm run build        # Compile TypeScript to dist/
+npm run build        # Compile TypeScript to dist/ + copy prompts
 npm start           # Build and run the interactive CLI
+npm run lint        # ESLint checking
+npm run lint:fix    # Auto-fix linting issues
+npm run format      # Format code with Prettier
 ```
 
 ### Testing
 ```bash
 npm test            # Run tests in watch mode
 npm run test:run    # Run tests once
-npm run test:coverage  # Run tests with coverage report
+npm run test:unit   # Unit tests only
+npm run test:integration # Integration tests
+npm run test:coverage # Run tests with coverage report
 ```
 
-### Code Quality
-```bash
-npm run lint        # Check code style
-npm run lint:fix    # Auto-fix linting issues
-npm run format      # Format code with Prettier
-```
+
+### General code and design philosophy
+
+YAGNI. DRY. SIMPLE. CLEAN. STRAIGHTFORWARD. TESTABLE. LOOSELY COUPLED.
+
+TEST FIRST. Whether you're designing a new feature or fixing a bug, you write the tests first and verify that they fail. Then you implement only enough code to make them pass.
+
+Good naming is VERY VERY important. Think hard about naming things. It's always ok to ask your human partner for naming advice.
+
 
 ### Development Notes
 - Pre-commit hooks automatically run linting, formatting, and related tests
 - All code must pass TypeScript strict mode compilation
-- Environment variable `ANTHROPIC_KEY` required for agent functionality
 
-## Architecture Overview
+## Core Architecture
 
-### Core Design Pattern: Event-Sourcing
+### Event-Sourcing Foundation
 All conversations are stored as immutable event sequences that can be reconstructed into conversation state. This enables:
 - Resumable conversations across process restarts
 - Multiple interface types (CLI, web, API) working with same data
 - Complete audit trail of all interactions
+- Stateless operation - any component can rebuild state from events
 
 ### Event Flow
 ```
@@ -48,52 +56,74 @@ AGENT_MESSAGE event → TOOL_CALL events → Tool execution →
 TOOL_RESULT events → Agent continues or responds
 ```
 
+### Three-Layer System
+- **Data Layer**: ThreadManager/Persistence (SQLite-based with graceful degradation)
+- **Logic Layer**: Agent/Tools (core conversation engine)
+- **Interface Layer**: Terminal/Web/API (pluggable UI components)
+
 ### Key Components
 
-**Agent System** (`src/agents/`)
-- `Agent` class: Wraps AI model interactions (currently Anthropic)
-- Not a singleton - supports multiple concurrent agents
-- Handles tool call extraction and response formatting
+**Agent System (`src/agents/agent.ts`)**
+- Event-driven conversation engine with state machine: `idle → thinking → streaming → tool_execution → idle`
+- Emits events for UI updates: `agent_thinking_start/complete`, `tool_call_start/complete`, `state_change`
+- Token budget management and streaming response handling
+- Abort functionality for long-running operations
+- Supports multiple concurrent agents (not a singleton)
 
-**Thread Management** (`src/threads/`)
-- `ThreadManager`: Pure data layer for event storage (in-memory, SQLite planned)
-- `buildConversationFromEvents()`: Converts event sequence to Anthropic message format
+**Thread Management (`src/threads/`)**
+- **ThreadManager**: High-level thread operations and event coordination
+- **ThreadPersistence**: SQLite-based persistence with graceful degradation to memory-only
+- **ThreadProcessor**: UI-optimized event processing with performance caching
 - Stateless design - can rebuild conversation from events at any time
+- `buildConversationFromEvents()` converts event sequences to provider-specific formats
 
-**Tool System** (`src/tools/`)
-- `ToolRegistry`: Central tool discovery and management
-- `ToolExecutor`: Safe tool execution with error handling
-- `implementations/`: Individual tool implementations (currently bash)
-- Model-agnostic tool interface supporting multiple AI providers
+**Tool System (`src/tools/`)**
+- **ToolExecutor**: Central tool management with approval workflow integration
+- Categories: file operations, system operations, workflow tools
+- User approval system with configurable policies
+- Safe execution with error handling and thread-aware context passing
+- Model-agnostic interface supporting all AI providers
 
-**Main Interface** (`src/agent.ts`)
-- Orchestration layer - wires components together
-- Interactive CLI using readline
-- Handles user I/O and message processing workflow
+**Provider System (`src/providers/`)**
+- Abstraction layer supporting multiple AI providers (Anthropic, OpenAI, LMStudio, Ollama)
+- Normalized interface with format conversion between generic and provider-specific APIs
+- Streaming support where available
+- Registry system with auto-discovery
 
-## Event Types and Data Model
+**Interface System (`src/interfaces/`)**
+- **TerminalInterface**: Rich Ink/React-based UI with real-time updates and tool approval modals
+- **ThreadProcessor**: Cached processing of persisted events + real-time streaming content processing
+- **NonInteractiveInterface**: Single-prompt execution mode
 
-```typescript
-type EventType = 
-  | 'USER_MESSAGE' 
-  | 'AGENT_MESSAGE' 
-  | 'TOOL_CALL' 
-  | 'TOOL_RESULT'
-  | 'LOCAL_SYSTEM_MESSAGE'
-  | 'THINKING';
+## Event Model
 
-interface ThreadEvent {
-  id: string;
-  threadId: string;
-  type: EventType;
-  timestamp: Date;
-  data: string | ToolCallData | ToolResultData;
-}
+Events include: USER_MESSAGE, AGENT_MESSAGE, TOOL_CALL, TOOL_RESULT, THINKING, SYSTEM_PROMPT, USER_SYSTEM_PROMPT.
+
+**Critical**: Events must be processed in sequence for conversation reconstruction.
+
+## CLI Usage
+
+```bash
+# Basic usage
+lace                          # Interactive mode
+lace --prompt "your request"  # Single prompt mode
+lace --continue              # Resume latest conversation
+lace --provider openai       # Choose AI provider
+
+# Tool approval
+--allow-non-destructive-tools    # Auto-approve read-only tools
+--auto-approve-tools bash,file-read  # Auto-approve specific tools
+--disable-tools file-write       # Disable specific tools
 ```
 
-Events are stored in sequence and converted to conversation format when needed. This pattern is critical for the stateless architecture.
+## Technology Stack
 
-**Note**: For detailed information about thinking block processing architecture, see `docs/thinking-blocks.md`.
+- **TypeScript 5.6+** with strict mode
+- **Node.js** with ES modules
+- **SQLite** (better-sqlite3) for persistence
+- **React + Ink** for terminal interface
+- **Vitest** for testing
+- **ESLint + Prettier** for code quality
 
 ## Tool Development
 
@@ -116,31 +146,94 @@ interface Tool {
 
 Tools are model-agnostic - the Agent class handles conversion to provider-specific formats.
 
-## Code Conventions
+## Key Patterns
 
-### File Structure
-- Files: `kebab-case.ts`
-- Every file starts with `// ABOUTME:` comment explaining purpose
-- Test files: `*.test.ts` in `__tests__/` directories alongside source
-- Private class members prefixed with `_`
+### Event-Driven Architecture
+All state changes go through immutable events. Agent emits events like `agent_thinking_start`, `tool_call_complete`, `state_change` for UI updates.
 
-### Critical Patterns
-- **YAGNI**: Don't add features we don't need right now
-- **Error Handling**: Fail fast on unknown event types, don't silently drop data
-- **Event Ordering**: Events must be processed in sequence for conversation reconstruction
-- **Stateless Operation**: Any component should be able to rebuild state from events
+### Provider Abstraction
+Generic `ProviderMessage[]` format converts to provider-specific APIs. Each provider handles format conversion and streaming support.
+
+### Tool System
+- User approval system with policies (ALLOW_ONCE, ALLOW_SESSION, DENY)
+- 11 tools: file operations (read/write/edit/insert/list/find), system operations (bash/search/url-fetch), workflow tools (task-manager/delegate)
+- Safe execution with error handling and context passing
+
+### Thread Management
+- SQLite persistence with graceful degradation to memory-only
+- Resumable conversations with `--continue` flag
+- Delegate thread management for sub-conversations
+- Thread compaction for token optimization
+
 
 ## Testing Strategy
 
-### Current Coverage
-- Conversation reconstruction with real event data
-- Error handling for malformed event sequences
-- Tool execution and error cases
+- **Unit Tests**: Individual component behavior
+- **Integration Tests**: Cross-component interactions
+- **E2E Tests**: Full conversation workflows
+- **Co-location**: Test files next to source files (e.g., `agent.ts` → `agent.test.ts`)
+- **Vitest**: Primary testing framework with JSDoc environment for React components
 
-### Test Data Patterns
-Tests use actual event structures captured from real usage to ensure conversation reconstruction works correctly.
+## Code Standards
+
+### Key Principles
+- Files start with `// ABOUTME:` comment explaining purpose
+- **Strict TypeScript** - Never use `any`, prefer `unknown` with type guards
+- **Pure functions** - Avoid side effects, use immutable transformations
+- **Structured errors** - Use error classes with context, not plain strings
+
+### Event System
+- **Immutable events** - Events should never be modified after creation
+- **Event sourcing consistency** - All state changes must go through events
+- **Type-safe events** - Use discriminated unions for event types
+- **Event ordering critical** - Events must be processed in sequence
+
+### Error Handling
+- **Structured error classes** with context, not plain strings
+- **Graceful degradation** - System should continue working when non-critical components fail
+- **Fail fast** on unknown event types - don't silently drop data
+- **No system crashes** on tool failures or provider errors
+
+**Recovery Mechanisms:**
+- Clean abort functionality and state reset on errors
+- Graceful database fallback to memory-only operation
+- Provider errors captured and displayed, conversation continues
+
+### Critical Architecture Patterns
+- **YAGNI** - Don't add features we don't need right now
+- **Stateless operation** - Any component should be able to rebuild state from events
+- **Event ordering** - Events must be processed in sequence for conversation reconstruction
+- **Provider abstraction** - Clean separation between generic and provider-specific formats
+
+### Thinking Block Processing
+Dual-path: Agent layer stores raw content for model context, UI layer extracts thinking blocks for display.
+
+### Data Flow
+User Input → Events → Agent Processing → Provider API → Tool Execution → Response Complete
+
+ThreadProcessor caches processed events for performance.
+
+## Configuration
+
+- **Environment**: ANTHROPIC_KEY, OPENAI_API_KEY, LACE_DIR
+- **User Instructions**: `~/.lace/instructions.md`
+- **System Prompts**: Template-based generation in `src/config/prompts/`
+- **Database**: SQLite storage in LACE_DIR with graceful degradation
+
+## Security & Safety
+
+- User approval required for all destructive operations
+- Complete audit trail of tool executions
+- Local-only data storage (SQLite)
+- Read-only vs destructive tool classification
+- Configurable approval policies
+
 
 ## Debugging and Development
+
+Because the UI is a full terminal application, it's hard for you to debug it interactively. Sometimes, it's better to refactor components into smaller, more easily testable pieces. Sometimes, it's better to ask your human partner to test something for you. 
+
+You never use console.log for debugging. Instead, you use the logger system and inspect the logs after runs.
 
 ### Event Inspection
 The conversation builder (`buildConversationFromEvents`) is critical for debugging. If conversations behave unexpectedly:
@@ -153,47 +246,7 @@ The conversation builder (`buildConversationFromEvents`) is critical for debuggi
 - Unknown event types cause hard failures (by design)
 - Event ordering is critical - events must be processed sequentially
 
-## Logging Guidelines
-
-### When to Log
-- **DEBUG**: LLM request/response payloads, tool parsing details, performance metrics
-- **INFO**: High-level operations (conversation start, tool execution, provider switching)
-- **WARN**: Recoverable issues (fallback behavior, retries, deprecation warnings)
-- **ERROR**: Unrecoverable failures (authentication errors, network failures, invalid configurations)
-
-### What to Log
-```typescript
-// DEBUG: Raw LLM communication
-logger.debug('Sending request to LLM', { provider: 'anthropic', messageCount: messages.length, tools: tools.map(t => t.name) });
-logger.debug('LLM response received', { provider: 'anthropic', contentLength: response.content.length, toolCalls: response.toolCalls.length });
-
-// INFO: User-visible operations  
-logger.info('Tool execution started', { toolName: 'bash', command: input.command });
-logger.info('Conversation thread created', { threadId, provider: 'lmstudio' });
-
-// WARN: Fallback scenarios
-logger.warn('LMStudio connection failed, using cached model', { modelId, errorMessage: error.message });
-
-// ERROR: Critical failures
-logger.error('Provider initialization failed', { provider: 'anthropic', error: error.message });
-```
-
-### Privacy and Security
-- **Never log**: API keys, user credentials, sensitive file contents
-- **Sanitize**: File paths (log relative paths only), user input (truncate if very long)
-- **Hash**: User identifiers if needed for debugging
-
-### Performance Considerations  
-- Log payloads at DEBUG level only (they can be large)
-- Include relevant metadata for filtering (provider, operation, threadId)
-- Use structured data objects rather than string concatenation
-
-## Future Architecture
-
-The current design is prepared for:
-- SQLite persistence (replace in-memory ThreadManager)
-- Multiple interfaces (web UI, API, terminal UI)
-- Additional AI providers (extend Agent abstraction)
-- Concurrent agent threads (Agent class already supports this)
-
-The event-sourcing foundation makes these additions straightforward without major architectural changes.
+## Logging
+- DEBUG: LLM payloads, tool details; INFO: Operations; WARN: Fallbacks; ERROR: Failures
+- Never log API keys or sensitive content
+- Use structured data objects with relevant metadata
