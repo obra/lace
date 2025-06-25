@@ -5,6 +5,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent, ToolResultData } from '../../../../threads/types.js';
 import { CodeDisplay } from '../ui/CodeDisplay.js';
+import { UI_SYMBOLS } from '../../theme.js';
 
 interface ToolResultDisplayProps {
   event: ThreadEvent;
@@ -23,7 +24,7 @@ export function ToolResultDisplay({ event, isStreaming }: ToolResultDisplayProps
   const toolResultData = event.data as ToolResultData;
   const { callId, output, success, error } = toolResultData;
   const color = success ? 'green' : 'red';
-  const icon = success ? '✅' : '❌';
+  const icon = success ? UI_SYMBOLS.SUCCESS : UI_SYMBOLS.ERROR;
   
   return (
     <Box flexDirection="column" marginY={1}>

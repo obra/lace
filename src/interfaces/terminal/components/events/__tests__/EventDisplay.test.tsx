@@ -33,7 +33,7 @@ describe('EventDisplay', () => {
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
-    expect(lastFrame()).toContain('❦ ');
+    expect(lastFrame()).toContain(UI_SYMBOLS.AGENT + ' ');
     expect(lastFrame()).toContain('Hello there!');
   });
 
@@ -88,7 +88,7 @@ describe('EventDisplay', () => {
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
-    expect(lastFrame()).toContain('ℹ️  System');
+    expect(lastFrame()).toContain(UI_SYMBOLS.INFO + '  System');
     expect(lastFrame()).toContain('System notification');
   });
 

@@ -5,6 +5,7 @@ import React from 'react';
 import { Text } from 'ink';
 import useStdoutDimensions from '../../../utils/use-stdout-dimensions.js';
 import { CurrentTurnMetrics } from '../../../agents/agent.js';
+import { UI_SYMBOLS } from '../theme.js';
 
 interface CumulativeTokens {
   promptTokens: number;
@@ -36,7 +37,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   // Format cumulative session tokens for display
   const formatCumulativeTokens = (tokens?: CumulativeTokens) => {
     if (!tokens || tokens.totalTokens === 0) {
-      return "↑0 ↓0";
+      return `${UI_SYMBOLS.TOKEN_IN}0 ${UI_SYMBOLS.TOKEN_OUT}0`;
     }
     
     const formatCount = (count: number) => {
@@ -46,7 +47,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
       return count.toString();
     };
     
-    return `↑${formatCount(tokens.promptTokens)} ↓${formatCount(tokens.completionTokens)}`;
+    return `${UI_SYMBOLS.TOKEN_IN}${formatCount(tokens.promptTokens)} ${UI_SYMBOLS.TOKEN_OUT}${formatCount(tokens.completionTokens)}`;
   };
 
   // Format turn metrics for display
@@ -73,9 +74,9 @@ const StatusBar: React.FC<StatusBarProps> = ({
       return count.toString();
     };
     
-    const tokenDisplay = `↑${formatTokenCount(metrics.tokensIn)} ↓${formatTokenCount(metrics.tokensOut)}`;
+    const tokenDisplay = `${UI_SYMBOLS.TOKEN_IN}${formatTokenCount(metrics.tokensIn)} ${UI_SYMBOLS.TOKEN_OUT}${formatTokenCount(metrics.tokensOut)}`;
     
-    return `⏱️ ${duration} • ${tokenDisplay}`;
+    return `${UI_SYMBOLS.TIME} ${duration} • ${tokenDisplay}`;
   };
 
   // Format thread ID for display (don't truncate)
@@ -88,14 +89,14 @@ const StatusBar: React.FC<StatusBarProps> = ({
   const [currentWidth] = useStdoutDimensions();
   
   // Create content strings with turn-aware display
-  const leftContent = `🧠 ${providerName}${modelName ? `:${modelName}` : ''} • 📁 ${formatThreadId(threadId)}`;
+  const leftContent = `${UI_SYMBOLS.PROVIDER} ${providerName}${modelName ? `:${modelName}` : ''} • ${UI_SYMBOLS.FOLDER} ${formatThreadId(threadId)}`;
   
   // Right content shows turn progress when active, otherwise session info with cumulative tokens
   let rightContent: string;
   if (isTurnActive && turnMetrics) {
-    rightContent = `${formatTurnMetrics(turnMetrics)} • ⚡ Processing`;
+    rightContent = `${formatTurnMetrics(turnMetrics)} • ${UI_SYMBOLS.LIGHTNING} Processing`;
   } else {
-    rightContent = `💬 ${messageCount} • ${formatCumulativeTokens(cumulativeTokens)} • ${isProcessing ? '⚡ Processing' : '✓ Ready'}`;
+    rightContent = `${UI_SYMBOLS.MESSAGE} ${messageCount} • ${formatCumulativeTokens(cumulativeTokens)} • ${isProcessing ? UI_SYMBOLS.LIGHTNING + ' Processing' : UI_SYMBOLS.READY + ' Ready'}`;
   }
   
   // Calculate padding needed to fill the terminal width

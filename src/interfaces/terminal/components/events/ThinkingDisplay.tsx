@@ -4,6 +4,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
+import { UI_SYMBOLS } from '../../theme.js';
 
 interface ThinkingDisplayProps {
   event: ThreadEvent;
@@ -17,7 +18,7 @@ export function ThinkingDisplay({ event, isStreaming, isFocused }: ThinkingDispl
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box>
-        <Text color="gray">💭 </Text>
+        <Text color="gray">{UI_SYMBOLS.THINKING} </Text>
         <Text italic color="dim">{thinkingContent}</Text>
         {isStreaming && <Text color="gray"> (thinking...)</Text>}
       </Box>

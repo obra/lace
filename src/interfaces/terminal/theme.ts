@@ -45,6 +45,13 @@ export const UI_SYMBOLS = {
   BOX_CLOSE: ']', // Closing bracket
   EXPAND_HINT: '▸', // Expansion hint
   COLLAPSE_HINT: '▾', // Collapse hint
+
+  // Status bar symbols
+  PROVIDER: '◉', // Provider/brain indicator  
+  FOLDER: '▣', // Thread/folder indicator
+  MESSAGE: '◈', // Message count indicator
+  LIGHTNING: '⚡', // Processing indicator
+  READY: '✓', // Ready status indicator
 } as const;
 
 /**

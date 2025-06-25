@@ -81,10 +81,10 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
   const getMessagePrefix = (type: string) => {
     switch (type) {
       case "user": return "> ";
-      case "assistant": return "❦ ";
+      case "assistant": return UI_SYMBOLS.AGENT + " ";
       case "thinking": return `${UI_SYMBOLS.THINKING} `;
       case "tool": return `${UI_SYMBOLS.TOOL} `;
-      case "system": return "ℹ️  ";
+      case "system": return UI_SYMBOLS.INFO + "  ";
       default: return "";
     }
   };

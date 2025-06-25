@@ -5,6 +5,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { marked } from 'marked';
 import TerminalRenderer from 'marked-terminal';
+import { UI_SYMBOLS } from '../../theme.js';
 
 interface MarkdownDisplayProps {
   content: string;
@@ -27,7 +28,7 @@ export function MarkdownDisplay({ content, showIcon = true, dimmed = false }: Ma
     return (
       <Box flexDirection="column" marginBottom={1}>
         <Box flexDirection="row">
-          <Box><Text color={dimmed ? "dim" : "green"}>❦ </Text></Box>
+          <Box><Text color={dimmed ? "dim" : "green"}>{UI_SYMBOLS.AGENT} </Text></Box>
 	  <Box><Text wrap="wrap" dimColor={dimmed}>{cleanedContent}</Text></Box>
         </Box>
       </Box>
@@ -37,7 +38,7 @@ export function MarkdownDisplay({ content, showIcon = true, dimmed = false }: Ma
     return (
       <Box flexDirection="column" marginBottom={1}>
         <Box flexDirection="row">
-          {showIcon && <Text color={dimmed ? "dim" : "green"}>❦</Text>}
+          {showIcon && <Text color={dimmed ? "dim" : "green"}>{UI_SYMBOLS.AGENT}</Text>}
           <Text color={dimmed ? "dim" : "white"} wrap="wrap">{content.trim()}</Text>
         </Box>
       </Box>

@@ -19,8 +19,8 @@ describe('StatusBar', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('🧠 anthropic');
-    expect(frame).toContain('💬 5');
+    expect(frame).toContain(UI_SYMBOLS.PROVIDER + ' anthropic');
+    expect(frame).toContain(UI_SYMBOLS.MESSAGE + ' 5');
   });
 
   it('shows model name when provided', () => {
@@ -44,7 +44,7 @@ describe('StatusBar', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('📁 12345678901234567890');
+    expect(frame).toContain(UI_SYMBOLS.FOLDER + ' 12345678901234567890');
   });
 
   it('shows short thread ID as-is', () => {
@@ -56,7 +56,7 @@ describe('StatusBar', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('📁 abc123');
+    expect(frame).toContain(UI_SYMBOLS.FOLDER + ' abc123');
   });
 
   it('formats cumulative tokens in k format for large numbers', () => {
@@ -109,7 +109,7 @@ describe('StatusBar', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('⚡ Processing');
+    expect(frame).toContain(UI_SYMBOLS.LIGHTNING + ' Processing');
   });
 
   it('shows ready status when not processing', () => {
@@ -121,7 +121,7 @@ describe('StatusBar', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('✓ Ready');
+    expect(frame).toContain(UI_SYMBOLS.READY + ' Ready');
   });
 
   it('handles missing thread ID gracefully', () => {
@@ -130,6 +130,6 @@ describe('StatusBar', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('📁 no-thread');
+    expect(frame).toContain(UI_SYMBOLS.FOLDER + ' no-thread');
   });
 });

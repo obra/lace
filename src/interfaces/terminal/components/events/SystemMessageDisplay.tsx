@@ -4,6 +4,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
+import { UI_SYMBOLS } from '../../theme.js';
 
 interface SystemMessageDisplayProps {
   event: ThreadEvent;
@@ -17,7 +18,7 @@ export function SystemMessageDisplay({ event, isStreaming, isFocused }: SystemMe
   return (
     <Box flexDirection="column" marginY={1}>
       <Box>
-        <Text color="gray" italic>ℹ️  System</Text>
+        <Text color="gray" italic>{UI_SYMBOLS.INFO}  System</Text>
         {isStreaming && <Text color="gray"> (processing...)</Text>}
       </Box>
       <Box marginLeft={2}>
