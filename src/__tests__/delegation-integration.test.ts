@@ -9,7 +9,7 @@ import { ToolExecutor } from '../tools/executor.js';
 import { DelegateTool } from '../tools/implementations/delegate.js';
 import { BashTool } from '../tools/implementations/bash.js';
 import { LMStudioProvider } from '../providers/lmstudio-provider.js';
-import { skipIfProviderIsUnavailable } from './utils/provider-test-helpers.js';
+import { checkProviderAvailability } from './utils/provider-test-helpers.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -202,7 +202,8 @@ describe('Delegation Integration Tests', () => {
     });
 
     // Skip this test if LMStudio is not available
-    await skipIfProviderIsUnavailable('LMStudio', provider);
+    const isAvailable = await checkProviderAvailability('LMStudio', provider);
+    if (!isAvailable) return;
 
     // Create main agent with real provider
     const mainThreadId = threadManager.generateThreadId();

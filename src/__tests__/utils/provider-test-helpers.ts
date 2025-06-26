@@ -1,26 +1,27 @@
 // ABOUTME: Simple provider availability checking for local server providers
-// ABOUTME: Call once in beforeAll to skip tests if local providers unavailable
+// ABOUTME: Returns availability status for conditional test execution
 
 /**
- * Skip test suite if a local provider (LMStudio, Ollama) is unavailable.
- * Call this in beforeAll() to automatically skip tests when the provider
- * server is not running or has no models loaded.
+ * Check if a local provider (LMStudio, Ollama) is available.
+ * Use the return value to conditionally run tests.
  *
  * @param providerName - Human-readable provider name for logging
  * @param provider - Provider instance with diagnose() method
+ * @returns Promise<boolean> - true if provider is available, false otherwise
  */
-export async function skipIfProviderIsUnavailable(
+export async function checkProviderAvailability(
   providerName: string,
   provider: { diagnose(): Promise<{ connected: boolean; models: string[]; error?: string }> }
-): Promise<void> {
+): Promise<boolean> {
   try {
     const diagnostics = await provider.diagnose();
     if (!diagnostics.connected || diagnostics.models.length === 0) {
       console.log(`Skipping ${providerName} tests - ${diagnostics.error || 'not available'}`);
-      return;
+      return false;
     }
+    return true;
   } catch (error) {
     console.log(`Skipping ${providerName} tests - ${error}`);
-    return;
+    return false;
   }
 }

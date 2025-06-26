@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { OllamaProvider } from '../ollama-provider.js';
 import { Tool, ToolContext } from '../../tools/types.js';
 import { logger } from '../../utils/logger.js';
-import { skipIfProviderIsUnavailable } from '../../__tests__/utils/provider-test-helpers.js';
+import { checkProviderAvailability } from '../../__tests__/utils/provider-test-helpers.js';
 
 // Mock tool for testing without side effects
 class MockTool implements Tool {
@@ -28,19 +28,21 @@ class MockTool implements Tool {
   }
 }
 
-describe.sequential('Ollama Provider Integration Tests', () => {
-  let provider: OllamaProvider;
+// Check provider availability once at module level
+const provider = new OllamaProvider({
+  model: 'qwen3:0.6b',
+  systemPrompt: 'You are a helpful assistant. Use tools when asked.',
+});
+
+const isOllamaAvailable = await checkProviderAvailability('Ollama', provider);
+
+const conditionalDescribe = isOllamaAvailable ? describe.sequential : describe.skip;
+
+conditionalDescribe('Ollama Provider Integration Tests', () => {
   let mockTool: MockTool;
 
   beforeAll(async () => {
-    provider = new OllamaProvider({
-      model: 'qwen3:0.6b',
-      systemPrompt: 'You are a helpful assistant. Use tools when asked.',
-    });
-
     mockTool = new MockTool();
-
-    await skipIfProviderIsUnavailable('Ollama', provider);
   }, 60000);
 
   it('should connect and get basic response', async () => {

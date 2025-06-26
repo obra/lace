@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { LMStudioProvider } from '../lmstudio-provider.js';
 import { Tool, ToolContext } from '../../tools/types.js';
 import { logger } from '../../utils/logger.js';
-import { skipIfProviderIsUnavailable } from '../../__tests__/utils/provider-test-helpers.js';
+import { checkProviderAvailability } from '../../__tests__/utils/provider-test-helpers.js';
 
 // Mock tool for testing without side effects
 class MockTool implements Tool {
@@ -48,21 +48,23 @@ class FailingTool implements Tool {
   }
 }
 
-describe.sequential('LMStudio Provider Integration Tests', () => {
-  let provider: LMStudioProvider;
+// Check provider availability once at module level
+const provider = new LMStudioProvider({
+  model: 'qwen/qwen3-1.7b',
+  systemPrompt: 'You are a helpful assistant. Use tools when asked.',
+});
+
+const isLMStudioAvailable = await checkProviderAvailability('LMStudio', provider);
+
+const conditionalDescribe = isLMStudioAvailable ? describe.sequential : describe.skip;
+
+conditionalDescribe('LMStudio Provider Integration Tests', () => {
   let mockTool: MockTool;
   let failingTool: FailingTool;
 
   beforeAll(async () => {
-    provider = new LMStudioProvider({
-      model: 'qwen/qwen3-1.7b',
-      systemPrompt: 'You are a helpful assistant. Use tools when asked.',
-    });
-
     mockTool = new MockTool();
     failingTool = new FailingTool();
-
-    await skipIfProviderIsUnavailable('LMStudio', provider);
   });
 
   it('should handle multiple tool calls in sequence', async () => {
