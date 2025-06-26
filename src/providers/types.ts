@@ -3,23 +3,6 @@
 
 import { ProviderToolCall, ProviderToolResult, ProviderMessage } from './base-provider.js';
 
-export interface ProviderResponse {
-  content: string;
-  toolCalls: ProviderToolCall[];
-  stopReason?: string; // Normalized: "max_tokens" | "stop" | "tool_use" | "error"
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
-  performance?: {
-    // Unique value for local models
-    tokensPerSecond?: number;
-    timeToFirstToken?: number;
-    totalDuration?: number;
-  };
-}
-
 
 
 
