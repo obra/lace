@@ -178,8 +178,41 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     resolve: (decision: ApprovalDecision) => void;
   } | null>(null);
   
-  // Focus management with disabled automatic cycling
+  // Focus management with disabled automatic cycling and history tracking
   const { focus, focusNext, focusPrevious, disableFocus } = useFocusManager();
+  
+  // Track focus history for natural escape behavior
+  const [focusHistory, setFocusHistory] = useState<string[]>(['shell-input']);
+  const currentFocusRef = useRef<string>('shell-input');
+  
+  // Focus with history tracking for natural escape navigation
+  const focusWithHistory = useCallback((newFocusId: string) => {
+    setFocusHistory(prev => {
+      // Don't add duplicate consecutive entries
+      if (prev[prev.length - 1] === newFocusId) {
+        return prev;
+      }
+      return [...prev, newFocusId];
+    });
+    currentFocusRef.current = newFocusId;
+    focus(newFocusId);
+  }, [focus]);
+  
+  // Handle escape key - go back in focus history or forward from shell-input
+  const handleEscape = useCallback(() => {
+    const currentFocusId = currentFocusRef.current;
+    
+    if (currentFocusId === 'shell-input') {
+      // Shell-input is the root - escape navigates forward to timeline
+      focusWithHistory('timeline');
+    } else if (focusHistory.length > 1) {
+      // Go back in history for other components
+      const previousFocus = focusHistory[focusHistory.length - 2];
+      setFocusHistory(prev => prev.slice(0, -1)); // pop current focus
+      currentFocusRef.current = previousFocus;
+      focus(previousFocus); // go to previous, don't add to history
+    }
+  }, [focusHistory, focus, focusWithHistory]);
   
   // Interface context functions
   const showAlert = useCallback((alertData: { variant: 'info' | 'warning' | 'error' | 'success'; title: string; children?: React.ReactNode }) => {
@@ -196,10 +229,17 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   useEffect(() => {
     disableFocus();
   }, [disableFocus]);
-  
-  // Note: Removed global escape handler to let focused components handle escape properly
-  // Each component (TimelineDisplay, ShellInput) handles its own escape behavior
-  // Tab is NOT handled here - let ShellInput handle it for autocomplete
+
+  // Global escape handling using focus history - but let shell-input handle its own escape
+  useInput(useCallback((input, key) => {
+    if (key.escape) {
+      // Only handle escape globally if we're NOT on shell-input 
+      // (shell-input handles its own escape for autocomplete vs navigation)
+      if (currentFocusRef.current !== 'shell-input') {
+        handleEscape();
+      }
+    }
+  }, [handleEscape]), { isActive: !approvalRequest });
 
   // Sync events from agent's thread (including delegate threads)
   const syncEvents = useCallback(() => {
@@ -221,9 +261,9 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       approvalRequest.resolve(decision);
       setApprovalRequest(null);
       // Return focus to shell input when modal closes (for typing)
-      focus('shell-input');
+      focusWithHistory('shell-input');
     }
-  }, [approvalRequest, focus]);
+  }, [approvalRequest, focusWithHistory]);
 
   // Setup event handlers for Agent events
   useEffect(() => {
@@ -550,7 +590,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       });
     });
     
-    // Set initial focus to shell input (for typing)
+    // Set initial focus to shell input (for typing) - no history needed for initial focus
     focus('shell-input');
   }, [agent, addMessage, syncEvents, focus]);
 
@@ -559,11 +599,11 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     if (approvalRequest) {
       // Use setTimeout to ensure the modal is rendered before focusing
       const timeoutId = setTimeout(() => {
-        focus('approval-modal');
+        focusWithHistory('approval-modal');
       }, 0);
       return () => clearTimeout(timeoutId);
     }
-  }, [approvalRequest, focus]);
+  }, [approvalRequest, focusWithHistory]);
 
   // Measure bottom section height for viewport calculations
   useEffect(() => {
@@ -665,6 +705,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
                 focusId="shell-input"
                 autoFocus={true}
                 disabled={false} // Allow typing during processing, submission is controlled in handleSubmit
+                focusWithHistory={focusWithHistory}
               />
             </Box>
 

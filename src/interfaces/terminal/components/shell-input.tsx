@@ -6,6 +6,7 @@ import { Box, Text, useInput, useFocus, useFocusManager } from "ink";
 import { useTextBuffer } from "../hooks/use-text-buffer.js";
 import TextRenderer from "./text-renderer.js";
 import FileAutocomplete from "./file-autocomplete.js";
+import { logger } from "../../../utils/logger.js";
 
 // Keyboard shortcut system - list-based approach
 type KeyboardShortcut = string[];  // e.g., ['ctrl', 'a'] or ['meta', 'shift', 'z']
@@ -69,6 +70,7 @@ interface ShellInputProps {
   disabled?: boolean;
   onSubmit?: (value: string) => void;
   onChange?: (value: string) => void;
+  focusWithHistory?: (focusId: string) => void;
 }
 
 const ShellInput: React.FC<ShellInputProps> = ({
@@ -79,6 +81,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
   disabled = false,
   onSubmit,
   onChange,
+  focusWithHistory,
 }) => {
   // Safe focus handling - avoid useFocus in test environments where raw mode may not work reliably
   const [isFocused, setIsFocused] = useState(autoFocus);
@@ -93,15 +96,36 @@ const ShellInput: React.FC<ShellInputProps> = ({
     ? useFocus({ id: focusId, autoFocus: autoFocus && !disabled })
     : null;
   const actualIsFocused = useRealFocus ? focusResult?.isFocused : isFocused && !disabled;
-  const { focus } = useFocusManager();
+  
+  // Debug focus changes
+  useEffect(() => {
+    logger.debug('ShellInput: Focus changed', {
+      focusId,
+      actualIsFocused,
+      useRealFocus,
+      focusResultIsFocused: focusResult?.isFocused,
+      manualIsFocused: isFocused,
+      disabled
+    });
+  }, [actualIsFocused, focusId, useRealFocus, focusResult?.isFocused, isFocused, disabled]);
+  const { focus, enableFocus, disableFocus } = useFocusManager();
   const [bufferState, bufferOps] = useTextBuffer(value);
 
-  // Autocomplete state
-  const [autocompleteVisible, setAutocompleteVisible] = useState(false);
-  const [autocompleteQuery, setAutocompleteQuery] = useState("");
-  const [autocompleteSelectedIndex, setAutocompleteSelectedIndex] = useState(0);
-  const [autocompleteItems, setAutocompleteItems] = useState<string[]>([]);
-  const [autocompleteOriginalItems, setAutocompleteOriginalItems] = useState<string[]>([]);
+  // Autocomplete state - use single state object to prevent multiple re-renders
+  const [autocompleteState, setAutocompleteState] = useState({
+    visible: false,
+    query: "",
+    selectedIndex: 0,
+    items: [] as string[],
+    originalItems: [] as string[]
+  });
+  
+  // Destructure for backwards compatibility
+  const autocompleteVisible = autocompleteState.visible;
+  const autocompleteQuery = autocompleteState.query;
+  const autocompleteSelectedIndex = autocompleteState.selectedIndex;
+  const autocompleteItems = autocompleteState.items;
+  const autocompleteOriginalItems = autocompleteState.originalItems;
 
   // Only sync external value changes on first mount or significant changes
   const [lastExternalValue, setLastExternalValue] = useState(value);
@@ -171,7 +195,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
     bufferOps.setText(newLines.join('\n'));
     bufferOps.setCursorPosition(bufferState.cursorLine, start + cleanCompletion.length);
     
-    setAutocompleteVisible(false);
+    setAutocompleteState(prev => ({ ...prev, visible: false }));
   }, [bufferState, bufferOps, getCurrentWord]);
 
   const showAutocomplete = useCallback(async () => {
@@ -179,9 +203,12 @@ const ShellInput: React.FC<ShellInputProps> = ({
     const currentLine = bufferState.lines[bufferState.cursorLine] || '';
     const trimmedLine = currentLine.trim();
     
-    setAutocompleteQuery(beforeCursor);
-    setAutocompleteSelectedIndex(0);
-    setAutocompleteVisible(true);
+    setAutocompleteState(prev => ({ 
+      ...prev, 
+      query: beforeCursor, 
+      selectedIndex: 0, 
+      visible: true 
+    }));
     
     try {
       let completions: string[] = [];
@@ -213,12 +240,18 @@ const ShellInput: React.FC<ShellInputProps> = ({
         }
       }
       
-      setAutocompleteItems(completions);
-      setAutocompleteOriginalItems(completions);
+      setAutocompleteState(prev => ({ 
+        ...prev, 
+        items: completions, 
+        originalItems: completions 
+      }));
     } catch (error) {
       console.error('Failed to load completions:', error);
-      setAutocompleteItems([]);
-      setAutocompleteOriginalItems([]);
+      setAutocompleteState(prev => ({ 
+        ...prev, 
+        items: [], 
+        originalItems: [] 
+      }));
     }
   }, [getCurrentWord, bufferState.cursorLine, bufferState.lines]);
 
@@ -247,8 +280,11 @@ const ShellInput: React.FC<ShellInputProps> = ({
       const matches = itemName.toLowerCase().includes(filterQuery.toLowerCase());
       return matches;
     });
-    setAutocompleteItems(filtered);
-    setAutocompleteSelectedIndex(0);
+    setAutocompleteState(prev => ({ 
+      ...prev, 
+      items: filtered, 
+      selectedIndex: 0 
+    }));
   }, [autocompleteVisible, autocompleteOriginalItems]);
 
   const filterAutocomplete = useCallback(() => {
@@ -257,11 +293,14 @@ const ShellInput: React.FC<ShellInputProps> = ({
   }, [getCurrentWord, filterAutocompleteWithText]);
 
   const hideAutocomplete = useCallback(() => {
-    setAutocompleteVisible(false);
-    setAutocompleteQuery('');
-    setAutocompleteSelectedIndex(0);
-    setAutocompleteItems([]);
-    setAutocompleteOriginalItems([]);
+    // Single state update to prevent multiple re-renders that confuse Ink's focus management
+    setAutocompleteState({
+      visible: false,
+      query: "",
+      selectedIndex: 0,
+      items: [],
+      originalItems: []
+    });
   }, []);
 
   // Input handler
@@ -295,14 +334,32 @@ const ShellInput: React.FC<ShellInputProps> = ({
         return;
       }
 
-      // Handle Escape to close autocomplete or focus timeline
+      // Handle Escape - close autocomplete or let global handler manage focus
       if (key.escape) {
         if (autocompleteVisible) {
+          logger.debug('ShellInput: Escape pressed - closing autocomplete', { 
+            actualIsFocused, 
+            autocompleteVisible, 
+            focusId
+          });
           hideAutocomplete();
+          // Explicitly re-focus ShellInput since hideAutocomplete causes focus loss
+          setTimeout(() => {
+            logger.debug('ShellInput: Re-focusing after autocomplete close', { focusId });
+            focus(focusId);
+          }, 0);
           return;
         } else {
-          // Focus timeline component explicitly
-          focus('timeline');
+          logger.debug('ShellInput: Escape pressed - navigating to timeline', { 
+            actualIsFocused, 
+            focusId
+          });
+          // No autocomplete - navigate to timeline
+          if (focusWithHistory) {
+            focusWithHistory('timeline');
+          } else {
+            focus('timeline');
+          }
           return;
         }
       }
@@ -383,7 +440,10 @@ const ShellInput: React.FC<ShellInputProps> = ({
       // Up/Down arrows for autocomplete navigation or cursor movement
       if (key.upArrow) {
         if (autocompleteVisible && autocompleteItems.length > 0) {
-          setAutocompleteSelectedIndex(prev => Math.max(0, prev - 1));
+          setAutocompleteState(prev => ({ 
+            ...prev, 
+            selectedIndex: Math.max(0, prev.selectedIndex - 1) 
+          }));
         } else {
           bufferOps.moveCursor("up");
         }
@@ -391,7 +451,10 @@ const ShellInput: React.FC<ShellInputProps> = ({
       }
       if (key.downArrow) {
         if (autocompleteVisible && autocompleteItems.length > 0) {
-          setAutocompleteSelectedIndex(prev => Math.min(autocompleteItems.length - 1, prev + 1));
+          setAutocompleteState(prev => ({ 
+            ...prev, 
+            selectedIndex: Math.min(autocompleteItems.length - 1, prev.selectedIndex + 1) 
+          }));
         } else {
           bufferOps.moveCursor("down");
         }

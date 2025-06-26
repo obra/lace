@@ -175,24 +175,11 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
     return -1;
   }, [focusedLine, itemPositions, totalContentHeight]);
 
-  // Handle keyboard navigation - only register when focused and has content
+  // Handle keyboard navigation - only register when this component is focused
   useInput(useCallback((input, key) => {
     if (key.escape) {
-      // Handle escape based on focus hierarchy
-      const currentFocusId = focusId || 'timeline';
-      logger.debug('TimelineDisplay: Escape key pressed', {
-        currentFocusId,
-        parentFocusId,
-        action: parentFocusId ? `focus(${parentFocusId})` : 'focusNext()'
-      });
-      
-      if (parentFocusId) {
-        // We're in a nested timeline - go back to parent focus
-        focus(parentFocusId);
-      } else {
-        // We're in the main timeline - go to shell input
-        focus('shell-input');
-      }
+      // Let the global escape handler in terminal-interface handle focus switching
+      // based on focus history - don't handle focus switching here
       return;
     }
     
@@ -251,7 +238,7 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
         }
       }
     }
-  }, [totalContentHeight, viewportLines, focusNext, focus, timeline.items, delegateTimelines, getFocusedItemIndex, parentFocusId]), { isActive: totalContentHeight > 0 });
+  }, [totalContentHeight, viewportLines, focusNext, focus, timeline.items, delegateTimelines, getFocusedItemIndex, parentFocusId]), { isActive: isFocused });
   
   
   const focusedItemIndex = getFocusedItemIndex();
@@ -294,7 +281,8 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
     lineScrollOffset,
     viewportLines,
     terminalHeight,
-    componentIsFocused: isFocused
+    componentIsFocused: isFocused,
+    focusId: focusId || 'timeline'
   });
   
   return (
