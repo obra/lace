@@ -2,7 +2,8 @@
 // ABOUTME: Uses native tool calling via low-level channel API for proper tool execution
 
 import { LMStudioClient } from '@lmstudio/sdk';
-import { AIProvider, ProviderMessage, ProviderResponse, ProviderConfig } from './types.js';
+import { AIProvider } from './base-provider.js';
+import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderToolCall } from './base-provider.js';
 import { Tool } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
 
@@ -21,6 +22,7 @@ interface LMStudioModel {
 export interface LMStudioProviderConfig extends ProviderConfig {
   baseUrl?: string;
   verbose?: boolean;
+  [key: string]: unknown; // Allow for additional properties
 }
 
 export class LMStudioProvider extends AIProvider {

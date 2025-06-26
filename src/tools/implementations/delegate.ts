@@ -9,9 +9,10 @@ import { ToolExecutor } from '../executor.js';
 import { AnthropicProvider } from '../../providers/anthropic-provider.js';
 import { LMStudioProvider } from '../../providers/lmstudio-provider.js';
 import { OllamaProvider } from '../../providers/ollama-provider.js';
-import { AIProvider } from '../../providers/types.js';
+import { AIProvider } from '../../providers/base-provider.js';
 import { TokenBudgetConfig } from '../../token-management/types.js';
 import { getEnvVar } from '../../config/env-loader.js';
+import { logger } from '../../utils/logger.js';
 
 export class DelegateTool implements Tool {
   name = 'delegate';
@@ -143,8 +144,8 @@ Examples:
       };
 
       // Create subagent
-      let subagent: Agent | null = null;
-
+      let subagent: Agent | null = null; // Declare outside try block
+      logger.debug('DelegateTool: Creating subagent', { subagentThreadId });
       try {
         subagent = new Agent({
           provider,
@@ -164,23 +165,28 @@ Examples:
         });
 
         // Start subagent
+        logger.debug('DelegateTool: Starting subagent');
         await subagent.start();
 
         // Send the task
         const taskMessage = `Task: ${title}\n\n${prompt}`;
+        logger.debug('DelegateTool: Sending message to subagent', { taskMessageLength: taskMessage.length });
 
         // Create promise that resolves when conversation completes or times out
         const resultPromise = new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => {
+            logger.error('DelegateTool: Subagent timed out', { subagentThreadId });
             reject(new Error(`Subagent timeout after ${this.defaultTimeout}ms`));
           }, this.defaultTimeout);
 
           const completeHandler = () => {
+            logger.debug('DelegateTool: Subagent conversation complete', { subagentThreadId });
             clearTimeout(timeout);
             resolve();
           };
 
           const errorHandler = ({ error }: { error: Error }) => {
+            logger.error('DelegateTool: Subagent error during conversation', { subagentThreadId, error: error.message });
             clearTimeout(timeout);
             reject(error);
           };
@@ -198,6 +204,7 @@ Examples:
 
         // Return collected responses
         const combinedResponse = responses.join('\n\n');
+        logger.debug('DelegateTool: Subagent finished, returning result', { combinedResponseLength: combinedResponse.length });
         return createSuccessResult([
           {
             type: 'text',
@@ -205,6 +212,7 @@ Examples:
           },
         ]);
       } catch (error) {
+        logger.error('DelegateTool: Error during subagent execution', { error: error instanceof Error ? error.message : String(error) });
         // CLEANUP: Remove event listeners even on error to prevent memory leaks
         if (subagent) {
           subagent.removeAllListeners();

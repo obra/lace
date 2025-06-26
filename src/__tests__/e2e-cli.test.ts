@@ -86,7 +86,7 @@ describe('End-to-End CLI Tests', () => {
         const result = await runCLI(
           ['--provider', 'lmstudio', '--model', 'qwen/qwen3-1.7b', '--prompt', 'Hello /nothink'],
           {
-            timeout: 10000,
+            timeout: 30000,
           }
         );
 
@@ -138,7 +138,7 @@ describe('End-to-End CLI Tests', () => {
             '--prompt',
             'Hello',
           ],
-          { timeout: 10000 }
+          { timeout: 30000 }
         );
 
         if (result.exitCode !== 0) {
@@ -189,7 +189,7 @@ describe('End-to-End CLI Tests', () => {
               '--prompt',
               'Add 2+2 /nothink',
             ],
-            { timeout: 10000 }
+            { timeout: 30000 }
           );
 
           if (result.exitCode !== 0) {

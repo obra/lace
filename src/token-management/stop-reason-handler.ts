@@ -1,7 +1,7 @@
 // ABOUTME: Handles provider stop reasons and filters incomplete tool calls
 // ABOUTME: Prevents broken tool calls from crashing the system when max_tokens is reached
 
-import { ProviderResponse, ProviderToolCall } from '../providers/types.js';
+import { ProviderResponse, ProviderToolCall } from '../providers/base-provider.js';
 import { Tool } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
 

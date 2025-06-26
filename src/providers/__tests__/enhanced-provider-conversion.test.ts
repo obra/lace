@@ -2,7 +2,7 @@
 // ABOUTME: Tests how each provider converts enhanced ProviderMessage to their native format
 
 import { describe, it, expect } from 'vitest';
-import { ProviderMessage } from '../types.js';
+import { ProviderMessage } from '../base-provider.js';
 import {
   convertToAnthropicFormat,
   convertToOpenAIFormat,

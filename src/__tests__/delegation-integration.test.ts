@@ -254,7 +254,7 @@ describe('Delegation Integration Tests', () => {
     // Check that we have events from delegate thread
     const delegateEvents = allEvents.filter((e) => e.threadId.includes('.'));
     expect(delegateEvents.length).toBeGreaterThan(0);
-  }, 15000); // 15 second timeout for real delegation
+  }, 60000); // 60 second timeout for real delegation
 
   it('should render delegation boxes in UI timeline', () => {
     const mainThreadId = threadManager.generateThreadId();

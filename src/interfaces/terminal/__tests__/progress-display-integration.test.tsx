@@ -7,7 +7,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, CurrentTurnMetrics } from '../../../agents/agent.js';
 import { ToolExecutor } from '../../../tools/executor.js';
 import { ThreadManager } from '../../../threads/thread-manager.js';
-import { AIProvider, ProviderMessage, ProviderResponse } from '../../../providers/types.js';
+import { AIProvider } from '../../../providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '../../../providers/base-provider.js';
 import { Tool } from '../../../tools/types.js';
 import { TerminalInterfaceComponent } from '../terminal-interface.js';
 

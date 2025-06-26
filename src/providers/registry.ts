@@ -4,7 +4,8 @@
 import { glob } from 'glob';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { AIProvider, ProviderResponse } from './types.js';
+import { AIProvider } from './base-provider.js';
+import { ProviderResponse } from './types.js';
 
 export class ProviderRegistry {
   private _providers = new Map<string, AIProvider>();
@@ -36,12 +37,14 @@ export class ProviderRegistry {
     const providerFiles = await glob('*-provider.js', {
       cwd: providersDir.replace('/src/', '/dist/'),
       absolute: true,
+      ignore: 'base-provider.js',
     });
 
     // Also check for TypeScript files in development
     const tsProviderFiles = await glob('*-provider.ts', {
       cwd: providersDir,
       absolute: true,
+      ignore: '**/base-provider.ts',
     });
 
     // Use TS files if available (development), otherwise use JS files (production)

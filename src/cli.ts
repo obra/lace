@@ -9,7 +9,7 @@ loadEnvFile();
 
 import { Agent } from './agents/agent.js';
 import { ProviderRegistry } from './providers/registry.js';
-import { AIProvider } from './providers/types.js';
+import { AIProvider } from './providers/base-provider.js';
 import { ToolExecutor } from './tools/executor.js';
 import { DelegateTool } from './tools/implementations/delegate.js';
 import { ThreadManager } from './threads/thread-manager.js';
@@ -111,7 +111,9 @@ async function main() {
       continueThreadId = options.continue;
     } else {
       // --continue with no argument, get latest
+      logger.debug('Attempting to get latest thread ID');
       continueThreadId = (await threadManager.getLatestThreadId()) || undefined;
+      logger.debug(`Latest thread ID: ${continueThreadId}`);
     }
   }
 

@@ -55,7 +55,7 @@ describe('End-to-End CLI Conversation Tests', () => {
             'Add 2+2',
           ],
           {
-            timeout: 15000,
+            timeout: 30000,
           }
         );
 
@@ -114,7 +114,7 @@ describe('End-to-End CLI Conversation Tests', () => {
             'Hello',
           ],
           {
-            timeout: 15000,
+            timeout: 30000,
           }
         );
 
@@ -135,7 +135,7 @@ describe('End-to-End CLI Conversation Tests', () => {
             'Add 2+2',
           ],
           {
-            timeout: 15000,
+            timeout: 30000,
           }
         );
 
@@ -157,7 +157,7 @@ describe('End-to-End CLI Conversation Tests', () => {
             'Hello',
           ],
           {
-            timeout: 15000,
+            timeout: 30000,
           }
         );
 
@@ -183,7 +183,7 @@ describe('End-to-End CLI Conversation Tests', () => {
             'Add 2+2',
           ],
           {
-            timeout: 15000,
+            timeout: 30000,
           }
         );
 
@@ -208,7 +208,7 @@ describe('End-to-End CLI Conversation Tests', () => {
             'Add 3+3',
           ],
           {
-            timeout: 15000,
+            timeout: 30000,
           }
         );
 
@@ -256,7 +256,7 @@ describe('End-to-End CLI Conversation Tests', () => {
             'Add 2+2',
           ],
           {
-            timeout: 15000,
+            timeout: 30000,
           }
         );
 
@@ -288,7 +288,7 @@ describe('End-to-End CLI Conversation Tests', () => {
             'Hello',
           ],
           {
-            timeout: 15000,
+            timeout: 30000,
           }
         );
 

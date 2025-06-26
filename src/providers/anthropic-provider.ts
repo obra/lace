@@ -2,19 +2,20 @@
 // ABOUTME: Wraps Anthropic SDK in the common provider interface
 
 import Anthropic from '@anthropic-ai/sdk';
+import { AIProvider } from './base-provider.js';
 import {
-  AIProvider,
   ProviderMessage,
   ProviderResponse,
   ProviderConfig,
   ProviderToolCall,
-} from './types.js';
+} from './base-provider.js';
 import { Tool } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
 import { convertToAnthropicFormat } from './format-converters.js';
 
 export interface AnthropicProviderConfig extends ProviderConfig {
   apiKey: string;
+  [key: string]: unknown; // Allow for additional properties
 }
 
 export class AnthropicProvider extends AIProvider {
@@ -40,11 +41,9 @@ export class AnthropicProvider extends AIProvider {
     return true;
   }
 
-  async createResponse(
-    messages: ProviderMessage[],
-    tools: Tool[] = [],
-    signal?: AbortSignal
-  ): Promise<ProviderResponse> {
+  
+
+  private _createRequestPayload(messages: ProviderMessage[], tools: Tool[]): Anthropic.Messages.MessageCreateParams {
     // Convert our enhanced generic messages to Anthropic format
     const anthropicMessages = convertToAnthropicFormat(messages);
 
@@ -60,21 +59,29 @@ export class AnthropicProvider extends AIProvider {
       input_schema: tool.input_schema,
     }));
 
-    const requestPayload = {
+    return {
       model: this.modelName,
       max_tokens: this._config.maxTokens || 4000,
       messages: anthropicMessages,
       system: systemPrompt,
       tools: anthropicTools,
     };
+  }
+
+  async createResponse(
+    messages: ProviderMessage[],
+    tools: Tool[] = [],
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> {
+    const requestPayload = this._createRequestPayload(messages, tools);
 
     logger.debug('Sending request to Anthropic', {
       provider: 'anthropic',
       model: requestPayload.model,
-      messageCount: anthropicMessages.length,
-      systemPromptLength: systemPrompt.length,
-      toolCount: anthropicTools.length,
-      toolNames: anthropicTools.map((t) => t.name),
+      messageCount: requestPayload.messages.length,
+      systemPromptLength: requestPayload.system?.length,
+      toolCount: requestPayload.tools?.length,
+      toolNames: requestPayload.tools?.map((t) => t.name),
     });
 
     // Log full request payload for debugging
@@ -83,9 +90,9 @@ export class AnthropicProvider extends AIProvider {
       payload: JSON.stringify(requestPayload, null, 2),
     });
 
-    const response = await this._anthropic.messages.create(requestPayload, {
+    const response = (await this._anthropic.messages.create(requestPayload, {
       signal,
-    });
+    })) as Anthropic.Messages.Message;
 
     // Log full response for debugging
     logger.debug('Anthropic response payload', {
@@ -94,16 +101,16 @@ export class AnthropicProvider extends AIProvider {
     });
 
     const textContent = response.content
-      .filter((content): content is Anthropic.TextBlock => content.type === 'text')
-      .map((content) => content.text)
+      .filter((contentBlock): contentBlock is Anthropic.TextBlock => contentBlock.type === 'text')
+      .map((contentBlock) => contentBlock.text)
       .join('');
 
     const toolCalls = response.content
-      .filter((content): content is Anthropic.ToolUseBlock => content.type === 'tool_use')
-      .map((content) => ({
-        id: content.id,
-        name: content.name,
-        input: content.input as Record<string, unknown>,
+      .filter((contentBlock): contentBlock is Anthropic.ToolUseBlock => contentBlock.type === 'tool_use')
+      .map((contentBlock) => ({
+        id: contentBlock.id,
+        name: contentBlock.name,
+        input: contentBlock.input as Record<string, unknown>,
       }));
 
     logger.debug('Received response from Anthropic', {
@@ -133,36 +140,15 @@ export class AnthropicProvider extends AIProvider {
     tools: Tool[] = [],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    // Convert our enhanced generic messages to Anthropic format
-    const anthropicMessages = convertToAnthropicFormat(messages);
-
-    // Extract system message if present
-    const systemMessage = messages.find((msg) => msg.role === 'system');
-    const systemPrompt =
-      systemMessage?.content || this._systemPrompt || 'You are a helpful assistant.';
-
-    // Convert tools to Anthropic format
-    const anthropicTools: Anthropic.Tool[] = tools.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      input_schema: tool.input_schema,
-    }));
-
-    const requestPayload = {
-      model: this.modelName,
-      max_tokens: this._config.maxTokens || 4000,
-      messages: anthropicMessages,
-      system: systemPrompt,
-      tools: anthropicTools,
-    };
+    const requestPayload = this._createRequestPayload(messages, tools);
 
     logger.debug('Sending streaming request to Anthropic', {
       provider: 'anthropic',
       model: requestPayload.model,
-      messageCount: anthropicMessages.length,
-      systemPromptLength: systemPrompt.length,
-      toolCount: anthropicTools.length,
-      toolNames: anthropicTools.map((t) => t.name),
+      messageCount: requestPayload.messages.length,
+      systemPromptLength: requestPayload.system?.length,
+      toolCount: requestPayload.tools?.length,
+      toolNames: requestPayload.tools?.map((t) => t.name),
     });
 
     // Log full request payload for debugging
@@ -190,8 +176,7 @@ export class AnthropicProvider extends AIProvider {
 
       // Listen for progressive token usage updates during streaming
       stream.on('streamEvent', (event) => {
-        // Handle message_delta events that contain final token usage
-        if (event.type === 'message_delta' && event?.usage) {
+        if (event.type === 'message_delta' && event.usage) {
           const usage = event.usage;
           this.emit('token_usage_update', {
             usage: {
@@ -261,7 +246,7 @@ export class AnthropicProvider extends AIProvider {
         provider: 'anthropic',
         contentLength: textContent.length,
         toolCallCount: toolCalls.length,
-        toolCallNames: toolCalls.map((tc) => tc.name),
+        toolCallNames: toolCalls.map((tc: ProviderToolCall) => tc.name),
         usage: finalMessage.usage,
       });
 
