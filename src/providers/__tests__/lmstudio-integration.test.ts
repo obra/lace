@@ -66,7 +66,6 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
   });
 
   it('should handle multiple tool calls in sequence', async () => {
-
     const messages = [
       {
         role: 'user' as const,
@@ -179,8 +178,6 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
   }, 30000);
 
   it('should handle mixed tool and text responses', async () => {
-    
-
     const messages = [
       {
         role: 'user' as const,
@@ -222,8 +219,6 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
   }, 30000);
 
   it('should handle unicode and special characters', async () => {
-    
-
     const messages = [
       {
         role: 'user' as const,
@@ -239,8 +234,6 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
   }, 30000);
 
   it('should execute tools using native tool calling', async () => {
-    
-
     const simpleTool: Tool = {
       name: 'get_weather',
       description: 'Get weather information for a location',

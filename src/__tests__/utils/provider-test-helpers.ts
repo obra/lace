@@ -5,7 +5,7 @@
  * Skip test suite if a local provider (LMStudio, Ollama) is unavailable.
  * Call this in beforeAll() to automatically skip tests when the provider
  * server is not running or has no models loaded.
- * 
+ *
  * @param providerName - Human-readable provider name for logging
  * @param provider - Provider instance with diagnose() method
  */
