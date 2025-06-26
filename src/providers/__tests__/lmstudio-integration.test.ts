@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { LMStudioProvider } from '../lmstudio-provider.js';
 import { Tool, ToolContext } from '../../tools/types.js';
 import { logger } from '../../utils/logger.js';
+import { skipIfProviderIsUnavailable } from '../../__tests__/utils/provider-test-helpers.js';
 
 // Mock tool for testing without side effects
 class MockTool implements Tool {
@@ -51,7 +52,6 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
   let provider: LMStudioProvider;
   let mockTool: MockTool;
   let failingTool: FailingTool;
-  let isLMStudioAvailable = false;
 
   beforeAll(async () => {
     provider = new LMStudioProvider({
@@ -62,31 +62,10 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
     mockTool = new MockTool();
     failingTool = new FailingTool();
 
-    // Check if LMStudio is available once for all tests
-    try {
-      const diagnostics = await provider.diagnose();
-
-      if (diagnostics.connected && diagnostics.models.length > 0) {
-        isLMStudioAvailable = true;
-        logger.info('LMStudio integration tests enabled - server available with models');
-      } else {
-        logger.info(
-          'Skipping LMStudio integration tests - server not available or no models loaded'
-        );
-      }
-    } catch (error) {
-      logger.info('Skipping LMStudio integration tests - connection failed', { error });
-    }
-  });
-
-  beforeEach(() => {
-    if (!isLMStudioAvailable) {
-      return; // Skip individual tests if LMStudio not available
-    }
+    await skipIfProviderIsUnavailable('LMStudio', provider);
   });
 
   it('should handle multiple tool calls in sequence', async () => {
-    if (!isLMStudioAvailable) return;
 
     const messages = [
       {
@@ -200,7 +179,7 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
   }, 30000);
 
   it('should handle mixed tool and text responses', async () => {
-    if (!isLMStudioAvailable) return;
+    
 
     const messages = [
       {
@@ -243,7 +222,7 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
   }, 30000);
 
   it('should handle unicode and special characters', async () => {
-    if (!isLMStudioAvailable) return;
+    
 
     const messages = [
       {
@@ -260,7 +239,7 @@ describe.sequential('LMStudio Provider Integration Tests', () => {
   }, 30000);
 
   it('should execute tools using native tool calling', async () => {
-    if (!isLMStudioAvailable) return;
+    
 
     const simpleTool: Tool = {
       name: 'get_weather',

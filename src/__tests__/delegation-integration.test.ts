@@ -9,6 +9,7 @@ import { ToolExecutor } from '../tools/executor.js';
 import { DelegateTool } from '../tools/implementations/delegate.js';
 import { BashTool } from '../tools/implementations/bash.js';
 import { LMStudioProvider } from '../providers/lmstudio-provider.js';
+import { skipIfProviderIsUnavailable } from './utils/provider-test-helpers.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -194,19 +195,14 @@ describe('Delegation Integration Tests', () => {
   });
 
   it('should integrate delegation with DelegateTool', async () => {
-    // Skip this test if LMStudio is not available
-    try {
-      await fetch('http://localhost:1234/v1/models');
-    } catch {
-      console.log('Skipping delegation integration test - LMStudio not available');
-      return;
-    }
-
     // Create LMStudio provider for real integration testing
     const provider = new LMStudioProvider({
       baseUrl: 'ws://localhost:1234',
       model: 'qwen/qwen3-1.7b',
     });
+
+    // Skip this test if LMStudio is not available
+    await skipIfProviderIsUnavailable('LMStudio', provider);
 
     // Create main agent with real provider
     const mainThreadId = threadManager.generateThreadId();
