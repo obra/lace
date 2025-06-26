@@ -85,6 +85,12 @@ export abstract class AIProvider extends EventEmitter {
   protected estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);
   }
+
+  // System prompt handling with fallback logic
+  protected getEffectiveSystemPrompt(messages: ProviderMessage[]): string {
+    const systemMessage = messages.find(msg => msg.role === 'system');
+    return systemMessage?.content || this._systemPrompt || 'You are a helpful assistant.';
+  }
 }
 
 export interface ProviderToolCall {

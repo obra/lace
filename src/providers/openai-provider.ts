@@ -57,10 +57,8 @@ export class OpenAIProvider extends AIProvider {
       messages
     ) as unknown as OpenAI.Chat.ChatCompletionMessageParam[];
 
-    // Extract system message if present
-    const systemMessage = messages.find((msg) => msg.role === 'system');
-    const systemPrompt =
-      systemMessage?.content || this._systemPrompt || 'You are a helpful assistant.';
+    // Extract system message if present  
+    const systemPrompt = this.getEffectiveSystemPrompt(messages);
 
     // Add system message at the beginning if not already present
     const messagesWithSystem = [

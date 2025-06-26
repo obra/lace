@@ -48,9 +48,7 @@ export class AnthropicProvider extends AIProvider {
     const anthropicMessages = convertToAnthropicFormat(messages);
 
     // Extract system message if present
-    const systemMessage = messages.find((msg) => msg.role === 'system');
-    const systemPrompt =
-      systemMessage?.content || this._systemPrompt || 'You are a helpful assistant.';
+    const systemPrompt = this.getEffectiveSystemPrompt(messages);
 
     // Convert tools to Anthropic format
     const anthropicTools: Anthropic.Tool[] = tools.map((tool) => ({
