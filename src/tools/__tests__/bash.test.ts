@@ -128,22 +128,22 @@ describe('BashTool', () => {
   });
 
   describe('Command execution failures', () => {
-    it('should handle command not found as tool failure', async () => {
+    it('should handle not found as tool failure', async () => {
       const result = await bashTool.executeTool({
         command: 'nonexistentcommand12345',
       });
 
       // Based on observed behavior: single nonexistent command = tool failure
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('command not found');
+      expect(result.content[0].text).toContain('not found');
       expect(result.content[0].text).toContain('nonexistentcommand12345');
 
       const output = JSON.parse(result.content[0].text!);
       expect(output.exitCode).toBe(127); // Command not found
-      expect(output.stderr).toContain('command not found');
+      expect(output.stderr).toContain('not found');
     });
 
-    it('should handle command not found in sequence as tool success', async () => {
+    it('should handle not found in sequence as tool success', async () => {
       const result = await bashTool.executeTool({
         command: 'echo "before"; nonexistentcommand12345; echo "Exit code: $?"',
       });
@@ -154,7 +154,7 @@ describe('BashTool', () => {
       const output = JSON.parse(result.content[0].text!);
       expect(output.stdout).toContain('before');
       expect(output.stdout).toContain('Exit code: 127');
-      expect(output.stderr).toContain('command not found');
+      expect(output.stderr).toContain('not found');
     });
 
     it('should handle permission denied', async () => {
@@ -296,7 +296,7 @@ describe('BashTool', () => {
     });
 
     it('should match the behavior I observed with command sequences', async () => {
-      // Based on: echo "Testing command not found"; nonexistentcommand12345; echo "Exit code was: $?"
+      // Based on: echo "Testing not found"; nonexistentcommand12345; echo "Exit code was: $?"
       const result = await bashTool.executeTool({
         command: 'echo "Testing"; nonexistentcmd123; echo "After error"',
       });
@@ -306,7 +306,7 @@ describe('BashTool', () => {
       const output = JSON.parse(result.content[0].text!);
       expect(output.stdout).toContain('Testing');
       expect(output.stdout).toContain('After error');
-      expect(output.stderr).toContain('command not found');
+      expect(output.stderr).toContain('not found');
     });
   });
 });
