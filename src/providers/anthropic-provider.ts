@@ -191,7 +191,7 @@ export class AnthropicProvider extends AIProvider {
       // Estimate progressive tokens from text chunks
       stream.on('text', (text) => {
         // Rough token estimation: ~4 characters per token
-        const newTokens = Math.ceil(text.length / 4);
+        const newTokens = this.estimateTokens(text);
         estimatedOutputTokens += newTokens;
 
         // Emit progressive token estimate

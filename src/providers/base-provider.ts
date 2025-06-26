@@ -80,6 +80,11 @@ export abstract class AIProvider extends EventEmitter {
   get modelName(): string {
     return this._config.model || this.defaultModel;
   }
+
+  // Token estimation utility for streaming
+  protected estimateTokens(text: string): number {
+    return Math.ceil(text.length / 4);
+  }
 }
 
 export interface ProviderToolCall {

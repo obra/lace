@@ -213,7 +213,7 @@ export class OpenAIProvider extends AIProvider {
           this.emit('token', { token: delta.content });
 
           // Estimate progressive tokens from text chunks
-          const newTokens = Math.ceil(delta.content.length / 4);
+          const newTokens = this.estimateTokens(delta.content);
           estimatedOutputTokens += newTokens;
 
           // Emit progressive token estimate
