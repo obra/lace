@@ -287,6 +287,21 @@ export class UrlFetchTool implements Tool {
       });
     }
 
+    // Validate returnContent parameter
+    if (input.returnContent !== undefined && typeof input.returnContent !== 'boolean') {
+      return this.createRichError({
+        error: {
+          type: 'validation',
+          message: 'returnContent must be a boolean value',
+        },
+        request: {
+          url,
+          method,
+          headers,
+        },
+      });
+    }
+
     // Set up fetch options with timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);

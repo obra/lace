@@ -318,8 +318,8 @@ describe('UrlFetchTool', () => {
 
     it('should provide request timing information', async () => {
       const result = await tool.executeTool({
-        url: 'https://httpbin.org/delay/1',
-        timeout: 1500, // Valid timeout that should still timeout
+        url: 'https://httpbin.org/delay/3',
+        timeout: 1000, // Minimum timeout - 3 second delay should always timeout
       });
 
       expect(result.isError).toBe(true);
