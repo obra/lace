@@ -122,7 +122,7 @@ export class AnthropicProvider extends AIProvider {
     return {
       content: textContent,
       toolCalls,
-      stopReason: this._normalizeStopReason(response.stop_reason),
+      stopReason: this.normalizeStopReason(response.stop_reason),
       usage: response.usage
         ? {
             promptTokens: response.usage.input_tokens,
@@ -251,7 +251,7 @@ export class AnthropicProvider extends AIProvider {
       const response = {
         content: textContent,
         toolCalls,
-        stopReason: this._normalizeStopReason(finalMessage.stop_reason),
+        stopReason: this.normalizeStopReason(finalMessage.stop_reason),
         usage: finalMessage.usage
           ? {
               promptTokens: finalMessage.usage.input_tokens,
@@ -273,7 +273,7 @@ export class AnthropicProvider extends AIProvider {
     }
   }
 
-  private _normalizeStopReason(stopReason: string | null): string | undefined {
+  protected normalizeStopReason(stopReason: string | null | undefined): string | undefined {
     if (!stopReason) return undefined;
 
     switch (stopReason) {

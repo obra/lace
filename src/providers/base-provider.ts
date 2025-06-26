@@ -91,6 +91,15 @@ export abstract class AIProvider extends EventEmitter {
     const systemMessage = messages.find(msg => msg.role === 'system');
     return systemMessage?.content || this._systemPrompt || 'You are a helpful assistant.';
   }
+
+  // Base stop reason normalization - providers should override for specific mappings
+  protected normalizeStopReason(stopReason: string | null | undefined): string | undefined {
+    if (!stopReason) return undefined;
+    
+    // Providers should override this method to handle their specific stop reasons
+    // This base implementation provides a safe default
+    return 'stop';
+  }
 }
 
 export interface ProviderToolCall {

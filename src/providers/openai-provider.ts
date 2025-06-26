@@ -144,7 +144,7 @@ export class OpenAIProvider extends AIProvider {
     return {
       content: textContent,
       toolCalls,
-      stopReason: this._normalizeStopReason(choice.finish_reason),
+      stopReason: this.normalizeStopReason(choice.finish_reason),
       usage: response.usage
         ? {
             promptTokens: response.usage.prompt_tokens,
@@ -282,7 +282,7 @@ export class OpenAIProvider extends AIProvider {
       const response = {
         content,
         toolCalls,
-        stopReason: this._normalizeStopReason(stopReason),
+        stopReason: this.normalizeStopReason(stopReason),
         usage: usage
           ? {
               promptTokens: usage.prompt_tokens,
@@ -304,7 +304,7 @@ export class OpenAIProvider extends AIProvider {
     }
   }
 
-  private _normalizeStopReason(stopReason: string | null | undefined): string | undefined {
+  protected normalizeStopReason(stopReason: string | null | undefined): string | undefined {
     if (!stopReason) return undefined;
 
     switch (stopReason) {
