@@ -15,7 +15,7 @@ describe('TypeScript Compilation', () => {
         timeout: 30000, // 30 second timeout
       });
     }).not.toThrow();
-  });
+  }, 35000); // 35 second timeout for vitest
 
   it('should have clean TypeScript output for build', () => {
     expect(() => {
@@ -27,5 +27,5 @@ describe('TypeScript Compilation', () => {
         timeout: 30000, // 30 second timeout
       });
     }).not.toThrow();
-  });
+  }, 35000); // 35 second timeout for vitest
 });

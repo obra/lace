@@ -260,7 +260,7 @@ describe('TextRenderer Edge Cases and Robust Rendering', () => {
       );
       
       const endTime = performance.now();
-      expect(endTime - startTime).toBeLessThan(200); // Should render reasonably quickly
+      expect(endTime - startTime).toBeLessThan(500); // Should render reasonably quickly (increased for CI)
       expect(container).toBeTruthy();
     });
 

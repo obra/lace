@@ -61,7 +61,7 @@ export class AnthropicProvider extends AIProvider {
     }));
 
     const requestPayload = {
-      model: this._config.model || this.defaultModel,
+      model: this.modelName,
       max_tokens: this._config.maxTokens || 4000,
       messages: anthropicMessages,
       system: systemPrompt,
@@ -149,7 +149,7 @@ export class AnthropicProvider extends AIProvider {
     }));
 
     const requestPayload = {
-      model: this._config.model || this.defaultModel,
+      model: this.modelName,
       max_tokens: this._config.maxTokens || 4000,
       messages: anthropicMessages,
       system: systemPrompt,

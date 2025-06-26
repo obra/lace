@@ -242,6 +242,10 @@ export class Agent extends EventEmitter {
     return this._provider.providerName;
   }
 
+  get provider(): AIProvider {
+    return this._provider;
+  }
+
   // Token budget management
   getTokenBudgetStatus() {
     return this._tokenBudgetManager?.getBudgetStatus() || null;

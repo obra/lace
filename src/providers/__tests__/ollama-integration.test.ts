@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { OllamaProvider } from '../ollama-provider.js';
 import { Tool, ToolContext } from '../../tools/types.js';
 import { logger } from '../../utils/logger.js';
+import { checkProviderAvailability } from '../../__tests__/utils/provider-test-helpers.js';
 
 // Mock tool for testing without side effects
 class MockTool implements Tool {
@@ -27,48 +28,22 @@ class MockTool implements Tool {
   }
 }
 
-describe.sequential('Ollama Provider Integration Tests', () => {
-  let provider: OllamaProvider;
+// Check provider availability once at module level
+const provider = new OllamaProvider({
+  model: 'qwen3:0.6b',
+  systemPrompt: 'You are a helpful assistant. Use tools when asked.',
+});
+
+const isOllamaAvailable = await checkProviderAvailability('Ollama', provider);
+
+const conditionalDescribe = isOllamaAvailable ? describe.sequential : describe.skip;
+
+conditionalDescribe('Ollama Provider Integration Tests', () => {
   let mockTool: MockTool;
-  let isOllamaAvailable = false;
 
   beforeAll(async () => {
-    provider = new OllamaProvider({
-      model: 'qwen3:0.6b',
-      systemPrompt: 'You are a helpful assistant. Use tools when asked.',
-    });
-
     mockTool = new MockTool();
-
-    // Check if Ollama is available and working for tests
-    try {
-      const diagnostics = await provider.diagnose();
-      if (diagnostics.connected && diagnostics.models.length > 0) {
-        // Test actual connectivity with a simple request
-        const testResponse = await provider.createResponse(
-          [{ role: 'user', content: 'Say "test"' }],
-          []
-        );
-
-        if (testResponse.content) {
-          isOllamaAvailable = true;
-          logger.info('Ollama integration tests enabled - server working properly');
-        } else {
-          logger.info('Skipping Ollama integration tests - server not responding properly');
-        }
-      } else {
-        logger.info('Skipping Ollama integration tests - server not available or no models loaded');
-      }
-    } catch (error) {
-      logger.info('Skipping Ollama integration tests - connection or response failed', { error });
-    }
   }, 60000);
-
-  beforeEach(() => {
-    if (!isOllamaAvailable) {
-      return; // Skip individual tests if Ollama not available
-    }
-  });
 
   it('should connect and get basic response', async () => {
     const messages = [

@@ -73,8 +73,6 @@ export class OllamaProvider extends AIProvider {
     tools: Tool[] = [],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    const modelId = this._config.model || this.defaultModel;
-
     // First check if we can connect and if the model exists
     const diagnostics = await this.diagnose();
 
@@ -91,12 +89,12 @@ export class OllamaProvider extends AIProvider {
     }
 
     // Check if our target model is available
-    if (!diagnostics.models.includes(modelId)) {
+    if (!diagnostics.models.includes(this.modelName)) {
       throw new Error(
-        `Model "${modelId}" is not available in Ollama.\n\n` +
+        `Model "${this.modelName}" is not available in Ollama.\n\n` +
           `Available models: ${diagnostics.models.join(', ')}\n\n` +
           `To fix this:\n` +
-          `  - Pull the model: 'ollama pull ${modelId}'\n` +
+          `  - Pull the model: 'ollama pull ${this.modelName}'\n` +
           `  - Choose an available model from the list above\n` +
           `  - Use --provider anthropic as fallback`
       );
@@ -123,7 +121,7 @@ export class OllamaProvider extends AIProvider {
 
     logger.debug('Sending request to Ollama', {
       provider: 'ollama',
-      model: modelId,
+      model: this.modelName,
       messageCount: ollamaMessages.length,
       toolCount: tools.length,
       toolNames: tools.map((t) => t.name),
@@ -131,7 +129,7 @@ export class OllamaProvider extends AIProvider {
 
     // Prepare the request payload
     const requestPayload = {
-      model: modelId,
+      model: this.modelName,
       messages: ollamaMessages,
       stream: false as const,
       tools:
@@ -170,7 +168,7 @@ export class OllamaProvider extends AIProvider {
 
     logger.debug('Received response from Ollama', {
       provider: 'ollama',
-      model: modelId,
+      model: this.modelName,
       messageContent: response.message?.content,
       hasToolCalls: !!response.message?.tool_calls,
       toolCallCount: response.message?.tool_calls?.length || 0,
@@ -186,7 +184,7 @@ export class OllamaProvider extends AIProvider {
 
     logger.debug('Parsed Ollama response', {
       provider: 'ollama',
-      model: modelId,
+      model: this.modelName,
       contentLength: content.length,
       toolCallCount: toolCalls.length,
       toolCallNames: toolCalls.map((tc) => tc.name),
@@ -206,8 +204,6 @@ export class OllamaProvider extends AIProvider {
     tools: Tool[] = [],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    const modelId = this._config.model || this.defaultModel;
-
     // First check if we can connect and if the model exists
     const diagnostics = await this.diagnose();
 
@@ -224,12 +220,12 @@ export class OllamaProvider extends AIProvider {
     }
 
     // Check if our target model is available
-    if (!diagnostics.models.includes(modelId)) {
+    if (!diagnostics.models.includes(this.modelName)) {
       throw new Error(
-        `Model "${modelId}" is not available in Ollama.\n\n` +
+        `Model "${this.modelName}" is not available in Ollama.\n\n` +
           `Available models: ${diagnostics.models.join(', ')}\n\n` +
           `To fix this:\n` +
-          `  - Pull the model: 'ollama pull ${modelId}'\n` +
+          `  - Pull the model: 'ollama pull ${this.modelName}'\n` +
           `  - Choose an available model from the list above\n` +
           `  - Use --provider anthropic as fallback`
       );
@@ -256,7 +252,7 @@ export class OllamaProvider extends AIProvider {
 
     logger.debug('Sending streaming request to Ollama', {
       provider: 'ollama',
-      model: modelId,
+      model: this.modelName,
       messageCount: ollamaMessages.length,
       toolCount: tools.length,
       toolNames: tools.map((t) => t.name),
@@ -264,7 +260,7 @@ export class OllamaProvider extends AIProvider {
 
     // Prepare the request payload for streaming
     const requestPayload = {
-      model: modelId,
+      model: this.modelName,
       messages: ollamaMessages,
       stream: true as const,
       tools:
@@ -360,7 +356,7 @@ export class OllamaProvider extends AIProvider {
 
       logger.debug('Received streaming response from Ollama', {
         provider: 'ollama',
-        model: modelId,
+        model: this.modelName,
         contentLength: content.length,
         toolCallCount: toolCalls.length,
         toolCallNames: toolCalls.map((tc) => tc.name),

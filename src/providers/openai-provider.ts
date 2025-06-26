@@ -82,7 +82,7 @@ export class OpenAIProvider extends AIProvider {
     }));
 
     const requestPayload: OpenAI.Chat.ChatCompletionCreateParams = {
-      model: this._config.model || this.defaultModel,
+      model: this.modelName,
       messages: messagesWithSystem,
       max_tokens: this._config.maxTokens || 4000,
       ...(tools.length > 0 && { tools: openaiTools }),
@@ -181,7 +181,7 @@ export class OpenAIProvider extends AIProvider {
     }));
 
     const requestPayload: OpenAI.Chat.ChatCompletionCreateParams = {
-      model: this._config.model || this.defaultModel,
+      model: this.modelName,
       messages: messagesWithSystem,
       max_tokens: this._config.maxTokens || 4000,
       stream: true,

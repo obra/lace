@@ -47,6 +47,7 @@ export class BashTool implements Tool {
       const { stdout, stderr } = await execAsync(command, {
         cwd: process.cwd(),
         maxBuffer: 10485760,
+        shell: '/bin/bash',
       });
 
       const result: BashOutput = {
