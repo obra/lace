@@ -11,22 +11,27 @@ import MessageDisplay from '../message-display.js';
 
 interface TimelineItemProps {
   item: TimelineItemType;
-  isFocused: boolean;
-  focusedLine: number;
+  isSelected: boolean; // Whether timeline cursor is on this item (for expansion)
+  isFocused: boolean; // Whether this item has keyboard focus (for its own behaviors)
+  selectedLine: number;
   itemStartLine: number;
   onToggle?: () => void;
+  onExpansionToggle?: () => void; // Called when left/right arrows should toggle expansion
   currentFocusId?: string;
 }
 
 interface DynamicToolRendererProps {
   item: Extract<TimelineItemType, { type: 'tool_execution' }>;
-  isFocused: boolean;
+  isSelected: boolean; // Whether timeline cursor is on this item
+  isFocused: boolean; // Whether this item has keyboard focus
   onToggle?: () => void;
+  onExpansionToggle?: () => void;
 }
 
 function DynamicToolRenderer({ 
   item, 
-  isFocused, 
+  isSelected, 
+  isFocused,
   onToggle
 }: DynamicToolRendererProps) {
   const [ToolRenderer, setToolRenderer] = React.useState<React.ComponentType<unknown> | null>(null);
@@ -69,6 +74,7 @@ function DynamicToolRenderer({
     };
     return <GenericToolRenderer 
       item={debugItem}
+      isSelected={isSelected}
       isFocused={isFocused}
       onToggle={onToggle}
     />;
@@ -90,6 +96,7 @@ function DynamicToolRenderer({
   
   return <RendererComponent 
     item={debugItem}
+    isSelected={isSelected}
     isFocused={isFocused}
     onToggle={onToggle}
   />;
@@ -97,8 +104,9 @@ function DynamicToolRenderer({
 
 export function TimelineItem({ 
   item, 
-  isFocused, 
-  focusedLine, 
+  isSelected, 
+  isFocused,
+  selectedLine, 
   itemStartLine, 
   onToggle, 
   currentFocusId
@@ -114,7 +122,8 @@ export function TimelineItem({
           data: item.content
         }} 
         isFocused={isFocused}
-        focusedLine={focusedLine}
+        isSelected={isSelected}
+        focusedLine={selectedLine}
         itemStartLine={itemStartLine}
         onToggle={onToggle}
       />;
@@ -129,22 +138,8 @@ export function TimelineItem({
           data: item.content
         }} 
         isFocused={isFocused}
-        focusedLine={focusedLine}
-        itemStartLine={itemStartLine}
-        onToggle={onToggle}
-      />;
-      
-    case 'thinking':
-      return <EventDisplay 
-        event={{
-          id: item.id,
-          threadId: '',
-          type: 'THINKING',
-          timestamp: item.timestamp,
-          data: item.content
-        }} 
-        isFocused={isFocused}
-        focusedLine={focusedLine}
+        isSelected={isSelected}
+        focusedLine={selectedLine}
         itemStartLine={itemStartLine}
         onToggle={onToggle}
       />;
@@ -159,7 +154,8 @@ export function TimelineItem({
           data: item.content
         }} 
         isFocused={isFocused}
-        focusedLine={focusedLine}
+        isSelected={isSelected}
+        focusedLine={selectedLine}
         itemStartLine={itemStartLine}
         onToggle={onToggle}
       />;
@@ -167,6 +163,7 @@ export function TimelineItem({
     case 'tool_execution':
       return <DynamicToolRenderer 
         item={item}
+        isSelected={isSelected}
         isFocused={isFocused}
         onToggle={onToggle}
       />;

@@ -13,7 +13,7 @@ interface CollapsibleBoxProps {
   maxHeight?: number;
   borderStyle?: 'single' | 'double' | 'round' | 'classic' | 'bold' | 'arrow';
   borderColor?: string;
-  isFocused?: boolean; // Whether this specific box is focused (for visual indication)
+  isSelected?: boolean; // Whether this specific box is selected (for visual indication)
 }
 
 export function CollapsibleBox({ 
@@ -24,7 +24,7 @@ export function CollapsibleBox({
   maxHeight,
   borderStyle = 'round',
   borderColor = 'gray',
-  isFocused = false
+  isSelected = false
 }: CollapsibleBoxProps) {
   
   return (
@@ -34,7 +34,7 @@ export function CollapsibleBox({
           <Text color={borderColor}>
             {isExpanded ? UI_SYMBOLS.EXPANDED : UI_SYMBOLS.COLLAPSED} {label}
           </Text>
-          {isFocused && (
+          {isSelected && (
             <Text color="gray"> ({UI_SYMBOLS.ARROW_LEFT} {UI_SYMBOLS.ARROW_RIGHT} to toggle)</Text>
           )}
         </Box>

@@ -6,6 +6,7 @@ import { Box, useInput, useFocus, useFocusManager } from 'ink';
 import { Timeline, TimelineItem } from '../../../thread-processor.js';
 import { TimelineViewport } from './TimelineViewport.js';
 import { TimelineContent } from './TimelineContent.js';
+import { emitExpansionToggle } from './hooks/useTimelineExpansionToggle.js';
 
 interface TimelineDisplayProps {
   timeline: Timeline;
@@ -20,8 +21,12 @@ export default function TimelineDisplay({ timeline, focusId, parentFocusId, bott
   
 
   // Handle item-specific interactions
-  const handleItemInteraction = useCallback((focusedItemIndex: number, input: string, key: any) => {
-    // Delegation focus handled by DelegationBox internally
+  const handleItemInteraction = useCallback((selectedItemIndex: number, input: string, key: any) => {
+    if (key.leftArrow || key.rightArrow) {
+      // Emit expansion toggle event - only selected item will respond
+      emitExpansionToggle();
+    }
+    // Other interactions (return key, etc.) can be handled here in the future
   }, []);
 
   return (

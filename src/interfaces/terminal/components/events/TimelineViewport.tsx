@@ -13,15 +13,15 @@ interface TimelineViewportProps {
   focusId?: string;
   parentFocusId?: string;
   bottomSectionHeight?: number;
-  onItemInteraction?: (focusedItemIndex: number, input: string, key: any) => void;
+  onItemInteraction?: (selectedItemIndex: number, input: string, key: any) => void;
   children: (props: {
     timeline: Timeline;
     viewportState: {
-      focusedLine: number;
+      selectedLine: number;
       lineScrollOffset: number;
       itemPositions: number[];
       totalContentHeight: number;
-      focusedItemIndex: number;
+      selectedItemIndex: number;
     };
     viewportActions: {
       triggerRemeasurement: () => void;
@@ -109,7 +109,7 @@ export function TimelineViewport({
     } else if (key.leftArrow || key.rightArrow || key.return) {
       // Forward item interactions to parent
       if (onItemInteraction) {
-        onItemInteraction(viewport.focusedItemIndex, input, key);
+        onItemInteraction(viewport.selectedItemIndex, input, key);
       }
     }
   }, { isActive: isFocused }); // Always active when focused, not just when content exists
@@ -138,11 +138,11 @@ export function TimelineViewport({
           {children({
             timeline,
             viewportState: {
-              focusedLine: viewport.focusedLine,
+              selectedLine: viewport.selectedLine,
               lineScrollOffset: viewport.lineScrollOffset,
               itemPositions: viewport.itemPositions,
               totalContentHeight: viewport.totalContentHeight,
-              focusedItemIndex: viewport.focusedItemIndex
+              selectedItemIndex: viewport.selectedItemIndex
             },
             viewportActions: {
               triggerRemeasurement: viewport.triggerRemeasurement
@@ -155,7 +155,7 @@ export function TimelineViewport({
         <Box 
           position="absolute"
           flexDirection="column"
-          marginTop={-viewport.lineScrollOffset + viewport.focusedLine}
+          marginTop={-viewport.lineScrollOffset + viewport.selectedLine}
         >
           <Text backgroundColor="white" color="black">
             {'>'}

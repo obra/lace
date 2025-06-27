@@ -7,8 +7,8 @@ import { Timeline, TimelineItem as TimelineItemType } from '../../../thread-proc
 import { TimelineItem } from './TimelineItem.js';
 
 interface ViewportState {
-  focusedItemIndex: number;
-  focusedLine: number;
+  selectedItemIndex: number;
+  selectedLine: number;
   itemPositions: number[];
 }
 
@@ -34,7 +34,7 @@ export function TimelineContent({
   return (
     <React.Fragment>
       {timeline.items.map((item, index) => {
-        const isItemFocused = index === viewportState.focusedItemIndex;
+        const isItemSelected = index === viewportState.selectedItemIndex;
         return (
           <Box 
             key={`timeline-item-${index}`} 
@@ -49,8 +49,9 @@ export function TimelineContent({
           >
             <TimelineItem 
               item={item} 
-              isFocused={isItemFocused}
-              focusedLine={viewportState.focusedLine}
+              isSelected={isItemSelected}
+              isFocused={false} // TODO: Implement individual item focus
+              selectedLine={viewportState.selectedLine}
               itemStartLine={viewportState.itemPositions[index] || 0}
               onToggle={viewportActions.triggerRemeasurement}
               currentFocusId={currentFocusId}
