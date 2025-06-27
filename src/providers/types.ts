@@ -1,11 +1,7 @@
 // ABOUTME: Type definitions for AI provider abstraction layer
 // ABOUTME: Defines common interfaces for different AI model providers (Anthropic, LMStudio, etc.)
 
-import { ProviderToolCall, ProviderToolResult, ProviderMessage } from './base-provider.js';
-
-
-
-
+import { ProviderResponse } from './base-provider.js';
 
 export interface StreamingEvents {
   token: { token: string };

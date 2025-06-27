@@ -41,9 +41,10 @@ export class AnthropicProvider extends AIProvider {
     return true;
   }
 
-  
-
-  private _createRequestPayload(messages: ProviderMessage[], tools: Tool[]): Anthropic.Messages.MessageCreateParams {
+  private _createRequestPayload(
+    messages: ProviderMessage[],
+    tools: Tool[]
+  ): Anthropic.Messages.MessageCreateParams {
     // Convert our enhanced generic messages to Anthropic format
     const anthropicMessages = convertToAnthropicFormat(messages);
 
@@ -104,7 +105,9 @@ export class AnthropicProvider extends AIProvider {
       .join('');
 
     const toolCalls = response.content
-      .filter((contentBlock): contentBlock is Anthropic.ToolUseBlock => contentBlock.type === 'tool_use')
+      .filter(
+        (contentBlock): contentBlock is Anthropic.ToolUseBlock => contentBlock.type === 'tool_use'
+      )
       .map((contentBlock) => ({
         id: contentBlock.id,
         name: contentBlock.name,

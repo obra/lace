@@ -1,4 +1,3 @@
-
 // ABOUTME: Tests for Ollama provider
 // ABOUTME: Verifies basic functionality and configuration
 

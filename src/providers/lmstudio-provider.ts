@@ -3,7 +3,7 @@
 
 import { LMStudioClient } from '@lmstudio/sdk';
 import { AIProvider } from './base-provider.js';
-import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderToolCall } from './base-provider.js';
+import { ProviderMessage, ProviderResponse, ProviderConfig } from './base-provider.js';
 import { Tool } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
 

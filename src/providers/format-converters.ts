@@ -15,12 +15,14 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
       if (msg.role === 'user') {
         // User messages can have tool results
         if (msg.toolResults && msg.toolResults.length > 0) {
-          const content: Anthropic.ToolResultBlockParam[] = msg.toolResults.map((result: ProviderToolResult) => ({
-            type: 'tool_result',
-            tool_use_id: result.id,
-            content: result.output,
-            ...(result.success === false ? { is_error: true } : {}),
-          }));
+          const content: Anthropic.ToolResultBlockParam[] = msg.toolResults.map(
+            (result: ProviderToolResult) => ({
+              type: 'tool_result',
+              tool_use_id: result.id,
+              content: result.output,
+              ...(result.success === false ? { is_error: true } : {}),
+            })
+          );
 
           // If there's also text content, add it
           if (msg.content && msg.content.trim()) {

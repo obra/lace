@@ -170,7 +170,9 @@ Examples:
 
         // Send the task
         const taskMessage = `Task: ${title}\n\n${prompt}`;
-        logger.debug('DelegateTool: Sending message to subagent', { taskMessageLength: taskMessage.length });
+        logger.debug('DelegateTool: Sending message to subagent', {
+          taskMessageLength: taskMessage.length,
+        });
 
         // Create promise that resolves when conversation completes or times out
         const resultPromise = new Promise<void>((resolve, reject) => {
@@ -186,7 +188,10 @@ Examples:
           };
 
           const errorHandler = ({ error }: { error: Error }) => {
-            logger.error('DelegateTool: Subagent error during conversation', { subagentThreadId, error: error.message });
+            logger.error('DelegateTool: Subagent error during conversation', {
+              subagentThreadId,
+              error: error.message,
+            });
             clearTimeout(timeout);
             reject(error);
           };
@@ -204,7 +209,9 @@ Examples:
 
         // Return collected responses
         const combinedResponse = responses.join('\n\n');
-        logger.debug('DelegateTool: Subagent finished, returning result', { combinedResponseLength: combinedResponse.length });
+        logger.debug('DelegateTool: Subagent finished, returning result', {
+          combinedResponseLength: combinedResponse.length,
+        });
         return createSuccessResult([
           {
             type: 'text',
@@ -212,7 +219,9 @@ Examples:
           },
         ]);
       } catch (error) {
-        logger.error('DelegateTool: Error during subagent execution', { error: error instanceof Error ? error.message : String(error) });
+        logger.error('DelegateTool: Error during subagent execution', {
+          error: error instanceof Error ? error.message : String(error),
+        });
         // CLEANUP: Remove event listeners even on error to prevent memory leaks
         if (subagent) {
           subagent.removeAllListeners();

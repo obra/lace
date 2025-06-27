@@ -51,13 +51,17 @@ export class OpenAIProvider extends AIProvider {
     return true;
   }
 
-  private _createRequestPayload(messages: ProviderMessage[], tools: Tool[], stream: boolean): OpenAI.Chat.ChatCompletionCreateParams {
+  private _createRequestPayload(
+    messages: ProviderMessage[],
+    tools: Tool[],
+    stream: boolean
+  ): OpenAI.Chat.ChatCompletionCreateParams {
     // Convert our enhanced generic messages to OpenAI format
     const openaiMessages = convertToOpenAIFormat(
       messages
     ) as unknown as OpenAI.Chat.ChatCompletionMessageParam[];
 
-    // Extract system message if present  
+    // Extract system message if present
     const systemPrompt = this.getEffectiveSystemPrompt(messages);
 
     // Add system message at the beginning if not already present
