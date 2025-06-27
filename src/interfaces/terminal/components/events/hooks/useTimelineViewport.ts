@@ -2,7 +2,7 @@
 // ABOUTME: Encapsulates measurement, keyboard navigation, and auto-scroll behavior
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { measureElement } from 'ink';
+import { measureElement, DOMElement } from 'ink';
 import { Timeline } from '../../../../thread-processor.js';
 import { logger } from '../../../../../utils/logger.js';
 
@@ -71,8 +71,8 @@ export function useTimelineViewport({
       positions[i] = currentPosition;
 
       const itemRef = itemRefs.current.get(i);
-      if (itemRef) {
-        const { height } = measureElement(itemRef);
+      if (itemRef && typeof itemRef === 'object' && 'nodeName' in itemRef) {
+        const { height } = measureElement(itemRef as DOMElement);
         currentPosition += height;
       } else {
         // Only use fallback until ref is available
