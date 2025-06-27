@@ -2,19 +2,20 @@
 // ABOUTME: Wraps OpenAI SDK in the common provider interface
 
 import OpenAI, { ClientOptions } from 'openai';
+import { AIProvider } from './base-provider.js';
 import {
-  AIProvider,
   ProviderMessage,
   ProviderResponse,
   ProviderConfig,
   ProviderToolCall,
-} from './types.js';
+} from './base-provider.js';
 import { Tool } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
 import { convertToOpenAIFormat } from './format-converters.js';
 
 export interface OpenAIProviderConfig extends ProviderConfig {
   apiKey: string;
+  [key: string]: unknown; // Allow for additional properties
 }
 
 export class OpenAIProvider extends AIProvider {
@@ -50,20 +51,14 @@ export class OpenAIProvider extends AIProvider {
     return true;
   }
 
-  async createResponse(
-    messages: ProviderMessage[],
-    tools: Tool[] = [],
-    signal?: AbortSignal
-  ): Promise<ProviderResponse> {
+  private _createRequestPayload(messages: ProviderMessage[], tools: Tool[], stream: boolean): OpenAI.Chat.ChatCompletionCreateParams {
     // Convert our enhanced generic messages to OpenAI format
     const openaiMessages = convertToOpenAIFormat(
       messages
     ) as unknown as OpenAI.Chat.ChatCompletionMessageParam[];
 
-    // Extract system message if present
-    const systemMessage = messages.find((msg) => msg.role === 'system');
-    const systemPrompt =
-      systemMessage?.content || this._systemPrompt || 'You are a helpful assistant.';
+    // Extract system message if present  
+    const systemPrompt = this.getEffectiveSystemPrompt(messages);
 
     // Add system message at the beginning if not already present
     const messagesWithSystem = [
@@ -85,16 +80,27 @@ export class OpenAIProvider extends AIProvider {
       model: this.modelName,
       messages: messagesWithSystem,
       max_tokens: this._config.maxTokens || 4000,
+      stream,
       ...(tools.length > 0 && { tools: openaiTools }),
     };
+
+    return requestPayload;
+  }
+
+  async createResponse(
+    messages: ProviderMessage[],
+    tools: Tool[] = [],
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> {
+    const requestPayload = this._createRequestPayload(messages, tools, false);
 
     logger.debug('Sending request to OpenAI', {
       provider: 'openai',
       model: requestPayload.model,
-      messageCount: messagesWithSystem.length,
-      systemPromptLength: systemPrompt.length,
-      toolCount: openaiTools.length,
-      toolNames: openaiTools.map((t) => t.function.name),
+      messageCount: requestPayload.messages.length,
+      systemPromptLength: requestPayload.messages[0].content?.length,
+      toolCount: requestPayload.tools?.length,
+      toolNames: requestPayload.tools?.map((t) => t.function.name),
     });
 
     // Log full request payload for debugging
@@ -138,7 +144,7 @@ export class OpenAIProvider extends AIProvider {
     return {
       content: textContent,
       toolCalls,
-      stopReason: this._normalizeStopReason(choice.finish_reason),
+      stopReason: this.normalizeStopReason(choice.finish_reason),
       usage: response.usage
         ? {
             promptTokens: response.usage.prompt_tokens,
@@ -154,47 +160,15 @@ export class OpenAIProvider extends AIProvider {
     tools: Tool[] = [],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    // Convert our enhanced generic messages to OpenAI format
-    const openaiMessages = convertToOpenAIFormat(
-      messages
-    ) as unknown as OpenAI.Chat.ChatCompletionMessageParam[];
-
-    // Extract system message if present
-    const systemMessage = messages.find((msg) => msg.role === 'system');
-    const systemPrompt =
-      systemMessage?.content || this._systemPrompt || 'You are a helpful assistant.';
-
-    // Add system message at the beginning if not already present
-    const messagesWithSystem = [
-      { role: 'system' as const, content: systemPrompt },
-      ...openaiMessages.filter((msg) => msg.role !== 'system'),
-    ];
-
-    // Convert tools to OpenAI format
-    const openaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map((tool) => ({
-      type: 'function' as const,
-      function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.input_schema,
-      },
-    }));
-
-    const requestPayload: OpenAI.Chat.ChatCompletionCreateParams = {
-      model: this.modelName,
-      messages: messagesWithSystem,
-      max_tokens: this._config.maxTokens || 4000,
-      stream: true,
-      ...(tools.length > 0 && { tools: openaiTools }),
-    };
+    const requestPayload = this._createRequestPayload(messages, tools, true);
 
     logger.debug('Sending streaming request to OpenAI', {
       provider: 'openai',
       model: requestPayload.model,
-      messageCount: messagesWithSystem.length,
-      systemPromptLength: systemPrompt.length,
-      toolCount: openaiTools.length,
-      toolNames: openaiTools.map((t) => t.function.name),
+      messageCount: requestPayload.messages.length,
+      systemPromptLength: requestPayload.messages[0].content?.length,
+      toolCount: requestPayload.tools?.length,
+      toolNames: requestPayload.tools?.map((t) => t.function.name),
     });
 
     // Log full request payload for debugging
@@ -237,7 +211,7 @@ export class OpenAIProvider extends AIProvider {
           this.emit('token', { token: delta.content });
 
           // Estimate progressive tokens from text chunks
-          const newTokens = Math.ceil(delta.content.length / 4);
+          const newTokens = this.estimateTokens(delta.content);
           estimatedOutputTokens += newTokens;
 
           // Emit progressive token estimate
@@ -308,7 +282,7 @@ export class OpenAIProvider extends AIProvider {
       const response = {
         content,
         toolCalls,
-        stopReason: this._normalizeStopReason(stopReason),
+        stopReason: this.normalizeStopReason(stopReason),
         usage: usage
           ? {
               promptTokens: usage.prompt_tokens,
@@ -330,7 +304,7 @@ export class OpenAIProvider extends AIProvider {
     }
   }
 
-  private _normalizeStopReason(stopReason: string | null | undefined): string | undefined {
+  protected normalizeStopReason(stopReason: string | null | undefined): string | undefined {
     if (!stopReason) return undefined;
 
     switch (stopReason) {

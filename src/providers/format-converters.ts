@@ -1,7 +1,7 @@
 // ABOUTME: Provider-specific format conversion functions for enhanced ProviderMessage format
 // ABOUTME: Converts generic tool call format to provider-specific native formats
 
-import { ProviderMessage } from './types.js';
+import { ProviderMessage, ProviderToolCall, ProviderToolResult } from './base-provider.js';
 import { Tool } from '../tools/types.js';
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -15,7 +15,7 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
       if (msg.role === 'user') {
         // User messages can have tool results
         if (msg.toolResults && msg.toolResults.length > 0) {
-          const content: Anthropic.ToolResultBlockParam[] = msg.toolResults.map((result) => ({
+          const content: Anthropic.ToolResultBlockParam[] = msg.toolResults.map((result: ProviderToolResult) => ({
             type: 'tool_result',
             tool_use_id: result.id,
             content: result.output,
@@ -52,7 +52,7 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
           }
 
           // Add tool calls
-          msg.toolCalls.forEach((toolCall) => {
+          msg.toolCalls.forEach((toolCall: ProviderToolCall) => {
             content.push({
               type: 'tool_use',
               id: toolCall.id,
@@ -93,7 +93,7 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
       if (msg.role === 'user') {
         if (msg.toolResults && msg.toolResults.length > 0) {
           // OpenAI uses separate messages with role 'tool' for each tool result
-          const toolMessages = msg.toolResults.map((result) => ({
+          const toolMessages = msg.toolResults.map((result: ProviderToolResult) => ({
             role: 'tool',
             tool_call_id: result.id,
             content: result.output,
@@ -119,7 +119,7 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
             {
               role: 'assistant',
               content: msg.content || null,
-              tool_calls: msg.toolCalls.map((toolCall) => ({
+              tool_calls: msg.toolCalls.map((toolCall: ProviderToolCall) => ({
                 id: toolCall.id,
                 type: 'function',
                 function: {
@@ -158,7 +158,7 @@ export function convertToLMStudioFormat(
   return messages.map((msg) => {
     if (msg.role === 'user' && msg.toolResults && msg.toolResults.length > 0) {
       // Convert tool results to text descriptions (same as text-only format)
-      const toolResultTexts = msg.toolResults.map((result) => {
+      const toolResultTexts = msg.toolResults.map((result: ProviderToolResult) => {
         if (result.success) {
           return `[Tool result: SUCCESS - ${result.output}]`;
         } else {
@@ -175,7 +175,7 @@ export function convertToLMStudioFormat(
     } else if (msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0) {
       // Convert tool calls to JSON blocks (NOT bracketed text)
       const toolCallJsonBlocks = msg.toolCalls.map(
-        (toolCall) =>
+        (toolCall: ProviderToolCall) =>
           `\`\`\`json\n{\n  "name": "${toolCall.name}",\n  "arguments": ${JSON.stringify(toolCall.input)}\n}\n\`\`\``
       );
 

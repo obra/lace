@@ -1,7 +1,7 @@
 // ABOUTME: Tracks and manages token usage across conversations with proactive budget enforcement
 // ABOUTME: Prevents token exhaustion by monitoring usage and providing recommendations for optimization
 
-import { ProviderResponse } from '../providers/types.js';
+import { ProviderResponse } from '../providers/base-provider.js';
 import { logger } from '../utils/logger.js';
 import {
   TokenBudgetConfig,

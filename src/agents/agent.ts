@@ -7,7 +7,7 @@ import {
   ProviderMessage,
   ProviderToolCall,
   ProviderToolResult,
-} from '../providers/types.js';
+} from '../providers/base-provider.js';
 import { Tool, ToolResult } from '../tools/types.js';
 import { ToolExecutor } from '../tools/executor.js';
 import { ApprovalDecision } from '../tools/approval-types.js';

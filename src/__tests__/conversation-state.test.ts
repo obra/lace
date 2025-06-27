@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Agent } from '../agents/agent.js';
 import { ThreadManager } from '../threads/thread-manager.js';
 import { ToolExecutor } from '../tools/executor.js';
-import { AIProvider, ProviderResponse } from '../providers/types.js';
+import { AIProvider, ProviderMessage, ProviderResponse } from '../providers/base-provider.js';
 
 // Mock provider that returns predictable responses for stable testing
 class MockConversationProvider extends AIProvider {

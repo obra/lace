@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TokenBudgetManager } from '../token-budget-manager.js';
-import { ProviderResponse } from '../../providers/types.js';
+import { ProviderResponse } from '../../providers/base-provider.js';
 
 describe('TokenBudgetManager', () => {
   let budgetManager: TokenBudgetManager;
