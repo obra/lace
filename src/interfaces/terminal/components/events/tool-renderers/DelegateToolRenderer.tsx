@@ -1,9 +1,10 @@
-// ABOUTME: Generic tool renderer component using TimelineEntryCollapsibleBox
-// ABOUTME: Provides consistent expansion behavior for any tool execution with input/output display
+// ABOUTME: Specialized tool renderer for delegate tool executions with delegation timeline display
+// ABOUTME: Combines tool execution display with DelegationBox using TimelineEntryCollapsibleBox for consistency
 
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import { TimelineEntryCollapsibleBox } from '../../ui/TimelineEntryCollapsibleBox.js';
+import { DelegationBox } from '../DelegationBox.js';
 import { ToolCallData, ToolResultData } from '../../../../../threads/types.js';
 import { CompactOutput } from '../../ui/CompactOutput.js';
 import { CodeDisplay } from '../../ui/CodeDisplay.js';
@@ -18,7 +19,7 @@ type ToolExecutionItem = {
   callId: string;
 };
 
-interface GenericToolRendererProps {
+interface DelegateToolRendererProps {
   item: ToolExecutionItem;
   isStreaming?: boolean;
   isFocused?: boolean;
@@ -35,85 +36,67 @@ function isJsonOutput(output: string): boolean {
          (trimmed.startsWith('[') && trimmed.endsWith(']'));
 }
 
-export function GenericToolRenderer({ 
+export function DelegateToolRenderer({ 
   item, 
   isStreaming, 
   isFocused, 
   onToggle,
   isExpanded: controlledExpanded,
   onExpandedChange
-}: GenericToolRendererProps) {
+}: DelegateToolRendererProps) {
   // Use controlled expansion if provided, otherwise manage internally
   const [internalExpanded, setInternalExpanded] = useState(false);
   const isExpanded = controlledExpanded ?? internalExpanded;
   
   const { call, result } = item;
-  const { toolName, input } = call;
+  const { input } = call;
   
   const success = result?.success ?? true;
   const output = result?.output;
   const error = result?.error;
   
-  // Generate tool command summary for compact header
-  const getToolCommand = (toolName: string, input: Record<string, unknown>): string => {
-    switch (toolName) {
-      case 'bash':
-        return input.command as string || '';
-      case 'file-read':
-      case 'file-write':
-      case 'file-edit':
-        return input.file_path as string || '';
-      case 'ripgrep-search':
-        return `"${input.pattern}"` || '';
-      case 'delegate':
-        return `"${input.task || input.prompt}"` || '';
-      default:
-        // For other tools, show first parameter value if it's short
-        const firstValue = Object.values(input)[0];
-        if (typeof firstValue === 'string' && firstValue.length < 50) {
-          return firstValue;
-        }
-        return '';
-    }
-  };
-  
-  const toolCommand = getToolCommand(toolName, input);
+  // Extract delegate task from input
+  const delegateTask = (input.task || input.prompt) as string || 'Unknown task';
   const statusIcon = success ? UI_SYMBOLS.SUCCESS : (result ? UI_SYMBOLS.ERROR : UI_SYMBOLS.PENDING);
   
-  // Format tool name nicely (bash, file-read, etc.)
-  const formatToolName = (toolName: string): string => {
-    return toolName.replace(/_/g, '-');
+  // Extract delegate thread ID from result for status display
+  const extractDelegateThreadId = (item: ToolExecutionItem) => {
+    if (!item.result?.output) return null;
+    const match = item.result.output.match(/Thread:\s*([^\s]+)/);
+    return match ? match[1] : null;
   };
   
-  // Truncate long inputs for summary (first 50 chars)
-  const truncateInput = (input: Record<string, unknown>): string => {
-    const inputStr = JSON.stringify(input);
-    if (inputStr.length <= 50) return inputStr;
-    return inputStr.substring(0, 47) + '...';
-  };
+  const delegateThreadId = extractDelegateThreadId(item);
   
   // Create compact summary for collapsed state
-  const toolSummary = (
+  const delegateSummary = (
     <Box flexDirection="column">
       <Box>
         <Text color={UI_COLORS.TOOL}>{UI_SYMBOLS.TOOL} </Text>
-        <Text color={UI_COLORS.TOOL} bold>{formatToolName(toolName)}</Text>
-        {toolCommand && (
-          <React.Fragment>
-            <Text color="gray"> </Text>
-            <Text color="white">{toolCommand}</Text>
-          </React.Fragment>
-        )}
+        <Text color={UI_COLORS.TOOL} bold>delegate</Text>
+        <Text color="gray"> </Text>
+        <Text color="white">"{delegateTask}"</Text>
         <Text color="gray"> </Text>
         <Text color={success ? UI_COLORS.SUCCESS : (result ? UI_COLORS.ERROR : UI_COLORS.PENDING)}>
           {statusIcon}
         </Text>
         {isStreaming && <Text color="gray"> (running...)</Text>}
-        <Text color="magenta"> [GENERIC]</Text>
+        <Text color="cyan"> [DELEGATE]</Text>
       </Box>
       
-      {/* Compact output preview when collapsed */}
-      {result && success && output && (
+      {/* Show delegation status when collapsed */}
+      {delegateThreadId && (
+        <Box marginLeft={2} marginTop={1}>
+          <Text color={UI_COLORS.DELEGATE}>{UI_SYMBOLS.DELEGATE} </Text>
+          <Text color="gray">Thread: {delegateThreadId}</Text>
+          {result && success && (
+            <Text color={UI_COLORS.SUCCESS}> - Delegation active</Text>
+          )}
+        </Box>
+      )}
+      
+      {/* Compact output preview when collapsed and successful */}
+      {result && success && output && !delegateThreadId && (
         <Box marginLeft={2} marginTop={1}>
           <CompactOutput 
             output={output} 
@@ -126,7 +109,7 @@ export function GenericToolRenderer({
     </Box>
   );
 
-  // Create expanded content showing full input/output
+  // Create expanded content showing full input/output + delegation
   const expandedContent = (
     <Box flexDirection="column">
       {/* Input parameters */}
@@ -143,7 +126,7 @@ export function GenericToolRenderer({
       
       {/* Output */}
       {result && (
-        <Box flexDirection="column">
+        <Box flexDirection="column" marginBottom={delegateThreadId ? 1 : 0}>
           <Text color={success ? 'green' : 'red'}>
             {success ? 'Output:' : 'Error:'}
           </Text>
@@ -161,6 +144,20 @@ export function GenericToolRenderer({
           </Box>
         </Box>
       )}
+      
+      {/* Delegation details when expanded */}
+      {delegateThreadId && (
+        <Box flexDirection="column">
+          <Text color="yellow">Delegation:</Text>
+          <Box marginLeft={2}>
+            <DelegationBox 
+              toolCall={item}
+              parentFocusId="timeline"
+              onToggle={onToggle}
+            />
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 
@@ -175,8 +172,8 @@ export function GenericToolRenderer({
 
   return (
     <TimelineEntryCollapsibleBox
-      label={`${formatToolName(toolName)}${toolCommand ? ` ${toolCommand}` : ''}`}
-      summary={toolSummary}
+      label={`delegate "${delegateTask}"`}
+      summary={delegateSummary}
       isExpanded={isExpanded}
       onExpandedChange={handleExpandedChange}
       isFocused={isFocused}

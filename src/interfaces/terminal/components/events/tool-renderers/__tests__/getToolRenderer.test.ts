@@ -71,11 +71,11 @@ describe('getToolRenderer', () => {
   describe('Import handling', () => {
     it('should return default export when available', async () => {
       const mockComponent = () => 'DefaultExport';
-      vi.doMock('./DelegateToolRenderer.js', () => ({
+      vi.doMock('./TestMockToolRenderer.js', () => ({
         default: mockComponent,
       }));
 
-      const result = await getToolRenderer('delegate');
+      const result = await getToolRenderer('test-mock');
       expect(result).toBe(mockComponent);
     });
 
@@ -187,6 +187,14 @@ describe('Integration scenarios', () => {
 
     const renderer = await getToolRenderer('bash');
     expect(renderer).toBe(MockRenderer);
+  });
+
+  it('should find DelegateToolRenderer for delegate tools', async () => {
+    // This test verifies that delegate tools can be found by the discovery system
+    // Since DelegateToolRenderer.js now exists, this should find the real component
+    const renderer = await getToolRenderer('delegate');
+    expect(renderer).toBeTruthy();
+    expect(typeof renderer).toBe('function');
   });
 
   it('should provide fallback path when specific renderer not found', async () => {

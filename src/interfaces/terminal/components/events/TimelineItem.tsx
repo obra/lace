@@ -31,14 +31,22 @@ function DynamicToolRenderer({
 }: DynamicToolRendererProps) {
   const [ToolRenderer, setToolRenderer] = React.useState<React.ComponentType<unknown> | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [debugInfo, setDebugInfo] = React.useState<string>('');
 
   React.useEffect(() => {
     let cancelled = false;
+    setDebugInfo(`Looking for ${item.call.toolName}ToolRenderer...`);
     
     getToolRenderer(item.call.toolName).then(renderer => {
       if (!cancelled) {
         setToolRenderer(() => renderer);
         setIsLoading(false);
+        setDebugInfo(renderer ? `Found: ${renderer.name}` : 'Not found, using Generic');
+      }
+    }).catch(error => {
+      if (!cancelled) {
+        setIsLoading(false);
+        setDebugInfo(`Error: ${error.message}`);
       }
     });
 
@@ -48,8 +56,19 @@ function DynamicToolRenderer({
   }, [item.call.toolName]);
 
   if (isLoading) {
+    // Add debug info to loading state
+    const debugItem = {
+      ...item,
+      call: {
+        ...item.call,
+        input: {
+          ...item.call.input,
+          _debug: debugInfo
+        }
+      }
+    };
     return <GenericToolRenderer 
-      item={item}
+      item={debugItem}
       isFocused={isFocused}
       onToggle={onToggle}
     />;
@@ -57,8 +76,20 @@ function DynamicToolRenderer({
 
   const RendererComponent = ToolRenderer || GenericToolRenderer;
   
+  // Add debug info to final render
+  const debugItem = {
+    ...item,
+    call: {
+      ...item.call,
+      input: {
+        ...item.call.input,
+        _debug: debugInfo
+      }
+    }
+  };
+  
   return <RendererComponent 
-    item={item}
+    item={debugItem}
     isFocused={isFocused}
     onToggle={onToggle}
   />;
