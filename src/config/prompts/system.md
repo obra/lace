@@ -6,4 +6,6 @@
 
 {{include:sections/guidelines.md}}
 
+{{include:sections/debugging.md}}
+
 {{context.disclaimer}}
