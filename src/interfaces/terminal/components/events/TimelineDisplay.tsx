@@ -18,7 +18,6 @@ interface TimelineDisplayProps {
 }
 
 export default function TimelineDisplay({ timeline, delegateTimelines, focusId, parentFocusId, bottomSectionHeight }: TimelineDisplayProps) {
-  const [delegationExpandState, setDelegationExpandState] = useState<Map<string, boolean>>(new Map()); // Track expand/collapse state by callId
   const { isFocused } = useFocus({ id: focusId || 'timeline' });
   const { focus } = useFocusManager();
   const { extractDelegateThreadId } = useDelegateThreadExtraction(delegateTimelines);
@@ -31,16 +30,8 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
       
       if (item.type === 'tool_execution') {
         if (item.call?.toolName === 'delegate') {
-          // Handle delegation items
-          if (key.leftArrow || key.rightArrow) {
-            // Toggle expand/collapse delegation box
-            setDelegationExpandState(prev => {
-              const newState = new Map(prev);
-              const currentExpanded = newState.get(item.callId) ?? true;
-              newState.set(item.callId, !currentExpanded);
-              return newState;
-            });
-          } else if (key.return && delegateTimelines) {
+          // Handle delegation focus navigation
+          if (key.return && delegateTimelines) {
             // Focus the delegation timeline
             const delegateThreadId = extractDelegateThreadId(item);
             if (delegateThreadId) {
@@ -73,9 +64,7 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
           viewportActions={viewportActions}
           itemRefs={itemRefs}
           delegateTimelines={delegateTimelines}
-          delegationExpandState={delegationExpandState}
           currentFocusId={focusId}
-          extractDelegateThreadId={extractDelegateThreadId}
         />
       }
     </TimelineViewport>

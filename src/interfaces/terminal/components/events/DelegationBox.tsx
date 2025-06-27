@@ -1,7 +1,7 @@
 // ABOUTME: Collapsible delegation box component for displaying delegate thread conversations
 // ABOUTME: Shows delegation progress, events, and provides expand/collapse functionality
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import { Timeline } from '../../../thread-processor.js';
 import TimelineDisplay from './TimelineDisplay.js';
@@ -12,11 +12,13 @@ interface DelegationBoxProps {
   threadId: string;
   timeline: Timeline;
   delegateTimelines?: Map<string, Timeline>;
-  expanded: boolean;
   parentFocusId?: string; // Focus ID of the parent timeline for escape hierarchy
+  onToggle?: () => void;
 }
 
-export function DelegationBox({ threadId, timeline, delegateTimelines, expanded, parentFocusId }: DelegationBoxProps) {
+export function DelegationBox({ threadId, timeline, delegateTimelines, parentFocusId, onToggle }: DelegationBoxProps) {
+  // Manage own expansion state
+  const [expanded, setExpanded] = useState(true); // Default to expanded for delegation
   
   logger.debug('DelegationBox: Rendering', {
     threadId,

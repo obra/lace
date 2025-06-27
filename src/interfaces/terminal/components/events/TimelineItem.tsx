@@ -8,6 +8,7 @@ import { EventDisplay } from './EventDisplay.js';
 import { ToolExecutionDisplay } from './ToolExecutionDisplay.js';
 import { DelegationBox } from './DelegationBox.js';
 import MessageDisplay from '../message-display.js';
+import { useDelegateThreadExtraction } from './hooks/useDelegateThreadExtraction.js';
 import { logger } from '../../../../utils/logger.js';
 
 interface TimelineItemProps {
@@ -17,9 +18,7 @@ interface TimelineItemProps {
   focusedLine: number;
   itemStartLine: number;
   onToggle?: () => void;
-  delegationExpandState: Map<string, boolean>;
   currentFocusId?: string;
-  extractDelegateThreadId: (item: Extract<TimelineItemType, { type: 'tool_execution' }>) => string | null;
 }
 
 export function TimelineItem({ 
@@ -29,10 +28,10 @@ export function TimelineItem({
   focusedLine, 
   itemStartLine, 
   onToggle, 
-  delegationExpandState, 
-  currentFocusId, 
-  extractDelegateThreadId 
+  currentFocusId
 }: TimelineItemProps) {
+  // Use hook internally instead of receiving function as prop
+  const { extractDelegateThreadId } = useDelegateThreadExtraction(delegateTimelines);
   switch (item.type) {
     case 'user_message':
       return <EventDisplay 
@@ -132,11 +131,9 @@ export function TimelineItem({
           const delegateTimeline = delegateThreadId ? delegateTimelines.get(delegateThreadId) : null;
           
           if (delegateTimeline && delegateThreadId) {
-            const isExpanded = delegationExpandState.get(item.callId) ?? true;
             logger.debug('TimelineItem: RENDERING delegation box', { 
               threadId: delegateThreadId,
               callId: item.callId,
-              isExpanded,
               timelineItemCount: delegateTimeline.items.length
             });
             return (
@@ -151,8 +148,8 @@ export function TimelineItem({
                   threadId={delegateThreadId}
                   timeline={delegateTimeline}
                   delegateTimelines={delegateTimelines}
-                  expanded={isExpanded}
                   parentFocusId={currentFocusId || 'timeline'}
+                  onToggle={onToggle}
                 />
               </Box>
             );

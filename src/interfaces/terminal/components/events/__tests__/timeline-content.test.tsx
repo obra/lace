@@ -32,18 +32,14 @@ function TimelineContent({
   viewportActions, 
   itemRefs, 
   delegateTimelines, 
-  delegationExpandState, 
-  currentFocusId, 
-  extractDelegateThreadId 
+  currentFocusId 
 }: {
   timeline: Timeline;
   viewportState: { focusedItemIndex: number; focusedLine: number; itemPositions: number[] };
   viewportActions: { triggerRemeasurement: () => void };
   itemRefs: React.MutableRefObject<Map<number, unknown>>;
   delegateTimelines?: Map<string, Timeline>;
-  delegationExpandState: Map<string, boolean>;
   currentFocusId?: string;
-  extractDelegateThreadId: (item: Extract<TimelineItem, { type: 'tool_execution' }>) => string | null;
 }) {
   return (
     <React.Fragment>
@@ -68,9 +64,7 @@ function TimelineContent({
               focusedLine={viewportState.focusedLine}
               itemStartLine={viewportState.itemPositions[index] || 0}
               onToggle={viewportActions.triggerRemeasurement}
-              delegationExpandState={delegationExpandState}
               currentFocusId={currentFocusId}
-              extractDelegateThreadId={extractDelegateThreadId}
             />
           </Box>
         );
@@ -120,9 +114,7 @@ describe('TimelineContent (Baseline)', () => {
       triggerRemeasurement: mockTriggerRemeasurement
     },
     delegateTimelines: undefined,
-    delegationExpandState: new Map<string, boolean>(),
-    currentFocusId: 'timeline',
-    extractDelegateThreadId: mockExtractDelegateThreadId
+    currentFocusId: 'timeline'
   };
 
   describe('Item rendering', () => {
@@ -319,7 +311,6 @@ describe('TimelineContent (Baseline)', () => {
     it('should forward all required props to TimelineItem', () => {
       const timeline = createMockTimeline(1);
       const delegateTimelines = new Map([['thread-1', createMockTimeline(1)]]);
-      const delegationExpandState = new Map([['call-1', true]]);
 
       const { lastFrame } = render(
         <TimelineContent 
@@ -327,7 +318,6 @@ describe('TimelineContent (Baseline)', () => {
           itemRefs={mockItemRefs}
           {...defaultProps}
           delegateTimelines={delegateTimelines}
-          delegationExpandState={delegationExpandState}
           currentFocusId="custom-focus"
         />
       );

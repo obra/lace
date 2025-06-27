@@ -2,10 +2,13 @@
 // ABOUTME: Covers unified content processing, caching, and timeline generation functionality
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ThreadProcessor } from '../thread-processor.js';
+import {
+  ThreadProcessor,
+  ProcessedThreadItems,
+  EphemeralTimelineItems,
+  EphemeralMessage,
+} from '../thread-processor.js';
 import { ThreadEvent, ToolCallData, ToolResultData } from '../../threads/types.js';
-import { EphemeralMessage } from '../../agents/types.js';
-import { ProcessedThreadItems, EphemeralTimelineItems } from '../types.js';
 
 describe('ThreadProcessor', () => {
   let processor: ThreadProcessor;

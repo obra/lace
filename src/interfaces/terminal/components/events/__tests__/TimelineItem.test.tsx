@@ -20,8 +20,8 @@ vi.mock('../ToolExecutionDisplay.js', () => ({
 }));
 
 vi.mock('../DelegationBox.js', () => ({
-  DelegationBox: ({ threadId, expanded }: any) => 
-    React.createElement(Text, {}, `DelegationBox:${threadId}:${expanded ? 'expanded' : 'collapsed'}`)
+  DelegationBox: ({ threadId }: any) => 
+    React.createElement(Text, {}, `DelegationBox:${threadId}:expanded`)
 }));
 
 vi.mock('../../message-display.js', () => ({
@@ -38,8 +38,15 @@ vi.mock('../../../../../utils/logger.js', () => ({
   }
 }));
 
+const mockExtractDelegateThreadId = vi.fn();
+
+vi.mock('../hooks/useDelegateThreadExtraction.js', () => ({
+  useDelegateThreadExtraction: () => ({
+    extractDelegateThreadId: mockExtractDelegateThreadId
+  })
+}));
+
 describe('TimelineItem Component', () => {
-  const mockExtractDelegateThreadId = vi.fn();
   const mockOnToggle = vi.fn();
 
   beforeEach(() => {
@@ -53,9 +60,7 @@ describe('TimelineItem Component', () => {
     focusedLine: 0,
     itemStartLine: 0,
     onToggle: mockOnToggle,
-    delegationExpandState: new Map<string, boolean>(),
-    currentFocusId: 'timeline',
-    extractDelegateThreadId: mockExtractDelegateThreadId
+    currentFocusId: 'timeline'
   };
 
   describe('user_message items', () => {
@@ -254,7 +259,7 @@ describe('TimelineItem Component', () => {
       expect(frame).toContain('DelegationBox:delegate-thread-456:expanded');
     });
 
-    it('should respect delegation expand state', () => {
+    it('should start expanded by default with self-managed state', () => {
       const item: TimelineItemType = {
         type: 'tool_execution',
         timestamp: new Date('2024-01-01T10:00:00Z'),
@@ -275,8 +280,6 @@ describe('TimelineItem Component', () => {
         ['delegate-thread-456', createDelegateTimeline()]
       ]);
 
-      const delegationExpandState = new Map([['delegate-call-123', false]]);
-
       mockExtractDelegateThreadId.mockReturnValue('delegate-thread-456');
 
       const { lastFrame } = render(
@@ -284,12 +287,11 @@ describe('TimelineItem Component', () => {
           item={item} 
           {...defaultProps} 
           delegateTimelines={delegateTimelines}
-          delegationExpandState={delegationExpandState}
         />
       );
 
       const frame = lastFrame();
-      expect(frame).toContain('DelegationBox:delegate-thread-456:collapsed');
+      expect(frame).toContain('DelegationBox:delegate-thread-456:expanded');
     });
 
     it('should fall back to regular tool display when no delegate thread found', () => {

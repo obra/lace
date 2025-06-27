@@ -19,8 +19,8 @@ vi.mock('../ToolExecutionDisplay.js', () => ({
 }));
 
 vi.mock('../DelegationBox.js', () => ({
-  DelegationBox: ({ threadId, expanded }: any) => 
-    React.createElement(Text, {}, `DelegationBox:${threadId}:${expanded ? 'expanded' : 'collapsed'}`)
+  DelegationBox: ({ threadId }: any) => 
+    React.createElement(Text, {}, `DelegationBox:${threadId}:expanded`)
 }));
 
 vi.mock('../../message-display.js', () => ({
@@ -184,7 +184,6 @@ function TimelineItemDisplay({
                 threadId: delegateThreadId,
                 timeline: delegateTimeline,
                 delegateTimelines: delegateTimelines,
-                expanded: isExpanded,
                 parentFocusId: currentFocusId || 'timeline'
               })
             ]);
@@ -471,7 +470,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
       expect(frame).toContain('DelegationBox:delegate-thread-456:expanded');
     });
 
-    it('should respect delegation expand state', () => {
+    it('should start expanded by default with self-managed state', () => {
       const item: TimelineItem = {
         type: 'tool_execution',
         timestamp: new Date('2024-01-01T10:00:00Z'),
@@ -506,7 +505,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
       );
 
       const frame = lastFrame();
-      expect(frame).toContain('DelegationBox:delegate-thread-456:collapsed');
+      expect(frame).toContain('DelegationBox:delegate-thread-456:expanded');
     });
 
     it('should fall back to regular tool display when no delegate thread found', () => {
