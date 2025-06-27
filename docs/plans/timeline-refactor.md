@@ -226,33 +226,94 @@ This step was completed together with Step 5 as they were closely related.
 
 ---
 
-## Step 9: Unify Timeline Expansion State
+## Step 9: Fix Focus vs Selection Terminology
 
-**Prompt**: "Replace multiple expansion state systems with single unified state in TimelineDisplay. Test-first approach.
+**Prompt**: "Rename all timeline cursor/selection variables to use correct terminology. Test-first approach.
 
 Requirements:
-- Remove delegationExpandState and toolExpandState from TimelineDisplay
-- Replace with single `expandedItems: Map<string, boolean>` 
-- Remove complex tool-specific interaction handling (delegate vs regular tool logic)
-- Replace handleItemInteraction with simple universal expansion toggle
-- Update TimelineContent props to pass unified expansion state
-- Generate unique item IDs for expansion tracking (use item.id or item.callId)
-- Support left/right arrow expansion for all expandable items
+- Rename `focusedItemIndex` → `selectedItemIndex` throughout timeline components
+- Rename `isFocused` props on timeline items → `isSelected` 
+- Rename `focusedLine` → `selectedLine` or `cursorLine`
+- Rename `itemToRefocusAfterMeasurement` → `itemToReselectAfterMeasurement`
+- Keep `useFocus({ id: 'timeline' })` for actual keyboard focus (correct as-is)
+- Update all component interfaces and function signatures
+- Update all tests to use correct terminology
+- Update variable names in viewport hooks and timeline processors
 
-The interaction should become:
-```typescript
-if (key.leftArrow || key.rightArrow) {
-  const itemId = getItemId(timeline.items[focusedItemIndex]);
-  const currentExpanded = expandedItems.get(itemId) ?? getDefaultExpansion(item);
-  handleItemExpansion(itemId, !currentExpanded);
-}
-```
+**Terminology clarification**:
+- **Focus**: Which component receives keyboard input (timeline, shell-input, etc.)
+- **Selection**: Which item the cursor is highlighting within the focused timeline
 
-All timeline entries should have consistent expansion behavior."
+This creates clearer separation between keyboard focus management and visual cursor selection."
 
 ---
 
-## Step 10: Clean Up Removed Components and Dependencies
+## Step 10: Remove Keyboard Handling from TimelineEntryCollapsibleBox
+
+**Prompt**: "Remove useInput from TimelineEntryCollapsibleBox to fix focus hierarchy issues. Test-first approach.
+
+Requirements:
+- Remove useInput hook entirely from TimelineEntryCollapsibleBox component
+- Remove useCallback import (no longer needed)
+- Keep component purely presentational - no keyboard handling
+- Ensure TimelineViewport remains the single source of keyboard input
+- Update any tests that expect TimelineEntryCollapsibleBox to handle keys directly
+- Verify that expansion still works through proper hierarchy (TimelineViewport → TimelineDisplay → components)
+
+**Problem being solved**: TimelineEntryCollapsibleBox was listening for keyboard input even when the timeline wasn't focused, causing expansion to work when it shouldn't (e.g., when shell-input is focused)."
+
+---
+
+## Step 11: Implement Event-Based Expansion Toggle
+
+**Prompt**: "Add event-based communication for timeline expansion toggle. Test-first approach.
+
+Requirements:
+- Create useTimelineExpansionToggle hook for expandable components
+- Use simple event emitter pattern (EventEmitter or custom events)
+- Hook accepts isSelected boolean and toggleExpansion callback
+- Only selected item responds to toggle events
+- Update TimelineDisplay handleItemInteraction to emit toggle events on left/right arrows
+- Update GenericToolRenderer and other expandable components to use the hook
+- Test that only the selected item expands when left/right pressed
+- Test that expansion doesn't work when timeline isn't focused
+
+**Event flow**:
+1. Timeline focused + item selected + left/right arrow pressed
+2. TimelineDisplay emits 'toggle-expansion' event  
+3. Only the selected expandable component responds and toggles its state
+
+**Files to create**:
+- `src/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.ts`
+- Corresponding test file"
+
+---
+
+## ⚠️ Step 11.5: Fix DelegationBox Rendering (BLOCKED)
+
+**Status**: BLOCKED - Requires tool types refactor first
+
+**Issue**: DelegationBox cannot access delegate thread metadata due to type mismatch between ToolResult (rich content + metadata) and ToolResultData (flat string output). 
+
+**Dependencies**: Complete `docs/plans/tool-types-refactor.md` first to enable:
+- Delegate tool to include `metadata.threadId` in ToolResult
+- DelegationBox to access thread ID directly without regex parsing  
+- Full delegation timeline rendering
+
+**Prompt**: "Fix DelegationBox to render delegate timelines properly after tool types refactor.
+
+Requirements:
+- Update DelegationBox to access `toolCall.result?.metadata?.threadId` directly
+- Remove regex parsing logic for thread ID extraction
+- Fetch actual timeline data from ThreadManager using threadId
+- Replace placeholder timeline with real delegate thread events
+- Test delegation rendering with actual delegate tool executions
+
+This step can only be completed after the tool types refactor provides metadata access."
+
+---
+
+## Step 12: Clean Up Removed Components and Dependencies
 
 **Prompt**: "Remove unused components and clean up dependencies after timeline refactor. Test-first approach.
 
@@ -270,7 +331,7 @@ Ensure timeline functionality works without thinking extraction complexity."
 
 ---
 
-## Step 11: Add Specialized Tool Renderers (Optional)
+## Step 13: Add Specialized Tool Renderers (Optional)
 
 **Prompt**: "Create specialized renderers for file operations and bash tools. Test-first approach.
 

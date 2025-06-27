@@ -54,7 +54,7 @@ export interface ToolResult {
 ## Phase 5: Update delegate tool to include threadId metadata
 **Prompt**: "In `src/tools/implementations/delegate.ts`, update executeTool signature to receive ToolCall. Return ToolResult with metadata: `{ id: call.id, content: [...], isError: false, metadata: { threadId: subagentThreadId } }`."
 
-## Phase 6: Update DelegationBox to use metadata
+## Phase 6: Update DelegationBox to use metadata SKIP FOR NOW
 **Prompt**: "In `src/interfaces/terminal/components/events/DelegationBox.tsx`, replace regex extraction with direct access: `toolCall.result?.metadata?.threadId`. Remove all regex parsing logic."
 
 ## Phase 7: Update all tool implementations 
