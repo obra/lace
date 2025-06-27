@@ -5,7 +5,7 @@ import React, { useState, useCallback } from 'react';
 import { Box, useInput, useFocus, useFocusManager } from 'ink';
 import { Timeline, TimelineItem } from '../../../thread-processor.js';
 import { TimelineViewport } from './TimelineViewport.js';
-import { TimelineItem as TimelineItemComponent } from './TimelineItem.js';
+import { TimelineContent } from './TimelineContent.js';
 import { useDelegateThreadExtraction } from './hooks/useDelegateThreadExtraction.js';
 import { logger } from '../../../../utils/logger.js';
 
@@ -79,35 +79,17 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
       onItemInteraction={handleItemInteraction}
     >
       {({ timeline: tl, viewportState, viewportActions, itemRefs }) => 
-        tl.items.map((item, index) => {
-            const isItemFocused = index === viewportState.focusedItemIndex;
-            return (
-              <Box 
-                key={`timeline-item-${index}`} 
-                flexDirection="column"
-                ref={(ref) => {
-                  if (ref) {
-                    itemRefs.current.set(index, ref);
-                  } else {
-                    itemRefs.current.delete(index);
-                  }
-                }}
-              >
-                <TimelineItemComponent 
-                  item={item} 
-                  delegateTimelines={delegateTimelines}
-                  isFocused={isItemFocused}
-                  focusedLine={viewportState.focusedLine}
-                  itemStartLine={viewportState.itemPositions[index] || 0}
-                  onToggle={viewportActions.triggerRemeasurement}
-                  delegationExpandState={delegationExpandState}
-                  toolExpandState={toolExpandState}
-                  currentFocusId={focusId}
-                  extractDelegateThreadId={extractDelegateThreadId}
-                />
-              </Box>
-            );
-          })
+        <TimelineContent
+          timeline={tl}
+          viewportState={viewportState}
+          viewportActions={viewportActions}
+          itemRefs={itemRefs}
+          delegateTimelines={delegateTimelines}
+          delegationExpandState={delegationExpandState}
+          toolExpandState={toolExpandState}
+          currentFocusId={focusId}
+          extractDelegateThreadId={extractDelegateThreadId}
+        />
       }
     </TimelineViewport>
   );
