@@ -1,6 +1,8 @@
 // ABOUTME: Type definitions for thread events and thread management
 // ABOUTME: Events include user messages, agent messages, tool calls, and tool results
 
+import { ToolCall, ToolResult } from '../tools/types.js';
+
 export type EventType =
   | 'USER_MESSAGE'
   | 'AGENT_MESSAGE'
@@ -15,20 +17,7 @@ export interface ThreadEvent {
   threadId: string;
   type: EventType;
   timestamp: Date;
-  data: string | ToolCallData | ToolResultData;
-}
-
-export interface ToolCallData {
-  toolName: string;
-  input: Record<string, unknown>;
-  callId: string;
-}
-
-export interface ToolResultData {
-  callId: string;
-  output: string;
-  success: boolean;
-  error?: string;
+  data: string | ToolCall | ToolResult;
 }
 
 export interface Thread {

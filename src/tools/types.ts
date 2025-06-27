@@ -13,12 +13,19 @@ export interface ToolAnnotations {
   openWorldHint?: boolean;
 }
 
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>; // MCP uses "arguments"
+}
+
 export interface Tool {
   name: string;
+  title?: string; // Optional title for UI display
   description: string;
-  input_schema: ToolInputSchema;
+  inputSchema: ToolInputSchema; // MCP alignment: camelCase
   annotations?: ToolAnnotations;
-  executeTool(input: Record<string, unknown>, context?: ToolContext): Promise<ToolResult>;
+  executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult>;
 }
 
 export interface ToolInputSchema {
@@ -43,24 +50,41 @@ export interface ContentBlock {
 }
 
 export interface ToolResult {
+  id?: string; // Optional - set by tools if they have it
   content: ContentBlock[];
-  isError: boolean;
+  isError: boolean; // Keep required (clearer than MCP's optional)
+  metadata?: Record<string, unknown>; // For delegation threadId, etc.
 }
 
-export function createToolResult(isError: boolean, content: ContentBlock[]): ToolResult {
+export function createToolResult(
+  isError: boolean,
+  content: ContentBlock[],
+  id?: string,
+  metadata?: Record<string, unknown>
+): ToolResult {
   return {
     content,
     isError,
+    ...(id && { id }),
+    ...(metadata && { metadata }),
   };
 }
 
-export function createSuccessResult(content: ContentBlock[]): ToolResult {
-  return createToolResult(false, content);
+export function createSuccessResult(
+  content: ContentBlock[],
+  id?: string,
+  metadata?: Record<string, unknown>
+): ToolResult {
+  return createToolResult(false, content, id, metadata);
 }
 
-export function createErrorResult(input: string | ContentBlock[]): ToolResult {
+export function createErrorResult(
+  input: string | ContentBlock[],
+  id?: string,
+  metadata?: Record<string, unknown>
+): ToolResult {
   if (typeof input === 'string') {
-    return createToolResult(true, [{ type: 'text', text: input }]);
+    return createToolResult(true, [{ type: 'text', text: input }], id, metadata);
   }
-  return createToolResult(true, input);
+  return createToolResult(true, input, id, metadata);
 }
