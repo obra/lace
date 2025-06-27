@@ -26,10 +26,12 @@
 - **url_fetch**: Fetch and analyze web content
 - **delegate**: Create sub-agents for complex tasks
 
-### Workflow Tools
-- **task_add**: Add tasks to track progress
-- **task_list**: View current tasks
-- **task_complete**: Mark tasks as done
+### Workflow Tools (MANDATORY USE)
+- **task_add**: Add tasks to track progress - MUST use to track all work
+- **task_list**: View current tasks regularly
+- **task_complete**: Mark tasks as done when finished
+
+**Critical**: You MUST use task tools to track what you're doing. NEVER discard tasks without explicit approval.
 
 ## Key Principles
 

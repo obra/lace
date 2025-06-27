@@ -47,6 +47,12 @@
 - Include examples for APIs
 - Document assumptions and constraints
 
+## Comment Standards
+**No Temporal References**: Never add comments that reference how code has changed or what it replaced. Comments should describe what the code IS, not what it WAS or how it BECAME. Avoid words like 'now', 'new', 'updated', 'moved', 'changed', 'replaced', 'refactored', 'old', 'previous', 'legacy', etc.
+
+Good: `// Validates user credentials against database`
+Bad: `// Now validates using the new auth service`
+
 ## Technical Debt
 - Track it as you find it
 - Fix high-impact, low-effort items first

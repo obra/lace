@@ -57,6 +57,33 @@
 - Try clean install
 - Document requirements
 
+## Systematic Debugging Process
+
+**MANDATORY**: You MUST find the root cause, NEVER fix symptoms or add workarounds.
+
+### Phase 1: Root Cause Investigation (BEFORE fixes)
+- Read error messages completely - they often contain the solution
+- Reproduce consistently before investigating
+- Check recent changes (git diff, commits)
+
+### Phase 2: Pattern Analysis
+- Find similar working code in the codebase
+- Read reference implementations completely
+- Identify differences between working and broken
+- Understand all dependencies
+
+### Phase 3: Hypothesis and Testing
+1. Form SINGLE hypothesis about root cause
+2. Make smallest possible change to test
+3. Verify before continuing
+4. If failed, STOP and re-analyze (don't add more fixes)
+
+### Phase 4: Implementation Rules
+- Have simplest possible failing test case
+- NEVER add multiple fixes at once
+- ALWAYS test after each change
+- If first fix fails, STOP and re-analyze
+
 ## Recovery Strategies
 
 ### Track Failed Approaches
@@ -66,13 +93,6 @@
 - "Tried: restart service - same error"
 
 This prevents repeating the same failed fixes.
-
-### Scientific Method
-1. Observe what's happening
-2. Form hypothesis
-3. Test ONE change
-4. Measure result
-5. Iterate with new hypothesis
 
 ### Binary Search Debugging
 - Find last working state
