@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, mkdir, rm } from 'fs/promises';
 import { join } from 'path';
 import { RipgrepSearchTool } from '../implementations/ripgrep-search.js';
+import { createTestToolCall } from './test-utils.js';
 
 describe('RipgrepSearchTool', () => {
   const tool = new RipgrepSearchTool();
@@ -48,19 +49,19 @@ describe('RipgrepSearchTool', () => {
     });
 
     it('should have correct input schema', () => {
-      expect(tool.input_schema.properties).toHaveProperty('pattern');
-      expect(tool.input_schema.properties).toHaveProperty('path');
-      expect(tool.input_schema.properties).toHaveProperty('caseSensitive');
-      expect(tool.input_schema.required).toEqual(['pattern']);
+      expect(tool.inputSchema.properties).toHaveProperty('pattern');
+      expect(tool.inputSchema.properties).toHaveProperty('path');
+      expect(tool.inputSchema.properties).toHaveProperty('caseSensitive');
+      expect(tool.inputSchema.required).toEqual(['pattern']);
     });
   });
 
   describe('basic search', () => {
     it('should find matches in multiple files', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'hello',
         path: testDir,
-      });
+      }));
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -73,20 +74,20 @@ describe('RipgrepSearchTool', () => {
     });
 
     it('should return no matches message when pattern not found', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'nonexistentpattern',
         path: testDir,
-      });
+      }));
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('No matches found for pattern: nonexistentpattern');
     });
 
     it('should include line numbers in results', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'function hello',
         path: testDir,
-      });
+      }));
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -96,17 +97,17 @@ describe('RipgrepSearchTool', () => {
 
   describe('search options', () => {
     it('should respect case sensitivity', async () => {
-      const caseInsensitive = await tool.executeTool({
+      const caseInsensitive = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'HELLO',
         path: testDir,
         caseSensitive: false,
-      });
+      }));
 
-      const caseSensitive = await tool.executeTool({
+      const caseSensitive = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'HELLO',
         path: testDir,
         caseSensitive: true,
-      });
+      }));
 
       expect(caseInsensitive.isError).toBe(false);
       expect(caseInsensitive.content[0].text).toContain('Found');
@@ -116,11 +117,11 @@ describe('RipgrepSearchTool', () => {
     });
 
     it('should filter by include pattern', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'hello',
         path: testDir,
         includePattern: '*.ts',
-      });
+      }));
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -131,11 +132,11 @@ describe('RipgrepSearchTool', () => {
     });
 
     it('should filter by exclude pattern', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'hello',
         path: testDir,
         excludePattern: '*.test.txt',
-      });
+      }));
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -146,11 +147,11 @@ describe('RipgrepSearchTool', () => {
     });
 
     it('should respect max results limit', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'hello',
         path: testDir,
         maxResults: 1,
-      });
+      }));
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -167,17 +168,17 @@ describe('RipgrepSearchTool', () => {
       await writeFile(join(testDir, 'partial.txt'), 'hellofriend'); // Only partial match
       await writeFile(join(testDir, 'whole.txt'), 'hello world'); // Only whole word match
 
-      const wholeWord = await tool.executeTool({
+      const wholeWord = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'hello',
         path: testDir,
         wholeWord: true,
-      });
+      }));
 
-      const partialWord = await tool.executeTool({
+      const partialWord = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'hello',
         path: testDir,
         wholeWord: false,
-      });
+      }));
 
       expect(wholeWord.isError).toBe(false);
       expect(partialWord.isError).toBe(false);
@@ -192,31 +193,31 @@ describe('RipgrepSearchTool', () => {
 
   describe('error handling', () => {
     it('should handle missing pattern parameter', async () => {
-      const result = await tool.executeTool({ path: testDir });
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', { path: testDir }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('Pattern must be a non-empty string');
     });
 
     it('should handle empty pattern parameter', async () => {
-      const result = await tool.executeTool({ pattern: '', path: testDir });
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', { pattern: '', path: testDir }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('Pattern must be a non-empty string');
     });
 
     it('should handle non-string pattern parameter', async () => {
-      const result = await tool.executeTool({ pattern: 123, path: testDir });
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', { pattern: 123, path: testDir }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('Pattern must be a non-empty string');
     });
 
     it('should handle non-existent directory', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'hello',
         path: '/non/existent/directory',
-      });
+      }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('No such file or directory');
@@ -233,10 +234,10 @@ describe('RipgrepSearchTool', () => {
 
   describe('output formatting', () => {
     it('should group results by file', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'hello',
         path: testDir,
-      });
+      }));
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -250,10 +251,10 @@ describe('RipgrepSearchTool', () => {
     });
 
     it('should show match count in header', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'hello',
         path: testDir,
-      });
+      }));
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -261,10 +262,10 @@ describe('RipgrepSearchTool', () => {
     });
 
     it('should handle single match correctly', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'nested hello',
         path: testDir,
-      });
+      }));
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -277,10 +278,10 @@ describe('RipgrepSearchTool', () => {
     it('should handle special regex characters in pattern', async () => {
       await writeFile(join(testDir, 'special.txt'), 'Price: $10.50\nEmail: test@example.com');
 
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: '$10.50',
         path: testDir,
-      });
+      }));
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -290,10 +291,10 @@ describe('RipgrepSearchTool', () => {
     it('should handle empty files', async () => {
       await writeFile(join(testDir, 'empty.txt'), '');
 
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'anything',
         path: testDir,
-      });
+      }));
 
       expect(result.isError).toBe(false);
       // Should not crash and should not find matches in empty file
@@ -304,10 +305,10 @@ describe('RipgrepSearchTool', () => {
       const binaryContent = Buffer.from([0x00, 0x01, 0x02, 0x03, 0xff, 0xfe]);
       await writeFile(join(testDir, 'binary.bin'), binaryContent);
 
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('ripgrep_search', {
         pattern: 'hello',
         path: testDir,
-      });
+      }));
 
       expect(result.isError).toBe(false);
       // Should not crash when encountering binary files

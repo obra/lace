@@ -198,12 +198,14 @@ describe('ThreadPersistence', () => {
       await persistence.saveThread(thread);
 
       const complexData = {
-        toolName: 'bash',
-        input: { command: 'ls -la' },
-        callId: 'call_123',
-        nested: {
-          array: [1, 2, 3],
-          object: { key: 'value' },
+        id: 'call_123',
+        name: 'bash',
+        arguments: { 
+          command: 'ls -la',
+          nested: {
+            array: [1, 2, 3],
+            object: { key: 'value' },
+          }
         },
       };
 
@@ -612,14 +614,14 @@ describe('Integration Tests', () => {
     threadManager.addEvent(threadId, 'USER_MESSAGE', 'List files in current directory');
     threadManager.addEvent(threadId, 'AGENT_MESSAGE', "I'll help you list the files");
     threadManager.addEvent(threadId, 'TOOL_CALL', {
-      toolName: 'bash',
-      input: { command: 'ls -la' },
-      callId: 'call_123',
+      name: 'bash',
+      arguments: { command: 'ls -la' },
+      id: 'call_123',
     });
     threadManager.addEvent(threadId, 'TOOL_RESULT', {
-      callId: 'call_123',
-      output: 'file1.txt\nfile2.txt\n',
-      success: true,
+      id: 'call_123',
+      content: [{ type: 'text', text: 'file1.txt\nfile2.txt\n' }],
+      isError: false,
     });
     threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Here are the files in your directory');
 

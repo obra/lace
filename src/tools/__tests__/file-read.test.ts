@@ -5,6 +5,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { writeFile, mkdir, rm } from 'fs/promises';
 import { join } from 'path';
 import { FileReadTool } from '../implementations/file-read.js';
+import { createTestToolCall } from './test-utils.js';
 
 describe('FileReadTool', () => {
   const tool = new FileReadTool();
@@ -29,7 +30,7 @@ describe('FileReadTool', () => {
     });
 
     it('should have correct input schema', () => {
-      expect(tool.input_schema).toEqual({
+      expect(tool.inputSchema).toEqual({
         type: 'object',
         properties: {
           path: { type: 'string', description: 'File path to read' },
@@ -43,7 +44,7 @@ describe('FileReadTool', () => {
 
   describe('file reading', () => {
     it('should read entire file when no range specified', async () => {
-      const result = await tool.executeTool({ path: testFile });
+      const result = await tool.executeTool(createTestToolCall('file_read', { path: testFile }));
 
       expect(result.isError).toBe(false);
       expect(result.content).toHaveLength(1);
@@ -52,31 +53,31 @@ describe('FileReadTool', () => {
     });
 
     it('should read specific line range', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('file_read', {
         path: testFile,
         startLine: 2,
         endLine: 4,
-      });
+      }));
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('Line 2\nLine 3\nLine 4');
     });
 
     it('should read from start line to end of file', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('file_read', {
         path: testFile,
         startLine: 3,
-      });
+      }));
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('Line 3\nLine 4\nLine 5');
     });
 
     it('should read from beginning to end line', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('file_read', {
         path: testFile,
         endLine: 2,
-      });
+      }));
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('Line 1\nLine 2');
@@ -85,42 +86,42 @@ describe('FileReadTool', () => {
 
   describe('error handling', () => {
     it('should handle missing path parameter', async () => {
-      const result = await tool.executeTool({});
+      const result = await tool.executeTool(createTestToolCall('file_read', {}));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('Path must be a non-empty string');
     });
 
     it('should handle empty path parameter', async () => {
-      const result = await tool.executeTool({ path: '' });
+      const result = await tool.executeTool(createTestToolCall('file_read', { path: '' }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('Path must be a non-empty string');
     });
 
     it('should handle non-existent file', async () => {
-      const result = await tool.executeTool({ path: '/non/existent/file.txt' });
+      const result = await tool.executeTool(createTestToolCall('file_read', { path: '/non/existent/file.txt' }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('ENOENT');
     });
 
     it('should handle start line beyond file length', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('file_read', {
         path: testFile,
         startLine: 10,
-      });
+      }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('Start line 10 exceeds file length (5 lines)');
     });
 
     it('should handle end line beyond file length gracefully', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('file_read', {
         path: testFile,
         startLine: 3,
         endLine: 10,
-      });
+      }));
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('Line 3\nLine 4\nLine 5');
@@ -132,7 +133,7 @@ describe('FileReadTool', () => {
       const emptyFile = join(testDir, 'empty.txt');
       await writeFile(emptyFile, '');
 
-      const result = await tool.executeTool({ path: emptyFile });
+      const result = await tool.executeTool(createTestToolCall('file_read', { path: emptyFile }));
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('');
@@ -142,7 +143,7 @@ describe('FileReadTool', () => {
       const singleLineFile = join(testDir, 'single.txt');
       await writeFile(singleLineFile, 'Only line');
 
-      const result = await tool.executeTool({ path: singleLineFile });
+      const result = await tool.executeTool(createTestToolCall('file_read', { path: singleLineFile }));
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('Only line');

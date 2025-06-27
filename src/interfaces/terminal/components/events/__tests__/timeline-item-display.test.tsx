@@ -15,7 +15,7 @@ vi.mock('../EventDisplay.js', () => ({
 
 vi.mock('../ToolExecutionDisplay.js', () => ({
   ToolExecutionDisplay: ({ callEvent, isFocused }: any) => 
-    React.createElement(Text, {}, `ToolExecutionDisplay:${callEvent.data.toolName}:collapsed:${isFocused ? 'focused' : 'unfocused'}`)
+    React.createElement(Text, {}, `ToolExecutionDisplay:${callEvent.data.name}:collapsed:${isFocused ? 'focused' : 'unfocused'}`)
 }));
 
 vi.mock('../DelegationBox.js', () => ({
@@ -137,10 +137,11 @@ function TimelineItemDisplay({
       } : undefined;
       
       // Check if this is a delegate tool call
-      if (item.call.toolName === 'delegate') {
+      if (item.call.name === 'delegate') {
         logger.debug('TimelineDisplay: Processing delegate tool call', { 
-          callId: item.callId,
-          toolName: item.call.toolName,
+          id: item.callId,
+          name: item.call.name,
+          arguments: {},
           hasDelegateTimelines: !!delegateTimelines,
           delegateTimelineCount: delegateTimelines?.size || 0
         });
@@ -151,7 +152,7 @@ function TimelineItemDisplay({
             callId: item.callId,
             extractedThreadId: delegateThreadId,
             availableThreads: Array.from(delegateTimelines.keys()),
-            toolResult: item.result?.output ? item.result.output.substring(0, 100) + '...' : 'no result'
+            toolResult: item.result?.content?.[0]?.text ? item.result?.content?.[0]?.text.substring(0, 100) + '...' : 'no result'
           });
           
           const delegateTimeline = delegateThreadId ? delegateTimelines.get(delegateThreadId) : null;
@@ -189,8 +190,9 @@ function TimelineItemDisplay({
           }
         } else {
           logger.debug('TimelineDisplay: No delegate timelines provided', {
-            callId: item.callId,
-            toolName: item.call.toolName
+            id: item.callId,
+            name: item.call.name,
+            arguments: {}
           });
         }
       }
@@ -325,14 +327,14 @@ describe('TimelineItemDisplay (Baseline)', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'call-123',
         call: {
-          toolName: 'bash',
-          input: { command: 'ls' },
-          callId: 'call-123'
+          id: 'call-123',
+          name: 'bash',
+          arguments: { command: 'ls' }
         },
         result: {
-          callId: 'call-123',
-          output: 'file1.txt\nfile2.txt',
-          success: true
+          id: 'call-123',
+          content: [{ type: 'text', text: 'file1.txt\nfile2.txt' }],
+          isError: false
         }
       };
 
@@ -349,14 +351,14 @@ describe('TimelineItemDisplay (Baseline)', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'call-123',
         call: {
-          toolName: 'bash',
-          input: { command: 'ls' },
-          callId: 'call-123'
+          id: 'call-123',
+          name: 'bash',
+          arguments: { command: 'ls' }
         },
         result: {
-          callId: 'call-123',
-          output: 'file1.txt\nfile2.txt',
-          success: true
+          id: 'call-123',
+          content: [{ type: 'text', text: 'file1.txt\nfile2.txt' }],
+          isError: false
         }
       };
 
@@ -377,9 +379,9 @@ describe('TimelineItemDisplay (Baseline)', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'call-124',
         call: {
-          toolName: 'file-read',
-          input: { path: '/test.txt' },
-          callId: 'call-124'
+          id: 'call-124',
+          name: 'file-read',
+          arguments: { path: '/test.txt' }
         }
         // No result
       };
@@ -413,14 +415,14 @@ describe('TimelineItemDisplay (Baseline)', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'delegate-call-123',
         call: {
-          toolName: 'delegate',
-          input: { prompt: 'Help me with this' },
-          callId: 'delegate-call-123'
+          id: 'delegate-call-123',
+          name: 'delegate',
+          arguments: { prompt: 'Help me with this' }
         },
         result: {
-          callId: 'delegate-call-123',
-          output: 'Thread: delegate-thread-456',
-          success: true
+          id: 'delegate-call-123',
+          content: [{ type: 'text', text: 'Thread: delegate-thread-456' }],
+          isError: false
         }
       };
 
@@ -449,14 +451,14 @@ describe('TimelineItemDisplay (Baseline)', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'delegate-call-123',
         call: {
-          toolName: 'delegate',
-          input: { prompt: 'Help me with this' },
-          callId: 'delegate-call-123'
+          id: 'delegate-call-123',
+          name: 'delegate',
+          arguments: { prompt: 'Help me with this' }
         },
         result: {
-          callId: 'delegate-call-123',
-          output: 'Thread: delegate-thread-456',
-          success: true
+          id: 'delegate-call-123',
+          content: [{ type: 'text', text: 'Thread: delegate-thread-456' }],
+          isError: false
         }
       };
 
@@ -487,14 +489,14 @@ describe('TimelineItemDisplay (Baseline)', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'delegate-call-123',
         call: {
-          toolName: 'delegate',
-          input: { prompt: 'Help me with this' },
-          callId: 'delegate-call-123'
+          id: 'delegate-call-123',
+          name: 'delegate',
+          arguments: { prompt: 'Help me with this' }
         },
         result: {
-          callId: 'delegate-call-123',
-          output: 'No thread found',
-          success: true
+          id: 'delegate-call-123',
+          content: [{ type: 'text', text: 'No thread found' }],
+          isError: false
         }
       };
 
@@ -523,9 +525,9 @@ describe('TimelineItemDisplay (Baseline)', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'delegate-call-123',
         call: {
-          toolName: 'delegate',
-          input: { prompt: 'Help me with this' },
-          callId: 'delegate-call-123'
+          id: 'delegate-call-123',
+          name: 'delegate',
+          arguments: { prompt: 'Help me with this' }
         }
       };
 
@@ -603,9 +605,9 @@ describe('TimelineItemDisplay (Baseline)', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'delegate-call-123',
         call: {
-          toolName: 'delegate',
-          input: { prompt: 'Help me' },
-          callId: 'delegate-call-123'
+          id: 'delegate-call-123',
+          name: 'delegate',
+          arguments: { prompt: 'Help me' }
         }
       };
 
@@ -629,9 +631,9 @@ describe('TimelineItemDisplay (Baseline)', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'bash-call-123',
         call: {
-          toolName: 'bash',
-          input: { command: 'ls' },
-          callId: 'bash-call-123'
+          id: 'bash-call-123',
+          name: 'bash',
+          arguments: { command: 'ls' }
         }
       };
 

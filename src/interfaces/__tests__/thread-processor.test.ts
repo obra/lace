@@ -8,7 +8,8 @@ import {
   EphemeralTimelineItems,
   EphemeralMessage,
 } from '../thread-processor.js';
-import { ThreadEvent, ToolCallData, ToolResultData } from '../../threads/types.js';
+import { ThreadEvent } from '../../threads/types.js';
+import { ToolCall, ToolResult } from '../../tools/types.js';
 
 describe('ThreadProcessor', () => {
   let processor: ThreadProcessor;
@@ -164,16 +165,16 @@ describe('ThreadProcessor', () => {
 
   describe('tool call grouping', () => {
     it('groups tool calls with their results', () => {
-      const toolCallData: ToolCallData = {
-        toolName: 'bash',
-        input: { command: 'ls' },
-        callId: 'call-123',
+      const toolCallData: ToolCall = {
+        id: 'call-123',
+        name: 'bash',
+        arguments: { command: 'ls' },
       };
 
-      const toolResultData: ToolResultData = {
-        callId: 'call-123',
-        output: 'file1.txt\nfile2.txt',
-        success: true,
+      const toolResultData: ToolResult = {
+        id: 'call-123',
+        content: [{ type: 'text', text: 'file1.txt\nfile2.txt' }],
+        isError: false,
       };
 
       const events: ThreadEvent[] = [
@@ -206,10 +207,10 @@ describe('ThreadProcessor', () => {
     });
 
     it('handles tool calls without results', () => {
-      const toolCallData: ToolCallData = {
-        toolName: 'bash',
-        input: { command: 'ls' },
-        callId: 'call-123',
+      const toolCallData: ToolCall = {
+        id: 'call-123',
+        name: 'bash',
+        arguments: { command: 'ls' },
       };
 
       const events: ThreadEvent[] = [
@@ -235,10 +236,10 @@ describe('ThreadProcessor', () => {
     });
 
     it('handles orphaned tool results', () => {
-      const toolResultData: ToolResultData = {
-        callId: 'missing-call',
-        output: 'orphaned result',
-        success: true,
+      const toolResultData: ToolResult = {
+        id: 'missing-call',
+        content: [{ type: 'text', text: 'orphaned result' }],
+        isError: false,
       };
 
       const events: ThreadEvent[] = [
@@ -669,10 +670,10 @@ describe('ThreadProcessor', () => {
           type: 'TOOL_CALL',
           timestamp: new Date('2024-01-01T10:00:02Z'),
           data: {
-            toolName: 'bash',
-            input: { command: 'ls -la' },
-            callId: 'call-123',
-          },
+            id: 'call-123',
+            name: 'bash',
+            arguments: { command: 'ls -la' },
+          } as ToolCall,
         },
         // Tool result
         {
@@ -681,10 +682,10 @@ describe('ThreadProcessor', () => {
           type: 'TOOL_RESULT',
           timestamp: new Date('2024-01-01T10:00:03Z'),
           data: {
-            callId: 'call-123',
-            output: 'file1.txt\nfile2.txt',
-            success: true,
-          },
+            id: 'call-123',
+            content: [{ type: 'text', text: 'file1.txt\nfile2.txt' }],
+            isError: false,
+          } as ToolResult,
         },
         // Another agent message
         {

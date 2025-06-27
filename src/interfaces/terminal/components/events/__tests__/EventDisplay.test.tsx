@@ -5,7 +5,8 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
 import { EventDisplay } from '../EventDisplay.js';
-import { ThreadEvent, ToolCallData, ToolResultData } from '../../../../../threads/types.js';
+import { ThreadEvent } from '../../../../../threads/types.js';
+import { ToolCall, ToolResult } from '../../../../../tools/types.js';
 import { UI_SYMBOLS } from '../../../theme.js';
 
 describe('EventDisplay', () => {
@@ -38,10 +39,10 @@ describe('EventDisplay', () => {
   });
 
   it('should render TOOL_CALL events', () => {
-    const toolCallData: ToolCallData = {
-      toolName: 'bash',
-      input: { command: 'ls -la' },
-      callId: 'call-123'
+    const toolCallData: ToolCall = {
+      id: 'call-123',
+      name: 'bash',
+      arguments: { command: 'ls -la' }
     };
 
     const event: ThreadEvent = {
@@ -59,10 +60,10 @@ describe('EventDisplay', () => {
   });
 
   it('should render TOOL_RESULT events', () => {
-    const toolResultData: ToolResultData = {
-      callId: 'call-123',
-      output: 'File listing complete',
-      success: true
+    const toolResultData: ToolResult = {
+      id: 'call-123',
+      content: [{ type: 'text', text: 'File listing complete' }],
+      isError: false
     };
 
     const event: ThreadEvent = {

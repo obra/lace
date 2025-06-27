@@ -109,14 +109,14 @@ describe('TimelineDisplay Viewport Behavior', () => {
         timestamp: new Date(),
         callId: 'call-123',
         call: {
-          toolName: 'bash',
-          input: { command: 'ls' },
-          callId: 'call-123'
+          id: 'call-123',
+          name: 'bash',
+          arguments: { command: 'ls' }
         },
         result: {
-          callId: 'call-123',
-          output: 'file1.txt\nfile2.txt',
-          success: true
+          id: 'call-123',
+          content: [{ type: 'text', text: 'file1.txt\nfile2.txt' }],
+          isError: false
         }
       }],
       metadata: {
@@ -139,14 +139,14 @@ describe('TimelineDisplay Viewport Behavior', () => {
         timestamp: new Date(),
         callId: 'delegate-call-123',
         call: {
-          toolName: 'delegate',
-          input: { prompt: 'Help me' },
-          callId: 'delegate-call-123'
+          id: 'delegate-call-123',
+          name: 'delegate',
+          arguments: { prompt: 'Help me' }
         },
         result: {
-          callId: 'delegate-call-123',
-          output: 'Thread: delegate-thread-id',
-          success: true
+          id: 'delegate-call-123',
+          content: [{ type: 'text', text: 'Thread: delegate-thread-id' }],
+          isError: false
         }
       }],
       metadata: {

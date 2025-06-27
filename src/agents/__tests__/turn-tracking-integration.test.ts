@@ -7,7 +7,7 @@ import { ToolExecutor } from '../../tools/executor.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 import { AIProvider } from '../../providers/base-provider.js';
 import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool } from '../../tools/types.js';
+import { Tool, ToolCall } from '../../tools/types.js';
 
 // Mock provider for controlled testing
 class MockIntegrationProvider extends AIProvider {
@@ -354,16 +354,17 @@ describe('Turn Tracking Provider Integration Tests', () => {
       const mockTool: Tool = {
         name: 'mock_tool',
         description: 'A simple mock tool',
-        input_schema: {
+        inputSchema: {
           type: 'object',
           properties: {
             text: { type: 'string' },
           },
           required: ['text'],
         },
-        executeTool: async (input: Record<string, unknown>) => {
+        executeTool: async (call: ToolCall) => {
           return {
-            content: [{ type: 'text', text: `Processed: ${input.text}` }],
+            id: call.id,
+            content: [{ type: 'text', text: `Processed: ${call.arguments.text}` }],
             isError: false,
           };
         },

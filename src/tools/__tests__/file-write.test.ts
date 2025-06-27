@@ -5,6 +5,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { readFile, rm, stat } from 'fs/promises';
 import { join, dirname } from 'path';
 import { FileWriteTool } from '../implementations/file-write.js';
+import { createTestToolCall } from './test-utils.js';
 
 describe('FileWriteTool', () => {
   const tool = new FileWriteTool();
@@ -22,7 +23,7 @@ describe('FileWriteTool', () => {
     });
 
     it('should have correct input schema', () => {
-      expect(tool.input_schema).toEqual({
+      expect(tool.inputSchema).toEqual({
         type: 'object',
         properties: {
           path: { type: 'string', description: 'File path to write to' },
@@ -42,7 +43,7 @@ describe('FileWriteTool', () => {
       const testFile = join(testDir, 'test.txt');
       const content = 'Hello, world!';
 
-      const result = await tool.executeTool({ path: testFile, content });
+      const result = await tool.executeTool(createTestToolCall('file_write', { path: testFile, content }));
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe(
@@ -59,10 +60,10 @@ describe('FileWriteTool', () => {
       const newContent = 'New content';
 
       // First write
-      await tool.executeTool({ path: testFile, content: originalContent });
+      await tool.executeTool(createTestToolCall('file_write', { path: testFile, content: originalContent }));
 
       // Overwrite
-      const result = await tool.executeTool({ path: testFile, content: newContent });
+      const result = await tool.executeTool(createTestToolCall('file_write', { path: testFile, content: newContent }));
 
       expect(result.isError).toBe(false);
 
@@ -74,7 +75,7 @@ describe('FileWriteTool', () => {
       const testFile = join(testDir, 'deep', 'nested', 'file.txt');
       const content = 'Deep file content';
 
-      const result = await tool.executeTool({ path: testFile, content });
+      const result = await tool.executeTool(createTestToolCall('file_write', { path: testFile, content }));
 
       expect(result.isError).toBe(false);
 
@@ -90,11 +91,11 @@ describe('FileWriteTool', () => {
       const testFile = join(testDir, 'nonexistent', 'file.txt');
       const content = 'Content';
 
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('file_write', {
         path: testFile,
         content,
         createDirs: false,
-      });
+      }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('ENOENT');
@@ -103,31 +104,31 @@ describe('FileWriteTool', () => {
 
   describe('error handling', () => {
     it('should handle missing path parameter', async () => {
-      const result = await tool.executeTool({ content: 'test' });
+      const result = await tool.executeTool(createTestToolCall('file_write', { content: 'test' }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('Path must be a non-empty string');
     });
 
     it('should handle empty path parameter', async () => {
-      const result = await tool.executeTool({ path: '', content: 'test' });
+      const result = await tool.executeTool(createTestToolCall('file_write', { path: '', content: 'test' }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('Path must be a non-empty string');
     });
 
     it('should handle missing content parameter', async () => {
-      const result = await tool.executeTool({ path: '/tmp/test.txt' });
+      const result = await tool.executeTool(createTestToolCall('file_write', { path: '/tmp/test.txt' }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('Content must be a string');
     });
 
     it('should handle non-string content parameter', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('file_write', {
         path: '/tmp/test.txt',
         content: 123,
-      });
+      }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('Content must be a string');
@@ -139,7 +140,7 @@ describe('FileWriteTool', () => {
       const testFile = join(testDir, 'empty.txt');
       const content = '';
 
-      const result = await tool.executeTool({ path: testFile, content });
+      const result = await tool.executeTool(createTestToolCall('file_write', { path: testFile, content }));
 
       expect(result.isError).toBe(false);
 
@@ -151,7 +152,7 @@ describe('FileWriteTool', () => {
       const testFile = join(testDir, 'large.txt');
       const content = 'A'.repeat(10000);
 
-      const result = await tool.executeTool({ path: testFile, content });
+      const result = await tool.executeTool(createTestToolCall('file_write', { path: testFile, content }));
 
       expect(result.isError).toBe(false);
 
@@ -164,7 +165,7 @@ describe('FileWriteTool', () => {
       const testFile = join(testDir, 'unicode.txt');
       const content = 'Hello 世界! 🚀 Émojis and spéciål chars';
 
-      const result = await tool.executeTool({ path: testFile, content });
+      const result = await tool.executeTool(createTestToolCall('file_write', { path: testFile, content }));
 
       expect(result.isError).toBe(false);
 

@@ -16,7 +16,7 @@ vi.mock('../EventDisplay.js', () => ({
 
 vi.mock('../tool-renderers/GenericToolRenderer.js', () => ({
   GenericToolRenderer: ({ item, isFocused }: any) => 
-    React.createElement(Text, {}, `GenericToolRenderer:${item.call.toolName}:${isFocused ? 'focused' : 'unfocused'}`)
+    React.createElement(Text, {}, `GenericToolRenderer:${item.call.name}:${isFocused ? 'focused' : 'unfocused'}`)
 }));
 
 vi.mock('../tool-renderers/getToolRenderer.js', () => ({
@@ -166,14 +166,14 @@ describe('TimelineItem Component', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'call-123',
         call: {
-          toolName: 'bash',
-          input: { command: 'ls' },
-          callId: 'call-123'
+          id: 'call-123',
+          name: 'bash',
+          arguments: { command: 'ls' }
         },
         result: {
-          callId: 'call-123',
-          output: 'file1.txt\nfile2.txt',
-          success: true
+          id: 'call-123',
+          content: [{ type: 'text', text: 'file1.txt\nfile2.txt' }],
+          isError: false
         }
       };
 
@@ -190,14 +190,14 @@ describe('TimelineItem Component', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'call-123',
         call: {
-          toolName: 'bash',
-          input: { command: 'ls' },
-          callId: 'call-123'
+          id: 'call-123',
+          name: 'bash',
+          arguments: { command: 'ls' }
         },
         result: {
-          callId: 'call-123',
-          output: 'file1.txt\nfile2.txt',
-          success: true
+          id: 'call-123',
+          content: [{ type: 'text', text: 'file1.txt\nfile2.txt' }],
+          isError: false
         }
       };
 
@@ -230,14 +230,14 @@ describe('TimelineItem Component', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'delegate-call-123',
         call: {
-          toolName: 'delegate',
-          input: { prompt: 'Help me with this' },
-          callId: 'delegate-call-123'
+          id: 'delegate-call-123',
+          name: 'delegate',
+          arguments: { prompt: 'Help me with this' }
         },
         result: {
-          callId: 'delegate-call-123',
-          output: 'Thread: delegate-thread-456',
-          success: true
+          id: 'delegate-call-123',
+          content: [{ type: 'text', text: 'Thread: delegate-thread-456' }],
+          isError: false
         }
       };
 
@@ -255,14 +255,14 @@ describe('TimelineItem Component', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'delegate-call-123',
         call: {
-          toolName: 'delegate',
-          input: { prompt: 'Help me with this' },
-          callId: 'delegate-call-123'
+          id: 'delegate-call-123',
+          name: 'delegate',
+          arguments: { prompt: 'Help me with this' }
         },
         result: {
-          callId: 'delegate-call-123',
-          output: 'Thread: delegate-thread-456',
-          success: true
+          id: 'delegate-call-123',
+          content: [{ type: 'text', text: 'Thread: delegate-thread-456' }],
+          isError: false
         }
       };
 
@@ -283,14 +283,14 @@ describe('TimelineItem Component', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'delegate-call-123',
         call: {
-          toolName: 'delegate',
-          input: { prompt: 'Help me with this' },
-          callId: 'delegate-call-123'
+          id: 'delegate-call-123',
+          name: 'delegate',
+          arguments: { prompt: 'Help me with this' }
         },
         result: {
-          callId: 'delegate-call-123',
-          output: 'No thread found',
-          success: true
+          id: 'delegate-call-123',
+          content: [{ type: 'text', text: 'No thread found' }],
+          isError: false
         }
       };
 
@@ -308,9 +308,9 @@ describe('TimelineItem Component', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'delegate-call-123',
         call: {
-          toolName: 'delegate',
-          input: { prompt: 'Help me' },
-          callId: 'delegate-call-123'
+          id: 'delegate-call-123',
+          name: 'delegate',
+          arguments: { prompt: 'Help me' }
         }
       };
 
@@ -379,9 +379,9 @@ describe('TimelineItem Component', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'bash-call-123',
         call: {
-          toolName: 'bash',
-          input: { command: 'ls' },
-          callId: 'bash-call-123'
+          id: 'bash-call-123',
+          name: 'bash',
+          arguments: { command: 'ls' }
         }
       };
 

@@ -9,6 +9,7 @@ import { CLIOptions } from '../cli/args.js';
 import { BashTool } from '../tools/implementations/bash.js';
 import { FileReadTool } from '../tools/implementations/file-read.js';
 import { FileWriteTool } from '../tools/implementations/file-write.js';
+import { ToolCall } from '../tools/types.js';
 
 // Mock approval interface for testing
 class MockApprovalInterface implements ApprovalCallback {
@@ -34,6 +35,19 @@ class MockApprovalInterface implements ApprovalCallback {
   }
 }
 
+// Helper function to create ToolCall objects
+function createToolCall(
+  name: string,
+  args: Record<string, unknown>,
+  id: string = 'test-id'
+): ToolCall {
+  return {
+    id,
+    name,
+    arguments: args,
+  };
+}
+
 describe('Tool Approval System Integration', () => {
   let toolExecutor: ToolExecutor;
   let mockInterface: MockApprovalInterface;
@@ -56,7 +70,9 @@ describe('Tool Approval System Integration', () => {
       toolExecutor.setApprovalCallback(mockInterface);
       mockInterface.setResponse('bash', ApprovalDecision.ALLOW_ONCE);
 
-      const result = await toolExecutor.executeTool('bash', { command: 'echo "test"' });
+      const result = await toolExecutor.executeTool(
+        createToolCall('bash', { command: 'echo "test"' })
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('test');
@@ -71,7 +87,9 @@ describe('Tool Approval System Integration', () => {
       toolExecutor.setApprovalCallback(mockInterface);
       mockInterface.setResponse('bash', ApprovalDecision.DENY);
 
-      const result = await toolExecutor.executeTool('bash', { command: 'echo "test"' });
+      const result = await toolExecutor.executeTool(
+        createToolCall('bash', { command: 'echo "test"' })
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Tool execution denied by approval policy');
@@ -80,7 +98,9 @@ describe('Tool Approval System Integration', () => {
 
     it('should execute tool without approval when no callback is set', async () => {
       // No approval callback set
-      const result = await toolExecutor.executeTool('bash', { command: 'echo "no approval"' });
+      const result = await toolExecutor.executeTool(
+        createToolCall('bash', { command: 'echo "no approval"' })
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('no approval');
@@ -109,7 +129,9 @@ describe('Tool Approval System Integration', () => {
       const policyCallback = createGlobalPolicyCallback(mockInterface, cliOptions, toolExecutor);
       toolExecutor.setApprovalCallback(policyCallback);
 
-      const result = await toolExecutor.executeTool('bash', { command: 'echo "auto-approved"' });
+      const result = await toolExecutor.executeTool(
+        createToolCall('bash', { command: 'echo "auto-approved"' })
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('auto-approved');
@@ -136,7 +158,9 @@ describe('Tool Approval System Integration', () => {
       const policyCallback = createGlobalPolicyCallback(mockInterface, cliOptions, toolExecutor);
       toolExecutor.setApprovalCallback(policyCallback);
 
-      const result = await toolExecutor.executeTool('bash', { command: 'echo "blocked"' });
+      const result = await toolExecutor.executeTool(
+        createToolCall('bash', { command: 'echo "blocked"' })
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Tool execution denied by approval policy');
@@ -167,9 +191,11 @@ describe('Tool Approval System Integration', () => {
       const policyCallback = createGlobalPolicyCallback(mockInterface, cliOptions, toolExecutor);
       toolExecutor.setApprovalCallback(policyCallback);
 
-      const result = await toolExecutor.executeTool('file_read', {
-        path: '/tmp/safe-read-test.txt',
-      });
+      const result = await toolExecutor.executeTool(
+        createToolCall('file_read', {
+          path: '/tmp/safe-read-test.txt',
+        })
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('safe content');
@@ -200,9 +226,11 @@ describe('Tool Approval System Integration', () => {
       toolExecutor.setApprovalCallback(policyCallback);
 
       mockInterface.setResponse('bash', ApprovalDecision.ALLOW_ONCE);
-      const result = await toolExecutor.executeTool('bash', {
-        command: 'echo "interface decision"',
-      });
+      const result = await toolExecutor.executeTool(
+        createToolCall('bash', {
+          command: 'echo "interface decision"',
+        })
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('interface decision');
@@ -234,13 +262,17 @@ describe('Tool Approval System Integration', () => {
       mockInterface.setResponse('bash', ApprovalDecision.ALLOW_SESSION);
 
       // First execution should call interface
-      const firstResult = await toolExecutor.executeTool('bash', { command: 'echo "first"' });
+      const firstResult = await toolExecutor.executeTool(
+        createToolCall('bash', { command: 'echo "first"' })
+      );
       expect(firstResult.isError).toBe(false);
       expect(firstResult.content[0].text).toContain('first');
       expect(mockInterface.callLog).toHaveLength(1);
 
       // Second execution should use cached approval
-      const secondResult = await toolExecutor.executeTool('bash', { command: 'echo "second"' });
+      const secondResult = await toolExecutor.executeTool(
+        createToolCall('bash', { command: 'echo "second"' })
+      );
       expect(secondResult.isError).toBe(false);
       expect(secondResult.content[0].text).toContain('second');
       expect(mockInterface.callLog).toHaveLength(1); // Should not increase
@@ -268,9 +300,11 @@ describe('Tool Approval System Integration', () => {
       const policyCallback = createGlobalPolicyCallback(mockInterface, cliOptions, toolExecutor);
       toolExecutor.setApprovalCallback(policyCallback);
 
-      const result = await toolExecutor.executeTool('bash', {
-        command: 'echo "should be blocked"',
-      });
+      const result = await toolExecutor.executeTool(
+        createToolCall('bash', {
+          command: 'echo "should be blocked"',
+        })
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Tool execution denied by approval policy');
@@ -298,11 +332,15 @@ describe('Tool Approval System Integration', () => {
       toolExecutor.setApprovalCallback(policyCallback);
 
       // Test bash (should be blocked despite auto-approve)
-      const bashResult = await toolExecutor.executeTool('bash', { command: 'echo "blocked"' });
+      const bashResult = await toolExecutor.executeTool(
+        createToolCall('bash', { command: 'echo "blocked"' })
+      );
       expect(bashResult.isError).toBe(true);
 
       // Test file_read (should be blocked despite read-only)
-      const fileReadResult = await toolExecutor.executeTool('file_read', { path: 'test.txt' });
+      const fileReadResult = await toolExecutor.executeTool(
+        createToolCall('file_read', { path: 'test.txt' })
+      );
       expect(fileReadResult.isError).toBe(true);
 
       expect(mockInterface.callLog).toHaveLength(0);
@@ -319,7 +357,9 @@ describe('Tool Approval System Integration', () => {
 
       toolExecutor.setApprovalCallback(errorCallback);
 
-      const result = await toolExecutor.executeTool('bash', { command: 'echo "error test"' });
+      const result = await toolExecutor.executeTool(
+        createToolCall('bash', { command: 'echo "error test"' })
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Approval system failed');
@@ -328,7 +368,9 @@ describe('Tool Approval System Integration', () => {
     it('should handle unknown tools gracefully', async () => {
       toolExecutor.setApprovalCallback(mockInterface);
 
-      const result = await toolExecutor.executeTool('unknown_tool', { param: 'value' });
+      const result = await toolExecutor.executeTool(
+        createToolCall('unknown_tool', { param: 'value' })
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Tool 'unknown_tool' not found");

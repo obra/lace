@@ -3,7 +3,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LMStudioProvider } from '../lmstudio-provider.js';
-import { Tool, ToolContext } from '../../tools/types.js';
+import { Tool, ToolCall, ToolResult, ToolContext } from '../../tools/types.js';
 
 // Mock the LMStudio SDK
 vi.mock('@lmstudio/sdk', () => {
@@ -75,15 +75,16 @@ describe('LMStudioProvider', () => {
       const testTool: Tool = {
         name: 'test_tool',
         description: 'A test tool',
-        input_schema: {
+        inputSchema: {
           type: 'object',
           properties: {
             input: { type: 'string' },
           },
           required: ['input'],
         },
-        async executeTool(_input: Record<string, unknown>, _context?: ToolContext) {
+        async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
           return {
+            id: call.id,
             isError: false,
             content: [{ type: 'text' as const, text: 'test result' }],
           };
@@ -98,7 +99,7 @@ describe('LMStudioProvider', () => {
           function: {
             name: tool.name,
             description: tool.description,
-            parameters: tool.input_schema,
+            parameters: tool.inputSchema,
           },
         })),
       };

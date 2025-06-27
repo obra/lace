@@ -32,8 +32,8 @@ describe('Provider-Specific Format Conversion', () => {
       toolResults: [
         {
           id: 'toolu_123',
-          output: 'export interface Tool { ... }',
-          success: true,
+          content: [{ type: 'text', text: 'export interface Tool { ... }' }],
+          isError: false,
         },
       ],
     },
@@ -133,8 +133,8 @@ describe('Provider-Specific Format Conversion', () => {
           toolResults: [
             {
               id: 'toolu_789',
-              output: 'total 24\ndrwxr-xr-x  5 user  staff  160 ...',
-              success: true,
+              content: [{ type: 'text', text: 'total 24\ndrwxr-xr-x  5 user  staff  160 ...' }],
+              isError: false,
             },
           ],
         },
@@ -164,9 +164,8 @@ describe('Provider-Specific Format Conversion', () => {
           toolResults: [
             {
               id: 'toolu_error',
-              output: '',
-              success: false,
-              error: 'Permission denied',
+              content: [{ type: 'text', text: 'Permission denied' }],
+              isError: true,
             },
           ],
         },
@@ -181,7 +180,7 @@ describe('Provider-Specific Format Conversion', () => {
             {
               type: 'tool_result',
               tool_use_id: 'toolu_error',
-              content: '',
+              content: 'Permission denied',
               is_error: true,
             },
           ],
@@ -272,9 +271,8 @@ describe('Provider-Specific Format Conversion', () => {
           toolResults: [
             {
               id: 'toolu_error',
-              output: '',
-              success: false,
-              error: 'Command not found',
+              content: [{ type: 'text', text: 'Command not found' }],
+              isError: true,
             },
           ],
         },
@@ -289,7 +287,7 @@ describe('Provider-Specific Format Conversion', () => {
         },
         {
           role: 'user',
-          content: '[Tool result: ERROR -  (Error: Command not found)]',
+          content: '[Tool result: ERROR - Command not found]',
         },
       ]);
     });
@@ -320,13 +318,13 @@ describe('Provider-Specific Format Conversion', () => {
           toolResults: [
             {
               id: 'toolu_file1',
-              output: 'Content 1',
-              success: true,
+              content: [{ type: 'text', text: 'Content 1' }],
+              isError: false,
             },
             {
               id: 'toolu_file2',
-              output: 'Content 2',
-              success: true,
+              content: [{ type: 'text', text: 'Content 2' }],
+              isError: false,
             },
           ],
         },

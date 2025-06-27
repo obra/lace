@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { LMStudioProvider } from '../lmstudio-provider.js';
-import { Tool, ToolContext } from '../../tools/types.js';
+import { Tool, ToolCall, ToolResult, ToolContext } from '../../tools/types.js';
 import { logger } from '../../utils/logger.js';
 import { checkProviderAvailability } from '../../__tests__/utils/provider-test-helpers.js';
 
@@ -11,7 +11,7 @@ import { checkProviderAvailability } from '../../__tests__/utils/provider-test-h
 class MockTool implements Tool {
   name = 'mock_tool';
   description = 'A mock tool for testing';
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       action: { type: 'string', description: 'Action to perform' },
@@ -20,10 +20,11 @@ class MockTool implements Tool {
     required: ['action'],
   };
 
-  async executeTool(input: Record<string, unknown>, _context?: ToolContext) {
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     return {
+      id: call.id,
       isError: false,
-      content: [{ type: 'text' as const, text: `Mock executed: ${JSON.stringify(input)}` }],
+      content: [{ type: 'text' as const, text: `Mock executed: ${JSON.stringify(call.arguments)}` }],
     };
   }
 }
@@ -32,7 +33,7 @@ class MockTool implements Tool {
 class FailingTool implements Tool {
   name = 'failing_tool';
   description = 'A tool that always fails';
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       message: { type: 'string', description: 'Error message' },
@@ -40,8 +41,9 @@ class FailingTool implements Tool {
     required: ['message'],
   };
 
-  async executeTool(_input: Record<string, unknown>, _context?: ToolContext) {
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     return {
+      id: call.id,
       isError: true,
       content: [{ type: 'text' as const, text: 'Simulated failure' }],
     };
@@ -104,8 +106,8 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
         toolResults: [
           {
             id: 'call_1',
-            output: 'Mock executed: {"action":"initial"}',
-            success: true,
+            content: [{ type: 'text' as const, text: 'Mock executed: {"action":"initial"}' }],
+            isError: false,
           },
         ],
       },
@@ -123,7 +125,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
     const complexTool: Tool = {
       name: 'complex_tool',
       description: 'A tool with complex parameters',
-      input_schema: {
+      inputSchema: {
         type: 'object',
         properties: {
           operation: {
@@ -138,13 +140,14 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
         },
         required: ['operation', 'target'],
       },
-      async executeTool(input: Record<string, unknown>, _context?: ToolContext) {
+      async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
         return {
+          id: call.id,
           isError: false,
           content: [
             {
               type: 'text' as const,
-              text: `Complex operation completed: ${JSON.stringify(input)}`,
+              text: `Complex operation completed: ${JSON.stringify(call.arguments)}`,
             },
           ],
         };
@@ -241,20 +244,21 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
     const simpleTool: Tool = {
       name: 'get_weather',
       description: 'Get weather information for a location',
-      input_schema: {
+      inputSchema: {
         type: 'object',
         properties: {
           location: { type: 'string', description: 'Location name' },
         },
         required: ['location'],
       },
-      async executeTool(input: Record<string, unknown>, _context?: ToolContext) {
+      async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
         return {
+          id: call.id,
           isError: false,
           content: [
             {
               type: 'text' as const,
-              text: `Weather in ${input.location}: Sunny, 72°F`,
+              text: `Weather in ${call.arguments.location}: Sunny, 72°F`,
             },
           ],
         };

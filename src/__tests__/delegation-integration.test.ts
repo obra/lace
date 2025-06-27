@@ -233,7 +233,12 @@ describe('Delegation Integration Tests', () => {
     const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
 
     // Execute delegation (this will create a sub-thread and run a real subagent)
-    const result = await delegateTool.executeTool(delegateInput);
+    const toolCall = {
+      id: 'test-delegation-call',
+      name: 'delegate',
+      arguments: delegateInput,
+    };
+    const result = await delegateTool.executeTool(toolCall);
 
     // Debug: Print the result to see what went wrong
     if (result.isError) {
@@ -280,14 +285,18 @@ describe('Delegation Integration Tests', () => {
         threadId: delegateThreadId,
         type: 'TOOL_CALL' as const,
         timestamp: new Date(),
-        data: { toolName: 'bash', input: { command: 'find .' }, callId: 'call1' },
+        data: { id: 'call1', name: 'bash', arguments: { command: 'find .' } },
       },
       {
         id: 'evt4',
         threadId: delegateThreadId,
         type: 'TOOL_RESULT' as const,
         timestamp: new Date(),
-        data: { callId: 'call1', output: 'Found files', success: true },
+        data: {
+          id: 'call1',
+          content: [{ type: 'text' as const, text: 'Found files' }],
+          isError: false,
+        },
       },
       {
         id: 'evt5',

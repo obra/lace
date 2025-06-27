@@ -3,6 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { UrlFetchTool } from '../implementations/url-fetch.js';
+import { createTestToolCall } from './test-utils.js';
 
 describe('UrlFetchTool', () => {
   const tool = new UrlFetchTool();
@@ -18,7 +19,7 @@ describe('UrlFetchTool', () => {
     });
 
     it('should have correct input schema', () => {
-      expect(tool.input_schema).toEqual({
+      expect(tool.inputSchema).toEqual({
         type: 'object',
         properties: {
           url: {
@@ -126,7 +127,7 @@ describe('UrlFetchTool', () => {
 
   describe('parameter validation', () => {
     it('should handle missing URL parameter', async () => {
-      const result = await tool.executeTool({});
+      const result = await tool.executeTool(createTestToolCall('url_fetch', {}));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('VALIDATION ERROR');
@@ -136,7 +137,7 @@ describe('UrlFetchTool', () => {
     });
 
     it('should handle empty URL parameter', async () => {
-      const result = await tool.executeTool({ url: '' });
+      const result = await tool.executeTool(createTestToolCall('url_fetch', { url: '' }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('VALIDATION ERROR');
@@ -145,10 +146,10 @@ describe('UrlFetchTool', () => {
     });
 
     it('should handle invalid timeout values', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('url_fetch', {
         url: 'https://example.com',
         timeout: 500, // below minimum
-      });
+      }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain(
@@ -157,20 +158,20 @@ describe('UrlFetchTool', () => {
     });
 
     it('should handle invalid maxSize values', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('url_fetch', {
         url: 'https://example.com',
         maxSize: 500, // below minimum
-      });
+      }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Max size must be between 1024 and 104857600 bytes');
     });
 
     it('should handle invalid method values', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('url_fetch', {
         url: 'https://example.com',
         method: 'INVALID',
-      });
+      }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Method must be one of: GET, POST');
@@ -180,19 +181,19 @@ describe('UrlFetchTool', () => {
   describe('network error handling', () => {
     it('should handle very short timeouts', async () => {
       // Test with impossibly short timeout
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('url_fetch', {
         url: 'https://httpbin.org/get',
         timeout: 1, // 1ms - should always timeout
-      });
+      }));
 
       expect(result.isError).toBe(true);
       // Just check that it's an error, don't rely on specific message text for now
     }, 10000);
 
     it('should handle invalid domains', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('url_fetch', {
         url: 'https://this-domain-definitely-does-not-exist-12345.invalid',
-      });
+      }));
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('NETWORK ERROR');
@@ -276,10 +277,10 @@ describe('UrlFetchTool', () => {
     });
 
     it('should handle returnContent parameter validation', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('url_fetch', {
         url: 'https://example.com',
         returnContent: 'invalid',
-      });
+      }));
 
       // Should still work - TypeScript types ensure boolean, but runtime should handle gracefully
       expect(result.isError).toBe(true); // Will error on network, but validates params first
@@ -297,7 +298,7 @@ describe('UrlFetchTool', () => {
 
   describe('rich error context', () => {
     it('should provide detailed validation error context', async () => {
-      const result = await tool.executeTool({ url: 'invalid-url' });
+      const result = await tool.executeTool(createTestToolCall('url_fetch', { url: 'invalid-url' }));
 
       expect(result.isError).toBe(true);
       const errorText = result.content[0].text;
@@ -317,10 +318,10 @@ describe('UrlFetchTool', () => {
     });
 
     it('should provide request timing information', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('url_fetch', {
         url: 'https://httpbin.org/delay/3',
         timeout: 1000, // Minimum timeout - 3 second delay should always timeout
-      });
+      }));
 
       expect(result.isError).toBe(true);
       const errorText = result.content[0].text;
@@ -334,9 +335,9 @@ describe('UrlFetchTool', () => {
     }, 10000);
 
     it('should include response headers and status in HTTP errors', async () => {
-      const result = await tool.executeTool({
+      const result = await tool.executeTool(createTestToolCall('url_fetch', {
         url: 'https://httpbin.org/status/404',
-      });
+      }));
 
       expect(result.isError).toBe(true);
       const errorText = result.content[0].text;

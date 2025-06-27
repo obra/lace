@@ -289,9 +289,9 @@ describe('TimelineContent Component', () => {
             timestamp: new Date('2024-01-01T10:02:00Z'),
             callId: 'call-1',
             call: {
-              toolName: 'bash',
-              input: { command: 'ls' },
-              callId: 'call-1'
+              id: 'call-1',
+              name: 'bash',
+              arguments: { command: 'ls' }
             }
           }
         ],
