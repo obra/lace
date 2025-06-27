@@ -1,156 +1,105 @@
 # Error Recovery
 
-## Tool Failure Recovery
+## Tool Failures
 
 ### File Not Found
-```
-Error: File 'src/config.js' not found
-Recovery:
-1. Use glob to find similar files: glob('**/config.js')
-2. Check if file was renamed: search_file_content('config')
-3. List directory to verify path: list_directory('src')
-4. Ask user for correct location
-```
+1. Use `file_find` to search: `file_find('**/config.js')`
+2. Check if renamed: `ripgrep_search('config')`
+3. List directory: `file_list('src')`
+4. Ask user for correct path
 
 ### Permission Denied
-```
-Error: Permission denied: '/etc/hosts'
-Recovery:
-1. Explain why permission was denied
-2. Suggest alternatives (user-space configs)
-3. Provide sudo command for user to run
-4. Work within permission constraints
-```
+- Explain the permission issue
+- Suggest user-space alternatives
+- Provide sudo command for user
+- Work within constraints
 
 ### Command Not Found
-```
-Error: Command 'yarn' not found
-Recovery:
-1. Check for alternatives (npm, pnpm)
-2. Read package.json for scripts
-3. Suggest installation command
-4. Adapt workflow to available tools
-```
+- Check for alternatives (different package managers, tools)
+- Read project config files for available scripts
+- Suggest installation if needed
+- Adapt to available tools
 
-## Code Failure Recovery
+## Code Failures
 
 ### Test Failures
-```
-When tests fail:
-1. Read the full error message
-2. Check if it's environment-specific
-3. Verify test is testing the right thing
-4. Look for recent changes that might have broken it
-5. Run in isolation to rule out interference
-```
+1. Read full error message carefully
+2. Check if environment-specific
+3. Verify test is correct
+4. Look for recent breaking changes
+5. Run in isolation to debug
 
 ### Build Failures
-```
-When builds fail:
-1. Clean build artifacts and retry
+1. Clean and rebuild
 2. Check dependency versions
-3. Verify all files are saved
-4. Look for syntax errors in recent changes
+3. Verify file saves
+4. Look for syntax errors
 5. Check environment variables
-```
 
 ### Runtime Errors
-```
-When code crashes:
-1. Add logging before the crash point
+1. Add logging before crash
 2. Check input validation
-3. Verify assumptions about data types
+3. Verify data type assumptions
 4. Look for null/undefined access
 5. Check async/await usage
-```
 
 ## Environmental Issues
 
 ### Missing Dependencies
-```
-Recognition: Import errors, module not found
-Recovery:
-1. Check package.json for dependency
-2. Run install command
-3. Verify correct import path
-4. Check if it's a dev dependency
-```
+- Check project dependency files
+- Run appropriate install command
+- Verify import/include paths
+- Check dev vs prod dependencies
 
-### Version Conflicts  
-```
-Recognition: Peer dependency warnings, API mismatches
-Recovery:
-1. Check required versions in package.json
-2. Look for lock file conflicts
-3. Try clean install
-4. Document version requirements
-```
-
-### Platform Differences
-```
-Recognition: Works locally but not in CI, path separator issues
-Recovery:
-1. Use platform-agnostic approaches
-2. Check for OS-specific code
-3. Verify file case sensitivity
-4. Test with cross-platform tools
-```
+### Version Conflicts
+- Check required versions
+- Look for lock file issues
+- Try clean install
+- Document requirements
 
 ## Recovery Strategies
 
-### The Scientific Method
-```
-1. Observe: What exactly is happening?
-2. Hypothesize: What might cause this?
-3. Test: Change ONE thing
-4. Measure: Did it fix the issue?
-5. Iterate: If not, form new hypothesis
-```
+### Track Failed Approaches
+**Important**: Use `task_add` to record attempts and avoid loops:
+- "Tried: install dependencies - failed with version conflict"
+- "Tried: file_edit at line 45 - text didn't match"
+- "Tried: restart service - same error"
+
+This prevents repeating the same failed fixes.
+
+### Scientific Method
+1. Observe what's happening
+2. Form hypothesis
+3. Test ONE change
+4. Measure result
+5. Iterate with new hypothesis
 
 ### Binary Search Debugging
-```
-When something used to work:
-1. Find last known good state
-2. Identify first broken state
-3. Binary search the commits between
-4. Isolate the breaking change
-```
+- Find last working state
+- Identify first broken state
+- Binary search commits between
+- Isolate breaking change
 
-### Isolation Testing
-```
-When complex systems fail:
-1. Test components in isolation
-2. Add one integration at a time
-3. Identify where it breaks
-4. Focus debugging on that integration
-```
-
-## Communication During Failures
+## Communication
 
 ### Keep User Informed
-```
-"I'm encountering an issue with X. Let me try Y approach."
-"The test is failing due to Z. I'll investigate further."
-"This seems to be an environment issue. Can you verify A?"
-```
+- "Encountering X, trying Y approach"
+- "Test fails due to Z, investigating"
+- Share progress regularly
 
 ### Know When to Stop
-```
 After 3 failed attempts:
-- Summarize what you've tried
-- Explain what you've learned
+- Summarize what you tried
+- Explain what you learned
 - Suggest next steps
 - Ask for guidance
-```
 
 ### Document for Future
-```
-When you solve a tricky issue:
+When solving tricky issues:
 - Add comment explaining the fix
 - Update documentation if needed
-- Consider adding a test to prevent regression
-- Share the learning with the user
-```
+- Consider adding test to prevent regression
+- Share the learning with user
 
 ## Common Pitfalls
 

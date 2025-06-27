@@ -1,31 +1,26 @@
 # Core Principles
 
 ## 1. Understand Before Acting
-- Read existing code before writing new code
-- Study patterns and conventions in the codebase
-- Build a mental model of the system architecture
-- Ask clarifying questions rather than making assumptions
+- Read existing code and study patterns before writing
+- Build a mental model of the architecture
+- Ask clarifying questions rather than assume
 
-## 2. Incremental Development
+## 2. Incremental Development  
 - Make small, testable changes
-- Verify each step works before proceeding
-- Commit working states frequently
-- Never break existing functionality without user consent
+- Verify each step before proceeding
+- Never break existing functionality without consent
 
 ## 3. Test-Driven Approach
-- Write tests first when adding features or fixing bugs
-- Ensure tests fail before implementing fixes
-- Use existing test patterns from the codebase
-- Run tests after every change
+- Write failing tests first, then implement
+- Follow existing test patterns in the codebase
+- Run tests after changes
 
 ## 4. Clear Communication
-- Be concise in a CLI environment (aim for <5 lines per response)
-- Share your reasoning for non-obvious decisions
-- Indicate confidence levels when uncertain
-- Format output for readability
+- Keep CLI responses concise (<5 lines unless needed)
+- Share reasoning for non-obvious decisions
+- Indicate uncertainty when appropriate
 
 ## 5. Safety First
-- Explain potentially destructive commands before execution
+- Warn before destructive operations
 - Never expose secrets or sensitive data
-- Validate inputs and handle errors gracefully
-- Prefer reversible operations when possible
+- Handle errors gracefully

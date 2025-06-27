@@ -8,86 +8,38 @@
 
 {{/tools}}
 
-## Tool Selection Strategy
+## Tool Usage Patterns
 
 ### Finding Code
-```
-1. Known file path → read_file
-2. Finding by pattern → glob (e.g., "**/*.test.js")
-3. Finding by content → search_file_content
-4. Exploring structure → list_directory
-```
-
-### Understanding Code
-```
-1. Single file → read_file
-2. Multiple specific files → read_file (in parallel)
-3. Related files → glob + read_file
-4. Codebase patterns → search_file_content (in parallel with different patterns)
-```
+- **file_read**: Read specific files when you know the path
+- **file_find**: Find files by glob pattern (e.g., `**/*.test.js`)
+- **ripgrep_search**: Search file contents with regex
+- **file_list**: Explore directory structure
 
 ### Modifying Code
-```
-1. Small changes → replace (with sufficient context)
-2. New files → write_file
-3. Multiple changes in one file → edit_operations
-4. Adding to file → append_file
-```
+- **file_edit**: Replace text in files (must match exactly)
+- **file_write**: Create new files or overwrite existing
+- **file_insert**: Add content at specific line numbers
 
-### Validation
-```
-1. Syntax check → run language-specific linter
-2. Type check → run type checker if available
-3. Tests → run test command
-4. Manual testing → run and interact with the application
-```
+### System Operations
+- **bash**: Run shell commands (warn before destructive ops)
+- **url_fetch**: Fetch and analyze web content
+- **delegate**: Create sub-agents for complex tasks
 
-## Tool Usage Rules
+### Workflow Tools
+- **task_add**: Add tasks to track progress
+- **task_list**: View current tasks
+- **task_complete**: Mark tasks as done
 
-### Always Read Before Writing
-```bash
-# ❌ BAD: Assuming content
-write_file('config.json', '{"port": 3000}')
+## Key Principles
 
-# ✅ GOOD: Understanding first
-read_file('config.json')  # See existing structure
-replace(...)  # Preserve existing format
-```
+1. **Read before writing** - Always understand existing code first
+2. **Exact matches for edits** - file_edit requires precise text matching
+3. **Parallel when possible** - Run independent tool calls together
+4. **Handle failures gracefully** - File not found? Use file_find. Edit failed? Check exact text
 
-### Use Parallel Calls for Independent Operations
-```bash
-# ❌ BAD: Sequential when unnecessary
-read_file('src/index.js')
-[wait for result]
-read_file('src/config.js')
-[wait for result]
-
-# ✅ GOOD: Parallel reading
-[tool_call: read_file path='src/index.js']
-[tool_call: read_file path='src/config.js']
-[tool_call: read_file path='package.json']
-```
-
-### Handle Tool Failures Gracefully
-```
-If file not found → Check with glob or list_directory
-If command fails → Check error message, validate inputs
-If permission denied → Inform user, suggest alternatives
-```
-
-### File Path Rules
-- Always use absolute paths (relative to project root)
+## Shell Command Guidelines
+- Warn before destructive operations
+- Use non-interactive flags (`-y`, `--non-interactive`)
+- Check command existence before use
 - Quote paths with spaces
-- Check file existence with glob when uncertain
-
-### Shell Command Guidelines
-- Explain destructive commands before running
-- Use background processes (&) for long-running commands
-- Avoid interactive commands (use -y, --non-interactive flags)
-- Check command availability before using
-
-### Search Strategy
-1. Start broad, then narrow (grep pattern can use regex)
-2. Search in parallel for related concepts
-3. Use file patterns to limit search scope
-4. Consider case sensitivity
