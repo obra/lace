@@ -23,7 +23,6 @@ interface TimelineContentProps {
   itemRefs: React.MutableRefObject<Map<number, unknown>>;
   delegateTimelines?: Map<string, Timeline>;
   delegationExpandState: Map<string, boolean>;
-  toolExpandState: Map<string, boolean>;
   currentFocusId?: string;
   extractDelegateThreadId: (item: Extract<TimelineItemType, { type: 'tool_execution' }>) => string | null;
 }
@@ -35,7 +34,6 @@ export function TimelineContent({
   itemRefs, 
   delegateTimelines, 
   delegationExpandState, 
-  toolExpandState, 
   currentFocusId, 
   extractDelegateThreadId 
 }: TimelineContentProps) {
@@ -63,7 +61,6 @@ export function TimelineContent({
               itemStartLine={viewportState.itemPositions[index] || 0}
               onToggle={viewportActions.triggerRemeasurement}
               delegationExpandState={delegationExpandState}
-              toolExpandState={toolExpandState}
               currentFocusId={currentFocusId}
               extractDelegateThreadId={extractDelegateThreadId}
             />

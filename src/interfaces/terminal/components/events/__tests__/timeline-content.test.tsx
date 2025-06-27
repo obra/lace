@@ -33,7 +33,6 @@ function TimelineContent({
   itemRefs, 
   delegateTimelines, 
   delegationExpandState, 
-  toolExpandState, 
   currentFocusId, 
   extractDelegateThreadId 
 }: {
@@ -43,7 +42,6 @@ function TimelineContent({
   itemRefs: React.MutableRefObject<Map<number, unknown>>;
   delegateTimelines?: Map<string, Timeline>;
   delegationExpandState: Map<string, boolean>;
-  toolExpandState: Map<string, boolean>;
   currentFocusId?: string;
   extractDelegateThreadId: (item: Extract<TimelineItem, { type: 'tool_execution' }>) => string | null;
 }) {
@@ -71,7 +69,6 @@ function TimelineContent({
               itemStartLine={viewportState.itemPositions[index] || 0}
               onToggle={viewportActions.triggerRemeasurement}
               delegationExpandState={delegationExpandState}
-              toolExpandState={toolExpandState}
               currentFocusId={currentFocusId}
               extractDelegateThreadId={extractDelegateThreadId}
             />
@@ -124,7 +121,6 @@ describe('TimelineContent (Baseline)', () => {
     },
     delegateTimelines: undefined,
     delegationExpandState: new Map<string, boolean>(),
-    toolExpandState: new Map<string, boolean>(),
     currentFocusId: 'timeline',
     extractDelegateThreadId: mockExtractDelegateThreadId
   };
@@ -324,7 +320,6 @@ describe('TimelineContent (Baseline)', () => {
       const timeline = createMockTimeline(1);
       const delegateTimelines = new Map([['thread-1', createMockTimeline(1)]]);
       const delegationExpandState = new Map([['call-1', true]]);
-      const toolExpandState = new Map([['call-2', false]]);
 
       const { lastFrame } = render(
         <TimelineContent 
@@ -333,7 +328,6 @@ describe('TimelineContent (Baseline)', () => {
           {...defaultProps}
           delegateTimelines={delegateTimelines}
           delegationExpandState={delegationExpandState}
-          toolExpandState={toolExpandState}
           currentFocusId="custom-focus"
         />
       );

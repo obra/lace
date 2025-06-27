@@ -66,7 +66,6 @@ describe('TimelineContent Component', () => {
     itemRefs: mockItemRefs,
     delegateTimelines: undefined,
     delegationExpandState: new Map<string, boolean>(),
-    toolExpandState: new Map<string, boolean>(),
     currentFocusId: 'timeline',
     extractDelegateThreadId: mockExtractDelegateThreadId
   });
@@ -264,7 +263,6 @@ describe('TimelineContent Component', () => {
     it('should forward expand states', () => {
       const timeline = createMockTimeline(1);
       const delegationExpandState = new Map([['call-1', true]]);
-      const toolExpandState = new Map([['call-2', false]]);
 
       // These props are passed through but don't affect our mock output
       // This test verifies the props are accepted without errors
@@ -273,7 +271,6 @@ describe('TimelineContent Component', () => {
           timeline={timeline} 
           {...getDefaultProps()}
           delegationExpandState={delegationExpandState}
-          toolExpandState={toolExpandState}
         />
       );
 
@@ -388,7 +385,6 @@ describe('TimelineContent Component', () => {
           timeline={timeline} 
           {...getDefaultProps()}
           delegationExpandState={new Map()}
-          toolExpandState={new Map()}
         />
       );
 

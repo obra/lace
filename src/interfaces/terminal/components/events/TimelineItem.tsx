@@ -18,7 +18,6 @@ interface TimelineItemProps {
   itemStartLine: number;
   onToggle?: () => void;
   delegationExpandState: Map<string, boolean>;
-  toolExpandState: Map<string, boolean>;
   currentFocusId?: string;
   extractDelegateThreadId: (item: Extract<TimelineItemType, { type: 'tool_execution' }>) => string | null;
 }
@@ -31,7 +30,6 @@ export function TimelineItem({
   itemStartLine, 
   onToggle, 
   delegationExpandState, 
-  toolExpandState, 
   currentFocusId, 
   extractDelegateThreadId 
 }: TimelineItemProps) {
@@ -147,7 +145,7 @@ export function TimelineItem({
                   callEvent={callEvent} 
                   resultEvent={resultEvent}
                   isFocused={isFocused}
-                  isExpanded={false} // Tool part always collapsed for delegate calls
+                  onToggle={onToggle}
                 />
                 <DelegationBox 
                   threadId={delegateThreadId}
@@ -176,12 +174,11 @@ export function TimelineItem({
         }
       }
       
-      const isToolExpanded = toolExpandState.get(item.callId) ?? false;
       return <ToolExecutionDisplay 
         callEvent={callEvent} 
         resultEvent={resultEvent}
         isFocused={isFocused}
-        isExpanded={isToolExpanded}
+        onToggle={onToggle}
       />;
       
     case 'ephemeral_message':

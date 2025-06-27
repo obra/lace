@@ -2,7 +2,6 @@
 // ABOUTME: Split processing for cached thread events and frequent ephemeral message updates
 
 import { ThreadEvent, ToolCallData, ToolResultData } from '../threads/types.js';
-import sax from 'sax';
 import { logger } from '../utils/logger.js';
 
 export interface Timeline {
@@ -128,28 +127,13 @@ export class ThreadProcessor {
 
     for (const msg of ephemeralMessages) {
       if (msg.type === 'assistant' && msg.content) {
-        // Extract thinking blocks from streaming assistant content
-        const { content: cleanContent, thinkingBlocks } = this.extractThinkingBlocks(msg.content);
-
-        // Add thinking blocks as separate items
-        thinkingBlocks.forEach((thinkingContent, index) => {
-          items.push({
-            type: 'thinking' as const,
-            content: thinkingContent,
-            timestamp: new Date(msg.timestamp.getTime() + index), // Slight offset for ordering
-            id: `${msg.timestamp.getTime()}_thinking_${index}`,
-          });
+        // Keep full assistant content with thinking blocks intact
+        items.push({
+          type: 'ephemeral_message' as const,
+          messageType: msg.type,
+          content: msg.content, // Full content with thinking blocks
+          timestamp: msg.timestamp,
         });
-
-        // Add clean content if there's any
-        if (cleanContent.trim()) {
-          items.push({
-            type: 'ephemeral_message' as const,
-            messageType: msg.type,
-            content: cleanContent,
-            timestamp: new Date(msg.timestamp.getTime() + thinkingBlocks.length), // After thinking blocks
-          });
-        }
       } else {
         // Non-assistant messages or messages without content - pass through unchanged
         items.push({
@@ -171,17 +155,14 @@ export class ThreadProcessor {
     processedEvents: ProcessedThreadItems,
     ephemeralItems: EphemeralTimelineItems
   ): Timeline {
-    // Deduplicate thinking blocks that appear in both sources
-    const deduplicatedEvents = this._deduplicateThinkingBlocks(processedEvents);
-
-    // Merge and sort chronologically
-    const allItems: TimelineItem[] = [...deduplicatedEvents, ...ephemeralItems].sort(
+    // Merge and sort chronologically (no deduplication needed - no separate thinking items)
+    const allItems: TimelineItem[] = [...processedEvents, ...ephemeralItems].sort(
       (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
     );
 
     // Calculate metadata
-    const eventCount = deduplicatedEvents.length;
-    const messageCount = deduplicatedEvents.filter(
+    const eventCount = processedEvents.length;
+    const messageCount = processedEvents.filter(
       (item) => item.type === 'user_message' || item.type === 'agent_message'
     ).length;
 
@@ -255,30 +236,15 @@ export class ThreadProcessor {
             break;
           }
 
-          const rawContent = event.data as string;
-          const { content: cleanContent, thinkingBlocks } = this.extractThinkingBlocks(rawContent);
-
-          const eventItems: TimelineItem[] = [];
-
-          // Add thinking blocks first (they come before the message)
-          thinkingBlocks.forEach((thinking, index) => {
-            eventItems.push({
-              type: 'thinking',
-              content: thinking,
-              timestamp: new Date(event.timestamp.getTime() - (thinkingBlocks.length - index) * 10), // Slight offset for ordering
-              id: `${event.id}_thinking_${index}`,
-            });
-          });
-
-          // Add cleaned agent message
-          if (cleanContent.trim()) {
-            eventItems.push({
+          // Create single agent message item with full content
+          const eventItems: TimelineItem[] = [
+            {
               type: 'agent_message',
-              content: cleanContent,
+              content: event.data as string, // Full content with thinking blocks
               timestamp: event.timestamp,
               id: event.id,
-            });
-          }
+            },
+          ];
 
           // Cache the processed items for this event
           this._eventCache.set(event.id, eventItems);
@@ -287,22 +253,7 @@ export class ThreadProcessor {
         }
 
         case 'THINKING': {
-          // Check cache first
-          const cachedThinking = this._eventCache.get(event.id);
-          if (cachedThinking) {
-            items.push(...cachedThinking);
-            break;
-          }
-
-          const thinkingItem = {
-            type: 'thinking' as const,
-            content: event.data as string,
-            timestamp: event.timestamp,
-            id: event.id,
-          };
-
-          this._eventCache.set(event.id, [thinkingItem]);
-          items.push(thinkingItem);
+          // THINKING events are now ignored - thinking blocks handled internally by AgentMessageDisplay
           break;
         }
 
@@ -411,121 +362,6 @@ export class ThreadProcessor {
   private _processEventGroup(events: ThreadEvent[]): TimelineItem[] {
     const { items } = this._processEventGroupWithState(events, new Map());
     return items;
-  }
-
-  private extractThinkingBlocks(content: string): { content: string; thinkingBlocks: string[] } {
-    const thinkingBlocks: string[] = [];
-    let cleanContent = '';
-
-    try {
-      // Use SAX parser for consistent thinking block extraction
-      const parser = sax.parser(false, { lowercase: true });
-      let insideThinkTag = false;
-      let thinkContent = '';
-      let textBuffer = '';
-
-      parser.onopentag = (tag) => {
-        if (tag.name === 'think') {
-          // Add any accumulated text before think tag
-          cleanContent += textBuffer;
-          textBuffer = '';
-          insideThinkTag = true;
-          thinkContent = '';
-        }
-        // Ignore root tag - it's just our wrapper
-      };
-
-      parser.ontext = (text) => {
-        if (insideThinkTag) {
-          thinkContent += text;
-        } else {
-          textBuffer += text;
-        }
-      };
-
-      parser.onclosetag = (tagName) => {
-        if (tagName === 'think' && insideThinkTag) {
-          // Extract completed thinking block
-          if (thinkContent.trim()) {
-            thinkingBlocks.push(thinkContent.trim());
-          }
-          insideThinkTag = false;
-          thinkContent = '';
-        }
-        // Ignore root tag - it's just our wrapper
-      };
-
-      parser.onerror = () => {
-        // Parser error, fall back to regex
-        throw new Error('SAX parser failed');
-      };
-
-      parser.onend = () => {
-        // Add any remaining text
-        cleanContent += textBuffer;
-
-        // Handle incomplete thinking block (streaming edge case)
-        if (insideThinkTag && thinkContent.trim()) {
-          // For incomplete blocks, mark them as incomplete
-          thinkingBlocks.push(`${thinkContent.trim()} [incomplete]`);
-        }
-      };
-
-      // Parse the content - wrap in root element for well-formed XML
-      parser.write(`<root>${content}</root>`).close();
-
-      return { content: cleanContent.trim(), thinkingBlocks };
-    } catch (error) {
-      // If SAX parser fails, fall back to regex for robustness
-      console.warn('SAX parser failed, falling back to regex:', error);
-      const regex = /<think>([\s\S]*?)<\/think>/g;
-      const blocks: string[] = [];
-      let match;
-      let clean = content;
-
-      while ((match = regex.exec(content)) !== null) {
-        blocks.push(match[1].trim());
-      }
-
-      clean = content.replace(regex, '').trim();
-      return { content: clean, thinkingBlocks: blocks };
-    }
-  }
-
-  /**
-   * Deduplicate thinking blocks that appear in both THINKING events and extracted from AGENT_MESSAGE
-   * Keeps the THINKING events (streaming source) over extracted blocks for chronological accuracy
-   */
-  private _deduplicateThinkingBlocks(items: ProcessedThreadItems): ProcessedThreadItems {
-    const seenThinkingContent = new Set<string>();
-    const deduplicatedItems: ProcessedThreadItems = [];
-
-    // First pass: collect content from THINKING events (streaming source - preferred)
-    for (const item of items) {
-      if (item.type === 'thinking' && !item.id.includes('_thinking_')) {
-        // This is from a THINKING ThreadEvent (streaming) - doesn't have _thinking_ pattern
-        seenThinkingContent.add(item.content.trim());
-        deduplicatedItems.push(item);
-      }
-    }
-
-    // Second pass: add other items, skipping extracted thinking blocks that duplicate streaming ones
-    for (const item of items) {
-      if (item.type === 'thinking' && item.id.includes('_thinking_')) {
-        // This is an extracted thinking block from AGENT_MESSAGE content
-        if (!seenThinkingContent.has(item.content.trim())) {
-          // Not a duplicate, add it
-          deduplicatedItems.push(item);
-        }
-        // Skip duplicates - streaming version already added
-      } else if (item.type !== 'thinking' || item.id.includes('_thinking_')) {
-        // Not a thinking block, or is an extracted one (handled above), add non-thinking items
-        deduplicatedItems.push(item);
-      }
-    }
-
-    // Sort by timestamp to maintain chronological order
-    return deduplicatedItems.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
   }
 
   /**

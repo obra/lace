@@ -54,7 +54,6 @@ describe('TimelineItem Component', () => {
     itemStartLine: 0,
     onToggle: mockOnToggle,
     delegationExpandState: new Map<string, boolean>(),
-    toolExpandState: new Map<string, boolean>(),
     currentFocusId: 'timeline',
     extractDelegateThreadId: mockExtractDelegateThreadId
   };
@@ -183,7 +182,7 @@ describe('TimelineItem Component', () => {
       expect(lastFrame()).toContain('ToolExecutionDisplay:bash:collapsed:unfocused');
     });
 
-    it('should respect tool expand state', () => {
+    it('should start collapsed by default with self-managed state', () => {
       const item: TimelineItemType = {
         type: 'tool_execution',
         timestamp: new Date('2024-01-01T10:00:00Z'),
@@ -200,13 +199,11 @@ describe('TimelineItem Component', () => {
         }
       };
 
-      const toolExpandState = new Map([['call-123', true]]);
-
       const { lastFrame } = render(
-        <TimelineItem item={item} {...defaultProps} toolExpandState={toolExpandState} />
+        <TimelineItem item={item} {...defaultProps} />
       );
 
-      expect(lastFrame()).toContain('ToolExecutionDisplay:bash:expanded:unfocused');
+      expect(lastFrame()).toContain('ToolExecutionDisplay:bash:collapsed:unfocused');
     });
   });
 

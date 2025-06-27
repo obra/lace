@@ -14,8 +14,8 @@ vi.mock('../EventDisplay.js', () => ({
 }));
 
 vi.mock('../ToolExecutionDisplay.js', () => ({
-  ToolExecutionDisplay: ({ callEvent, isExpanded, isFocused }: any) => 
-    React.createElement(Text, {}, `ToolExecutionDisplay:${callEvent.data.toolName}:${isExpanded ? 'expanded' : 'collapsed'}:${isFocused ? 'focused' : 'unfocused'}`)
+  ToolExecutionDisplay: ({ callEvent, isFocused }: any) => 
+    React.createElement(Text, {}, `ToolExecutionDisplay:${callEvent.data.toolName}:collapsed:${isFocused ? 'focused' : 'unfocused'}`)
 }));
 
 vi.mock('../DelegationBox.js', () => ({
@@ -45,7 +45,17 @@ import MessageDisplay from '../../message-display.js';
 import { logger } from '../../../../../utils/logger.js';
 
 // Copy of the current TimelineItemDisplay function for baseline testing
-function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, itemStartLine, onToggle, delegationExpandState, toolExpandState, currentFocusId, extractDelegateThreadId }: { 
+function TimelineItemDisplay({ 
+  item,
+  delegateTimelines,
+  isFocused,
+  focusedLine,
+  itemStartLine,
+  onToggle,
+  delegationExpandState,
+  currentFocusId,
+  extractDelegateThreadId 
+}: {
   item: TimelineItem; 
   delegateTimelines?: Map<string, Timeline>;
   isFocused: boolean;
@@ -53,7 +63,6 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
   itemStartLine: number;
   onToggle?: () => void;
   delegationExpandState: Map<string, boolean>;
-  toolExpandState: Map<string, boolean>;
   currentFocusId?: string;
   extractDelegateThreadId: (item: Extract<TimelineItem, { type: 'tool_execution' }>) => string | null;
 }) {
@@ -169,7 +178,6 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
                 callEvent: callEvent, 
                 resultEvent: resultEvent,
                 isFocused: isFocused,
-                isExpanded: false // Tool part always collapsed for delegate calls
               }),
               React.createElement(DelegationBox, {
                 key: 'delegation',
@@ -198,12 +206,10 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
         }
       }
       
-      const isToolExpanded = toolExpandState.get(item.callId) ?? false;
       return React.createElement(ToolExecutionDisplay, {
         callEvent: callEvent, 
         resultEvent: resultEvent,
-        isFocused: isFocused,
-        isExpanded: isToolExpanded
+        isFocused: isFocused
       });
       
     case 'ephemeral_message':
@@ -237,7 +243,6 @@ describe('TimelineItemDisplay (Baseline)', () => {
     itemStartLine: 0,
     onToggle: mockOnToggle,
     delegationExpandState: new Map<string, boolean>(),
-    toolExpandState: new Map<string, boolean>(),
     currentFocusId: 'timeline',
     extractDelegateThreadId: mockExtractDelegateThreadId
   };
@@ -366,7 +371,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
       expect(lastFrame()).toContain('ToolExecutionDisplay:bash:collapsed:unfocused');
     });
 
-    it('should respect tool expand state', () => {
+    it('should start collapsed by default with self-managed state', () => {
       const item: TimelineItem = {
         type: 'tool_execution',
         timestamp: new Date('2024-01-01T10:00:00Z'),
@@ -383,17 +388,15 @@ describe('TimelineItemDisplay (Baseline)', () => {
         }
       };
 
-      const toolExpandState = new Map([['call-123', true]]);
 
       const { lastFrame } = render(
         React.createElement(TimelineItemDisplay, { 
           item, 
           ...defaultProps, 
-          toolExpandState 
         })
       );
 
-      expect(lastFrame()).toContain('ToolExecutionDisplay:bash:expanded:unfocused');
+      expect(lastFrame()).toContain('ToolExecutionDisplay:bash:collapsed:unfocused');
     });
 
     it('should handle tool execution without result', () => {

@@ -19,7 +19,6 @@ interface TimelineDisplayProps {
 
 export default function TimelineDisplay({ timeline, delegateTimelines, focusId, parentFocusId, bottomSectionHeight }: TimelineDisplayProps) {
   const [delegationExpandState, setDelegationExpandState] = useState<Map<string, boolean>>(new Map()); // Track expand/collapse state by callId
-  const [toolExpandState, setToolExpandState] = useState<Map<string, boolean>>(new Map()); // Track tool expand/collapse state by callId
   const { isFocused } = useFocus({ id: focusId || 'timeline' });
   const { focus } = useFocusManager();
   const { extractDelegateThreadId } = useDelegateThreadExtraction(delegateTimelines);
@@ -54,17 +53,6 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
               focus(targetFocusId);
             }
           }
-        } else {
-          // Handle regular tool execution items
-          if (key.leftArrow || key.rightArrow) {
-            // Toggle expand/collapse tool execution
-            setToolExpandState(prev => {
-              const newState = new Map(prev);
-              const currentExpanded = newState.get(item.callId) ?? false;
-              newState.set(item.callId, !currentExpanded);
-              return newState;
-            });
-          }
         }
       }
     }
@@ -86,7 +74,6 @@ export default function TimelineDisplay({ timeline, delegateTimelines, focusId, 
           itemRefs={itemRefs}
           delegateTimelines={delegateTimelines}
           delegationExpandState={delegationExpandState}
-          toolExpandState={toolExpandState}
           currentFocusId={focusId}
           extractDelegateThreadId={extractDelegateThreadId}
         />
