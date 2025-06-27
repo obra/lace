@@ -7,6 +7,7 @@ import { Timeline, TimelineItem as TimelineItemType } from '../../../thread-proc
 import { EventDisplay } from './EventDisplay.js';
 import { GenericToolRenderer } from './tool-renderers/GenericToolRenderer.js';
 import { getToolRenderer } from './tool-renderers/getToolRenderer.js';
+import { ToolRendererErrorBoundary } from './ToolRendererErrorBoundary.js';
 import MessageDisplay from '../message-display.js';
 
 interface TimelineItemProps {
@@ -161,12 +162,21 @@ export function TimelineItem({
       />;
       
     case 'tool_execution':
-      return <DynamicToolRenderer 
-        item={item}
-        isSelected={isSelected}
-        isFocused={isFocused}
-        onToggle={onToggle}
-      />;
+      return (
+        <ToolRendererErrorBoundary
+          item={item}
+          isSelected={isSelected}
+          isFocused={isFocused}
+          onToggle={onToggle}
+        >
+          <DynamicToolRenderer 
+            item={item}
+            isSelected={isSelected}
+            isFocused={isFocused}
+            onToggle={onToggle}
+          />
+        </ToolRendererErrorBoundary>
+      );
       
     case 'ephemeral_message':
       return <MessageDisplay 
