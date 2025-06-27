@@ -19,8 +19,15 @@ vi.mock('../ToolExecutionDisplay.js', () => ({
 }));
 
 vi.mock('../DelegationBox.js', () => ({
-  DelegationBox: ({ threadId }: any) => 
-    React.createElement(Text, {}, `DelegationBox:${threadId}:expanded`)
+  DelegationBox: ({ toolCall }: any) => {
+    const extractDelegateThreadId = (item: any) => {
+      if (!item.result?.output) return null;
+      const match = item.result.output.match(/Thread:\s*([^\s]+)/);
+      return match ? match[1] : null;
+    };
+    const threadId = extractDelegateThreadId(toolCall);
+    return threadId ? React.createElement(Text, {}, `DelegationBox:${threadId}:expanded`) : null;
+  }
 }));
 
 vi.mock('../../message-display.js', () => ({
@@ -181,9 +188,7 @@ function TimelineItemDisplay({
               }),
               React.createElement(DelegationBox, {
                 key: 'delegation',
-                threadId: delegateThreadId,
-                timeline: delegateTimeline,
-                delegateTimelines: delegateTimelines,
+                toolCall: item,
                 parentFocusId: currentFocusId || 'timeline'
               })
             ]);

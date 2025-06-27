@@ -21,7 +21,6 @@ interface TimelineContentProps {
   viewportState: ViewportState;
   viewportActions: ViewportActions;
   itemRefs: React.MutableRefObject<Map<number, unknown>>;
-  delegateTimelines?: Map<string, Timeline>;
   currentFocusId?: string;
 }
 
@@ -30,7 +29,6 @@ export function TimelineContent({
   viewportState, 
   viewportActions, 
   itemRefs, 
-  delegateTimelines, 
   currentFocusId 
 }: TimelineContentProps) {
   return (
@@ -51,7 +49,6 @@ export function TimelineContent({
           >
             <TimelineItem 
               item={item} 
-              delegateTimelines={delegateTimelines}
               isFocused={isItemFocused}
               focusedLine={viewportState.focusedLine}
               itemStartLine={viewportState.itemPositions[index] || 0}

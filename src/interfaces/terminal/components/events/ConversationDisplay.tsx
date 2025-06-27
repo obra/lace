@@ -47,7 +47,6 @@ export function ConversationDisplay({ events, ephemeralMessages, focusId, bottom
     <Box flexDirection="column" flexGrow={1} overflow="hidden">
       <TimelineDisplay 
         timeline={mainTimeline} 
-        delegateTimelines={processedThreads.delegateTimelines}
         focusId={focusId}
         bottomSectionHeight={bottomSectionHeight}
       />

@@ -8,12 +8,9 @@ import { EventDisplay } from './EventDisplay.js';
 import { ToolExecutionDisplay } from './ToolExecutionDisplay.js';
 import { DelegationBox } from './DelegationBox.js';
 import MessageDisplay from '../message-display.js';
-import { useDelegateThreadExtraction } from './hooks/useDelegateThreadExtraction.js';
-import { logger } from '../../../../utils/logger.js';
 
 interface TimelineItemProps {
   item: TimelineItemType;
-  delegateTimelines?: Map<string, Timeline>;
   isFocused: boolean;
   focusedLine: number;
   itemStartLine: number;
@@ -23,15 +20,12 @@ interface TimelineItemProps {
 
 export function TimelineItem({ 
   item, 
-  delegateTimelines, 
   isFocused, 
   focusedLine, 
   itemStartLine, 
   onToggle, 
   currentFocusId
 }: TimelineItemProps) {
-  // Use hook internally instead of receiving function as prop
-  const { extractDelegateThreadId } = useDelegateThreadExtraction(delegateTimelines);
   switch (item.type) {
     case 'user_message':
       return <EventDisplay 
@@ -112,63 +106,21 @@ export function TimelineItem({
       
       // Check if this is a delegate tool call
       if (item.call.toolName === 'delegate') {
-        logger.debug('TimelineItem: Processing delegate tool call', { 
-          callId: item.callId,
-          toolName: item.call.toolName,
-          hasDelegateTimelines: !!delegateTimelines,
-          delegateTimelineCount: delegateTimelines?.size || 0
-        });
-        
-        if (delegateTimelines) {
-          const delegateThreadId = extractDelegateThreadId(item);
-          logger.debug('TimelineItem: Delegate thread ID extraction result', {
-            callId: item.callId,
-            extractedThreadId: delegateThreadId,
-            availableThreads: Array.from(delegateTimelines.keys()),
-            toolResult: item.result?.output ? item.result.output.substring(0, 100) + '...' : 'no result'
-          });
-          
-          const delegateTimeline = delegateThreadId ? delegateTimelines.get(delegateThreadId) : null;
-          
-          if (delegateTimeline && delegateThreadId) {
-            logger.debug('TimelineItem: RENDERING delegation box', { 
-              threadId: delegateThreadId,
-              callId: item.callId,
-              timelineItemCount: delegateTimeline.items.length
-            });
-            return (
-              <Box flexDirection="column">
-                <ToolExecutionDisplay 
-                  callEvent={callEvent} 
-                  resultEvent={resultEvent}
-                  isFocused={isFocused}
-                  onToggle={onToggle}
-                />
-                <DelegationBox 
-                  threadId={delegateThreadId}
-                  timeline={delegateTimeline}
-                  delegateTimelines={delegateTimelines}
-                  parentFocusId={currentFocusId || 'timeline'}
-                  onToggle={onToggle}
-                />
-              </Box>
-            );
-          } else {
-            logger.debug('TimelineItem: NOT rendering delegation box', {
-              reason: 'missing timeline or threadId',
-              callId: item.callId,
-              delegateThreadId,
-              hasTimeline: !!delegateTimeline,
-              hasDelegateTimelines: !!delegateTimelines,
-              delegateTimelineKeys: delegateTimelines ? Array.from(delegateTimelines.keys()) : []
-            });
-          }
-        } else {
-          logger.debug('TimelineItem: No delegate timelines provided', {
-            callId: item.callId,
-            toolName: item.call.toolName
-          });
-        }
+        return (
+          <Box flexDirection="column">
+            <ToolExecutionDisplay 
+              callEvent={callEvent} 
+              resultEvent={resultEvent}
+              isFocused={isFocused}
+              onToggle={onToggle}
+            />
+            <DelegationBox 
+              toolCall={item}
+              parentFocusId={currentFocusId || 'timeline'}
+              onToggle={onToggle}
+            />
+          </Box>
+        );
       }
       
       return <ToolExecutionDisplay 

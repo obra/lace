@@ -3,28 +3,44 @@
 
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
-import { Timeline } from '../../../thread-processor.js';
+import { Timeline, TimelineItem as TimelineItemType } from '../../../thread-processor.js';
 import TimelineDisplay from './TimelineDisplay.js';
 import { logger } from '../../../../utils/logger.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
 
 interface DelegationBoxProps {
-  threadId: string;
-  timeline: Timeline;
-  delegateTimelines?: Map<string, Timeline>;
+  toolCall: Extract<TimelineItemType, { type: 'tool_execution' }>;
   parentFocusId?: string; // Focus ID of the parent timeline for escape hierarchy
   onToggle?: () => void;
 }
 
-export function DelegationBox({ threadId, timeline, delegateTimelines, parentFocusId, onToggle }: DelegationBoxProps) {
+export function DelegationBox({ toolCall, parentFocusId, onToggle }: DelegationBoxProps) {
+  // Extract delegate thread ID from tool result
+  const extractDelegateThreadId = (item: Extract<TimelineItemType, { type: 'tool_execution' }>) => {
+    if (!item.result?.output) return null;
+    const match = item.result.output.match(/Thread:\s*([^\s]+)/);
+    return match ? match[1] : null;
+  };
+  
+  const delegateThreadId = extractDelegateThreadId(toolCall);
+  if (!delegateThreadId) {
+    return null; // No delegate thread to display
+  }
+  
   // Manage own expansion state
   const [expanded, setExpanded] = useState(true); // Default to expanded for delegation
   
+  // TODO: Fetch timeline data from ThreadManager using delegateThreadId
+  // For now, show placeholder
+  const timeline = {
+    items: [],
+    metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() }
+  };
+  
   logger.debug('DelegationBox: Rendering', {
-    threadId,
+    threadId: delegateThreadId,
     expanded,
-    timelineItemCount: timeline.items.length,
-    hasDelegateTimelines: !!delegateTimelines
+    timelineItemCount: timeline.items.length
   });
   
   // Determine delegation status
@@ -34,7 +50,7 @@ export function DelegationBox({ threadId, timeline, delegateTimelines, parentFoc
   const tokens = calculateTokens(timeline);
   
   logger.debug('DelegationBox: Status calculated', {
-    threadId,
+    threadId: delegateThreadId,
     isComplete,
     taskDescription,
     duration,
@@ -47,7 +63,7 @@ export function DelegationBox({ threadId, timeline, delegateTimelines, parentFoc
       <Box justifyContent="space-between" marginBottom={expanded ? 1 : 0}>
         <Box>
           <Text color={UI_COLORS.DELEGATE}>{UI_SYMBOLS.DELEGATE} </Text>
-          <Text color="gray">{threadId}</Text>
+          <Text color="gray">{delegateThreadId}</Text>
           <Text color="white"> ({taskDescription})</Text>
         </Box>
         <Box>
@@ -68,8 +84,7 @@ export function DelegationBox({ threadId, timeline, delegateTimelines, parentFoc
         <Box flexDirection="column" paddingLeft={2}>
           <TimelineDisplay 
             timeline={timeline} 
-            delegateTimelines={delegateTimelines}
-            focusId={`delegate-${threadId}`}
+            focusId={`delegate-${delegateThreadId}`}
             parentFocusId={parentFocusId}
           />
         </Box>

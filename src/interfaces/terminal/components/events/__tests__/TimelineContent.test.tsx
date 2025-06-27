@@ -10,8 +10,8 @@ import { TimelineContent } from '../TimelineContent.js';
 
 // Mock TimelineItem component
 vi.mock('../TimelineItem.js', () => ({
-  TimelineItem: ({ item, isFocused, delegateTimelines, currentFocusId }: any) => 
-    React.createElement(Text, {}, `TLI:${item.type}:${isFocused ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}:${delegateTimelines ? 'hasDel' : 'noDel'}`)
+  TimelineItem: ({ item, isFocused, currentFocusId }: any) => 
+    React.createElement(Text, {}, `TLI:${item.type}:${isFocused ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}`)
 }));
 
 vi.mock('../../../../../utils/logger.js', () => ({
@@ -25,12 +25,10 @@ vi.mock('../../../../../utils/logger.js', () => ({
 
 describe('TimelineContent Component', () => {
   const mockTriggerRemeasurement = vi.fn();
-  const mockExtractDelegateThreadId = vi.fn();
   let mockItemRefs: React.MutableRefObject<Map<number, unknown>> = { current: new Map() };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockExtractDelegateThreadId.mockReturnValue(null);
     mockItemRefs = { current: new Map() };
   });
 
@@ -64,9 +62,7 @@ describe('TimelineContent Component', () => {
       triggerRemeasurement: mockTriggerRemeasurement
     },
     itemRefs: mockItemRefs,
-    delegateTimelines: undefined,
-    currentFocusId: 'timeline',
-    extractDelegateThreadId: mockExtractDelegateThreadId
+    currentFocusId: 'timeline'
   });
 
   describe('Basic rendering', () => {
@@ -78,8 +74,8 @@ describe('TimelineContent Component', () => {
       );
 
       const frame = lastFrame();
-      expect(frame).toContain('TLI:user_message:FOCUS:timeline:noDel'); // First item focused
-      expect(frame).toContain('TLI:user_message:UNFOCUS:timeline:noDel'); // Others unfocused
+      expect(frame).toContain('TLI:user_message:FOCUS:timeline'); // First item focused
+      expect(frame).toContain('TLI:user_message:UNFOCUS:timeline'); // Others unfocused
     });
 
     it('should handle empty timeline', () => {
@@ -99,7 +95,7 @@ describe('TimelineContent Component', () => {
         <TimelineContent timeline={timeline} {...getDefaultProps()} />
       );
 
-      expect(lastFrame()).toContain('TLI:user_message:FOCUS:timeline:noDel');
+      expect(lastFrame()).toContain('TLI:user_message:FOCUS:timeline');
     });
   });
 
@@ -185,22 +181,7 @@ describe('TimelineContent Component', () => {
   });
 
   describe('Prop forwarding', () => {
-    it('should forward delegate timelines', () => {
-      const timeline = createMockTimeline(2);
-      const delegateTimelines = new Map([['thread-1', createMockTimeline(1)]]);
-
-      const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          {...getDefaultProps()}
-          delegateTimelines={delegateTimelines}
-        />
-      );
-
-      const frame = lastFrame();
-      expect(frame).toContain('hasDel');
-      expect(frame).not.toContain('noDel');
-    });
+    // Note: delegateTimelines prop has been removed - delegate logic is now internal to DelegationBox
 
     it('should forward currentFocusId', () => {
       const timeline = createMockTimeline(1);
@@ -359,18 +340,17 @@ describe('TimelineContent Component', () => {
   });
 
   describe('Edge cases', () => {
-    it('should handle undefined delegateTimelines', () => {
+    it('should handle component without errors', () => {
       const timeline = createMockTimeline(1);
 
       const { lastFrame } = render(
         <TimelineContent 
           timeline={timeline} 
           {...getDefaultProps()}
-          delegateTimelines={undefined}
         />
       );
 
-      expect(lastFrame()).toContain('noDel');
+      expect(lastFrame()).toContain('TLI:user_message');
     });
 
     it('should handle empty expand state maps', () => {
