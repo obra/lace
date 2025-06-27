@@ -217,7 +217,7 @@ function TimelineItemDisplay({ item, delegateTimelines, isFocused, focusedLine, 
       });
       
     default:
-      return React.createElement(Box, {}, 'Unknown timeline item type');
+      return React.createElement(Box, {}, React.createElement(Text, {}, 'Unknown timeline item type'));
   }
 }
 

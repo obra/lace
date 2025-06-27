@@ -2,7 +2,7 @@
 // ABOUTME: Handles all timeline item types: user_message, agent_message, thinking, system_message, tool_execution, ephemeral_message
 
 import React from 'react';
-import { Box } from 'ink';
+import { Box, Text } from 'ink';
 import { Timeline, TimelineItem as TimelineItemType } from '../../../thread-processor.js';
 import { EventDisplay } from './EventDisplay.js';
 import { ToolExecutionDisplay } from './ToolExecutionDisplay.js';
@@ -195,6 +195,6 @@ export function TimelineItem({
       />;
       
     default:
-      return <Box>Unknown timeline item type</Box>;
+      return <Box><Text>Unknown timeline item type</Text></Box>;
   }
 }
