@@ -8,12 +8,14 @@ import { ThreadEvent, ToolCallData, ToolResultData } from '../../../../threads/t
 import { CompactOutput } from '../ui/CompactOutput.js';
 import { CodeDisplay } from '../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
+import { useTimelineExpansionToggle } from './hooks/useTimelineExpansionToggle.js';
 
 interface ToolExecutionDisplayProps {
   callEvent: ThreadEvent;
   resultEvent?: ThreadEvent;
   isStreaming?: boolean;
   isFocused?: boolean;
+  isSelected?: boolean;
   onToggle?: () => void;
 }
 
@@ -26,9 +28,18 @@ function isJsonOutput(output: string): boolean {
 }
 
 
-export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFocused, onToggle }: ToolExecutionDisplayProps) {
+export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFocused, isSelected, onToggle }: ToolExecutionDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const toolCallData = callEvent.data as ToolCallData;
+  
+  // Handle expansion toggle events
+  const toggleExpansion = () => {
+    setIsExpanded(!isExpanded);
+    onToggle?.();
+  };
+  
+  // Listen for expansion toggle events when selected
+  useTimelineExpansionToggle(isSelected || false, toggleExpansion);
   const { toolName, input } = toolCallData;
   
   const toolResultData = resultEvent?.data as ToolResultData | undefined;
@@ -142,7 +153,7 @@ export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFo
         setIsExpanded(expanded);
         onToggle?.();
       }}
-      isFocused={isFocused}
+      isSelected={isSelected}
       onToggle={onToggle}
     >
       {expandedContent}

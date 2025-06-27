@@ -9,6 +9,7 @@ import { ToolCallData, ToolResultData } from '../../../../../threads/types.js';
 import { CompactOutput } from '../../ui/CompactOutput.js';
 import { CodeDisplay } from '../../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
+import { useTimelineExpansionToggle } from '../hooks/useTimelineExpansionToggle.js';
 
 // Extract tool execution timeline item type
 type ToolExecutionItem = {
@@ -22,7 +23,8 @@ type ToolExecutionItem = {
 interface DelegateToolRendererProps {
   item: ToolExecutionItem;
   isStreaming?: boolean;
-  isFocused?: boolean;
+  isSelected?: boolean; // Whether timeline cursor is on this item
+  isFocused?: boolean; // Whether this item has keyboard focus
   onToggle?: () => void;
   isExpanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
@@ -39,6 +41,7 @@ function isJsonOutput(output: string): boolean {
 export function DelegateToolRenderer({ 
   item, 
   isStreaming, 
+  isSelected,
   isFocused, 
   onToggle,
   isExpanded: controlledExpanded,
@@ -47,6 +50,20 @@ export function DelegateToolRenderer({
   // Use controlled expansion if provided, otherwise manage internally
   const [internalExpanded, setInternalExpanded] = useState(false);
   const isExpanded = controlledExpanded ?? internalExpanded;
+  
+  // Handle expansion toggle events
+  const toggleExpansion = () => {
+    const newExpanded = !isExpanded;
+    if (onExpandedChange) {
+      onExpandedChange(newExpanded);
+    } else {
+      setInternalExpanded(newExpanded);
+    }
+    onToggle?.();
+  };
+  
+  // Listen for expansion toggle events when selected
+  useTimelineExpansionToggle(isSelected || false, toggleExpansion);
   
   const { call, result } = item;
   const { input } = call;
@@ -176,7 +193,7 @@ export function DelegateToolRenderer({
       summary={delegateSummary}
       isExpanded={isExpanded}
       onExpandedChange={handleExpandedChange}
-      isFocused={isFocused}
+      isSelected={isSelected}
       onToggle={onToggle}
     >
       {expandedContent}
