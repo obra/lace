@@ -3,7 +3,8 @@
 
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
-import { ThreadEvent, ToolCallData } from '../../../../threads/types.js';
+import { ThreadEvent } from '../../../../threads/types.js';
+import { ToolCall } from '../../../../tools/types.js';
 import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
 import { CodeDisplay } from '../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
@@ -18,8 +19,8 @@ interface ToolCallDisplayProps {
 }
 
 export function ToolCallDisplay({ event, isStreaming, isFocused, isSelected, onToggle }: ToolCallDisplayProps) {
-  const toolCallData = event.data as ToolCallData;
-  const { toolName, input, callId } = toolCallData;
+  const toolCallData = event.data as ToolCall;
+  const { name: toolName, arguments: input, id: callId } = toolCallData;
   const [isExpanded, setIsExpanded] = useState(false);
   
   // Handle expansion toggle events

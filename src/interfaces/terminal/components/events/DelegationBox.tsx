@@ -169,8 +169,9 @@ function calculateTokens(timeline: Timeline): { tokensIn: number; tokensOut: num
     } else if (item.type === 'tool_execution') {
       const toolItem = item as Extract<Timeline['items'][0], { type: 'tool_execution' }>;
       // Tool results count as input to the agent
-      if (toolItem.result?.output && typeof toolItem.result.output === 'string') {
-        tokensIn += estimateTokens(toolItem.result.output);
+      const resultText = toolItem.result?.content?.[0]?.text;
+      if (resultText) {
+        tokensIn += estimateTokens(resultText);
       }
     }
   });

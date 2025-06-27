@@ -42,9 +42,9 @@ function DynamicToolRenderer({
 
   React.useEffect(() => {
     let cancelled = false;
-    setDebugInfo(`Looking for ${item.call.toolName}ToolRenderer...`);
+    setDebugInfo(`Looking for ${item.call.name}ToolRenderer...`);
     
-    getToolRenderer(item.call.toolName).then(renderer => {
+    getToolRenderer(item.call.name).then(renderer => {
       if (!cancelled) {
         setToolRenderer(() => renderer);
         setIsLoading(false);
@@ -60,7 +60,7 @@ function DynamicToolRenderer({
     return () => {
       cancelled = true;
     };
-  }, [item.call.toolName]);
+  }, [item.call.name]);
 
   if (isLoading) {
     // Add debug info to loading state
@@ -68,8 +68,8 @@ function DynamicToolRenderer({
       ...item,
       call: {
         ...item.call,
-        input: {
-          ...item.call.input,
+        arguments: {
+          ...item.call.arguments,
           _debug: debugInfo
         }
       }

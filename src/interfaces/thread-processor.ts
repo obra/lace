@@ -1,7 +1,9 @@
 // ABOUTME: Processes raw ThreadEvents into UI-optimized timeline format with performance optimizations
 // ABOUTME: Split processing for cached thread events and frequent ephemeral message updates
 
-import { ThreadEvent, ToolCallData, ToolResultData } from '../threads/types.js';
+import { ThreadEvent } from '../threads/types.js';
+import { ToolCall, ToolResult } from '../tools/types.js';
+import sax from 'sax';
 import { logger } from '../utils/logger.js';
 
 export interface Timeline {
@@ -23,8 +25,8 @@ export type TimelineItem =
   | { type: 'agent_message'; content: string; timestamp: Date; id: string }
   | {
       type: 'tool_execution';
-      call: ToolCallData;
-      result?: ToolResultData;
+      call: ToolCall;
+      result?: ToolResult;
       timestamp: Date;
       callId: string;
     }
@@ -198,10 +200,10 @@ export class ThreadProcessor {
 
   private _processEventGroupWithState(
     events: ThreadEvent[],
-    initialPendingToolCalls: Map<string, { event: ThreadEvent; call: ToolCallData }>
+    initialPendingToolCalls: Map<string, { event: ThreadEvent; call: ToolCall }>
   ): {
     items: TimelineItem[];
-    pendingToolCalls: Map<string, { event: ThreadEvent; call: ToolCallData }>;
+    pendingToolCalls: Map<string, { event: ThreadEvent; call: ToolCall }>;
   } {
     const items: TimelineItem[] = [];
     const pendingToolCalls = new Map(initialPendingToolCalls);
@@ -282,21 +284,22 @@ export class ThreadProcessor {
         }
 
         case 'TOOL_CALL': {
-          const toolCallData = event.data as ToolCallData;
+          const toolCallData = event.data as ToolCall;
           logger.debug('Processing TOOL_CALL', {
-            callId: toolCallData.callId,
-            toolName: toolCallData.toolName,
+            callId: toolCallData.id,
+            toolName: toolCallData.name,
           });
-          pendingToolCalls.set(toolCallData.callId, { event, call: toolCallData });
+          pendingToolCalls.set(toolCallData.id, { event, call: toolCallData });
           break;
         }
 
         case 'TOOL_RESULT': {
-          const toolResultData = event.data as ToolResultData;
-          const pendingCall = pendingToolCalls.get(toolResultData.callId);
+          const toolResultData = event.data as ToolResult;
+          const resultId = toolResultData.id || '';
+          const pendingCall = pendingToolCalls.get(resultId);
 
           logger.debug('Processing TOOL_RESULT', {
-            callId: toolResultData.callId,
+            callId: resultId,
             foundPendingCall: !!pendingCall,
             pendingCallIds: Array.from(pendingToolCalls.keys()),
           });
@@ -308,22 +311,22 @@ export class ThreadProcessor {
               call: pendingCall.call,
               result: toolResultData,
               timestamp: pendingCall.event.timestamp,
-              callId: toolResultData.callId,
+              callId: resultId,
             });
-            pendingToolCalls.delete(toolResultData.callId);
+            pendingToolCalls.delete(resultId);
           } else {
             // Orphaned result - treat as system message
             logger.warn('Orphaned tool result found', {
-              callId: toolResultData.callId,
+              callId: resultId,
               availablePendingCallIds: Array.from(pendingToolCalls.keys()),
-              output:
-                typeof toolResultData.output === 'string'
-                  ? toolResultData.output.slice(0, 100)
-                  : 'non-string output',
+              output: toolResultData.content[0]?.text
+                ? toolResultData.content[0].text.slice(0, 100)
+                : 'non-text output',
             });
+            const resultText = toolResultData.content[0]?.text || '[non-text result]';
             items.push({
               type: 'system_message',
-              content: `Tool result (orphaned): ${toolResultData.output}`,
+              content: `Tool result (orphaned): ${resultText}`,
               timestamp: event.timestamp,
               id: event.id,
             });
@@ -340,7 +343,7 @@ export class ThreadProcessor {
         call,
         result: undefined,
         timestamp: event.timestamp,
-        callId: call.callId,
+        callId: call.id,
       });
     }
 

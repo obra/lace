@@ -3,7 +3,8 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ThreadEvent, ToolResultData } from '../../../../threads/types.js';
+import { ThreadEvent } from '../../../../threads/types.js';
+import { ToolResult } from '../../../../tools/types.js';
 import { CodeDisplay } from '../ui/CodeDisplay.js';
 import { UI_SYMBOLS } from '../../theme.js';
 
@@ -21,8 +22,9 @@ function isJsonOutput(output: string): boolean {
 }
 
 export function ToolResultDisplay({ event, isStreaming }: ToolResultDisplayProps) {
-  const toolResultData = event.data as ToolResultData;
-  const { callId, output, success, error } = toolResultData;
+  const toolResultData = event.data as ToolResult;
+  const callId = toolResultData.id || 'unknown';
+  const success = !toolResultData.isError;
   const color = success ? 'green' : 'red';
   const icon = success ? UI_SYMBOLS.SUCCESS : UI_SYMBOLS.ERROR;
   
@@ -35,14 +37,31 @@ export function ToolResultDisplay({ event, isStreaming }: ToolResultDisplayProps
       </Box>
       
       <Box marginLeft={2} flexDirection="column">
-        {success ? (
-          isJsonOutput(output) ? (
-            <CodeDisplay code={output} language="json" />
-          ) : (
-            <Text wrap="wrap">{output}</Text>
-          )
-        ) : (
-          <Text color="red">{error || 'Unknown error'}</Text>
+        {toolResultData.content.map((block, index) => (
+          <Box key={index} flexDirection="column" marginBottom={index < toolResultData.content.length - 1 ? 1 : 0}>
+            {block.type === 'text' && block.text && (
+              success ? (
+                isJsonOutput(block.text) ? (
+                  <CodeDisplay code={block.text} language="json" />
+                ) : (
+                  <Text wrap="wrap" color={toolResultData.isError ? 'red' : undefined}>
+                    {block.text}
+                  </Text>
+                )
+              ) : (
+                <Text color="red">{block.text}</Text>
+              )
+            )}
+            {block.type === 'image' && (
+              <Text color="gray">[Image: {block.data ? 'base64 data' : block.uri}]</Text>
+            )}
+            {block.type === 'resource' && (
+              <Text color="gray">[Resource: {block.uri}]</Text>
+            )}
+          </Box>
+        ))}
+        {toolResultData.content.length === 0 && (
+          <Text color="gray">[No content]</Text>
         )}
       </Box>
     </Box>
