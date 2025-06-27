@@ -4,8 +4,7 @@
 import { glob } from 'glob';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { AIProvider } from './base-provider.js';
-import { ProviderResponse } from './types.js';
+import { AIProvider, ProviderResponse } from './base-provider.js';
 
 export class ProviderRegistry {
   private _providers = new Map<string, AIProvider>();
