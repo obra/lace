@@ -7,11 +7,13 @@ import { ThreadEvent } from '../../../../threads/types.js';
 import { MarkdownDisplay } from '../ui/MarkdownDisplay.js';
 import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
 import { parseThinkingBlocks, createSummaryContent, formatThinkingForDisplay } from './utils/thinking-parser.js';
+import { useTimelineExpansionToggle } from './hooks/useTimelineExpansionToggle.js';
 
 interface AgentMessageDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
   isFocused?: boolean;
+  isSelected?: boolean;
   onToggle?: () => void;
 }
 
@@ -19,6 +21,7 @@ export function AgentMessageDisplay({
   event, 
   isStreaming, 
   isFocused,
+  isSelected,
   onToggle
 }: AgentMessageDisplayProps) {
   const message = event.data as string;
@@ -28,6 +31,15 @@ export function AgentMessageDisplay({
   
   // Manage own expansion state
   const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Handle expansion toggle events
+  const toggleExpansion = () => {
+    setIsExpanded(!isExpanded);
+    onToggle?.();
+  };
+  
+  // Listen for expansion toggle events when selected
+  useTimelineExpansionToggle(isSelected || false, toggleExpansion);
   
   // If no thinking blocks, render directly without collapsible wrapper
   if (!parsed.hasThinking) {
@@ -61,7 +73,7 @@ export function AgentMessageDisplay({
         setIsExpanded(expanded);
         onToggle?.();
       }}
-      isFocused={isFocused}
+      isSelected={isSelected}
       onToggle={onToggle}
     >
       <Box flexDirection="column">

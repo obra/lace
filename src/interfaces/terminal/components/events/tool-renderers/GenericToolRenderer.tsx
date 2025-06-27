@@ -8,6 +8,7 @@ import { ToolCallData, ToolResultData } from '../../../../../threads/types.js';
 import { CompactOutput } from '../../ui/CompactOutput.js';
 import { CodeDisplay } from '../../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
+import { useTimelineExpansionToggle } from '../hooks/useTimelineExpansionToggle.js';
 
 // Extract tool execution timeline item type
 type ToolExecutionItem = {
@@ -21,7 +22,8 @@ type ToolExecutionItem = {
 interface GenericToolRendererProps {
   item: ToolExecutionItem;
   isStreaming?: boolean;
-  isFocused?: boolean;
+  isSelected?: boolean; // Whether timeline cursor is on this item
+  isFocused?: boolean; // Whether this item has keyboard focus
   onToggle?: () => void;
   isExpanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
@@ -38,7 +40,8 @@ function isJsonOutput(output: string): boolean {
 export function GenericToolRenderer({ 
   item, 
   isStreaming, 
-  isFocused, 
+  isSelected, 
+  isFocused,
   onToggle,
   isExpanded: controlledExpanded,
   onExpandedChange
@@ -46,6 +49,19 @@ export function GenericToolRenderer({
   // Use controlled expansion if provided, otherwise manage internally
   const [internalExpanded, setInternalExpanded] = useState(false);
   const isExpanded = controlledExpanded ?? internalExpanded;
+  
+  // Handle expansion toggle events
+  const toggleExpansion = () => {
+    if (onExpandedChange) {
+      onExpandedChange(!isExpanded);
+    } else {
+      setInternalExpanded(!isExpanded);
+    }
+    onToggle?.();
+  };
+  
+  // Listen for expansion toggle events when selected
+  useTimelineExpansionToggle(isSelected || false, toggleExpansion);
   
   const { call, result } = item;
   const { toolName, input } = call;
@@ -179,7 +195,7 @@ export function GenericToolRenderer({
       summary={toolSummary}
       isExpanded={isExpanded}
       onExpandedChange={handleExpandedChange}
-      isFocused={isFocused}
+      isSelected={isSelected}
       onToggle={onToggle}
     >
       {expandedContent}
