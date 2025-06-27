@@ -23,6 +23,7 @@
     "@anthropic-ai/sdk": "^0.54.0",
     "@inkjs/ui": "^2.0.0",
     "@lmstudio/sdk": "^1.2.1",
+    "@modelcontextprotocol/sdk": "^1.13.2",
     "@types/glob": "^8.1.0",
     "@types/marked": "^5.0.2",
     "@types/react": "^18.3.1",
