@@ -3,7 +3,8 @@
 
 import React, { Suspense } from 'react';
 import { Box, Text } from 'ink';
-import { Timeline, TimelineItem as TimelineItemType } from '../../../thread-processor.js';
+import { Timeline, TimelineItem as TimelineItemType, EphemeralMessage } from '../../../thread-processor.js';
+import { EventType } from '../../../../threads/types.js';
 import { EventDisplay } from './EventDisplay.js';
 import { GenericToolRenderer } from './tool-renderers/GenericToolRenderer.js';
 import { getToolRenderer } from './tool-renderers/getToolRenderer.js';
@@ -150,7 +151,7 @@ export function TimelineItem({
         event={{
           id: item.id,
           threadId: '',
-          type: (item.originalEventType || 'LOCAL_SYSTEM_MESSAGE') as any,
+          type: (item.originalEventType || 'LOCAL_SYSTEM_MESSAGE') as EventType,
           timestamp: item.timestamp,
           data: item.content
         }} 
@@ -181,7 +182,7 @@ export function TimelineItem({
     case 'ephemeral_message':
       return <MessageDisplay 
         message={{
-          type: item.messageType as any,
+          type: item.messageType as EphemeralMessage['type'],
           content: item.content,
           timestamp: item.timestamp
         }} 
