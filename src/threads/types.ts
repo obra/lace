@@ -7,7 +7,6 @@ export type EventType =
   | 'TOOL_CALL'
   | 'TOOL_RESULT'
   | 'LOCAL_SYSTEM_MESSAGE'
-  | 'THINKING'
   | 'SYSTEM_PROMPT'
   | 'USER_SYSTEM_PROMPT';
 

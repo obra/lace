@@ -7,16 +7,29 @@ import { ThreadEvent, ToolCallData } from '../../../../threads/types.js';
 import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
 import { CodeDisplay } from '../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
+import { useTimelineExpansionToggle } from './hooks/useTimelineExpansionToggle.js';
 
 interface ToolCallDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
+  isFocused?: boolean;
+  isSelected?: boolean;
+  onToggle?: () => void;
 }
 
-export function ToolCallDisplay({ event, isStreaming }: ToolCallDisplayProps) {
+export function ToolCallDisplay({ event, isStreaming, isFocused, isSelected, onToggle }: ToolCallDisplayProps) {
   const toolCallData = event.data as ToolCallData;
   const { toolName, input, callId } = toolCallData;
   const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Handle expansion toggle events
+  const toggleExpansion = () => {
+    setIsExpanded(!isExpanded);
+    onToggle?.();
+  };
+  
+  // Listen for expansion toggle events when selected
+  useTimelineExpansionToggle(isSelected || false, toggleExpansion);
   
   const headerSummary = (
     <Box>
@@ -32,9 +45,14 @@ export function ToolCallDisplay({ event, isStreaming }: ToolCallDisplayProps) {
       label="Input Parameters"
       summary={headerSummary}
       isExpanded={isExpanded}
-      onExpandedChange={setIsExpanded}
+      onExpandedChange={(expanded) => {
+        setIsExpanded(expanded);
+        onToggle?.();
+      }}
       maxHeight={10}
       borderColor={UI_COLORS.TOOL}
+      isSelected={isSelected}
+      onToggle={onToggle}
     >
       <CodeDisplay code={JSON.stringify(input)} language="json" />
     </TimelineEntryCollapsibleBox>

@@ -761,7 +761,6 @@ export class Agent extends EventEmitter {
         });
       } else if (
         event.type === 'LOCAL_SYSTEM_MESSAGE' ||
-        event.type === 'THINKING' ||
         event.type === 'SYSTEM_PROMPT' ||
         event.type === 'USER_SYSTEM_PROMPT'
       ) {

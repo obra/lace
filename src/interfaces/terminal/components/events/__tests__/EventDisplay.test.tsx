@@ -116,7 +116,7 @@ describe('EventDisplay', () => {
 
     const { lastFrame } = render(<EventDisplay event={event} />);
     expect(lastFrame()).toContain(`${UI_SYMBOLS.TOOL} System Prompt`);
-    // The toggle hint only appears when isFocused={true}
+    // The toggle hint only appears when isSelected={true}
   });
 
   it('should render USER_SYSTEM_PROMPT events', () => {
@@ -130,6 +130,6 @@ describe('EventDisplay', () => {
 
     const { lastFrame } = render(<EventDisplay event={event} />);
     expect(lastFrame()).toContain(`${UI_SYMBOLS.USER} User Instructions`);
-    // The toggle hint only appears when isFocused={true}
+    // The toggle hint only appears when isSelected={true}
   });
 });

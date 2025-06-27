@@ -1,12 +1,12 @@
 // ABOUTME: Comprehensive tests for ThreadProcessor including performance optimization features
-// ABOUTME: Tests caching, thinking block extraction, tool grouping, and timeline generation
+// ABOUTME: Covers unified content processing, caching, and timeline generation functionality
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   ThreadProcessor,
-  EphemeralMessage,
   ProcessedThreadItems,
   EphemeralTimelineItems,
+  EphemeralMessage,
 } from '../thread-processor.js';
 import { ThreadEvent, ToolCallData, ToolResultData } from '../../threads/types.js';
 
@@ -17,6 +17,73 @@ describe('ThreadProcessor', () => {
     processor = new ThreadProcessor();
   });
 
+  describe('unified content processing', () => {
+    it('keeps agent messages with thinking blocks intact', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: 'agent-1',
+          threadId: 'thread-1',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-01T10:00:00Z'),
+          data: '<think>Let me think about this</think>Here is my response',
+        },
+      ];
+
+      const result = processor.processEvents(events);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        type: 'agent_message',
+        content: '<think>Let me think about this</think>Here is my response',
+        timestamp: new Date('2024-01-01T10:00:00Z'),
+        id: 'agent-1',
+      });
+    });
+
+    it('handles multiple thinking blocks in one message', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: 'agent-1',
+          threadId: 'thread-1',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-01T10:00:00Z'),
+          data: '<think>First</think>Text<think>Second</think>More text',
+        },
+      ];
+
+      const result = processor.processEvents(events);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        type: 'agent_message',
+        content: '<think>First</think>Text<think>Second</think>More text',
+        timestamp: new Date('2024-01-01T10:00:00Z'),
+        id: 'agent-1',
+      });
+    });
+
+    it('handles agent messages with no thinking blocks', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: 'agent-1',
+          threadId: 'thread-1',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-01T10:00:00Z'),
+          data: 'Just regular content',
+        },
+      ];
+
+      const result = processor.processEvents(events);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        type: 'agent_message',
+        content: 'Just regular content',
+        timestamp: new Date('2024-01-01T10:00:00Z'),
+        id: 'agent-1',
+      });
+    });
+  });
   describe('processEvents (caching)', () => {
     const sampleEvents: ThreadEvent[] = [
       {
@@ -92,102 +159,6 @@ describe('ThreadProcessor', () => {
       expect(result1).not.toBe(result2);
       // But should have same content
       expect(result1).toEqual(result2);
-    });
-  });
-
-  describe('thinking block extraction', () => {
-    it('extracts thinking blocks from agent messages', () => {
-      const events: ThreadEvent[] = [
-        {
-          id: 'agent-1',
-          threadId: 'thread-1',
-          type: 'AGENT_MESSAGE',
-          timestamp: new Date('2024-01-01T10:00:00Z'),
-          data: '<think>Let me think about this</think>Here is my response',
-        },
-      ];
-
-      const result = processor.processEvents(events);
-
-      expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({
-        type: 'thinking',
-        content: 'Let me think about this',
-        timestamp: new Date('2024-01-01T09:59:59.990Z'), // Slight offset
-        id: 'agent-1_thinking_0',
-      });
-      expect(result[1]).toEqual({
-        type: 'agent_message',
-        content: 'Here is my response',
-        timestamp: new Date('2024-01-01T10:00:00Z'),
-        id: 'agent-1',
-      });
-    });
-
-    it('handles multiple thinking blocks in one message', () => {
-      const events: ThreadEvent[] = [
-        {
-          id: 'agent-1',
-          threadId: 'thread-1',
-          type: 'AGENT_MESSAGE',
-          timestamp: new Date('2024-01-01T10:00:00Z'),
-          data: '<think>First thought</think>Some text<think>Second thought</think>Final response',
-        },
-      ];
-
-      const result = processor.processEvents(events);
-
-      expect(result).toHaveLength(3);
-      expect(result[0].type).toBe('thinking');
-      expect('content' in result[0] ? result[0].content : '').toBe('First thought');
-      expect(result[1].type).toBe('thinking');
-      expect('content' in result[1] ? result[1].content : '').toBe('Second thought');
-      expect(result[2].type).toBe('agent_message');
-      expect('content' in result[2] ? result[2].content : '').toBe('Some textFinal response');
-    });
-
-    it('handles agent messages with no thinking blocks', () => {
-      const events: ThreadEvent[] = [
-        {
-          id: 'agent-1',
-          threadId: 'thread-1',
-          type: 'AGENT_MESSAGE',
-          timestamp: new Date('2024-01-01T10:00:00Z'),
-          data: 'Just a regular response',
-        },
-      ];
-
-      const result = processor.processEvents(events);
-
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
-        type: 'agent_message',
-        content: 'Just a regular response',
-        timestamp: new Date('2024-01-01T10:00:00Z'),
-        id: 'agent-1',
-      });
-    });
-
-    it('handles standalone THINKING events', () => {
-      const events: ThreadEvent[] = [
-        {
-          id: 'thinking-1',
-          threadId: 'thread-1',
-          type: 'THINKING',
-          timestamp: new Date('2024-01-01T10:00:00Z'),
-          data: 'Standalone thinking block',
-        },
-      ];
-
-      const result = processor.processEvents(events);
-
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
-        type: 'thinking',
-        content: 'Standalone thinking block',
-        timestamp: new Date('2024-01-01T10:00:00Z'),
-        id: 'thinking-1',
-      });
     });
   });
 
@@ -301,8 +272,8 @@ describe('ThreadProcessor', () => {
           timestamp: new Date('2024-01-01T10:00:00Z'),
         },
         {
-          type: 'thinking',
-          content: 'Let me think...',
+          type: 'assistant',
+          content: '<think>Let me think...</think>',
           timestamp: new Date('2024-01-01T10:00:01Z'),
         },
       ];
@@ -318,13 +289,13 @@ describe('ThreadProcessor', () => {
       });
       expect(result[1]).toEqual({
         type: 'ephemeral_message',
-        messageType: 'thinking',
-        content: 'Let me think...',
+        messageType: 'assistant',
+        content: '<think>Let me think...</think>',
         timestamp: new Date('2024-01-01T10:00:01Z'),
       });
     });
 
-    it('should extract thinking blocks from streaming assistant messages', () => {
+    it('should keep thinking blocks intact in streaming assistant messages', () => {
       const timestamp = new Date('2024-01-01T10:00:00Z');
       const messages: EphemeralMessage[] = [
         {
@@ -336,22 +307,14 @@ describe('ThreadProcessor', () => {
 
       const result = processor.processEphemeralEvents(messages);
 
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(1);
 
-      // Should have thinking block item first
+      // Should have single item with full content
       expect(result[0]).toEqual({
-        type: 'thinking',
-        content: 'I need to think about this carefully',
-        timestamp,
-        id: `${timestamp.getTime()}_thinking_0`,
-      });
-
-      // Should have clean content item second
-      expect(result[1]).toEqual({
         type: 'ephemeral_message',
         messageType: 'assistant',
-        content: 'Here is my response',
-        timestamp: new Date(timestamp.getTime() + 1), // +1ms after thinking block
+        content: '<think>I need to think about this carefully</think>Here is my response',
+        timestamp,
       });
     });
 
@@ -367,34 +330,16 @@ describe('ThreadProcessor', () => {
 
       const result = processor.processEphemeralEvents(messages);
 
-      expect(result).toHaveLength(3);
-
-      // First thinking block
+      expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
-        type: 'thinking',
-        content: 'First thought',
-        timestamp,
-        id: `${timestamp.getTime()}_thinking_0`,
-      });
-
-      // Second thinking block
-      expect(result[1]).toEqual({
-        type: 'thinking',
-        content: 'Second thought',
-        timestamp: new Date(timestamp.getTime() + 1),
-        id: `${timestamp.getTime()}_thinking_1`,
-      });
-
-      // Clean content
-      expect(result[2]).toEqual({
         type: 'ephemeral_message',
         messageType: 'assistant',
-        content: 'Some textMore text',
-        timestamp: new Date(timestamp.getTime() + 2),
+        content: '<think>First thought</think>Some text<think>Second thought</think>More text',
+        timestamp,
       });
     });
 
-    it('should handle assistant messages with only thinking blocks (no clean content)', () => {
+    it('should handle assistant messages with only thinking blocks', () => {
       const timestamp = new Date('2024-01-01T10:00:00Z');
       const messages: EphemeralMessage[] = [
         {
@@ -408,10 +353,10 @@ describe('ThreadProcessor', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
-        type: 'thinking',
-        content: 'Only thinking here',
+        type: 'ephemeral_message',
+        messageType: 'assistant',
+        content: '<think>Only thinking here</think>',
         timestamp,
-        id: `${timestamp.getTime()}_thinking_0`,
       });
     });
 
@@ -436,16 +381,9 @@ describe('ThreadProcessor', () => {
     });
   });
 
-  describe('thinking block deduplication', () => {
-    it('deduplicates thinking blocks from streaming and extracted sources', () => {
+  describe('unified content behavior', () => {
+    it('keeps agent messages with thinking blocks intact', () => {
       const events: ThreadEvent[] = [
-        {
-          id: 'thinking-1',
-          threadId: 'thread-1',
-          type: 'THINKING',
-          timestamp: new Date('2024-01-01T10:00:00Z'),
-          data: 'Let me think about this',
-        },
         {
           id: 'agent-1',
           threadId: 'thread-1',
@@ -458,29 +396,18 @@ describe('ThreadProcessor', () => {
       const processedEvents = processor.processEvents(events);
       const timeline = processor.buildTimeline(processedEvents, []);
 
-      // Should only have one thinking block (from streaming source) after deduplication
-      const thinkingItems = timeline.items.filter((item) => item.type === 'thinking');
-      expect(thinkingItems).toHaveLength(1);
-      expect(thinkingItems[0].id).toBe('thinking-1'); // Streaming source preserved
-      expect('content' in thinkingItems[0] ? thinkingItems[0].content : '').toBe(
-        'Let me think about this'
-      );
+      // Should have agent message with thinking blocks preserved
+      expect(timeline.items).toHaveLength(1);
 
-      // Agent message should have thinking removed
       const agentItems = timeline.items.filter((item) => item.type === 'agent_message');
       expect(agentItems).toHaveLength(1);
-      expect('content' in agentItems[0] ? agentItems[0].content : '').toBe('Here is my response');
+      expect('content' in agentItems[0] ? agentItems[0].content : '').toBe(
+        '<think>Let me think about this</think>Here is my response'
+      );
     });
 
-    it('preserves non-duplicate thinking blocks from both sources', () => {
+    it('handles agent message with embedded thinking blocks', () => {
       const events: ThreadEvent[] = [
-        {
-          id: 'thinking-1',
-          threadId: 'thread-1',
-          type: 'THINKING',
-          timestamp: new Date('2024-01-01T10:00:00Z'),
-          data: 'First thought from streaming',
-        },
         {
           id: 'agent-1',
           threadId: 'thread-1',
@@ -493,14 +420,14 @@ describe('ThreadProcessor', () => {
       const processedEvents = processor.processEvents(events);
       const timeline = processor.buildTimeline(processedEvents, []);
 
-      // Should have both thinking blocks since they're different
-      const thinkingItems = timeline.items.filter((item) => item.type === 'thinking');
-      expect(thinkingItems).toHaveLength(2);
+      // Should have agent message with thinking preserved
+      expect(timeline.items).toHaveLength(1);
 
-      // Check both contents are preserved
-      const contents = thinkingItems.map((item) => ('content' in item ? item.content : ''));
-      expect(contents).toContain('First thought from streaming');
-      expect(contents).toContain('Second thought from extraction');
+      const agentItems = timeline.items.filter((item) => item.type === 'agent_message');
+      expect(agentItems).toHaveLength(1);
+      expect('content' in agentItems[0] ? agentItems[0].content : '').toBe(
+        '<think>Second thought from extraction</think>Here is my response'
+      );
     });
   });
 
@@ -554,12 +481,6 @@ describe('ThreadProcessor', () => {
           id: 'user-1',
         },
         {
-          type: 'thinking',
-          content: 'Thinking...',
-          timestamp: new Date('2024-01-01T10:01:00Z'),
-          id: 'thinking-1',
-        },
-        {
           type: 'agent_message',
           content: 'Response',
           timestamp: new Date('2024-01-01T10:02:00Z'),
@@ -570,7 +491,7 @@ describe('ThreadProcessor', () => {
       const timeline = processor.buildTimeline(processedEvents, []);
 
       expect(timeline.metadata).toEqual({
-        eventCount: 3,
+        eventCount: 2,
         messageCount: 2, // Only user_message and agent_message count
         lastActivity: new Date('2024-01-01T10:02:00Z'),
       });
@@ -608,7 +529,7 @@ describe('ThreadProcessor', () => {
   });
 
   describe('SAX parser edge cases', () => {
-    it('handles incomplete thinking blocks gracefully', () => {
+    it('handles incomplete thinking blocks gracefully in agent messages', () => {
       const events: ThreadEvent[] = [
         {
           id: 'agent-1',
@@ -621,11 +542,10 @@ describe('ThreadProcessor', () => {
 
       const result = processor.processEvents(events);
 
-      // Should still create a thinking block (either with incomplete marker or fallback to regex)
-      const thinkingItems = result.filter((item) => item.type === 'thinking');
-      expect(thinkingItems).toHaveLength(1);
-      // Content should be preserved regardless of parsing method
-      expect('content' in thinkingItems[0] ? thinkingItems[0].content : '').toContain(
+      // Should have agent message with preserved content
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe('agent_message');
+      expect('content' in result[0] ? result[0].content : '').toContain(
         'Incomplete thinking block'
       );
     });
@@ -734,20 +654,12 @@ describe('ThreadProcessor', () => {
           timestamp: new Date('2024-01-01T10:00:00Z'),
           data: 'Help me with a task',
         },
-        // Streaming thinking event
-        {
-          id: 'thinking-1',
-          threadId: 'thread-1',
-          type: 'THINKING',
-          timestamp: new Date('2024-01-01T10:00:01Z'),
-          data: 'I need to think about this step by step',
-        },
-        // Agent message with embedded thinking (duplicate content)
+        // Agent message with embedded thinking
         {
           id: 'agent-1',
           threadId: 'thread-1',
           type: 'AGENT_MESSAGE',
-          timestamp: new Date('2024-01-01T10:00:02Z'),
+          timestamp: new Date('2024-01-01T10:00:01Z'),
           data: '<think>I need to think about this step by step</think>I will help you with that task.',
         },
         // Tool call
@@ -755,7 +667,7 @@ describe('ThreadProcessor', () => {
           id: 'tool-call-1',
           threadId: 'thread-1',
           type: 'TOOL_CALL',
-          timestamp: new Date('2024-01-01T10:00:03Z'),
+          timestamp: new Date('2024-01-01T10:00:02Z'),
           data: {
             toolName: 'bash',
             input: { command: 'ls -la' },
@@ -767,7 +679,7 @@ describe('ThreadProcessor', () => {
           id: 'tool-result-1',
           threadId: 'thread-1',
           type: 'TOOL_RESULT',
-          timestamp: new Date('2024-01-01T10:00:04Z'),
+          timestamp: new Date('2024-01-01T10:00:03Z'),
           data: {
             callId: 'call-123',
             output: 'file1.txt\nfile2.txt',
@@ -779,7 +691,7 @@ describe('ThreadProcessor', () => {
           id: 'agent-2',
           threadId: 'thread-1',
           type: 'AGENT_MESSAGE',
-          timestamp: new Date('2024-01-01T10:00:05Z'),
+          timestamp: new Date('2024-01-01T10:00:04Z'),
           data: 'I found 2 files in the directory.',
         },
       ];
@@ -789,29 +701,25 @@ describe('ThreadProcessor', () => {
 
       // Should have:
       // - 1 user message
-      // - 1 thinking block (deduplicated)
-      // - 2 agent messages
+      // - 2 agent messages (with thinking blocks preserved)
       // - 1 tool execution
-      expect(timeline.items).toHaveLength(5);
+      // (THINKING events are ignored)
+      expect(timeline.items).toHaveLength(4);
 
       // Verify chronological order
       const types = timeline.items.map((item) => item.type);
-      expect(types).toEqual([
-        'user_message',
-        'thinking',
-        'agent_message',
-        'tool_execution',
-        'agent_message',
-      ]);
+      expect(types).toEqual(['user_message', 'agent_message', 'tool_execution', 'agent_message']);
 
-      // Verify thinking block deduplication
-      const thinkingItems = timeline.items.filter((item) => item.type === 'thinking');
-      expect(thinkingItems).toHaveLength(1);
-      expect(thinkingItems[0].id).toBe('thinking-1'); // Streaming version preserved
+      // Verify agent message has thinking preserved
+      const agentItems = timeline.items.filter((item) => item.type === 'agent_message');
+      expect(agentItems).toHaveLength(2);
+      expect('content' in agentItems[0] ? agentItems[0].content : '').toBe(
+        '<think>I need to think about this step by step</think>I will help you with that task.'
+      );
 
       // Verify metadata
       expect(timeline.metadata.messageCount).toBe(3); // user + 2 agent messages
-      expect(timeline.metadata.eventCount).toBe(5);
+      expect(timeline.metadata.eventCount).toBe(4); // Only processed events count (THINKING ignored)
     });
 
     it('maintains timeline consistency with ephemeral messages during streaming', () => {
@@ -827,8 +735,8 @@ describe('ThreadProcessor', () => {
 
       const ephemeralMessages: EphemeralMessage[] = [
         {
-          type: 'thinking',
-          content: 'Let me process this...',
+          type: 'assistant',
+          content: '<think>Let me process this...</think>',
           timestamp: new Date('2024-01-01T10:00:01Z'),
         },
         {

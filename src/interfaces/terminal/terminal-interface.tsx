@@ -50,7 +50,7 @@ interface TerminalInterfaceProps {
 }
 
 interface Message {
-  type: "user" | "assistant" | "system" | "tool" | "thinking";
+  type: "user" | "assistant" | "system" | "tool";
   content: string;
   timestamp: Date;
 }

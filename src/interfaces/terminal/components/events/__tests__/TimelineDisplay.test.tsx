@@ -132,21 +132,7 @@ describe('TimelineDisplay Viewport Behavior', () => {
     expect(lastFrame()).toContain('bash');
   });
 
-  it('should handle delegate timelines', () => {
-    const delegateTimeline: Timeline = {
-      items: [{
-        id: 'delegate-msg',
-        type: 'agent_message',
-        timestamp: new Date(),
-        content: 'Delegate response'
-      }],
-      metadata: {
-        eventCount: 1,
-        messageCount: 1,
-        lastActivity: new Date()
-      }
-    };
-    
+  it('should handle delegate tool executions', () => {
     const timeline: Timeline = {
       items: [{
         type: 'tool_execution',
@@ -170,13 +156,8 @@ describe('TimelineDisplay Viewport Behavior', () => {
       }
     };
     
-    const delegateTimelines = new Map([['delegate-thread-id', delegateTimeline]]);
-    
     const { lastFrame } = render(
-      <TimelineDisplay 
-        timeline={timeline} 
-        delegateTimelines={delegateTimelines}
-      />
+      <TimelineDisplay timeline={timeline} />
     );
     
     // Should render delegate tool

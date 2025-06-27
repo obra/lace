@@ -9,27 +9,26 @@ import { ToolResultDisplay } from './ToolResultDisplay.js';
 import { UserMessageDisplay } from './UserMessageDisplay.js';
 import { AgentMessageDisplay } from './AgentMessageDisplay.js';
 import { SystemMessageDisplay } from './SystemMessageDisplay.js';
-import { ThinkingDisplay } from './ThinkingDisplay.js';
 import { SystemPromptDisplay } from './SystemPromptDisplay.js';
 import { UserSystemPromptDisplay } from './UserSystemPromptDisplay.js';
 
 interface EventDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
-  isFocused?: boolean;
+  isFocused?: boolean; // Whether this component has keyboard focus
+  isSelected?: boolean; // Whether timeline cursor is on this item (for CollapsibleBox)
   focusedLine?: number;
   itemStartLine?: number;
   onToggle?: () => void;
 }
 
-export function EventDisplay({ event, isStreaming, isFocused, focusedLine, itemStartLine, onToggle }: EventDisplayProps) {
+export function EventDisplay({ event, isStreaming, isFocused, isSelected, focusedLine, itemStartLine, onToggle }: EventDisplayProps) {
   const componentMap = {
     'TOOL_CALL': ToolCallDisplay,
     'TOOL_RESULT': ToolResultDisplay,
     'USER_MESSAGE': UserMessageDisplay,
     'AGENT_MESSAGE': AgentMessageDisplay,
     'LOCAL_SYSTEM_MESSAGE': SystemMessageDisplay,
-    'THINKING': ThinkingDisplay,
     'SYSTEM_PROMPT': SystemPromptDisplay,
     'USER_SYSTEM_PROMPT': UserSystemPromptDisplay,
   } as const;
@@ -49,7 +48,7 @@ export function EventDisplay({ event, isStreaming, isFocused, focusedLine, itemS
 
   return (
     <Box flexDirection="column">
-      <Component event={event} isStreaming={isStreaming} isFocused={isFocused} onToggle={onToggle} />
+      <Component event={event} isStreaming={isStreaming} isFocused={isFocused} isSelected={isSelected} onToggle={onToggle} />
     </Box>
   );
 }

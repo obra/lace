@@ -1,39 +1,117 @@
-// ABOUTME: Individual timeline item component with type-specific rendering logic
-// ABOUTME: Handles all timeline item types: user_message, agent_message, thinking, system_message, tool_execution, ephemeral_message
+// ABOUTME: Individual timeline item component with dynamic tool renderer discovery
+// ABOUTME: Handles all timeline item types with unified expansion behavior and automatic tool renderer selection
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Box, Text } from 'ink';
-import { Timeline, TimelineItem as TimelineItemType } from '../../../thread-processor.js';
+import { Timeline, TimelineItem as TimelineItemType, EphemeralMessage } from '../../../thread-processor.js';
+import { EventType } from '../../../../threads/types.js';
 import { EventDisplay } from './EventDisplay.js';
-import { ToolExecutionDisplay } from './ToolExecutionDisplay.js';
-import { DelegationBox } from './DelegationBox.js';
+import { GenericToolRenderer } from './tool-renderers/GenericToolRenderer.js';
+import { getToolRenderer } from './tool-renderers/getToolRenderer.js';
+import { ToolRendererErrorBoundary } from './ToolRendererErrorBoundary.js';
 import MessageDisplay from '../message-display.js';
-import { logger } from '../../../../utils/logger.js';
 
 interface TimelineItemProps {
   item: TimelineItemType;
-  delegateTimelines?: Map<string, Timeline>;
-  isFocused: boolean;
-  focusedLine: number;
+  isSelected: boolean; // Whether timeline cursor is on this item (for expansion)
+  isFocused: boolean; // Whether this item has keyboard focus (for its own behaviors)
+  selectedLine: number;
   itemStartLine: number;
   onToggle?: () => void;
-  delegationExpandState: Map<string, boolean>;
-  toolExpandState: Map<string, boolean>;
+  onExpansionToggle?: () => void; // Called when left/right arrows should toggle expansion
   currentFocusId?: string;
-  extractDelegateThreadId: (item: Extract<TimelineItemType, { type: 'tool_execution' }>) => string | null;
+}
+
+interface DynamicToolRendererProps {
+  item: Extract<TimelineItemType, { type: 'tool_execution' }>;
+  isSelected: boolean; // Whether timeline cursor is on this item
+  isFocused: boolean; // Whether this item has keyboard focus
+  onToggle?: () => void;
+  onExpansionToggle?: () => void;
+}
+
+function DynamicToolRenderer({ 
+  item, 
+  isSelected, 
+  isFocused,
+  onToggle
+}: DynamicToolRendererProps) {
+  const [ToolRenderer, setToolRenderer] = React.useState<React.ComponentType<unknown> | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [debugInfo, setDebugInfo] = React.useState<string>('');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setDebugInfo(`Looking for ${item.call.toolName}ToolRenderer...`);
+    
+    getToolRenderer(item.call.toolName).then(renderer => {
+      if (!cancelled) {
+        setToolRenderer(() => renderer);
+        setIsLoading(false);
+        setDebugInfo(renderer ? `Found: ${renderer.name}` : 'Not found, using Generic');
+      }
+    }).catch(error => {
+      if (!cancelled) {
+        setIsLoading(false);
+        setDebugInfo(`Error: ${error.message}`);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [item.call.toolName]);
+
+  if (isLoading) {
+    // Add debug info to loading state
+    const debugItem = {
+      ...item,
+      call: {
+        ...item.call,
+        input: {
+          ...item.call.input,
+          _debug: debugInfo
+        }
+      }
+    };
+    return <GenericToolRenderer 
+      item={debugItem}
+      isSelected={isSelected}
+      isFocused={isFocused}
+      onToggle={onToggle}
+    />;
+  }
+
+  const RendererComponent = ToolRenderer || GenericToolRenderer;
+  
+  // Add debug info to final render
+  const debugItem = {
+    ...item,
+    call: {
+      ...item.call,
+      input: {
+        ...item.call.input,
+        _debug: debugInfo
+      }
+    }
+  };
+  
+  return <RendererComponent 
+    item={debugItem}
+    isSelected={isSelected}
+    isFocused={isFocused}
+    onToggle={onToggle}
+  />;
 }
 
 export function TimelineItem({ 
   item, 
-  delegateTimelines, 
-  isFocused, 
-  focusedLine, 
+  isSelected, 
+  isFocused,
+  selectedLine, 
   itemStartLine, 
   onToggle, 
-  delegationExpandState, 
-  toolExpandState, 
-  currentFocusId, 
-  extractDelegateThreadId 
+  currentFocusId
 }: TimelineItemProps) {
   switch (item.type) {
     case 'user_message':
@@ -46,7 +124,8 @@ export function TimelineItem({
           data: item.content
         }} 
         isFocused={isFocused}
-        focusedLine={focusedLine}
+        isSelected={isSelected}
+        focusedLine={selectedLine}
         itemStartLine={itemStartLine}
         onToggle={onToggle}
       />;
@@ -61,22 +140,8 @@ export function TimelineItem({
           data: item.content
         }} 
         isFocused={isFocused}
-        focusedLine={focusedLine}
-        itemStartLine={itemStartLine}
-        onToggle={onToggle}
-      />;
-      
-    case 'thinking':
-      return <EventDisplay 
-        event={{
-          id: item.id,
-          threadId: '',
-          type: 'THINKING',
-          timestamp: item.timestamp,
-          data: item.content
-        }} 
-        isFocused={isFocused}
-        focusedLine={focusedLine}
+        isSelected={isSelected}
+        focusedLine={selectedLine}
         itemStartLine={itemStartLine}
         onToggle={onToggle}
       />;
@@ -86,108 +151,38 @@ export function TimelineItem({
         event={{
           id: item.id,
           threadId: '',
-          type: (item.originalEventType || 'LOCAL_SYSTEM_MESSAGE') as any,
+          type: (item.originalEventType || 'LOCAL_SYSTEM_MESSAGE') as EventType,
           timestamp: item.timestamp,
           data: item.content
         }} 
         isFocused={isFocused}
-        focusedLine={focusedLine}
+        isSelected={isSelected}
+        focusedLine={selectedLine}
         itemStartLine={itemStartLine}
         onToggle={onToggle}
       />;
       
     case 'tool_execution':
-      const callEvent = {
-        id: `${item.callId}-call`,
-        threadId: '',
-        type: 'TOOL_CALL' as const,
-        timestamp: item.timestamp,
-        data: item.call
-      };
-      
-      const resultEvent = item.result ? {
-        id: `${item.callId}-result`,
-        threadId: '',
-        type: 'TOOL_RESULT' as const,
-        timestamp: item.timestamp,
-        data: item.result
-      } : undefined;
-      
-      // Check if this is a delegate tool call
-      if (item.call.toolName === 'delegate') {
-        logger.debug('TimelineItem: Processing delegate tool call', { 
-          callId: item.callId,
-          toolName: item.call.toolName,
-          hasDelegateTimelines: !!delegateTimelines,
-          delegateTimelineCount: delegateTimelines?.size || 0
-        });
-        
-        if (delegateTimelines) {
-          const delegateThreadId = extractDelegateThreadId(item);
-          logger.debug('TimelineItem: Delegate thread ID extraction result', {
-            callId: item.callId,
-            extractedThreadId: delegateThreadId,
-            availableThreads: Array.from(delegateTimelines.keys()),
-            toolResult: item.result?.output ? item.result.output.substring(0, 100) + '...' : 'no result'
-          });
-          
-          const delegateTimeline = delegateThreadId ? delegateTimelines.get(delegateThreadId) : null;
-          
-          if (delegateTimeline && delegateThreadId) {
-            const isExpanded = delegationExpandState.get(item.callId) ?? true;
-            logger.debug('TimelineItem: RENDERING delegation box', { 
-              threadId: delegateThreadId,
-              callId: item.callId,
-              isExpanded,
-              timelineItemCount: delegateTimeline.items.length
-            });
-            return (
-              <Box flexDirection="column">
-                <ToolExecutionDisplay 
-                  callEvent={callEvent} 
-                  resultEvent={resultEvent}
-                  isFocused={isFocused}
-                  isExpanded={false} // Tool part always collapsed for delegate calls
-                />
-                <DelegationBox 
-                  threadId={delegateThreadId}
-                  timeline={delegateTimeline}
-                  delegateTimelines={delegateTimelines}
-                  expanded={isExpanded}
-                  parentFocusId={currentFocusId || 'timeline'}
-                />
-              </Box>
-            );
-          } else {
-            logger.debug('TimelineItem: NOT rendering delegation box', {
-              reason: 'missing timeline or threadId',
-              callId: item.callId,
-              delegateThreadId,
-              hasTimeline: !!delegateTimeline,
-              hasDelegateTimelines: !!delegateTimelines,
-              delegateTimelineKeys: delegateTimelines ? Array.from(delegateTimelines.keys()) : []
-            });
-          }
-        } else {
-          logger.debug('TimelineItem: No delegate timelines provided', {
-            callId: item.callId,
-            toolName: item.call.toolName
-          });
-        }
-      }
-      
-      const isToolExpanded = toolExpandState.get(item.callId) ?? false;
-      return <ToolExecutionDisplay 
-        callEvent={callEvent} 
-        resultEvent={resultEvent}
-        isFocused={isFocused}
-        isExpanded={isToolExpanded}
-      />;
+      return (
+        <ToolRendererErrorBoundary
+          item={item}
+          isSelected={isSelected}
+          isFocused={isFocused}
+          onToggle={onToggle}
+        >
+          <DynamicToolRenderer 
+            item={item}
+            isSelected={isSelected}
+            isFocused={isFocused}
+            onToggle={onToggle}
+          />
+        </ToolRendererErrorBoundary>
+      );
       
     case 'ephemeral_message':
       return <MessageDisplay 
         message={{
-          type: item.messageType as any,
+          type: item.messageType as EphemeralMessage['type'],
           content: item.content,
           timestamp: item.timestamp
         }} 

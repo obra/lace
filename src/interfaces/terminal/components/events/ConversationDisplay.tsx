@@ -9,7 +9,7 @@ import { useThreadProcessor } from '../../terminal-interface.js';
 import TimelineDisplay from './TimelineDisplay.js';
 
 interface Message {
-  type: "user" | "assistant" | "system" | "tool" | "thinking";
+  type: "user" | "assistant" | "system" | "tool";
   content: string;
   timestamp: Date;
 }
@@ -47,7 +47,6 @@ export function ConversationDisplay({ events, ephemeralMessages, focusId, bottom
     <Box flexDirection="column" flexGrow={1} overflow="hidden">
       <TimelineDisplay 
         timeline={mainTimeline} 
-        delegateTimelines={processedThreads.delegateTimelines}
         focusId={focusId}
         bottomSectionHeight={bottomSectionHeight}
       />

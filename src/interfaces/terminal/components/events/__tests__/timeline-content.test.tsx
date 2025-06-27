@@ -9,8 +9,8 @@ import { Timeline, TimelineItem } from '../../../../thread-processor.js';
 
 // Mock TimelineItem component
 vi.mock('../TimelineItem.js', () => ({
-  TimelineItem: ({ item, isFocused, delegateTimelines, currentFocusId }: any) => 
-    React.createElement(Text, {}, `TLI:${item.type}:${isFocused ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}:${delegateTimelines ? 'hasDel' : 'noDel'}`)
+  TimelineItem: ({ item, isSelected, currentFocusId }: any) => 
+    React.createElement(Text, {}, `TLI:${item.type}:${isSelected ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}`)
 }));
 
 vi.mock('../../../../../utils/logger.js', () => ({
@@ -31,26 +31,18 @@ function TimelineContent({
   viewportState, 
   viewportActions, 
   itemRefs, 
-  delegateTimelines, 
-  delegationExpandState, 
-  toolExpandState, 
-  currentFocusId, 
-  extractDelegateThreadId 
+  currentFocusId 
 }: {
   timeline: Timeline;
-  viewportState: { focusedItemIndex: number; focusedLine: number; itemPositions: number[] };
+  viewportState: { selectedItemIndex: number; selectedLine: number; itemPositions: number[] };
   viewportActions: { triggerRemeasurement: () => void };
   itemRefs: React.MutableRefObject<Map<number, unknown>>;
-  delegateTimelines?: Map<string, Timeline>;
-  delegationExpandState: Map<string, boolean>;
-  toolExpandState: Map<string, boolean>;
   currentFocusId?: string;
-  extractDelegateThreadId: (item: Extract<TimelineItem, { type: 'tool_execution' }>) => string | null;
 }) {
   return (
     <React.Fragment>
       {timeline.items.map((item, index) => {
-        const isItemFocused = index === viewportState.focusedItemIndex;
+        const isItemFocused = index === viewportState.selectedItemIndex;
         return (
           <Box 
             key={`timeline-item-${index}`} 
@@ -65,15 +57,12 @@ function TimelineContent({
           >
             <TimelineItemComponent 
               item={item} 
-              delegateTimelines={delegateTimelines}
+              isSelected={isItemFocused}
               isFocused={isItemFocused}
-              focusedLine={viewportState.focusedLine}
+              selectedLine={viewportState.selectedLine}
               itemStartLine={viewportState.itemPositions[index] || 0}
               onToggle={viewportActions.triggerRemeasurement}
-              delegationExpandState={delegationExpandState}
-              toolExpandState={toolExpandState}
               currentFocusId={currentFocusId}
-              extractDelegateThreadId={extractDelegateThreadId}
             />
           </Box>
         );
@@ -115,18 +104,14 @@ describe('TimelineContent (Baseline)', () => {
 
   const defaultProps = {
     viewportState: {
-      focusedItemIndex: 0,
-      focusedLine: 0,
+      selectedItemIndex: 0,
+      selectedLine: 0,
       itemPositions: [0, 5, 10]
     },
     viewportActions: {
       triggerRemeasurement: mockTriggerRemeasurement
     },
-    delegateTimelines: undefined,
-    delegationExpandState: new Map<string, boolean>(),
-    toolExpandState: new Map<string, boolean>(),
-    currentFocusId: 'timeline',
-    extractDelegateThreadId: mockExtractDelegateThreadId
+    currentFocusId: 'timeline'
   };
 
   describe('Item rendering', () => {
@@ -143,8 +128,8 @@ describe('TimelineContent (Baseline)', () => {
 
       const frame = lastFrame();
       expect(frame).toBeDefined();
-      expect(frame!).toContain('TLI:user_message:FOCUS:timeline:noDel'); // First item focused
-      expect(frame!).toContain('TLI:user_message:UNFOCUS:timeline:noDel'); // Others unfocused
+      expect(frame!).toContain('TLI:user_message:FOCUS:timeline'); // First item focused
+      expect(frame!).toContain('TLI:user_message:UNFOCUS:timeline'); // Others unfocused
     });
 
     it('should handle empty timeline', () => {
@@ -161,32 +146,29 @@ describe('TimelineContent (Baseline)', () => {
       expect(lastFrame()).toBe('');
     });
 
-    it('should pass delegate timelines when available', () => {
+    it('should render timeline items correctly', () => {
       const timeline = createMockTimeline(2);
-      const delegateTimelines = new Map([['thread-1', createMockTimeline(1)]]);
 
       const { lastFrame } = render(
         <TimelineContent 
           timeline={timeline} 
           itemRefs={mockItemRefs}
           {...defaultProps}
-          delegateTimelines={delegateTimelines}
         />
       );
 
       const frame = lastFrame();
       expect(frame).toBeDefined();
-      expect(frame!).toContain('hasDel');
-      expect(frame!).not.toContain('noDel');
+      expect(frame!).toContain('TLI:user_message');
     });
   });
 
   describe('Focus management', () => {
-    it('should mark correct item as focused based on focusedItemIndex', () => {
+    it('should mark correct item as focused based on selectedItemIndex', () => {
       const timeline = createMockTimeline(3);
       const viewportState = {
-        focusedItemIndex: 1, // Second item focused
-        focusedLine: 0,
+        selectedItemIndex: 1, // Second item focused
+        selectedLine: 0,
         itemPositions: [0, 5, 10]
       };
 
@@ -210,11 +192,11 @@ describe('TimelineContent (Baseline)', () => {
       expect(unfocusedMatches).toHaveLength(2);
     });
 
-    it('should handle focusedItemIndex out of bounds', () => {
+    it('should handle selectedItemIndex out of bounds', () => {
       const timeline = createMockTimeline(2);
       const viewportState = {
-        focusedItemIndex: 5, // Out of bounds
-        focusedLine: 0,
+        selectedItemIndex: 5, // Out of bounds
+        selectedLine: 0,
         itemPositions: [0, 5]
       };
 
@@ -229,7 +211,7 @@ describe('TimelineContent (Baseline)', () => {
 
       const frame = lastFrame();
       expect(frame).toBeDefined();
-      // All items should be unfocused when focusedItemIndex is out of bounds
+      // All items should be unfocused when selectedItemIndex is out of bounds
       const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
       expect(unfocusedMatches).toHaveLength(2);
       
@@ -278,8 +260,8 @@ describe('TimelineContent (Baseline)', () => {
     it('should pass correct itemStartLine from viewportState.itemPositions', () => {
       const timeline = createMockTimeline(2);
       const viewportState = {
-        focusedItemIndex: 0,
-        focusedLine: 0,
+        selectedItemIndex: 0,
+        selectedLine: 0,
         itemPositions: [10, 25] // Custom positions
       };
 
@@ -300,8 +282,8 @@ describe('TimelineContent (Baseline)', () => {
     it('should handle missing itemPositions gracefully', () => {
       const timeline = createMockTimeline(2);
       const viewportState = {
-        focusedItemIndex: 0,
-        focusedLine: 0,
+        selectedItemIndex: 0,
+        selectedLine: 0,
         itemPositions: [] // Empty positions array
       };
 
@@ -322,18 +304,12 @@ describe('TimelineContent (Baseline)', () => {
   describe('Props forwarding', () => {
     it('should forward all required props to TimelineItem', () => {
       const timeline = createMockTimeline(1);
-      const delegateTimelines = new Map([['thread-1', createMockTimeline(1)]]);
-      const delegationExpandState = new Map([['call-1', true]]);
-      const toolExpandState = new Map([['call-2', false]]);
 
       const { lastFrame } = render(
         <TimelineContent 
           timeline={timeline} 
           itemRefs={mockItemRefs}
           {...defaultProps}
-          delegateTimelines={delegateTimelines}
-          delegationExpandState={delegationExpandState}
-          toolExpandState={toolExpandState}
           currentFocusId="custom-focus"
         />
       );
@@ -341,7 +317,6 @@ describe('TimelineContent (Baseline)', () => {
       const frame = lastFrame();
       expect(frame).toBeDefined();
       expect(frame!).toContain('custom-focus');
-      expect(frame!).toContain('hasDel');
     });
 
     it('should call triggerRemeasurement when TimelineItem onToggle is triggered', () => {

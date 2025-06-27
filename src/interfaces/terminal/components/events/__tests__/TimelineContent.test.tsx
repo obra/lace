@@ -10,8 +10,8 @@ import { TimelineContent } from '../TimelineContent.js';
 
 // Mock TimelineItem component
 vi.mock('../TimelineItem.js', () => ({
-  TimelineItem: ({ item, isFocused, delegateTimelines, currentFocusId }: any) => 
-    React.createElement(Text, {}, `TLI:${item.type}:${isFocused ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}:${delegateTimelines ? 'hasDel' : 'noDel'}`)
+  TimelineItem: ({ item, isSelected, currentFocusId }: any) => 
+    React.createElement(Text, {}, `TLI:${item.type}:${isSelected ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}`)
 }));
 
 vi.mock('../../../../../utils/logger.js', () => ({
@@ -25,12 +25,10 @@ vi.mock('../../../../../utils/logger.js', () => ({
 
 describe('TimelineContent Component', () => {
   const mockTriggerRemeasurement = vi.fn();
-  const mockExtractDelegateThreadId = vi.fn();
   let mockItemRefs: React.MutableRefObject<Map<number, unknown>> = { current: new Map() };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockExtractDelegateThreadId.mockReturnValue(null);
     mockItemRefs = { current: new Map() };
   });
 
@@ -56,19 +54,15 @@ describe('TimelineContent Component', () => {
 
   const getDefaultProps = () => ({
     viewportState: {
-      focusedItemIndex: 0,
-      focusedLine: 0,
+      selectedItemIndex: 0,
+      selectedLine: 0,
       itemPositions: [0, 5, 10]
     },
     viewportActions: {
       triggerRemeasurement: mockTriggerRemeasurement
     },
     itemRefs: mockItemRefs,
-    delegateTimelines: undefined,
-    delegationExpandState: new Map<string, boolean>(),
-    toolExpandState: new Map<string, boolean>(),
-    currentFocusId: 'timeline',
-    extractDelegateThreadId: mockExtractDelegateThreadId
+    currentFocusId: 'timeline'
   });
 
   describe('Basic rendering', () => {
@@ -80,8 +74,8 @@ describe('TimelineContent Component', () => {
       );
 
       const frame = lastFrame();
-      expect(frame).toContain('TLI:user_message:FOCUS:timeline:noDel'); // First item focused
-      expect(frame).toContain('TLI:user_message:UNFOCUS:timeline:noDel'); // Others unfocused
+      expect(frame).toContain('TLI:user_message:FOCUS:timeline'); // First item focused
+      expect(frame).toContain('TLI:user_message:UNFOCUS:timeline'); // Others unfocused
     });
 
     it('should handle empty timeline', () => {
@@ -101,16 +95,16 @@ describe('TimelineContent Component', () => {
         <TimelineContent timeline={timeline} {...getDefaultProps()} />
       );
 
-      expect(lastFrame()).toContain('TLI:user_message:FOCUS:timeline:noDel');
+      expect(lastFrame()).toContain('TLI:user_message:FOCUS:timeline');
     });
   });
 
   describe('Focus management', () => {
-    it('should focus correct item based on focusedItemIndex', () => {
+    it('should focus correct item based on selectedItemIndex', () => {
       const timeline = createMockTimeline(3);
       const viewportState = {
-        focusedItemIndex: 1, // Second item focused
-        focusedLine: 0,
+        selectedItemIndex: 1, // Second item focused
+        selectedLine: 0,
         itemPositions: [0, 5, 10]
       };
 
@@ -133,11 +127,11 @@ describe('TimelineContent Component', () => {
       expect(unfocusedMatches).toHaveLength(2);
     });
 
-    it('should handle focusedItemIndex out of bounds', () => {
+    it('should handle selectedItemIndex out of bounds', () => {
       const timeline = createMockTimeline(2);
       const viewportState = {
-        focusedItemIndex: 5, // Out of bounds
-        focusedLine: 0,
+        selectedItemIndex: 5, // Out of bounds
+        selectedLine: 0,
         itemPositions: [0, 5]
       };
 
@@ -151,7 +145,7 @@ describe('TimelineContent Component', () => {
 
       const frame = lastFrame();
       expect(frame).toBeDefined();
-      // All items should be unfocused when focusedItemIndex is out of bounds
+      // All items should be unfocused when selectedItemIndex is out of bounds
       const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
       expect(unfocusedMatches).toHaveLength(2);
       
@@ -159,11 +153,11 @@ describe('TimelineContent Component', () => {
       expect(focusedMatches).toBeNull();
     });
 
-    it('should handle negative focusedItemIndex', () => {
+    it('should handle negative selectedItemIndex', () => {
       const timeline = createMockTimeline(2);
       const viewportState = {
-        focusedItemIndex: -1, // Negative index
-        focusedLine: 0,
+        selectedItemIndex: -1, // Negative index
+        selectedLine: 0,
         itemPositions: [0, 5]
       };
 
@@ -177,7 +171,7 @@ describe('TimelineContent Component', () => {
 
       const frame = lastFrame();
       expect(frame).toBeDefined();
-      // All items should be unfocused when focusedItemIndex is negative
+      // All items should be unfocused when selectedItemIndex is negative
       const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
       expect(unfocusedMatches).toHaveLength(2);
       
@@ -187,22 +181,7 @@ describe('TimelineContent Component', () => {
   });
 
   describe('Prop forwarding', () => {
-    it('should forward delegate timelines', () => {
-      const timeline = createMockTimeline(2);
-      const delegateTimelines = new Map([['thread-1', createMockTimeline(1)]]);
-
-      const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          {...getDefaultProps()}
-          delegateTimelines={delegateTimelines}
-        />
-      );
-
-      const frame = lastFrame();
-      expect(frame).toContain('hasDel');
-      expect(frame).not.toContain('noDel');
-    });
+    // Note: delegateTimelines prop has been removed - delegate logic is now internal to DelegationBox
 
     it('should forward currentFocusId', () => {
       const timeline = createMockTimeline(1);
@@ -221,8 +200,8 @@ describe('TimelineContent Component', () => {
     it('should pass viewportState data to items', () => {
       const timeline = createMockTimeline(2);
       const viewportState = {
-        focusedItemIndex: 0,
-        focusedLine: 10,
+        selectedItemIndex: 0,
+        selectedLine: 10,
         itemPositions: [100, 200] // Custom positions
       };
 
@@ -242,8 +221,8 @@ describe('TimelineContent Component', () => {
     it('should handle missing itemPositions gracefully', () => {
       const timeline = createMockTimeline(2);
       const viewportState = {
-        focusedItemIndex: 0,
-        focusedLine: 0,
+        selectedItemIndex: 0,
+        selectedLine: 0,
         itemPositions: [] // Empty positions array
       };
 
@@ -263,17 +242,12 @@ describe('TimelineContent Component', () => {
   describe('State management', () => {
     it('should forward expand states', () => {
       const timeline = createMockTimeline(1);
-      const delegationExpandState = new Map([['call-1', true]]);
-      const toolExpandState = new Map([['call-2', false]]);
-
       // These props are passed through but don't affect our mock output
       // This test verifies the props are accepted without errors
       const { lastFrame } = render(
         <TimelineContent 
           timeline={timeline} 
           {...getDefaultProps()}
-          delegationExpandState={delegationExpandState}
-          toolExpandState={toolExpandState}
         />
       );
 
@@ -366,18 +340,17 @@ describe('TimelineContent Component', () => {
   });
 
   describe('Edge cases', () => {
-    it('should handle undefined delegateTimelines', () => {
+    it('should handle component without errors', () => {
       const timeline = createMockTimeline(1);
 
       const { lastFrame } = render(
         <TimelineContent 
           timeline={timeline} 
           {...getDefaultProps()}
-          delegateTimelines={undefined}
         />
       );
 
-      expect(lastFrame()).toContain('noDel');
+      expect(lastFrame()).toContain('TLI:user_message');
     });
 
     it('should handle empty expand state maps', () => {
@@ -387,8 +360,6 @@ describe('TimelineContent Component', () => {
         <TimelineContent 
           timeline={timeline} 
           {...getDefaultProps()}
-          delegationExpandState={new Map()}
-          toolExpandState={new Map()}
         />
       );
 

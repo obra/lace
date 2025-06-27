@@ -80,11 +80,11 @@ describe('TimelineViewport', () => {
     
     // Should provide viewport state
     expect(capturedState).toBeDefined();
-    expect(capturedState.focusedLine).toBeDefined();
+    expect(capturedState.selectedLine).toBeDefined();
     expect(capturedState.lineScrollOffset).toBeDefined();
     expect(capturedState.itemPositions).toBeDefined();
     expect(capturedState.totalContentHeight).toBeDefined();
-    expect(capturedState.focusedItemIndex).toBeDefined();
+    expect(capturedState.selectedItemIndex).toBeDefined();
   });
 
   it('should provide viewport actions to children', () => {

@@ -7,8 +7,8 @@ import { Timeline, TimelineItem as TimelineItemType } from '../../../thread-proc
 import { TimelineItem } from './TimelineItem.js';
 
 interface ViewportState {
-  focusedItemIndex: number;
-  focusedLine: number;
+  selectedItemIndex: number;
+  selectedLine: number;
   itemPositions: number[];
 }
 
@@ -21,11 +21,7 @@ interface TimelineContentProps {
   viewportState: ViewportState;
   viewportActions: ViewportActions;
   itemRefs: React.MutableRefObject<Map<number, unknown>>;
-  delegateTimelines?: Map<string, Timeline>;
-  delegationExpandState: Map<string, boolean>;
-  toolExpandState: Map<string, boolean>;
   currentFocusId?: string;
-  extractDelegateThreadId: (item: Extract<TimelineItemType, { type: 'tool_execution' }>) => string | null;
 }
 
 export function TimelineContent({ 
@@ -33,16 +29,12 @@ export function TimelineContent({
   viewportState, 
   viewportActions, 
   itemRefs, 
-  delegateTimelines, 
-  delegationExpandState, 
-  toolExpandState, 
-  currentFocusId, 
-  extractDelegateThreadId 
+  currentFocusId 
 }: TimelineContentProps) {
   return (
     <React.Fragment>
       {timeline.items.map((item, index) => {
-        const isItemFocused = index === viewportState.focusedItemIndex;
+        const isItemSelected = index === viewportState.selectedItemIndex;
         return (
           <Box 
             key={`timeline-item-${index}`} 
@@ -57,15 +49,12 @@ export function TimelineContent({
           >
             <TimelineItem 
               item={item} 
-              delegateTimelines={delegateTimelines}
-              isFocused={isItemFocused}
-              focusedLine={viewportState.focusedLine}
+              isSelected={isItemSelected}
+              isFocused={false} // TODO: Implement individual item focus
+              selectedLine={viewportState.selectedLine}
               itemStartLine={viewportState.itemPositions[index] || 0}
               onToggle={viewportActions.triggerRemeasurement}
-              delegationExpandState={delegationExpandState}
-              toolExpandState={toolExpandState}
               currentFocusId={currentFocusId}
-              extractDelegateThreadId={extractDelegateThreadId}
             />
           </Box>
         );

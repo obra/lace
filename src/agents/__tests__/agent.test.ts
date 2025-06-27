@@ -501,22 +501,6 @@ describe('Enhanced Agent', () => {
       expect(historyAfter.length).toBeGreaterThan(historyBefore.length);
     });
 
-    it('should ignore THINKING events in conversation for model context', () => {
-      // Add THINKING event directly to thread
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test question');
-      threadManager.addEvent(threadId, 'THINKING', 'I need to think about this...');
-      threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Here is my response');
-
-      const history = agent.buildThreadMessages();
-
-      // Should only have user and agent messages, no THINKING
-      expect(history).toHaveLength(2);
-      expect(history[0].role).toBe('user');
-      expect(history[0].content).toBe('Test question');
-      expect(history[1].role).toBe('assistant');
-      expect(history[1].content).toBe('Here is my response');
-    });
-
     it('should ignore LOCAL_SYSTEM_MESSAGE events in conversation', () => {
       threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test');
       threadManager.addEvent(threadId, 'LOCAL_SYSTEM_MESSAGE', 'System info message');
@@ -865,9 +849,9 @@ describe('Enhanced Agent', () => {
           '<think>I need to think about this</think>Here is my response'
         );
 
-        // No THINKING events should be created by the Agent - that's UI layer responsibility
-        const thinkingEvents = events.filter((e) => e.type === 'THINKING');
-        expect(thinkingEvents).toHaveLength(0);
+        // Verify only expected event types exist
+        const eventTypes = new Set(events.map((e) => e.type));
+        expect(eventTypes).not.toContain('THINKING' as any);
       });
     });
 
