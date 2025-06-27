@@ -2,6 +2,7 @@
 // ABOUTME: Handles extraction, word counting, and content transformation for AgentMessageDisplay
 
 import sax from 'sax';
+import { logger } from '../../../../../utils/logger.js';
 
 export interface ThinkingBlock {
   content: string;
@@ -107,7 +108,7 @@ export function parseThinkingBlocks(content: string): ParsedContent {
     };
   } catch (error) {
     // If SAX parser fails, fall back to regex for robustness
-    console.warn('SAX parser failed, falling back to regex:', error);
+    logger.warn('SAX parser failed, falling back to regex:', error);
     const regex = /<think>([\s\S]*?)<\/think>/g;
     const blocks: ThinkingBlock[] = [];
     let match;
