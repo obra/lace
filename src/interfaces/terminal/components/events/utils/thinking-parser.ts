@@ -4,6 +4,20 @@
 import sax from 'sax';
 import { logger } from '../../../../../utils/logger.js';
 
+// Simple LRU cache for parsing results
+const CACHE_SIZE = 100;
+const parseCache = new Map<string, ParsedContent>();
+
+function cacheResult(content: string, result: ParsedContent): ParsedContent {
+  // Implement simple LRU by removing oldest entries when cache is full
+  if (parseCache.size >= CACHE_SIZE) {
+    const firstKey = parseCache.keys().next().value;
+    parseCache.delete(firstKey);
+  }
+  parseCache.set(content, result);
+  return result;
+}
+
 export interface ThinkingBlock {
   content: string;
   startIndex: number;
@@ -20,8 +34,13 @@ export interface ParsedContent {
 /**
  * Parse agent message content to extract thinking blocks and clean content
  * Uses SAX parser to handle streaming cases with incomplete thinking blocks
+ * Results are memoized for performance
  */
 export function parseThinkingBlocks(content: string): ParsedContent {
+  // Check cache first
+  if (parseCache.has(content)) {
+    return parseCache.get(content)!;
+  }
   const thinkingBlocks: ThinkingBlock[] = [];
   let cleanContent = '';
   let totalThinkingWords = 0;
@@ -100,12 +119,13 @@ export function parseThinkingBlocks(content: string): ParsedContent {
     // Parse the content - wrap in root element for well-formed XML
     parser.write(`<root>${content}</root>`).close();
 
-    return {
+    const result = {
       hasThinking: thinkingBlocks.length > 0,
       thinkingBlocks,
       contentWithoutThinking: cleanContent.trim(),
       totalThinkingWords,
     };
+    return cacheResult(content, result);
   } catch (error) {
     // If SAX parser fails, fall back to regex for robustness
     logger.warn('SAX parser failed, falling back to regex:', error);
@@ -124,12 +144,13 @@ export function parseThinkingBlocks(content: string): ParsedContent {
     }
 
     clean = content.replace(regex, '').trim();
-    return {
+    const result = {
       hasThinking: blocks.length > 0,
       thinkingBlocks: blocks,
       contentWithoutThinking: clean,
       totalThinkingWords,
     };
+    return cacheResult(content, result);
   }
 }
 
