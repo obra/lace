@@ -21,7 +21,6 @@ export interface ProcessedThreads {
 export type TimelineItem =
   | { type: 'user_message'; content: string; timestamp: Date; id: string }
   | { type: 'agent_message'; content: string; timestamp: Date; id: string }
-  | { type: 'thinking'; content: string; timestamp: Date; id: string }
   | {
       type: 'tool_execution';
       call: ToolCallData;
@@ -41,20 +40,17 @@ export type TimelineItem =
 // Cached processed events (from persisted ThreadEvents)
 export type ProcessedThreadItems = Exclude<TimelineItem, { type: 'ephemeral_message' }>[];
 
-// Fast processing for streaming messages (can include thinking blocks from streaming)
-export type EphemeralTimelineItems = (
-  | Extract<TimelineItem, { type: 'ephemeral_message' }>
-  | Extract<TimelineItem, { type: 'thinking' }>
-)[];
+// Fast processing for streaming messages
+export type EphemeralTimelineItems = Extract<TimelineItem, { type: 'ephemeral_message' }>[];
 
 export interface EphemeralMessage {
-  type: 'user' | 'assistant' | 'system' | 'tool' | 'thinking';
+  type: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp: Date;
 }
 
 export class ThreadProcessor {
-  // Cache individual parsed events (expensive operations like thinking block extraction)
+  // Cache individual parsed events
   private _eventCache = new Map<string, TimelineItem[]>();
 
   /**
@@ -120,18 +116,18 @@ export class ThreadProcessor {
 
   /**
    * Process ephemeral messages (called frequently during streaming)
-   * Extracts thinking blocks from streaming assistant messages
+   * Processes streaming assistant messages
    */
   processEphemeralEvents(ephemeralMessages: EphemeralMessage[]): EphemeralTimelineItems {
     const items: EphemeralTimelineItems = [];
 
     for (const msg of ephemeralMessages) {
       if (msg.type === 'assistant' && msg.content) {
-        // Keep full assistant content with thinking blocks intact
+        // Keep full assistant content intact
         items.push({
           type: 'ephemeral_message' as const,
           messageType: msg.type,
-          content: msg.content, // Full content with thinking blocks
+          content: msg.content, // Full content
           timestamp: msg.timestamp,
         });
       } else {
@@ -155,7 +151,7 @@ export class ThreadProcessor {
     processedEvents: ProcessedThreadItems,
     ephemeralItems: EphemeralTimelineItems
   ): Timeline {
-    // Merge and sort chronologically (no deduplication needed - no separate thinking items)
+    // Merge and sort chronologically
     const allItems: TimelineItem[] = [...processedEvents, ...ephemeralItems].sort(
       (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
     );
@@ -240,7 +236,7 @@ export class ThreadProcessor {
           const eventItems: TimelineItem[] = [
             {
               type: 'agent_message',
-              content: event.data as string, // Full content with thinking blocks
+              content: event.data as string, // Full content
               timestamp: event.timestamp,
               id: event.id,
             },
@@ -249,11 +245,6 @@ export class ThreadProcessor {
           // Cache the processed items for this event
           this._eventCache.set(event.id, eventItems);
           items.push(...eventItems);
-          break;
-        }
-
-        case 'THINKING': {
-          // THINKING events are now ignored - thinking blocks handled internally by AgentMessageDisplay
           break;
         }
 

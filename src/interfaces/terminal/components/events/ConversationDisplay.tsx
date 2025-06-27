@@ -9,7 +9,7 @@ import { useThreadProcessor } from '../../terminal-interface.js';
 import TimelineDisplay from './TimelineDisplay.js';
 
 interface Message {
-  type: "user" | "assistant" | "system" | "tool" | "thinking";
+  type: "user" | "assistant" | "system" | "tool";
   content: string;
   timestamp: Date;
 }
