@@ -1,12 +1,12 @@
-// ABOUTME: Individual timeline item component with type-specific rendering logic
-// ABOUTME: Handles all timeline item types: user_message, agent_message, thinking, system_message, tool_execution, ephemeral_message
+// ABOUTME: Individual timeline item component with dynamic tool renderer discovery
+// ABOUTME: Handles all timeline item types with unified expansion behavior and automatic tool renderer selection
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Box, Text } from 'ink';
 import { Timeline, TimelineItem as TimelineItemType } from '../../../thread-processor.js';
 import { EventDisplay } from './EventDisplay.js';
-import { ToolExecutionDisplay } from './ToolExecutionDisplay.js';
-import { DelegationBox } from './DelegationBox.js';
+import { GenericToolRenderer } from './tool-renderers/GenericToolRenderer.js';
+import { getToolRenderer } from './tool-renderers/getToolRenderer.js';
 import MessageDisplay from '../message-display.js';
 
 interface TimelineItemProps {
@@ -16,6 +16,52 @@ interface TimelineItemProps {
   itemStartLine: number;
   onToggle?: () => void;
   currentFocusId?: string;
+}
+
+interface DynamicToolRendererProps {
+  item: Extract<TimelineItemType, { type: 'tool_execution' }>;
+  isFocused: boolean;
+  onToggle?: () => void;
+}
+
+function DynamicToolRenderer({ 
+  item, 
+  isFocused, 
+  onToggle
+}: DynamicToolRendererProps) {
+  const [ToolRenderer, setToolRenderer] = React.useState<React.ComponentType<unknown> | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    
+    getToolRenderer(item.call.toolName).then(renderer => {
+      if (!cancelled) {
+        setToolRenderer(() => renderer);
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [item.call.toolName]);
+
+  if (isLoading) {
+    return <GenericToolRenderer 
+      item={item}
+      isFocused={isFocused}
+      onToggle={onToggle}
+    />;
+  }
+
+  const RendererComponent = ToolRenderer || GenericToolRenderer;
+  
+  return <RendererComponent 
+    item={item}
+    isFocused={isFocused}
+    onToggle={onToggle}
+  />;
 }
 
 export function TimelineItem({ 
@@ -88,44 +134,8 @@ export function TimelineItem({
       />;
       
     case 'tool_execution':
-      const callEvent = {
-        id: `${item.callId}-call`,
-        threadId: '',
-        type: 'TOOL_CALL' as const,
-        timestamp: item.timestamp,
-        data: item.call
-      };
-      
-      const resultEvent = item.result ? {
-        id: `${item.callId}-result`,
-        threadId: '',
-        type: 'TOOL_RESULT' as const,
-        timestamp: item.timestamp,
-        data: item.result
-      } : undefined;
-      
-      // Check if this is a delegate tool call
-      if (item.call.toolName === 'delegate') {
-        return (
-          <Box flexDirection="column">
-            <ToolExecutionDisplay 
-              callEvent={callEvent} 
-              resultEvent={resultEvent}
-              isFocused={isFocused}
-              onToggle={onToggle}
-            />
-            <DelegationBox 
-              toolCall={item}
-              parentFocusId={currentFocusId || 'timeline'}
-              onToggle={onToggle}
-            />
-          </Box>
-        );
-      }
-      
-      return <ToolExecutionDisplay 
-        callEvent={callEvent} 
-        resultEvent={resultEvent}
+      return <DynamicToolRenderer 
+        item={item}
         isFocused={isFocused}
         onToggle={onToggle}
       />;

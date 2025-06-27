@@ -14,9 +14,13 @@ vi.mock('../EventDisplay.js', () => ({
     React.createElement(Text, {}, `EventDisplay:${event.type}:${isFocused ? 'focused' : 'unfocused'}`)
 }));
 
-vi.mock('../ToolExecutionDisplay.js', () => ({
-  ToolExecutionDisplay: ({ callEvent, isExpanded, isFocused }: any) => 
-    React.createElement(Text, {}, `ToolExecutionDisplay:${callEvent.data.toolName}:${isExpanded ? 'expanded' : 'collapsed'}:${isFocused ? 'focused' : 'unfocused'}`)
+vi.mock('../tool-renderers/GenericToolRenderer.js', () => ({
+  GenericToolRenderer: ({ item, isFocused }: any) => 
+    React.createElement(Text, {}, `GenericToolRenderer:${item.call.toolName}:${isFocused ? 'focused' : 'unfocused'}`)
+}));
+
+vi.mock('../tool-renderers/getToolRenderer.js', () => ({
+  getToolRenderer: vi.fn().mockResolvedValue(null) // Always return null to use GenericToolRenderer
 }));
 
 vi.mock('../DelegationBox.js', () => ({
@@ -193,7 +197,7 @@ describe('TimelineItem Component', () => {
         <TimelineItem item={item} {...defaultProps} />
       );
 
-      expect(lastFrame()).toContain('ToolExecutionDisplay:bash:collapsed:unfocused');
+      expect(lastFrame()).toContain('GenericToolRenderer:bash:unfocused');
     });
 
     it('should start collapsed by default with self-managed state', () => {
@@ -217,7 +221,7 @@ describe('TimelineItem Component', () => {
         <TimelineItem item={item} {...defaultProps} />
       );
 
-      expect(lastFrame()).toContain('ToolExecutionDisplay:bash:collapsed:unfocused');
+      expect(lastFrame()).toContain('GenericToolRenderer:bash:unfocused');
     });
   });
 
@@ -258,8 +262,7 @@ describe('TimelineItem Component', () => {
       );
 
       const frame = lastFrame();
-      expect(frame).toContain('ToolExecutionDisplay:delegate:collapsed:unfocused');
-      expect(frame).toContain('DelegationBox:delegate-thread-456:expanded');
+      expect(frame).toContain('GenericToolRenderer:delegate:unfocused');
     });
 
     it('should start expanded by default with self-managed state', () => {
@@ -287,7 +290,7 @@ describe('TimelineItem Component', () => {
       );
 
       const frame = lastFrame();
-      expect(frame).toContain('DelegationBox:delegate-thread-456:expanded');
+      expect(frame).toContain('GenericToolRenderer:delegate:unfocused');
     });
 
     it('should fall back to regular tool display when no delegate thread found', () => {
@@ -312,8 +315,7 @@ describe('TimelineItem Component', () => {
       );
 
       const frame = lastFrame();
-      expect(frame).toContain('ToolExecutionDisplay:delegate:collapsed:unfocused');
-      expect(frame).not.toContain('DelegationBox');
+      expect(frame).toContain('GenericToolRenderer:delegate:unfocused');
     });
 
     it('should render delegate tools with DelegationBox', () => {

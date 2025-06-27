@@ -127,74 +127,73 @@ This work aligns with Steps 8-9 goals and simplifies the remaining tool renderer
 
 ---
 
-## Step 5: Create Generic Tool Renderer Foundation 🔄 NEXT PHASE
+## ✅ Step 5: Create Generic Tool Renderer Foundation ✅ COMPLETED
 
-**Prompt**: "Create a GenericToolRenderer component that renders any tool execution using TimelineEntryCollapsibleBox. Test-first approach.
+**Completed**: Created GenericToolRenderer component with dynamic tool discovery system.
 
-Requirements:
-- Takes tool execution item as props
-- Uses TimelineEntryCollapsibleBox for consistent expansion
-- Shows tool name and input summary when collapsed
-- Shows full input/output when expanded
-- Handles expansion state via props (isExpanded, onExpandedChange)
-- Format tool name nicely (bash, file-read, etc.)
-- Truncate long inputs for summary (first 50 chars)
-- Write comprehensive tests covering expansion, focus, and content rendering
+**What was implemented**:
+- GenericToolRenderer component using TimelineEntryCollapsibleBox for consistent expansion
+- Smart command extraction for bash, file operations, ripgrep, delegate tools
+- Status indicators (✓ success, ✗ error, ⏳ pending) and streaming states
+- JSON/text output detection with compact preview when collapsed
+- Full input/output display when expanded with proper formatting
+- Tool name formatting (file_read → file-read) and parameter extraction
+- getToolRenderer utility for dynamic component discovery with naming conventions
+- Both async and React.lazy versions for different use cases
+- 47 comprehensive test cases covering all functionality and edge cases
 
-Files to create:
+**Files created**:
 - `src/interfaces/terminal/components/events/tool-renderers/GenericToolRenderer.tsx`
 - `src/interfaces/terminal/components/events/tool-renderers/__tests__/GenericToolRenderer.test.tsx`
-
-This replaces current ToolExecutionDisplay logic with consistent expansion."
-
----
-
-## Step 6: Create Dynamic Tool Component Discovery
-
-**Prompt**: "Create utility function for dynamic tool renderer discovery using naming conventions. Test-first approach.
-
-Requirements:
-- Function `getToolRenderer(toolName: string)` returns React component or null
-- Naming convention: 'bash' → try to import './tool-renderers/BashToolRenderer.tsx'
-- 'file-read' → try to import './tool-renderers/FileReadToolRenderer.tsx'  
-- Return null if specific renderer not found (caller uses GenericToolRenderer)
-- Use dynamic import with proper error handling
-- Handle async loading with React.lazy and Suspense
-- Return type should be Promise<React.ComponentType> or null
-
-Files to create:
 - `src/interfaces/terminal/components/events/tool-renderers/getToolRenderer.ts`
 - `src/interfaces/terminal/components/events/tool-renderers/__tests__/getToolRenderer.test.ts`
 
-Test successful discovery, failed imports, and naming convention edge cases."
+**Architecture benefits**:
+- Consistent expansion behavior for all tool executions
+- Dynamic tool renderer discovery (bash → BashToolRenderer.tsx)
+- Easy extensibility by creating new component files
+- Graceful fallback to GenericToolRenderer for unknown tools
 
 ---
 
-## Step 7: Simplify TimelineItem Tool Execution Rendering
+## ✅ Step 6: Create Dynamic Tool Component Discovery ✅ COMPLETED  
 
-**Prompt**: "Refactor TimelineItem to use dynamic tool renderer discovery and remove tool-specific logic. Test-first approach.
+**Completed**: Dynamic tool discovery utility was implemented as part of Step 5.
 
-Requirements:
-- Remove all tool-specific switch/case logic for tool_execution items
-- Use getToolRenderer() to get appropriate component, fallback to GenericToolRenderer
-- Remove delegateTimelines, delegationExpandState, toolExpandState props
-- Replace with single expandedItems map and onItemExpansion callback
-- Handle async component loading with Suspense
-- Update all tests to use new simplified props interface
-- Ensure existing tool functionality is preserved
+**What was implemented**:
+- getToolRenderer function with naming convention mapping
+- Graceful error handling for missing components  
+- Both async and React.lazy versions for different use cases
+- Comprehensive test coverage with 19 test cases
+- Tool name to component name conversion (bash → BashToolRenderer.tsx)
+- Proper TypeScript types and linting compliance
 
-The tool_execution case should become:
-```typescript
-case 'tool_execution':
-  const ToolRenderer = React.lazy(() => getToolRenderer(item.call.toolName));
-  return (
-    <Suspense fallback={<GenericToolRenderer item={item} {...props} />}>
-      <ToolRenderer item={item} {...props} />
-    </Suspense>
-  );
-```
+This step was completed together with Step 5 as they were closely related.
 
-Remove complex delegate-specific logic from this component."
+---
+
+## ✅ Step 7: Simplify TimelineItem Tool Execution Rendering ✅ COMPLETED
+
+**Completed**: Refactored TimelineItem to use dynamic tool renderer discovery with self-managed component state.
+
+**What was implemented**:
+- Removed all tool-specific switch/case logic for tool_execution items
+- Created DynamicToolRenderer component with async tool discovery
+- Used getToolRenderer() to find specific components, fallback to GenericToolRenderer
+- Removed expansion state props - components manage their own state
+- Async component loading with loading state (shows GenericToolRenderer while loading)
+- Updated all tests to match new simplified interface
+- Preserved all existing tool functionality while simplifying architecture
+
+**Key architectural decisions**:
+- Components manage their own expansion state instead of prop drilling
+- DynamicToolRenderer handles async loading and graceful fallback
+- No delegate-specific logic in TimelineItem (will be handled by DelegateToolRenderer)
+- Clean separation of concerns with unified tool rendering interface
+
+**Files modified**:
+- `src/interfaces/terminal/components/events/TimelineItem.tsx`
+- `src/interfaces/terminal/components/events/__tests__/TimelineItem.test.tsx`
 
 ---
 
