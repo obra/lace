@@ -32,7 +32,7 @@ Single expansion state map for everything
 
 ---
 
-## Step 1: Simplify Agent Message Processing
+## ✅ Step 1: Simplify Agent Message Processing ✅ COMPLETED
 
 **Prompt**: "Remove thinking block extraction from ThreadProcessor and simplify agent message processing. Test-first approach.
 
@@ -61,7 +61,7 @@ Remove all thinking-related timeline processing complexity."
 
 ---
 
-## Step 2: Enhance AgentMessageDisplay with Internal Thinking Handling
+## ✅ Step 2: Enhance AgentMessageDisplay with Internal Thinking Handling ✅ COMPLETED
 
 **Prompt**: "Refactor AgentMessageDisplay to handle thinking blocks internally with expansion. Test-first approach.
 
@@ -82,7 +82,7 @@ Remove dependency on separate ThinkingDisplay component."
 
 ---
 
-## Step 3: Update TimelineItem to Use Expansion for Agent Messages
+## ✅ Step 3: Update TimelineItem to Use Expansion for Agent Messages ✅ COMPLETED
 
 **Prompt**: "Update TimelineItem to support expansion for agent_message type. Test-first approach.
 
@@ -98,7 +98,7 @@ Agent messages should now expand/collapse like tool executions and other entries
 
 ---
 
-## Step 4: Ensure User Messages Always Show Full Content
+## ✅ Step 4: Ensure User Messages Always Show Full Content ✅ COMPLETED
 
 **Prompt**: "Update user message rendering to always show full content without summarization. Test-first approach.
 
@@ -114,7 +114,20 @@ User messages are typically short and represent user intent - they should always
 
 ---
 
-## Step 5: Create Generic Tool Renderer Foundation
+## 🚧 PARTIALLY COMPLETED: Prop Drilling Elimination (Steps 8-9) 🚧
+
+We completed early elimination of prop drilling for delegation state:
+- Removed delegateTimelines prop drilling from all timeline components  
+- DelegationBox now accepts toolCall prop and extracts thread ID internally
+- Removed extractDelegateThreadId prop drilling by making it internal utility
+- All timeline components now manage their own state (expansion, delegation)
+- Single expansion state approach established
+
+This work aligns with Steps 8-9 goals and simplifies the remaining tool renderer work.
+
+---
+
+## Step 5: Create Generic Tool Renderer Foundation 🔄 NEXT PHASE
 
 **Prompt**: "Create a GenericToolRenderer component that renders any tool execution using TimelineEntryCollapsibleBox. Test-first approach.
 
@@ -275,16 +288,16 @@ Only implement if they provide clear value over GenericToolRenderer."
 ## Success Criteria
 
 After completion:
-- [ ] Agent messages are single timeline entries with internal thinking handling
-- [ ] User messages always show full content  
-- [ ] Single expansion state system instead of multiple
-- [ ] All timeline entries consistently expandable
+- [x] Agent messages are single timeline entries with internal thinking handling
+- [x] User messages always show full content  
+- [x] Single expansion state system instead of multiple
+- [x] All timeline entries consistently expandable
 - [ ] Tool-specific rendering automatically discovered
 - [ ] No tool-specific logic in TimelineItem or TimelineDisplay
-- [ ] No separate thinking timeline items or processing
-- [ ] Fewer total lines of code
-- [ ] All existing functionality preserved
-- [ ] 100% test coverage maintained
+- [x] No separate thinking timeline items or processing
+- [x] Fewer total lines of code
+- [x] All existing functionality preserved
+- [x] 100% test coverage maintained
 - [ ] Easy to add new tool renderers by creating files
 
 ## Non-Goals

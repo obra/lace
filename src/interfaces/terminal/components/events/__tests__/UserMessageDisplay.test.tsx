@@ -188,7 +188,7 @@ Line 4: Final line`;
       
       const frame = lastFrame();
       // Content should be present (may be wrapped) - check for substantial presence
-      const aCount = (frame.match(/A/g) || []).length;
+      const aCount = (frame?.match(/A/g) || []).length;
       expect(aCount).toBe(200); // All 200 A's should be present
     });
   });
