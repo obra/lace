@@ -338,7 +338,7 @@ describe('GenericToolRenderer', () => {
     it('should render without errors when focused', () => {
       const item = createToolExecutionItem();
       
-      const { lastFrame } = render(<GenericToolRenderer item={item} isFocused={true} />);
+      const { lastFrame } = render(<GenericToolRenderer item={item} isSelected={true} />);
       
       expect(lastFrame()).toBeTruthy();
     });
@@ -346,7 +346,7 @@ describe('GenericToolRenderer', () => {
     it('should render without errors when not focused', () => {
       const item = createToolExecutionItem();
       
-      const { lastFrame } = render(<GenericToolRenderer item={item} isFocused={false} />);
+      const { lastFrame } = render(<GenericToolRenderer item={item} isSelected={false} />);
       
       expect(lastFrame()).toBeTruthy();
     });

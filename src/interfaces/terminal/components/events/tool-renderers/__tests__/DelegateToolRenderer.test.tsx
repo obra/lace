@@ -377,7 +377,7 @@ describe('DelegateToolRenderer', () => {
     it('should render without errors when focused', () => {
       const item = createDelegateExecutionItem();
       
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isFocused={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item} isSelected={true} />);
       
       expect(lastFrame()).toBeTruthy();
     });
@@ -385,7 +385,7 @@ describe('DelegateToolRenderer', () => {
     it('should render without errors when not focused', () => {
       const item = createDelegateExecutionItem();
       
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isFocused={false} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item} isSelected={false} />);
       
       expect(lastFrame()).toBeTruthy();
     });
