@@ -94,7 +94,7 @@ export class StopReasonHandler {
         logger.debug('Tool call incomplete, filtering out', {
           toolName: toolCall.name,
           providedInput: toolCall.input,
-          requiredSchema: tool.input_schema,
+          requiredSchema: tool.inputSchema,
         });
       }
 
@@ -111,7 +111,7 @@ export class StopReasonHandler {
     }
 
     // Check if all required parameters are present
-    const schema = tool.input_schema;
+    const schema = tool.inputSchema;
     if (schema && schema.required && Array.isArray(schema.required)) {
       for (const requiredParam of schema.required) {
         if (
