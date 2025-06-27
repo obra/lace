@@ -12,7 +12,9 @@ function cacheResult(content: string, result: ParsedContent): ParsedContent {
   // Implement simple LRU by removing oldest entries when cache is full
   if (parseCache.size >= CACHE_SIZE) {
     const firstKey = parseCache.keys().next().value;
-    parseCache.delete(firstKey);
+    if (firstKey !== undefined) {
+      parseCache.delete(firstKey);
+    }
   }
   parseCache.set(content, result);
   return result;
