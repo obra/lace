@@ -263,6 +263,19 @@ const ShellInput: React.FC<ShellInputProps> = ({
     setAutocompleteOriginalItems([]);
   }, []);
 
+  // Autocomplete navigation handlers
+  const handleAutocompleteNavigate = useCallback((direction: 'up' | 'down') => {
+    if (direction === 'up') {
+      setAutocompleteSelectedIndex(prev => Math.max(0, prev - 1));
+    } else {
+      setAutocompleteSelectedIndex(prev => Math.min(autocompleteItems.length - 1, prev + 1));
+    }
+  }, [autocompleteItems.length]);
+
+  const handleAutocompleteCancel = useCallback(() => {
+    hideAutocomplete();
+  }, [hideAutocomplete]);
+
   // Input handler
   useInput(
     (input, key) => {
@@ -273,13 +286,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
 
       // Handle Tab key for autocomplete
       if (key.tab) {
-        if (autocompleteVisible && autocompleteItems.length > 0) {
-          // Apply the selected completion
-          const selectedItem = autocompleteItems[autocompleteSelectedIndex];
-          if (selectedItem) {
-            handleAutocompleteSelect(selectedItem);
-          }
-        } else {
+        if (!autocompleteVisible) {
           // Only show autocomplete if there's meaningful content to complete
           const { beforeCursor } = getCurrentWord();
           const currentLine = bufferState.lines[bufferState.cursorLine] || '';
@@ -291,22 +298,13 @@ const ShellInput: React.FC<ShellInputProps> = ({
             showAutocomplete();
           }
         }
+        // If autocomplete is visible, it will handle Tab itself
         return;
       }
-
-      // Handle Escape to close autocomplete
-      if (key.escape && autocompleteVisible) {
-        hideAutocomplete();
-        return;
-      }
-      // Handle Enter - autocomplete selection or submit/newline
+      // Handle Enter - submit/newline (autocomplete handles its own Enter)
       if (key.return) {
-        // If autocomplete is visible, select the highlighted item
-        if (autocompleteVisible && autocompleteItems.length > 0) {
-          const selectedItem = autocompleteItems[autocompleteSelectedIndex];
-          if (selectedItem) {
-            handleAutocompleteSelect(selectedItem);
-          }
+        // Don't handle Enter if autocomplete is visible - let autocomplete handle it
+        if (autocompleteVisible) {
           return;
         }
 
@@ -331,17 +329,12 @@ const ShellInput: React.FC<ShellInputProps> = ({
         return;
       }
 
-      // Right arrow applies completion like Tab
+      // Right arrow navigation (autocomplete handles its own right arrow)
       if (key.rightArrow) {
-        if (autocompleteVisible && autocompleteItems.length > 0) {
-          // Apply the selected completion
-          const selectedItem = autocompleteItems[autocompleteSelectedIndex];
-          if (selectedItem) {
-            handleAutocompleteSelect(selectedItem);
-          }
-        } else {
+        if (!autocompleteVisible) {
           bufferOps.moveCursor("right");
         }
+        // If autocomplete is visible, let it handle right arrow
         return;
       }
 
@@ -373,21 +366,19 @@ const ShellInput: React.FC<ShellInputProps> = ({
         return;
       }
       
-      // Up/Down arrows for autocomplete navigation or cursor movement
+      // Up/Down arrows for cursor movement (autocomplete handles its own navigation)
       if (key.upArrow) {
-        if (autocompleteVisible && autocompleteItems.length > 0) {
-          setAutocompleteSelectedIndex(prev => Math.max(0, prev - 1));
-        } else {
+        if (!autocompleteVisible) {
           bufferOps.moveCursor("up");
         }
+        // If autocomplete is visible, let it handle up arrow
         return;
       }
       if (key.downArrow) {
-        if (autocompleteVisible && autocompleteItems.length > 0) {
-          setAutocompleteSelectedIndex(prev => Math.min(autocompleteItems.length - 1, prev + 1));
-        } else {
+        if (!autocompleteVisible) {
           bufferOps.moveCursor("down");
         }
+        // If autocomplete is visible, let it handle down arrow
         return;
       }
 
@@ -503,6 +494,10 @@ const ShellInput: React.FC<ShellInputProps> = ({
             selectedIndex={autocompleteSelectedIndex}
             isVisible={autocompleteVisible}
             maxItems={5}
+            focusId="autocomplete"
+            onSelect={handleAutocompleteSelect}
+            onCancel={handleAutocompleteCancel}
+            onNavigate={handleAutocompleteNavigate}
           />
         </Box>
       )}

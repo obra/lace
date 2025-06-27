@@ -1,22 +1,72 @@
-// ABOUTME: File path autocomplete display component
-// ABOUTME: Shows file/directory completion list with highlighting for selected item
+// ABOUTME: File path autocomplete component with focus management
+// ABOUTME: Focusable autocomplete that handles its own keyboard input and navigation
 
-import React from 'react';
-import { Box, Text } from 'ink';
+import React, { useEffect } from 'react';
+import { Box, Text, useInput, useFocus, useFocusManager } from 'ink';
 
 interface FileAutocompleteProps {
   items: string[];
   selectedIndex: number;
   isVisible: boolean;
   maxItems?: number;
+  focusId?: string;
+  onSelect?: (item: string) => void;
+  onCancel?: () => void;
+  onNavigate?: (direction: 'up' | 'down') => void;
 }
 
 const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
   items,
   selectedIndex,
   isVisible,
-  maxItems = 5
+  maxItems = 5,
+  focusId = 'autocomplete',
+  onSelect,
+  onCancel,
+  onNavigate
 }) => {
+  const { isFocused } = useFocus({ id: focusId, autoFocus: isVisible });
+  const { focus } = useFocusManager();
+
+  // Take focus when becoming visible
+  useEffect(() => {
+    if (isVisible && items.length > 0) {
+      focus(focusId);
+    }
+  }, [isVisible, items.length, focus, focusId]);
+
+  // Handle keyboard input
+  useInput((input, key) => {
+    if (!isFocused) return;
+
+    if (key.escape) {
+      // Return focus to shell input and cancel autocomplete
+      focus('shell-input');
+      onCancel?.();
+      return;
+    }
+
+    if (key.return || key.tab || key.rightArrow) {
+      // Select the current item
+      const selectedItem = items[selectedIndex];
+      if (selectedItem && onSelect) {
+        focus('shell-input');
+        onSelect(selectedItem);
+      }
+      return;
+    }
+
+    if (key.upArrow) {
+      onNavigate?.('up');
+      return;
+    }
+
+    if (key.downArrow) {
+      onNavigate?.('down');
+      return;
+    }
+  }, { isActive: isFocused });
+
   if (!isVisible || items.length === 0) {
     return null;
   }
@@ -25,7 +75,6 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
   const startIndex = Math.max(0, Math.min(selectedIndex, items.length - maxItems));
   const endIndex = Math.min(items.length, startIndex + maxItems);
   const visibleItems = items.slice(startIndex, endIndex);
-  const hasMore = items.length > maxItems;
 
   return (
     <Box flexDirection="column">
@@ -37,6 +86,7 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
           <Text 
             key={`${actualIndex}-${item}`}
             color={isSelected ? "yellow" : "dim"}
+            backgroundColor={isFocused && isSelected ? "blue" : undefined}
           >
             {isSelected ? '> ' : '  '}{item.trim()}
           </Text>
