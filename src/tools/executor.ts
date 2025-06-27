@@ -1,7 +1,7 @@
 // ABOUTME: Simplified tool execution engine with configuration API and approval integration
 // ABOUTME: Handles tool registration, approval checks, and safe execution with simple configuration
 
-import { ToolResult, ToolContext, Tool } from './types.js';
+import { ToolResult, ToolContext, Tool, ToolCall, createErrorResult } from './types.js';
 import { ApprovalCallback, ApprovalDecision } from './approval-types.js';
 import { BashTool } from './implementations/bash.js';
 import { FileReadTool } from './implementations/file-read.js';
@@ -69,58 +69,45 @@ export class ToolExecutor {
     this.registerTools(tools);
   }
 
-  async executeTool(
-    toolName: string,
-    input: Record<string, unknown>,
-    context?: ToolContext
-  ): Promise<ToolResult> {
+  async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
     // 1. Check if tool exists
-    const tool = this.tools.get(toolName);
+    const tool = this.tools.get(call.name);
     if (!tool) {
-      return {
-        content: [{ type: 'text', text: `Tool '${toolName}' not found` }],
-        isError: true,
-      };
+      return createErrorResult(`Tool '${call.name}' not found`, call.id);
     }
 
     // 2. Check approval if callback is configured
     if (this.approvalCallback) {
       try {
-        const approval = await this.approvalCallback.requestApproval(toolName, input);
+        const approval = await this.approvalCallback.requestApproval(call.name, call.arguments);
 
         if (approval === ApprovalDecision.DENY) {
-          return {
-            content: [{ type: 'text', text: 'Tool execution denied by approval policy' }],
-            isError: true,
-          };
+          return createErrorResult('Tool execution denied by approval policy', call.id);
         }
 
         // ALLOW_ONCE and ALLOW_SESSION both proceed to execution
       } catch (error) {
         // Approval system failure
-        return {
-          content: [
-            {
-              type: 'text',
-              text: error instanceof Error ? error.message : 'Approval system error',
-            },
-          ],
-          isError: true,
-        };
+        return createErrorResult(
+          error instanceof Error ? error.message : 'Approval system error',
+          call.id
+        );
       }
     }
 
     // 3. Execute the tool
     try {
-      const result = await tool.executeTool(input, context);
+      const result = await tool.executeTool(call, context);
+      // Ensure the result has the call ID if it wasn't set by the tool
+      if (!result.id && call.id) {
+        result.id = call.id;
+      }
       return result;
     } catch (error) {
-      return {
-        content: [
-          { type: 'text', text: error instanceof Error ? error.message : 'Unknown error occurred' },
-        ],
-        isError: true,
-      };
+      return createErrorResult(
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
   }
 }
