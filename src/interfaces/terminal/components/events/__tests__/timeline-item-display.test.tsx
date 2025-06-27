@@ -55,8 +55,8 @@ import { logger } from '../../../../../utils/logger.js';
 function TimelineItemDisplay({ 
   item,
   delegateTimelines,
-  isFocused,
-  focusedLine,
+  isSelected,
+  selectedLine,
   itemStartLine,
   onToggle,
   delegationExpandState,
@@ -65,8 +65,8 @@ function TimelineItemDisplay({
 }: {
   item: TimelineItem; 
   delegateTimelines?: Map<string, Timeline>;
-  isFocused: boolean;
-  focusedLine: number;
+  isSelected: boolean;
+  selectedLine: number;
   itemStartLine: number;
   onToggle?: () => void;
   delegationExpandState: Map<string, boolean>;
@@ -83,8 +83,8 @@ function TimelineItemDisplay({
           timestamp: item.timestamp,
           data: item.content
         },
-        isFocused,
-        focusedLine,
+        isFocused: isSelected,
+        focusedLine: selectedLine,
         itemStartLine,
         onToggle
       });
@@ -98,23 +98,8 @@ function TimelineItemDisplay({
           timestamp: item.timestamp,
           data: item.content
         },
-        isFocused,
-        focusedLine,
-        itemStartLine,
-        onToggle
-      });
-      
-    case 'thinking':
-      return React.createElement(EventDisplay, {
-        event: {
-          id: item.id,
-          threadId: '',
-          type: 'THINKING',
-          timestamp: item.timestamp,
-          data: item.content
-        },
-        isFocused,
-        focusedLine,
+        isFocused: isSelected,
+        focusedLine: selectedLine,
         itemStartLine,
         onToggle
       });
@@ -128,8 +113,8 @@ function TimelineItemDisplay({
           timestamp: item.timestamp,
           data: item.content
         },
-        isFocused,
-        focusedLine,
+        isFocused: isSelected,
+        focusedLine: selectedLine,
         itemStartLine,
         onToggle
       });
@@ -184,7 +169,7 @@ function TimelineItemDisplay({
                 key: 'tool',
                 callEvent: callEvent, 
                 resultEvent: resultEvent,
-                isFocused: isFocused,
+                isFocused: isSelected,
               }),
               React.createElement(DelegationBox, {
                 key: 'delegation',
@@ -213,7 +198,7 @@ function TimelineItemDisplay({
       return React.createElement(ToolExecutionDisplay, {
         callEvent: callEvent, 
         resultEvent: resultEvent,
-        isFocused: isFocused
+        isFocused: isSelected
       });
       
     case 'ephemeral_message':
@@ -223,7 +208,7 @@ function TimelineItemDisplay({
           content: item.content,
           timestamp: item.timestamp
         },
-        isFocused: isFocused
+        isFocused: isSelected
       });
       
     default:
@@ -242,8 +227,8 @@ describe('TimelineItemDisplay (Baseline)', () => {
 
   const defaultProps = {
     delegateTimelines: undefined,
-    isFocused: false,
-    focusedLine: 0,
+    isSelected: false,
+    selectedLine: 0,
     itemStartLine: 0,
     onToggle: mockOnToggle,
     delegationExpandState: new Map<string, boolean>(),
@@ -276,7 +261,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
       };
 
       const { lastFrame } = render(
-        React.createElement(TimelineItemDisplay, { item, ...defaultProps, isFocused: true })
+        React.createElement(TimelineItemDisplay, { item, ...defaultProps, isSelected: true })
       );
 
       expect(lastFrame()).toContain('EventDisplay:USER_MESSAGE:focused');
@@ -297,23 +282,6 @@ describe('TimelineItemDisplay (Baseline)', () => {
       );
 
       expect(lastFrame()).toContain('EventDisplay:AGENT_MESSAGE:unfocused');
-    });
-  });
-
-  describe('thinking items', () => {
-    it('should render thinking with EventDisplay', () => {
-      const item: TimelineItem = {
-        id: 'thinking-1',
-        type: 'thinking',
-        timestamp: new Date('2024-01-01T10:00:00Z'),
-        content: 'Let me think...'
-      };
-
-      const { lastFrame } = render(
-        React.createElement(TimelineItemDisplay, { item, ...defaultProps })
-      );
-
-      expect(lastFrame()).toContain('EventDisplay:THINKING:unfocused');
     });
   });
 
@@ -603,7 +571,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         React.createElement(TimelineItemDisplay, { 
           item, 
           ...defaultProps, 
-          isFocused: true 
+          isSelected: true 
         })
       );
 

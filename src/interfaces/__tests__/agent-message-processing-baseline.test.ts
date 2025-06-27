@@ -107,23 +107,4 @@ describe('Agent Message Processing - Unified Content', () => {
       });
     });
   });
-
-  describe('THINKING event behavior', () => {
-    it('should ignore standalone THINKING events', () => {
-      const events: ThreadEvent[] = [
-        {
-          id: 'thinking-1',
-          threadId: 'thread-1',
-          type: 'THINKING',
-          timestamp: new Date('2024-01-01T10:00:00Z'),
-          data: 'Standalone thinking block',
-        },
-      ];
-
-      const result = processor.processEvents(events);
-
-      // New behavior: THINKING events are ignored, no timeline items created
-      expect(result).toHaveLength(0);
-    });
-  });
 });

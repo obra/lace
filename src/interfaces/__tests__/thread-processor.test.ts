@@ -83,22 +83,6 @@ describe('ThreadProcessor', () => {
         id: 'agent-1',
       });
     });
-
-    it('ignores standalone THINKING events', () => {
-      const events: ThreadEvent[] = [
-        {
-          id: 'thinking-1',
-          threadId: 'thread-1',
-          type: 'THINKING',
-          timestamp: new Date('2024-01-01T10:00:00Z'),
-          data: 'Standalone thinking',
-        },
-      ];
-
-      const result = processor.processEvents(events);
-
-      expect(result).toHaveLength(0);
-    });
   });
   describe('processEvents (caching)', () => {
     const sampleEvents: ThreadEvent[] = [
@@ -288,8 +272,8 @@ describe('ThreadProcessor', () => {
           timestamp: new Date('2024-01-01T10:00:00Z'),
         },
         {
-          type: 'thinking',
-          content: 'Let me think...',
+          type: 'assistant',
+          content: '<think>Let me think...</think>',
           timestamp: new Date('2024-01-01T10:00:01Z'),
         },
       ];
@@ -305,8 +289,8 @@ describe('ThreadProcessor', () => {
       });
       expect(result[1]).toEqual({
         type: 'ephemeral_message',
-        messageType: 'thinking',
-        content: 'Let me think...',
+        messageType: 'assistant',
+        content: '<think>Let me think...</think>',
         timestamp: new Date('2024-01-01T10:00:01Z'),
       });
     });
@@ -398,15 +382,8 @@ describe('ThreadProcessor', () => {
   });
 
   describe('unified content behavior', () => {
-    it('ignores standalone THINKING events and keeps agent messages with thinking intact', () => {
+    it('keeps agent messages with thinking blocks intact', () => {
       const events: ThreadEvent[] = [
-        {
-          id: 'thinking-1',
-          threadId: 'thread-1',
-          type: 'THINKING',
-          timestamp: new Date('2024-01-01T10:00:00Z'),
-          data: 'Let me think about this',
-        },
         {
           id: 'agent-1',
           threadId: 'thread-1',
@@ -419,7 +396,7 @@ describe('ThreadProcessor', () => {
       const processedEvents = processor.processEvents(events);
       const timeline = processor.buildTimeline(processedEvents, []);
 
-      // Should only have agent message (THINKING events are ignored)
+      // Should have agent message with thinking blocks preserved
       expect(timeline.items).toHaveLength(1);
 
       const agentItems = timeline.items.filter((item) => item.type === 'agent_message');
@@ -429,15 +406,8 @@ describe('ThreadProcessor', () => {
       );
     });
 
-    it('handles mixed thinking sources with agent message keeping full content', () => {
+    it('handles agent message with embedded thinking blocks', () => {
       const events: ThreadEvent[] = [
-        {
-          id: 'thinking-1',
-          threadId: 'thread-1',
-          type: 'THINKING',
-          timestamp: new Date('2024-01-01T10:00:00Z'),
-          data: 'First thought from streaming',
-        },
         {
           id: 'agent-1',
           threadId: 'thread-1',
@@ -450,7 +420,7 @@ describe('ThreadProcessor', () => {
       const processedEvents = processor.processEvents(events);
       const timeline = processor.buildTimeline(processedEvents, []);
 
-      // Should have only agent message (THINKING events are ignored)
+      // Should have agent message with thinking preserved
       expect(timeline.items).toHaveLength(1);
 
       const agentItems = timeline.items.filter((item) => item.type === 'agent_message');
@@ -511,12 +481,6 @@ describe('ThreadProcessor', () => {
           id: 'user-1',
         },
         {
-          type: 'thinking',
-          content: 'Thinking...',
-          timestamp: new Date('2024-01-01T10:01:00Z'),
-          id: 'thinking-1',
-        },
-        {
           type: 'agent_message',
           content: 'Response',
           timestamp: new Date('2024-01-01T10:02:00Z'),
@@ -527,7 +491,7 @@ describe('ThreadProcessor', () => {
       const timeline = processor.buildTimeline(processedEvents, []);
 
       expect(timeline.metadata).toEqual({
-        eventCount: 3,
+        eventCount: 2,
         messageCount: 2, // Only user_message and agent_message count
         lastActivity: new Date('2024-01-01T10:02:00Z'),
       });
@@ -690,20 +654,12 @@ describe('ThreadProcessor', () => {
           timestamp: new Date('2024-01-01T10:00:00Z'),
           data: 'Help me with a task',
         },
-        // Streaming thinking event
-        {
-          id: 'thinking-1',
-          threadId: 'thread-1',
-          type: 'THINKING',
-          timestamp: new Date('2024-01-01T10:00:01Z'),
-          data: 'I need to think about this step by step',
-        },
-        // Agent message with embedded thinking (duplicate content)
+        // Agent message with embedded thinking
         {
           id: 'agent-1',
           threadId: 'thread-1',
           type: 'AGENT_MESSAGE',
-          timestamp: new Date('2024-01-01T10:00:02Z'),
+          timestamp: new Date('2024-01-01T10:00:01Z'),
           data: '<think>I need to think about this step by step</think>I will help you with that task.',
         },
         // Tool call
@@ -711,7 +667,7 @@ describe('ThreadProcessor', () => {
           id: 'tool-call-1',
           threadId: 'thread-1',
           type: 'TOOL_CALL',
-          timestamp: new Date('2024-01-01T10:00:03Z'),
+          timestamp: new Date('2024-01-01T10:00:02Z'),
           data: {
             toolName: 'bash',
             input: { command: 'ls -la' },
@@ -723,7 +679,7 @@ describe('ThreadProcessor', () => {
           id: 'tool-result-1',
           threadId: 'thread-1',
           type: 'TOOL_RESULT',
-          timestamp: new Date('2024-01-01T10:00:04Z'),
+          timestamp: new Date('2024-01-01T10:00:03Z'),
           data: {
             callId: 'call-123',
             output: 'file1.txt\nfile2.txt',
@@ -735,7 +691,7 @@ describe('ThreadProcessor', () => {
           id: 'agent-2',
           threadId: 'thread-1',
           type: 'AGENT_MESSAGE',
-          timestamp: new Date('2024-01-01T10:00:05Z'),
+          timestamp: new Date('2024-01-01T10:00:04Z'),
           data: 'I found 2 files in the directory.',
         },
       ];
@@ -779,8 +735,8 @@ describe('ThreadProcessor', () => {
 
       const ephemeralMessages: EphemeralMessage[] = [
         {
-          type: 'thinking',
-          content: 'Let me process this...',
+          type: 'assistant',
+          content: '<think>Let me process this...</think>',
           timestamp: new Date('2024-01-01T10:00:01Z'),
         },
         {

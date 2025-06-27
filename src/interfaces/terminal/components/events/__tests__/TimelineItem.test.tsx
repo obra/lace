@@ -69,8 +69,9 @@ describe('TimelineItem Component', () => {
   });
 
   const defaultProps = {
+    isSelected: false,
     isFocused: false,
-    focusedLine: 0,
+    selectedLine: 0,
     itemStartLine: 0,
     onToggle: mockOnToggle,
     currentFocusId: 'timeline'
@@ -101,7 +102,7 @@ describe('TimelineItem Component', () => {
       };
 
       const { lastFrame } = render(
-        <TimelineItem item={item} {...defaultProps} isFocused={true} />
+        <TimelineItem item={item} {...defaultProps} isSelected={true} isFocused={true} />
       );
 
       expect(lastFrame()).toContain('EventDisplay:USER_MESSAGE:focused');
@@ -122,23 +123,6 @@ describe('TimelineItem Component', () => {
       );
 
       expect(lastFrame()).toContain('EventDisplay:AGENT_MESSAGE:unfocused');
-    });
-  });
-
-  describe('thinking items', () => {
-    it('should render thinking with EventDisplay', () => {
-      const item: TimelineItemType = {
-        id: 'thinking-1',
-        type: 'thinking',
-        timestamp: new Date('2024-01-01T10:00:00Z'),
-        content: 'Let me think...'
-      };
-
-      const { lastFrame } = render(
-        <TimelineItem item={item} {...defaultProps} />
-      );
-
-      expect(lastFrame()).toContain('EventDisplay:THINKING:unfocused');
     });
   });
 
@@ -364,7 +348,7 @@ describe('TimelineItem Component', () => {
       };
 
       const { lastFrame } = render(
-        <TimelineItem item={item} {...defaultProps} isFocused={true} />
+        <TimelineItem item={item} {...defaultProps} isSelected={true} isFocused={true} />
       );
 
       expect(lastFrame()).toContain('MessageDisplay:warning:focused');

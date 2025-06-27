@@ -107,55 +107,6 @@ describe('Agent Message Processing - New Simplified Behavior', () => {
     });
   });
 
-  describe('THINKING events are ignored', () => {
-    it('should ignore standalone THINKING events', () => {
-      const events: ThreadEvent[] = [
-        {
-          id: 'thinking-1',
-          threadId: 'thread-1',
-          type: 'THINKING',
-          timestamp: new Date('2024-01-01T10:00:00Z'),
-          data: 'Standalone thinking block',
-        },
-      ];
-
-      const result = processor.processEvents(events);
-
-      // New behavior: THINKING events are ignored
-      expect(result).toHaveLength(0);
-    });
-
-    it('should process agent message but ignore thinking event', () => {
-      const events: ThreadEvent[] = [
-        {
-          id: 'thinking-1',
-          threadId: 'thread-1',
-          type: 'THINKING',
-          timestamp: new Date('2024-01-01T10:00:00Z'),
-          data: 'Standalone thinking block',
-        },
-        {
-          id: 'agent-1',
-          threadId: 'thread-1',
-          type: 'AGENT_MESSAGE',
-          timestamp: new Date('2024-01-01T10:00:01Z'),
-          data: 'Agent response',
-        },
-      ];
-
-      const result = processor.processEvents(events);
-
-      // New behavior: Only agent message, thinking event ignored
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
-        type: 'agent_message',
-        content: 'Agent response',
-        timestamp: new Date('2024-01-01T10:00:01Z'),
-        id: 'agent-1',
-      });
-    });
-  });
-
   describe('Ephemeral message processing', () => {
     it('should keep full assistant content with thinking blocks', () => {
       const ephemeralMessages = [

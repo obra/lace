@@ -10,8 +10,8 @@ import { TimelineContent } from '../TimelineContent.js';
 
 // Mock TimelineItem component
 vi.mock('../TimelineItem.js', () => ({
-  TimelineItem: ({ item, isFocused, currentFocusId }: any) => 
-    React.createElement(Text, {}, `TLI:${item.type}:${isFocused ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}`)
+  TimelineItem: ({ item, isSelected, currentFocusId }: any) => 
+    React.createElement(Text, {}, `TLI:${item.type}:${isSelected ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}`)
 }));
 
 vi.mock('../../../../../utils/logger.js', () => ({
@@ -54,8 +54,8 @@ describe('TimelineContent Component', () => {
 
   const getDefaultProps = () => ({
     viewportState: {
-      focusedItemIndex: 0,
-      focusedLine: 0,
+      selectedItemIndex: 0,
+      selectedLine: 0,
       itemPositions: [0, 5, 10]
     },
     viewportActions: {
@@ -100,11 +100,11 @@ describe('TimelineContent Component', () => {
   });
 
   describe('Focus management', () => {
-    it('should focus correct item based on focusedItemIndex', () => {
+    it('should focus correct item based on selectedItemIndex', () => {
       const timeline = createMockTimeline(3);
       const viewportState = {
-        focusedItemIndex: 1, // Second item focused
-        focusedLine: 0,
+        selectedItemIndex: 1, // Second item focused
+        selectedLine: 0,
         itemPositions: [0, 5, 10]
       };
 
@@ -127,11 +127,11 @@ describe('TimelineContent Component', () => {
       expect(unfocusedMatches).toHaveLength(2);
     });
 
-    it('should handle focusedItemIndex out of bounds', () => {
+    it('should handle selectedItemIndex out of bounds', () => {
       const timeline = createMockTimeline(2);
       const viewportState = {
-        focusedItemIndex: 5, // Out of bounds
-        focusedLine: 0,
+        selectedItemIndex: 5, // Out of bounds
+        selectedLine: 0,
         itemPositions: [0, 5]
       };
 
@@ -145,7 +145,7 @@ describe('TimelineContent Component', () => {
 
       const frame = lastFrame();
       expect(frame).toBeDefined();
-      // All items should be unfocused when focusedItemIndex is out of bounds
+      // All items should be unfocused when selectedItemIndex is out of bounds
       const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
       expect(unfocusedMatches).toHaveLength(2);
       
@@ -153,11 +153,11 @@ describe('TimelineContent Component', () => {
       expect(focusedMatches).toBeNull();
     });
 
-    it('should handle negative focusedItemIndex', () => {
+    it('should handle negative selectedItemIndex', () => {
       const timeline = createMockTimeline(2);
       const viewportState = {
-        focusedItemIndex: -1, // Negative index
-        focusedLine: 0,
+        selectedItemIndex: -1, // Negative index
+        selectedLine: 0,
         itemPositions: [0, 5]
       };
 
@@ -171,7 +171,7 @@ describe('TimelineContent Component', () => {
 
       const frame = lastFrame();
       expect(frame).toBeDefined();
-      // All items should be unfocused when focusedItemIndex is negative
+      // All items should be unfocused when selectedItemIndex is negative
       const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
       expect(unfocusedMatches).toHaveLength(2);
       
@@ -200,8 +200,8 @@ describe('TimelineContent Component', () => {
     it('should pass viewportState data to items', () => {
       const timeline = createMockTimeline(2);
       const viewportState = {
-        focusedItemIndex: 0,
-        focusedLine: 10,
+        selectedItemIndex: 0,
+        selectedLine: 10,
         itemPositions: [100, 200] // Custom positions
       };
 
@@ -221,8 +221,8 @@ describe('TimelineContent Component', () => {
     it('should handle missing itemPositions gracefully', () => {
       const timeline = createMockTimeline(2);
       const viewportState = {
-        focusedItemIndex: 0,
-        focusedLine: 0,
+        selectedItemIndex: 0,
+        selectedLine: 0,
         itemPositions: [] // Empty positions array
       };
 

@@ -9,8 +9,8 @@ import { Timeline, TimelineItem } from '../../../../thread-processor.js';
 
 // Mock TimelineItem component
 vi.mock('../TimelineItem.js', () => ({
-  TimelineItem: ({ item, isFocused, currentFocusId }: any) => 
-    React.createElement(Text, {}, `TLI:${item.type}:${isFocused ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}`)
+  TimelineItem: ({ item, isSelected, currentFocusId }: any) => 
+    React.createElement(Text, {}, `TLI:${item.type}:${isSelected ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}`)
 }));
 
 vi.mock('../../../../../utils/logger.js', () => ({
@@ -34,7 +34,7 @@ function TimelineContent({
   currentFocusId 
 }: {
   timeline: Timeline;
-  viewportState: { focusedItemIndex: number; focusedLine: number; itemPositions: number[] };
+  viewportState: { selectedItemIndex: number; selectedLine: number; itemPositions: number[] };
   viewportActions: { triggerRemeasurement: () => void };
   itemRefs: React.MutableRefObject<Map<number, unknown>>;
   currentFocusId?: string;
@@ -42,7 +42,7 @@ function TimelineContent({
   return (
     <React.Fragment>
       {timeline.items.map((item, index) => {
-        const isItemFocused = index === viewportState.focusedItemIndex;
+        const isItemFocused = index === viewportState.selectedItemIndex;
         return (
           <Box 
             key={`timeline-item-${index}`} 
@@ -57,8 +57,9 @@ function TimelineContent({
           >
             <TimelineItemComponent 
               item={item} 
+              isSelected={isItemFocused}
               isFocused={isItemFocused}
-              focusedLine={viewportState.focusedLine}
+              selectedLine={viewportState.selectedLine}
               itemStartLine={viewportState.itemPositions[index] || 0}
               onToggle={viewportActions.triggerRemeasurement}
               currentFocusId={currentFocusId}
@@ -103,8 +104,8 @@ describe('TimelineContent (Baseline)', () => {
 
   const defaultProps = {
     viewportState: {
-      focusedItemIndex: 0,
-      focusedLine: 0,
+      selectedItemIndex: 0,
+      selectedLine: 0,
       itemPositions: [0, 5, 10]
     },
     viewportActions: {
@@ -163,11 +164,11 @@ describe('TimelineContent (Baseline)', () => {
   });
 
   describe('Focus management', () => {
-    it('should mark correct item as focused based on focusedItemIndex', () => {
+    it('should mark correct item as focused based on selectedItemIndex', () => {
       const timeline = createMockTimeline(3);
       const viewportState = {
-        focusedItemIndex: 1, // Second item focused
-        focusedLine: 0,
+        selectedItemIndex: 1, // Second item focused
+        selectedLine: 0,
         itemPositions: [0, 5, 10]
       };
 
@@ -191,11 +192,11 @@ describe('TimelineContent (Baseline)', () => {
       expect(unfocusedMatches).toHaveLength(2);
     });
 
-    it('should handle focusedItemIndex out of bounds', () => {
+    it('should handle selectedItemIndex out of bounds', () => {
       const timeline = createMockTimeline(2);
       const viewportState = {
-        focusedItemIndex: 5, // Out of bounds
-        focusedLine: 0,
+        selectedItemIndex: 5, // Out of bounds
+        selectedLine: 0,
         itemPositions: [0, 5]
       };
 
@@ -210,7 +211,7 @@ describe('TimelineContent (Baseline)', () => {
 
       const frame = lastFrame();
       expect(frame).toBeDefined();
-      // All items should be unfocused when focusedItemIndex is out of bounds
+      // All items should be unfocused when selectedItemIndex is out of bounds
       const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
       expect(unfocusedMatches).toHaveLength(2);
       
@@ -259,8 +260,8 @@ describe('TimelineContent (Baseline)', () => {
     it('should pass correct itemStartLine from viewportState.itemPositions', () => {
       const timeline = createMockTimeline(2);
       const viewportState = {
-        focusedItemIndex: 0,
-        focusedLine: 0,
+        selectedItemIndex: 0,
+        selectedLine: 0,
         itemPositions: [10, 25] // Custom positions
       };
 
@@ -281,8 +282,8 @@ describe('TimelineContent (Baseline)', () => {
     it('should handle missing itemPositions gracefully', () => {
       const timeline = createMockTimeline(2);
       const viewportState = {
-        focusedItemIndex: 0,
-        focusedLine: 0,
+        selectedItemIndex: 0,
+        selectedLine: 0,
         itemPositions: [] // Empty positions array
       };
 
