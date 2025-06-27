@@ -29,6 +29,13 @@ interface GenericToolRendererProps {
   onExpandedChange?: (expanded: boolean) => void;
 }
 
+// Default props for optional boolean values
+const defaultProps = {
+  isStreaming: false,
+  isSelected: false,
+  isFocused: false,
+} as const;
+
 function isJsonOutput(output: string): boolean {
   if (!output || typeof output !== 'string') return false;
   
@@ -39,9 +46,9 @@ function isJsonOutput(output: string): boolean {
 
 export function GenericToolRenderer({ 
   item, 
-  isStreaming, 
-  isSelected, 
-  isFocused,
+  isStreaming = defaultProps.isStreaming, 
+  isSelected = defaultProps.isSelected, 
+  isFocused = defaultProps.isFocused,
   onToggle,
   isExpanded: controlledExpanded,
   onExpandedChange
@@ -61,7 +68,7 @@ export function GenericToolRenderer({
   };
   
   // Listen for expansion toggle events when selected
-  useTimelineExpansionToggle(isSelected || false, toggleExpansion);
+  useTimelineExpansionToggle(isSelected, toggleExpansion);
   
   const { call, result } = item;
   const { toolName, input } = call;
