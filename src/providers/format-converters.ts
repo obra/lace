@@ -19,8 +19,8 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
             (result: ProviderToolResult) => ({
               type: 'tool_result',
               tool_use_id: result.id,
-              content: result.output,
-              ...(result.success === false ? { is_error: true } : {}),
+              content: result.content.map((block) => block.text || '').join('\n'),
+              ...(result.isError ? { is_error: true } : {}),
             })
           );
 
@@ -98,7 +98,7 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
           const toolMessages = msg.toolResults.map((result: ProviderToolResult) => ({
             role: 'tool',
             tool_call_id: result.id,
-            content: result.output,
+            content: result.content.map((block) => block.text || '').join('\n'),
           }));
 
           // If there's also text content, include the user message first
@@ -161,10 +161,11 @@ export function convertToLMStudioFormat(
     if (msg.role === 'user' && msg.toolResults && msg.toolResults.length > 0) {
       // Convert tool results to text descriptions (same as text-only format)
       const toolResultTexts = msg.toolResults.map((result: ProviderToolResult) => {
-        if (result.success) {
-          return `[Tool result: SUCCESS - ${result.output}]`;
+        const outputText = result.content.map((block) => block.text || '').join('\n');
+        if (!result.isError) {
+          return `[Tool result: SUCCESS - ${outputText}]`;
         } else {
-          return `[Tool result: ERROR - ${result.output}${result.error ? ` (Error: ${result.error})` : ''}]`;
+          return `[Tool result: ERROR - ${outputText}]`;
         }
       });
 
@@ -210,7 +211,7 @@ export function convertToLMStudioTools(tools: Tool[]): {
     function: {
       name: tool.name,
       description: tool.description,
-      parameters: tool.input_schema,
+      parameters: tool.inputSchema,
     },
   }));
 
@@ -241,10 +242,11 @@ export function convertToTextOnlyFormat(messages: ProviderMessage[]): ProviderMe
     if (msg.role === 'user' && msg.toolResults && msg.toolResults.length > 0) {
       // Convert tool results to text descriptions
       const toolResultTexts = msg.toolResults.map((result) => {
-        if (result.success) {
-          return `[Tool result: SUCCESS - ${result.output}]`;
+        const outputText = result.content.map((block) => block.text || '').join('\n');
+        if (!result.isError) {
+          return `[Tool result: SUCCESS - ${outputText}]`;
         } else {
-          return `[Tool result: ERROR - ${result.output}${result.error ? ` (Error: ${result.error})` : ''}]`;
+          return `[Tool result: ERROR - ${outputText}]`;
         }
       });
 

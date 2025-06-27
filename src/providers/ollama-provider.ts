@@ -142,7 +142,7 @@ export class OllamaProvider extends AIProvider {
                 function: {
                   name: tool.name,
                   description: tool.description,
-                  parameters: tool.input_schema,
+                  parameters: tool.inputSchema,
                 },
               })
             )
@@ -273,7 +273,7 @@ export class OllamaProvider extends AIProvider {
                 function: {
                   name: tool.name,
                   description: tool.description,
-                  parameters: tool.input_schema,
+                  parameters: tool.inputSchema,
                 },
               })
             )

@@ -55,7 +55,7 @@ export class AnthropicProvider extends AIProvider {
     const anthropicTools: Anthropic.Tool[] = tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
-      input_schema: tool.input_schema,
+      input_schema: tool.inputSchema,
     }));
 
     return {
