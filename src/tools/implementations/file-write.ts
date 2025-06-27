@@ -3,7 +3,7 @@
 
 import { writeFile, mkdir } from 'fs/promises';
 import { dirname } from 'path';
-import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
 
 export class FileWriteTool implements Tool {
   name = 'file_write';
@@ -11,7 +11,7 @@ export class FileWriteTool implements Tool {
   annotations = {
     destructiveHint: true,
   };
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       path: { type: 'string', description: 'File path to write to' },
@@ -24,23 +24,23 @@ export class FileWriteTool implements Tool {
     required: ['path', 'content'],
   };
 
-  async executeTool(input: Record<string, unknown>, _context?: ToolContext): Promise<ToolResult> {
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     const {
       path,
       content,
       createDirs = true,
-    } = input as {
+    } = call.arguments as {
       path: string;
       content: string;
       createDirs?: boolean;
     };
 
     if (!path || typeof path !== 'string') {
-      return createErrorResult('Path must be a non-empty string');
+      return createErrorResult('Path must be a non-empty string', call.id);
     }
 
     if (typeof content !== 'string') {
-      return createErrorResult('Content must be a string');
+      return createErrorResult('Content must be a string', call.id);
     }
 
     try {
@@ -56,9 +56,9 @@ export class FileWriteTool implements Tool {
           type: 'text',
           text: `Successfully wrote ${content.length} characters to ${path}`,
         },
-      ]);
+      ], call.id);
     } catch (error) {
-      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred');
+      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred', call.id);
     }
   }
 }

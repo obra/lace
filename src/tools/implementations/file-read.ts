@@ -2,7 +2,7 @@
 // ABOUTME: Safe file access for code inspection and analysis
 
 import { readFile } from 'fs/promises';
-import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
 
 export class FileReadTool implements Tool {
   name = 'file_read';
@@ -12,7 +12,7 @@ export class FileReadTool implements Tool {
     readOnlyHint: true,
     idempotentHint: true,
   };
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       path: { type: 'string', description: 'File path to read' },
@@ -22,15 +22,15 @@ export class FileReadTool implements Tool {
     required: ['path'],
   };
 
-  async executeTool(input: Record<string, unknown>, _context?: ToolContext): Promise<ToolResult> {
-    const { path, startLine, endLine } = input as {
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
+    const { path, startLine, endLine } = call.arguments as {
       path: string;
       startLine?: number;
       endLine?: number;
     };
 
     if (!path || typeof path !== 'string') {
-      return createErrorResult('Path must be a non-empty string');
+      return createErrorResult('Path must be a non-empty string', call.id);
     }
 
     try {
@@ -44,7 +44,8 @@ export class FileReadTool implements Tool {
 
         if (start >= lines.length) {
           return createErrorResult(
-            `Start line ${startLine} exceeds file length (${lines.length} lines)`
+            `Start line ${startLine} exceeds file length (${lines.length} lines)`,
+            call.id
           );
         }
 
@@ -58,9 +59,9 @@ export class FileReadTool implements Tool {
           type: 'text',
           text: resultContent,
         },
-      ]);
+      ], call.id);
     } catch (error) {
-      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred');
+      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred', call.id);
     }
   }
 }

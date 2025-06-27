@@ -6,7 +6,7 @@ import { unlinkSync } from 'fs';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import TurndownService from 'turndown';
-import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
 import { logger } from '../../utils/logger.js';
 
 // Constants for configuration and validation
@@ -74,7 +74,7 @@ export class UrlFetchTool implements Tool {
     openWorldHint: true,
   };
 
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       url: {
@@ -197,21 +197,21 @@ export class UrlFetchTool implements Tool {
     process.on('SIGTERM', cleanup);
   }
 
-  async executeTool(input: Record<string, unknown>, _context?: ToolContext): Promise<ToolResult> {
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     // Validate required properties before destructuring
-    if (!input.url || typeof input.url !== 'string') {
+    if (!call.arguments.url || typeof call.arguments.url !== 'string') {
       return this.createRichError({
         error: {
           type: 'validation',
           message: 'URL is required and must be a non-empty string',
         },
         request: {
-          url: String(input.url || 'undefined'),
+          url: String(call.arguments.url || 'undefined'),
           method: 'GET',
           headers: {},
           timing: { start: Date.now() },
         },
-      });
+      }, call.id);
     }
 
     const {
@@ -223,7 +223,7 @@ export class UrlFetchTool implements Tool {
       maxSize = DEFAULT_MAX_SIZE,
       followRedirects = true,
       returnContent = true,
-    } = input as unknown as UrlFetchInput;
+    } = call.arguments as unknown as UrlFetchInput;
 
     const timing: RequestTiming = {
       start: Date.now(),
@@ -242,7 +242,7 @@ export class UrlFetchTool implements Tool {
           method,
           headers,
         },
-      });
+      }, call.id);
     }
 
     if (typeof timeout !== 'number' || timeout < MIN_TIMEOUT || timeout > MAX_TIMEOUT) {
@@ -256,7 +256,7 @@ export class UrlFetchTool implements Tool {
           method,
           headers,
         },
-      });
+      }, call.id);
     }
 
     if (typeof maxSize !== 'number' || maxSize < MIN_SIZE || maxSize > MAX_SIZE_LIMIT) {
@@ -270,7 +270,7 @@ export class UrlFetchTool implements Tool {
           method,
           headers,
         },
-      });
+      }, call.id);
     }
 
     if (!VALID_HTTP_METHODS.includes(method as HttpMethod)) {
@@ -284,11 +284,11 @@ export class UrlFetchTool implements Tool {
           method,
           headers,
         },
-      });
+      }, call.id);
     }
 
     // Validate returnContent parameter
-    if (input.returnContent !== undefined && typeof input.returnContent !== 'boolean') {
+    if (call.arguments.returnContent !== undefined && typeof call.arguments.returnContent !== 'boolean') {
       return this.createRichError({
         error: {
           type: 'validation',
@@ -299,7 +299,7 @@ export class UrlFetchTool implements Tool {
           method,
           headers,
         },
-      });
+      }, call.id);
     }
 
     // Set up fetch options with timeout
@@ -377,7 +377,7 @@ export class UrlFetchTool implements Tool {
             headers: responseHeaders,
             bodyPreview,
           },
-        });
+        }, call.id);
       }
 
       const contentType = response.headers.get('content-type') || 'application/octet-stream';
@@ -405,7 +405,7 @@ export class UrlFetchTool implements Tool {
             headers: responseHeaders,
             size,
           },
-        });
+        }, call.id);
       }
 
       // Read response
@@ -432,16 +432,16 @@ export class UrlFetchTool implements Tool {
             headers: responseHeaders,
             size: actualSize,
           },
-        });
+        }, call.id);
       }
 
       // Handle small responses inline
       if (actualSize <= INLINE_CONTENT_LIMIT) {
-        return this.handleInlineContent(buffer, contentType, url, returnContent);
+        return this.handleInlineContent(buffer, contentType, url, returnContent, call.id);
       }
 
       // Handle large responses with temp files
-      return await this.handleLargeContent(buffer, contentType, url, actualSize, returnContent);
+      return await this.handleLargeContent(buffer, contentType, url, actualSize, returnContent, call.id);
     } catch (error) {
       clearTimeout(timeoutId);
       timing.total = Date.now() - timing.start;
@@ -483,7 +483,7 @@ export class UrlFetchTool implements Tool {
             headers,
             timing,
           },
-        });
+        }, call.id);
       }
 
       return this.createRichError({
@@ -497,7 +497,7 @@ export class UrlFetchTool implements Tool {
           headers,
           timing,
         },
-      });
+      }, call.id);
     }
   }
 
@@ -505,7 +505,8 @@ export class UrlFetchTool implements Tool {
     buffer: ArrayBuffer,
     contentType: string,
     url: string,
-    returnContent: boolean
+    returnContent: boolean,
+    callId?: string
   ): ToolResult {
     try {
       if (!returnContent) {
@@ -514,7 +515,7 @@ export class UrlFetchTool implements Tool {
             type: 'text',
             text: `Content fetched from ${url}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\nContent not returned (returnContent=false). Use file tools to access if needed.`,
           },
-        ]);
+        ], callId);
       }
 
       const processedContent = this.processContent(buffer, contentType);
@@ -524,10 +525,11 @@ export class UrlFetchTool implements Tool {
           type: 'text',
           text: `Content from ${url}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\n${processedContent}`,
         },
-      ]);
+      ], callId);
     } catch (error) {
       return createErrorResult(
-        `Failed to process content: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to process content: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        callId
       );
     }
   }
@@ -583,7 +585,7 @@ export class UrlFetchTool implements Tool {
     );
   }
 
-  private createRichError(context: RichErrorContext): ToolResult {
+  private createRichError(context: RichErrorContext, callId?: string): ToolResult {
     const errorDetails = {
       ...context,
       // Add timestamp for debugging
@@ -636,7 +638,7 @@ export class UrlFetchTool implements Tool {
 
     errorMessage += `\nDiagnostic data: ${JSON.stringify(errorDetails, null, 2)}`;
 
-    return createErrorResult(errorMessage);
+    return createErrorResult(errorMessage, callId);
   }
 
   private async handleLargeContent(
@@ -644,7 +646,8 @@ export class UrlFetchTool implements Tool {
     contentType: string,
     url: string,
     size: number,
-    returnContent: boolean
+    returnContent: boolean,
+    callId?: string
   ): Promise<ToolResult> {
     try {
       // Create temp directory if it doesn't exist
@@ -693,7 +696,7 @@ export class UrlFetchTool implements Tool {
             type: 'text',
             text: `Large file fetched from ${url}:\n\nContent-Type: ${contentType}\nSize: ${size} bytes (${sizeInMB}MB)\nSaved to: ${tempFilePath}\n\nContent not returned (returnContent=false). Use file tools to access the temp file.`,
           },
-        ]);
+        ], callId);
       }
 
       // Process the full content and provide that as the main response
@@ -706,10 +709,11 @@ export class UrlFetchTool implements Tool {
           type: 'text',
           text: `Content from ${url}:\n\nContent-Type: ${contentType}\nSize: ${size} bytes (${sizeInMB}MB)\nFull content saved to: ${tempFilePath}\n\n${processedContent}`,
         },
-      ]);
+      ], callId);
     } catch (error) {
       return createErrorResult(
-        `Failed to save large content: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to save large content: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        callId
       );
     }
   }

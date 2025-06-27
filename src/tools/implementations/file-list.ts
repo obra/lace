@@ -3,7 +3,7 @@
 
 import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
-import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
 
 interface FileEntry {
   name: string;
@@ -28,7 +28,7 @@ export class FileListTool implements Tool {
     readOnlyHint: true,
     idempotentHint: true,
   };
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       path: { type: 'string', description: 'Directory path to list (default: current directory)' },
@@ -44,7 +44,7 @@ export class FileListTool implements Tool {
     required: [],
   };
 
-  async executeTool(input: Record<string, unknown>, _context?: ToolContext): Promise<ToolResult> {
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     const {
       path = '.',
       pattern,
@@ -52,7 +52,7 @@ export class FileListTool implements Tool {
       recursive = false,
       maxDepth = 3,
       summaryThreshold = 50,
-    } = input as {
+    } = call.arguments as {
       path?: string;
       pattern?: string;
       includeHidden?: boolean;
@@ -80,9 +80,9 @@ export class FileListTool implements Tool {
           type: 'text',
           text: output,
         },
-      ]);
+      ], call.id);
     } catch (error) {
-      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred');
+      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred', call.id);
     }
   }
 

@@ -1,7 +1,7 @@
 // ABOUTME: Session-based task management tools for tracking work items
 // ABOUTME: In-memory task storage for current session workflow management
 
-import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
 
 interface Task {
   id: string;
@@ -66,13 +66,18 @@ function getTaskStore(threadId: string = 'default'): TaskStore {
   return taskStores.get(threadId)!;
 }
 
+// Test helper - only exported for testing
+export function clearAllTaskStores(): void {
+  taskStores.clear();
+}
+
 export class TaskAddTool implements Tool {
   name = 'task_add';
   description = 'Add a new task to the session task list';
   annotations = {
     idempotentHint: false,
   };
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       description: { type: 'string', description: 'Task description' },
@@ -80,11 +85,11 @@ export class TaskAddTool implements Tool {
     required: ['description'],
   };
 
-  async executeTool(input: Record<string, unknown>, context?: ToolContext): Promise<ToolResult> {
-    const { description } = input as { description: string };
+  async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
+    const { description } = call.arguments as { description: string };
 
     if (!description || typeof description !== 'string' || description.trim() === '') {
-      return createErrorResult('Description must be a non-empty string');
+      return createErrorResult('Description must be a non-empty string', call.id);
     }
 
     const taskStore = getTaskStore(context?.threadId);
@@ -95,7 +100,7 @@ export class TaskAddTool implements Tool {
         type: 'text',
         text: `Added task #${task.id}: ${task.description}`,
       },
-    ]);
+    ], call.id);
   }
 }
 
@@ -106,7 +111,7 @@ export class TaskListTool implements Tool {
     readOnlyHint: true,
     idempotentHint: true,
   };
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       includeCompleted: {
@@ -117,8 +122,8 @@ export class TaskListTool implements Tool {
     required: [],
   };
 
-  async executeTool(input: Record<string, unknown>, context?: ToolContext): Promise<ToolResult> {
-    const { includeCompleted = false } = input as { includeCompleted?: boolean };
+  async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
+    const { includeCompleted = false } = call.arguments as { includeCompleted?: boolean };
 
     const taskStore = getTaskStore(context?.threadId);
     const tasks = taskStore.getTasks(includeCompleted);
@@ -130,7 +135,7 @@ export class TaskListTool implements Tool {
           type: 'text',
           text: message,
         },
-      ]);
+      ], call.id);
     }
 
     const taskLines = tasks.map((task) => {
@@ -151,7 +156,7 @@ export class TaskListTool implements Tool {
         type: 'text',
         text: `${summary}\n${taskLines.join('\n')}`,
       },
-    ]);
+    ], call.id);
   }
 }
 
@@ -161,7 +166,7 @@ export class TaskCompleteTool implements Tool {
   annotations = {
     idempotentHint: false,
   };
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       id: { type: 'string', description: 'Task ID to complete' },
@@ -169,18 +174,18 @@ export class TaskCompleteTool implements Tool {
     required: ['id'],
   };
 
-  async executeTool(input: Record<string, unknown>, context?: ToolContext): Promise<ToolResult> {
-    const { id } = input as { id: string };
+  async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
+    const { id } = call.arguments as { id: string };
 
     if (!id || typeof id !== 'string') {
-      return createErrorResult('Task ID must be a non-empty string');
+      return createErrorResult('Task ID must be a non-empty string', call.id);
     }
 
     const taskStore = getTaskStore(context?.threadId);
     const task = taskStore.completeTask(id);
 
     if (!task) {
-      return createErrorResult(`Task #${id} not found`);
+      return createErrorResult(`Task #${id} not found`, call.id);
     }
 
     return createSuccessResult([
@@ -188,6 +193,6 @@ export class TaskCompleteTool implements Tool {
         type: 'text',
         text: `Completed task #${task.id}: ${task.description}`,
       },
-    ]);
+    ], call.id);
   }
 }

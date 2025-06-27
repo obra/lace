@@ -3,7 +3,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
 
 const execAsync = promisify(exec);
 
@@ -22,7 +22,7 @@ export class BashTool implements Tool {
     destructiveHint: true,
     openWorldHint: true,
   };
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       command: { type: 'string', description: 'The bash command to execute' },
@@ -30,8 +30,8 @@ export class BashTool implements Tool {
     required: ['command'],
   };
 
-  async executeTool(input: Record<string, unknown>, _context?: ToolContext): Promise<ToolResult> {
-    const { command } = input as { command: string };
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
+    const { command } = call.arguments as { command: string };
 
     if (!command || typeof command !== 'string') {
       return createErrorResult(
@@ -39,7 +39,8 @@ export class BashTool implements Tool {
           stdout: '',
           stderr: 'Command must be a non-empty string',
           exitCode: 1,
-        })
+        }),
+        call.id
       );
     }
 
@@ -61,7 +62,7 @@ export class BashTool implements Tool {
           type: 'text',
           text: JSON.stringify(result),
         },
-      ]);
+      ], call.id);
     } catch (error: unknown) {
       const err = error as { message: string; stdout?: string; stderr?: string; code?: number };
 
@@ -84,7 +85,7 @@ export class BashTool implements Tool {
           exitCode: 127,
         };
 
-        return createErrorResult(JSON.stringify(result));
+        return createErrorResult(JSON.stringify(result), call.id);
       }
 
       // If we have stdout or command executed in a sequence, treat as tool success
@@ -101,7 +102,7 @@ export class BashTool implements Tool {
             type: 'text',
             text: JSON.stringify(result),
           },
-        ]);
+        ], call.id);
       }
 
       // True failure - command couldn't execute at all (rare cases)
