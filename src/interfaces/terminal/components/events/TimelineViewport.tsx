@@ -2,16 +2,15 @@
 // ABOUTME: Manages viewport state and keyboard input, renders content and scroll indicators
 
 import React, { useRef } from 'react';
-import { Box, useInput, useFocus, useFocusManager, Text } from 'ink';
+import { Box, useInput, Text } from 'ink';
 import useStdoutDimensions from '../../../../utils/use-stdout-dimensions.js';
 import { Timeline } from '../../../thread-processor.js';
 import { useTimelineViewport } from './hooks/useTimelineViewport.js';
 import { logger } from '../../../../utils/logger.js';
+import { useLaceFocus, FocusRegions } from '../../focus/index.js';
 
 interface TimelineViewportProps {
   timeline: Timeline;
-  focusId?: string;
-  parentFocusId?: string;
   bottomSectionHeight?: number;
   onItemInteraction?: (selectedItemIndex: number, input: string, key: any) => void;
   children: (props: {
@@ -32,14 +31,11 @@ interface TimelineViewportProps {
 
 export function TimelineViewport({
   timeline,
-  focusId,
-  parentFocusId,
   bottomSectionHeight,
   onItemInteraction,
   children,
 }: TimelineViewportProps) {
-  const { isFocused } = useFocus({ id: focusId || 'timeline' });
-  const { focusNext, focus } = useFocusManager();
+  const { isFocused } = useLaceFocus(FocusRegions.timeline);
   const [, terminalHeight] = useStdoutDimensions();
 
   // Item refs for measurement
@@ -74,27 +70,10 @@ export function TimelineViewport({
         key,
         input,
         isFocused,
-        focusId,
         isActive: isFocused && viewport.totalContentHeight > 0,
       });
 
-      if (key.escape) {
-        // Handle escape based on focus hierarchy
-        const currentFocusId = focusId || 'timeline';
-        logger.debug('TimelineViewport: Escape key pressed', {
-          currentFocusId,
-          parentFocusId,
-          action: parentFocusId ? `focus(${parentFocusId})` : 'focus(shell-input)',
-        });
-
-        if (parentFocusId) {
-          focus(parentFocusId);
-        } else {
-          // Focus the shell input specifically
-          focus('shell-input');
-        }
-        return;
-      }
+      // Note: Escape key is handled globally by LaceFocusProvider
 
       if (key.upArrow) {
         viewport.navigateUp();
