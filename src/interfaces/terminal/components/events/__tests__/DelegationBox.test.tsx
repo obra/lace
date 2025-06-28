@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DelegationBox } from '../DelegationBox.js';
 import { ThreadEvent } from '../../../../../threads/types.js';
 import { TimelineItem } from '../../../../thread-processor.js';
+import { useThreadManager, useThreadProcessor } from '../../../terminal-interface.js';
 
 // Mock TimelineDisplay
 vi.mock('../TimelineDisplay.js', () => ({
@@ -23,10 +24,8 @@ const mockThreadProcessor = {
   processThreads: vi.fn(),
 };
 
-vi.mock('../../terminal-interface.js', () => ({
-  useThreadManager: () => mockThreadManager,
-  useThreadProcessor: () => mockThreadProcessor,
-}));
+// Mock the hooks directly
+vi.mock('../../../terminal-interface.js');
 
 // Create test data
 function createTestToolCall(metadata: { threadId: string }): Extract<TimelineItem, { type: 'tool_execution' }> {
@@ -69,6 +68,10 @@ function createTestEvents(): ThreadEvent[] {
 describe('DelegationBox', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Set up mock implementations
+    vi.mocked(useThreadManager).mockReturnValue(mockThreadManager);
+    vi.mocked(useThreadProcessor).mockReturnValue(mockThreadProcessor);
   });
 
   it('should fetch and display delegate thread data when threadId is present', async () => {
@@ -79,13 +82,11 @@ describe('DelegationBox', () => {
     
     mockThreadManager.getEvents.mockReturnValue(delegateEvents);
     mockThreadProcessor.processThreads.mockReturnValue({
-      mainTimeline: {
-        items: [
-          { type: 'user_message', content: 'Hello from delegate', timestamp: new Date(), id: 'msg-1' },
-          { type: 'agent_message', content: 'Response from delegate', timestamp: new Date(), id: 'msg-2' },
-        ],
-        metadata: { eventCount: 2, messageCount: 2, lastActivity: new Date() },
-      },
+      items: [
+        { type: 'user_message', content: 'Hello from delegate', timestamp: new Date(), id: 'msg-1' },
+        { type: 'agent_message', content: 'Response from delegate', timestamp: new Date(), id: 'msg-2' },
+      ],
+      metadata: { eventCount: 2, messageCount: 2, lastActivity: new Date() },
     });
 
     // Act
@@ -116,10 +117,8 @@ describe('DelegationBox', () => {
     
     mockThreadManager.getEvents.mockReturnValue([]);
     mockThreadProcessor.processThreads.mockReturnValue({
-      mainTimeline: {
-        items: [],
-        metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
-      },
+      items: [],
+      metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
     });
 
     // Act

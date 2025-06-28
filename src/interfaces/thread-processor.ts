@@ -60,7 +60,14 @@ export class ThreadProcessor {
 
     // Group events by threadId and get main thread only
     const threadGroups = this._groupEventsByThread(events);
-    const mainThreadGroup = threadGroups.find((g) => !g.threadId.includes('.'));
+
+    // If all events are from a single thread (e.g., processing delegate thread in isolation),
+    // treat that thread as the "main" thread for this processing context
+    let mainThreadGroup = threadGroups.find((g) => !g.threadId.includes('.'));
+    if (!mainThreadGroup && threadGroups.length === 1) {
+      mainThreadGroup = threadGroups[0]; // Single thread (delegate) becomes "main" in this context
+    }
+
     const mainEvents = mainThreadGroup?.events || [];
     const mainThreadId = mainThreadGroup?.threadId || 'main';
 
@@ -131,7 +138,6 @@ export class ThreadProcessor {
       },
     };
   }
-
 
   private _processEventGroupWithState(
     events: ThreadEvent[],

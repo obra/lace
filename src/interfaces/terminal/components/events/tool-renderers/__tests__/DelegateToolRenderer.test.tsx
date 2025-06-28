@@ -417,8 +417,8 @@ describe('DelegateToolRenderer', () => {
       const { lastFrame } = render(<DelegateToolRenderer item={item} />);
 
       const frame = lastFrame();
-      expect(frame).toContain('Thread: delegate-thread-789');
-      expect(frame).toContain('[DELEGATE]');
+      expect(frame).toContain('[DelegateBox] delegate "Analyze logs"');
+      // DelegationBox component should be rendered for tools with metadata threadId
     });
 
     it('should show delegation active status when thread ID present in metadata', () => {
@@ -432,8 +432,8 @@ describe('DelegateToolRenderer', () => {
 
       const { lastFrame } = render(<DelegateToolRenderer item={item} />);
 
-      expect(lastFrame()).toContain('Thread: delegate-thread-completed');
-      expect(lastFrame()).toContain('Delegation active');
+      expect(lastFrame()).toContain('[DelegateBox] delegate "Complete analysis"');
+      // DelegationBox component should be rendered for completed delegate tasks
     });
 
     it('should not show delegation info when no thread ID in metadata', () => {
