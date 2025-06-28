@@ -3,7 +3,7 @@
 
 import React, { useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { useLaceFocus, FocusRegions } from '../focus/index.js';
+import { useLaceFocus, FocusRegions, useLaceFocusContext } from '../focus/index.js';
 
 interface FileAutocompleteProps {
   items: string[];
@@ -25,6 +25,7 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
   onNavigate,
 }) => {
   const { isFocused, takeFocus } = useLaceFocus(FocusRegions.autocomplete);
+  const { pushFocus } = useLaceFocusContext();
 
   // Take focus when becoming visible
   useEffect(() => {
@@ -38,9 +39,10 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
     (input, key) => {
       if (!isFocused) return;
 
-      // Note: Escape key is handled globally by LaceFocusProvider
       if (key.escape) {
         onCancel?.();
+        // Return focus to shell input when canceling autocomplete
+        pushFocus(FocusRegions.shell);
         return;
       }
 
@@ -50,6 +52,8 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
         if (selectedItem && onSelect) {
           onSelect(selectedItem);
         }
+        // Return focus to shell input after selection
+        pushFocus(FocusRegions.shell);
         return;
       }
 

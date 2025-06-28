@@ -6,7 +6,7 @@ import { Box, Text, useInput } from 'ink';
 import { useTextBuffer } from '../hooks/use-text-buffer.js';
 import TextRenderer from './text-renderer.js';
 import FileAutocomplete from './file-autocomplete.js';
-import { useLaceFocus, FocusRegions } from '../focus/index.js';
+import { useLaceFocus, FocusRegions, useLaceFocusContext } from '../focus/index.js';
 
 // Keyboard shortcut system - list-based approach
 type KeyboardShortcut = string[]; // e.g., ['ctrl', 'a'] or ['meta', 'shift', 'z']
@@ -80,7 +80,8 @@ const ShellInput: React.FC<ShellInputProps> = ({
   onChange,
 }) => {
   // Use Lace focus system with shell region
-  const { isFocused } = useLaceFocus(FocusRegions.shell, { autoFocus: autoFocus && !disabled });
+  const { isFocused, takeFocus } = useLaceFocus(FocusRegions.shell, { autoFocus: autoFocus && !disabled });
+  const { pushFocus } = useLaceFocusContext();
   const actualIsFocused = isFocused && !disabled;
   const [bufferState, bufferOps] = useTextBuffer(value);
 
@@ -279,6 +280,17 @@ const ShellInput: React.FC<ShellInputProps> = ({
     (input, key) => {
       // Do nothing if disabled
       if (disabled) {
+        return;
+      }
+
+      // Handle Escape key to navigate to timeline
+      if (key.escape) {
+        if (autocompleteVisible) {
+          // If autocomplete is visible, let it handle escape (to close it)
+          return;
+        }
+        // Navigate to timeline
+        pushFocus(FocusRegions.timeline);
         return;
       }
 

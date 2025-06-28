@@ -74,9 +74,11 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
   const [focusStack] = useState(() => new FocusStack());
   const [currentFocus, setCurrentFocus] = useState(focusStack.current());
 
-  // Disable Ink's automatic Tab cycling to prevent conflicts with autocomplete
+  // Disable Ink's automatic Tab cycling and set initial focus
   useEffect(() => {
     inkFocus.disableFocus();
+    // Set initial focus to the shell input
+    inkFocus.focus(FocusRegions.shell);
   }, [inkFocus]);
 
   /**
@@ -115,12 +117,11 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
     return currentFocus === focusId;
   }, [currentFocus]);
 
-  // Global Escape key handler for hierarchical navigation
-  useInput(useCallback((input, key) => {
-    if (key.escape) {
-      popFocus();
-    }
-  }, [popFocus]));
+  // Note: Escape key handling is now component-specific
+  // - ShellInput: Escape navigates to timeline
+  // - Timeline: Escape goes back to shell
+  // - Autocomplete: Escape closes autocomplete
+  // - Modals: Escape closes modal
 
   const contextValue: LaceFocusContextValue = {
     currentFocus,

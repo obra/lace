@@ -7,7 +7,7 @@ import useStdoutDimensions from '../../../../utils/use-stdout-dimensions.js';
 import { Timeline } from '../../../thread-processor.js';
 import { useTimelineViewport } from './hooks/useTimelineViewport.js';
 import { logger } from '../../../../utils/logger.js';
-import { useLaceFocus, FocusRegions } from '../../focus/index.js';
+import { useLaceFocus, FocusRegions, useLaceFocusContext } from '../../focus/index.js';
 
 interface TimelineViewportProps {
   timeline: Timeline;
@@ -36,6 +36,7 @@ export function TimelineViewport({
   children,
 }: TimelineViewportProps) {
   const { isFocused } = useLaceFocus(FocusRegions.timeline);
+  const { pushFocus } = useLaceFocusContext();
   const [, terminalHeight] = useStdoutDimensions();
 
   // Item refs for measurement
@@ -73,7 +74,11 @@ export function TimelineViewport({
         isActive: isFocused && viewport.totalContentHeight > 0,
       });
 
-      // Note: Escape key is handled globally by LaceFocusProvider
+      // Handle Escape key to go back to shell input
+      if (key.escape) {
+        pushFocus(FocusRegions.shell);
+        return;
+      }
 
       if (key.upArrow) {
         viewport.navigateUp();
