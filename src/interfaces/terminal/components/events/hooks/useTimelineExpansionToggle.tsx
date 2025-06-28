@@ -2,6 +2,7 @@
 // ABOUTME: Provides directional expand/collapse events and shared state management for timeline items
 
 import React, { useCallback, useEffect, useState, createContext, useContext } from 'react';
+import { logger } from '../../../../../utils/logger.js';
 
 // Event emitter for expansion events
 class ExpansionEmitter {
@@ -27,7 +28,10 @@ class ExpansionEmitter {
       try {
         listener();
       } catch (error) {
-        console.error('Error in expansion listener:', error);
+        logger.error('Error in expansion listener', {
+          error: error instanceof Error ? error.message : String(error),
+          operation: 'expand',
+        });
       }
     });
   }
@@ -37,7 +41,10 @@ class ExpansionEmitter {
       try {
         listener();
       } catch (error) {
-        console.error('Error in collapse listener:', error);
+        logger.error('Error in collapse listener', {
+          error: error instanceof Error ? error.message : String(error),
+          operation: 'collapse',
+        });
       }
     });
   }
@@ -56,13 +63,13 @@ export function TimelineExpansionProvider({ children }: { children: React.ReactN
   );
 }
 
-// Global fallback emitter for backward compatibility
-const globalEmitter = new ExpansionEmitter();
-
-// Hook to get the expansion emitter from context or fallback to global
+// Hook to get the expansion emitter from context
 function useExpansionEmitter(): ExpansionEmitter {
   const emitter = useContext(ExpansionEmitterContext);
-  return emitter || globalEmitter;
+  if (!emitter) {
+    throw new Error('useExpansionEmitter must be used within a TimelineExpansionProvider');
+  }
+  return emitter;
 }
 
 // Export hooks to emit directional events  

@@ -50,6 +50,13 @@ vi.mock('../../../../theme.js', () => ({
   },
 }));
 
+vi.mock('../../hooks/useTimelineExpansionToggle.js', () => ({
+  useTimelineItemExpansion: () => ({
+    isExpanded: false,
+    handleExpandedChange: vi.fn(),
+  }),
+}));
+
 describe('GenericToolRenderer', () => {
   const createToolExecutionItem = (
     toolName: string = 'bash',
@@ -170,19 +177,20 @@ describe('GenericToolRenderer', () => {
       expect(lastFrame()).toContain('Expanded: false');
     });
 
-    it('should use controlled expansion when provided', () => {
+    it('should use shared expansion state from hook', () => {
       const item = createToolExecutionItem();
 
-      const { lastFrame } = render(<GenericToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<GenericToolRenderer item={item} />);
 
-      expect(lastFrame()).toContain('Expanded: true');
+      // Expansion is now managed by the hook system
+      expect(lastFrame()).toContain('Expanded: false');
     });
 
     it('should call onExpandedChange when provided', () => {
       const item = createToolExecutionItem();
       const onExpandedChange = vi.fn();
 
-      render(<GenericToolRenderer item={item} onExpandedChange={onExpandedChange} />);
+      render(<GenericToolRenderer item={item}  />);
 
       // onExpandedChange is passed to TimelineEntryCollapsibleBox
       expect(onExpandedChange).not.toHaveBeenCalled(); // Not called during render
@@ -207,7 +215,7 @@ describe('GenericToolRenderer', () => {
         createSuccessResult('file.txt')
       );
 
-      const { lastFrame } = render(<GenericToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<GenericToolRenderer item={item}  />);
 
       const frame = lastFrame();
       expect(frame).toContain('[ComplexContent]'); // Expanded content mock
@@ -313,7 +321,7 @@ describe('GenericToolRenderer', () => {
         createErrorResult('Command not found')
       );
 
-      const { lastFrame } = render(<GenericToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<GenericToolRenderer item={item}  />);
 
       const frame = lastFrame();
       expect(frame).toContain('[ComplexContent]'); // Error content in expanded view
@@ -328,7 +336,7 @@ describe('GenericToolRenderer', () => {
       };
       const item = createToolExecutionItem('bash', { command: 'invalid' }, result);
 
-      const { lastFrame } = render(<GenericToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<GenericToolRenderer item={item}  />);
 
       const frame = lastFrame();
       expect(frame).toContain('[ComplexContent]'); // Error content with fallback
@@ -343,7 +351,7 @@ describe('GenericToolRenderer', () => {
       };
       const item = createToolExecutionItem('bash', { command: 'echo' }, result);
 
-      const { lastFrame } = render(<GenericToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<GenericToolRenderer item={item}  />);
 
       const frame = lastFrame();
       expect(frame).toContain('[ComplexContent]'); // Success content with fallback
@@ -378,7 +386,7 @@ describe('GenericToolRenderer', () => {
       };
       const item = createToolExecutionItem('file-write', complexInput);
 
-      const { lastFrame } = render(<GenericToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<GenericToolRenderer item={item}  />);
 
       const frame = lastFrame();
       expect(frame).toContain('[ComplexContent]'); // Complex input displayed as JSON

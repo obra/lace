@@ -1,7 +1,7 @@
 // ABOUTME: Generic tool renderer component using TimelineEntryCollapsibleBox
 // ABOUTME: Provides consistent expansion behavior for any tool execution with input/output display
 
-import React, { useState, useCallback } from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
 import { TimelineEntryCollapsibleBox } from '../../ui/TimelineEntryCollapsibleBox.js';
 import { ToolCall, ToolResult } from '../../../../../tools/types.js';
@@ -25,8 +25,6 @@ interface GenericToolRendererProps {
   isSelected?: boolean; // Whether timeline cursor is on this item
   isFocused?: boolean; // Whether this item has keyboard focus
   onToggle?: () => void;
-  isExpanded?: boolean;
-  onExpandedChange?: (expanded: boolean) => void;
 }
 
 // Default props for optional boolean values
@@ -52,34 +50,12 @@ export function GenericToolRenderer({
   isSelected = defaultProps.isSelected,
   isFocused = defaultProps.isFocused,
   onToggle,
-  isExpanded: controlledExpanded,
-  onExpandedChange,
 }: GenericToolRendererProps) {
-  // Use controlled expansion if provided, otherwise manage internally
-  const [internalExpanded, setInternalExpanded] = useState(false);
-  const isExpanded = controlledExpanded ?? internalExpanded;
-
-  // Custom handler that works with controlled/uncontrolled mode
-  const handleExpandedChange = useCallback((expanded: boolean) => {
-    if (onExpandedChange) {
-      onExpandedChange(expanded);
-    } else {
-      setInternalExpanded(expanded);
-    }
-    onToggle?.();
-  }, [onExpandedChange, onToggle]);
-
-  // Use shared expansion management only if not in controlled mode
-  const sharedExpansion = useTimelineItemExpansion(
-    controlledExpanded === undefined ? isSelected : false,
-    controlledExpanded === undefined ? onToggle : undefined
+  // Use shared expansion management for consistent behavior
+  const { isExpanded, handleExpandedChange } = useTimelineItemExpansion(
+    isSelected,
+    onToggle
   );
-  
-  // Use shared state if not controlled, otherwise use controlled state
-  const finalIsExpanded = controlledExpanded ?? sharedExpansion.isExpanded;
-  const finalHandleExpandedChange = controlledExpanded !== undefined 
-    ? handleExpandedChange 
-    : sharedExpansion.handleExpandedChange;
 
   const { call, result } = item;
   const { name: toolName, arguments: input } = call;
@@ -199,8 +175,8 @@ export function GenericToolRenderer({
     <TimelineEntryCollapsibleBox
       label={`${formatToolName(toolName)}${toolCommand ? ` ${toolCommand}` : ''}`}
       summary={toolSummary}
-      isExpanded={finalIsExpanded}
-      onExpandedChange={finalHandleExpandedChange}
+      isExpanded={isExpanded}
+      onExpandedChange={handleExpandedChange}
       isSelected={isSelected}
       onToggle={onToggle}
     >
