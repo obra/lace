@@ -9,6 +9,13 @@ import { ThreadEvent } from '../../../../../threads/types.js';
 import { UI_SYMBOLS } from '../../../theme.js';
 
 // Mock dependencies
+vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
+  useTimelineItemExpansion: () => ({
+    isExpanded: false,
+    handleExpandedChange: vi.fn(),
+  }),
+}));
+
 vi.mock('../ui/MarkdownDisplay.js', () => ({
   MarkdownDisplay: ({ content, showIcon, dimmed }: any) =>
     React.createElement(
