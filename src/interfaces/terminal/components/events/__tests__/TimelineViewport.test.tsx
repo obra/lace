@@ -7,6 +7,7 @@ import { render } from 'ink-testing-library';
 import { Text } from 'ink';
 import { TimelineViewport } from '../TimelineViewport.js';
 import { Timeline } from '../../../../thread-processor.js';
+import { LaceFocusProvider } from '../../../focus/focus-provider.js';
 
 // Mock external dependencies that aren't core to the component logic
 vi.mock('../../../../../utils/use-stdout-dimensions.js', () => ({
@@ -23,6 +24,15 @@ vi.mock('../../../../../utils/logger.js', () => ({
 }));
 
 describe('TimelineViewport', () => {
+  // Helper to render with focus provider
+  const renderWithFocus = (component: React.ReactElement) => {
+    return render(
+      <LaceFocusProvider>
+        {component}
+      </LaceFocusProvider>
+    );
+  };
+
   const createMockTimeline = (itemCount: number): Timeline => {
     const items = [];
     for (let i = 0; i < itemCount; i++) {
@@ -46,7 +56,7 @@ describe('TimelineViewport', () => {
   it('should render viewport container with children', () => {
     const timeline = createMockTimeline(3);
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithFocus(
       <TimelineViewport timeline={timeline}>
         {({ timeline: tl, viewportState, itemRefs }) =>
           tl.items.map((item, index) => (
@@ -69,7 +79,7 @@ describe('TimelineViewport', () => {
     const timeline = createMockTimeline(2);
     let capturedState: any = null;
 
-    render(
+    renderWithFocus(
       <TimelineViewport timeline={timeline}>
         {({ viewportState }) => {
           capturedState = viewportState;
@@ -91,7 +101,7 @@ describe('TimelineViewport', () => {
     const timeline = createMockTimeline(2);
     let capturedActions: any = null;
 
-    render(
+    renderWithFocus(
       <TimelineViewport timeline={timeline}>
         {({ viewportActions }) => {
           capturedActions = viewportActions;
@@ -109,7 +119,7 @@ describe('TimelineViewport', () => {
     const timeline = createMockTimeline(2);
     let capturedRefs: any = null;
 
-    render(
+    renderWithFocus(
       <TimelineViewport timeline={timeline}>
         {({ itemRefs }) => {
           capturedRefs = itemRefs;
@@ -126,7 +136,7 @@ describe('TimelineViewport', () => {
   it('should render cursor overlay when focused', () => {
     const timeline = createMockTimeline(1);
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithFocus(
       <TimelineViewport timeline={timeline}>
         {() => <Text>Content</Text>}
       </TimelineViewport>
@@ -148,7 +158,7 @@ describe('TimelineViewport', () => {
       },
     };
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithFocus(
       <TimelineViewport timeline={timeline}>
         {({ timeline: tl }) => <Text>Items: {tl.items.length}</Text>}
       </TimelineViewport>
@@ -162,7 +172,7 @@ describe('TimelineViewport', () => {
   it('should accept focus configuration', () => {
     const timeline = createMockTimeline(1);
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithFocus(
       <TimelineViewport timeline={timeline}>
         {() => <Text>Focused content</Text>}
       </TimelineViewport>

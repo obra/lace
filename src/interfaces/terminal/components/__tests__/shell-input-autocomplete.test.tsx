@@ -5,6 +5,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render as renderInkComponent } from 'ink-testing-library';
 import ShellInput from '../shell-input.js';
+import { LaceFocusProvider } from '../../focus/focus-provider.js';
 
 // Capture the useInput handler for direct testing
 let capturedInputHandler: ((input: string, key: any) => void) | null = null;
@@ -27,6 +28,13 @@ vi.mock('../../utils/file-scanner.js', () => ({
 }));
 
 describe('ShellInput Autocomplete Integration', () => {
+  // Helper to render with focus provider
+  const renderWithFocus = (component: React.ReactElement) => {
+    return renderInkComponent(
+      React.createElement(LaceFocusProvider, { children: component })
+    );
+  };
+
   let mockOnSubmit: ReturnType<typeof vi.fn>;
   let mockOnChange: ReturnType<typeof vi.fn>;
 
@@ -42,7 +50,7 @@ describe('ShellInput Autocomplete Integration', () => {
 
   describe('basic autocomplete functionality', () => {
     it('should render without autocomplete visible initially', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="" autoFocus={false} />
       );
 
@@ -54,7 +62,7 @@ describe('ShellInput Autocomplete Integration', () => {
     });
 
     it('should handle Tab key to show autocomplete when there is content', async () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="s" autoFocus={true} />
       );
 
@@ -72,7 +80,7 @@ describe('ShellInput Autocomplete Integration', () => {
     });
 
     it('should hide autocomplete on second Tab press', async () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="s" autoFocus={true} />
       );
 
@@ -93,7 +101,7 @@ describe('ShellInput Autocomplete Integration', () => {
     });
 
     it('should hide autocomplete on Escape key', async () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="s" autoFocus={true} />
       );
 
@@ -113,7 +121,7 @@ describe('ShellInput Autocomplete Integration', () => {
 
   describe('autocomplete navigation', () => {
     it('should navigate autocomplete with arrow keys', async () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="p" autoFocus={true} />
       );
 
@@ -131,7 +139,7 @@ describe('ShellInput Autocomplete Integration', () => {
     });
 
     it('should navigate up and down with bounds checking', async () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="s" autoFocus={true} />
       );
 
@@ -157,7 +165,7 @@ describe('ShellInput Autocomplete Integration', () => {
 
   describe('autocomplete selection', () => {
     it('should select item with Enter key', async () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="s" autoFocus={true} />
       );
 
@@ -177,7 +185,7 @@ describe('ShellInput Autocomplete Integration', () => {
     });
 
     it('should complete partial text correctly', async () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="sr" autoFocus={true} />
       );
 
@@ -196,7 +204,7 @@ describe('ShellInput Autocomplete Integration', () => {
 
   describe('autocomplete state management', () => {
     it('should hide autocomplete when typing', async () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="" autoFocus={true} />
       );
 
@@ -214,7 +222,7 @@ describe('ShellInput Autocomplete Integration', () => {
     });
 
     it('should handle disabled state', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput
           onSubmit={mockOnSubmit}
           onChange={mockOnChange}
@@ -235,7 +243,7 @@ describe('ShellInput Autocomplete Integration', () => {
 
   describe('autocomplete positioning', () => {
     it('should position autocomplete relative to cursor', async () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput
           onSubmit={mockOnSubmit}
           onChange={mockOnChange}
@@ -268,7 +276,7 @@ describe('ShellInput Autocomplete Integration', () => {
         mockScanner.getCompletions.mockResolvedValue(['src/app.ts', 'src/agent.ts']);
       }
 
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput
           onSubmit={mockOnSubmit}
           onChange={mockOnChange}
@@ -290,7 +298,7 @@ describe('ShellInput Autocomplete Integration', () => {
 
   describe('tab completion constraints', () => {
     it('should not trigger autocomplete on Tab when input is completely empty', async () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="" autoFocus={true} />
       );
 
@@ -310,7 +318,7 @@ describe('ShellInput Autocomplete Integration', () => {
     });
 
     it('should not trigger autocomplete on Tab when input is only whitespace', async () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="   " autoFocus={true} />
       );
 
@@ -328,7 +336,7 @@ describe('ShellInput Autocomplete Integration', () => {
     });
 
     it('should trigger autocomplete on Tab when there is content to complete', async () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="s" autoFocus={true} />
       );
 
@@ -344,7 +352,7 @@ describe('ShellInput Autocomplete Integration', () => {
     });
 
     it('should trigger autocomplete on Tab when cursor is after whitespace but line has content', async () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="ls " autoFocus={true} />
       );
 
@@ -371,7 +379,7 @@ describe('ShellInput Autocomplete Integration', () => {
         mockScanner.getCompletions.mockRejectedValue(new Error('File system error'));
       }
 
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="test" autoFocus={true} />
       );
 

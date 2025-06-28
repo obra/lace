@@ -9,6 +9,7 @@ import { DelegationBox } from '../DelegationBox.js';
 import { ThreadEvent } from '../../../../../threads/types.js';
 import { TimelineItem } from '../../../../thread-processor.js';
 import { useThreadManager, useThreadProcessor } from '../../../terminal-interface.js';
+import { LaceFocusProvider } from '../../../focus/focus-provider.js';
 
 // Mock TimelineDisplay
 vi.mock('../TimelineDisplay.js', () => ({
@@ -61,6 +62,15 @@ function createTestEvents(): ThreadEvent[] {
 }
 
 describe('DelegationBox', () => {
+  // Helper to render with focus provider
+  const renderWithFocus = (component: React.ReactElement) => {
+    return render(
+      <LaceFocusProvider>
+        {component}
+      </LaceFocusProvider>
+    );
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     
@@ -92,7 +102,7 @@ describe('DelegationBox', () => {
     });
 
     // Act
-    const { lastFrame } = render(<DelegationBox toolCall={toolCall} />);
+    const { lastFrame } = renderWithFocus(<DelegationBox toolCall={toolCall} />);
 
     // Assert
     expect(mockThreadManager).toHaveBeenCalledWith(delegateThreadId);
@@ -105,7 +115,7 @@ describe('DelegationBox', () => {
     const toolCall = createTestToolCall({ threadId: '' });
     
     // Act
-    const { lastFrame } = render(<DelegationBox toolCall={toolCall} />);
+    const { lastFrame } = renderWithFocus(<DelegationBox toolCall={toolCall} />);
 
     // Assert
     expect(lastFrame()).toBe('');
@@ -127,7 +137,7 @@ describe('DelegationBox', () => {
     });
 
     // Act
-    const { lastFrame } = render(<DelegationBox toolCall={toolCall} />);
+    const { lastFrame } = renderWithFocus(<DelegationBox toolCall={toolCall} />);
 
     // Assert
     expect(mockThreadManager).toHaveBeenCalledWith(delegateThreadId);

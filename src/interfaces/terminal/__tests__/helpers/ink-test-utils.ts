@@ -7,6 +7,7 @@ import { act } from '@testing-library/react';
 import tty from 'node:tty';
 import { expect } from 'vitest';
 import React from 'react';
+import { LaceFocusProvider } from '../../focus/focus-provider.js';
 
 /**
  * Strips ANSI escape codes from text for content testing
@@ -166,6 +167,15 @@ interface RenderResult {
   stdin: EnhancedStdin;
   frames: string[];
   lastFrame: () => string | undefined;
+}
+
+/**
+ * Renders an Ink component wrapped with LaceFocusProvider for focus system testing
+ */
+export function renderInkComponentWithFocus(tree: React.ReactElement): RenderResult {
+  return renderInkComponent(
+    React.createElement(LaceFocusProvider, { children: tree })
+  );
 }
 
 export function renderInkComponent(tree: React.ReactElement): RenderResult {

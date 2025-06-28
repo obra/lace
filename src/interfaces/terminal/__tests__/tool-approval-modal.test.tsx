@@ -4,7 +4,7 @@
 import React from 'react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { act } from '@testing-library/react';
-import { renderInkComponent, stripAnsi } from './helpers/ink-test-utils.js';
+import { renderInkComponentWithFocus, stripAnsi } from './helpers/ink-test-utils.js';
 import ToolApprovalModal from '../components/tool-approval-modal.js';
 import { ApprovalDecision } from '../../../tools/approval-types.js';
 
@@ -42,7 +42,7 @@ describe('ToolApprovalModal', () => {
 
   describe('visibility', () => {
     it('renders minimal output when not visible', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls -la' }}
@@ -60,7 +60,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('renders modal when visible', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls -la' }}
@@ -79,7 +79,7 @@ describe('ToolApprovalModal', () => {
 
   describe('tool information display', () => {
     it('shows read-only tool correctly', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="read"
           input={{ file: 'test.txt' }}
@@ -94,7 +94,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('shows destructive tool correctly', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'rm -rf /' }}
@@ -109,7 +109,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('formats simple input parameters', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'echo hello' }}
@@ -125,7 +125,7 @@ describe('ToolApprovalModal', () => {
 
     it('truncates long input parameters', () => {
       const longCommand = 'a'.repeat(200);
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: longCommand }}
@@ -141,7 +141,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('formats complex input parameters', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="tool"
           input={{
@@ -162,7 +162,7 @@ describe('ToolApprovalModal', () => {
 
   describe('options display', () => {
     it('shows all approval options', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -178,7 +178,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('shows help text', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -194,7 +194,7 @@ describe('ToolApprovalModal', () => {
 
   describe('keyboard interactions', () => {
     it('calls onDecision with ALLOW_ONCE when y is pressed', () => {
-      renderInkComponent(
+      renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -210,7 +210,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('calls onDecision with ALLOW_ONCE when a is pressed', () => {
-      renderInkComponent(
+      renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -226,7 +226,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('calls onDecision with ALLOW_SESSION when s is pressed', () => {
-      renderInkComponent(
+      renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -242,7 +242,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('calls onDecision with DENY when n is pressed', () => {
-      renderInkComponent(
+      renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'rm file' }}
@@ -258,7 +258,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('calls onDecision with DENY when d is pressed', () => {
-      renderInkComponent(
+      renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'rm file' }}
@@ -274,7 +274,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('navigates options with arrow keys', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -300,7 +300,7 @@ describe('ToolApprovalModal', () => {
       // Reset handler to ensure clean state
       capturedInputHandler = null;
 
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           key="enter-test" // Force new component instance
           toolName="bash"
@@ -327,7 +327,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('ignores input when not visible', () => {
-      renderInkComponent(
+      renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -345,7 +345,7 @@ describe('ToolApprovalModal', () => {
 
   describe('state management', () => {
     it('resets selection when becoming visible', async () => {
-      const { lastFrame, rerender } = renderInkComponent(
+      const { lastFrame, rerender } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
