@@ -14,11 +14,6 @@ export interface Timeline {
   };
 }
 
-export interface ProcessedThreads {
-  mainTimeline: Timeline;
-  delegateTimelines: Map<string, Timeline>;
-}
-
 export type TimelineItem =
   | { type: 'user_message'; content: string; timestamp: Date; id: string }
   | { type: 'agent_message'; content: string; timestamp: Date; id: string }
@@ -55,64 +50,23 @@ export class ThreadProcessor {
   private _eventCache = new Map<string, TimelineItem[]>();
 
   /**
-   * Process multiple threads from mixed events into separate timelines (primary API)
+   * Process main thread from mixed events, ignoring delegate threads
    */
-  processThreads(events: ThreadEvent[]): ProcessedThreads {
+  processThreads(events: ThreadEvent[]): Timeline {
     logger.debug('ThreadProcessor.processThreads received events', {
       eventCount: events.length,
       events: events.map((e) => ({ type: e.type, threadId: e.threadId, id: e.id })),
     });
 
-    // Group events by threadId
+    // Group events by threadId and get main thread only
     const threadGroups = this._groupEventsByThread(events);
-    logger.debug('Thread groups created', {
-      groups: threadGroups.map((g) => ({ threadId: g.threadId, eventCount: g.events.length })),
-    });
-
-    // Separate main thread from delegates
     const mainThreadGroup = threadGroups.find((g) => !g.threadId.includes('.'));
     const mainEvents = mainThreadGroup?.events || [];
     const mainThreadId = mainThreadGroup?.threadId || 'main';
-    const delegateGroups = threadGroups.filter((g) => g.threadId.includes('.'));
-
-    logger.debug('Thread separation complete', {
-      mainThreadId,
-      mainEventCount: mainEvents.length,
-      delegateThreads: delegateGroups.map((g) => ({
-        threadId: g.threadId,
-        eventCount: g.events.length,
-      })),
-    });
 
     // Process main thread with incremental caching
     const mainProcessedItems = this._processThreadIncremental(mainThreadId, mainEvents);
-    const mainTimeline = this.buildTimeline(mainProcessedItems, []);
-
-    // Process each delegate thread with incremental caching
-    const delegateTimelines = new Map<string, Timeline>();
-    for (const group of delegateGroups) {
-      logger.debug('Processing delegate thread', {
-        threadId: group.threadId,
-        eventCount: group.events.length,
-      });
-      const processedItems = this._processThreadIncremental(group.threadId, group.events);
-      const timeline = this.buildTimeline(processedItems, []);
-      delegateTimelines.set(group.threadId, timeline);
-      logger.debug('Delegate timeline created', {
-        threadId: group.threadId,
-        itemCount: timeline.items.length,
-      });
-    }
-
-    logger.debug('processThreads complete', {
-      mainTimelineItems: mainTimeline.items.length,
-      delegateTimelineCount: delegateTimelines.size,
-    });
-
-    return {
-      mainTimeline,
-      delegateTimelines,
-    };
+    return this.buildTimeline(mainProcessedItems, []);
   }
 
   /**
@@ -178,24 +132,6 @@ export class ThreadProcessor {
     };
   }
 
-  /**
-   * Process events for backward compatibility with tests
-   */
-  processEvents(events: ThreadEvent[]): ProcessedThreadItems {
-    // For backward compatibility, process as single thread
-    const threadId = events[0]?.threadId || 'main';
-    return this._processThreadIncremental(threadId, events);
-  }
-
-  /**
-   * Process single thread for backward compatibility
-   */
-  processThread(events: ThreadEvent[], ephemeralMessages: EphemeralMessage[] = []): Timeline {
-    const threadId = events[0]?.threadId || 'main';
-    const processedEvents = this._processThreadIncremental(threadId, events);
-    const ephemeralItems = this.processEphemeralEvents(ephemeralMessages);
-    return this.buildTimeline(processedEvents, ephemeralItems);
-  }
 
   private _processEventGroupWithState(
     events: ThreadEvent[],
@@ -370,6 +306,7 @@ export class ThreadProcessor {
   /**
    * Clear cache (useful for testing or manual cache invalidation)
    */
+
   clearCache(): void {
     this._eventCache.clear();
   }
