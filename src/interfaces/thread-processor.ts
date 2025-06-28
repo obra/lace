@@ -3,7 +3,6 @@
 
 import { ThreadEvent } from '../threads/types.js';
 import { ToolCall, ToolResult } from '../tools/types.js';
-import sax from 'sax';
 import { logger } from '../utils/logger.js';
 
 export interface Timeline {

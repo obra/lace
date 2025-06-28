@@ -89,8 +89,8 @@ function DynamicToolRenderer({
     ...item,
     call: {
       ...item.call,
-      input: {
-        ...item.call.input,
+      arguments: {
+        ...item.call.arguments,
         _debug: debugInfo
       }
     }

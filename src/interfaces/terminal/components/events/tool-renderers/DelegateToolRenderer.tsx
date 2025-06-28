@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import { TimelineEntryCollapsibleBox } from '../../ui/TimelineEntryCollapsibleBox.js';
 import { DelegationBox } from '../DelegationBox.js';
-import { ToolCallData, ToolResultData } from '../../../../../threads/types.js';
+import { ToolCall, ToolResult } from '../../../../../tools/types.js';
 import { CompactOutput } from '../../ui/CompactOutput.js';
 import { CodeDisplay } from '../../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
@@ -14,8 +14,8 @@ import { useTimelineExpansionToggle } from '../hooks/useTimelineExpansionToggle.
 // Extract tool execution timeline item type
 type ToolExecutionItem = {
   type: 'tool_execution';
-  call: ToolCallData;
-  result?: ToolResultData;
+  call: ToolCall;
+  result?: ToolResult;
   timestamp: Date;
   callId: string;
 };
@@ -66,11 +66,11 @@ export function DelegateToolRenderer({
   useTimelineExpansionToggle(isSelected || false, toggleExpansion);
   
   const { call, result } = item;
-  const { input } = call;
+  const { arguments: input } = call;
   
-  const success = result?.success ?? true;
-  const output = result?.output;
-  const error = result?.error;
+  const success = result ? !result.isError : true;
+  const output = result?.content?.[0]?.text;
+  const error = result?.isError ? output : undefined;
   
   // Extract delegate task from input
   const delegateTask = (input.task || input.prompt) as string || 'Unknown task';
@@ -78,8 +78,8 @@ export function DelegateToolRenderer({
   
   // Extract delegate thread ID from result for status display
   const extractDelegateThreadId = (item: ToolExecutionItem) => {
-    if (!item.result?.output) return null;
-    const match = item.result.output.match(/Thread:\s*([^\s]+)/);
+    if (!item.result?.content?.[0]?.text) return null;
+    const match = item.result.content[0].text.match(/Thread:\s*([^\s]+)/);
     return match ? match[1] : null;
   };
   

@@ -5,7 +5,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { GenericToolRenderer } from '../GenericToolRenderer.js';
-import { ToolCallData, ToolResultData } from '../../../../../../threads/types.js';
+import { ToolCall, ToolResult } from '../../../../../../tools/types.js';
 import { Text } from 'ink';
 
 // Mock dependencies with simple text components
@@ -48,30 +48,29 @@ describe('GenericToolRenderer', () => {
   const createToolExecutionItem = (
     toolName: string = 'bash',
     input: Record<string, unknown> = { command: 'ls -la' },
-    result?: ToolResultData
+    result?: ToolResult
   ) => ({
     type: 'tool_execution' as const,
     call: {
-      toolName,
-      input,
-      callId: 'call-123'
-    } as ToolCallData,
+      id: 'call-123',
+      name: toolName,
+      arguments: input
+    } as ToolCall,
     result,
     timestamp: new Date('2024-01-01T10:00:00Z'),
     callId: 'call-123'
   });
 
-  const createSuccessResult = (output: string = 'file1.txt\nfile2.txt'): ToolResultData => ({
-    callId: 'call-123',
-    output,
-    success: true
+  const createSuccessResult = (output: string = 'file1.txt\nfile2.txt'): ToolResult => ({
+    id: 'call-123',
+    content: [{ type: 'text', text: output }],
+    isError: false
   });
 
-  const createErrorResult = (error: string = 'Command failed'): ToolResultData => ({
-    callId: 'call-123',
-    error,
-    success: false,
-    output: ''
+  const createErrorResult = (error: string = 'Command failed'): ToolResult => ({
+    id: 'call-123',
+    content: [{ type: 'text', text: error }],
+    isError: true
   });
 
   beforeEach(() => {
@@ -304,10 +303,10 @@ describe('GenericToolRenderer', () => {
     });
 
     it('should handle missing error message gracefully', () => {
-      const result: ToolResultData = {
-        callId: 'call-123',
-        success: false,
-        output: ''
+      const result: ToolResult = {
+        id: 'call-123',
+        content: [{ type: 'text', text: '' }],
+        isError: true
       };
       const item = createToolExecutionItem('bash', { command: 'invalid' }, result);
       
@@ -319,10 +318,10 @@ describe('GenericToolRenderer', () => {
     });
 
     it('should handle missing output gracefully', () => {
-      const result: ToolResultData = {
-        callId: 'call-123',
-        success: true,
-        output: ''
+      const result: ToolResult = {
+        id: 'call-123',
+        content: [{ type: 'text', text: '' }],
+        isError: false
       };
       const item = createToolExecutionItem('bash', { command: 'echo' }, result);
       

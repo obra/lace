@@ -5,7 +5,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { DelegateToolRenderer } from '../DelegateToolRenderer.js';
-import { ToolCallData, ToolResultData } from '../../../../../../threads/types.js';
+import { ToolCall, ToolResult } from '../../../../../../tools/types.js';
 import { Text } from 'ink';
 
 // Mock dependencies with simple text components
@@ -62,30 +62,29 @@ vi.mock('../../../../theme.js', () => ({
 describe('DelegateToolRenderer', () => {
   const createDelegateExecutionItem = (
     input: Record<string, unknown> = { task: 'Calculate 3+6' },
-    result?: ToolResultData
+    result?: ToolResult
   ) => ({
     type: 'tool_execution' as const,
     call: {
-      toolName: 'delegate',
-      input,
-      callId: 'call-123'
-    } as ToolCallData,
+      id: 'call-123',
+      name: 'delegate',
+      arguments: input
+    } as ToolCall,
     result,
     timestamp: new Date('2024-01-01T10:00:00Z'),
     callId: 'call-123'
   });
 
-  const createSuccessResult = (output: string = 'Thread: delegate-thread-456'): ToolResultData => ({
-    callId: 'call-123',
-    output,
-    success: true
+  const createSuccessResult = (output: string = 'Thread: delegate-thread-456'): ToolResult => ({
+    id: 'call-123',
+    content: [{ type: 'text', text: output }],
+    isError: false
   });
 
-  const createErrorResult = (error: string = 'Delegation failed'): ToolResultData => ({
-    callId: 'call-123',
-    error,
-    success: false,
-    output: ''
+  const createErrorResult = (error: string = 'Delegation failed'): ToolResult => ({
+    id: 'call-123',
+    content: [{ type: 'text', text: error }],
+    isError: true
   });
 
   beforeEach(() => {
@@ -193,9 +192,9 @@ describe('DelegateToolRenderer', () => {
       const item = createDelegateExecutionItem(
         { task: 'Calculate sum' },
         {
-          callId: 'call-123',
-          success: true,
-          output: ''
+          id: 'call-123',
+          content: [{ type: 'text', text: '' }],
+          isError: false
         }
       );
       
@@ -315,10 +314,10 @@ describe('DelegateToolRenderer', () => {
     });
 
     it('should handle missing error message gracefully', () => {
-      const result: ToolResultData = {
-        callId: 'call-123',
-        success: false,
-        output: ''
+      const result: ToolResult = {
+        id: 'call-123',
+        content: [{ type: 'text', text: '' }],
+        isError: true
       };
       const item = createDelegateExecutionItem({ task: 'Calculate sum' }, result);
       
@@ -331,10 +330,10 @@ describe('DelegateToolRenderer', () => {
     });
 
     it('should handle missing output gracefully', () => {
-      const result: ToolResultData = {
-        callId: 'call-123',
-        success: true,
-        output: ''
+      const result: ToolResult = {
+        id: 'call-123',
+        content: [{ type: 'text', text: '' }],
+        isError: false
       };
       const item = createDelegateExecutionItem({ task: 'Calculate sum' }, result);
       

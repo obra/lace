@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import { TimelineEntryCollapsibleBox } from '../../ui/TimelineEntryCollapsibleBox.js';
-import { ToolCallData, ToolResultData } from '../../../../../threads/types.js';
+import { ToolCall, ToolResult } from '../../../../../tools/types.js';
 import { CompactOutput } from '../../ui/CompactOutput.js';
 import { CodeDisplay } from '../../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
@@ -13,8 +13,8 @@ import { useTimelineExpansionToggle } from '../hooks/useTimelineExpansionToggle.
 // Extract tool execution timeline item type
 type ToolExecutionItem = {
   type: 'tool_execution';
-  call: ToolCallData;
-  result?: ToolResultData;
+  call: ToolCall;
+  result?: ToolResult;
   timestamp: Date;
   callId: string;
 };
@@ -71,11 +71,11 @@ export function GenericToolRenderer({
   useTimelineExpansionToggle(isSelected, toggleExpansion);
   
   const { call, result } = item;
-  const { toolName, input } = call;
+  const { name: toolName, arguments: input } = call;
   
-  const success = result?.success ?? true;
-  const output = result?.output;
-  const error = result?.error;
+  const success = result ? !result.isError : true;
+  const output = result?.content?.[0]?.text;
+  const error = result?.isError ? output : undefined;
   
   // Generate tool command summary for compact header
   const getToolCommand = (toolName: string, input: Record<string, unknown>): string => {

@@ -144,7 +144,7 @@ export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFo
                       />
                     )}
                     {block.type === 'image' && (
-                      <Text color="gray">[Image: {block.source?.data ? 'base64 data' : 'no data'}]</Text>
+                      <Text color="gray">[Image: {block.data ? 'base64 data' : 'no data'}]</Text>
                     )}
                     {block.type === 'resource' && (
                       <Text color="gray">[Resource: {block.uri}]</Text>

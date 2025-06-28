@@ -21,8 +21,8 @@ vi.mock('../ToolExecutionDisplay.js', () => ({
 vi.mock('../DelegationBox.js', () => ({
   DelegationBox: ({ toolCall }: any) => {
     const extractDelegateThreadId = (item: any) => {
-      if (!item.result?.output) return null;
-      const match = item.result.output.match(/Thread:\s*([^\s]+)/);
+      if (!item.result?.content?.[0]?.text) return null;
+      const match = item.result.content[0].text.match(/Thread:\s*([^\s]+)/);
       return match ? match[1] : null;
     };
     const threadId = extractDelegateThreadId(toolCall);
