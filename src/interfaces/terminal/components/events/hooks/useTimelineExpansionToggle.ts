@@ -43,7 +43,6 @@ export function emitExpansionCollapse(): void {
   expansionEmitter.emitCollapse();
 }
 
-
 // Combined hook that provides complete expansion state management
 export function useTimelineItemExpansion(isSelected: boolean, onToggle?: () => void) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -57,7 +56,6 @@ export function useTimelineItemExpansion(isSelected: boolean, onToggle?: () => v
     setIsExpanded(false);
     onToggle?.();
   }, [onToggle]);
-
 
   const handleExpandedChange = useCallback(
     (expanded: boolean) => {
@@ -85,4 +83,3 @@ export function useTimelineItemExpansion(isSelected: boolean, onToggle?: () => v
     handleExpandedChange,
   };
 }
-
