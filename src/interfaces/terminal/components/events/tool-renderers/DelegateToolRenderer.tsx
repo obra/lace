@@ -78,11 +78,10 @@ export function DelegateToolRenderer({
   const delegateTask = ((input.task || input.prompt) as string) || 'Unknown task';
   const statusIcon = success ? UI_SYMBOLS.SUCCESS : result ? UI_SYMBOLS.ERROR : UI_SYMBOLS.PENDING;
 
-  // Extract delegate thread ID from result for status display
+  // Extract delegate thread ID from result metadata
   const extractDelegateThreadId = (item: ToolExecutionItem) => {
-    if (!item.result?.content?.[0]?.text) return null;
-    const match = item.result.content[0].text.match(/Thread:\s*([^\s]+)/);
-    return match ? match[1] : null;
+    const threadId = item.result?.metadata?.threadId;
+    return threadId && typeof threadId === 'string' ? threadId : null;
   };
 
   const delegateThreadId = extractDelegateThreadId(item);

@@ -15,11 +15,10 @@ interface DelegationBoxProps {
 }
 
 export function DelegationBox({ toolCall, parentFocusId, onToggle }: DelegationBoxProps) {
-  // Extract delegate thread ID from tool result
+  // Extract delegate thread ID from tool result metadata
   const extractDelegateThreadId = (item: Extract<TimelineItemType, { type: 'tool_execution' }>) => {
-    if (!item.result?.content?.[0]?.text) return null;
-    const match = item.result.content[0].text.match(/Thread:\s*([^\s]+)/);
-    return match ? match[1] : null;
+    const threadId = item.result?.metadata?.threadId;
+    return threadId && typeof threadId === 'string' ? threadId : null;
   };
 
   const delegateThreadId = extractDelegateThreadId(toolCall);
