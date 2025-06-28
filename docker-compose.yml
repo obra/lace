@@ -1,0 +1,20 @@
+# ABOUTME: Docker Compose configuration for Lace development environment
+# ABOUTME: Isolated node_modules and LMStudio port forwarding
+
+version: '3.8'
+
+services:
+  lace-dev:
+    build: .
+    volumes:
+      - .:/home/laceuser/lace
+      - lace-node-modules:/home/laceuser/lace/node_modules
+    ports:
+      - "1234:1234"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    tty: true
+    stdin_open: true
+
+volumes:
+  lace-node-modules:
