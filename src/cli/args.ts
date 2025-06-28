@@ -14,6 +14,7 @@ export interface CLIOptions {
   prompt: string | undefined;
   ui: 'terminal';
   continue?: string | boolean;
+  harFile?: string;
   // Tool approval options
   allowNonDestructiveTools: boolean;
   autoApproveTools: string[];
@@ -124,6 +125,10 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
       'info'
     )
     .option('--log-file <path>', 'Write logs to file (no file = no logging)')
+    .option(
+      '--har <path>',
+      'Record HTTP traffic to HAR file for debugging (includes all provider requests)'
+    )
     .option('--prompt <text>', 'Send a single prompt and exit (non-interactive mode)')
     .option('--continue [session_id]', 'Continue previous conversation (latest if no ID provided)')
     .addOption(
@@ -202,6 +207,7 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
     help: options.help || false,
     logLevel: options.logLevel,
     logFile: options.logFile,
+    harFile: options.har,
     prompt: options.prompt,
     ui: options.ui,
     continue: options.continue,
@@ -264,6 +270,10 @@ export async function showHelp(): Promise<void> {
       'info'
     )
     .option('--log-file <path>', 'Write logs to file (no file = no logging)')
+    .option(
+      '--har <path>',
+      'Record HTTP traffic to HAR file for debugging (includes all provider requests)'
+    )
     .option('--prompt <text>', 'Send a single prompt and exit (non-interactive mode)')
     .option('--continue [session_id]', 'Continue previous conversation (latest if no ID provided)')
     .addOption(
