@@ -1,12 +1,14 @@
 // ABOUTME: Collapsible delegation box component for displaying delegate thread conversations
 // ABOUTME: Shows delegation progress, events, and provides expand/collapse functionality
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { Timeline, TimelineItem as TimelineItemType } from '../../../thread-processor.js';
 import TimelineDisplay from './TimelineDisplay.js';
 import { logger } from '../../../../utils/logger.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
+import { useThreadManager, useThreadProcessor } from '../../terminal-interface.js';
+import { calculateTokens, formatTokenCount } from '../../../../utils/token-estimation.js';
 
 interface DelegationBoxProps {
   toolCall: Extract<TimelineItemType, { type: 'tool_execution' }>;
@@ -15,11 +17,10 @@ interface DelegationBoxProps {
 }
 
 export function DelegationBox({ toolCall, parentFocusId, onToggle }: DelegationBoxProps) {
-  // Extract delegate thread ID from tool result
+  // Extract delegate thread ID from tool result metadata
   const extractDelegateThreadId = (item: Extract<TimelineItemType, { type: 'tool_execution' }>) => {
-    if (!item.result?.content?.[0]?.text) return null;
-    const match = item.result.content[0].text.match(/Thread:\s*([^\s]+)/);
-    return match ? match[1] : null;
+    const threadId = item.result?.metadata?.threadId;
+    return threadId && typeof threadId === 'string' ? threadId : null;
   };
 
   const delegateThreadId = extractDelegateThreadId(toolCall);
@@ -27,15 +28,30 @@ export function DelegationBox({ toolCall, parentFocusId, onToggle }: DelegationB
     return null; // No delegate thread to display
   }
 
+  // Get thread data from context
+  const threadManager = useThreadManager();
+  const threadProcessor = useThreadProcessor();
+
   // Manage own expansion state
   const [expanded, setExpanded] = useState(true); // Default to expanded for delegation
 
-  // TODO: Fetch timeline data from ThreadManager using delegateThreadId
-  // For now, show placeholder
-  const timeline = {
-    items: [],
-    metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
-  };
+  // Fetch and process delegate thread data
+  const timeline = useMemo(() => {
+    try {
+      const events = threadManager.getEvents(delegateThreadId);
+      const processed = threadProcessor.processThreads(events);
+      return processed; // processThreads now returns Timeline directly
+    } catch (error) {
+      logger.error('Failed to load delegate thread', {
+        threadId: delegateThreadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {
+        items: [],
+        metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
+      };
+    }
+  }, [delegateThreadId, threadManager, threadProcessor]);
 
   logger.debug('DelegationBox: Rendering', {
     threadId: delegateThreadId,
@@ -164,40 +180,3 @@ function calculateDuration(timeline: Timeline): string {
   }
 }
 
-// Shared token estimation function to match main agent logic
-function estimateTokens(text: string): number {
-  // Rough approximation: 1 token ≈ 4 characters for most models
-  return Math.ceil(text.length / 4);
-}
-
-function calculateTokens(timeline: Timeline): { tokensIn: number; tokensOut: number } {
-  let tokensIn = 0;
-  let tokensOut = 0;
-
-  timeline.items.forEach((item) => {
-    // Use proper type guards instead of runtime 'content' checks
-    if (item.type === 'user_message') {
-      const userItem = item as Extract<Timeline['items'][0], { type: 'user_message' }>;
-      tokensIn += estimateTokens(userItem.content);
-    } else if (item.type === 'agent_message') {
-      const agentItem = item as Extract<Timeline['items'][0], { type: 'agent_message' }>;
-      tokensOut += estimateTokens(agentItem.content);
-    } else if (item.type === 'tool_execution') {
-      const toolItem = item as Extract<Timeline['items'][0], { type: 'tool_execution' }>;
-      // Tool results count as input to the agent
-      const resultText = toolItem.result?.content?.[0]?.text;
-      if (resultText) {
-        tokensIn += estimateTokens(resultText);
-      }
-    }
-  });
-
-  return { tokensIn, tokensOut };
-}
-
-function formatTokenCount(count: number): string {
-  if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}k`;
-  }
-  return count.toString();
-}

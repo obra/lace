@@ -1,6 +1,7 @@
 FROM node:24
 
 # Install development dependencies including ripgrep and Python for native modules
+
 RUN apt-get update && apt-get install -y \
     curl \
     git \
@@ -19,6 +20,7 @@ RUN useradd -rm -d /home/laceuser -s /bin/bash -g root -G sudo -u 1001 laceuser
 
 # Set working directory
 WORKDIR /home/laceuser/lace
+
 
 # Create node_modules directory and set ownership
 RUN mkdir -p /home/laceuser/lace/node_modules && \

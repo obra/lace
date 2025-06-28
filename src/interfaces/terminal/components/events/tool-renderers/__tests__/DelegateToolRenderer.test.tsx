@@ -37,11 +37,10 @@ vi.mock('../../../ui/CodeDisplay.js', () => ({
 
 vi.mock('../../DelegationBox.js', () => ({
   DelegationBox: ({ toolCall }: any) => {
-    // Extract delegate thread ID like the real component
+    // Extract delegate thread ID from metadata like the real component
     const extractDelegateThreadId = (item: any) => {
-      if (!item.result?.output) return null;
-      const match = item.result.output.match(/Thread:\s*([^\s]+)/);
-      return match ? match[1] : null;
+      const threadId = item.result?.metadata?.threadId;
+      return threadId && typeof threadId === 'string' ? threadId : null;
     };
     const threadId = extractDelegateThreadId(toolCall);
     return React.createElement(Text, {}, `[DelegationBox] Thread: ${threadId || 'No thread'}`);
@@ -402,6 +401,55 @@ describe('DelegateToolRenderer', () => {
       const { lastFrame } = render(<DelegateToolRenderer item={item} />);
 
       expect(lastFrame()).toContain('delegate "Unknown task"');
+    });
+  });
+
+  describe('Thread ID extraction from metadata', () => {
+    it('should extract thread ID from result metadata', () => {
+      const result: ToolResult = {
+        id: 'call-123',
+        content: [{ type: 'text', text: 'Delegation created successfully' }],
+        isError: false,
+        metadata: { threadId: 'delegate-thread-789' },
+      };
+      const item = createDelegateExecutionItem({ task: 'Analyze logs' }, result);
+
+      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
+
+      const frame = lastFrame();
+      expect(frame).toContain('[DelegateBox] delegate "Analyze logs"');
+      // DelegationBox component should be rendered for tools with metadata threadId
+    });
+
+    it('should show delegation active status when thread ID present in metadata', () => {
+      const result: ToolResult = {
+        id: 'call-456',
+        content: [{ type: 'text', text: 'Task completed' }],
+        isError: false,
+        metadata: { threadId: 'delegate-thread-completed' },
+      };
+      const item = createDelegateExecutionItem({ task: 'Complete analysis' }, result);
+
+      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
+
+      expect(lastFrame()).toContain('[DelegateBox] delegate "Complete analysis"');
+      // DelegationBox component should be rendered for completed delegate tasks
+    });
+
+    it('should not show delegation info when no thread ID in metadata', () => {
+      const result: ToolResult = {
+        id: 'call-789',
+        content: [{ type: 'text', text: 'No delegation' }],
+        isError: false,
+        metadata: {},
+      };
+      const item = createDelegateExecutionItem({ task: 'Simple task' }, result);
+
+      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
+
+      const frame = lastFrame();
+      expect(frame).not.toContain('Thread:');
+      expect(frame).not.toContain('Delegation active');
     });
   });
 });

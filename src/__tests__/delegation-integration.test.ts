@@ -97,7 +97,7 @@ describe('Delegation Integration Tests', () => {
     expect(allEvents[2].data).toBe('Delegate 2 message');
   });
 
-  it('should group events by thread in ThreadProcessor', () => {
+  it('should process main thread only in ThreadProcessor', () => {
     const mainThreadId = threadManager.generateThreadId();
     const delegateThreadId = `${mainThreadId}.1`;
 
@@ -136,18 +136,16 @@ describe('Delegation Integration Tests', () => {
     const processor = new ThreadProcessor();
     const result = processor.processThreads(events);
 
-    // Main timeline should have 2 items (main messages only)
-    expect(result.mainTimeline.items).toHaveLength(2);
-    expect(result.mainTimeline.items[0].type).toBe('user_message');
-    expect(result.mainTimeline.items[1].type).toBe('agent_message');
+    // Should return Timeline with main thread events only (ignores delegates)
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].type).toBe('user_message');
+    expect(result.items[1].type).toBe('agent_message');
 
-    // Should have one delegate timeline with 2 items
-    expect(result.delegateTimelines.size).toBe(1);
-    const delegateTimeline = result.delegateTimelines.get(delegateThreadId);
-    expect(delegateTimeline).toBeDefined();
-    expect(delegateTimeline!.items).toHaveLength(2);
-    expect(delegateTimeline!.items[0].type).toBe('agent_message');
-    expect(delegateTimeline!.items[1].type).toBe('agent_message');
+    // Delegate events are ignored by simplified processor
+    const hasDelegate = result.items.some(item => 
+      'content' in item && typeof item.content === 'string' && item.content.includes('Delegate')
+    );
+    expect(hasDelegate).toBe(false);
   });
 
   it('should handle nested delegations', () => {
@@ -253,15 +251,15 @@ describe('Delegation Integration Tests', () => {
     // Should have original user message + delegate events
     expect(allEvents.length).toBeGreaterThan(1);
 
-    // Note: Delegation metadata is now shown in the delegation box UI
-    // rather than as LOCAL_SYSTEM_MESSAGE events
+    // Note: Delegate events are processed by individual DelegationBox components
+    // rather than being included in the main timeline
 
     // Check that we have events from delegate thread
     const delegateEvents = allEvents.filter((e) => e.threadId.includes('.'));
     expect(delegateEvents.length).toBeGreaterThan(0);
   }, 60000); // 60 second timeout for real delegation
 
-  it('should render delegation boxes in UI timeline', () => {
+  it('should process main thread only for UI timeline', () => {
     const mainThreadId = threadManager.generateThreadId();
     const delegateThreadId = `${mainThreadId}.1`;
 
@@ -310,14 +308,11 @@ describe('Delegation Integration Tests', () => {
     const processor = new ThreadProcessor();
     const result = processor.processThreads(events);
 
-    // Main timeline should have user message only
-    expect(result.mainTimeline.items).toHaveLength(1);
-    expect(result.mainTimeline.items[0].type).toBe('user_message');
+    // Simplified processor only returns main thread events
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].type).toBe('user_message');
 
-    // Should have delegate timeline with all delegate events
-    expect(result.delegateTimelines.size).toBe(1);
-    const delegateTimeline = result.delegateTimelines.get(delegateThreadId);
-    expect(delegateTimeline).toBeDefined();
-    expect(delegateTimeline!.items).toHaveLength(3); // agent message, tool execution, agent message
+    // Delegate events are processed separately by DelegationBox components
+    // when they fetch their own delegate thread data
   });
 });

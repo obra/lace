@@ -319,4 +319,34 @@ describe('DelegateTool', () => {
     expect(result.content[0]?.text).toContain('First response');
     expect(result.content[0]?.text).toContain('Second response');
   });
+
+  it('should include delegate thread ID in result metadata', async () => {
+    mockAgent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+      if (event === 'agent_response_complete') {
+        setTimeout(() => handler({ content: 'Delegation complete' }), 0);
+      }
+      return mockAgent;
+    });
+
+    mockAgent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+      if (event === 'conversation_complete') {
+        setTimeout(() => handler(), 10);
+      }
+      return mockAgent;
+    });
+
+    const result = await tool.executeTool(
+      createTestToolCall('delegate', {
+        title: 'Test metadata',
+        prompt: 'Test thread ID in metadata',
+        expected_response: 'Success',
+      })
+    );
+
+    expect(result.isError).toBe(false);
+    expect(result.metadata).toBeDefined();
+    expect(result.metadata?.threadId).toBeDefined();
+    expect(typeof result.metadata?.threadId).toBe('string');
+    expect(result.metadata?.threadId).toMatch(/\.\d+$/); // Delegate thread format
+  });
 });

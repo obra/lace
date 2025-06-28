@@ -30,7 +30,7 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
@@ -52,7 +52,7 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
@@ -74,7 +74,7 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
@@ -104,7 +104,7 @@ describe('ThreadProcessor', () => {
     ];
 
     it('processes thread events into timeline items', () => {
-      const result = processor.processEvents(sampleEvents);
+      const result = processor.processThreads(sampleEvents).items;
 
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({
@@ -122,15 +122,15 @@ describe('ThreadProcessor', () => {
     });
 
     it('caches individual event processing', () => {
-      const result1 = processor.processEvents(sampleEvents);
-      const result2 = processor.processEvents(sampleEvents);
+      const result1 = processor.processThreads(sampleEvents).items;
+      const result2 = processor.processThreads(sampleEvents).items;
 
       // Should have same content (individual events are cached)
       expect(result1).toStrictEqual(result2);
     });
 
     it('reprocesses when events change', () => {
-      const result1 = processor.processEvents(sampleEvents);
+      const result1 = processor.processThreads(sampleEvents).items;
 
       const newEvents = [
         ...sampleEvents,
@@ -143,7 +143,7 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const result2 = processor.processEvents(newEvents);
+      const result2 = processor.processThreads(newEvents).items;
 
       // Should be different references and different lengths
       expect(result1).not.toBe(result2);
@@ -152,9 +152,9 @@ describe('ThreadProcessor', () => {
     });
 
     it('clears cache when requested', () => {
-      const result1 = processor.processEvents(sampleEvents);
+      const result1 = processor.processThreads(sampleEvents).items;
       processor.clearCache();
-      const result2 = processor.processEvents(sampleEvents);
+      const result2 = processor.processThreads(sampleEvents).items;
 
       // Should be different references after cache clear
       expect(result1).not.toBe(result2);
@@ -194,7 +194,7 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
@@ -223,7 +223,7 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
@@ -252,7 +252,7 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
@@ -394,8 +394,7 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const processedEvents = processor.processEvents(events);
-      const timeline = processor.buildTimeline(processedEvents, []);
+      const timeline = processor.processThreads(events);
 
       // Should have agent message with thinking blocks preserved
       expect(timeline.items).toHaveLength(1);
@@ -418,8 +417,7 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const processedEvents = processor.processEvents(events);
-      const timeline = processor.buildTimeline(processedEvents, []);
+      const timeline = processor.processThreads(events);
 
       // Should have agent message with thinking preserved
       expect(timeline.items).toHaveLength(1);
@@ -499,7 +497,7 @@ describe('ThreadProcessor', () => {
     });
   });
 
-  describe('processThread (convenience method)', () => {
+  describe('processThreads + buildTimeline (convenience combination)', () => {
     it('combines all processing steps', () => {
       const events: ThreadEvent[] = [
         {
@@ -519,7 +517,9 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const timeline = processor.processThread(events, ephemeralMessages);
+      const processedEvents = processor.processThreads(events).items.filter(item => item.type !== 'ephemeral_message') as ProcessedThreadItems;
+      const ephemeralItems = processor.processEphemeralEvents(ephemeralMessages);
+      const timeline = processor.buildTimeline(processedEvents, ephemeralItems);
 
       expect(timeline.items).toHaveLength(2);
       expect(timeline.items[0].type).toBe('user_message');
@@ -541,7 +541,7 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       // Should have agent message with preserved content
       expect(result).toHaveLength(1);
@@ -563,9 +563,9 @@ describe('ThreadProcessor', () => {
       ];
 
       // Should not throw error - falls back to regex
-      expect(() => processor.processEvents(events)).not.toThrow();
+      expect(() => processor.processThreads(events).items).not.toThrow();
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       // Should have at least an agent message
       const agentItems = result.filter((item) => item.type === 'agent_message');
@@ -583,7 +583,7 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       // Should process what it can and not break
       expect(result.length).toBeGreaterThan(0);
@@ -608,8 +608,8 @@ describe('ThreadProcessor', () => {
         });
       }
 
-      const result1 = processor.processEvents(events);
-      const result2 = processor.processEvents(events); // Individual events cached
+      const result1 = processor.processThreads(events).items;
+      const result2 = processor.processThreads(events).items; // Individual events cached
 
       expect(result1).toStrictEqual(result2); // Same content due to event-level caching
       expect(result1).toHaveLength(1000);
@@ -627,17 +627,17 @@ describe('ThreadProcessor', () => {
       ];
 
       // First call should process
-      const result1 = processor.processEvents(events);
+      const result1 = processor.processThreads(events).items;
 
       // Second call should have same content (individual events cached)
-      const result2 = processor.processEvents(events);
+      const result2 = processor.processThreads(events).items;
 
       // Should have same content (individual events are cached)
       expect(result1).toStrictEqual(result2);
 
       // Clear cache and verify new processing
       processor.clearCache();
-      const result3 = processor.processEvents(events);
+      const result3 = processor.processThreads(events).items;
 
       // Should still have same content
       expect(result1).toStrictEqual(result3);
@@ -697,8 +697,7 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const processedEvents = processor.processEvents(events);
-      const timeline = processor.buildTimeline(processedEvents, []);
+      const timeline = processor.processThreads(events);
 
       // Should have:
       // - 1 user message
@@ -747,7 +746,9 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const timeline = processor.processThread(events, ephemeralMessages);
+      const processedEvents = processor.processThreads(events).items.filter(item => item.type !== 'ephemeral_message') as ProcessedThreadItems;
+      const ephemeralItems = processor.processEphemeralEvents(ephemeralMessages);
+      const timeline = processor.buildTimeline(processedEvents, ephemeralItems);
 
       // Should merge events and ephemeral messages chronologically
       expect(timeline.items).toHaveLength(3);

@@ -17,7 +17,10 @@
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
-    "prepare": "husky"
+    "prepare": "husky",
+    "docker:build": "docker build -t lace-test .",
+    "docker:run": "docker run -it --rm lace-test",
+    "docker:shell": "docker run -it --rm lace-test /bin/bash"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",

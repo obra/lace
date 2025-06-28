@@ -24,7 +24,7 @@ describe('Agent Message Processing - Unified Content', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       // New behavior: Creates 1 timeline item with full content
       expect(result).toHaveLength(1);
@@ -49,7 +49,7 @@ describe('Agent Message Processing - Unified Content', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       // New behavior: Creates 1 timeline item with full content
       expect(result).toHaveLength(1);
@@ -72,7 +72,7 @@ describe('Agent Message Processing - Unified Content', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       // Behavior unchanged: Creates 1 timeline item (no thinking blocks)
       expect(result).toHaveLength(1);
@@ -95,7 +95,7 @@ describe('Agent Message Processing - Unified Content', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       // New behavior: Creates 1 agent message item with thinking content
       expect(result).toHaveLength(1);

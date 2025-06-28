@@ -14,11 +14,6 @@ export interface Timeline {
   };
 }
 
-export interface ProcessedThreads {
-  mainTimeline: Timeline;
-  delegateTimelines: Map<string, Timeline>;
-}
-
 export type TimelineItem =
   | { type: 'user_message'; content: string; timestamp: Date; id: string }
   | { type: 'agent_message'; content: string; timestamp: Date; id: string }
@@ -55,9 +50,15 @@ export class ThreadProcessor {
   private _eventCache = new Map<string, TimelineItem[]>();
 
   /**
-   * Process multiple threads from mixed events into separate timelines (primary API)
+   * Process events into a single timeline
+   *
+   * Processing strategy:
+   * 1. Mixed threads: Process main thread only (threadId without dots), ignore delegates
+   * 2. Single thread: Process that thread (enables DelegationBox to process isolated delegates)
+   *
+   * This approach keeps the main UI fast while allowing delegate components to process their own data.
    */
-  processThreads(events: ThreadEvent[]): ProcessedThreads {
+  processThreads(events: ThreadEvent[]): Timeline {
     logger.debug('ThreadProcessor.processThreads received events', {
       eventCount: events.length,
       events: events.map((e) => ({ type: e.type, threadId: e.threadId, id: e.id })),
@@ -65,54 +66,28 @@ export class ThreadProcessor {
 
     // Group events by threadId
     const threadGroups = this._groupEventsByThread(events);
-    logger.debug('Thread groups created', {
-      groups: threadGroups.map((g) => ({ threadId: g.threadId, eventCount: g.events.length })),
-    });
 
-    // Separate main thread from delegates
-    const mainThreadGroup = threadGroups.find((g) => !g.threadId.includes('.'));
-    const mainEvents = mainThreadGroup?.events || [];
-    const mainThreadId = mainThreadGroup?.threadId || 'main';
-    const delegateGroups = threadGroups.filter((g) => g.threadId.includes('.'));
-
-    logger.debug('Thread separation complete', {
-      mainThreadId,
-      mainEventCount: mainEvents.length,
-      delegateThreads: delegateGroups.map((g) => ({
-        threadId: g.threadId,
-        eventCount: g.events.length,
-      })),
-    });
-
-    // Process main thread with incremental caching
-    const mainProcessedItems = this._processThreadIncremental(mainThreadId, mainEvents);
-    const mainTimeline = this.buildTimeline(mainProcessedItems, []);
-
-    // Process each delegate thread with incremental caching
-    const delegateTimelines = new Map<string, Timeline>();
-    for (const group of delegateGroups) {
-      logger.debug('Processing delegate thread', {
-        threadId: group.threadId,
-        eventCount: group.events.length,
-      });
-      const processedItems = this._processThreadIncremental(group.threadId, group.events);
-      const timeline = this.buildTimeline(processedItems, []);
-      delegateTimelines.set(group.threadId, timeline);
-      logger.debug('Delegate timeline created', {
-        threadId: group.threadId,
-        itemCount: timeline.items.length,
-      });
+    // Select which thread to process:
+    // 1. Prefer main thread (no dots in threadId) for mixed-thread scenarios
+    // 2. Use single thread if that's all we have (delegate processing mode)
+    let targetThreadGroup = threadGroups.find((g) => !g.threadId.includes('.'));
+    if (!targetThreadGroup && threadGroups.length === 1) {
+      targetThreadGroup = threadGroups[0];
     }
 
-    logger.debug('processThreads complete', {
-      mainTimelineItems: mainTimeline.items.length,
-      delegateTimelineCount: delegateTimelines.size,
+    const targetEvents = targetThreadGroup?.events || [];
+    const targetThreadId = targetThreadGroup?.threadId || 'main';
+
+    logger.debug('ThreadProcessor.processThreads selected thread', {
+      targetThreadId,
+      eventCount: targetEvents.length,
+      totalGroups: threadGroups.length,
+      processingMode: threadGroups.length === 1 ? 'single-thread' : 'mixed-threads',
     });
 
-    return {
-      mainTimeline,
-      delegateTimelines,
-    };
+    // Process selected thread with incremental caching
+    const processedItems = this._processThreadIncremental(targetThreadId, targetEvents);
+    return this.buildTimeline(processedItems, []);
   }
 
   /**
@@ -176,25 +151,6 @@ export class ThreadProcessor {
         lastActivity,
       },
     };
-  }
-
-  /**
-   * Process events for backward compatibility with tests
-   */
-  processEvents(events: ThreadEvent[]): ProcessedThreadItems {
-    // For backward compatibility, process as single thread
-    const threadId = events[0]?.threadId || 'main';
-    return this._processThreadIncremental(threadId, events);
-  }
-
-  /**
-   * Process single thread for backward compatibility
-   */
-  processThread(events: ThreadEvent[], ephemeralMessages: EphemeralMessage[] = []): Timeline {
-    const threadId = events[0]?.threadId || 'main';
-    const processedEvents = this._processThreadIncremental(threadId, events);
-    const ephemeralItems = this.processEphemeralEvents(ephemeralMessages);
-    return this.buildTimeline(processedEvents, ephemeralItems);
   }
 
   private _processEventGroupWithState(
@@ -318,11 +274,11 @@ export class ThreadProcessor {
             logger.warn('Orphaned tool result found', {
               callId: resultId,
               availablePendingCallIds: Array.from(pendingToolCalls.keys()),
-              output: toolResultData.content[0]?.text
-                ? toolResultData.content[0].text.slice(0, 100)
+              output: toolResultData.content?.[0]?.text
+                ? toolResultData.content?.[0]?.text?.slice(0, 100)
                 : 'non-text output',
             });
-            const resultText = toolResultData.content[0]?.text || '[non-text result]';
+            const resultText = toolResultData.content?.[0]?.text || '[non-text result]';
             items.push({
               type: 'system_message',
               content: `Tool result (orphaned): ${resultText}`,

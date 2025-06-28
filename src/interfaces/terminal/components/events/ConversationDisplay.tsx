@@ -4,7 +4,7 @@
 import React, { useMemo, useRef } from 'react';
 import { Box } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
-import { ThreadProcessor, Timeline, ProcessedThreads } from '../../../thread-processor.js';
+import { ThreadProcessor, Timeline, ProcessedThreadItems } from '../../../thread-processor.js';
 import { useThreadProcessor } from '../../terminal-interface.js';
 import TimelineDisplay from './TimelineDisplay.js';
 
@@ -30,8 +30,8 @@ export function ConversationDisplay({
   // Use shared ThreadProcessor from context
   const threadProcessor = useThreadProcessor();
 
-  // Process all threads
-  const processedThreads = useMemo(() => {
+  // Process main thread only
+  const mainThreadProcessed = useMemo(() => {
     return threadProcessor.processThreads(events);
   }, [events, threadProcessor]);
 
@@ -42,11 +42,14 @@ export function ConversationDisplay({
 
   // Build main timeline with ephemeral messages
   const mainTimeline = useMemo(() => {
-    return threadProcessor.buildTimeline(
-      processedThreads.mainTimeline.items as any,
-      ephemeralItems
-    );
-  }, [processedThreads.mainTimeline, ephemeralItems, threadProcessor]);
+    // Filter out ephemeral items to get proper ProcessedThreadItems type
+    const processedItems = mainThreadProcessed.items.filter(
+      (item): item is Exclude<typeof item, { type: 'ephemeral_message' }> => 
+        item.type !== 'ephemeral_message'
+    ) as ProcessedThreadItems;
+    
+    return threadProcessor.buildTimeline(processedItems, ephemeralItems);
+  }, [mainThreadProcessed, ephemeralItems, threadProcessor]);
 
   return (
     <Box flexDirection="column" flexGrow={1} overflow="hidden">
