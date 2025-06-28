@@ -142,8 +142,9 @@ describe('Delegation Integration Tests', () => {
     expect(result.items[1].type).toBe('agent_message');
 
     // Delegate events are ignored by simplified processor
-    const hasDelegate = result.items.some(item => 
-      'content' in item && typeof item.content === 'string' && item.content.includes('Delegate')
+    const hasDelegate = result.items.some(
+      (item) =>
+        'content' in item && typeof item.content === 'string' && item.content.includes('Delegate')
     );
     expect(hasDelegate).toBe(false);
   });

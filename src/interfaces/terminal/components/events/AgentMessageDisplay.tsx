@@ -1,7 +1,7 @@
 // ABOUTME: Display component for AGENT_MESSAGE events with internal thinking handling
 // ABOUTME: Shows agent responses with expansion support for thinking blocks
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
 import { MarkdownDisplay } from '../ui/MarkdownDisplay.js';
@@ -11,7 +11,7 @@ import {
   createSummaryContent,
   formatThinkingForDisplay,
 } from './utils/thinking-parser.js';
-import { useTimelineExpansionToggle } from './hooks/useTimelineExpansionToggle.js';
+import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
 
 interface AgentMessageDisplayProps {
   event: ThreadEvent;
@@ -33,17 +33,8 @@ export function AgentMessageDisplay({
   // Parse thinking blocks from message content
   const parsed = useMemo(() => parseThinkingBlocks(message), [message]);
 
-  // Manage own expansion state
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  // Handle expansion toggle events
-  const toggleExpansion = () => {
-    setIsExpanded(!isExpanded);
-    onToggle?.();
-  };
-
-  // Listen for expansion toggle events when selected
-  useTimelineExpansionToggle(isSelected || false, toggleExpansion);
+  // Use shared expansion state management
+  const { isExpanded, handleExpandedChange } = useTimelineItemExpansion(isSelected || false, onToggle);
 
   // If no thinking blocks, render directly without collapsible wrapper
   if (!parsed.hasThinking) {
@@ -73,10 +64,7 @@ export function AgentMessageDisplay({
         )
       }
       isExpanded={isExpanded}
-      onExpandedChange={(expanded) => {
-        setIsExpanded(expanded);
-        onToggle?.();
-      }}
+      onExpandedChange={handleExpandedChange}
       isSelected={isSelected}
       onToggle={onToggle}
     >

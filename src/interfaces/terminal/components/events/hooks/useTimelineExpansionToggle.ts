@@ -1,41 +1,112 @@
-// ABOUTME: Hook for timeline expansion toggle events using event emitter pattern
-// ABOUTME: Allows expandable components to respond to left/right arrow keys when selected
+// ABOUTME: Hook and emitters for timeline expansion events using event emitter pattern
+// ABOUTME: Provides directional expand/collapse events and shared state management for timeline items
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-// Simple event emitter for expansion toggle events
-class ExpansionToggleEmitter {
-  private listeners: Set<() => void> = new Set();
+// Event emitter for expansion events
+class ExpansionEmitter {
+  private expandListeners: Set<() => void> = new Set();
+  private collapseListeners: Set<() => void> = new Set();
 
-  subscribe(listener: () => void): () => void {
-    this.listeners.add(listener);
+  subscribeExpand(listener: () => void): () => void {
+    this.expandListeners.add(listener);
     return () => {
-      this.listeners.delete(listener);
+      this.expandListeners.delete(listener);
     };
   }
 
-  emit(): void {
-    this.listeners.forEach((listener) => listener());
+  subscribeCollapse(listener: () => void): () => void {
+    this.collapseListeners.add(listener);
+    return () => {
+      this.collapseListeners.delete(listener);
+    };
+  }
+
+  emitExpand(): void {
+    this.expandListeners.forEach((listener) => listener());
+  }
+
+  emitCollapse(): void {
+    this.collapseListeners.forEach((listener) => listener());
   }
 }
 
-// Global instance for expansion toggle events
-const expansionToggleEmitter = new ExpansionToggleEmitter();
+// Global instance for expansion events
+const expansionEmitter = new ExpansionEmitter();
 
-// Export function to emit toggle events
-export function emitExpansionToggle(): void {
-  expansionToggleEmitter.emit();
+// Export functions to emit directional events
+export function emitExpansionExpand(): void {
+  expansionEmitter.emitExpand();
 }
 
-// Hook for expandable components to listen for toggle events
+export function emitExpansionCollapse(): void {
+  expansionEmitter.emitCollapse();
+}
+
+// Legacy function for backward compatibility during transition
+export function emitExpansionToggle(): void {
+  // Default to expand for now - will be removed after refactoring
+  expansionEmitter.emitExpand();
+}
+
+// Combined hook that provides complete expansion state management
+export function useTimelineItemExpansion(isSelected: boolean, onToggle?: () => void) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const expand = useCallback(() => {
+    setIsExpanded(true);
+    onToggle?.();
+  }, [onToggle]);
+
+  const collapse = useCallback(() => {
+    setIsExpanded(false);
+    onToggle?.();
+  }, [onToggle]);
+
+  const toggleExpansion = useCallback(() => {
+    setIsExpanded(!isExpanded);
+    onToggle?.();
+  }, [isExpanded, onToggle]);
+
+  const handleExpandedChange = useCallback(
+    (expanded: boolean) => {
+      setIsExpanded(expanded);
+      onToggle?.();
+    },
+    [onToggle]
+  );
+
+  // Listen for directional expansion events when selected
+  useEffect(() => {
+    if (!isSelected) return;
+
+    const unsubscribeExpand = expansionEmitter.subscribeExpand(expand);
+    const unsubscribeCollapse = expansionEmitter.subscribeCollapse(collapse);
+
+    return () => {
+      unsubscribeExpand();
+      unsubscribeCollapse();
+    };
+  }, [isSelected, expand, collapse]);
+
+  return {
+    isExpanded,
+    toggleExpansion,
+    handleExpandedChange,
+  };
+}
+
+// Legacy hook for backward compatibility during transition
 export function useTimelineExpansionToggle(isSelected: boolean, toggleExpansion: () => void): void {
   useEffect(() => {
-    const handleToggle = () => {
+    if (!isSelected) return;
+
+    const handleExpand = () => {
       if (isSelected) {
         toggleExpansion();
       }
     };
 
-    return expansionToggleEmitter.subscribe(handleToggle);
+    return expansionEmitter.subscribeExpand(handleExpand);
   }, [isSelected, toggleExpansion]);
 }
