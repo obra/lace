@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { render } from 'ink-testing-library';
+import { Text } from 'ink';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DelegationBox } from '../DelegationBox.js';
 import { ThreadEvent } from '../../../../../threads/types.js';
@@ -12,7 +13,7 @@ import { useThreadManager, useThreadProcessor } from '../../../terminal-interfac
 // Mock TimelineDisplay
 vi.mock('../TimelineDisplay.js', () => ({
   default: ({ timeline }: any) =>
-    React.createElement('text', {}, `[TimelineDisplay] ${timeline.items.length} items`),
+    React.createElement(Text, {}, `[TimelineDisplay] ${timeline.items.length} items`),
 }));
 
 // Mock the hooks directly
