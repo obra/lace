@@ -26,7 +26,16 @@ export function UserSystemPromptDisplay({
   const userInstructions = event.data as string;
 
   // Use shared expansion state management
-  const { isExpanded, handleExpandedChange } = useTimelineItemExpansion(isSelected || false, onToggle);
+  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected || false, (expanded) => onToggle?.());
+
+  // Create handler that works with TimelineEntryCollapsibleBox interface
+  const handleExpandedChange = (expanded: boolean) => {
+    if (expanded) {
+      onExpand();
+    } else {
+      onCollapse();
+    }
+  };
 
   return (
     <TimelineEntryCollapsibleBox

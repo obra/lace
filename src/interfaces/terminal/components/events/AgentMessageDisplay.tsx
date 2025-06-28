@@ -34,7 +34,16 @@ export function AgentMessageDisplay({
   const parsed = useMemo(() => parseThinkingBlocks(message), [message]);
 
   // Use shared expansion state management
-  const { isExpanded, handleExpandedChange } = useTimelineItemExpansion(isSelected || false, onToggle);
+  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected || false, (expanded) => onToggle?.());
+
+  // Create handler that works with TimelineEntryCollapsibleBox interface
+  const handleExpandedChange = (expanded: boolean) => {
+    if (expanded) {
+      onExpand();
+    } else {
+      onCollapse();
+    }
+  };
 
   // If no thinking blocks, render directly without collapsible wrapper
   if (!parsed.hasThinking) {

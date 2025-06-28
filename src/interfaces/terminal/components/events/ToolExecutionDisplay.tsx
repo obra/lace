@@ -41,7 +41,16 @@ export function ToolExecutionDisplay({
   const toolCallData = callEvent.data as ToolCall;
 
   // Use shared expansion state management
-  const { isExpanded, handleExpandedChange } = useTimelineItemExpansion(isSelected || false, onToggle);
+  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected || false, (expanded) => onToggle?.());
+
+  // Create handler that works with TimelineEntryCollapsibleBox interface
+  const handleExpandedChange = (expanded: boolean) => {
+    if (expanded) {
+      onExpand();
+    } else {
+      onCollapse();
+    }
+  };
   const { name: toolName, arguments: input } = toolCallData;
 
   const toolResultData = resultEvent?.data as ToolResult | undefined;
