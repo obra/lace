@@ -18,7 +18,6 @@ import MessageDisplay from '../message-display.js';
 interface TimelineItemProps {
   item: TimelineItemType;
   isSelected: boolean; // Whether timeline cursor is on this item (for expansion)
-  isFocused: boolean; // Whether this item has keyboard focus (for its own behaviors)
   selectedLine: number;
   itemStartLine: number;
   onToggle?: () => void;
@@ -28,12 +27,11 @@ interface TimelineItemProps {
 interface DynamicToolRendererProps {
   item: Extract<TimelineItemType, { type: 'tool_execution' }>;
   isSelected: boolean; // Whether timeline cursor is on this item
-  isFocused: boolean; // Whether this item has keyboard focus
   onToggle?: () => void;
   onExpansionToggle?: () => void;
 }
 
-function DynamicToolRenderer({ item, isSelected, isFocused, onToggle }: DynamicToolRendererProps) {
+function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRendererProps) {
   const [ToolRenderer, setToolRenderer] = React.useState<React.ComponentType<unknown> | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [debugInfo, setDebugInfo] = React.useState<string>('');
@@ -78,7 +76,6 @@ function DynamicToolRenderer({ item, isSelected, isFocused, onToggle }: DynamicT
       <GenericToolRenderer
         item={debugItem}
         isSelected={isSelected}
-        isFocused={isFocused}
         onToggle={onToggle}
       />
     );
@@ -102,7 +99,6 @@ function DynamicToolRenderer({ item, isSelected, isFocused, onToggle }: DynamicT
     <RendererComponent
       item={debugItem}
       isSelected={isSelected}
-      isFocused={isFocused}
       onToggle={onToggle}
     />
   );
@@ -111,7 +107,6 @@ function DynamicToolRenderer({ item, isSelected, isFocused, onToggle }: DynamicT
 export function TimelineItem({
   item,
   isSelected,
-  isFocused,
   selectedLine,
   itemStartLine,
   onToggle,
@@ -127,7 +122,6 @@ export function TimelineItem({
             timestamp: item.timestamp,
             data: item.content,
           }}
-          isFocused={isFocused}
           isSelected={isSelected}
           focusedLine={selectedLine}
           itemStartLine={itemStartLine}
@@ -145,7 +139,6 @@ export function TimelineItem({
             timestamp: item.timestamp,
             data: item.content,
           }}
-          isFocused={isFocused}
           isSelected={isSelected}
           focusedLine={selectedLine}
           itemStartLine={itemStartLine}
@@ -163,7 +156,6 @@ export function TimelineItem({
             timestamp: item.timestamp,
             data: item.content,
           }}
-          isFocused={isFocused}
           isSelected={isSelected}
           focusedLine={selectedLine}
           itemStartLine={itemStartLine}
@@ -176,14 +168,12 @@ export function TimelineItem({
         <ToolRendererErrorBoundary
           item={item}
           isSelected={isSelected}
-          isFocused={isFocused}
           onToggle={onToggle}
         >
           <DynamicToolRenderer
             item={item}
             isSelected={isSelected}
-            isFocused={isFocused}
-            onToggle={onToggle}
+              onToggle={onToggle}
           />
         </ToolRendererErrorBoundary>
       );
@@ -196,7 +186,6 @@ export function TimelineItem({
             content: item.content,
             timestamp: item.timestamp,
           }}
-          isFocused={isFocused}
         />
       );
 

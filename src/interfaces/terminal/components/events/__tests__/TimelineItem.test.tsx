@@ -114,7 +114,7 @@ describe('TimelineItem Component', () => {
       };
 
       const { lastFrame } = render(
-        <TimelineItem item={item} {...defaultProps} isSelected={true} isFocused={true} />
+        <TimelineItem item={item} {...defaultProps} isSelected={true} />
       );
 
       expect(lastFrame()).toContain('EventDisplay:USER_MESSAGE:focused');
@@ -339,7 +339,7 @@ describe('TimelineItem Component', () => {
       };
 
       const { lastFrame } = render(
-        <TimelineItem item={item} {...defaultProps} isSelected={true} isFocused={true} />
+        <TimelineItem item={item} {...defaultProps} isSelected={true} />
       );
 
       expect(lastFrame()).toContain('MessageDisplay:warning:focused');

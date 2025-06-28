@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { renderInkComponentWithFocusWithFocus } from './helpers/ink-test-utils.js';
+import { renderInkComponentWithFocus } from './helpers/ink-test-utils.js';
 import ToolApprovalModal from '../components/tool-approval-modal.js';
 import { ApprovalDecision } from '../../../tools/approval-types.js';
 

@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import React from 'react';
 import { act } from '@testing-library/react';
-import { renderInkComponentWithFocusWithFocus, stripAnsi } from './helpers/ink-test-utils.js';
+import { renderInkComponentWithFocus, stripAnsi } from './helpers/ink-test-utils.js';
 import ShellInput from '../components/shell-input.js';
 import * as TextBufferModule from '../hooks/use-text-buffer.js';
 import { LaceFocusProvider } from '../focus/index.js';

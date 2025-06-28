@@ -62,7 +62,6 @@ function TimelineContent({
             <TimelineItemComponent
               item={item}
               isSelected={isItemFocused}
-              isFocused={isItemFocused}
               selectedLine={viewportState.selectedLine}
               itemStartLine={viewportState.itemPositions[index] || 0}
               onToggle={viewportActions.triggerRemeasurement}

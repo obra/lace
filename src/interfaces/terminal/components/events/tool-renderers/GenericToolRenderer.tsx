@@ -23,7 +23,6 @@ interface GenericToolRendererProps {
   item: ToolExecutionItem;
   isStreaming?: boolean;
   isSelected?: boolean; // Whether timeline cursor is on this item
-  isFocused?: boolean; // Whether this item has keyboard focus
   onToggle?: () => void;
 }
 
@@ -31,7 +30,6 @@ interface GenericToolRendererProps {
 const defaultProps = {
   isStreaming: false,
   isSelected: false,
-  isFocused: false,
 } as const;
 
 function isJsonOutput(output: string): boolean {
@@ -48,7 +46,6 @@ export function GenericToolRenderer({
   item,
   isStreaming = defaultProps.isStreaming,
   isSelected = defaultProps.isSelected,
-  isFocused = defaultProps.isFocused,
   onToggle,
 }: GenericToolRendererProps) {
   // Use shared expansion management for consistent behavior
