@@ -106,8 +106,8 @@ export function GenericToolRenderer({
   const statusIcon = success ? UI_SYMBOLS.SUCCESS : result ? UI_SYMBOLS.ERROR : UI_SYMBOLS.PENDING;
 
   // Format tool name nicely (bash, file-read, etc.)
-  const formatToolName = (toolName: string): string => {
-    return toolName.replace(/_/g, '-');
+  const formatToolName = (toolName: string | undefined): string => {
+    return (toolName || 'unknown').replace(/_/g, '-');
   };
 
   // Truncate long inputs for summary (first 50 chars)
