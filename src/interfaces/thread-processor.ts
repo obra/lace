@@ -318,11 +318,11 @@ export class ThreadProcessor {
             logger.warn('Orphaned tool result found', {
               callId: resultId,
               availablePendingCallIds: Array.from(pendingToolCalls.keys()),
-              output: toolResultData.content[0]?.text
-                ? toolResultData.content[0].text.slice(0, 100)
+              output: toolResultData.content?.[0]?.text
+                ? toolResultData.content?.[0]?.text?.slice(0, 100)
                 : 'non-text output',
             });
-            const resultText = toolResultData.content[0]?.text || '[non-text result]';
+            const resultText = toolResultData.content?.[0]?.text || '[non-text result]';
             items.push({
               type: 'system_message',
               content: `Tool result (orphaned): ${resultText}`,
