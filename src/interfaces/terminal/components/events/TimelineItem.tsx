@@ -23,7 +23,6 @@ interface TimelineItemProps {
   itemStartLine: number;
   onToggle?: () => void;
   onExpansionToggle?: () => void; // Called when left/right arrows should toggle expansion
-  currentFocusId?: string;
 }
 
 interface DynamicToolRendererProps {
@@ -116,7 +115,6 @@ export function TimelineItem({
   selectedLine,
   itemStartLine,
   onToggle,
-  currentFocusId,
 }: TimelineItemProps) {
   switch (item.type) {
     case 'user_message':
