@@ -252,11 +252,10 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       if (approvalRequest) {
         approvalRequest.resolve(decision);
         setApprovalRequest(null);
-        // Return focus to shell input when modal closes (for typing)
-        focus('shell-input');
+        // Focus automatically returns via LaceFocusProvider when modal closes
       }
     },
-    [approvalRequest, focus]
+    [approvalRequest]
   );
 
   // Setup event handlers for Agent events
@@ -629,20 +628,10 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       });
     });
 
-    // Set initial focus to shell input (for typing)
-    focus('shell-input');
-  }, [agent, addMessage, syncEvents, focus]);
+    // Initial focus is handled by LaceFocusProvider default stack
+  }, [agent, addMessage, syncEvents]);
 
-  // Focus approval modal when it appears
-  useEffect(() => {
-    if (approvalRequest) {
-      // Use setTimeout to ensure the modal is rendered before focusing
-      const timeoutId = setTimeout(() => {
-        focus('approval-modal');
-      }, 0);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [approvalRequest, focus]);
+  // Approval modal focus is handled by ModalWrapper automatically
 
   // Measure bottom section height for viewport calculations
   useEffect(() => {

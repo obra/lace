@@ -118,5 +118,5 @@ export function ModalWrapper({
     return null;
   }
 
-  return <>{children}</>;
+  return <React.Fragment>{children}</React.Fragment>;
 }

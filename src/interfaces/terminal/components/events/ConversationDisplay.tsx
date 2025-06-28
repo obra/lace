@@ -17,14 +17,12 @@ interface Message {
 interface ConversationDisplayProps {
   events: ThreadEvent[];
   ephemeralMessages: Message[];
-  focusId?: string;
   bottomSectionHeight?: number;
 }
 
 export function ConversationDisplay({
   events,
   ephemeralMessages,
-  focusId,
   bottomSectionHeight,
 }: ConversationDisplayProps) {
   // Use shared ThreadProcessor from context
@@ -55,7 +53,6 @@ export function ConversationDisplay({
     <Box flexDirection="column" flexGrow={1} overflow="hidden">
       <TimelineDisplay
         timeline={mainTimeline}
-        focusId={focusId}
         bottomSectionHeight={bottomSectionHeight}
       />
     </Box>
