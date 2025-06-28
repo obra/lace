@@ -1,7 +1,7 @@
 // ABOUTME: Specialized tool renderer for delegate tool executions with delegation timeline display
 // ABOUTME: Combines tool execution display with DelegationBox using TimelineEntryCollapsibleBox for consistency
 
-import React, { useState, useCallback } from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
 import { TimelineEntryCollapsibleBox } from '../../ui/TimelineEntryCollapsibleBox.js';
 import { DelegationBox } from '../DelegationBox.js';
@@ -26,8 +26,6 @@ interface DelegateToolRendererProps {
   isSelected?: boolean; // Whether timeline cursor is on this item
   isFocused?: boolean; // Whether this item has keyboard focus
   onToggle?: () => void;
-  isExpanded?: boolean;
-  onExpandedChange?: (expanded: boolean) => void;
 }
 
 function isJsonOutput(output: string): boolean {
@@ -46,34 +44,12 @@ export function DelegateToolRenderer({
   isSelected,
   isFocused,
   onToggle,
-  isExpanded: controlledExpanded,
-  onExpandedChange,
 }: DelegateToolRendererProps) {
-  // Use controlled expansion if provided, otherwise manage internally
-  const [internalExpanded, setInternalExpanded] = useState(false);
-  const isExpanded = controlledExpanded ?? internalExpanded;
-
-  // Custom handler that works with controlled/uncontrolled mode
-  const handleExpandedChange = useCallback((expanded: boolean) => {
-    if (onExpandedChange) {
-      onExpandedChange(expanded);
-    } else {
-      setInternalExpanded(expanded);
-    }
-    onToggle?.();
-  }, [onExpandedChange, onToggle]);
-
-  // Use shared expansion management only if not in controlled mode
-  const sharedExpansion = useTimelineItemExpansion(
-    controlledExpanded === undefined ? isSelected || false : false,
-    controlledExpanded === undefined ? onToggle : undefined
+  // Use shared expansion management for consistent behavior
+  const { isExpanded, handleExpandedChange } = useTimelineItemExpansion(
+    isSelected || false,
+    onToggle
   );
-  
-  // Use shared state if not controlled, otherwise use controlled state
-  const finalIsExpanded = controlledExpanded ?? sharedExpansion.isExpanded;
-  const finalHandleExpandedChange = controlledExpanded !== undefined 
-    ? handleExpandedChange 
-    : sharedExpansion.handleExpandedChange;
 
   const { call, result } = item;
   const { arguments: input } = call;
@@ -182,8 +158,8 @@ export function DelegateToolRenderer({
     <TimelineEntryCollapsibleBox
       label={`delegate "${delegateTask}"`}
       summary={delegateSummary}
-      isExpanded={finalIsExpanded}
-      onExpandedChange={finalHandleExpandedChange}
+      isExpanded={isExpanded}
+      onExpandedChange={handleExpandedChange}
       isSelected={isSelected}
       onToggle={onToggle}
     >

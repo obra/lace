@@ -64,6 +64,13 @@ vi.mock('../../../../theme.js', () => ({
   },
 }));
 
+vi.mock('../../hooks/useTimelineExpansionToggle.js', () => ({
+  useTimelineItemExpansion: () => ({
+    isExpanded: false,
+    handleExpandedChange: vi.fn(),
+  }),
+}));
+
 describe('DelegateToolRenderer', () => {
   const createDelegateExecutionItem = (
     input: Record<string, unknown> = { task: 'Calculate 3+6' },
@@ -220,22 +227,13 @@ describe('DelegateToolRenderer', () => {
       expect(lastFrame()).toContain('Expanded: false');
     });
 
-    it('should use controlled expansion when provided', () => {
+    it('should use shared expansion state from hook', () => {
       const item = createDelegateExecutionItem();
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
 
-      expect(lastFrame()).toContain('Expanded: true');
-    });
-
-    it('should call onExpandedChange when provided', () => {
-      const item = createDelegateExecutionItem();
-      const onExpandedChange = vi.fn();
-
-      render(<DelegateToolRenderer item={item} onExpandedChange={onExpandedChange} />);
-
-      // onExpandedChange is passed to TimelineEntryCollapsibleBox
-      expect(onExpandedChange).not.toHaveBeenCalled(); // Not called during render
+      // Expansion is now managed by the hook system
+      expect(lastFrame()).toContain('Expanded: false');
     });
   });
 
@@ -256,7 +254,7 @@ describe('DelegateToolRenderer', () => {
         createSuccessResult('Thread: delegate-thread-456')
       );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
       expect(frame).toContain('[DelegateContent]');
@@ -269,7 +267,7 @@ describe('DelegateToolRenderer', () => {
         createSuccessResult('Thread: delegate-thread-456')
       );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
       expect(frame).toContain('[DelegateContent]');
@@ -281,7 +279,7 @@ describe('DelegateToolRenderer', () => {
         createSuccessResult('No thread created')
       );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
       expect(frame).toContain('[DelegateContent]');
@@ -295,7 +293,7 @@ describe('DelegateToolRenderer', () => {
         createErrorResult('Failed to create delegate thread')
       );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
       expect(frame).toContain('[DelegateContent]');
@@ -310,7 +308,7 @@ describe('DelegateToolRenderer', () => {
       };
       const item = createDelegateExecutionItem({ task: 'Calculate sum' }, result);
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
       expect(frame).toContain('[DelegateContent]');
@@ -324,7 +322,7 @@ describe('DelegateToolRenderer', () => {
       };
       const item = createDelegateExecutionItem({ task: 'Calculate sum' }, result);
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
       expect(frame).toContain('[DelegateContent]');
@@ -388,7 +386,7 @@ describe('DelegateToolRenderer', () => {
       };
       const item = createDelegateExecutionItem(complexInput);
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
       expect(frame).toContain('[DelegateContent]');
