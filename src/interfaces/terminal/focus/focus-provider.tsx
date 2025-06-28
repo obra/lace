@@ -5,38 +5,35 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 import { useFocusManager, useInput } from 'ink';
 import { FocusStack } from './focus-stack.js';
 import { FocusRegions } from './focus-regions.js';
+import { logger } from '../../../utils/logger.js';
 
 /**
  * Context value interface for Lace focus management
+ * Hybrid approach: maintain old API while fixing underlying issues
  */
 interface LaceFocusContextValue {
   /**
-   * Current focus ID at the top of the stack
+   * Current focused region ID
    */
   currentFocus: string;
   
   /**
-   * Push a new focus context onto the stack and focus it
-   * @param focusId - The focus ID to push and focus
+   * Push a new focus onto the stack and update Ink's focus
    */
   pushFocus: (focusId: string) => void;
   
   /**
-   * Pop the current focus context and return to the previous one
-   * @returns The new current focus ID, or undefined if no change
+   * Pop the current focus and return to the previous one
    */
   popFocus: () => string | undefined;
   
   /**
-   * Get the current focus stack for debugging
-   * @returns Copy of the current focus stack
+   * Get a copy of the current focus stack for debugging
    */
   getFocusStack: () => string[];
   
   /**
    * Check if a specific focus ID is currently active
-   * @param focusId - The focus ID to check
-   * @returns True if the focus ID is currently active
    */
   isFocusActive: (focusId: string) => boolean;
 }
@@ -74,21 +71,78 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
   const [focusStack] = useState(() => new FocusStack());
   const [currentFocus, setCurrentFocus] = useState(focusStack.current());
 
-  // Disable Ink's automatic Tab cycling and set initial focus
+  // Set initial focus ONCE only - the infinite loop bug fix
   useEffect(() => {
+    // Disable Ink's focus cycling completely, then set initial focus
     inkFocus.disableFocus();
-    // Set initial focus to the shell input
     inkFocus.focus(FocusRegions.shell);
-  }, [inkFocus]);
+  }, []); // Empty deps - run only once, not on every inkFocus change
+
+  // Intercept Tab to prevent default cycling - HIGH PRIORITY
+  useInput((input, key) => {
+    if (key.tab) {
+      // Consume tab events to prevent default cycling
+      logger.debug('LaceFocusProvider: Tab intercepted and consumed');
+      return;
+    }
+  }, { isActive: true }); // Always active to ensure it runs before component handlers
+
+  // Global Escape handler - vi-like behavior with proper focus switching
+  useInput((input, key) => {
+    if (key.escape) {
+      logger.debug('LaceFocusProvider: Global escape pressed', {
+        currentFocus,
+        stackBefore: focusStack.getStack(),
+      });
+      
+      // Vi-like behavior: shell escape goes to timeline using focusNext
+      if (currentFocus === FocusRegions.shell) {
+        // From shell, navigate to timeline using focusNext (which works)
+        const newFocus = focusStack.push(FocusRegions.timeline);
+        setCurrentFocus(newFocus);
+        inkFocus.focusNext(); // Use focusNext instead of focus(id)
+        logger.debug('LaceFocusProvider: Shell -> Timeline navigation (using focusNext)');
+      } else if (currentFocus === FocusRegions.timeline) {
+        // From timeline, go back to shell (pop stack)
+        const newFocus = popFocus();
+        logger.debug('LaceFocusProvider: Timeline -> Shell navigation', {
+          newFocus,
+          stackAfter: focusStack.getStack(),
+        });
+      } else {
+        // From anywhere else (modals, etc), pop back
+        const newFocus = popFocus();
+        logger.debug('LaceFocusProvider: Pop focus completed', {
+          newFocus,
+          stackAfter: focusStack.getStack(),
+        });
+      }
+    }
+  });
 
   /**
    * Push a new focus onto the stack and update Ink's focus
    */
   const pushFocus = useCallback((focusId: string) => {
+    logger.debug('LaceFocusProvider: pushFocus called', {
+      fromFocus: currentFocus,
+      toFocus: focusId,
+      stackBefore: focusStack.getStack(),
+    });
     const newFocus = focusStack.push(focusId);
     setCurrentFocus(newFocus);
+    
+    logger.debug('LaceFocusProvider: Calling inkFocus.focus', {
+      focusId,
+      newFocus,
+    });
     inkFocus.focus(focusId);
-  }, [inkFocus, focusStack]);
+    
+    logger.debug('LaceFocusProvider: pushFocus completed', {
+      newCurrentFocus: newFocus,
+      stackAfter: focusStack.getStack(),
+    });
+  }, [inkFocus, focusStack, currentFocus]);
 
   /**
    * Pop the current focus and return to the previous one
@@ -97,7 +151,12 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
     const newFocus = focusStack.pop();
     if (newFocus) {
       setCurrentFocus(newFocus);
+      
+      logger.debug('LaceFocusProvider: Calling inkFocus.focus (pop)', {
+        focusId: newFocus,
+      });
       inkFocus.focus(newFocus);
+      
       return newFocus;
     }
     return undefined;
@@ -117,11 +176,8 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
     return currentFocus === focusId;
   }, [currentFocus]);
 
-  // Note: Escape key handling is now component-specific
-  // - ShellInput: Escape navigates to timeline
-  // - Timeline: Escape goes back to shell
-  // - Autocomplete: Escape closes autocomplete
-  // - Modals: Escape closes modal
+  // Global escape handling via useInput above - pops the focus stack
+  // Components use pushFocus() to navigate deeper into the hierarchy
 
   const contextValue: LaceFocusContextValue = {
     currentFocus,

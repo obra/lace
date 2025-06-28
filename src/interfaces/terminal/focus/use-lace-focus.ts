@@ -1,8 +1,10 @@
 // ABOUTME: Custom React hook for component-level focus management in terminal UI
 // ABOUTME: Bridges Ink's useFocus with Lace's hierarchical focus stack system
 
+import React from 'react';
 import { useFocus } from 'ink';
 import { useLaceFocusContext } from './focus-provider.js';
+import { logger } from '../../../utils/logger.js';
 
 /**
  * Options for configuring focus behavior
@@ -94,6 +96,19 @@ export function useLaceFocus(id: string, options: UseLaceFocusOptions = {}): Use
   // 1. Ink considers it focused (it's the active component)
   // 2. Lace's focus stack has it as the current focus
   const isFocused = inkIsFocused && isFocusActive(id);
+  
+  // Debug logging for focus state
+  React.useEffect(() => {
+    logger.debug(`useLaceFocus[${id}]: Focus state changed`, {
+      id,
+      inkIsFocused,
+      isFocusActive: isFocusActive(id),
+      isFocused,
+      focusStack: getFocusStack(),
+      // Add debugging for Ink registration
+      autoFocus: autoFocus,
+    });
+  }, [id, inkIsFocused, isFocusActive, isFocused, getFocusStack, autoFocus]);
 
   // Check if this component's ID is anywhere in the focus stack
   const focusStack = getFocusStack();
@@ -102,9 +117,9 @@ export function useLaceFocus(id: string, options: UseLaceFocusOptions = {}): Use
   /**
    * Push this component's focus ID onto the stack and make it active
    */
-  const takeFocus = () => {
+  const takeFocus = React.useCallback(() => {
     pushFocus(id);
-  };
+  }, [pushFocus, id]);
 
   return {
     isFocused,

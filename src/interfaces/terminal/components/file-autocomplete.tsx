@@ -32,7 +32,7 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
     if (isVisible && items.length > 0) {
       takeFocus();
     }
-  }, [isVisible, items.length, takeFocus]);
+  }, [isVisible, items.length]); // Removed takeFocus to prevent infinite loop
 
   // Handle keyboard input
   useInput(
