@@ -25,6 +25,7 @@ import { CommandExecutor } from '../../commands/executor.js';
 import type { UserInterface } from '../../commands/types.js';
 import { ThreadEvent } from '../../threads/types.js';
 import { ThreadProcessor } from '../thread-processor.js';
+import { ThreadManager } from '../../threads/thread-manager.js';
 
 // ThreadProcessor context for interface-level caching
 const ThreadProcessorContext = createContext<ThreadProcessor | null>(null);
@@ -35,6 +36,17 @@ export const useThreadProcessor = (): ThreadProcessor => {
     throw new Error('useThreadProcessor must be used within ThreadProcessorContext.Provider');
   }
   return processor;
+};
+
+// ThreadManager context for direct thread data access
+const ThreadManagerContext = createContext<ThreadManager | null>(null);
+
+export const useThreadManager = (): ThreadManager => {
+  const manager = useContext(ThreadManagerContext);
+  if (!manager) {
+    throw new Error('useThreadManager must be used within ThreadManagerContext.Provider');
+  }
+  return manager;
 };
 
 // Interface context for SIGINT communication
@@ -665,7 +677,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
   return (
     <ThreadProcessorContext.Provider value={threadProcessor}>
-      <InterfaceContext.Provider value={{ showAlert, clearAlert }}>
+      <ThreadManagerContext.Provider value={agent.threadManager}>
+        <InterfaceContext.Provider value={{ showAlert, clearAlert }}>
         {/* SIGINT Handler */}
         <SigintHandler agent={agent} showAlert={showAlert} />
 
@@ -764,7 +777,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             </Box>
           </Box>
         </Box>
-      </InterfaceContext.Provider>
+        </InterfaceContext.Provider>
+      </ThreadManagerContext.Provider>
     </ThreadProcessorContext.Provider>
   );
 };

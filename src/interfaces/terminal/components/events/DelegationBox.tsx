@@ -1,12 +1,13 @@
 // ABOUTME: Collapsible delegation box component for displaying delegate thread conversations
 // ABOUTME: Shows delegation progress, events, and provides expand/collapse functionality
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { Timeline, TimelineItem as TimelineItemType } from '../../../thread-processor.js';
 import TimelineDisplay from './TimelineDisplay.js';
 import { logger } from '../../../../utils/logger.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
+import { useThreadManager, useThreadProcessor } from '../../terminal-interface.js';
 
 interface DelegationBoxProps {
   toolCall: Extract<TimelineItemType, { type: 'tool_execution' }>;
@@ -26,15 +27,30 @@ export function DelegationBox({ toolCall, parentFocusId, onToggle }: DelegationB
     return null; // No delegate thread to display
   }
 
+  // Get thread data from context
+  const threadManager = useThreadManager();
+  const threadProcessor = useThreadProcessor();
+
   // Manage own expansion state
   const [expanded, setExpanded] = useState(true); // Default to expanded for delegation
 
-  // TODO: Fetch timeline data from ThreadManager using delegateThreadId
-  // For now, show placeholder
-  const timeline = {
-    items: [],
-    metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
-  };
+  // Fetch and process delegate thread data
+  const timeline = useMemo(() => {
+    try {
+      const events = threadManager.getEvents(delegateThreadId);
+      const processed = threadProcessor.processThreads(events);
+      return processed.mainTimeline; // Delegate thread becomes "main" when processed alone
+    } catch (error) {
+      logger.error('Failed to load delegate thread', {
+        threadId: delegateThreadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {
+        items: [],
+        metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
+      };
+    }
+  }, [delegateThreadId, threadManager, threadProcessor]);
 
   logger.debug('DelegationBox: Rendering', {
     threadId: delegateThreadId,
