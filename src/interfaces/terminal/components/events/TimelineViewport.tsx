@@ -148,6 +148,7 @@ export function TimelineViewport({
         </Box>
 
         {/* Cursor overlay */}
+ 	{ isFocused && 
         <Box
           position="absolute"
           flexDirection="column"
@@ -157,6 +158,7 @@ export function TimelineViewport({
             {'>'}
           </Text>
         </Box>
+	}
       </Box>
 
       {/* Scroll indicator - more content below */}
