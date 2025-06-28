@@ -204,7 +204,6 @@ function TimelineItemDisplay({
               React.createElement(DelegationBox, {
                 key: 'delegation',
                 toolCall: item,
-                parentFocusId: currentFocusId || 'timeline',
               }),
             ]);
           } else {

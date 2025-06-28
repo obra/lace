@@ -127,7 +127,7 @@ describe('TimelineViewport', () => {
     const timeline = createMockTimeline(1);
 
     const { lastFrame } = render(
-      <TimelineViewport timeline={timeline} focusId="test-timeline">
+      <TimelineViewport timeline={timeline}>
         {() => <Text>Content</Text>}
       </TimelineViewport>
     );
@@ -163,7 +163,7 @@ describe('TimelineViewport', () => {
     const timeline = createMockTimeline(1);
 
     const { lastFrame } = render(
-      <TimelineViewport timeline={timeline} focusId="test-focus" parentFocusId="parent-focus">
+      <TimelineViewport timeline={timeline}>
         {() => <Text>Focused content</Text>}
       </TimelineViewport>
     );

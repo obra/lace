@@ -66,7 +66,6 @@ function TimelineContent({
               selectedLine={viewportState.selectedLine}
               itemStartLine={viewportState.itemPositions[index] || 0}
               onToggle={viewportActions.triggerRemeasurement}
-              currentFocusId={currentFocusId}
             />
           </Box>
         );

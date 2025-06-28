@@ -169,14 +169,14 @@ describe('TimelineContent Component', () => {
   describe('Prop forwarding', () => {
     // Note: delegateTimelines prop has been removed - delegate logic is now internal to DelegationBox
 
-    it('should forward currentFocusId', () => {
+    it('should render without focus props', () => {
       const timeline = createMockTimeline(1);
 
       const { lastFrame } = render(
-        <TimelineContent timeline={timeline} {...getDefaultProps()} currentFocusId="custom-focus" />
+        <TimelineContent timeline={timeline} {...getDefaultProps()} />
       );
 
-      expect(lastFrame()).toContain('custom-focus');
+      expect(lastFrame()).toBeDefined();
     });
 
     it('should pass viewportState data to items', () => {

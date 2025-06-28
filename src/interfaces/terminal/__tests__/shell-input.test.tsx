@@ -7,6 +7,7 @@ import { act } from '@testing-library/react';
 import { renderInkComponent, stripAnsi } from './helpers/ink-test-utils.js';
 import ShellInput from '../components/shell-input.js';
 import * as TextBufferModule from '../hooks/use-text-buffer.js';
+import { LaceFocusProvider } from '../focus/index.js';
 
 // Mock the useTextBuffer hook
 vi.mock('../hooks/use-text-buffer.js', () => ({
@@ -27,11 +28,15 @@ vi.mock('../components/text-renderer.js', async () => {
   };
 });
 
+// Test wrapper to provide focus context
+const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <LaceFocusProvider>{children}</LaceFocusProvider>
+);
+
 describe('ShellInput Component', () => {
   const defaultProps = {
     value: '',
     placeholder: 'Type your message...',
-    focusId: 'test-input',
     autoFocus: false,
   };
 
@@ -219,7 +224,9 @@ describe('ShellInput Component', () => {
 
     it('should handle custom focusId', () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput {...defaultProps} focusId="custom-focus-id" />
+        <TestWrapper>
+          <ShellInput {...defaultProps} />
+        </TestWrapper>
       );
 
       // Should render without error with custom focus ID

@@ -103,7 +103,7 @@ describe('TimelineDisplay Viewport Behavior', () => {
 
   it('should handle focus management', () => {
     const timeline = createMockTimeline(3);
-    const { lastFrame } = render(<TimelineDisplay timeline={timeline} focusId="test-focus" />);
+    const { lastFrame } = render(<TimelineDisplay timeline={timeline} />);
 
     // Should render without crashing when focused
     expect(lastFrame()).toBeDefined();
