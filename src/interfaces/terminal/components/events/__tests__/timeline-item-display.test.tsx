@@ -11,7 +11,8 @@ import { Timeline, TimelineItem } from '../../../../thread-processor.js';
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
   useTimelineItemExpansion: () => ({
     isExpanded: false,
-    handleExpandedChange: vi.fn(),
+    onExpand: vi.fn(),
+    onCollapse: vi.fn(),
   }),
 }));
 

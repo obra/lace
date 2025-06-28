@@ -52,10 +52,19 @@ export function GenericToolRenderer({
   onToggle,
 }: GenericToolRendererProps) {
   // Use shared expansion management for consistent behavior
-  const { isExpanded, handleExpandedChange } = useTimelineItemExpansion(
+  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
     isSelected,
-    onToggle
+    (expanded) => onToggle?.()
   );
+
+  // Create handler that works with TimelineEntryCollapsibleBox interface
+  const handleExpandedChange = (expanded: boolean) => {
+    if (expanded) {
+      onExpand();
+    } else {
+      onCollapse();
+    }
+  };
 
   const { call, result } = item;
   const { name: toolName, arguments: input } = call;

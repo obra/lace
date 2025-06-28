@@ -54,6 +54,9 @@ class ExpansionEmitter {
 const ExpansionEmitterContext = createContext<ExpansionEmitter | null>(null);
 
 // Provider component for timeline expansion context
+// NOTE: Each provider instance creates its own ExpansionEmitter, so different
+// conversation views or timeline instances will have isolated expansion state.
+// This ensures expand/collapse events only affect items within the same timeline.
 export function TimelineExpansionProvider({ children }: { children: React.ReactNode }) {
   const [emitter] = useState(() => new ExpansionEmitter());
   return (
@@ -84,30 +87,35 @@ export function useExpansionCollapse() {
 }
 
 // Combined hook that provides complete expansion state management
-export function useTimelineItemExpansion(isSelected: boolean, onToggle?: () => void): {
+export function useTimelineItemExpansion(isSelected: boolean, onExpansionChange?: (expanded: boolean) => void): {
   isExpanded: boolean;
-  handleExpandedChange: (expanded: boolean) => void;
+  onExpand: () => void;
+  onCollapse: () => void;
 } {
   const [isExpanded, setIsExpanded] = useState(false);
   const emitter = useExpansionEmitter();
 
   const expand = useCallback(() => {
     setIsExpanded(true);
-    onToggle?.();
-  }, [onToggle]);
+    onExpansionChange?.(true);
+  }, [onExpansionChange]);
 
   const collapse = useCallback(() => {
     setIsExpanded(false);
-    onToggle?.();
-  }, [onToggle]);
+    onExpansionChange?.(false);
+  }, [onExpansionChange]);
 
-  const handleExpandedChange = useCallback(
-    (expanded: boolean) => {
-      setIsExpanded(expanded);
-      onToggle?.();
-    },
-    [onToggle]
-  );
+  const onExpand = useCallback(() => {
+    if (!isExpanded) {
+      expand();
+    }
+  }, [isExpanded, expand]);
+
+  const onCollapse = useCallback(() => {
+    if (isExpanded) {
+      collapse();
+    }
+  }, [isExpanded, collapse]);
 
   // Listen for directional expansion events when selected
   useEffect(() => {
@@ -124,6 +132,7 @@ export function useTimelineItemExpansion(isSelected: boolean, onToggle?: () => v
 
   return {
     isExpanded,
-    handleExpandedChange,
+    onExpand,
+    onCollapse,
   };
 }
