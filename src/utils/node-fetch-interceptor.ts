@@ -35,14 +35,14 @@ export function enableNodeFetchInterception(): void {
 
       if (!harRecorder) {
         // No HAR recording enabled, pass through
-        return originalNodeFetch(url, init);
+        return originalNodeFetch!(url, init);
       }
 
       const urlString = typeof url === 'string' ? url : url.url;
       const startTime = Date.now();
 
       try {
-        const response = await originalNodeFetch(url, init);
+        const response = await originalNodeFetch!(url, init);
         const endTime = Date.now();
 
         // Record to HAR synchronously to ensure it completes before process exits

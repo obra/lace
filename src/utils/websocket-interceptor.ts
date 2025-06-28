@@ -133,7 +133,7 @@ export function enableWebSocketInterception(): void {
   });
 
   // Install intercepted WebSocket
-  globalThis.WebSocket = InterceptedWebSocket as typeof WebSocket;
+  globalThis.WebSocket = InterceptedWebSocket as unknown as typeof WebSocket;
 
   logger.debug('WebSocket interception enabled for HAR recording');
 }

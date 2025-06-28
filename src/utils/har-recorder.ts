@@ -598,11 +598,13 @@ export class HARRecorder {
           const index = data.index;
           const blockType = data.content_block?.type || 'unknown';
 
-          if (!message.content[index]) {
-            message.content[index] = {
+          const content = message.content as Record<string, unknown>[] | undefined;
+          if (!content || !content[index]) {
+            if (!content) message.content = [];
+            (message.content as Record<string, unknown>[])[index] = {
               type: blockType,
               text: blockType === 'text' ? '' : null,
-              tool_use: blockType === 'tool_use' ? {} : null,
+              tool_use: blockType === 'tool_use' ? null : null,
               thinking: blockType === 'thinking' ? '' : null,
             };
           }
@@ -614,24 +616,26 @@ export class HARRecorder {
           const blockIndex = data.index;
           const delta = data.delta;
 
-          if (!message.content[blockIndex]) {
-            message.content[blockIndex] = {
+          const content = message.content as Record<string, unknown>[] | undefined;
+          if (!content || !content[blockIndex]) {
+            if (!content) message.content = [];
+            (message.content as Record<string, unknown>[])[blockIndex] = {
               type: 'unknown',
               text: '',
             };
           }
 
-          const block = message.content[blockIndex];
+          const block = (message.content as Record<string, unknown>[])[blockIndex];
 
           if (delta.type === 'text_delta') {
-            block.text = (block.text || '') + (delta.text || '');
+            block.text = String(block.text || '') + String(delta.text || '');
           } else if (delta.type === 'tool_use_delta') {
             block.tool_use = {
               ...(block.tool_use || {}),
               ...(delta.tool_use || {}),
             };
           } else if (delta.type === 'thinking_delta') {
-            block.thinking = (block.thinking || '') + (delta.thinking || '');
+            block.thinking = String(block.thinking || '') + String(delta.thinking || '');
           }
           break;
         }
@@ -654,7 +658,7 @@ export class HARRecorder {
       }
     } catch (error) {
       if (!message.errors) message.errors = [];
-      message.errors.push({
+      (message.errors as Record<string, unknown>[]).push({
         event_type: eventType,
         error: error instanceof Error ? error.message : String(error),
         data: eventData,
