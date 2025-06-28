@@ -9,8 +9,12 @@ import { Timeline, TimelineItem } from '../../../../thread-processor.js';
 
 // Mock TimelineItem component
 vi.mock('../TimelineItem.js', () => ({
-  TimelineItem: ({ item, isSelected, currentFocusId }: any) => 
-    React.createElement(Text, {}, `TLI:${item.type}:${isSelected ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}`)
+  TimelineItem: ({ item, isSelected, currentFocusId }: any) =>
+    React.createElement(
+      Text,
+      {},
+      `TLI:${item.type}:${isSelected ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}`
+    ),
 }));
 
 vi.mock('../../../../../utils/logger.js', () => ({
@@ -18,20 +22,20 @@ vi.mock('../../../../../utils/logger.js', () => ({
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
-    error: vi.fn()
-  }
+    error: vi.fn(),
+  },
 }));
 
 // Import the component after mocking
 import { TimelineItem as TimelineItemComponent } from '../TimelineItem.js';
 
 // Copy of the current render prop content for baseline testing
-function TimelineContent({ 
-  timeline, 
-  viewportState, 
-  viewportActions, 
-  itemRefs, 
-  currentFocusId 
+function TimelineContent({
+  timeline,
+  viewportState,
+  viewportActions,
+  itemRefs,
+  currentFocusId,
 }: {
   timeline: Timeline;
   viewportState: { selectedItemIndex: number; selectedLine: number; itemPositions: number[] };
@@ -44,8 +48,8 @@ function TimelineContent({
       {timeline.items.map((item, index) => {
         const isItemFocused = index === viewportState.selectedItemIndex;
         return (
-          <Box 
-            key={`timeline-item-${index}`} 
+          <Box
+            key={`timeline-item-${index}`}
             flexDirection="column"
             ref={(ref) => {
               if (ref) {
@@ -55,8 +59,8 @@ function TimelineContent({
               }
             }}
           >
-            <TimelineItemComponent 
-              item={item} 
+            <TimelineItemComponent
+              item={item}
               isSelected={isItemFocused}
               isFocused={isItemFocused}
               selectedLine={viewportState.selectedLine}
@@ -89,7 +93,7 @@ describe('TimelineContent (Baseline)', () => {
         id: `item-${i}`,
         type: 'user_message',
         timestamp: new Date(`2024-01-01T10:0${i}:00Z`),
-        content: `Message ${i}`
+        content: `Message ${i}`,
       });
     }
     return {
@@ -97,8 +101,8 @@ describe('TimelineContent (Baseline)', () => {
       metadata: {
         eventCount: itemCount,
         messageCount: itemCount,
-        lastActivity: new Date()
-      }
+        lastActivity: new Date(),
+      },
     };
   };
 
@@ -106,12 +110,12 @@ describe('TimelineContent (Baseline)', () => {
     viewportState: {
       selectedItemIndex: 0,
       selectedLine: 0,
-      itemPositions: [0, 5, 10]
+      itemPositions: [0, 5, 10],
     },
     viewportActions: {
-      triggerRemeasurement: mockTriggerRemeasurement
+      triggerRemeasurement: mockTriggerRemeasurement,
     },
-    currentFocusId: 'timeline'
+    currentFocusId: 'timeline',
   };
 
   describe('Item rendering', () => {
@@ -119,11 +123,7 @@ describe('TimelineContent (Baseline)', () => {
       const timeline = createMockTimeline(3);
 
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          itemRefs={mockItemRefs}
-          {...defaultProps} 
-        />
+        <TimelineContent timeline={timeline} itemRefs={mockItemRefs} {...defaultProps} />
       );
 
       const frame = lastFrame();
@@ -136,11 +136,7 @@ describe('TimelineContent (Baseline)', () => {
       const timeline = createMockTimeline(0);
 
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          itemRefs={mockItemRefs}
-          {...defaultProps} 
-        />
+        <TimelineContent timeline={timeline} itemRefs={mockItemRefs} {...defaultProps} />
       );
 
       expect(lastFrame()).toBe('');
@@ -150,11 +146,7 @@ describe('TimelineContent (Baseline)', () => {
       const timeline = createMockTimeline(2);
 
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          itemRefs={mockItemRefs}
-          {...defaultProps}
-        />
+        <TimelineContent timeline={timeline} itemRefs={mockItemRefs} {...defaultProps} />
       );
 
       const frame = lastFrame();
@@ -169,12 +161,12 @@ describe('TimelineContent (Baseline)', () => {
       const viewportState = {
         selectedItemIndex: 1, // Second item focused
         selectedLine: 0,
-        itemPositions: [0, 5, 10]
+        itemPositions: [0, 5, 10],
       };
 
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
+        <TimelineContent
+          timeline={timeline}
           itemRefs={mockItemRefs}
           {...defaultProps}
           viewportState={viewportState}
@@ -186,7 +178,7 @@ describe('TimelineContent (Baseline)', () => {
       // Should have exactly one focused item (index 1)
       const focusedMatches = frame!.match(/:FOCUS:/g);
       expect(focusedMatches).toHaveLength(1);
-      
+
       // Should have two unfocused items (indices 0 and 2)
       const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
       expect(unfocusedMatches).toHaveLength(2);
@@ -197,12 +189,12 @@ describe('TimelineContent (Baseline)', () => {
       const viewportState = {
         selectedItemIndex: 5, // Out of bounds
         selectedLine: 0,
-        itemPositions: [0, 5]
+        itemPositions: [0, 5],
       };
 
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
+        <TimelineContent
+          timeline={timeline}
           itemRefs={mockItemRefs}
           {...defaultProps}
           viewportState={viewportState}
@@ -214,7 +206,7 @@ describe('TimelineContent (Baseline)', () => {
       // All items should be unfocused when selectedItemIndex is out of bounds
       const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
       expect(unfocusedMatches).toHaveLength(2);
-      
+
       const focusedMatches = frame!.match(/:FOCUS:/g);
       expect(focusedMatches).toBeNull();
     });
@@ -223,14 +215,8 @@ describe('TimelineContent (Baseline)', () => {
   describe('Ref management', () => {
     it('should populate itemRefs with rendered items', () => {
       const timeline = createMockTimeline(3);
-      
-      render(
-        <TimelineContent 
-          timeline={timeline} 
-          itemRefs={mockItemRefs}
-          {...defaultProps} 
-        />
-      );
+
+      render(<TimelineContent timeline={timeline} itemRefs={mockItemRefs} {...defaultProps} />);
 
       // ItemRefs should be populated during render
       // Note: In actual usage, refs get set asynchronously, so we can't test the exact values
@@ -240,17 +226,13 @@ describe('TimelineContent (Baseline)', () => {
 
     it('should handle itemRefs cleanup on unmount', () => {
       const timeline = createMockTimeline(2);
-      
+
       const { unmount } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          itemRefs={mockItemRefs}
-          {...defaultProps} 
-        />
+        <TimelineContent timeline={timeline} itemRefs={mockItemRefs} {...defaultProps} />
       );
 
       unmount();
-      
+
       // ItemRefs should remain as the component manages them
       expect(mockItemRefs.current).toBeDefined();
     });
@@ -262,14 +244,14 @@ describe('TimelineContent (Baseline)', () => {
       const viewportState = {
         selectedItemIndex: 0,
         selectedLine: 0,
-        itemPositions: [10, 25] // Custom positions
+        itemPositions: [10, 25], // Custom positions
       };
 
       // Since our mock doesn't expose the itemStartLine directly, we test by ensuring
       // the component renders without errors with the position data
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
+        <TimelineContent
+          timeline={timeline}
           itemRefs={mockItemRefs}
           {...defaultProps}
           viewportState={viewportState}
@@ -284,12 +266,12 @@ describe('TimelineContent (Baseline)', () => {
       const viewportState = {
         selectedItemIndex: 0,
         selectedLine: 0,
-        itemPositions: [] // Empty positions array
+        itemPositions: [], // Empty positions array
       };
 
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
+        <TimelineContent
+          timeline={timeline}
           itemRefs={mockItemRefs}
           {...defaultProps}
           viewportState={viewportState}
@@ -306,8 +288,8 @@ describe('TimelineContent (Baseline)', () => {
       const timeline = createMockTimeline(1);
 
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
+        <TimelineContent
+          timeline={timeline}
           itemRefs={mockItemRefs}
           {...defaultProps}
           currentFocusId="custom-focus"
@@ -321,14 +303,8 @@ describe('TimelineContent (Baseline)', () => {
 
     it('should call triggerRemeasurement when TimelineItem onToggle is triggered', () => {
       const timeline = createMockTimeline(1);
-      
-      render(
-        <TimelineContent 
-          timeline={timeline} 
-          itemRefs={mockItemRefs}
-          {...defaultProps} 
-        />
-      );
+
+      render(<TimelineContent timeline={timeline} itemRefs={mockItemRefs} {...defaultProps} />);
 
       // The onToggle prop is passed to TimelineItem, but we can't easily trigger it in this test
       // since our mock doesn't expose the callback. This test verifies the prop is passed.
@@ -339,15 +315,11 @@ describe('TimelineContent (Baseline)', () => {
   describe('Key generation', () => {
     it('should generate unique keys for timeline items', () => {
       const timeline = createMockTimeline(3);
-      
+
       // This is tested implicitly - if keys weren't unique, React would warn
       // The test passing without warnings indicates proper key generation
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          itemRefs={mockItemRefs}
-          {...defaultProps} 
-        />
+        <TimelineContent timeline={timeline} itemRefs={mockItemRefs} {...defaultProps} />
       );
 
       expect(lastFrame()).toContain('TLI:user_message');
@@ -362,13 +334,13 @@ describe('TimelineContent (Baseline)', () => {
             id: 'user-1',
             type: 'user_message',
             timestamp: new Date('2024-01-01T10:00:00Z'),
-            content: 'Hello'
+            content: 'Hello',
           },
           {
             id: 'agent-1',
             type: 'agent_message',
             timestamp: new Date('2024-01-01T10:01:00Z'),
-            content: 'Hi there'
+            content: 'Hi there',
           },
           {
             type: 'tool_execution',
@@ -377,23 +349,19 @@ describe('TimelineContent (Baseline)', () => {
             call: {
               id: 'call-1',
               name: 'bash',
-              arguments: { command: 'ls' }
-            }
-          }
+              arguments: { command: 'ls' },
+            },
+          },
         ],
         metadata: {
           eventCount: 3,
           messageCount: 2,
-          lastActivity: new Date('2024-01-01T10:02:00Z')
-        }
+          lastActivity: new Date('2024-01-01T10:02:00Z'),
+        },
       };
 
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          itemRefs={mockItemRefs}
-          {...defaultProps} 
-        />
+        <TimelineContent timeline={timeline} itemRefs={mockItemRefs} {...defaultProps} />
       );
 
       const frame = lastFrame();

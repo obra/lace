@@ -38,11 +38,13 @@ describe('FileEditTool', () => {
 }`;
     await writeFile(testFile, originalContent);
 
-    const result = await tool.executeTool(createTestToolCall('file_edit', {
-      path: testFile,
-      old_text: "console.log('Hello, World!');",
-      new_text: "console.log('Hello, Universe!');",
-    }));
+    const result = await tool.executeTool(
+      createTestToolCall('file_edit', {
+        path: testFile,
+        old_text: "console.log('Hello, World!');",
+        new_text: "console.log('Hello, Universe!');",
+      })
+    );
 
     expect(result.isError).toBe(false);
     expect(result.content[0]?.text).toContain('Successfully replaced text');
@@ -56,15 +58,17 @@ describe('FileEditTool', () => {
 }`;
     await writeFile(testFile, originalContent);
 
-    const result = await tool.executeTool(createTestToolCall('file_edit', {
-      path: testFile,
-      old_text: `  const a = 1;
+    const result = await tool.executeTool(
+      createTestToolCall('file_edit', {
+        path: testFile,
+        old_text: `  const a = 1;
   const b = 2;
   return a + b;`,
-      new_text: `  const x = 10;
+        new_text: `  const x = 10;
   const y = 20;
   return x * y;`,
-    }));
+      })
+    );
 
     expect(result.isError).toBe(false);
     expect(result.content[0]?.text).toContain('Successfully replaced text');
@@ -74,11 +78,13 @@ describe('FileEditTool', () => {
   it('should fail when text is not found', async () => {
     await writeFile(testFile, 'Hello World');
 
-    const result = await tool.executeTool(createTestToolCall('file_edit', {
-      path: testFile,
-      old_text: 'Goodbye World',
-      new_text: 'Hello Universe',
-    }));
+    const result = await tool.executeTool(
+      createTestToolCall('file_edit', {
+        path: testFile,
+        old_text: 'Goodbye World',
+        new_text: 'Hello Universe',
+      })
+    );
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('No exact matches found');
@@ -87,33 +93,39 @@ describe('FileEditTool', () => {
   it('should fail when multiple matches exist', async () => {
     await writeFile(testFile, 'foo bar foo');
 
-    const result = await tool.executeTool(createTestToolCall('file_edit', {
-      path: testFile,
-      old_text: 'foo',
-      new_text: 'baz',
-    }));
+    const result = await tool.executeTool(
+      createTestToolCall('file_edit', {
+        path: testFile,
+        old_text: 'foo',
+        new_text: 'baz',
+      })
+    );
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Found 2 matches');
   });
 
   it('should validate input parameters', async () => {
-    const result = await tool.executeTool(createTestToolCall('file_edit', {
-      path: '',
-      old_text: 'test',
-      new_text: 'test2',
-    }));
+    const result = await tool.executeTool(
+      createTestToolCall('file_edit', {
+        path: '',
+        old_text: 'test',
+        new_text: 'test2',
+      })
+    );
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Path must be a non-empty string');
   });
 
   it('should handle file not found', async () => {
-    const result = await tool.executeTool(createTestToolCall('file_edit', {
-      path: '/nonexistent/file.txt',
-      old_text: 'test',
-      new_text: 'test2',
-    }));
+    const result = await tool.executeTool(
+      createTestToolCall('file_edit', {
+        path: '/nonexistent/file.txt',
+        old_text: 'test',
+        new_text: 'test2',
+      })
+    );
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('ENOENT');

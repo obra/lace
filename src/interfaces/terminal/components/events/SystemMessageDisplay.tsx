@@ -14,15 +14,19 @@ interface SystemMessageDisplayProps {
 
 export function SystemMessageDisplay({ event, isStreaming, isFocused }: SystemMessageDisplayProps) {
   const message = event.data as string;
-  
+
   return (
     <Box flexDirection="column" marginY={1}>
       <Box>
-        <Text color="gray" italic>{UI_SYMBOLS.INFO}  System</Text>
+        <Text color="gray" italic>
+          {UI_SYMBOLS.INFO} System
+        </Text>
         {isStreaming && <Text color="gray"> (processing...)</Text>}
       </Box>
       <Box marginLeft={2}>
-        <Text color="gray" wrap="wrap">{message}</Text>
+        <Text color="gray" wrap="wrap">
+          {message}
+        </Text>
       </Box>
     </Box>
   );

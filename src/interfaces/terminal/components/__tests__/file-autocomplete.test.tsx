@@ -23,12 +23,7 @@ describe('FileAutocomplete', () => {
 
     it('should render nothing when no items', () => {
       const { lastFrame } = render(
-        <FileAutocomplete
-          items={[]}
-          selectedIndex={0}
-          isVisible={true}
-          maxItems={5}
-        />
+        <FileAutocomplete items={[]} selectedIndex={0} isVisible={true} maxItems={5} />
       );
 
       expect(lastFrame()).toBe('');
@@ -74,22 +69,17 @@ describe('FileAutocomplete', () => {
   describe('scrolling behavior', () => {
     const manyItems = [
       'item1.ts',
-      'item2.ts', 
+      'item2.ts',
       'item3.ts',
       'item4.ts',
       'item5.ts',
       'item6.ts',
-      'item7.ts'
+      'item7.ts',
     ];
 
     it('should show only maxItems when list is longer', () => {
       const { lastFrame } = render(
-        <FileAutocomplete
-          items={manyItems}
-          selectedIndex={0}
-          isVisible={true}
-          maxItems={3}
-        />
+        <FileAutocomplete items={manyItems} selectedIndex={0} isVisible={true} maxItems={3} />
       );
 
       const output = lastFrame();
@@ -140,7 +130,7 @@ describe('FileAutocomplete', () => {
   describe('maxItems prop', () => {
     it('should default to 5 maxItems', () => {
       const manyItems = Array.from({ length: 10 }, (_, i) => `item${i}.ts`);
-      
+
       const { lastFrame } = render(
         <FileAutocomplete
           items={manyItems}
@@ -151,27 +141,22 @@ describe('FileAutocomplete', () => {
       );
 
       const output = lastFrame();
-      const lines = output?.split('\n').filter(line => line.trim()) || [];
-      
+      const lines = output?.split('\n').filter((line) => line.trim()) || [];
+
       // Should show 5 items by default
       expect(lines.length).toBeLessThanOrEqual(5);
     });
 
     it('should respect custom maxItems', () => {
       const manyItems = Array.from({ length: 10 }, (_, i) => `item${i}.ts`);
-      
+
       const { lastFrame } = render(
-        <FileAutocomplete
-          items={manyItems}
-          selectedIndex={0}
-          isVisible={true}
-          maxItems={2}
-        />
+        <FileAutocomplete items={manyItems} selectedIndex={0} isVisible={true} maxItems={2} />
       );
 
       const output = lastFrame();
-      const lines = output?.split('\n').filter(line => line.trim()) || [];
-      
+      const lines = output?.split('\n').filter((line) => line.trim()) || [];
+
       // Should show only 2 items
       expect(lines.length).toBeLessThanOrEqual(2);
     });
@@ -238,7 +223,7 @@ describe('FileAutocomplete', () => {
       );
 
       const output = lastFrame();
-      
+
       // Should not contain borders, emojis, or help text
       expect(output).not.toContain('─'); // No borders
       expect(output).not.toContain('│'); // No borders
@@ -246,7 +231,7 @@ describe('FileAutocomplete', () => {
       expect(output).not.toContain('📄'); // No emojis
       expect(output).not.toContain('↑↓'); // No help text
       expect(output).not.toContain('File Completions'); // No header
-      
+
       // Should only contain the file names and selection indicator
       expect(output).toContain('> src/');
       expect(output).toContain('  app.ts');
@@ -263,11 +248,11 @@ describe('FileAutocomplete', () => {
       );
 
       const output = lastFrame();
-      
+
       // Should use simple ">" for selection, spaces for non-selection
       expect(output).toContain('> selected.ts');
       expect(output).toContain('  unselected.ts');
-      
+
       // Should not use fancy arrows or indicators
       expect(output).not.toContain('▶');
       expect(output).not.toContain('→');

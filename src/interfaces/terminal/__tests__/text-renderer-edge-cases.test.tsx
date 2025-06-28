@@ -7,19 +7,14 @@ import React from 'react';
 import TextRenderer from '../components/text-renderer.js';
 
 describe('TextRenderer Edge Cases and Robust Rendering', () => {
-
   describe('enhanced rendering behavior', () => {
     it('should render long lines correctly', () => {
-      const longLine = 'This is a very long line that should render correctly without issues even when it exceeds normal terminal width';
+      const longLine =
+        'This is a very long line that should render correctly without issues even when it exceeds normal terminal width';
       const { container } = render(
-        <TextRenderer
-          lines={[longLine]}
-          cursorLine={0}
-          cursorColumn={50}
-          isFocused={true}
-        />
+        <TextRenderer lines={[longLine]} cursorLine={0} cursorColumn={50} isFocused={true} />
       );
-      
+
       expect(container.textContent).toContain(longLine.slice(0, 50));
       expect(container.textContent).toContain(longLine.slice(51));
     });
@@ -34,21 +29,16 @@ describe('TextRenderer Edge Cases and Robust Rendering', () => {
           isFocused={true}
         />
       );
-      
+
       expect(container.textContent).toContain(longLine);
     });
 
     it('should render multi-line content with different line lengths', () => {
       const lines = ['Short', 'A much longer line that tests wrapping behavior', 'Med'];
       const { container } = render(
-        <TextRenderer
-          lines={lines}
-          cursorLine={1}
-          cursorColumn={20}
-          isFocused={true}
-        />
+        <TextRenderer lines={lines} cursorLine={1} cursorColumn={20} isFocused={true} />
       );
-      
+
       expect(container.textContent).toContain('Short');
       expect(container.textContent).toContain('A much longer line');
       expect(container.textContent).toContain('Med');
@@ -57,14 +47,9 @@ describe('TextRenderer Edge Cases and Robust Rendering', () => {
     it('should handle cursor positioning edge cases', () => {
       const lines = ['Line 1', '', 'Line 3'];
       const { container } = render(
-        <TextRenderer
-          lines={lines}
-          cursorLine={1}
-          cursorColumn={0}
-          isFocused={true}
-        />
+        <TextRenderer lines={lines} cursorLine={1} cursorColumn={0} isFocused={true} />
       );
-      
+
       expect(container).toBeTruthy();
     });
 
@@ -77,7 +62,7 @@ describe('TextRenderer Edge Cases and Robust Rendering', () => {
           isFocused={true}
         />
       );
-      
+
       expect(container.textContent).toContain('Short');
     });
   });
@@ -93,7 +78,7 @@ describe('TextRenderer Edge Cases and Robust Rendering', () => {
           placeholder="Enter text here..."
         />
       );
-      
+
       expect(container.textContent).toContain('Enter text here...');
     });
 
@@ -107,12 +92,12 @@ describe('TextRenderer Edge Cases and Robust Rendering', () => {
           placeholder="Enter text here..."
         />
       );
-      
+
       expect(container.textContent).not.toContain('Enter text here...');
     });
 
     it('should handle custom placeholder text', () => {
-      const customPlaceholder = "Type your command...";
+      const customPlaceholder = 'Type your command...';
       const { container } = render(
         <TextRenderer
           lines={['']}
@@ -122,7 +107,7 @@ describe('TextRenderer Edge Cases and Robust Rendering', () => {
           placeholder={customPlaceholder}
         />
       );
-      
+
       expect(container.textContent).toContain(customPlaceholder);
     });
   });
@@ -130,55 +115,35 @@ describe('TextRenderer Edge Cases and Robust Rendering', () => {
   describe('cursor rendering', () => {
     it('should render cursor on focused line', () => {
       const { container } = render(
-        <TextRenderer
-          lines={['Hello World']}
-          cursorLine={0}
-          cursorColumn={5}
-          isFocused={true}
-        />
+        <TextRenderer lines={['Hello World']} cursorLine={0} cursorColumn={5} isFocused={true} />
       );
-      
+
       expect(container.textContent).toContain('Hello');
       expect(container.textContent).toContain('World');
     });
 
     it('should not render cursor when not focused', () => {
       const { container } = render(
-        <TextRenderer
-          lines={['Hello World']}
-          cursorLine={0}
-          cursorColumn={5}
-          isFocused={false}
-        />
+        <TextRenderer lines={['Hello World']} cursorLine={0} cursorColumn={5} isFocused={false} />
       );
-      
+
       expect(container.textContent).toContain('Hello World');
     });
 
     it('should handle cursor at beginning of line', () => {
       const { container } = render(
-        <TextRenderer
-          lines={['Hello World']}
-          cursorLine={0}
-          cursorColumn={0}
-          isFocused={true}
-        />
+        <TextRenderer lines={['Hello World']} cursorLine={0} cursorColumn={0} isFocused={true} />
       );
-      
+
       expect(container.textContent).toContain('Hello World');
     });
 
     it('should handle cursor at end of line', () => {
       const line = 'Hello World';
       const { container } = render(
-        <TextRenderer
-          lines={[line]}
-          cursorLine={0}
-          cursorColumn={line.length}
-          isFocused={true}
-        />
+        <TextRenderer lines={[line]} cursorLine={0} cursorColumn={line.length} isFocused={true} />
       );
-      
+
       expect(container.textContent).toContain(line);
     });
   });
@@ -193,21 +158,16 @@ describe('TextRenderer Edge Cases and Robust Rendering', () => {
           isFocused={true}
         />
       );
-      
+
       expect(container.textContent).toContain('Line 1');
       expect(container.textContent).toContain('Line 3');
     });
 
     it('should handle all empty lines', () => {
       const { container } = render(
-        <TextRenderer
-          lines={['', '', '']}
-          cursorLine={1}
-          cursorColumn={0}
-          isFocused={true}
-        />
+        <TextRenderer lines={['', '', '']} cursorLine={1} cursorColumn={0} isFocused={true} />
       );
-      
+
       expect(container).toBeTruthy();
     });
 
@@ -221,7 +181,7 @@ describe('TextRenderer Edge Cases and Robust Rendering', () => {
           placeholder="Start typing..."
         />
       );
-      
+
       expect(container.textContent).toContain('Start typing...');
       expect(container.textContent).toContain('Content');
     });
@@ -231,16 +191,11 @@ describe('TextRenderer Edge Cases and Robust Rendering', () => {
     it('should handle very long lines without performance issues', () => {
       const veryLongLine = 'A'.repeat(10000);
       const startTime = performance.now();
-      
+
       const { container } = render(
-        <TextRenderer
-          lines={[veryLongLine]}
-          cursorLine={0}
-          cursorColumn={5000}
-          isFocused={true}
-        />
+        <TextRenderer lines={[veryLongLine]} cursorLine={0} cursorColumn={5000} isFocused={true} />
       );
-      
+
       const endTime = performance.now();
       expect(endTime - startTime).toBeLessThan(100); // Should render quickly
       expect(container).toBeTruthy();
@@ -249,16 +204,11 @@ describe('TextRenderer Edge Cases and Robust Rendering', () => {
     it('should handle many lines without performance issues', () => {
       const manyLines = Array.from({ length: 1000 }, (_, i) => `Line ${i}`);
       const startTime = performance.now();
-      
+
       const { container } = render(
-        <TextRenderer
-          lines={manyLines}
-          cursorLine={500}
-          cursorColumn={3}
-          isFocused={true}
-        />
+        <TextRenderer lines={manyLines} cursorLine={500} cursorColumn={3} isFocused={true} />
       );
-      
+
       const endTime = performance.now();
       expect(endTime - startTime).toBeLessThan(500); // Should render reasonably quickly (increased for CI)
       expect(container).toBeTruthy();
@@ -267,14 +217,9 @@ describe('TextRenderer Edge Cases and Robust Rendering', () => {
     it('should handle special characters correctly', () => {
       const specialLine = 'Special: !@#$%^&*()[]{}|\\:";\'<>?,./ émojis 🚀💻';
       const { container } = render(
-        <TextRenderer
-          lines={[specialLine]}
-          cursorLine={0}
-          cursorColumn={10}
-          isFocused={true}
-        />
+        <TextRenderer lines={[specialLine]} cursorLine={0} cursorColumn={10} isFocused={true} />
       );
-      
+
       expect(container.textContent).toContain('Special');
       expect(container.textContent).toContain('🚀💻');
     });
@@ -282,14 +227,9 @@ describe('TextRenderer Edge Cases and Robust Rendering', () => {
     it('should handle unicode characters correctly', () => {
       const unicodeLine = 'Unicode: 你好世界 عالم مرحبا русский язык';
       const { container } = render(
-        <TextRenderer
-          lines={[unicodeLine]}
-          cursorLine={0}
-          cursorColumn={8}
-          isFocused={true}
-        />
+        <TextRenderer lines={[unicodeLine]} cursorLine={0} cursorColumn={8} isFocused={true} />
       );
-      
+
       expect(container.textContent).toContain('Unicode');
       expect(container.textContent).toContain('你好世界');
     });

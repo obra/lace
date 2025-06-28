@@ -18,7 +18,7 @@ interface TimelineEntryCollapsibleBoxProps {
   onToggle?: () => void; // Called when expanded/collapsed to trigger height re-measurement
 }
 
-export function TimelineEntryCollapsibleBox({ 
+export function TimelineEntryCollapsibleBox({
   children,
   label,
   summary,
@@ -28,12 +28,11 @@ export function TimelineEntryCollapsibleBox({
   borderStyle,
   borderColor,
   isSelected = false,
-  onToggle
+  onToggle,
 }: TimelineEntryCollapsibleBoxProps) {
-  
   return (
     <Box paddingBottom={1}>
-      <CollapsibleBox 
+      <CollapsibleBox
         children={children}
         label={label}
         summary={summary}

@@ -200,12 +200,12 @@ describe('ThreadPersistence', () => {
       const complexData = {
         id: 'call_123',
         name: 'bash',
-        arguments: { 
+        arguments: {
           command: 'ls -la',
           nested: {
             array: [1, 2, 3],
             object: { key: 'value' },
-          }
+          },
         },
       };
 

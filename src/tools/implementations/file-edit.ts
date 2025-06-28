@@ -2,7 +2,14 @@
 // ABOUTME: Essential tool for precise code modifications and refactoring
 
 import { readFile, writeFile } from 'fs/promises';
-import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 
 export class FileEditTool implements Tool {
   name = 'file_edit';
@@ -62,13 +69,19 @@ The old_text must appear exactly once in the file.`;
       const occurrences = content.split(old_text).length - 1;
 
       if (occurrences === 0) {
-        return createErrorResult(`No exact matches found for the specified text in ${path}. 
-SOLUTION: Use file_read to see the exact file content, then copy the text exactly including all whitespace, tabs, and line breaks. Even a single space difference will cause this error.`, call.id);
+        return createErrorResult(
+          `No exact matches found for the specified text in ${path}. 
+SOLUTION: Use file_read to see the exact file content, then copy the text exactly including all whitespace, tabs, and line breaks. Even a single space difference will cause this error.`,
+          call.id
+        );
       }
 
       if (occurrences > 1) {
-        return createErrorResult(`Found ${occurrences} matches for the specified text. 
-SOLUTION: Include more surrounding context (lines before/after) to make old_text unique. For example, include the entire function or block instead of just one line.`, call.id);
+        return createErrorResult(
+          `Found ${occurrences} matches for the specified text. 
+SOLUTION: Include more surrounding context (lines before/after) to make old_text unique. For example, include the entire function or block instead of just one line.`,
+          call.id
+        );
       }
 
       // Perform replacement
@@ -85,14 +98,20 @@ SOLUTION: Include more surrounding context (lines before/after) to make old_text
           ? `${oldLines} line${oldLines === 1 ? '' : 's'}`
           : `${oldLines} line${oldLines === 1 ? '' : 's'} → ${newLines} line${newLines === 1 ? '' : 's'}`;
 
-      return createSuccessResult([
-        {
-          type: 'text',
-          text: `Successfully replaced text in ${path} (${lineInfo})`,
-        },
-      ], call.id);
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: `Successfully replaced text in ${path} (${lineInfo})`,
+          },
+        ],
+        call.id
+      );
     } catch (error) {
-      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred', call.id);
+      return createErrorResult(
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
   }
 }

@@ -3,7 +3,14 @@
 
 import { writeFile, mkdir } from 'fs/promises';
 import { dirname } from 'path';
-import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 
 export class FileWriteTool implements Tool {
   name = 'file_write';
@@ -51,14 +58,20 @@ export class FileWriteTool implements Tool {
 
       await writeFile(path, content, 'utf-8');
 
-      return createSuccessResult([
-        {
-          type: 'text',
-          text: `Successfully wrote ${content.length} characters to ${path}`,
-        },
-      ], call.id);
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: `Successfully wrote ${content.length} characters to ${path}`,
+          },
+        ],
+        call.id
+      );
     } catch (error) {
-      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred', call.id);
+      return createErrorResult(
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
   }
 }

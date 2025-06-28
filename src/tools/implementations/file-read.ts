@@ -2,7 +2,14 @@
 // ABOUTME: Safe file access for code inspection and analysis
 
 import { readFile } from 'fs/promises';
-import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 
 export class FileReadTool implements Tool {
   name = 'file_read';
@@ -54,14 +61,20 @@ export class FileReadTool implements Tool {
 
       const resultContent = resultLines.join('\n');
 
-      return createSuccessResult([
-        {
-          type: 'text',
-          text: resultContent,
-        },
-      ], call.id);
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: resultContent,
+          },
+        ],
+        call.id
+      );
     } catch (error) {
-      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred', call.id);
+      return createErrorResult(
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
   }
 }

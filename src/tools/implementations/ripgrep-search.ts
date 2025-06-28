@@ -3,7 +3,14 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 
 const execAsync = promisify(exec);
 
@@ -90,22 +97,28 @@ export class RipgrepSearchTool implements Tool {
         const matches = this.parseRipgrepOutput(stdout);
         const resultText = this.formatResults(matches, pattern);
 
-        return createSuccessResult([
-          {
-            type: 'text',
-            text: resultText,
-          },
-        ], call.id);
+        return createSuccessResult(
+          [
+            {
+              type: 'text',
+              text: resultText,
+            },
+          ],
+          call.id
+        );
       } catch (execError: unknown) {
         // ripgrep exits with code 1 when no matches found
         const err = execError as { code?: number; message?: string };
         if (err.code === 1) {
-          return createSuccessResult([
-            {
-              type: 'text',
-              text: `No matches found for pattern: ${pattern}`,
-            },
-          ], call.id);
+          return createSuccessResult(
+            [
+              {
+                type: 'text',
+                text: `No matches found for pattern: ${pattern}`,
+              },
+            ],
+            call.id
+          );
         }
 
         // Other errors (e.g., invalid regex, file not found)

@@ -45,9 +45,9 @@ export class ToolRendererErrorBoundary extends Component<
           ...this.props.item.call,
           arguments: {
             ...this.props.item.call.arguments,
-            _error: `Renderer failed: ${this.state.error?.message || 'Unknown error'}`
-          }
-        }
+            _error: `Renderer failed: ${this.state.error?.message || 'Unknown error'}`,
+          },
+        },
       };
 
       return (

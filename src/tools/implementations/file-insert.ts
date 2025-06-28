@@ -2,7 +2,14 @@
 // ABOUTME: Supports both line-based insertion and end-of-file appending
 
 import { readFile, writeFile } from 'fs/promises';
-import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 
 export class FileInsertTool implements Tool {
   name = 'file_insert';
@@ -70,7 +77,10 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
       } else {
         // Insert at specific line
         if (line > lines.length) {
-          return createErrorResult(`Line ${line} exceeds file length (${lines.length} lines)`, call.id);
+          return createErrorResult(
+            `Line ${line} exceeds file length (${lines.length} lines)`,
+            call.id
+          );
         }
 
         // Insert after the specified line
@@ -84,14 +94,20 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
 
       const addedLines = content.split('\n').length;
 
-      return createSuccessResult([
-        {
-          type: 'text',
-          text: `${operation} in ${path} (+${addedLines} line${addedLines === 1 ? '' : 's'})`,
-        },
-      ], call.id);
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: `${operation} in ${path} (+${addedLines} line${addedLines === 1 ? '' : 's'})`,
+          },
+        ],
+        call.id
+      );
     } catch (error) {
-      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred', call.id);
+      return createErrorResult(
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
   }
 }

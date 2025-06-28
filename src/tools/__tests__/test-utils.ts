@@ -1,4 +1,4 @@
-// ABOUTME: Test utilities for tool testing  
+// ABOUTME: Test utilities for tool testing
 // ABOUTME: Provides helper functions to create ToolCall objects for tests
 
 import { ToolCall } from '../types.js';

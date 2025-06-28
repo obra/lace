@@ -3,7 +3,14 @@
 
 import { readdir, stat, access } from 'fs/promises';
 import { join } from 'path';
-import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 
 export class FileFindTool implements Tool {
   name = 'file_find';
@@ -69,14 +76,20 @@ export class FileFindTool implements Tool {
       const resultText =
         matches.length > 0 ? matches.join('\n') : `No files found matching pattern: ${pattern}`;
 
-      return createSuccessResult([
-        {
-          type: 'text',
-          text: resultText,
-        },
-      ], call.id);
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: resultText,
+          },
+        ],
+        call.id
+      );
     } catch (error) {
-      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred', call.id);
+      return createErrorResult(
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
   }
 

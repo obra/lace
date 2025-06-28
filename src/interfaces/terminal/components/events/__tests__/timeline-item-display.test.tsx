@@ -9,13 +9,21 @@ import { Timeline, TimelineItem } from '../../../../thread-processor.js';
 
 // Mock all the display components
 vi.mock('../EventDisplay.js', () => ({
-  EventDisplay: ({ event, isFocused }: any) => 
-    React.createElement(Text, {}, `EventDisplay:${event.type}:${isFocused ? 'focused' : 'unfocused'}`)
+  EventDisplay: ({ event, isFocused }: any) =>
+    React.createElement(
+      Text,
+      {},
+      `EventDisplay:${event.type}:${isFocused ? 'focused' : 'unfocused'}`
+    ),
 }));
 
 vi.mock('../ToolExecutionDisplay.js', () => ({
-  ToolExecutionDisplay: ({ callEvent, isFocused }: any) => 
-    React.createElement(Text, {}, `ToolExecutionDisplay:${callEvent.data.name}:collapsed:${isFocused ? 'focused' : 'unfocused'}`)
+  ToolExecutionDisplay: ({ callEvent, isFocused }: any) =>
+    React.createElement(
+      Text,
+      {},
+      `ToolExecutionDisplay:${callEvent.data.name}:collapsed:${isFocused ? 'focused' : 'unfocused'}`
+    ),
 }));
 
 vi.mock('../DelegationBox.js', () => ({
@@ -27,12 +35,16 @@ vi.mock('../DelegationBox.js', () => ({
     };
     const threadId = extractDelegateThreadId(toolCall);
     return threadId ? React.createElement(Text, {}, `DelegationBox:${threadId}:expanded`) : null;
-  }
+  },
 }));
 
 vi.mock('../../message-display.js', () => ({
-  default: ({ message, isFocused }: any) => 
-    React.createElement(Text, {}, `MessageDisplay:${message.type}:${isFocused ? 'focused' : 'unfocused'}`)
+  default: ({ message, isFocused }: any) =>
+    React.createElement(
+      Text,
+      {},
+      `MessageDisplay:${message.type}:${isFocused ? 'focused' : 'unfocused'}`
+    ),
 }));
 
 vi.mock('../../../../../utils/logger.js', () => ({
@@ -40,8 +52,8 @@ vi.mock('../../../../../utils/logger.js', () => ({
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
-    error: vi.fn()
-  }
+    error: vi.fn(),
+  },
 }));
 
 // Import the components after mocking
@@ -52,7 +64,7 @@ import MessageDisplay from '../../message-display.js';
 import { logger } from '../../../../../utils/logger.js';
 
 // Copy of the current TimelineItemDisplay function for baseline testing
-function TimelineItemDisplay({ 
+function TimelineItemDisplay({
   item,
   delegateTimelines,
   isSelected,
@@ -61,9 +73,9 @@ function TimelineItemDisplay({
   onToggle,
   delegationExpandState,
   currentFocusId,
-  extractDelegateThreadId 
+  extractDelegateThreadId,
 }: {
-  item: TimelineItem; 
+  item: TimelineItem;
   delegateTimelines?: Map<string, Timeline>;
   isSelected: boolean;
   selectedLine: number;
@@ -71,7 +83,9 @@ function TimelineItemDisplay({
   onToggle?: () => void;
   delegationExpandState: Map<string, boolean>;
   currentFocusId?: string;
-  extractDelegateThreadId: (item: Extract<TimelineItem, { type: 'tool_execution' }>) => string | null;
+  extractDelegateThreadId: (
+    item: Extract<TimelineItem, { type: 'tool_execution' }>
+  ) => string | null;
 }) {
   switch (item.type) {
     case 'user_message':
@@ -81,14 +95,14 @@ function TimelineItemDisplay({
           threadId: '',
           type: 'USER_MESSAGE',
           timestamp: item.timestamp,
-          data: item.content
+          data: item.content,
         },
         isFocused: isSelected,
         focusedLine: selectedLine,
         itemStartLine,
-        onToggle
+        onToggle,
       });
-      
+
     case 'agent_message':
       return React.createElement(EventDisplay, {
         event: {
@@ -96,14 +110,14 @@ function TimelineItemDisplay({
           threadId: '',
           type: 'AGENT_MESSAGE',
           timestamp: item.timestamp,
-          data: item.content
+          data: item.content,
         },
         isFocused: isSelected,
         focusedLine: selectedLine,
         itemStartLine,
-        onToggle
+        onToggle,
       });
-      
+
     case 'system_message':
       return React.createElement(EventDisplay, {
         event: {
@@ -111,72 +125,78 @@ function TimelineItemDisplay({
           threadId: '',
           type: (item.originalEventType || 'LOCAL_SYSTEM_MESSAGE') as any,
           timestamp: item.timestamp,
-          data: item.content
+          data: item.content,
         },
         isFocused: isSelected,
         focusedLine: selectedLine,
         itemStartLine,
-        onToggle
+        onToggle,
       });
-      
+
     case 'tool_execution':
       const callEvent = {
         id: `${item.callId}-call`,
         threadId: '',
         type: 'TOOL_CALL' as const,
         timestamp: item.timestamp,
-        data: item.call
+        data: item.call,
       };
-      
-      const resultEvent = item.result ? {
-        id: `${item.callId}-result`,
-        threadId: '',
-        type: 'TOOL_RESULT' as const,
-        timestamp: item.timestamp,
-        data: item.result
-      } : undefined;
-      
+
+      const resultEvent = item.result
+        ? {
+            id: `${item.callId}-result`,
+            threadId: '',
+            type: 'TOOL_RESULT' as const,
+            timestamp: item.timestamp,
+            data: item.result,
+          }
+        : undefined;
+
       // Check if this is a delegate tool call
       if (item.call.name === 'delegate') {
-        logger.debug('TimelineDisplay: Processing delegate tool call', { 
+        logger.debug('TimelineDisplay: Processing delegate tool call', {
           id: item.callId,
           name: item.call.name,
           arguments: {},
           hasDelegateTimelines: !!delegateTimelines,
-          delegateTimelineCount: delegateTimelines?.size || 0
+          delegateTimelineCount: delegateTimelines?.size || 0,
         });
-        
+
         if (delegateTimelines) {
           const delegateThreadId = extractDelegateThreadId(item);
           logger.debug('TimelineDisplay: Delegate thread ID extraction result', {
             callId: item.callId,
             extractedThreadId: delegateThreadId,
             availableThreads: Array.from(delegateTimelines.keys()),
-            toolResult: item.result?.content?.[0]?.text ? item.result?.content?.[0]?.text.substring(0, 100) + '...' : 'no result'
+            toolResult: item.result?.content?.[0]?.text
+              ? item.result?.content?.[0]?.text.substring(0, 100) + '...'
+              : 'no result',
           });
-          
-          const delegateTimeline = delegateThreadId ? delegateTimelines.get(delegateThreadId) : null;
-          
+
+          const delegateTimeline = delegateThreadId
+            ? delegateTimelines.get(delegateThreadId)
+            : null;
+
           if (delegateTimeline && delegateThreadId) {
             const isExpanded = delegationExpandState.get(item.callId) ?? true;
-            logger.debug('TimelineDisplay: RENDERING delegation box', { 
+            logger.debug('TimelineDisplay: RENDERING delegation box', {
               threadId: delegateThreadId,
               callId: item.callId,
               isExpanded,
-              timelineItemCount: delegateTimeline.items.length
+              timelineItemCount: delegateTimeline.items.length,
             });
-            return React.createElement(Box, { flexDirection: "column" }, [
+            return React.createElement(Box, { flexDirection: 'column' }, [
               React.createElement(ToolExecutionDisplay, {
                 key: 'tool',
-                callEvent: callEvent, 
+                callEvent: callEvent,
                 resultEvent: resultEvent,
                 isFocused: isSelected,
               }),
               React.createElement(DelegationBox, {
                 key: 'delegation',
                 toolCall: item,
-                parentFocusId: currentFocusId || 'timeline'
-              })
+                parentFocusId: currentFocusId || 'timeline',
+              }),
             ]);
           } else {
             logger.debug('TimelineDisplay: NOT rendering delegation box', {
@@ -185,36 +205,40 @@ function TimelineItemDisplay({
               delegateThreadId,
               hasTimeline: !!delegateTimeline,
               hasDelegateTimelines: !!delegateTimelines,
-              delegateTimelineKeys: delegateTimelines ? Array.from(delegateTimelines.keys()) : []
+              delegateTimelineKeys: delegateTimelines ? Array.from(delegateTimelines.keys()) : [],
             });
           }
         } else {
           logger.debug('TimelineDisplay: No delegate timelines provided', {
             id: item.callId,
             name: item.call.name,
-            arguments: {}
+            arguments: {},
           });
         }
       }
-      
+
       return React.createElement(ToolExecutionDisplay, {
-        callEvent: callEvent, 
+        callEvent: callEvent,
         resultEvent: resultEvent,
-        isFocused: isSelected
+        isFocused: isSelected,
       });
-      
+
     case 'ephemeral_message':
       return React.createElement(MessageDisplay, {
         message: {
           type: item.messageType as any,
           content: item.content,
-          timestamp: item.timestamp
+          timestamp: item.timestamp,
         },
-        isFocused: isSelected
+        isFocused: isSelected,
       });
-      
+
     default:
-      return React.createElement(Box, {}, React.createElement(Text, {}, 'Unknown timeline item type'));
+      return React.createElement(
+        Box,
+        {},
+        React.createElement(Text, {}, 'Unknown timeline item type')
+      );
   }
 }
 
@@ -235,7 +259,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
     onToggle: mockOnToggle,
     delegationExpandState: new Map<string, boolean>(),
     currentFocusId: 'timeline',
-    extractDelegateThreadId: mockExtractDelegateThreadId
+    extractDelegateThreadId: mockExtractDelegateThreadId,
   };
 
   describe('user_message items', () => {
@@ -244,7 +268,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         id: 'msg-1',
         type: 'user_message',
         timestamp: new Date('2024-01-01T10:00:00Z'),
-        content: 'Hello world'
+        content: 'Hello world',
       };
 
       const { lastFrame } = render(
@@ -259,7 +283,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         id: 'msg-1',
         type: 'user_message',
         timestamp: new Date('2024-01-01T10:00:00Z'),
-        content: 'Hello world'
+        content: 'Hello world',
       };
 
       const { lastFrame } = render(
@@ -276,7 +300,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         id: 'msg-2',
         type: 'agent_message',
         timestamp: new Date('2024-01-01T10:00:00Z'),
-        content: 'Hello back'
+        content: 'Hello back',
       };
 
       const { lastFrame } = render(
@@ -294,7 +318,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         type: 'system_message',
         timestamp: new Date('2024-01-01T10:00:00Z'),
         content: 'System notification',
-        originalEventType: 'SYSTEM_PROMPT'
+        originalEventType: 'SYSTEM_PROMPT',
       };
 
       const { lastFrame } = render(
@@ -309,7 +333,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         id: 'sys-2',
         type: 'system_message',
         timestamp: new Date('2024-01-01T10:00:00Z'),
-        content: 'System notification'
+        content: 'System notification',
       };
 
       const { lastFrame } = render(
@@ -329,13 +353,13 @@ describe('TimelineItemDisplay (Baseline)', () => {
         call: {
           id: 'call-123',
           name: 'bash',
-          arguments: { command: 'ls' }
+          arguments: { command: 'ls' },
         },
         result: {
           id: 'call-123',
           content: [{ type: 'text', text: 'file1.txt\nfile2.txt' }],
-          isError: false
-        }
+          isError: false,
+        },
       };
 
       const { lastFrame } = render(
@@ -353,20 +377,19 @@ describe('TimelineItemDisplay (Baseline)', () => {
         call: {
           id: 'call-123',
           name: 'bash',
-          arguments: { command: 'ls' }
+          arguments: { command: 'ls' },
         },
         result: {
           id: 'call-123',
           content: [{ type: 'text', text: 'file1.txt\nfile2.txt' }],
-          isError: false
-        }
+          isError: false,
+        },
       };
 
-
       const { lastFrame } = render(
-        React.createElement(TimelineItemDisplay, { 
-          item, 
-          ...defaultProps, 
+        React.createElement(TimelineItemDisplay, {
+          item,
+          ...defaultProps,
         })
       );
 
@@ -381,8 +404,8 @@ describe('TimelineItemDisplay (Baseline)', () => {
         call: {
           id: 'call-124',
           name: 'file-read',
-          arguments: { path: '/test.txt' }
-        }
+          arguments: { path: '/test.txt' },
+        },
         // No result
       };
 
@@ -396,17 +419,19 @@ describe('TimelineItemDisplay (Baseline)', () => {
 
   describe('delegate tool execution items', () => {
     const createDelegateTimeline = (): Timeline => ({
-      items: [{
-        id: 'delegate-msg-1',
-        type: 'user_message',
-        timestamp: new Date('2024-01-01T10:00:01Z'),
-        content: 'Delegate task'
-      }],
+      items: [
+        {
+          id: 'delegate-msg-1',
+          type: 'user_message',
+          timestamp: new Date('2024-01-01T10:00:01Z'),
+          content: 'Delegate task',
+        },
+      ],
       metadata: {
         eventCount: 1,
         messageCount: 1,
-        lastActivity: new Date('2024-01-01T10:00:01Z')
-      }
+        lastActivity: new Date('2024-01-01T10:00:01Z'),
+      },
     });
 
     it('should render delegate tool with DelegationBox when thread found', () => {
@@ -417,26 +442,24 @@ describe('TimelineItemDisplay (Baseline)', () => {
         call: {
           id: 'delegate-call-123',
           name: 'delegate',
-          arguments: { prompt: 'Help me with this' }
+          arguments: { prompt: 'Help me with this' },
         },
         result: {
           id: 'delegate-call-123',
           content: [{ type: 'text', text: 'Thread: delegate-thread-456' }],
-          isError: false
-        }
+          isError: false,
+        },
       };
 
-      const delegateTimelines = new Map([
-        ['delegate-thread-456', createDelegateTimeline()]
-      ]);
+      const delegateTimelines = new Map([['delegate-thread-456', createDelegateTimeline()]]);
 
       mockExtractDelegateThreadId.mockReturnValue('delegate-thread-456');
 
       const { lastFrame } = render(
-        React.createElement(TimelineItemDisplay, { 
-          item, 
-          ...defaultProps, 
-          delegateTimelines 
+        React.createElement(TimelineItemDisplay, {
+          item,
+          ...defaultProps,
+          delegateTimelines,
         })
       );
 
@@ -453,29 +476,27 @@ describe('TimelineItemDisplay (Baseline)', () => {
         call: {
           id: 'delegate-call-123',
           name: 'delegate',
-          arguments: { prompt: 'Help me with this' }
+          arguments: { prompt: 'Help me with this' },
         },
         result: {
           id: 'delegate-call-123',
           content: [{ type: 'text', text: 'Thread: delegate-thread-456' }],
-          isError: false
-        }
+          isError: false,
+        },
       };
 
-      const delegateTimelines = new Map([
-        ['delegate-thread-456', createDelegateTimeline()]
-      ]);
+      const delegateTimelines = new Map([['delegate-thread-456', createDelegateTimeline()]]);
 
       const delegationExpandState = new Map([['delegate-call-123', false]]);
 
       mockExtractDelegateThreadId.mockReturnValue('delegate-thread-456');
 
       const { lastFrame } = render(
-        React.createElement(TimelineItemDisplay, { 
-          item, 
-          ...defaultProps, 
+        React.createElement(TimelineItemDisplay, {
+          item,
+          ...defaultProps,
           delegateTimelines,
-          delegationExpandState
+          delegationExpandState,
         })
       );
 
@@ -491,26 +512,24 @@ describe('TimelineItemDisplay (Baseline)', () => {
         call: {
           id: 'delegate-call-123',
           name: 'delegate',
-          arguments: { prompt: 'Help me with this' }
+          arguments: { prompt: 'Help me with this' },
         },
         result: {
           id: 'delegate-call-123',
           content: [{ type: 'text', text: 'No thread found' }],
-          isError: false
-        }
+          isError: false,
+        },
       };
 
-      const delegateTimelines = new Map([
-        ['other-thread', createDelegateTimeline()]
-      ]);
+      const delegateTimelines = new Map([['other-thread', createDelegateTimeline()]]);
 
       mockExtractDelegateThreadId.mockReturnValue(null); // No thread found
 
       const { lastFrame } = render(
-        React.createElement(TimelineItemDisplay, { 
-          item, 
-          ...defaultProps, 
-          delegateTimelines 
+        React.createElement(TimelineItemDisplay, {
+          item,
+          ...defaultProps,
+          delegateTimelines,
         })
       );
 
@@ -527,14 +546,14 @@ describe('TimelineItemDisplay (Baseline)', () => {
         call: {
           id: 'delegate-call-123',
           name: 'delegate',
-          arguments: { prompt: 'Help me with this' }
-        }
+          arguments: { prompt: 'Help me with this' },
+        },
       };
 
       const { lastFrame } = render(
-        React.createElement(TimelineItemDisplay, { 
-          item, 
-          ...defaultProps
+        React.createElement(TimelineItemDisplay, {
+          item,
+          ...defaultProps,
           // No delegateTimelines
         })
       );
@@ -551,7 +570,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         type: 'ephemeral_message',
         timestamp: new Date('2024-01-01T10:00:00Z'),
         content: 'Temporary message',
-        messageType: 'info'
+        messageType: 'info',
       };
 
       const { lastFrame } = render(
@@ -566,14 +585,14 @@ describe('TimelineItemDisplay (Baseline)', () => {
         type: 'ephemeral_message',
         timestamp: new Date('2024-01-01T10:00:00Z'),
         content: 'Temporary message',
-        messageType: 'warning'
+        messageType: 'warning',
       };
 
       const { lastFrame } = render(
-        React.createElement(TimelineItemDisplay, { 
-          item, 
-          ...defaultProps, 
-          isSelected: true 
+        React.createElement(TimelineItemDisplay, {
+          item,
+          ...defaultProps,
+          isSelected: true,
         })
       );
 
@@ -587,7 +606,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         id: 'unknown-1',
         type: 'unknown_type',
         timestamp: new Date('2024-01-01T10:00:00Z'),
-        content: 'Unknown content'
+        content: 'Unknown content',
       } as any;
 
       const { lastFrame } = render(
@@ -607,18 +626,18 @@ describe('TimelineItemDisplay (Baseline)', () => {
         call: {
           id: 'delegate-call-123',
           name: 'delegate',
-          arguments: { prompt: 'Help me' }
-        }
+          arguments: { prompt: 'Help me' },
+        },
       };
 
       const delegateTimelines = new Map();
       mockExtractDelegateThreadId.mockReturnValue(null);
 
       render(
-        React.createElement(TimelineItemDisplay, { 
-          item, 
-          ...defaultProps, 
-          delegateTimelines 
+        React.createElement(TimelineItemDisplay, {
+          item,
+          ...defaultProps,
+          delegateTimelines,
         })
       );
 
@@ -633,13 +652,11 @@ describe('TimelineItemDisplay (Baseline)', () => {
         call: {
           id: 'bash-call-123',
           name: 'bash',
-          arguments: { command: 'ls' }
-        }
+          arguments: { command: 'ls' },
+        },
       };
 
-      render(
-        React.createElement(TimelineItemDisplay, { item, ...defaultProps })
-      );
+      render(React.createElement(TimelineItemDisplay, { item, ...defaultProps }));
 
       expect(mockExtractDelegateThreadId).not.toHaveBeenCalled();
     });

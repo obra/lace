@@ -35,10 +35,12 @@ describe('FileInsertTool', () => {
   it('should append to end of file by default', async () => {
     await writeFile(testFile, 'Line 1\nLine 2');
 
-    const result = await tool.executeTool(createTestToolCall('file_insert', {
-      path: testFile,
-      content: 'Line 3\nLine 4',
-    }));
+    const result = await tool.executeTool(
+      createTestToolCall('file_insert', {
+        path: testFile,
+        content: 'Line 3\nLine 4',
+      })
+    );
 
     expect(result.isError).toBe(false);
     expect(result.content[0]?.text).toContain('Appended to end of file');
@@ -48,11 +50,13 @@ describe('FileInsertTool', () => {
   it('should insert at specific line', async () => {
     await writeFile(testFile, 'Line 1\nLine 2\nLine 3');
 
-    const result = await tool.executeTool(createTestToolCall('file_insert', {
-      path: testFile,
-      content: 'Inserted Line',
-      line: 2,
-    }));
+    const result = await tool.executeTool(
+      createTestToolCall('file_insert', {
+        path: testFile,
+        content: 'Inserted Line',
+        line: 2,
+      })
+    );
 
     expect(result.isError).toBe(false);
     expect(result.content[0]?.text).toContain('Inserted after line 2');
@@ -61,10 +65,12 @@ describe('FileInsertTool', () => {
   it('should handle empty files', async () => {
     await writeFile(testFile, '');
 
-    const result = await tool.executeTool(createTestToolCall('file_insert', {
-      path: testFile,
-      content: 'First Line',
-    }));
+    const result = await tool.executeTool(
+      createTestToolCall('file_insert', {
+        path: testFile,
+        content: 'First Line',
+      })
+    );
 
     expect(result.isError).toBe(false);
   });
@@ -72,21 +78,25 @@ describe('FileInsertTool', () => {
   it('should fail when line exceeds file length', async () => {
     await writeFile(testFile, 'Line 1\nLine 2');
 
-    const result = await tool.executeTool(createTestToolCall('file_insert', {
-      path: testFile,
-      content: 'New Line',
-      line: 5,
-    }));
+    const result = await tool.executeTool(
+      createTestToolCall('file_insert', {
+        path: testFile,
+        content: 'New Line',
+        line: 5,
+      })
+    );
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Line 5 exceeds file length');
   });
 
   it('should validate input parameters', async () => {
-    const result = await tool.executeTool(createTestToolCall('file_insert', {
-      path: '',
-      content: 'test',
-    }));
+    const result = await tool.executeTool(
+      createTestToolCall('file_insert', {
+        path: '',
+        content: 'test',
+      })
+    );
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Path must be a non-empty string');
@@ -95,11 +105,13 @@ describe('FileInsertTool', () => {
   it('should validate line number', async () => {
     await writeFile(testFile, 'test');
 
-    const result = await tool.executeTool(createTestToolCall('file_insert', {
-      path: testFile,
-      content: 'test',
-      line: 0,
-    }));
+    const result = await tool.executeTool(
+      createTestToolCall('file_insert', {
+        path: testFile,
+        content: 'test',
+        line: 0,
+      })
+    );
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Line must be a positive number');

@@ -7,7 +7,7 @@ import { MarkdownDisplay } from './ui/MarkdownDisplay.js';
 import { UI_SYMBOLS } from '../theme.js';
 
 interface Message {
-  type: "user" | "assistant" | "system" | "tool" | "thinking";
+  type: 'user' | 'assistant' | 'system' | 'tool' | 'thinking';
   content: string;
   timestamp: Date;
 }
@@ -40,7 +40,7 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
       if (match.index > lastIndex) {
         parts.push({
           type: 'text',
-          content: content.slice(lastIndex, match.index)
+          content: content.slice(lastIndex, match.index),
         });
       }
 
@@ -48,7 +48,7 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
       parts.push({
         type: 'code',
         content: match[2] || '',
-        language: match[1] || 'text'
+        language: match[1] || 'text',
       });
 
       lastIndex = match.index + match[0].length;
@@ -58,7 +58,7 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
     if (lastIndex < content.length) {
       parts.push({
         type: 'text',
-        content: content.slice(lastIndex)
+        content: content.slice(lastIndex),
       });
     }
 
@@ -68,47 +68,67 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
   // Get message color based on type
   const getMessageColor = (type: string) => {
     switch (type) {
-      case "user": return "cyan";
-      case "assistant": return "white";
-      case "thinking": return "dim";
-      case "tool": return "yellow";
-      case "system": return "gray";
-      default: return "white";
+      case 'user':
+        return 'cyan';
+      case 'assistant':
+        return 'white';
+      case 'thinking':
+        return 'dim';
+      case 'tool':
+        return 'yellow';
+      case 'system':
+        return 'gray';
+      default:
+        return 'white';
     }
   };
 
   // Get message prefix
   const getMessagePrefix = (type: string) => {
     switch (type) {
-      case "user": return "> ";
-      case "assistant": return UI_SYMBOLS.AGENT + " ";
-      case "thinking": return `${UI_SYMBOLS.THINKING} `;
-      case "tool": return `${UI_SYMBOLS.TOOL} `;
-      case "system": return UI_SYMBOLS.INFO + "  ";
-      default: return "";
+      case 'user':
+        return '> ';
+      case 'assistant':
+        return UI_SYMBOLS.AGENT + ' ';
+      case 'thinking':
+        return `${UI_SYMBOLS.THINKING} `;
+      case 'tool':
+        return `${UI_SYMBOLS.TOOL} `;
+      case 'system':
+        return UI_SYMBOLS.INFO + '  ';
+      default:
+        return '';
     }
   };
 
   // Get prefix color
   const getPrefixColor = (type: string) => {
     switch (type) {
-      case "user": return "dim";
-      case "assistant": return "green";
-      case "thinking": return "gray";
-      case "tool": return "yellow";
-      case "system": return "gray";
-      default: return "white";
+      case 'user':
+        return 'dim';
+      case 'assistant':
+        return 'green';
+      case 'thinking':
+        return 'gray';
+      case 'tool':
+        return 'yellow';
+      case 'system':
+        return 'gray';
+      default:
+        return 'white';
     }
   };
 
   // Check if content is long enough to be collapsible (tool outputs, long assistant responses)
   const isLongContent = message.content.length > 500 || message.content.split('\n').length > 10;
-  const shouldShowCollapse = (message.type === 'tool' || message.type === 'assistant') && isLongContent;
+  const shouldShowCollapse =
+    (message.type === 'tool' || message.type === 'assistant') && isLongContent;
 
   // Collapse logic for tool outputs
-  const displayContent = shouldShowCollapse && isCollapsed 
-    ? message.content.split('\n').slice(0, 3).join('\n') + '\n... (collapsed, click to expand)'
-    : message.content;
+  const displayContent =
+    shouldShowCollapse && isCollapsed
+      ? message.content.split('\n').slice(0, 3).join('\n') + '\n... (collapsed, click to expand)'
+      : message.content;
 
   const contentParts = parseContent(displayContent);
   const messageColor = getMessageColor(message.type);
@@ -119,30 +139,26 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
     <Box flexDirection="column" marginBottom={1}>
       {/* Inline prefix with content */}
       <Box flexDirection="column">
-        {message.type === "thinking" ? (
+        {message.type === 'thinking' ? (
           <Box>
             <Text color={prefixColor}>{prefix}</Text>
-            <Text italic color={messageColor}>{displayContent}</Text>
+            <Text italic color={messageColor}>
+              {displayContent}
+            </Text>
           </Box>
-        ) : message.type === "assistant" ? (
+        ) : message.type === 'assistant' ? (
           // Use markdown rendering for assistant messages (streaming and final)
           <Box flexDirection="column">
             <MarkdownDisplay content={displayContent} showIcon={true} />
-            {isStreaming && showCursor && (
-              <Text inverse> </Text>
-            )}
-            {shouldShowCollapse && (
-              <Text color="dim"> 
-                {isCollapsed ? ' [+]' : ' [-]'}
-              </Text>
-            )}
+            {isStreaming && showCursor && <Text inverse> </Text>}
+            {shouldShowCollapse && <Text color="dim">{isCollapsed ? ' [+]' : ' [-]'}</Text>}
           </Box>
         ) : (
           contentParts.map((part, index) => (
             <Box key={index} flexDirection="column">
               {part.type === 'code' ? (
-                <Box 
-                  borderStyle="single" 
+                <Box
+                  borderStyle="single"
                   borderColor="gray"
                   padding={1}
                   marginY={1}
@@ -159,9 +175,7 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
                 </Box>
               ) : (
                 <Box>
-                  {index === 0 && (
-                    <Text color={prefixColor}>{prefix}</Text>
-                  )}
+                  {index === 0 && <Text color={prefixColor}>{prefix}</Text>}
                   <Text color={messageColor} wrap="wrap">
                     {part.content}
                     {isStreaming && index === contentParts.length - 1 && showCursor && (
@@ -169,9 +183,7 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
                     )}
                   </Text>
                   {shouldShowCollapse && index === 0 && (
-                    <Text color="dim"> 
-                      {isCollapsed ? ' [+]' : ' [-]'}
-                    </Text>
+                    <Text color="dim">{isCollapsed ? ' [+]' : ' [-]'}</Text>
                   )}
                 </Box>
               )}

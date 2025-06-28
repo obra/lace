@@ -30,89 +30,93 @@ interface TimelineViewportProps {
   }) => React.ReactNode;
 }
 
-export function TimelineViewport({ 
-  timeline, 
-  focusId, 
-  parentFocusId, 
+export function TimelineViewport({
+  timeline,
+  focusId,
+  parentFocusId,
   bottomSectionHeight,
   onItemInteraction,
-  children 
+  children,
 }: TimelineViewportProps) {
   const { isFocused } = useFocus({ id: focusId || 'timeline' });
   const { focusNext, focus } = useFocusManager();
   const [, terminalHeight] = useStdoutDimensions();
-  
+
   // Item refs for measurement
   const itemRefs = useRef<Map<number, any>>(new Map());
-  
+
   // Calculate viewport height
-  const viewportLines = bottomSectionHeight ? 
-    Math.max(10, (terminalHeight || 30) - bottomSectionHeight) : 
-    10;
-    
+  const viewportLines = bottomSectionHeight
+    ? Math.max(10, (terminalHeight || 30) - bottomSectionHeight)
+    : 10;
+
   // Use the viewport hook
   const viewport = useTimelineViewport({
     timeline,
     viewportLines,
-    itemRefs
+    itemRefs,
   });
-  
+
   // Measure scroll indicator heights
   const topIndicatorRef = useRef<any>(null);
   const bottomIndicatorRef = useRef<any>(null);
-  
+
   // Calculate scroll indicator visibility
   const hasMoreAbove = viewport.lineScrollOffset > 0;
-  const hasMoreBelow = viewport.totalContentHeight > 0 && 
+  const hasMoreBelow =
+    viewport.totalContentHeight > 0 &&
     viewport.lineScrollOffset + viewportLines < viewport.totalContentHeight;
 
   // Handle keyboard navigation
-  useInput((input, key) => {
-    logger.debug('TimelineViewport: Key pressed', {
-      key,
-      input,
-      isFocused,
-      focusId,
-      isActive: isFocused && viewport.totalContentHeight > 0
-    });
-    
-    if (key.escape) {
-      // Handle escape based on focus hierarchy
-      const currentFocusId = focusId || 'timeline';
-      logger.debug('TimelineViewport: Escape key pressed', {
-        currentFocusId,
-        parentFocusId,
-        action: parentFocusId ? `focus(${parentFocusId})` : 'focus(shell-input)'
+  useInput(
+    (input, key) => {
+      logger.debug('TimelineViewport: Key pressed', {
+        key,
+        input,
+        isFocused,
+        focusId,
+        isActive: isFocused && viewport.totalContentHeight > 0,
       });
-      
-      if (parentFocusId) {
-        focus(parentFocusId);
-      } else {
-        // Focus the shell input specifically
-        focus('shell-input');
+
+      if (key.escape) {
+        // Handle escape based on focus hierarchy
+        const currentFocusId = focusId || 'timeline';
+        logger.debug('TimelineViewport: Escape key pressed', {
+          currentFocusId,
+          parentFocusId,
+          action: parentFocusId ? `focus(${parentFocusId})` : 'focus(shell-input)',
+        });
+
+        if (parentFocusId) {
+          focus(parentFocusId);
+        } else {
+          // Focus the shell input specifically
+          focus('shell-input');
+        }
+        return;
       }
-      return;
-    }
-    
-    if (key.upArrow) {
-      viewport.navigateUp();
-    } else if (key.downArrow) {
-      viewport.navigateDown();
-    } else if (key.pageUp) {
-      viewport.navigatePageUp();
-    } else if (key.pageDown) {
-      viewport.navigatePageDown();
-    } else if (input === 'g') {
-      viewport.navigateToTop();
-    } else if (input === 'G') {
-      viewport.navigateToBottom();
-    } else if (key.leftArrow || key.rightArrow || key.return) {
-      // Forward item interactions to parent
-      if (onItemInteraction) {
-        onItemInteraction(viewport.selectedItemIndex, input, key);
+
+      if (key.upArrow) {
+        viewport.navigateUp();
+      } else if (key.downArrow) {
+        viewport.navigateDown();
+      } else if (key.pageUp) {
+        viewport.navigatePageUp();
+      } else if (key.pageDown) {
+        viewport.navigatePageDown();
+      } else if (input === 'g') {
+        viewport.navigateToTop();
+      } else if (input === 'G') {
+        viewport.navigateToBottom();
+      } else if (key.leftArrow || key.rightArrow || key.return) {
+        // Forward item interactions to parent
+        if (onItemInteraction) {
+          onItemInteraction(viewport.selectedItemIndex, input, key);
+        }
       }
-    }
-  }, { isActive: isFocused }); // Always active when focused, not just when content exists
+    },
+    { isActive: isFocused }
+  ); // Always active when focused, not just when content exists
 
   return (
     <Box flexDirection="column" flexGrow={1}>
@@ -122,19 +126,11 @@ export function TimelineViewport({
           <Text color="dim">↑ content above (line {viewport.lineScrollOffset}) ↑</Text>
         </Box>
       )}
-      
+
       {/* Viewport container with cursor overlay */}
-      <Box 
-        height={viewportLines}
-        flexDirection="column"
-        overflow="hidden"
-      >
+      <Box height={viewportLines} flexDirection="column" overflow="hidden">
         {/* Content container */}
-        <Box 
-          flexDirection="column" 
-          marginTop={-viewport.lineScrollOffset}
-          flexShrink={0}
-        >
+        <Box flexDirection="column" marginTop={-viewport.lineScrollOffset} flexShrink={0}>
           {children({
             timeline,
             viewportState: {
@@ -142,17 +138,17 @@ export function TimelineViewport({
               lineScrollOffset: viewport.lineScrollOffset,
               itemPositions: viewport.itemPositions,
               totalContentHeight: viewport.totalContentHeight,
-              selectedItemIndex: viewport.selectedItemIndex
+              selectedItemIndex: viewport.selectedItemIndex,
             },
             viewportActions: {
-              triggerRemeasurement: viewport.triggerRemeasurement
+              triggerRemeasurement: viewport.triggerRemeasurement,
             },
-            itemRefs
+            itemRefs,
           })}
         </Box>
-        
+
         {/* Cursor overlay */}
-        <Box 
+        <Box
           position="absolute"
           flexDirection="column"
           marginTop={-viewport.lineScrollOffset + viewport.selectedLine}
@@ -162,7 +158,7 @@ export function TimelineViewport({
           </Text>
         </Box>
       </Box>
-      
+
       {/* Scroll indicator - more content below */}
       {hasMoreBelow && (
         <Box justifyContent="center" ref={bottomIndicatorRef}>

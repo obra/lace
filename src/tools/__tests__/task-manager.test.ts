@@ -2,7 +2,12 @@
 // ABOUTME: Validates task creation, listing, completion, and state management
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { TaskAddTool, TaskListTool, TaskCompleteTool, clearAllTaskStores } from '../implementations/task-manager.js';
+import {
+  TaskAddTool,
+  TaskListTool,
+  TaskCompleteTool,
+  clearAllTaskStores,
+} from '../implementations/task-manager.js';
 import { createTestToolCall } from './test-utils.js';
 
 describe('Task Management Tools', () => {
@@ -81,14 +86,19 @@ describe('Task Management Tools', () => {
 
     describe('error handling', () => {
       it('should handle missing description', async () => {
-        const result = await addTool.executeTool(createTestToolCall('task_add', {}), { threadId: testThreadId });
+        const result = await addTool.executeTool(createTestToolCall('task_add', {}), {
+          threadId: testThreadId,
+        });
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe('Description must be a non-empty string');
       });
 
       it('should handle empty description', async () => {
-        const result = await addTool.executeTool(createTestToolCall('task_add', { description: '' }), { threadId: testThreadId });
+        const result = await addTool.executeTool(
+          createTestToolCall('task_add', { description: '' }),
+          { threadId: testThreadId }
+        );
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe('Description must be a non-empty string');
@@ -105,7 +115,10 @@ describe('Task Management Tools', () => {
       });
 
       it('should handle non-string description', async () => {
-        const result = await addTool.executeTool(createTestToolCall('task_add', { description: 123 }), { threadId: testThreadId });
+        const result = await addTool.executeTool(
+          createTestToolCall('task_add', { description: 123 }),
+          { threadId: testThreadId }
+        );
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe('Description must be a non-empty string');
@@ -124,16 +137,22 @@ describe('Task Management Tools', () => {
 
     describe('task listing', () => {
       it('should show no tasks when list is empty', async () => {
-        const result = await listTool.executeTool(createTestToolCall('task_list', {}), { threadId: testThreadId });
+        const result = await listTool.executeTool(createTestToolCall('task_list', {}), {
+          threadId: testThreadId,
+        });
 
         expect(result.isError).toBe(false);
         expect(result.content[0].text).toBe('No pending tasks');
       });
 
       it('should list pending tasks by default', async () => {
-        await addTool.executeTool(createTestToolCall('task_add', { description: 'Pending task' }), { threadId: testThreadId });
+        await addTool.executeTool(createTestToolCall('task_add', { description: 'Pending task' }), {
+          threadId: testThreadId,
+        });
 
-        const result = await listTool.executeTool(createTestToolCall('task_list', {}), { threadId: testThreadId });
+        const result = await listTool.executeTool(createTestToolCall('task_list', {}), {
+          threadId: testThreadId,
+        });
 
         expect(result.isError).toBe(false);
         const output = result.content[0].text!;
@@ -148,9 +167,13 @@ describe('Task Management Tools', () => {
           { threadId: testThreadId }
         );
         const taskId = addResult.content[0].text!.match(/#(\d+):/)?.[1];
-        await completeTool.executeTool(createTestToolCall('task_complete', { id: taskId! }), { threadId: testThreadId });
+        await completeTool.executeTool(createTestToolCall('task_complete', { id: taskId! }), {
+          threadId: testThreadId,
+        });
 
-        const result = await listTool.executeTool(createTestToolCall('task_list', {}), { threadId: testThreadId });
+        const result = await listTool.executeTool(createTestToolCall('task_list', {}), {
+          threadId: testThreadId,
+        });
 
         expect(result.isError).toBe(false);
         expect(result.content[0].text).toBe('No pending tasks');
@@ -162,7 +185,9 @@ describe('Task Management Tools', () => {
           { threadId: testThreadId }
         );
         const taskId = addResult.content[0].text!.match(/#(\d+):/)?.[1];
-        await completeTool.executeTool(createTestToolCall('task_complete', { id: taskId! }), { threadId: testThreadId });
+        await completeTool.executeTool(createTestToolCall('task_complete', { id: taskId! }), {
+          threadId: testThreadId,
+        });
 
         const result = await listTool.executeTool(
           createTestToolCall('task_list', { includeCompleted: true }),
@@ -178,13 +203,17 @@ describe('Task Management Tools', () => {
       });
 
       it('should show mixed pending and completed tasks', async () => {
-        await addTool.executeTool(createTestToolCall('task_add', { description: 'Pending task' }), { threadId: testThreadId });
+        await addTool.executeTool(createTestToolCall('task_add', { description: 'Pending task' }), {
+          threadId: testThreadId,
+        });
         const addResult = await addTool.executeTool(
           createTestToolCall('task_add', { description: 'Completed task' }),
           { threadId: testThreadId }
         );
         const taskId = addResult.content[0].text!.match(/#(\d+):/)?.[1];
-        await completeTool.executeTool(createTestToolCall('task_complete', { id: taskId! }), { threadId: testThreadId });
+        await completeTool.executeTool(createTestToolCall('task_complete', { id: taskId! }), {
+          threadId: testThreadId,
+        });
 
         const result = await listTool.executeTool(
           createTestToolCall('task_list', { includeCompleted: true }),
@@ -227,7 +256,10 @@ describe('Task Management Tools', () => {
         );
         const taskId = addResult.content[0].text!.match(/#(\d+):/)?.[1];
 
-        const result = await completeTool.executeTool(createTestToolCall('task_complete', { id: taskId! }), { threadId: testThreadId });
+        const result = await completeTool.executeTool(
+          createTestToolCall('task_complete', { id: taskId! }),
+          { threadId: testThreadId }
+        );
 
         expect(result.isError).toBe(false);
         expect(result.content[0].text).toMatch(/Completed task #\d+: Task to complete/);
@@ -240,8 +272,12 @@ describe('Task Management Tools', () => {
         );
         const taskId = addResult.content[0].text!.match(/#(\d+):/)?.[1];
 
-        await completeTool.executeTool(createTestToolCall('task_complete', { id: taskId! }), { threadId: testThreadId });
-        const listResult = await listTool.executeTool(createTestToolCall('task_list', {}), { threadId: testThreadId });
+        await completeTool.executeTool(createTestToolCall('task_complete', { id: taskId! }), {
+          threadId: testThreadId,
+        });
+        const listResult = await listTool.executeTool(createTestToolCall('task_list', {}), {
+          threadId: testThreadId,
+        });
 
         expect(listResult.content[0].text).toBe('No pending tasks');
       });
@@ -249,28 +285,39 @@ describe('Task Management Tools', () => {
 
     describe('error handling', () => {
       it('should handle missing task ID', async () => {
-        const result = await completeTool.executeTool(createTestToolCall('task_complete', {}), { threadId: testThreadId });
+        const result = await completeTool.executeTool(createTestToolCall('task_complete', {}), {
+          threadId: testThreadId,
+        });
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe('Task ID must be a non-empty string');
       });
 
       it('should handle empty task ID', async () => {
-        const result = await completeTool.executeTool(createTestToolCall('task_complete', { id: '' }), { threadId: testThreadId });
+        const result = await completeTool.executeTool(
+          createTestToolCall('task_complete', { id: '' }),
+          { threadId: testThreadId }
+        );
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe('Task ID must be a non-empty string');
       });
 
       it('should handle non-existent task ID', async () => {
-        const result = await completeTool.executeTool(createTestToolCall('task_complete', { id: '999' }), { threadId: testThreadId });
+        const result = await completeTool.executeTool(
+          createTestToolCall('task_complete', { id: '999' }),
+          { threadId: testThreadId }
+        );
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe('Task #999 not found');
       });
 
       it('should handle non-string task ID', async () => {
-        const result = await completeTool.executeTool(createTestToolCall('task_complete', { id: 123 }), { threadId: testThreadId });
+        const result = await completeTool.executeTool(
+          createTestToolCall('task_complete', { id: 123 }),
+          { threadId: testThreadId }
+        );
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe('Task ID must be a non-empty string');
@@ -281,20 +328,32 @@ describe('Task Management Tools', () => {
   describe('integration tests', () => {
     it('should handle complete workflow', async () => {
       // Add multiple tasks
-      await addTool.executeTool(createTestToolCall('task_add', { description: 'Task 1' }), { threadId: testThreadId });
-      await addTool.executeTool(createTestToolCall('task_add', { description: 'Task 2' }), { threadId: testThreadId });
-      await addTool.executeTool(createTestToolCall('task_add', { description: 'Task 3' }), { threadId: testThreadId });
+      await addTool.executeTool(createTestToolCall('task_add', { description: 'Task 1' }), {
+        threadId: testThreadId,
+      });
+      await addTool.executeTool(createTestToolCall('task_add', { description: 'Task 2' }), {
+        threadId: testThreadId,
+      });
+      await addTool.executeTool(createTestToolCall('task_add', { description: 'Task 3' }), {
+        threadId: testThreadId,
+      });
 
       // List tasks
-      let listResult = await listTool.executeTool(createTestToolCall('task_list', {}), { threadId: testThreadId });
+      let listResult = await listTool.executeTool(createTestToolCall('task_list', {}), {
+        threadId: testThreadId,
+      });
       expect(listResult.content[0].text).toContain('Pending tasks (3):');
 
       // Complete one task
       const taskId = listResult.content[0].text!.match(/#(\d+):/)?.[1];
-      await completeTool.executeTool(createTestToolCall('task_complete', { id: taskId! }), { threadId: testThreadId });
+      await completeTool.executeTool(createTestToolCall('task_complete', { id: taskId! }), {
+        threadId: testThreadId,
+      });
 
       // Verify updated list
-      listResult = await listTool.executeTool(createTestToolCall('task_list', {}), { threadId: testThreadId });
+      listResult = await listTool.executeTool(createTestToolCall('task_list', {}), {
+        threadId: testThreadId,
+      });
       expect(listResult.content[0].text).toContain('Pending tasks (2):');
 
       // Verify completed task appears in full list

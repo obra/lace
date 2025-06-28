@@ -48,11 +48,13 @@ describe('Delegate Thread Extraction (Baseline)', () => {
       name: 'delegate',
       arguments: { prompt: 'test' },
     },
-    result: result ? { 
-      id: callId, 
-      content: result.content || [],
-      isError: result.isError || false 
-    } : undefined,
+    result: result
+      ? {
+          id: callId,
+          content: result.content || [],
+          isError: result.isError || false,
+        }
+      : undefined,
   });
 
   const createMockTimeline = (firstItemTimestamp: Date): Timeline => ({
@@ -89,7 +91,12 @@ describe('Delegate Thread Extraction (Baseline)', () => {
     it('should handle complex thread ID formats', () => {
       // The regex pattern /Thread: ([^\)]+)/ captures until closing parenthesis
       const toolItem = createMockToolExecution('call-123', new Date('2024-01-01T10:00:00Z'), {
-        content: [{ type: 'text', text: 'Some output text Thread: lace_20240101_complex_id_123) more text' }],
+        content: [
+          {
+            type: 'text',
+            text: 'Some output text Thread: lace_20240101_complex_id_123) more text',
+          },
+        ],
         isError: false,
       });
 

@@ -18,31 +18,39 @@ interface ToolCallDisplayProps {
   onToggle?: () => void;
 }
 
-export function ToolCallDisplay({ event, isStreaming, isFocused, isSelected, onToggle }: ToolCallDisplayProps) {
+export function ToolCallDisplay({
+  event,
+  isStreaming,
+  isFocused,
+  isSelected,
+  onToggle,
+}: ToolCallDisplayProps) {
   const toolCallData = event.data as ToolCall;
   const { name: toolName, arguments: input, id: callId } = toolCallData;
   const [isExpanded, setIsExpanded] = useState(false);
-  
+
   // Handle expansion toggle events
   const toggleExpansion = () => {
     setIsExpanded(!isExpanded);
     onToggle?.();
   };
-  
+
   // Listen for expansion toggle events when selected
   useTimelineExpansionToggle(isSelected || false, toggleExpansion);
-  
+
   const headerSummary = (
     <Box>
       <Text color={UI_COLORS.TOOL}>{UI_SYMBOLS.TOOL} </Text>
-      <Text color={UI_COLORS.TOOL} bold>{toolName}</Text>
+      <Text color={UI_COLORS.TOOL} bold>
+        {toolName}
+      </Text>
       <Text color="gray"> #{callId.slice(-6)}</Text>
       {isStreaming && <Text color="gray"> (streaming...)</Text>}
     </Box>
   );
-  
+
   return (
-    <TimelineEntryCollapsibleBox 
+    <TimelineEntryCollapsibleBox
       label="Input Parameters"
       summary={headerSummary}
       isExpanded={isExpanded}

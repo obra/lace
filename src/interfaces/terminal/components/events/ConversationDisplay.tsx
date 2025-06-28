@@ -1,4 +1,4 @@
-// ABOUTME: Performance-optimized conversation display using ThreadProcessor with caching  
+// ABOUTME: Performance-optimized conversation display using ThreadProcessor with caching
 // ABOUTME: Processes thread events only when changed, ephemeral messages on every render
 
 import React, { useMemo, useRef } from 'react';
@@ -9,7 +9,7 @@ import { useThreadProcessor } from '../../terminal-interface.js';
 import TimelineDisplay from './TimelineDisplay.js';
 
 interface Message {
-  type: "user" | "assistant" | "system" | "tool";
+  type: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp: Date;
 }
@@ -21,7 +21,12 @@ interface ConversationDisplayProps {
   bottomSectionHeight?: number;
 }
 
-export function ConversationDisplay({ events, ephemeralMessages, focusId, bottomSectionHeight }: ConversationDisplayProps) {
+export function ConversationDisplay({
+  events,
+  ephemeralMessages,
+  focusId,
+  bottomSectionHeight,
+}: ConversationDisplayProps) {
   // Use shared ThreadProcessor from context
   const threadProcessor = useThreadProcessor();
 
@@ -45,8 +50,8 @@ export function ConversationDisplay({ events, ephemeralMessages, focusId, bottom
 
   return (
     <Box flexDirection="column" flexGrow={1} overflow="hidden">
-      <TimelineDisplay 
-        timeline={mainTimeline} 
+      <TimelineDisplay
+        timeline={mainTimeline}
         focusId={focusId}
         bottomSectionHeight={bottomSectionHeight}
       />

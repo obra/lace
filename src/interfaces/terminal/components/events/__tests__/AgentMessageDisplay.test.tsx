@@ -10,20 +10,35 @@ import { UI_SYMBOLS } from '../../../theme.js';
 
 // Mock dependencies
 vi.mock('../ui/MarkdownDisplay.js', () => ({
-  MarkdownDisplay: ({ content, showIcon, dimmed }: any) => 
-    React.createElement('text', {}, `MD:${content}:${showIcon ? 'icon' : 'noicon'}:${dimmed ? 'dim' : 'bright'}`)
+  MarkdownDisplay: ({ content, showIcon, dimmed }: any) =>
+    React.createElement(
+      'text',
+      {},
+      `MD:${content}:${showIcon ? 'icon' : 'noicon'}:${dimmed ? 'dim' : 'bright'}`
+    ),
 }));
 
 vi.mock('../ui/TimelineEntryCollapsibleBox.js', () => ({
-  TimelineEntryCollapsibleBox: ({ children, label, summary, isExpanded, onExpandedChange, isFocused }: any) => {
-    return React.createElement('collapsible', {
-      'data-expanded': isExpanded,
-      'data-focused': isFocused,
-      'data-label': label,
-      'data-summary': summary,
-      onClick: () => onExpandedChange?.(!isExpanded)
-    }, children);
-  }
+  TimelineEntryCollapsibleBox: ({
+    children,
+    label,
+    summary,
+    isExpanded,
+    onExpandedChange,
+    isFocused,
+  }: any) => {
+    return React.createElement(
+      'collapsible',
+      {
+        'data-expanded': isExpanded,
+        'data-focused': isFocused,
+        'data-label': label,
+        'data-summary': summary,
+        onClick: () => onExpandedChange?.(!isExpanded),
+      },
+      children
+    );
+  },
 }));
 
 describe('AgentMessageDisplay - Enhanced with Thinking', () => {
@@ -35,7 +50,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
 
   const createEvent = (content: string): ThreadEvent => ({
     id: 'agent-1',
-    threadId: 'thread-1', 
+    threadId: 'thread-1',
     type: 'AGENT_MESSAGE',
     timestamp: new Date('2024-01-01T10:00:00Z'),
     data: content,
@@ -44,13 +59,9 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
   describe('Thinking block detection and parsing', () => {
     it('should detect when message has thinking blocks', () => {
       const event = createEvent('<think>Some thinking</think>Regular content');
-      
+
       const { lastFrame } = render(
-        <AgentMessageDisplay 
-          event={event}
-          isFocused={true}
-          onToggle={mockOnToggle}
-        />
+        <AgentMessageDisplay event={event} isFocused={true} onToggle={mockOnToggle} />
       );
 
       // Should show collapsed state with Agent Response label
@@ -61,13 +72,9 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
 
     it('should not use collapsible for messages without thinking blocks', () => {
       const event = createEvent('Just regular content');
-      
+
       const { lastFrame } = render(
-        <AgentMessageDisplay 
-          event={event}
-          isFocused={true}
-          onToggle={mockOnToggle}
-        />
+        <AgentMessageDisplay event={event} isFocused={true} onToggle={mockOnToggle} />
       );
 
       // Should render directly without Agent Response label
@@ -78,14 +85,12 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
 
   describe('Collapsed state behavior', () => {
     it('should show summary with thinking word count when collapsed', () => {
-      const event = createEvent('<think>This is some thinking content here</think>Here is the response');
-      
+      const event = createEvent(
+        '<think>This is some thinking content here</think>Here is the response'
+      );
+
       const { lastFrame } = render(
-        <AgentMessageDisplay 
-          event={event}
-          isFocused={true}
-          onToggle={mockOnToggle}
-        />
+        <AgentMessageDisplay event={event} isFocused={true} onToggle={mockOnToggle} />
       );
 
       const frame = lastFrame();
@@ -94,14 +99,12 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
     });
 
     it('should handle multiple thinking blocks in summary', () => {
-      const event = createEvent('<think>First thought</think>Some text<think>Second longer thought process</think>Final response');
-      
+      const event = createEvent(
+        '<think>First thought</think>Some text<think>Second longer thought process</think>Final response'
+      );
+
       const { lastFrame } = render(
-        <AgentMessageDisplay 
-          event={event}
-          isFocused={true}
-          onToggle={mockOnToggle}
-        />
+        <AgentMessageDisplay event={event} isFocused={true} onToggle={mockOnToggle} />
       );
 
       const frame = lastFrame();
@@ -112,13 +115,9 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
 
     it('should handle thinking-only messages in collapsed state', () => {
       const event = createEvent('<think>Only thinking content here</think>');
-      
+
       const { lastFrame } = render(
-        <AgentMessageDisplay 
-          event={event}
-          isFocused={true}
-          onToggle={mockOnToggle}
-        />
+        <AgentMessageDisplay event={event} isFocused={true} onToggle={mockOnToggle} />
       );
 
       const frame = lastFrame();
@@ -130,13 +129,9 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
   describe('Initial state behavior', () => {
     it('should start collapsed by default for messages with thinking blocks', () => {
       const event = createEvent('<think>Some thinking</think>Here is the response');
-      
+
       const { lastFrame } = render(
-        <AgentMessageDisplay 
-          event={event}
-          isFocused={true}
-          onToggle={mockOnToggle}
-        />
+        <AgentMessageDisplay event={event} isFocused={true} onToggle={mockOnToggle} />
       );
 
       const frame = lastFrame();
@@ -146,19 +141,14 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       expect(frame).toContain('/thought for 2 words/');
       expect(frame).toContain('Here is the response');
     });
-
   });
 
   describe('Props forwarding', () => {
     it('should forward isFocused to TimelineEntryCollapsibleBox', () => {
       const event = createEvent('<think>Thinking</think>Content');
-      
+
       const { lastFrame } = render(
-        <AgentMessageDisplay 
-          event={event}
-          isFocused={true}
-          onToggle={mockOnToggle}
-        />
+        <AgentMessageDisplay event={event} isFocused={true} onToggle={mockOnToggle} />
       );
 
       // Test that the component renders with the focus prop forwarded to the mock
@@ -169,14 +159,8 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
 
     it('should call onToggle when expansion changes', () => {
       const event = createEvent('<think>Thinking</think>Content');
-      
-      render(
-        <AgentMessageDisplay 
-          event={event}
-          isFocused={true}
-          onToggle={mockOnToggle}
-        />
-      );
+
+      render(<AgentMessageDisplay event={event} isFocused={true} onToggle={mockOnToggle} />);
 
       // Component starts collapsed, can't easily test expansion without interaction
       expect(mockOnToggle).toHaveBeenCalledTimes(0);
@@ -186,9 +170,9 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
   describe('Streaming state', () => {
     it('should show thinking indicator when streaming', () => {
       const event = createEvent('Partial response...');
-      
+
       const { lastFrame } = render(
-        <AgentMessageDisplay 
+        <AgentMessageDisplay
           event={event}
           isStreaming={true}
           isFocused={true}
@@ -203,13 +187,9 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
   describe('Empty content handling', () => {
     it('should handle empty content gracefully', () => {
       const event = createEvent('');
-      
+
       const { lastFrame } = render(
-        <AgentMessageDisplay 
-          event={event}
-          isFocused={true}
-          onToggle={mockOnToggle}
-        />
+        <AgentMessageDisplay event={event} isFocused={true} onToggle={mockOnToggle} />
       );
 
       // Should render something (even if empty)

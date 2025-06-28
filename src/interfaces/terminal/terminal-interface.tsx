@@ -1,22 +1,30 @@
 // ABOUTME: Ink-based terminal interface for interactive chat with Agent
 // ABOUTME: Provides rich UI components with multi-line editing and visual feedback
 
-import React, { useState, useEffect, useCallback, useMemo, createContext, useContext, useRef } from "react";
-import { Box, Text, render, useFocusManager, useInput, measureElement } from "ink";
-import { Alert } from "@inkjs/ui";
-import useStdoutDimensions from "../../utils/use-stdout-dimensions.js";
-import ShellInput from "./components/shell-input.js";
-import ToolApprovalModal from "./components/tool-approval-modal.js";
-import { ConversationDisplay } from "./components/events/ConversationDisplay.js";
-import { withFullScreen } from "fullscreen-ink";
-import StatusBar from "./components/status-bar.js";
-import { Agent, CurrentTurnMetrics } from "../../agents/agent.js";
-import { ApprovalCallback, ApprovalDecision } from "../../tools/approval-types.js";
-import { CommandRegistry } from "../../commands/registry.js";
-import { CommandExecutor } from "../../commands/executor.js";
-import type { UserInterface } from "../../commands/types.js";
-import { ThreadEvent } from "../../threads/types.js";
-import { ThreadProcessor } from "../thread-processor.js";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  createContext,
+  useContext,
+  useRef,
+} from 'react';
+import { Box, Text, render, useFocusManager, useInput, measureElement } from 'ink';
+import { Alert } from '@inkjs/ui';
+import useStdoutDimensions from '../../utils/use-stdout-dimensions.js';
+import ShellInput from './components/shell-input.js';
+import ToolApprovalModal from './components/tool-approval-modal.js';
+import { ConversationDisplay } from './components/events/ConversationDisplay.js';
+import { withFullScreen } from 'fullscreen-ink';
+import StatusBar from './components/status-bar.js';
+import { Agent, CurrentTurnMetrics } from '../../agents/agent.js';
+import { ApprovalCallback, ApprovalDecision } from '../../tools/approval-types.js';
+import { CommandRegistry } from '../../commands/registry.js';
+import { CommandExecutor } from '../../commands/executor.js';
+import type { UserInterface } from '../../commands/types.js';
+import { ThreadEvent } from '../../threads/types.js';
+import { ThreadProcessor } from '../thread-processor.js';
 
 // ThreadProcessor context for interface-level caching
 const ThreadProcessorContext = createContext<ThreadProcessor | null>(null);
@@ -31,7 +39,11 @@ export const useThreadProcessor = (): ThreadProcessor => {
 
 // Interface context for SIGINT communication
 const InterfaceContext = createContext<{
-  showAlert: (alert: { variant: 'info' | 'warning' | 'error' | 'success'; title: string; children?: React.ReactNode }) => void;
+  showAlert: (alert: {
+    variant: 'info' | 'warning' | 'error' | 'success';
+    title: string;
+    children?: React.ReactNode;
+  }) => void;
   clearAlert: () => void;
 } | null>(null);
 
@@ -50,65 +62,73 @@ interface TerminalInterfaceProps {
 }
 
 interface Message {
-  type: "user" | "assistant" | "system" | "tool";
+  type: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp: Date;
 }
 
 // SIGINT Handler Component
-const SigintHandler: React.FC<{ agent: Agent; showAlert: (alert: any) => void }> = ({ agent, showAlert }) => {
+const SigintHandler: React.FC<{ agent: Agent; showAlert: (alert: any) => void }> = ({
+  agent,
+  showAlert,
+}) => {
   const [ctrlCCount, setCtrlCCount] = useState(0);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle Ctrl+C through Ink's input system
-  useInput(useCallback((input, key) => {
-    if (input === 'c' && key.ctrl) {
-      // Try to abort current operation first
-      const wasAborted = agent.abort();
-      
-      if (wasAborted) {
-        showAlert({
-          variant: 'warning' as const,
-          title: 'Operation aborted. Progress saved.'
-        });
-        setCtrlCCount(0); // Reset double-ctrl-c counter
-        if (ctrlCTimerRef.current) {
-          clearTimeout(ctrlCTimerRef.current);
-          ctrlCTimerRef.current = null;
-        }
-        return;
-      }
-      
-      // No operation to abort - handle double Ctrl+C for exit
-      setCtrlCCount(prev => {
-        const newCount = prev + 1;
-        
-        if (newCount === 1) {
-          showAlert({
-            variant: 'info' as const,
-            title: 'Press Ctrl+C again to exit Lace.'
-          });
-          ctrlCTimerRef.current = setTimeout(() => {
-            setCtrlCCount(0); // Reset after 2 seconds
-            ctrlCTimerRef.current = null;
-          }, 2000);
-        } else if (newCount >= 2) {
-          showAlert({
-            variant: 'info' as const,
-            title: 'Exiting Lace...'
-          });
-          if (ctrlCTimerRef.current) {
-            clearTimeout(ctrlCTimerRef.current);
-            ctrlCTimerRef.current = null;
+  useInput(
+    useCallback(
+      (input, key) => {
+        if (input === 'c' && key.ctrl) {
+          // Try to abort current operation first
+          const wasAborted = agent.abort();
+
+          if (wasAborted) {
+            showAlert({
+              variant: 'warning' as const,
+              title: 'Operation aborted. Progress saved.',
+            });
+            setCtrlCCount(0); // Reset double-ctrl-c counter
+            if (ctrlCTimerRef.current) {
+              clearTimeout(ctrlCTimerRef.current);
+              ctrlCTimerRef.current = null;
+            }
+            return;
           }
-          // Exit after a brief delay to show the message
-          setTimeout(() => process.exit(0), 500);
+
+          // No operation to abort - handle double Ctrl+C for exit
+          setCtrlCCount((prev) => {
+            const newCount = prev + 1;
+
+            if (newCount === 1) {
+              showAlert({
+                variant: 'info' as const,
+                title: 'Press Ctrl+C again to exit Lace.',
+              });
+              ctrlCTimerRef.current = setTimeout(() => {
+                setCtrlCCount(0); // Reset after 2 seconds
+                ctrlCTimerRef.current = null;
+              }, 2000);
+            } else if (newCount >= 2) {
+              showAlert({
+                variant: 'info' as const,
+                title: 'Exiting Lace...',
+              });
+              if (ctrlCTimerRef.current) {
+                clearTimeout(ctrlCTimerRef.current);
+                ctrlCTimerRef.current = null;
+              }
+              // Exit after a brief delay to show the message
+              setTimeout(() => process.exit(0), 500);
+            }
+
+            return newCount;
+          });
         }
-        
-        return newCount;
-      });
-    }
-  }, [agent, showAlert, ctrlCCount]));
+      },
+      [agent, showAlert, ctrlCCount]
+    )
+  );
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -136,9 +156,9 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   const [, terminalHeight] = useStdoutDimensions();
   const [events, setEvents] = useState<ThreadEvent[]>([]);
   const [ephemeralMessages, setEphemeralMessages] = useState<Message[]>([]);
-  const [currentInput, setCurrentInput] = useState("");
+  const [currentInput, setCurrentInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [streamingContent, setStreamingContent] = useState("");
+  const [streamingContent, setStreamingContent] = useState('');
   const [commandExecutor, setCommandExecutor] = useState<CommandExecutor | null>(null);
   // Cumulative session token tracking
   const [cumulativeTokens, setCumulativeTokens] = useState<{
@@ -146,7 +166,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     completionTokens: number;
     totalTokens: number;
   }>({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
-  
+
   // Track the final token usage from provider for accurate cumulative totals
   // Use ref to avoid race conditions with rapid requests
   const lastProviderUsageRef = useRef<{
@@ -154,22 +174,22 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     completionTokens: number;
     totalTokens: number;
   } | null>(null);
-  
+
   // Turn tracking state
   const [isTurnActive, setIsTurnActive] = useState(false);
   const [currentTurnId, setCurrentTurnId] = useState<string | null>(null);
   const [currentTurnMetrics, setCurrentTurnMetrics] = useState<CurrentTurnMetrics | null>(null);
-  
+
   // Alert state for SIGINT and other system messages
   const [alert, setAlert] = useState<{
     variant: 'info' | 'warning' | 'error' | 'success';
     title: string;
     children?: React.ReactNode;
   } | null>(null);
-  
+
   // Delegation tracking state
   const [isDelegating, setIsDelegating] = useState(false);
-  
+
   // Tool approval modal state
   const [approvalRequest, setApprovalRequest] = useState<{
     toolName: string;
@@ -177,16 +197,23 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     isReadOnly: boolean;
     resolve: (decision: ApprovalDecision) => void;
   } | null>(null);
-  
+
   // Focus management with disabled automatic cycling
   const { focus, focusNext, focusPrevious, disableFocus } = useFocusManager();
-  
+
   // Interface context functions
-  const showAlert = useCallback((alertData: { variant: 'info' | 'warning' | 'error' | 'success'; title: string; children?: React.ReactNode }) => {
-    setAlert(alertData);
-    // Auto-clear alerts after 3 seconds
-    setTimeout(() => setAlert(null), 3000);
-  }, []);
+  const showAlert = useCallback(
+    (alertData: {
+      variant: 'info' | 'warning' | 'error' | 'success';
+      title: string;
+      children?: React.ReactNode;
+    }) => {
+      setAlert(alertData);
+      // Auto-clear alerts after 3 seconds
+      setTimeout(() => setAlert(null), 3000);
+    },
+    []
+  );
 
   const clearAlert = useCallback(() => {
     setAlert(null);
@@ -196,15 +223,21 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   useEffect(() => {
     disableFocus();
   }, [disableFocus]);
-  
-  // Global keyboard shortcuts for manual focus switching  
-  useInput(useCallback((input, key) => {
-    if (key.escape) {
-      // Escape toggles between shell input and timeline
-      focusNext();
-    }
-    // Tab is NOT handled here - let ShellInput handle it for autocomplete
-  }, [focusNext]), { isActive: !approvalRequest });
+
+  // Global keyboard shortcuts for manual focus switching
+  useInput(
+    useCallback(
+      (input, key) => {
+        if (key.escape) {
+          // Escape toggles between shell input and timeline
+          focusNext();
+        }
+        // Tab is NOT handled here - let ShellInput handle it for autocomplete
+      },
+      [focusNext]
+    ),
+    { isActive: !approvalRequest }
+  );
 
   // Sync events from agent's thread (including delegate threads)
   const syncEvents = useCallback(() => {
@@ -221,14 +254,17 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   }, []);
 
   // Handle tool approval modal decision
-  const handleApprovalDecision = useCallback((decision: ApprovalDecision) => {
-    if (approvalRequest) {
-      approvalRequest.resolve(decision);
-      setApprovalRequest(null);
-      // Return focus to shell input when modal closes (for typing)
-      focus('shell-input');
-    }
-  }, [approvalRequest, focus]);
+  const handleApprovalDecision = useCallback(
+    (decision: ApprovalDecision) => {
+      if (approvalRequest) {
+        approvalRequest.resolve(decision);
+        setApprovalRequest(null);
+        // Return focus to shell input when modal closes (for typing)
+        focus('shell-input');
+      }
+    },
+    [approvalRequest, focus]
+  );
 
   // Setup event handlers for Agent events
   useEffect(() => {
@@ -255,7 +291,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     // Handle agent response complete
     const handleResponseComplete = ({ content }: { content: string }) => {
       // Clear streaming content - the final response will be in ThreadEvents
-      setStreamingContent("");
+      setStreamingContent('');
       setIsProcessing(false);
       syncEvents();
     };
@@ -296,11 +332,13 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         const newUsage = {
           promptTokens: usage.promptTokens || usage.prompt_tokens || 0,
           completionTokens: usage.completionTokens || usage.completion_tokens || 0,
-          totalTokens: usage.totalTokens || usage.total_tokens || 
-            (usage.promptTokens || usage.prompt_tokens || 0) + 
-            (usage.completionTokens || usage.completion_tokens || 0),
+          totalTokens:
+            usage.totalTokens ||
+            usage.total_tokens ||
+            (usage.promptTokens || usage.prompt_tokens || 0) +
+              (usage.completionTokens || usage.completion_tokens || 0),
         };
-        
+
         // Only update if we have meaningful token counts (avoid progressive estimates)
         if (newUsage.promptTokens > 0 || newUsage.totalTokens > 0) {
           lastProviderUsageRef.current = newUsage;
@@ -316,10 +354,18 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     const handleError = ({ error }: { error: Error }) => {
       const threadId = agent.threadManager.getCurrentThreadId();
       if (threadId) {
-        agent.threadManager.addEvent(threadId, 'LOCAL_SYSTEM_MESSAGE', `❌ Error: ${error.message}`);
-        
-        if (agent.providerName === "lmstudio") {
-          agent.threadManager.addEvent(threadId, 'LOCAL_SYSTEM_MESSAGE', "💡 Try using Anthropic Claude instead: node dist/cli.js --provider anthropic");
+        agent.threadManager.addEvent(
+          threadId,
+          'LOCAL_SYSTEM_MESSAGE',
+          `❌ Error: ${error.message}`
+        );
+
+        if (agent.providerName === 'lmstudio') {
+          agent.threadManager.addEvent(
+            threadId,
+            'LOCAL_SYSTEM_MESSAGE',
+            '💡 Try using Anthropic Claude instead: node dist/cli.js --provider anthropic'
+          );
         }
         syncEvents();
       }
@@ -327,192 +373,228 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     // Handle turn lifecycle events
-    const handleTurnStart = ({ turnId, metrics }: { turnId: string; userInput: string; metrics: CurrentTurnMetrics }) => {
+    const handleTurnStart = ({
+      turnId,
+      metrics,
+    }: {
+      turnId: string;
+      userInput: string;
+      metrics: CurrentTurnMetrics;
+    }) => {
       setIsTurnActive(true);
       setCurrentTurnId(turnId);
       setCurrentTurnMetrics(metrics);
       setIsProcessing(true);
     };
-    
+
     const handleTurnProgress = ({ metrics }: { metrics: CurrentTurnMetrics }) => {
       setCurrentTurnMetrics(metrics);
     };
-    
-    const handleTurnComplete = ({ turnId, metrics }: { turnId: string; metrics: CurrentTurnMetrics }) => {
+
+    const handleTurnComplete = ({
+      turnId,
+      metrics,
+    }: {
+      turnId: string;
+      metrics: CurrentTurnMetrics;
+    }) => {
       setIsTurnActive(false);
       setCurrentTurnId(null);
       setCurrentTurnMetrics(null);
       setIsProcessing(false);
-      
+
       // Use provider's final token counts for accurate cumulative totals (includes system prompts, context, etc.)
       const providerUsage = lastProviderUsageRef.current;
       if (providerUsage) {
-        setCumulativeTokens(prev => ({
+        setCumulativeTokens((prev) => ({
           // Provider promptTokens includes entire conversation context, so accumulate completions only
           promptTokens: providerUsage.promptTokens, // This is the total input context
           completionTokens: prev.completionTokens + providerUsage.completionTokens, // Accumulate outputs
-          totalTokens: providerUsage.promptTokens + (prev.completionTokens + providerUsage.completionTokens),
+          totalTokens:
+            providerUsage.promptTokens + (prev.completionTokens + providerUsage.completionTokens),
         }));
-        
+
         // Clear the provider usage after using it
         lastProviderUsageRef.current = null;
       }
-      
+
       // Show completion message with turn summary (still use turn metrics for per-turn display)
       addMessage({
-        type: "system",
+        type: 'system',
         content: `Turn completed in ${Math.floor(metrics.elapsedMs / 1000)}s (↑${metrics.tokensIn} ↓${metrics.tokensOut} tokens)`,
         timestamp: new Date(),
       });
     };
-    
-    const handleTurnAborted = ({ turnId, metrics }: { turnId: string; metrics: CurrentTurnMetrics }) => {
+
+    const handleTurnAborted = ({
+      turnId,
+      metrics,
+    }: {
+      turnId: string;
+      metrics: CurrentTurnMetrics;
+    }) => {
       setIsTurnActive(false);
       setCurrentTurnId(null);
       setCurrentTurnMetrics(null);
       setIsProcessing(false);
-      
+
       // Show abort message with partial progress
       addMessage({
-        type: "system",
+        type: 'system',
         content: `⚠️ Turn aborted after ${Math.floor(metrics.elapsedMs / 1000)}s (↑${metrics.tokensIn} ↓${metrics.tokensOut} tokens)`,
         timestamp: new Date(),
       });
     };
 
-
     // Register event listeners
-    agent.on("agent_token", handleToken);
-    agent.on("agent_thinking_complete", handleThinkingComplete);
-    agent.on("agent_response_complete", handleResponseComplete);
-    agent.on("approval_request", handleApprovalRequest);
-    agent.on("token_usage_update", handleTokenUsageUpdate);
-    agent.on("token_budget_warning", handleTokenBudgetWarning);
-    agent.on("tool_call_start", handleToolCallStart);
-    agent.on("tool_call_complete", handleToolCallComplete);
-    agent.on("error", handleError);
+    agent.on('agent_token', handleToken);
+    agent.on('agent_thinking_complete', handleThinkingComplete);
+    agent.on('agent_response_complete', handleResponseComplete);
+    agent.on('approval_request', handleApprovalRequest);
+    agent.on('token_usage_update', handleTokenUsageUpdate);
+    agent.on('token_budget_warning', handleTokenBudgetWarning);
+    agent.on('tool_call_start', handleToolCallStart);
+    agent.on('tool_call_complete', handleToolCallComplete);
+    agent.on('error', handleError);
     // Turn tracking events
-    agent.on("turn_start", handleTurnStart);
-    agent.on("turn_progress", handleTurnProgress);
-    agent.on("turn_complete", handleTurnComplete);
-    agent.on("turn_aborted", handleTurnAborted);
+    agent.on('turn_start', handleTurnStart);
+    agent.on('turn_progress', handleTurnProgress);
+    agent.on('turn_complete', handleTurnComplete);
+    agent.on('turn_aborted', handleTurnAborted);
 
     // Cleanup function
     return () => {
-      agent.off("agent_token", handleToken);
-      agent.off("agent_thinking_complete", handleThinkingComplete);
-      agent.off("agent_response_complete", handleResponseComplete);
-      agent.off("approval_request", handleApprovalRequest);
-      agent.off("token_usage_update", handleTokenUsageUpdate);
-      agent.off("token_budget_warning", handleTokenBudgetWarning);
-      agent.off("tool_call_start", handleToolCallStart);
-      agent.off("tool_call_complete", handleToolCallComplete);
-      agent.off("error", handleError);
+      agent.off('agent_token', handleToken);
+      agent.off('agent_thinking_complete', handleThinkingComplete);
+      agent.off('agent_response_complete', handleResponseComplete);
+      agent.off('approval_request', handleApprovalRequest);
+      agent.off('token_usage_update', handleTokenUsageUpdate);
+      agent.off('token_budget_warning', handleTokenBudgetWarning);
+      agent.off('tool_call_start', handleToolCallStart);
+      agent.off('tool_call_complete', handleToolCallComplete);
+      agent.off('error', handleError);
       // Turn tracking cleanup
-      agent.off("turn_start", handleTurnStart);
-      agent.off("turn_progress", handleTurnProgress);
-      agent.off("turn_complete", handleTurnComplete);
-      agent.off("turn_aborted", handleTurnAborted);
+      agent.off('turn_start', handleTurnStart);
+      agent.off('turn_progress', handleTurnProgress);
+      agent.off('turn_complete', handleTurnComplete);
+      agent.off('turn_aborted', handleTurnAborted);
     };
   }, [agent, addMessage, syncEvents, streamingContent]);
 
   // Listen to ThreadManager events for real-time delegation updates
   useEffect(() => {
-    const handleThreadUpdated = ({ threadId, eventType }: { threadId: string; eventType: string }) => {
+    const handleThreadUpdated = ({
+      threadId,
+      eventType,
+    }: {
+      threadId: string;
+      eventType: string;
+    }) => {
       // Sync events whenever ANY thread is updated (main or delegate)
       syncEvents();
     };
 
     agent.threadManager.on('thread_updated', handleThreadUpdated);
-    
+
     return () => {
       agent.threadManager.off('thread_updated', handleThreadUpdated);
     };
   }, [agent.threadManager, syncEvents]);
 
   // Create UserInterface implementation
-  const userInterface: UserInterface = React.useMemo(() => ({
-    agent,
-    
-    displayMessage(message: string): void {
-      addMessage({
-        type: "system",
-        content: message,
-        timestamp: new Date(),
-      });
-    },
-    
-    clearSession(): void {
-      // Create new thread and agent
-      const newThreadId = agent.threadManager.generateThreadId();
-      agent.threadManager.createThread(newThreadId);
-      // Reset React state
-      setEvents([]);
-      setEphemeralMessages([]);
-      addMessage({
-        type: "system",
-        content: `🤖 New conversation started using ${agent.providerName} provider.`,
-        timestamp: new Date(),
-      });
-    },
-    
-    exit(): void {
-      process.exit(0);
-    }
-  }), [agent, addMessage]);
+  const userInterface: UserInterface = React.useMemo(
+    () => ({
+      agent,
+
+      displayMessage(message: string): void {
+        addMessage({
+          type: 'system',
+          content: message,
+          timestamp: new Date(),
+        });
+      },
+
+      clearSession(): void {
+        // Create new thread and agent
+        const newThreadId = agent.threadManager.generateThreadId();
+        agent.threadManager.createThread(newThreadId);
+        // Reset React state
+        setEvents([]);
+        setEphemeralMessages([]);
+        addMessage({
+          type: 'system',
+          content: `🤖 New conversation started using ${agent.providerName} provider.`,
+          timestamp: new Date(),
+        });
+      },
+
+      exit(): void {
+        process.exit(0);
+      },
+    }),
+    [agent, addMessage]
+  );
 
   // Handle slash commands using new command system
-  const handleSlashCommand = useCallback(async (input: string) => {
-    if (!commandExecutor) {
-      addMessage({
-        type: "system",
-        content: "Commands not yet loaded...",
-        timestamp: new Date(),
-      });
-      return;
-    }
-    await commandExecutor.execute(input, userInterface);
-  }, [commandExecutor, userInterface, addMessage]);
+  const handleSlashCommand = useCallback(
+    async (input: string) => {
+      if (!commandExecutor) {
+        addMessage({
+          type: 'system',
+          content: 'Commands not yet loaded...',
+          timestamp: new Date(),
+        });
+        return;
+      }
+      await commandExecutor.execute(input, userInterface);
+    },
+    [commandExecutor, userInterface, addMessage]
+  );
 
   // Handle message submission
-  const handleSubmit = useCallback(async (input: string) => {
-    const trimmedInput = input.trim();
-    
-    if (!trimmedInput) return;
-    
-    // Prevent submission during processing (but allow typing)
-    if (isTurnActive || approvalRequest) {
-      addMessage({
-        type: "system",
-        content: isTurnActive ? "⚠️ Please wait for current operation to complete" : "⚠️ Tool approval required",
-        timestamp: new Date(),
-      });
-      return;
-    }
+  const handleSubmit = useCallback(
+    async (input: string) => {
+      const trimmedInput = input.trim();
 
-    // Handle slash commands
-    if (trimmedInput.startsWith("/")) {
-      await handleSlashCommand(trimmedInput);
-      setCurrentInput("");
-      return;
-    }
+      if (!trimmedInput) return;
 
-    setCurrentInput("");
-    setIsProcessing(true);
+      // Prevent submission during processing (but allow typing)
+      if (isTurnActive || approvalRequest) {
+        addMessage({
+          type: 'system',
+          content: isTurnActive
+            ? '⚠️ Please wait for current operation to complete'
+            : '⚠️ Tool approval required',
+          timestamp: new Date(),
+        });
+        return;
+      }
 
-    // Send to agent (it will create the USER_MESSAGE ThreadEvent)
-    try {
-      await agent.sendMessage(trimmedInput);
-      syncEvents(); // Ensure we have the latest events including the user message
-    } catch (error) {
-      addMessage({
-        type: "system",
-        content: `❌ Failed to send message: ${error instanceof Error ? error.message : String(error)}`,
-        timestamp: new Date(),
-      });
-      setIsProcessing(false);
-    }
-  }, [agent, addMessage, handleSlashCommand, syncEvents, isTurnActive, approvalRequest]);
+      // Handle slash commands
+      if (trimmedInput.startsWith('/')) {
+        await handleSlashCommand(trimmedInput);
+        setCurrentInput('');
+        return;
+      }
+
+      setCurrentInput('');
+      setIsProcessing(true);
+
+      // Send to agent (it will create the USER_MESSAGE ThreadEvent)
+      try {
+        await agent.sendMessage(trimmedInput);
+        syncEvents(); // Ensure we have the latest events including the user message
+      } catch (error) {
+        addMessage({
+          type: 'system',
+          content: `❌ Failed to send message: ${error instanceof Error ? error.message : String(error)}`,
+          timestamp: new Date(),
+        });
+        setIsProcessing(false);
+      }
+    },
+    [agent, addMessage, handleSlashCommand, syncEvents, isTurnActive, approvalRequest]
+  );
 
   // Initialize command system
   useEffect(() => {
@@ -524,7 +606,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       } catch (error) {
         console.error('Terminal: Failed to initialize command system:', error);
         addMessage({
-          type: "system",
+          type: 'system',
           content: `❌ Failed to initialize command system: ${error instanceof Error ? error.message : String(error)}`,
           timestamp: new Date(),
         });
@@ -533,28 +615,27 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     initCommands();
   }, [addMessage]);
 
-
   // Initialize agent on mount
   useEffect(() => {
     // Sync existing events from the thread
     syncEvents();
-    
+
     addMessage({
-      type: "system",
+      type: 'system',
       content: `🤖 Lace Agent started using ${agent.providerName} provider. Type "/help" to see available commands.`,
       timestamp: new Date(),
     });
-    
+
     // Start agent asynchronously
     agent.start().catch((error) => {
       console.error('Failed to start agent:', error);
       addMessage({
-        type: "system",
+        type: 'system',
         content: `❌ Failed to start agent: ${error.message}`,
         timestamp: new Date(),
       });
     });
-    
+
     // Set initial focus to shell input (for typing)
     focus('shell-input');
   }, [agent, addMessage, syncEvents, focus]);
@@ -587,7 +668,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       <InterfaceContext.Provider value={{ showAlert, clearAlert }}>
         {/* SIGINT Handler */}
         <SigintHandler agent={agent} showAlert={showAlert} />
-        
+
         <Box flexDirection="column" height="100%">
           {/* Alert overlay */}
           {alert && (
@@ -600,22 +681,30 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
           {/* Timeline - takes remaining space */}
           <Box flexGrow={1} ref={timelineContainerRef}>
-            <ConversationDisplay 
+            <ConversationDisplay
               events={events}
               ephemeralMessages={[
                 ...ephemeralMessages,
                 // Add streaming content as ephemeral message
-                ...(streamingContent ? [{
-                  type: "assistant" as const,
-                  content: streamingContent,
-                  timestamp: new Date(),
-                }] : []),
+                ...(streamingContent
+                  ? [
+                      {
+                        type: 'assistant' as const,
+                        content: streamingContent,
+                        timestamp: new Date(),
+                      },
+                    ]
+                  : []),
                 // Add processing indicator as ephemeral message
-                ...(isProcessing && !streamingContent ? [{
-                  type: "system" as const,
-                  content: "💭 Thinking...",
-                  timestamp: new Date(),
-                }] : [])
+                ...(isProcessing && !streamingContent
+                  ? [
+                      {
+                        type: 'system' as const,
+                        content: '💭 Thinking...',
+                        timestamp: new Date(),
+                      },
+                    ]
+                  : []),
               ]}
               focusId="timeline"
               bottomSectionHeight={bottomSectionHeight}
@@ -637,7 +726,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
           {/* Bottom section - status bar, input anchored to bottom */}
           <Box flexDirection="column" flexShrink={0} ref={bottomSectionRef}>
             {/* Status bar - takes natural height */}
-            <StatusBar 
+            <StatusBar
               providerName={agent.providerName || 'unknown'}
               modelName={(agent as any)._provider?.defaultModel || undefined}
               threadId={agent.threadManager.getCurrentThreadId() || undefined}
@@ -653,17 +742,18 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               <ShellInput
                 value={currentInput}
                 placeholder={
-                  approvalRequest 
-                    ? "Tool approval required..." 
+                  approvalRequest
+                    ? 'Tool approval required...'
                     : isTurnActive && currentTurnMetrics
                       ? (() => {
                           const elapsedSeconds = Math.floor(currentTurnMetrics.elapsedMs / 1000);
-                          const duration = elapsedSeconds >= 60 
-                            ? `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s`
-                            : `${elapsedSeconds}s`;
+                          const duration =
+                            elapsedSeconds >= 60
+                              ? `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s`
+                              : `${elapsedSeconds}s`;
                           return `Processing... ⏱️ ${duration} | Press Ctrl+C to abort`;
                         })()
-                      : "Type your message..."
+                      : 'Type your message...'
                 }
                 onSubmit={handleSubmit}
                 onChange={setCurrentInput}
@@ -672,7 +762,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
                 disabled={false} // Allow typing during processing, submission is controlled in handleSubmit
               />
             </Box>
-
           </Box>
         </Box>
       </InterfaceContext.Provider>
@@ -692,21 +781,15 @@ export class TerminalInterface implements ApprovalCallback {
 
   async startInteractive(): Promise<void> {
     if (this.isRunning) {
-      throw new Error("Terminal interface is already running");
+      throw new Error('Terminal interface is already running');
     }
 
     this.isRunning = true;
 
     // Render the Ink app with custom Ctrl+C handling
-    withFullScreen(
-      <TerminalInterfaceComponent
-        agent={this.agent}
-        approvalCallback={this}
-      />,
-      {
-        exitOnCtrlC: false, // Disable Ink's default Ctrl+C exit behavior
-      }
-    ).start();
+    withFullScreen(<TerminalInterfaceComponent agent={this.agent} approvalCallback={this} />, {
+      exitOnCtrlC: false, // Disable Ink's default Ctrl+C exit behavior
+    }).start();
 
     // Keep the process running
     await new Promise<void>((resolve) => {
@@ -737,7 +820,7 @@ export class TerminalInterface implements ApprovalCallback {
       // Emit an event that the UI component can listen to
       // Since we need React state updates, we'll use a different approach
       // For now, let's use a more direct method by updating the component state
-      
+
       // This is a bit of a hack - we'll improve this architecture later
       // For now, use a global event emitter pattern
       process.nextTick(() => {
@@ -749,7 +832,7 @@ export class TerminalInterface implements ApprovalCallback {
           resolve: (decision: ApprovalDecision) => {
             this.pendingApprovalRequests.delete(requestId);
             resolve(decision);
-          }
+          },
         });
       });
     });

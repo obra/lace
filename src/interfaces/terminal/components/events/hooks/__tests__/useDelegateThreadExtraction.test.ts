@@ -63,7 +63,7 @@ describe('useDelegateThreadExtraction Hook', () => {
 
       const toolItem = createMockToolExecution('call-123', new Date(), {
         content: [{ type: 'text', text: 'Thread: some-thread' }],
-      isError: false,
+        isError: false,
       });
 
       const threadId = result.current.extractDelegateThreadId(toolItem);
@@ -75,7 +75,7 @@ describe('useDelegateThreadExtraction Hook', () => {
 
       const toolItem = createMockToolExecution('call-123', new Date(), {
         content: [{ type: 'text', text: 'Thread: some-thread' }],
-      isError: false,
+        isError: false,
       });
 
       const threadId = result.current.extractDelegateThreadId(toolItem);
@@ -138,7 +138,7 @@ describe('useDelegateThreadExtraction Hook', () => {
 
       const toolItem = createMockToolExecution('call-123', new Date('2024-01-01T10:00:00Z'), {
         content: [{ type: 'text', text: 'Thread: explicit-thread-id)' }],
-      isError: false,
+        isError: false,
       });
 
       const threadId = result.current.extractDelegateThreadId(toolItem);
@@ -157,7 +157,7 @@ describe('useDelegateThreadExtraction Hook', () => {
 
       const toolItem = createMockToolExecution('call-123', toolTimestamp, {
         content: [{ type: 'text', text: 'No thread ID here' }],
-      isError: false,
+        isError: false,
       });
 
       const threadId = result.current.extractDelegateThreadId(toolItem);
@@ -177,7 +177,7 @@ describe('useDelegateThreadExtraction Hook', () => {
 
       const toolItem = createMockToolExecution('call-123', toolTimestamp, {
         content: [{ type: 'text', text: 'Thread: explicit-thread-id)' }],
-      isError: false,
+        isError: false,
       });
 
       const threadId = result.current.extractDelegateThreadId(toolItem);
@@ -193,7 +193,7 @@ describe('useDelegateThreadExtraction Hook', () => {
 
       const toolItem = createMockToolExecution('call-123', new Date('2024-01-01T10:00:00Z'), {
         content: [{ type: 'text', text: 'No thread information' }],
-      isError: false,
+        isError: false,
       });
 
       const threadId = result.current.extractDelegateThreadId(toolItem);
@@ -235,7 +235,7 @@ describe('useDelegateThreadExtraction Hook', () => {
 
       const toolItem = createMockToolExecution('call-123', new Date('2024-01-01T10:00:00Z'), {
         content: [{ type: 'text', text: 'No thread info' }],
-      isError: false,
+        isError: false,
       });
 
       const threadId = result.current.extractDelegateThreadId(toolItem);

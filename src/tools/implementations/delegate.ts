@@ -1,7 +1,14 @@
 // ABOUTME: Delegate tool for spawning subagents with specific tasks
 // ABOUTME: Enables efficient token usage by delegating to cheaper models
 
-import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 import { ApprovalDecision } from '../approval-types.js';
 import { Agent } from '../../agents/agent.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
@@ -110,7 +117,10 @@ Examples:
 
       // Use shared thread manager from parent (avoids multiple SQLite connections)
       if (!this.threadManager) {
-        return createErrorResult('Delegate tool not properly initialized - missing ThreadManager', call.id);
+        return createErrorResult(
+          'Delegate tool not properly initialized - missing ThreadManager',
+          call.id
+        );
       }
       const threadManager = this.threadManager;
 
@@ -214,12 +224,16 @@ Examples:
         logger.debug('DelegateTool: Subagent finished, returning result', {
           combinedResponseLength: combinedResponse.length,
         });
-        return createSuccessResult([
-          {
-            type: 'text',
-            text: combinedResponse || 'Subagent completed without response',
-          },
-        ], call.id, { threadId: subagentThreadId });
+        return createSuccessResult(
+          [
+            {
+              type: 'text',
+              text: combinedResponse || 'Subagent completed without response',
+            },
+          ],
+          call.id,
+          { threadId: subagentThreadId }
+        );
       } catch (error) {
         logger.error('DelegateTool: Error during subagent execution', {
           error: error instanceof Error ? error.message : String(error),
@@ -236,7 +250,9 @@ Examples:
       }
     } catch (error) {
       return createErrorResult(
-        error instanceof Error ? `Provider setup error: ${error.message}` : 'Unknown error occurred',
+        error instanceof Error
+          ? `Provider setup error: ${error.message}`
+          : 'Unknown error occurred',
         call.id
       );
     }

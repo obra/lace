@@ -24,7 +24,9 @@ class MockTool implements Tool {
     return {
       id: call.id,
       isError: false,
-      content: [{ type: 'text' as const, text: `Mock executed: ${JSON.stringify(call.arguments)}` }],
+      content: [
+        { type: 'text' as const, text: `Mock executed: ${JSON.stringify(call.arguments)}` },
+      ],
     };
   }
 }

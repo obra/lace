@@ -80,10 +80,12 @@ describe('FileFindTool', () => {
 
   describe('basic file finding', () => {
     it('should find files by extension', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: '*.ts',
-        path: testDir,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: '*.ts',
+          path: testDir,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -97,10 +99,12 @@ describe('FileFindTool', () => {
     });
 
     it('should find files by name prefix', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: 'test*',
-        path: testDir,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: 'test*',
+          path: testDir,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -112,10 +116,12 @@ describe('FileFindTool', () => {
     });
 
     it('should handle wildcard patterns', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: '*app*',
-        path: testDir,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: '*app*',
+          path: testDir,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -126,10 +132,12 @@ describe('FileFindTool', () => {
     });
 
     it('should handle question mark patterns', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: 'test.?s',
-        path: testDir,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: 'test.?s',
+          path: testDir,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -142,11 +150,13 @@ describe('FileFindTool', () => {
 
   describe('type filtering', () => {
     it('should find only files when type=file', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: '*',
-        path: testDir,
-        type: 'file',
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: '*',
+          path: testDir,
+          type: 'file',
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -160,11 +170,13 @@ describe('FileFindTool', () => {
     });
 
     it('should find only directories when type=directory', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: '*',
-        path: testDir,
-        type: 'directory',
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: '*',
+          path: testDir,
+          type: 'directory',
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -177,10 +189,12 @@ describe('FileFindTool', () => {
     });
 
     it('should find both files and directories by default', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: 'test*',
-        path: testDir,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: 'test*',
+          path: testDir,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -193,27 +207,33 @@ describe('FileFindTool', () => {
 
   describe('case sensitivity', () => {
     it('should be case insensitive by default', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: 'README*',
-        path: testDir,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: 'README*',
+          path: testDir,
+        })
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('README.md');
     });
 
     it('should respect case sensitivity when enabled', async () => {
-      const caseSensitive = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: 'readme*',
-        path: testDir,
-        caseSensitive: true,
-      }));
+      const caseSensitive = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: 'readme*',
+          path: testDir,
+          caseSensitive: true,
+        })
+      );
 
-      const caseInsensitive = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: 'readme*',
-        path: testDir,
-        caseSensitive: false,
-      }));
+      const caseInsensitive = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: 'readme*',
+          path: testDir,
+          caseSensitive: false,
+        })
+      );
 
       expect(caseSensitive.isError).toBe(false);
       expect(caseSensitive.content[0].text).toContain('No files found');
@@ -225,21 +245,25 @@ describe('FileFindTool', () => {
 
   describe('hidden files and directories', () => {
     it('should exclude hidden files by default', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: '.*',
-        path: testDir,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: '.*',
+          path: testDir,
+        })
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('No files found');
     });
 
     it('should include hidden files when requested', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: '.*',
-        path: testDir,
-        includeHidden: true,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: '.*',
+          path: testDir,
+          includeHidden: true,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -249,11 +273,13 @@ describe('FileFindTool', () => {
     });
 
     it('should find files in hidden directories when enabled', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: 'secret.txt',
-        path: testDir,
-        includeHidden: true,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: 'secret.txt',
+          path: testDir,
+          includeHidden: true,
+        })
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('secret.txt');
@@ -262,32 +288,38 @@ describe('FileFindTool', () => {
 
   describe('depth control', () => {
     it('should respect max depth limitation', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: '*.tsx',
-        path: testDir,
-        maxDepth: 1,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: '*.tsx',
+          path: testDir,
+          maxDepth: 1,
+        })
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('No files found');
     });
 
     it('should find files at allowed depth', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: '*.tsx',
-        path: testDir,
-        maxDepth: 2,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: '*.tsx',
+          path: testDir,
+          maxDepth: 2,
+        })
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('Button.tsx');
     });
 
     it('should use reasonable default max depth', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: '*.tsx',
-        path: testDir,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: '*.tsx',
+          path: testDir,
+        })
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('Button.tsx');
@@ -303,24 +335,30 @@ describe('FileFindTool', () => {
     });
 
     it('should handle empty pattern parameter', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', { pattern: '', path: testDir }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', { pattern: '', path: testDir })
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('Pattern must be a non-empty string');
     });
 
     it('should handle non-string pattern parameter', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', { pattern: 123, path: testDir }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', { pattern: 123, path: testDir })
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('Pattern must be a non-empty string');
     });
 
     it('should handle non-existent directory', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: '*.ts',
-        path: '/non/existent/directory',
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: '*.ts',
+          path: '/non/existent/directory',
+        })
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('ENOENT');
@@ -329,10 +367,12 @@ describe('FileFindTool', () => {
 
   describe('output format', () => {
     it('should return sorted results', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: '*.ts',
-        path: testDir,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: '*.ts',
+          path: testDir,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -344,20 +384,24 @@ describe('FileFindTool', () => {
     });
 
     it('should return no matches message when nothing found', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: '*.nonexistent',
-        path: testDir,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: '*.nonexistent',
+          path: testDir,
+        })
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('No files found matching pattern: *.nonexistent');
     });
 
     it('should return full paths', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: 'app.ts',
-        path: testDir,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: 'app.ts',
+          path: testDir,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -367,11 +411,13 @@ describe('FileFindTool', () => {
 
   describe('complex patterns', () => {
     it('should handle multiple character wildcards', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: '*.t*',
-        path: testDir,
-        includeHidden: true,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: '*.t*',
+          path: testDir,
+          includeHidden: true,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -388,10 +434,12 @@ describe('FileFindTool', () => {
       await writeFile(join(testDir, 'file-with-dash.ts'), 'content');
       await writeFile(join(testDir, 'file_with_underscore.js'), 'content');
 
-      const result = await tool.executeTool(createTestToolCall('file_find', {
-        pattern: '*-*',
-        path: testDir,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: '*-*',
+          path: testDir,
+        })
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('file-with-dash.ts');

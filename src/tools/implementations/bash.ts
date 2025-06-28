@@ -3,7 +3,14 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 
 const execAsync = promisify(exec);
 
@@ -57,12 +64,15 @@ export class BashTool implements Tool {
         exitCode: 0,
       };
 
-      return createSuccessResult([
-        {
-          type: 'text',
-          text: JSON.stringify(result),
-        },
-      ], call.id);
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: JSON.stringify(result),
+          },
+        ],
+        call.id
+      );
     } catch (error: unknown) {
       const err = error as { message: string; stdout?: string; stderr?: string; code?: number };
 
@@ -97,12 +107,15 @@ export class BashTool implements Tool {
           exitCode: err.code || 1, // Preserve actual exit code (non-zero)
         };
 
-        return createSuccessResult([
-          {
-            type: 'text',
-            text: JSON.stringify(result),
-          },
-        ], call.id);
+        return createSuccessResult(
+          [
+            {
+              type: 'text',
+              text: JSON.stringify(result),
+            },
+          ],
+          call.id
+        );
       }
 
       // True failure - command couldn't execute at all (rare cases)

@@ -1,4 +1,4 @@
-// ABOUTME: Display component for USER_SYSTEM_PROMPT events with collapsible interface  
+// ABOUTME: Display component for USER_SYSTEM_PROMPT events with collapsible interface
 // ABOUTME: Shows user instructions from LACE_DIR/instructions.md with expandable content
 
 import React, { useState } from 'react';
@@ -16,21 +16,27 @@ interface UserSystemPromptDisplayProps {
   onToggle?: () => void;
 }
 
-export function UserSystemPromptDisplay({ event, isStreaming, isFocused, isSelected, onToggle }: UserSystemPromptDisplayProps) {
+export function UserSystemPromptDisplay({
+  event,
+  isStreaming,
+  isFocused,
+  isSelected,
+  onToggle,
+}: UserSystemPromptDisplayProps) {
   const userInstructions = event.data as string;
   const [isExpanded, setIsExpanded] = useState(false);
-  
+
   // Handle expansion toggle events
   const toggleExpansion = () => {
     setIsExpanded(!isExpanded);
     onToggle?.();
   };
-  
+
   // Listen for expansion toggle events when selected
   useTimelineExpansionToggle(isSelected || false, toggleExpansion);
-  
+
   return (
-    <TimelineEntryCollapsibleBox 
+    <TimelineEntryCollapsibleBox
       key={`user-prompt-${event.id}`}
       label={`${UI_SYMBOLS.USER} User Instructions`}
       isExpanded={isExpanded}
@@ -42,7 +48,9 @@ export function UserSystemPromptDisplay({ event, isStreaming, isFocused, isSelec
       isSelected={isSelected}
       onToggle={onToggle}
     >
-      <Text color="cyan" wrap="wrap">{userInstructions}</Text>
+      <Text color="cyan" wrap="wrap">
+        {userInstructions}
+      </Text>
     </TimelineEntryCollapsibleBox>
   );
 }

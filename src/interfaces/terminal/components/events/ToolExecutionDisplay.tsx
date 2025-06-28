@@ -22,45 +22,55 @@ interface ToolExecutionDisplayProps {
 
 function isJsonOutput(output: string): boolean {
   if (!output || typeof output !== 'string') return false;
-  
+
   const trimmed = output.trim();
-  return (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-         (trimmed.startsWith('[') && trimmed.endsWith(']'));
+  return (
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+  );
 }
 
-
-export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFocused, isSelected, onToggle }: ToolExecutionDisplayProps) {
+export function ToolExecutionDisplay({
+  callEvent,
+  resultEvent,
+  isStreaming,
+  isFocused,
+  isSelected,
+  onToggle,
+}: ToolExecutionDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const toolCallData = callEvent.data as ToolCall;
-  
+
   // Handle expansion toggle events
   const toggleExpansion = () => {
     setIsExpanded(!isExpanded);
     onToggle?.();
   };
-  
+
   // Listen for expansion toggle events when selected
   useTimelineExpansionToggle(isSelected || false, toggleExpansion);
   const { name: toolName, arguments: input } = toolCallData;
-  
+
   const toolResultData = resultEvent?.data as ToolResult | undefined;
   const success = toolResultData ? !toolResultData.isError : true;
   // Get first text block for compact display
-  const firstTextBlock = toolResultData?.content.find(block => block.type === 'text' && block.text);
+  const firstTextBlock = toolResultData?.content.find(
+    (block) => block.type === 'text' && block.text
+  );
   const output = firstTextBlock?.text;
   const error = toolResultData?.isError ? output : undefined;
-  
+
   // Determine tool command for compact header
   const getToolCommand = (toolName: string, input: Record<string, unknown>): string => {
     switch (toolName) {
       case 'bash':
-        return input.command as string || '';
+        return (input.command as string) || '';
       case 'file-read':
-        return input.file_path as string || '';
+        return (input.file_path as string) || '';
       case 'file-write':
-        return input.file_path as string || '';
+        return (input.file_path as string) || '';
       case 'file-edit':
-        return input.file_path as string || '';
+        return (input.file_path as string) || '';
       case 'ripgrep-search':
         return `"${input.pattern}"` || '';
       case 'delegate':
@@ -74,16 +84,22 @@ export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFo
         return '';
     }
   };
-  
+
   const toolCommand = getToolCommand(toolName, input);
-  const statusIcon = success ? UI_SYMBOLS.SUCCESS : (resultEvent ? UI_SYMBOLS.ERROR : UI_SYMBOLS.PENDING);
-  
+  const statusIcon = success
+    ? UI_SYMBOLS.SUCCESS
+    : resultEvent
+      ? UI_SYMBOLS.ERROR
+      : UI_SYMBOLS.PENDING;
+
   // Create compact summary for collapsed state
   const toolSummary = (
     <Box flexDirection="column">
       <Box>
         <Text color={UI_COLORS.TOOL}>{UI_SYMBOLS.TOOL} </Text>
-        <Text color={UI_COLORS.TOOL} bold>{toolName}</Text>
+        <Text color={UI_COLORS.TOOL} bold>
+          {toolName}
+        </Text>
         {toolCommand && (
           <React.Fragment>
             <Text color="gray"> </Text>
@@ -91,15 +107,19 @@ export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFo
           </React.Fragment>
         )}
         <Text color="gray"> </Text>
-        <Text color={success ? UI_COLORS.SUCCESS : (resultEvent ? UI_COLORS.ERROR : UI_COLORS.PENDING)}>{statusIcon}</Text>
+        <Text
+          color={success ? UI_COLORS.SUCCESS : resultEvent ? UI_COLORS.ERROR : UI_COLORS.PENDING}
+        >
+          {statusIcon}
+        </Text>
         {isStreaming && <Text color="gray"> (running...)</Text>}
       </Box>
-      
+
       {/* Compact output preview when collapsed */}
       {resultEvent && success && output && (
         <Box marginLeft={2} marginTop={1}>
-          <CompactOutput 
-            output={output} 
+          <CompactOutput
+            output={output}
             language={isJsonOutput(output) ? 'json' : 'text'}
             maxLines={3}
             canExpand={false}
@@ -116,27 +136,21 @@ export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFo
       <Box flexDirection="column" marginBottom={1}>
         <Text color="yellow">Input:</Text>
         <Box marginLeft={2}>
-          <CodeDisplay 
-            code={JSON.stringify(input, null, 2)} 
-            language="json" 
-            compact={false}
-          />
+          <CodeDisplay code={JSON.stringify(input, null, 2)} language="json" compact={false} />
         </Box>
       </Box>
-      
+
       {/* Output */}
       {resultEvent && (
         <Box flexDirection="column">
-          <Text color={success ? 'green' : 'red'}>
-            {success ? 'Output:' : 'Error:'}
-          </Text>
+          <Text color={success ? 'green' : 'red'}>{success ? 'Output:' : 'Error:'}</Text>
           <Box marginLeft={2}>
             {success ? (
               toolResultData?.content ? (
                 toolResultData.content.map((block, idx) => (
                   <Box key={idx} flexDirection="column">
                     {block.type === 'text' && block.text && (
-                      <CompactOutput 
+                      <CompactOutput
                         output={block.text}
                         language={isJsonOutput(block.text) ? 'json' : 'text'}
                         maxLines={50}
@@ -146,9 +160,7 @@ export function ToolExecutionDisplay({ callEvent, resultEvent, isStreaming, isFo
                     {block.type === 'image' && (
                       <Text color="gray">[Image: {block.data ? 'base64 data' : 'no data'}]</Text>
                     )}
-                    {block.type === 'resource' && (
-                      <Text color="gray">[Resource: {block.uri}]</Text>
-                    )}
+                    {block.type === 'resource' && <Text color="gray">[Resource: {block.uri}]</Text>}
                   </Box>
                 ))
               ) : (

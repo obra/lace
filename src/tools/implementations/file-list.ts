@@ -3,7 +3,14 @@
 
 import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
-import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 
 interface FileEntry {
   name: string;
@@ -75,14 +82,20 @@ export class FileListTool implements Tool {
       const output =
         tree.children && tree.children.length > 0 ? this.formatTree(tree) : 'No files found';
 
-      return createSuccessResult([
-        {
-          type: 'text',
-          text: output,
-        },
-      ], call.id);
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: output,
+          },
+        ],
+        call.id
+      );
     } catch (error) {
-      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred', call.id);
+      return createErrorResult(
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
   }
 

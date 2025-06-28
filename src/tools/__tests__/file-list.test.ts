@@ -60,10 +60,12 @@ describe('FileListTool', () => {
     });
 
     it('should include hidden files when requested', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        includeHidden: true,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          includeHidden: true,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -71,10 +73,12 @@ describe('FileListTool', () => {
     });
 
     it('should filter by pattern', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        pattern: '*.txt',
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          pattern: '*.txt',
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -87,10 +91,12 @@ describe('FileListTool', () => {
 
   describe('recursive listing', () => {
     it('should list recursively when enabled', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        recursive: true,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          recursive: true,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -103,11 +109,13 @@ describe('FileListTool', () => {
     });
 
     it('should respect max depth', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        recursive: true,
-        maxDepth: 1,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          recursive: true,
+          maxDepth: 1,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -120,10 +128,12 @@ describe('FileListTool', () => {
 
   describe('pattern matching', () => {
     it('should handle wildcard patterns', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        pattern: 'file*',
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          pattern: 'file*',
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -134,10 +144,12 @@ describe('FileListTool', () => {
     });
 
     it('should handle question mark patterns', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        pattern: 'file?.txt',
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          pattern: 'file?.txt',
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -147,10 +159,12 @@ describe('FileListTool', () => {
     });
 
     it('should be case insensitive by default', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        pattern: 'FILE*',
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          pattern: 'FILE*',
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -160,7 +174,9 @@ describe('FileListTool', () => {
 
   describe('error handling', () => {
     it('should handle non-existent directory', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', { path: '/non/existent/dir' }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', { path: '/non/existent/dir' })
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('ENOENT');
@@ -238,7 +254,9 @@ describe('FileListTool', () => {
     });
 
     it('should show nested structure with proper indentation', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', { path: testDir, recursive: true }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', { path: testDir, recursive: true })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -269,11 +287,13 @@ describe('FileListTool', () => {
     });
 
     it('should always summarize node_modules', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        recursive: true,
-        includeHidden: true,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          recursive: true,
+          includeHidden: true,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -285,11 +305,13 @@ describe('FileListTool', () => {
     });
 
     it('should always summarize .git directory', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        recursive: true,
-        includeHidden: true,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          recursive: true,
+          includeHidden: true,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -300,11 +322,13 @@ describe('FileListTool', () => {
     });
 
     it('should summarize directories with more than threshold entries', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        recursive: true,
-        summaryThreshold: 50,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          recursive: true,
+          summaryThreshold: 50,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -315,11 +339,13 @@ describe('FileListTool', () => {
     });
 
     it('should respect custom summaryThreshold', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        recursive: true,
-        summaryThreshold: 10,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          recursive: true,
+          summaryThreshold: 10,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -334,10 +360,12 @@ describe('FileListTool', () => {
         await writeFile(join(testDir, `root${i}.txt`), `content${i}`);
       }
 
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        summaryThreshold: 10,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          summaryThreshold: 10,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -353,11 +381,13 @@ describe('FileListTool', () => {
       await writeFile(join(testDir, 'node_modules', 'package1', 'lib', 'util.js'), 'util');
       await mkdir(join(testDir, 'node_modules', 'package3'));
 
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        recursive: true,
-        includeHidden: true,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          recursive: true,
+          includeHidden: true,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -369,11 +399,13 @@ describe('FileListTool', () => {
 
   describe('tree with patterns', () => {
     it('should apply pattern filtering in tree output', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        pattern: '*.txt',
-        recursive: true,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          pattern: '*.txt',
+          recursive: true,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
@@ -390,10 +422,12 @@ describe('FileListTool', () => {
 
   describe('tree with hidden files', () => {
     it('should show hidden files in tree when requested', async () => {
-      const result = await tool.executeTool(createTestToolCall('file_list', {
-        path: testDir,
-        includeHidden: true,
-      }));
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          includeHidden: true,
+        })
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;

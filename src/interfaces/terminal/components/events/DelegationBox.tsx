@@ -21,44 +21,50 @@ export function DelegationBox({ toolCall, parentFocusId, onToggle }: DelegationB
     const match = item.result.content[0].text.match(/Thread:\s*([^\s]+)/);
     return match ? match[1] : null;
   };
-  
+
   const delegateThreadId = extractDelegateThreadId(toolCall);
   if (!delegateThreadId) {
     return null; // No delegate thread to display
   }
-  
+
   // Manage own expansion state
   const [expanded, setExpanded] = useState(true); // Default to expanded for delegation
-  
+
   // TODO: Fetch timeline data from ThreadManager using delegateThreadId
   // For now, show placeholder
   const timeline = {
     items: [],
-    metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() }
+    metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
   };
-  
+
   logger.debug('DelegationBox: Rendering', {
     threadId: delegateThreadId,
     expanded,
-    timelineItemCount: timeline.items.length
+    timelineItemCount: timeline.items.length,
   });
-  
+
   // Determine delegation status
   const isComplete = isThreadComplete(timeline);
   const taskDescription = extractTaskFromTimeline(timeline);
   const duration = calculateDuration(timeline);
   const tokens = calculateTokens(timeline);
-  
+
   logger.debug('DelegationBox: Status calculated', {
     threadId: delegateThreadId,
     isComplete,
     taskDescription,
     duration,
-    tokens: `↑${tokens.tokensIn} ↓${tokens.tokensOut}`
+    tokens: `↑${tokens.tokensIn} ↓${tokens.tokensOut}`,
   });
-  
+
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={isComplete ? "green" : "yellow"} padding={1} marginY={1}>
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={isComplete ? 'green' : 'yellow'}
+      padding={1}
+      marginY={1}
+    >
       {/* Header */}
       <Box justifyContent="space-between" marginBottom={expanded ? 1 : 0}>
         <Box>
@@ -68,22 +74,32 @@ export function DelegationBox({ toolCall, parentFocusId, onToggle }: DelegationB
         </Box>
         <Box>
           {isComplete ? (
-            <Text color={UI_COLORS.SUCCESS}>{UI_SYMBOLS.SUCCESS} Complete ({duration}) </Text>
+            <Text color={UI_COLORS.SUCCESS}>
+              {UI_SYMBOLS.SUCCESS} Complete ({duration}){' '}
+            </Text>
           ) : (
-            <Text color={UI_COLORS.PENDING}>{UI_SYMBOLS.WORKING} Working... ({duration}) </Text>
+            <Text color={UI_COLORS.PENDING}>
+              {UI_SYMBOLS.WORKING} Working... ({duration}){' '}
+            </Text>
           )}
-          <Text color="gray">{UI_SYMBOLS.TOKEN_IN}{formatTokenCount(tokens.tokensIn)} {UI_SYMBOLS.TOKEN_OUT}{formatTokenCount(tokens.tokensOut)} </Text>
+          <Text color="gray">
+            {UI_SYMBOLS.TOKEN_IN}
+            {formatTokenCount(tokens.tokensIn)} {UI_SYMBOLS.TOKEN_OUT}
+            {formatTokenCount(tokens.tokensOut)}{' '}
+          </Text>
           <Text color="cyan">
-            {expanded ? `[${UI_SYMBOLS.COLLAPSE_HINT} Collapse]` : `[${UI_SYMBOLS.EXPAND_HINT} Expand]`}
+            {expanded
+              ? `[${UI_SYMBOLS.COLLAPSE_HINT} Collapse]`
+              : `[${UI_SYMBOLS.EXPAND_HINT} Expand]`}
           </Text>
         </Box>
       </Box>
-      
+
       {/* Content */}
       {expanded && (
         <Box flexDirection="column" paddingLeft={2}>
-          <TimelineDisplay 
-            timeline={timeline} 
+          <TimelineDisplay
+            timeline={timeline}
             focusId={`delegate-${delegateThreadId}`}
             parentFocusId={parentFocusId}
           />
@@ -97,27 +113,27 @@ export function DelegationBox({ toolCall, parentFocusId, onToggle }: DelegationB
 function isThreadComplete(timeline: Timeline): boolean {
   const items = timeline.items;
   if (items.length === 0) return false;
-  
+
   const lastItem = items[items.length - 1];
-  
+
   // Consider complete if last item is an agent message and no pending tool calls
   if (lastItem.type === 'agent_message') {
     const pendingCalls = items
-      .filter(item => item.type === 'tool_execution' && !('result' in item && item.result))
-      .map(item => item.type === 'tool_execution' ? item.callId : '');
-    
+      .filter((item) => item.type === 'tool_execution' && !('result' in item && item.result))
+      .map((item) => (item.type === 'tool_execution' ? item.callId : ''));
+
     return pendingCalls.length === 0;
   }
-  
+
   return false;
 }
 
 function extractTaskFromTimeline(timeline: Timeline): string {
   // Look for task description in first agent message or system message
   const firstMessage = timeline.items.find(
-    item => item.type === 'agent_message' || item.type === 'system_message'
+    (item) => item.type === 'agent_message' || item.type === 'system_message'
   );
-  
+
   if (firstMessage && 'content' in firstMessage) {
     const content = firstMessage.content;
     // Extract first sentence or first 50 characters
@@ -130,11 +146,11 @@ function extractTaskFromTimeline(timeline: Timeline): string {
 function calculateDuration(timeline: Timeline): string {
   const items = timeline.items;
   if (items.length === 0) return '0s';
-  
+
   const start = items[0].timestamp;
   const end = items[items.length - 1].timestamp;
   const seconds = Math.floor((end.getTime() - start.getTime()) / 1000);
-  
+
   if (seconds < 60) {
     return `${seconds}s`;
   } else if (seconds < 3600) {
@@ -157,8 +173,8 @@ function estimateTokens(text: string): number {
 function calculateTokens(timeline: Timeline): { tokensIn: number; tokensOut: number } {
   let tokensIn = 0;
   let tokensOut = 0;
-  
-  timeline.items.forEach(item => {
+
+  timeline.items.forEach((item) => {
     // Use proper type guards instead of runtime 'content' checks
     if (item.type === 'user_message') {
       const userItem = item as Extract<Timeline['items'][0], { type: 'user_message' }>;
@@ -175,7 +191,7 @@ function calculateTokens(timeline: Timeline): { tokensIn: number; tokensOut: num
       }
     }
   });
-  
+
   return { tokensIn, tokensOut };
 }
 

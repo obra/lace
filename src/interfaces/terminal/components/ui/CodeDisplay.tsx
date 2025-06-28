@@ -38,12 +38,12 @@ export function CodeDisplay({ code, language = 'text', compact = false }: CodeDi
       // Keep original if not valid JSON
     }
   }
-  
+
   // Handle plain text directly without highlighting to avoid stderr output
   if (language === 'text' || language === 'plain') {
     return <Text color="white">{displayCode}</Text>;
   }
-  
+
   try {
     const highlighted = hljs.highlight(displayCode, { language });
     return renderHighlightedCode(highlighted.value);
@@ -56,7 +56,7 @@ export function CodeDisplay({ code, language = 'text', compact = false }: CodeDi
 function renderHighlightedCode(highlightedHtml: string): React.ReactElement {
   // Convert highlight.js HTML output to Ink Text components
   const lines = highlightedHtml.split('\n');
-  
+
   return (
     <React.Fragment>
       {lines.map((line, lineIndex) => (
@@ -77,15 +77,15 @@ function parseHighlightedLine(line: string): React.ReactNode {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&#x27;/g, "'");
-  
+
   // Parse highlight.js HTML and convert to Ink colors
   const parts: React.ReactNode[] = [];
   let currentIndex = 0;
-  
+
   // Match HTML tags with their content
   const tagRegex = /<span class="([^"]*)"[^>]*>([^<]*)<\/span>/g;
   let match;
-  
+
   while ((match = tagRegex.exec(decodedLine)) !== null) {
     // Add text before the tag
     if (match.index > currentIndex) {
@@ -98,21 +98,21 @@ function parseHighlightedLine(line: string): React.ReactNode {
         );
       }
     }
-    
+
     // Add the colored content based on highlight.js class
     const className = match[1];
     const content = match[2];
     const color = getColorForClass(className);
-    
+
     parts.push(
       <Text key={`highlight-${match.index}`} color={color}>
         {content}
       </Text>
     );
-    
+
     currentIndex = match.index + match[0].length;
   }
-  
+
   // Add remaining text
   if (currentIndex < decodedLine.length) {
     const remainingText = decodedLine.slice(currentIndex);
@@ -124,7 +124,7 @@ function parseHighlightedLine(line: string): React.ReactNode {
       );
     }
   }
-  
+
   return parts.length > 0 ? parts : decodedLine.replace(/<[^>]*>/g, ''); // Strip any remaining HTML
 }
 
@@ -140,6 +140,6 @@ function getColorForClass(className: string): string {
   if (className.includes('built_in')) return 'blue';
   if (className.includes('variable')) return 'yellow';
   if (className.includes('operator')) return 'white';
-  
+
   return 'white'; // Default
 }

@@ -69,14 +69,14 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
   const formatInput = (value: unknown): string => {
     if (typeof value === 'string') {
       if (value.length > 150) {
-        return `"${value.substring(0, 150)}..."`; 
+        return `"${value.substring(0, 150)}..."`;
       }
       return `"${value}"`;
     } else if (Array.isArray(value)) {
       if (value.length === 0) {
         return '[]';
       }
-      const items = value.slice(0, 2).map(item => formatInput(item));
+      const items = value.slice(0, 2).map((item) => formatInput(item));
       const suffix = value.length > 2 ? `, ...${value.length - 2} more` : '';
       return `[${items.join(', ')}${suffix}]`;
     } else if (typeof value === 'object' && value !== null) {
@@ -97,16 +97,18 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
   const options = [
     { key: 'y', label: 'Allow Once', decision: ApprovalDecision.ALLOW_ONCE },
     { key: 's', label: 'Allow Session', decision: ApprovalDecision.ALLOW_SESSION },
-    { key: 'n', label: 'Deny', decision: ApprovalDecision.DENY }
+    { key: 'n', label: 'Deny', decision: ApprovalDecision.DENY },
   ];
 
   return (
     <Box flexDirection="column" borderStyle="double" borderColor="yellow" padding={1} marginY={1}>
       {/* Header */}
       <Box justifyContent="center" marginBottom={1}>
-        <Text bold color="yellow">🛡️  TOOL APPROVAL REQUEST</Text>
+        <Text bold color="yellow">
+          🛡️ TOOL APPROVAL REQUEST
+        </Text>
       </Box>
-      
+
       {/* Tool information */}
       <Box flexDirection="column" marginBottom={1}>
         <Box>
@@ -115,7 +117,7 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
           <Text> </Text>
           <Text color={riskColor}>{riskLabel}</Text>
         </Box>
-        
+
         {/* Parameters */}
         {input !== null && input !== undefined && (
           <Box flexDirection="column" marginTop={1}>
@@ -132,8 +134,10 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
         <Text bold>Choose action (↑↓ to navigate, Enter to select):</Text>
         {options.map((option, index) => (
           <Box key={option.key} paddingLeft={2}>
-            <Text color={selectedOption === index ? 'black' : 'white'} 
-                  backgroundColor={selectedOption === index ? 'white' : undefined}>
+            <Text
+              color={selectedOption === index ? 'black' : 'white'}
+              backgroundColor={selectedOption === index ? 'white' : undefined}
+            >
               {selectedOption === index ? '▶ ' : '  '}
               <Text bold>{option.key}</Text>
               {') '}

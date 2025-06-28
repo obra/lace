@@ -15,12 +15,14 @@ interface UserMessageDisplayProps {
 
 export function UserMessageDisplay({ event, isStreaming, isFocused }: UserMessageDisplayProps) {
   const message = event.data as string;
-  
+
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box flexDirection="row">
         <Text color="dim">&gt; </Text>
-        <Text wrap="wrap" dimColor={!isFocused}>{message.trim()}</Text>
+        <Text wrap="wrap" dimColor={!isFocused}>
+          {message.trim()}
+        </Text>
         {isStreaming && <Text color="gray"> (typing...)</Text>}
       </Box>
     </Box>

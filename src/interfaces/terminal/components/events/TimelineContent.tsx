@@ -24,20 +24,20 @@ interface TimelineContentProps {
   currentFocusId?: string;
 }
 
-export function TimelineContent({ 
-  timeline, 
-  viewportState, 
-  viewportActions, 
-  itemRefs, 
-  currentFocusId 
+export function TimelineContent({
+  timeline,
+  viewportState,
+  viewportActions,
+  itemRefs,
+  currentFocusId,
 }: TimelineContentProps) {
   return (
     <React.Fragment>
       {timeline.items.map((item, index) => {
         const isItemSelected = index === viewportState.selectedItemIndex;
         return (
-          <Box 
-            key={`timeline-item-${index}`} 
+          <Box
+            key={`timeline-item-${index}`}
             flexDirection="column"
             ref={(ref) => {
               if (ref && itemRefs?.current) {
@@ -47,8 +47,8 @@ export function TimelineContent({
               }
             }}
           >
-            <TimelineItem 
-              item={item} 
+            <TimelineItem
+              item={item}
               isSelected={isItemSelected}
               isFocused={false} // TODO: Implement individual item focus
               selectedLine={viewportState.selectedLine}

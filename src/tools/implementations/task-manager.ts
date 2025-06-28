@@ -1,7 +1,14 @@
 // ABOUTME: Session-based task management tools for tracking work items
 // ABOUTME: In-memory task storage for current session workflow management
 
-import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 
 interface Task {
   id: string;
@@ -95,12 +102,15 @@ export class TaskAddTool implements Tool {
     const taskStore = getTaskStore(context?.threadId);
     const task = taskStore.addTask(description.trim());
 
-    return createSuccessResult([
-      {
-        type: 'text',
-        text: `Added task #${task.id}: ${task.description}`,
-      },
-    ], call.id);
+    return createSuccessResult(
+      [
+        {
+          type: 'text',
+          text: `Added task #${task.id}: ${task.description}`,
+        },
+      ],
+      call.id
+    );
   }
 }
 
@@ -130,12 +140,15 @@ export class TaskListTool implements Tool {
 
     if (tasks.length === 0) {
       const message = includeCompleted ? 'No tasks found' : 'No pending tasks';
-      return createSuccessResult([
-        {
-          type: 'text',
-          text: message,
-        },
-      ], call.id);
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: message,
+          },
+        ],
+        call.id
+      );
     }
 
     const taskLines = tasks.map((task) => {
@@ -151,12 +164,15 @@ export class TaskListTool implements Tool {
       ? `Tasks (${tasks.filter((t) => !t.completed).length} pending, ${tasks.filter((t) => t.completed).length} completed):`
       : `Pending tasks (${tasks.length}):`;
 
-    return createSuccessResult([
-      {
-        type: 'text',
-        text: `${summary}\n${taskLines.join('\n')}`,
-      },
-    ], call.id);
+    return createSuccessResult(
+      [
+        {
+          type: 'text',
+          text: `${summary}\n${taskLines.join('\n')}`,
+        },
+      ],
+      call.id
+    );
   }
 }
 
@@ -188,11 +204,14 @@ export class TaskCompleteTool implements Tool {
       return createErrorResult(`Task #${id} not found`, call.id);
     }
 
-    return createSuccessResult([
-      {
-        type: 'text',
-        text: `Completed task #${task.id}: ${task.description}`,
-      },
-    ], call.id);
+    return createSuccessResult(
+      [
+        {
+          type: 'text',
+          text: `Completed task #${task.id}: ${task.description}`,
+        },
+      ],
+      call.id
+    );
   }
 }

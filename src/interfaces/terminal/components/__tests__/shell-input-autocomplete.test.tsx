@@ -15,7 +15,7 @@ vi.mock('ink', async () => {
     ...actual,
     useInput: (handler: (input: string, key: any) => void) => {
       capturedInputHandler = handler;
-    }
+    },
   };
 });
 
@@ -43,12 +43,7 @@ describe('ShellInput Autocomplete Integration', () => {
   describe('basic autocomplete functionality', () => {
     it('should render without autocomplete visible initially', () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          onSubmit={mockOnSubmit}
-          onChange={mockOnChange}
-          value=""
-          autoFocus={false}
-        />
+        <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="" autoFocus={false} />
       );
 
       const output = lastFrame();
@@ -60,19 +55,14 @@ describe('ShellInput Autocomplete Integration', () => {
 
     it('should handle Tab key to show autocomplete when there is content', async () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          onSubmit={mockOnSubmit}
-          onChange={mockOnChange}
-          value="s"
-          autoFocus={true}
-        />
+        <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="s" autoFocus={true} />
       );
 
       // Call useInput handler directly instead of using stdin
       capturedInputHandler!('', { tab: true });
-      
+
       // Wait a bit for async autocomplete loading
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const output = lastFrame();
       // Should show autocomplete items after Tab when there's content
@@ -83,21 +73,16 @@ describe('ShellInput Autocomplete Integration', () => {
 
     it('should hide autocomplete on second Tab press', async () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          onSubmit={mockOnSubmit}
-          onChange={mockOnChange}
-          value="s"
-          autoFocus={true}
-        />
+        <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="s" autoFocus={true} />
       );
 
       // First Tab to show
       capturedInputHandler!('', { tab: true });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Second Tab to apply completion
       capturedInputHandler!('', { tab: true });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const output = lastFrame();
       // Should apply the completion and hide autocomplete dropdown
@@ -109,21 +94,16 @@ describe('ShellInput Autocomplete Integration', () => {
 
     it('should hide autocomplete on Escape key', async () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          onSubmit={mockOnSubmit}
-          onChange={mockOnChange}
-          value="s"
-          autoFocus={true}
-        />
+        <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="s" autoFocus={true} />
       );
 
       // Tab to show autocomplete
       capturedInputHandler!('', { tab: true });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Escape to hide
       capturedInputHandler!('', { escape: true });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const output = lastFrame();
       // Should not show autocomplete items after Escape
@@ -134,21 +114,16 @@ describe('ShellInput Autocomplete Integration', () => {
   describe('autocomplete navigation', () => {
     it('should navigate autocomplete with arrow keys', async () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          onSubmit={mockOnSubmit}
-          onChange={mockOnChange}
-          value="p"
-          autoFocus={true}
-        />
+        <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="p" autoFocus={true} />
       );
 
       // Show autocomplete
       capturedInputHandler!('', { tab: true });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Navigate down
       capturedInputHandler!('', { downArrow: true });
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       const output = lastFrame();
       // Should show selection moved (exact format depends on implementation)
@@ -157,27 +132,22 @@ describe('ShellInput Autocomplete Integration', () => {
 
     it('should navigate up and down with bounds checking', async () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          onSubmit={mockOnSubmit}
-          onChange={mockOnChange}
-          value="s"
-          autoFocus={true}
-        />
+        <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="s" autoFocus={true} />
       );
 
       // Show autocomplete
       capturedInputHandler!('', { tab: true });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Navigate up from first item (should stay at first)
       capturedInputHandler!('', { upArrow: true }); // Up arrow
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Navigate down multiple times to reach end
       capturedInputHandler!('', { downArrow: true }); // Down arrow
       capturedInputHandler!('', { downArrow: true }); // Down arrow
       capturedInputHandler!('', { downArrow: true }); // Down arrow (should stay at last)
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       const output = lastFrame();
       // Should handle bounds correctly without crashing
@@ -188,21 +158,16 @@ describe('ShellInput Autocomplete Integration', () => {
   describe('autocomplete selection', () => {
     it('should select item with Enter key', async () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          onSubmit={mockOnSubmit}
-          onChange={mockOnChange}
-          value="s"
-          autoFocus={true}
-        />
+        <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="s" autoFocus={true} />
       );
 
       // Show autocomplete
       capturedInputHandler!('', { tab: true });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Select first item with Enter
       capturedInputHandler!('\r', { return: true }); // Enter key
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Should call onChange with selected item
       expect(mockOnChange).toHaveBeenCalled();
@@ -213,21 +178,16 @@ describe('ShellInput Autocomplete Integration', () => {
 
     it('should complete partial text correctly', async () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          onSubmit={mockOnSubmit}
-          onChange={mockOnChange}
-          value="sr"
-          autoFocus={true}
-        />
+        <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="sr" autoFocus={true} />
       );
 
       // Show autocomplete for partial text
       capturedInputHandler!('', { tab: true });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Select item
       capturedInputHandler!('\r', { return: true });
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Should replace partial text with complete selection
       expect(mockOnChange).toHaveBeenCalledWith(expect.stringContaining('src/'));
@@ -237,21 +197,16 @@ describe('ShellInput Autocomplete Integration', () => {
   describe('autocomplete state management', () => {
     it('should hide autocomplete when typing', async () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          onSubmit={mockOnSubmit}
-          onChange={mockOnChange}
-          value=""
-          autoFocus={true}
-        />
+        <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="" autoFocus={true} />
       );
 
       // Show autocomplete
       capturedInputHandler!('', { tab: true });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Type a character
       capturedInputHandler!('a', {});
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       const output = lastFrame();
       // Should hide autocomplete when typing
@@ -291,7 +246,7 @@ describe('ShellInput Autocomplete Integration', () => {
 
       // Show autocomplete
       capturedInputHandler!('', { tab: true });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const output = lastFrame();
       // Should show autocomplete positioned after the text
@@ -304,11 +259,11 @@ describe('ShellInput Autocomplete Integration', () => {
     it('should detect current word correctly', async () => {
       const { FileScanner } = await import('../../utils/file-scanner.js');
       const mockScanner = vi.mocked(FileScanner).mock.instances[0] as any;
-      
+
       if (mockScanner?.getCompletions) {
         // Clear previous calls
         mockScanner.getCompletions.mockClear();
-        
+
         // Mock specific completions for partial path
         mockScanner.getCompletions.mockResolvedValue(['src/app.ts', 'src/agent.ts']);
       }
@@ -324,7 +279,7 @@ describe('ShellInput Autocomplete Integration', () => {
 
       // Position cursor after "sr" and trigger autocomplete
       capturedInputHandler!('', { tab: true });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Should call getCompletions with the partial word "sr"
       if (mockScanner?.getCompletions) {
@@ -336,19 +291,14 @@ describe('ShellInput Autocomplete Integration', () => {
   describe('tab completion constraints', () => {
     it('should not trigger autocomplete on Tab when input is completely empty', async () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          onSubmit={mockOnSubmit}
-          onChange={mockOnChange}
-          value=""
-          autoFocus={true}
-        />
+        <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="" autoFocus={true} />
       );
 
       // Simulate Tab key press on empty input
       capturedInputHandler!('', { tab: true });
-      
+
       // Wait a bit to ensure no async operations trigger
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const output = lastFrame();
       // Should NOT show autocomplete items since input is completely empty
@@ -361,19 +311,14 @@ describe('ShellInput Autocomplete Integration', () => {
 
     it('should not trigger autocomplete on Tab when input is only whitespace', async () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          onSubmit={mockOnSubmit}
-          onChange={mockOnChange}
-          value="   "
-          autoFocus={true}
-        />
+        <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="   " autoFocus={true} />
       );
 
       // Simulate Tab key press on whitespace-only input
       capturedInputHandler!('', { tab: true });
-      
+
       // Wait a bit to ensure no async operations trigger
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const output = lastFrame();
       // Should NOT show autocomplete items since input is only whitespace
@@ -384,19 +329,14 @@ describe('ShellInput Autocomplete Integration', () => {
 
     it('should trigger autocomplete on Tab when there is content to complete', async () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          onSubmit={mockOnSubmit}
-          onChange={mockOnChange}
-          value="s"
-          autoFocus={true}
-        />
+        <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="s" autoFocus={true} />
       );
 
       // Simulate Tab key press with content
       capturedInputHandler!('', { tab: true });
-      
+
       // Wait a bit for async autocomplete loading
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const output = lastFrame();
       // Should show autocomplete items since there's content to complete
@@ -405,19 +345,14 @@ describe('ShellInput Autocomplete Integration', () => {
 
     it('should trigger autocomplete on Tab when cursor is after whitespace but line has content', async () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          onSubmit={mockOnSubmit}
-          onChange={mockOnChange}
-          value="ls "
-          autoFocus={true}
-        />
+        <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="ls " autoFocus={true} />
       );
 
       // Simulate Tab key press after space (but line has content)
       capturedInputHandler!('', { tab: true });
-      
+
       // Wait a bit for async autocomplete loading
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const output = lastFrame();
       // Should show autocomplete items since line has content even though beforeCursor is empty
@@ -431,23 +366,18 @@ describe('ShellInput Autocomplete Integration', () => {
       // Mock FileScanner to throw an error
       const { FileScanner } = await import('../../utils/file-scanner.js');
       const mockScanner = vi.mocked(FileScanner).mock.instances[0] as any;
-      
+
       if (mockScanner?.getCompletions) {
         mockScanner.getCompletions.mockRejectedValue(new Error('File system error'));
       }
 
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          onSubmit={mockOnSubmit}
-          onChange={mockOnChange}
-          value="test"
-          autoFocus={true}
-        />
+        <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="test" autoFocus={true} />
       );
 
       // Should not crash when autocomplete fails
       capturedInputHandler!('', { tab: true });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const output = lastFrame();
       // Should still render the input without autocomplete (even if file system error occurred)

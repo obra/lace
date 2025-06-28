@@ -6,7 +6,14 @@ import { unlinkSync } from 'fs';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import TurndownService from 'turndown';
-import { Tool, ToolCall, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 import { logger } from '../../utils/logger.js';
 
 // Constants for configuration and validation
@@ -200,18 +207,21 @@ export class UrlFetchTool implements Tool {
   async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     // Validate required properties before destructuring
     if (!call.arguments.url || typeof call.arguments.url !== 'string') {
-      return this.createRichError({
-        error: {
-          type: 'validation',
-          message: 'URL is required and must be a non-empty string',
+      return this.createRichError(
+        {
+          error: {
+            type: 'validation',
+            message: 'URL is required and must be a non-empty string',
+          },
+          request: {
+            url: String(call.arguments.url || 'undefined'),
+            method: 'GET',
+            headers: {},
+            timing: { start: Date.now() },
+          },
         },
-        request: {
-          url: String(call.arguments.url || 'undefined'),
-          method: 'GET',
-          headers: {},
-          timing: { start: Date.now() },
-        },
-      }, call.id);
+        call.id
+      );
     }
 
     const {
@@ -232,74 +242,92 @@ export class UrlFetchTool implements Tool {
     try {
       this.validateUrl(url);
     } catch (error) {
-      return this.createRichError({
-        error: {
-          type: 'validation',
-          message: error instanceof Error ? error.message : 'Invalid URL',
+      return this.createRichError(
+        {
+          error: {
+            type: 'validation',
+            message: error instanceof Error ? error.message : 'Invalid URL',
+          },
+          request: {
+            url,
+            method,
+            headers,
+          },
         },
-        request: {
-          url,
-          method,
-          headers,
-        },
-      }, call.id);
+        call.id
+      );
     }
 
     if (typeof timeout !== 'number' || timeout < MIN_TIMEOUT || timeout > MAX_TIMEOUT) {
-      return this.createRichError({
-        error: {
-          type: 'validation',
-          message: `Timeout must be between ${MIN_TIMEOUT} and ${MAX_TIMEOUT} milliseconds`,
+      return this.createRichError(
+        {
+          error: {
+            type: 'validation',
+            message: `Timeout must be between ${MIN_TIMEOUT} and ${MAX_TIMEOUT} milliseconds`,
+          },
+          request: {
+            url,
+            method,
+            headers,
+          },
         },
-        request: {
-          url,
-          method,
-          headers,
-        },
-      }, call.id);
+        call.id
+      );
     }
 
     if (typeof maxSize !== 'number' || maxSize < MIN_SIZE || maxSize > MAX_SIZE_LIMIT) {
-      return this.createRichError({
-        error: {
-          type: 'validation',
-          message: `Max size must be between ${MIN_SIZE} and ${MAX_SIZE_LIMIT} bytes`,
+      return this.createRichError(
+        {
+          error: {
+            type: 'validation',
+            message: `Max size must be between ${MIN_SIZE} and ${MAX_SIZE_LIMIT} bytes`,
+          },
+          request: {
+            url,
+            method,
+            headers,
+          },
         },
-        request: {
-          url,
-          method,
-          headers,
-        },
-      }, call.id);
+        call.id
+      );
     }
 
     if (!VALID_HTTP_METHODS.includes(method as HttpMethod)) {
-      return this.createRichError({
-        error: {
-          type: 'validation',
-          message: `Method must be one of: ${VALID_HTTP_METHODS.join(', ')}`,
+      return this.createRichError(
+        {
+          error: {
+            type: 'validation',
+            message: `Method must be one of: ${VALID_HTTP_METHODS.join(', ')}`,
+          },
+          request: {
+            url,
+            method,
+            headers,
+          },
         },
-        request: {
-          url,
-          method,
-          headers,
-        },
-      }, call.id);
+        call.id
+      );
     }
 
     // Validate returnContent parameter
-    if (call.arguments.returnContent !== undefined && typeof call.arguments.returnContent !== 'boolean') {
-      return this.createRichError({
-        error: {
-          type: 'validation',
-          message: 'returnContent must be a boolean value',
+    if (
+      call.arguments.returnContent !== undefined &&
+      typeof call.arguments.returnContent !== 'boolean'
+    ) {
+      return this.createRichError(
+        {
+          error: {
+            type: 'validation',
+            message: 'returnContent must be a boolean value',
+          },
+          request: {
+            url,
+            method,
+            headers,
+          },
         },
-        request: {
-          url,
-          method,
-          headers,
-        },
-      }, call.id);
+        call.id
+      );
     }
 
     // Set up fetch options with timeout
@@ -357,27 +385,30 @@ export class UrlFetchTool implements Tool {
           // Ignore errors reading body
         }
 
-        return this.createRichError({
-          error: {
-            type: 'http',
-            message: `HTTP ${response.status} ${response.statusText}`,
-            code: response.status.toString(),
+        return this.createRichError(
+          {
+            error: {
+              type: 'http',
+              message: `HTTP ${response.status} ${response.statusText}`,
+              code: response.status.toString(),
+            },
+            request: {
+              url,
+              method,
+              headers,
+              finalUrl,
+              redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
+              timing,
+            },
+            response: {
+              status: response.status,
+              statusText: response.statusText,
+              headers: responseHeaders,
+              bodyPreview,
+            },
           },
-          request: {
-            url,
-            method,
-            headers,
-            finalUrl,
-            redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
-            timing,
-          },
-          response: {
-            status: response.status,
-            statusText: response.statusText,
-            headers: responseHeaders,
-            bodyPreview,
-          },
-        }, call.id);
+          call.id
+        );
       }
 
       const contentType = response.headers.get('content-type') || 'application/octet-stream';
@@ -386,26 +417,29 @@ export class UrlFetchTool implements Tool {
 
       // Check size limits
       if (size > maxSize) {
-        return this.createRichError({
-          error: {
-            type: 'size',
-            message: `Response size (${size} bytes) exceeds maximum allowed size (${maxSize} bytes)`,
+        return this.createRichError(
+          {
+            error: {
+              type: 'size',
+              message: `Response size (${size} bytes) exceeds maximum allowed size (${maxSize} bytes)`,
+            },
+            request: {
+              url,
+              method,
+              headers,
+              finalUrl,
+              redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
+              timing,
+            },
+            response: {
+              status: response.status,
+              statusText: response.statusText,
+              headers: responseHeaders,
+              size,
+            },
           },
-          request: {
-            url,
-            method,
-            headers,
-            finalUrl,
-            redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
-            timing,
-          },
-          response: {
-            status: response.status,
-            statusText: response.statusText,
-            headers: responseHeaders,
-            size,
-          },
-        }, call.id);
+          call.id
+        );
       }
 
       // Read response
@@ -413,26 +447,29 @@ export class UrlFetchTool implements Tool {
       const actualSize = buffer.byteLength;
 
       if (actualSize > maxSize) {
-        return this.createRichError({
-          error: {
-            type: 'size',
-            message: `Response size (${actualSize} bytes) exceeds maximum allowed size (${maxSize} bytes)`,
+        return this.createRichError(
+          {
+            error: {
+              type: 'size',
+              message: `Response size (${actualSize} bytes) exceeds maximum allowed size (${maxSize} bytes)`,
+            },
+            request: {
+              url,
+              method,
+              headers,
+              finalUrl,
+              redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
+              timing,
+            },
+            response: {
+              status: response.status,
+              statusText: response.statusText,
+              headers: responseHeaders,
+              size: actualSize,
+            },
           },
-          request: {
-            url,
-            method,
-            headers,
-            finalUrl,
-            redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
-            timing,
-          },
-          response: {
-            status: response.status,
-            statusText: response.statusText,
-            headers: responseHeaders,
-            size: actualSize,
-          },
-        }, call.id);
+          call.id
+        );
       }
 
       // Handle small responses inline
@@ -441,7 +478,14 @@ export class UrlFetchTool implements Tool {
       }
 
       // Handle large responses with temp files
-      return await this.handleLargeContent(buffer, contentType, url, actualSize, returnContent, call.id);
+      return await this.handleLargeContent(
+        buffer,
+        contentType,
+        url,
+        actualSize,
+        returnContent,
+        call.id
+      );
     } catch (error) {
       clearTimeout(timeoutId);
       timing.total = Date.now() - timing.start;
@@ -471,11 +515,29 @@ export class UrlFetchTool implements Tool {
           errorCode = error.code as string;
         }
 
-        return this.createRichError({
+        return this.createRichError(
+          {
+            error: {
+              type: errorType,
+              message: error.message,
+              code: errorCode,
+            },
+            request: {
+              url,
+              method,
+              headers,
+              timing,
+            },
+          },
+          call.id
+        );
+      }
+
+      return this.createRichError(
+        {
           error: {
-            type: errorType,
-            message: error.message,
-            code: errorCode,
+            type: 'network',
+            message: 'Unknown network error occurred',
           },
           request: {
             url,
@@ -483,21 +545,9 @@ export class UrlFetchTool implements Tool {
             headers,
             timing,
           },
-        }, call.id);
-      }
-
-      return this.createRichError({
-        error: {
-          type: 'network',
-          message: 'Unknown network error occurred',
         },
-        request: {
-          url,
-          method,
-          headers,
-          timing,
-        },
-      }, call.id);
+        call.id
+      );
     }
   }
 
@@ -510,22 +560,28 @@ export class UrlFetchTool implements Tool {
   ): ToolResult {
     try {
       if (!returnContent) {
-        return createSuccessResult([
-          {
-            type: 'text',
-            text: `Content fetched from ${url}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\nContent not returned (returnContent=false). Use file tools to access if needed.`,
-          },
-        ], callId);
+        return createSuccessResult(
+          [
+            {
+              type: 'text',
+              text: `Content fetched from ${url}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\nContent not returned (returnContent=false). Use file tools to access if needed.`,
+            },
+          ],
+          callId
+        );
       }
 
       const processedContent = this.processContent(buffer, contentType);
 
-      return createSuccessResult([
-        {
-          type: 'text',
-          text: `Content from ${url}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\n${processedContent}`,
-        },
-      ], callId);
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: `Content from ${url}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\n${processedContent}`,
+          },
+        ],
+        callId
+      );
     } catch (error) {
       return createErrorResult(
         `Failed to process content: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -691,12 +747,15 @@ export class UrlFetchTool implements Tool {
       const sizeInMB = (size / (1024 * 1024)).toFixed(1);
 
       if (!returnContent) {
-        return createSuccessResult([
-          {
-            type: 'text',
-            text: `Large file fetched from ${url}:\n\nContent-Type: ${contentType}\nSize: ${size} bytes (${sizeInMB}MB)\nSaved to: ${tempFilePath}\n\nContent not returned (returnContent=false). Use file tools to access the temp file.`,
-          },
-        ], callId);
+        return createSuccessResult(
+          [
+            {
+              type: 'text',
+              text: `Large file fetched from ${url}:\n\nContent-Type: ${contentType}\nSize: ${size} bytes (${sizeInMB}MB)\nSaved to: ${tempFilePath}\n\nContent not returned (returnContent=false). Use file tools to access the temp file.`,
+            },
+          ],
+          callId
+        );
       }
 
       // Process the full content and provide that as the main response
@@ -704,12 +763,15 @@ export class UrlFetchTool implements Tool {
         ? this.processContent(buffer, contentType)
         : `[Binary content - ${contentType}]`;
 
-      return createSuccessResult([
-        {
-          type: 'text',
-          text: `Content from ${url}:\n\nContent-Type: ${contentType}\nSize: ${size} bytes (${sizeInMB}MB)\nFull content saved to: ${tempFilePath}\n\n${processedContent}`,
-        },
-      ], callId);
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: `Content from ${url}:\n\nContent-Type: ${contentType}\nSize: ${size} bytes (${sizeInMB}MB)\nFull content saved to: ${tempFilePath}\n\n${processedContent}`,
+          },
+        ],
+        callId
+      );
     } catch (error) {
       return createErrorResult(
         `Failed to save large content: ${error instanceof Error ? error.message : 'Unknown error'}`,

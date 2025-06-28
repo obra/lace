@@ -16,7 +16,7 @@ describe('EventDisplay', () => {
       threadId: 'thread-1',
       type: 'USER_MESSAGE',
       timestamp: new Date(),
-      data: 'Hello, world!'
+      data: 'Hello, world!',
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
@@ -30,7 +30,7 @@ describe('EventDisplay', () => {
       threadId: 'thread-1',
       type: 'AGENT_MESSAGE',
       timestamp: new Date(),
-      data: 'Hello there!'
+      data: 'Hello there!',
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
@@ -42,7 +42,7 @@ describe('EventDisplay', () => {
     const toolCallData: ToolCall = {
       id: 'call-123',
       name: 'bash',
-      arguments: { command: 'ls -la' }
+      arguments: { command: 'ls -la' },
     };
 
     const event: ThreadEvent = {
@@ -50,7 +50,7 @@ describe('EventDisplay', () => {
       threadId: 'thread-1',
       type: 'TOOL_CALL',
       timestamp: new Date(),
-      data: toolCallData
+      data: toolCallData,
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
@@ -63,7 +63,7 @@ describe('EventDisplay', () => {
     const toolResultData: ToolResult = {
       id: 'call-123',
       content: [{ type: 'text', text: 'File listing complete' }],
-      isError: false
+      isError: false,
     };
 
     const event: ThreadEvent = {
@@ -71,7 +71,7 @@ describe('EventDisplay', () => {
       threadId: 'thread-1',
       type: 'TOOL_RESULT',
       timestamp: new Date(),
-      data: toolResultData
+      data: toolResultData,
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
@@ -85,7 +85,7 @@ describe('EventDisplay', () => {
       threadId: 'thread-1',
       type: 'LOCAL_SYSTEM_MESSAGE',
       timestamp: new Date(),
-      data: 'System notification'
+      data: 'System notification',
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
@@ -99,7 +99,7 @@ describe('EventDisplay', () => {
       threadId: 'thread-1',
       type: 'AGENT_MESSAGE',
       timestamp: new Date(),
-      data: 'Streaming response...'
+      data: 'Streaming response...',
     };
 
     const { lastFrame } = render(<EventDisplay event={event} isStreaming={true} />);
@@ -112,7 +112,7 @@ describe('EventDisplay', () => {
       threadId: 'thread-1',
       type: 'SYSTEM_PROMPT',
       timestamp: new Date(),
-      data: 'You are a helpful AI assistant.'
+      data: 'You are a helpful AI assistant.',
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
@@ -126,7 +126,7 @@ describe('EventDisplay', () => {
       threadId: 'thread-1',
       type: 'USER_SYSTEM_PROMPT',
       timestamp: new Date(),
-      data: 'Always be concise and helpful.'
+      data: 'Always be concise and helpful.',
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
