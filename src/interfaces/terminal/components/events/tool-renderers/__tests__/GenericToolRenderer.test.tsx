@@ -208,7 +208,7 @@ describe('GenericToolRenderer', () => {
       expect(frame).toContain('bash'); // Tool name in label
     });
 
-    it('should show input and output when expanded', () => {
+    it('should show input and output summary when collapsed', () => {
       const item = createToolExecutionItem(
         'bash',
         { command: 'ls' },
@@ -218,8 +218,8 @@ describe('GenericToolRenderer', () => {
       const { lastFrame } = render(<GenericToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[ComplexContent]'); // Expanded content mock
-      expect(frame).toContain('Expanded: true'); // Should be expanded
+      expect(frame).toContain('[ComplexSummary]'); // Collapsed summary mock
+      expect(frame).toContain('Expanded: false'); // Should be collapsed
     });
 
     it('should show compact output preview when collapsed with result', () => {
@@ -324,8 +324,8 @@ describe('GenericToolRenderer', () => {
       const { lastFrame } = render(<GenericToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[ComplexContent]'); // Error content in expanded view
-      expect(frame).toContain('Expanded: true');
+      expect(frame).toContain('[ComplexSummary]'); // Error content in collapsed view
+      expect(frame).toContain('Expanded: false');
     });
 
     it('should handle missing error message gracefully', () => {
@@ -339,8 +339,8 @@ describe('GenericToolRenderer', () => {
       const { lastFrame } = render(<GenericToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[ComplexContent]'); // Error content with fallback
-      expect(frame).toContain('Expanded: true');
+      expect(frame).toContain('[ComplexSummary]'); // Error content with fallback
+      expect(frame).toContain('Expanded: false');
     });
 
     it('should handle missing output gracefully', () => {
@@ -354,8 +354,8 @@ describe('GenericToolRenderer', () => {
       const { lastFrame } = render(<GenericToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[ComplexContent]'); // Success content with fallback
-      expect(frame).toContain('Expanded: true');
+      expect(frame).toContain('[ComplexSummary]'); // Success content with fallback
+      expect(frame).toContain('Expanded: false');
     });
   });
 
@@ -389,8 +389,8 @@ describe('GenericToolRenderer', () => {
       const { lastFrame } = render(<GenericToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[ComplexContent]'); // Complex input displayed as JSON
-      expect(frame).toContain('Expanded: true');
+      expect(frame).toContain('[ComplexSummary]'); // Complex input summary
+      expect(frame).toContain('Expanded: false');
     });
   });
 });

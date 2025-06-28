@@ -248,7 +248,7 @@ describe('DelegateToolRenderer', () => {
       expect(frame).toContain('Expanded: false');
     });
 
-    it('should show input, output and delegation details when expanded', () => {
+    it('should show delegate summary when collapsed', () => {
       const item = createDelegateExecutionItem(
         { task: 'Calculate sum' },
         createSuccessResult('Thread: delegate-thread-456')
@@ -257,11 +257,11 @@ describe('DelegateToolRenderer', () => {
       const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateContent]');
-      expect(frame).toContain('Expanded: true');
+      expect(frame).toContain('[DelegateSummary]');
+      expect(frame).toContain('Expanded: false');
     });
 
-    it('should show delegation box when thread ID is found and expanded', () => {
+    it('should show delegate summary when thread ID is found but collapsed', () => {
       const item = createDelegateExecutionItem(
         { task: 'Calculate sum' },
         createSuccessResult('Thread: delegate-thread-456')
@@ -270,10 +270,11 @@ describe('DelegateToolRenderer', () => {
       const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateContent]');
+      expect(frame).toContain('[DelegateSummary]');
+      expect(frame).toContain('Expanded: false');
     });
 
-    it('should not show delegation box when no thread ID found', () => {
+    it('should show delegate summary when no thread ID found', () => {
       const item = createDelegateExecutionItem(
         { task: 'Calculate sum' },
         createSuccessResult('No thread created')
@@ -282,12 +283,13 @@ describe('DelegateToolRenderer', () => {
       const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateContent]');
+      expect(frame).toContain('[DelegateSummary]');
+      expect(frame).toContain('Expanded: false');
     });
   });
 
   describe('Error handling', () => {
-    it('should display error message when delegation fails', () => {
+    it('should display delegate summary when delegation fails', () => {
       const item = createDelegateExecutionItem(
         { task: 'Calculate sum' },
         createErrorResult('Failed to create delegate thread')
@@ -296,8 +298,8 @@ describe('DelegateToolRenderer', () => {
       const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateContent]');
-      expect(frame).toContain('Expanded: true');
+      expect(frame).toContain('[DelegateSummary]');
+      expect(frame).toContain('Expanded: false');
     });
 
     it('should handle missing error message gracefully', () => {
@@ -311,7 +313,8 @@ describe('DelegateToolRenderer', () => {
       const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateContent]');
+      expect(frame).toContain('[DelegateSummary]');
+      expect(frame).toContain('Expanded: false');
     });
 
     it('should handle missing output gracefully', () => {
@@ -325,7 +328,8 @@ describe('DelegateToolRenderer', () => {
       const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateContent]');
+      expect(frame).toContain('[DelegateSummary]');
+      expect(frame).toContain('Expanded: false');
     });
   });
 
@@ -389,8 +393,9 @@ describe('DelegateToolRenderer', () => {
       const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateContent]');
+      expect(frame).toContain('[DelegateSummary]');
       expect(frame).toContain('delegate "Process data analysis"');
+      expect(frame).toContain('Expanded: false');
     });
 
     it('should handle empty input objects', () => {
