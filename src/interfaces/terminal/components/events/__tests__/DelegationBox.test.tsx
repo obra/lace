@@ -15,17 +15,11 @@ vi.mock('../TimelineDisplay.js', () => ({
     React.createElement('text', {}, `[TimelineDisplay] ${timeline.items.length} items`),
 }));
 
-// Mock contexts
-const mockThreadManager = {
-  getEvents: vi.fn(),
-};
-
-const mockThreadProcessor = {
-  processThreads: vi.fn(),
-};
-
 // Mock the hooks directly
-vi.mock('../../../terminal-interface.js');
+vi.mock('../../../terminal-interface.js', () => ({
+  useThreadManager: vi.fn(),
+  useThreadProcessor: vi.fn(),
+}));
 
 // Create test data
 function createTestToolCall(metadata: { threadId: string }): Extract<TimelineItem, { type: 'tool_execution' }> {
@@ -70,8 +64,12 @@ describe('DelegationBox', () => {
     vi.clearAllMocks();
     
     // Set up mock implementations
-    vi.mocked(useThreadManager).mockReturnValue(mockThreadManager);
-    vi.mocked(useThreadProcessor).mockReturnValue(mockThreadProcessor);
+    vi.mocked(useThreadManager).mockReturnValue({
+      getEvents: vi.fn(),
+    } as any);
+    vi.mocked(useThreadProcessor).mockReturnValue({
+      processThreads: vi.fn(),
+    } as any);
   });
 
   it('should fetch and display delegate thread data when threadId is present', async () => {
@@ -80,8 +78,11 @@ describe('DelegationBox', () => {
     const toolCall = createTestToolCall({ threadId: delegateThreadId });
     const delegateEvents = createTestEvents();
     
-    mockThreadManager.getEvents.mockReturnValue(delegateEvents);
-    mockThreadProcessor.processThreads.mockReturnValue({
+    const mockThreadManager = vi.mocked(useThreadManager()).getEvents;
+    const mockProcessThreads = vi.mocked(useThreadProcessor()).processThreads;
+    
+    mockThreadManager.mockReturnValue(delegateEvents);
+    mockProcessThreads.mockReturnValue({
       items: [
         { type: 'user_message', content: 'Hello from delegate', timestamp: new Date(), id: 'msg-1' },
         { type: 'agent_message', content: 'Response from delegate', timestamp: new Date(), id: 'msg-2' },
@@ -93,8 +94,8 @@ describe('DelegationBox', () => {
     const { lastFrame } = render(<DelegationBox toolCall={toolCall} />);
 
     // Assert
-    expect(mockThreadManager.getEvents).toHaveBeenCalledWith(delegateThreadId);
-    expect(mockThreadProcessor.processThreads).toHaveBeenCalledWith(delegateEvents);
+    expect(mockThreadManager).toHaveBeenCalledWith(delegateThreadId);
+    expect(mockProcessThreads).toHaveBeenCalledWith(delegateEvents);
     expect(lastFrame()).toContain('[TimelineDisplay] 2 items');
   });
 
@@ -107,7 +108,7 @@ describe('DelegationBox', () => {
 
     // Assert
     expect(lastFrame()).toBe('');
-    expect(mockThreadManager.getEvents).not.toHaveBeenCalled();
+    expect(vi.mocked(useThreadManager()).getEvents).not.toHaveBeenCalled();
   });
 
   it('should handle empty delegate thread gracefully', () => {
@@ -115,8 +116,11 @@ describe('DelegationBox', () => {
     const delegateThreadId = 'empty-delegate-thread';
     const toolCall = createTestToolCall({ threadId: delegateThreadId });
     
-    mockThreadManager.getEvents.mockReturnValue([]);
-    mockThreadProcessor.processThreads.mockReturnValue({
+    const mockThreadManager = vi.mocked(useThreadManager()).getEvents;
+    const mockProcessThreads = vi.mocked(useThreadProcessor()).processThreads;
+    
+    mockThreadManager.mockReturnValue([]);
+    mockProcessThreads.mockReturnValue({
       items: [],
       metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
     });
@@ -125,7 +129,7 @@ describe('DelegationBox', () => {
     const { lastFrame } = render(<DelegationBox toolCall={toolCall} />);
 
     // Assert
-    expect(mockThreadManager.getEvents).toHaveBeenCalledWith(delegateThreadId);
+    expect(mockThreadManager).toHaveBeenCalledWith(delegateThreadId);
     expect(lastFrame()).toContain('[TimelineDisplay] 0 items');
   });
 });

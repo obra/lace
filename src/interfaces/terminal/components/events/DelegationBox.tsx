@@ -8,6 +8,7 @@ import TimelineDisplay from './TimelineDisplay.js';
 import { logger } from '../../../../utils/logger.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
 import { useThreadManager, useThreadProcessor } from '../../terminal-interface.js';
+import { calculateTokens, formatTokenCount } from '../../../../utils/token-estimation.js';
 
 interface DelegationBoxProps {
   toolCall: Extract<TimelineItemType, { type: 'tool_execution' }>;
@@ -179,40 +180,3 @@ function calculateDuration(timeline: Timeline): string {
   }
 }
 
-// Shared token estimation function to match main agent logic
-function estimateTokens(text: string): number {
-  // Rough approximation: 1 token ≈ 4 characters for most models
-  return Math.ceil(text.length / 4);
-}
-
-function calculateTokens(timeline: Timeline): { tokensIn: number; tokensOut: number } {
-  let tokensIn = 0;
-  let tokensOut = 0;
-
-  timeline.items.forEach((item) => {
-    // Use proper type guards instead of runtime 'content' checks
-    if (item.type === 'user_message') {
-      const userItem = item as Extract<Timeline['items'][0], { type: 'user_message' }>;
-      tokensIn += estimateTokens(userItem.content);
-    } else if (item.type === 'agent_message') {
-      const agentItem = item as Extract<Timeline['items'][0], { type: 'agent_message' }>;
-      tokensOut += estimateTokens(agentItem.content);
-    } else if (item.type === 'tool_execution') {
-      const toolItem = item as Extract<Timeline['items'][0], { type: 'tool_execution' }>;
-      // Tool results count as input to the agent
-      const resultText = toolItem.result?.content?.[0]?.text;
-      if (resultText) {
-        tokensIn += estimateTokens(resultText);
-      }
-    }
-  });
-
-  return { tokensIn, tokensOut };
-}
-
-function formatTokenCount(count: number): string {
-  if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}k`;
-  }
-  return count.toString();
-}

@@ -50,7 +50,13 @@ export class ThreadProcessor {
   private _eventCache = new Map<string, TimelineItem[]>();
 
   /**
-   * Process main thread from mixed events, ignoring delegate threads
+   * Process events into a single timeline
+   *
+   * Processing strategy:
+   * 1. Mixed threads: Process main thread only (threadId without dots), ignore delegates
+   * 2. Single thread: Process that thread (enables DelegationBox to process isolated delegates)
+   *
+   * This approach keeps the main UI fast while allowing delegate components to process their own data.
    */
   processThreads(events: ThreadEvent[]): Timeline {
     logger.debug('ThreadProcessor.processThreads received events', {
@@ -58,22 +64,30 @@ export class ThreadProcessor {
       events: events.map((e) => ({ type: e.type, threadId: e.threadId, id: e.id })),
     });
 
-    // Group events by threadId and get main thread only
+    // Group events by threadId
     const threadGroups = this._groupEventsByThread(events);
 
-    // If all events are from a single thread (e.g., processing delegate thread in isolation),
-    // treat that thread as the "main" thread for this processing context
-    let mainThreadGroup = threadGroups.find((g) => !g.threadId.includes('.'));
-    if (!mainThreadGroup && threadGroups.length === 1) {
-      mainThreadGroup = threadGroups[0]; // Single thread (delegate) becomes "main" in this context
+    // Select which thread to process:
+    // 1. Prefer main thread (no dots in threadId) for mixed-thread scenarios
+    // 2. Use single thread if that's all we have (delegate processing mode)
+    let targetThreadGroup = threadGroups.find((g) => !g.threadId.includes('.'));
+    if (!targetThreadGroup && threadGroups.length === 1) {
+      targetThreadGroup = threadGroups[0];
     }
 
-    const mainEvents = mainThreadGroup?.events || [];
-    const mainThreadId = mainThreadGroup?.threadId || 'main';
+    const targetEvents = targetThreadGroup?.events || [];
+    const targetThreadId = targetThreadGroup?.threadId || 'main';
 
-    // Process main thread with incremental caching
-    const mainProcessedItems = this._processThreadIncremental(mainThreadId, mainEvents);
-    return this.buildTimeline(mainProcessedItems, []);
+    logger.debug('ThreadProcessor.processThreads selected thread', {
+      targetThreadId,
+      eventCount: targetEvents.length,
+      totalGroups: threadGroups.length,
+      processingMode: threadGroups.length === 1 ? 'single-thread' : 'mixed-threads',
+    });
+
+    // Process selected thread with incremental caching
+    const processedItems = this._processThreadIncremental(targetThreadId, targetEvents);
+    return this.buildTimeline(processedItems, []);
   }
 
   /**
@@ -312,7 +326,6 @@ export class ThreadProcessor {
   /**
    * Clear cache (useful for testing or manual cache invalidation)
    */
-
   clearCache(): void {
     this._eventCache.clear();
   }

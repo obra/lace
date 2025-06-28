@@ -4,7 +4,7 @@
 import React, { useMemo, useRef } from 'react';
 import { Box } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
-import { ThreadProcessor, Timeline } from '../../../thread-processor.js';
+import { ThreadProcessor, Timeline, ProcessedThreadItems } from '../../../thread-processor.js';
 import { useThreadProcessor } from '../../terminal-interface.js';
 import TimelineDisplay from './TimelineDisplay.js';
 
@@ -42,10 +42,13 @@ export function ConversationDisplay({
 
   // Build main timeline with ephemeral messages
   const mainTimeline = useMemo(() => {
-    return threadProcessor.buildTimeline(
-      mainThreadProcessed.items as any,
-      ephemeralItems
-    );
+    // Filter out ephemeral items to get proper ProcessedThreadItems type
+    const processedItems = mainThreadProcessed.items.filter(
+      (item): item is Exclude<typeof item, { type: 'ephemeral_message' }> => 
+        item.type !== 'ephemeral_message'
+    ) as ProcessedThreadItems;
+    
+    return threadProcessor.buildTimeline(processedItems, ephemeralItems);
   }, [mainThreadProcessed, ephemeralItems, threadProcessor]);
 
   return (
