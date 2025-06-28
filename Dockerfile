@@ -1,39 +1,31 @@
-FROM ubuntu:22.04
+FROM node:24
 
-# Install basic dependencies
+# Install development dependencies including ripgrep and Python for native modules
 RUN apt-get update && apt-get install -y \
     curl \
     git \
     build-essential \
+    python3 \
+    python3-dev \
+    ripgrep \
+    vim \
+    nano \
+    htop \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 20.x
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs
-
-# Create a non-root user for testing
-RUN useradd -m -s /bin/bash laceuser
+# Create user first
+RUN useradd -rm -d /home/laceuser -s /bin/bash -g root -G sudo -u 1001 laceuser
 
 # Set working directory
 WORKDIR /home/laceuser/lace
 
-# Copy package files first for better caching
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci
-
-# Copy the rest of the application
-COPY . .
-
-# Build the application
-RUN npm run build
-
-# Change ownership to laceuser
-RUN chown -R laceuser:laceuser /home/laceuser
+# Create node_modules directory and set ownership
+RUN mkdir -p /home/laceuser/lace/node_modules && \
+    chown -R laceuser:root /home/laceuser
 
 # Switch to non-root user
 USER laceuser
 
-# Default command
+# Default to bash for development
 CMD ["/bin/bash"]
