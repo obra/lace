@@ -119,6 +119,9 @@ describe('HAR Integration', () => {
         timings: { send: 0, wait: 0, receive: 0 },
       });
 
+      // Force flush for testing
+      recorder!.flush();
+
       expect(existsSync(harFile)).toBe(true);
 
       // Verify HAR file structure
@@ -173,6 +176,9 @@ describe('HAR Integration', () => {
         cache: {},
         timings: { send: 0, wait: 0, receive: 0 },
       });
+
+      // Force flush for testing
+      recorder.flush();
 
       expect(getHARRecorder()).not.toBeNull();
       expect(existsSync(nestedHarFile)).toBe(true);
@@ -251,6 +257,9 @@ describe('HAR Integration', () => {
           );
         }
 
+        // Force flush for testing
+        recorder!.flush();
+
         // Verify HAR file exists and contains the request
         expect(existsSync(TEST_HAR_FILE)).toBe(true);
         const harContent = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
@@ -326,6 +335,9 @@ describe('HAR Integration', () => {
             Date.now()
           );
         }
+
+        // Force flush for testing
+        recorder!.flush();
 
         expect(existsSync(TEST_HAR_FILE)).toBe(true);
         const harContent = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));

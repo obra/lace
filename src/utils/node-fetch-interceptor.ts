@@ -7,15 +7,14 @@ import { logger } from './logger.js';
 let originalNodeFetch: typeof fetch | null = null;
 let interceptorEnabled = false;
 
-export function enableNodeFetchInterception(): void {
+export async function enableNodeFetchInterception(): Promise<void> {
   if (interceptorEnabled) {
     return;
   }
 
   try {
     // Dynamically import node-fetch to intercept it
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const nodeFetchModule = require('node-fetch');
+    const nodeFetchModule = await import('node-fetch');
 
     if (!nodeFetchModule || !nodeFetchModule.default) {
       logger.debug('node-fetch not available for interception');
@@ -45,9 +44,18 @@ export function enableNodeFetchInterception(): void {
         const response = await originalNodeFetch!(url, init);
         const endTime = Date.now();
 
+        // Clone the response before recording since the body will be consumed
+        const responseForHAR = response.clone();
+
         // Record to HAR synchronously to ensure it completes before process exits
         try {
-          await harRecorder.recordFetchRequest(urlString, init || {}, startTime, response, endTime);
+          await harRecorder.recordFetchRequest(
+            urlString,
+            init || {},
+            startTime,
+            responseForHAR,
+            endTime
+          );
         } catch (error) {
           logger.error('Failed to record node-fetch request to HAR', { error, url: urlString });
         }
@@ -74,14 +82,13 @@ export function enableNodeFetchInterception(): void {
   }
 }
 
-export function disableNodeFetchInterception(): void {
+export async function disableNodeFetchInterception(): Promise<void> {
   if (!interceptorEnabled || !originalNodeFetch) {
     return;
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const nodeFetchModule = require('node-fetch');
+    const nodeFetchModule = await import('node-fetch');
     if (nodeFetchModule) {
       nodeFetchModule.default = originalNodeFetch;
     }

@@ -13,7 +13,7 @@ let trafficLoggingEnabled = false;
  * Enable global traffic logging to specified file
  * Automatically enables appropriate interceptors for all supported protocols
  */
-export function enableTrafficLogging(outputFile: string): void {
+export async function enableTrafficLogging(outputFile: string): Promise<void> {
   if (trafficLoggingEnabled) {
     logger.debug('Traffic logging already enabled');
     return;
@@ -25,11 +25,16 @@ export function enableTrafficLogging(outputFile: string): void {
 
     // Enable all necessary interceptors
     enableFetchInterception(); // For Ollama & Anthropic
-    enableNodeFetchInterception(); // For OpenAI
+    await enableNodeFetchInterception(); // For OpenAI
     enableWebSocketInterception(); // For LMStudio
 
     trafficLoggingEnabled = true;
     logger.info('Traffic logging enabled', { outputFile });
+    logger.warn('Global function interception active', {
+      interceptedFunctions: ['fetch', 'node-fetch', 'WebSocket'],
+      warning:
+        'HAR recording modifies global HTTP/WebSocket functions. This may affect other code.',
+    });
   } catch (error) {
     logger.error('Failed to enable traffic logging', { error, outputFile });
     throw error;

@@ -119,6 +119,12 @@ export class HARRecorder {
   private entries: HAREntry[] = [];
   private filePath: string;
   private initialized = false;
+  private writeBuffer: HAREntry[] = [];
+  private writeTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly BUFFER_SIZE = 100; // Max entries to buffer
+  private readonly FLUSH_INTERVAL = 5000; // Flush every 5 seconds
+  private writeErrors = 0;
+  private readonly MAX_WRITE_ERRORS = 10;
 
   constructor(filePath: string) {
     this.filePath = filePath;
@@ -159,22 +165,80 @@ export class HARRecorder {
   recordEntry(entry: HAREntry): void {
     this.ensureInitialized();
     this.entries.push(entry);
+    this.writeBuffer.push(entry);
+
+    // Schedule flush if buffer is full or no timer is running
+    if (this.writeBuffer.length >= this.BUFFER_SIZE) {
+      this.flushBuffer();
+    } else if (!this.writeTimer) {
+      this.writeTimer = setTimeout(() => this.flushBuffer(), this.FLUSH_INTERVAL);
+    }
+
+    logger.debug('HAR entry buffered', {
+      url: entry.request.url,
+      method: entry.request.method,
+      status: entry.response.status,
+      bufferSize: this.writeBuffer.length,
+    });
+  }
+
+  private flushBuffer(): void {
+    if (this.writeBuffer.length === 0) return;
 
     try {
-      // Read current HAR file, add entry, write back
+      // Clear timer
+      if (this.writeTimer) {
+        clearTimeout(this.writeTimer);
+        this.writeTimer = null;
+      }
+
+      // Read current HAR file, add all buffered entries, write back
       const content = readFileSync(this.filePath, 'utf8');
       const harFile: HARFile = JSON.parse(content);
-      harFile.log.entries.push(entry);
+      harFile.log.entries.push(...this.writeBuffer);
 
       writeFileSync(this.filePath, JSON.stringify(harFile, null, 2));
-      logger.debug('HAR entry recorded', {
-        url: entry.request.url,
-        method: entry.request.method,
-        status: entry.response.status,
+
+      logger.debug('HAR buffer flushed', {
+        entriesWritten: this.writeBuffer.length,
+        totalEntries: harFile.log.entries.length,
       });
+
+      // Clear buffer and reset error count on success
+      this.writeBuffer.length = 0;
+      this.writeErrors = 0;
     } catch (error) {
-      logger.error('Failed to record HAR entry', { error, entry });
+      this.writeErrors++;
+
+      logger.error('Failed to flush HAR buffer', {
+        error,
+        bufferSize: this.writeBuffer.length,
+        sampleEntry: this.writeBuffer[0]?.request?.url,
+        errorCount: this.writeErrors,
+        maxErrors: this.MAX_WRITE_ERRORS,
+      });
+
+      // If too many consecutive write errors, clear buffer to prevent memory leak
+      if (this.writeErrors >= this.MAX_WRITE_ERRORS) {
+        logger.warn('Too many HAR write failures, clearing buffer to prevent memory leak', {
+          droppedEntries: this.writeBuffer.length,
+          errorCount: this.writeErrors,
+        });
+        this.writeBuffer.length = 0;
+        this.writeErrors = 0;
+      }
+      // Don't clear buffer on error - retry on next flush (unless max errors reached)
     }
+  }
+
+  // Ensure buffer is flushed when process exits
+  destroy(): void {
+    this.flushBuffer();
+  }
+
+  // Force immediate flush (for testing)
+  flush(): void {
+    this.flushBuffer();
   }
 
   async recordFetchRequest(
@@ -800,12 +864,32 @@ export function getHARRecorder(): HARRecorder | null {
 }
 
 export function initializeHARRecording(filePath: string): HARRecorder {
+  // Flush any existing recorder before replacing
+  if (globalHARRecorder) {
+    globalHARRecorder.destroy();
+  }
+
   globalHARRecorder = new HARRecorder(filePath);
   logger.info('HAR recording enabled', { filePath });
+
+  // Ensure buffer is flushed on process exit
+  const flushOnExit = () => {
+    if (globalHARRecorder) {
+      globalHARRecorder.destroy();
+    }
+  };
+
+  process.on('exit', flushOnExit);
+  process.on('SIGINT', flushOnExit);
+  process.on('SIGTERM', flushOnExit);
+
   return globalHARRecorder;
 }
 
 export function disableHARRecording(): void {
+  if (globalHARRecorder) {
+    globalHARRecorder.destroy();
+  }
   globalHARRecorder = null;
   logger.info('HAR recording disabled');
 }

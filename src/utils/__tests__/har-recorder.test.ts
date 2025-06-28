@@ -68,6 +68,9 @@ describe('HARRecorder', () => {
         timings: { send: 1, wait: 98, receive: 1 },
       });
 
+      // Force flush for testing
+      recorder.flush();
+
       expect(existsSync(TEST_HAR_FILE)).toBe(true);
 
       const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
@@ -163,6 +166,9 @@ describe('HARRecorder', () => {
         Date.now()
       );
 
+      // Force flush for testing
+      recorder.flush();
+
       const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
       const entry = content.log.entries[0];
 
@@ -211,6 +217,9 @@ describe('HARRecorder', () => {
         Date.now()
       );
 
+      // Force flush for testing
+      recorder.flush();
+
       const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
       const entry = content.log.entries[0];
 
@@ -243,6 +252,9 @@ describe('HARRecorder', () => {
         '{"choices": [{"message": {"content": "Hello"}}]}',
         Date.now()
       );
+
+      // Force flush for testing
+      recorder.flush();
 
       const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
       const entry = content.log.entries[0];
@@ -291,6 +303,9 @@ describe('HARRecorder', () => {
         Date.now(),
         messages
       );
+
+      // Force flush for testing
+      recorder.flush();
 
       const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
       const entry = content.log.entries[0];

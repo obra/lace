@@ -81,7 +81,7 @@ async function main() {
 
   // Initialize traffic logging if requested
   if (options.harFile) {
-    enableTrafficLogging(options.harFile);
+    await enableTrafficLogging(options.harFile);
   }
 
   logger.info('Starting Lace Agent', {

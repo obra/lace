@@ -38,7 +38,7 @@ describe('TrafficLogger', () => {
       const { enableNodeFetchInterception } = await import('../node-fetch-interceptor.js');
       const { enableWebSocketInterception } = await import('../websocket-interceptor.js');
 
-      enableTrafficLogging('/tmp/test.har');
+      await enableTrafficLogging('/tmp/test.har');
 
       expect(initializeHARRecording).toHaveBeenCalledWith('/tmp/test.har');
       expect(enableFetchInterception).toHaveBeenCalled();
@@ -50,8 +50,8 @@ describe('TrafficLogger', () => {
     it('should not enable twice if already enabled', async () => {
       const { initializeHARRecording } = await import('../har-recorder.js');
 
-      enableTrafficLogging('/tmp/test1.har');
-      enableTrafficLogging('/tmp/test2.har');
+      await enableTrafficLogging('/tmp/test1.har');
+      await enableTrafficLogging('/tmp/test2.har');
 
       expect(initializeHARRecording).toHaveBeenCalledTimes(1);
       expect(initializeHARRecording).toHaveBeenCalledWith('/tmp/test1.har');
