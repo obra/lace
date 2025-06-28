@@ -64,20 +64,13 @@ vi.mock('../../../../../utils/logger.js', () => ({
   },
 }));
 
-const mockExtractDelegateThreadId = vi.fn();
-
-vi.mock('../hooks/useDelegateThreadExtraction.js', () => ({
-  useDelegateThreadExtraction: () => ({
-    extractDelegateThreadId: mockExtractDelegateThreadId,
-  }),
-}));
+// Note: useDelegateThreadExtraction hook was removed - DelegationBox now self-sufficient
 
 describe('TimelineItem Component', () => {
   const mockOnToggle = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockExtractDelegateThreadId.mockReturnValue(null);
   });
 
   const defaultProps = {
@@ -374,7 +367,7 @@ describe('TimelineItem Component', () => {
 
       render(<TimelineItem item={item} {...defaultProps} />);
 
-      expect(mockExtractDelegateThreadId).not.toHaveBeenCalled();
+      // Note: delegate extraction is now handled directly by DelegationBox
     });
   });
 });
