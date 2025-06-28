@@ -43,11 +43,6 @@ export function emitExpansionCollapse(): void {
   expansionEmitter.emitCollapse();
 }
 
-// Legacy function for backward compatibility during transition
-export function emitExpansionToggle(): void {
-  // Default to expand for now - will be removed after refactoring
-  expansionEmitter.emitExpand();
-}
 
 // Combined hook that provides complete expansion state management
 export function useTimelineItemExpansion(isSelected: boolean, onToggle?: () => void) {
@@ -63,10 +58,6 @@ export function useTimelineItemExpansion(isSelected: boolean, onToggle?: () => v
     onToggle?.();
   }, [onToggle]);
 
-  const toggleExpansion = useCallback(() => {
-    setIsExpanded(!isExpanded);
-    onToggle?.();
-  }, [isExpanded, onToggle]);
 
   const handleExpandedChange = useCallback(
     (expanded: boolean) => {
@@ -91,22 +82,7 @@ export function useTimelineItemExpansion(isSelected: boolean, onToggle?: () => v
 
   return {
     isExpanded,
-    toggleExpansion,
     handleExpandedChange,
   };
 }
 
-// Legacy hook for backward compatibility during transition
-export function useTimelineExpansionToggle(isSelected: boolean, toggleExpansion: () => void): void {
-  useEffect(() => {
-    if (!isSelected) return;
-
-    const handleExpand = () => {
-      if (isSelected) {
-        toggleExpansion();
-      }
-    };
-
-    return expansionEmitter.subscribeExpand(handleExpand);
-  }, [isSelected, toggleExpansion]);
-}
