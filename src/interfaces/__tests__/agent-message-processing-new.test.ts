@@ -24,7 +24,7 @@ describe('Agent Message Processing - New Simplified Behavior', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       // New behavior: Creates 1 timeline item with full content
       expect(result).toHaveLength(1);
@@ -48,7 +48,7 @@ describe('Agent Message Processing - New Simplified Behavior', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       // New behavior: Creates 1 timeline item with full content
       expect(result).toHaveLength(1);
@@ -71,7 +71,7 @@ describe('Agent Message Processing - New Simplified Behavior', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       // New behavior: Creates 1 timeline item
       expect(result).toHaveLength(1);
@@ -94,7 +94,7 @@ describe('Agent Message Processing - New Simplified Behavior', () => {
         },
       ];
 
-      const result = processor.processEvents(events);
+      const result = processor.processThreads(events).items;
 
       // New behavior: Creates 1 agent message item with thinking content
       expect(result).toHaveLength(1);

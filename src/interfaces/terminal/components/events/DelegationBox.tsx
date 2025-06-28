@@ -39,7 +39,7 @@ export function DelegationBox({ toolCall, parentFocusId, onToggle }: DelegationB
     try {
       const events = threadManager.getEvents(delegateThreadId);
       const processed = threadProcessor.processThreads(events);
-      return processed.mainTimeline; // Delegate thread becomes "main" when processed alone
+      return processed; // processThreads now returns Timeline directly
     } catch (error) {
       logger.error('Failed to load delegate thread', {
         threadId: delegateThreadId,
