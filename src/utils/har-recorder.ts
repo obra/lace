@@ -248,7 +248,7 @@ export class HARRecorder {
     response: Response,
     endTime: number
   ): Promise<void> {
-    const method = init.method || 'GET';
+    const method = (init.method as string) || 'GET';
     const startedDateTime = new Date(startTime).toISOString();
     const totalTime = endTime - startTime;
 

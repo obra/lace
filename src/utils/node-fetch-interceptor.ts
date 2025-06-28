@@ -4,7 +4,9 @@
 import { getHARRecorder } from './har-recorder.js';
 import { logger } from './logger.js';
 
-let originalNodeFetch: typeof fetch | null = null;
+let originalNodeFetch:
+  | ((url: string | Request, init?: Record<string, unknown>) => Promise<Response>)
+  | null = null;
 let interceptorEnabled = false;
 
 export async function enableNodeFetchInterception(): Promise<void> {
@@ -22,11 +24,11 @@ export async function enableNodeFetchInterception(): Promise<void> {
     }
 
     // Store original
-    originalNodeFetch = nodeFetchModule.default;
+    originalNodeFetch = nodeFetchModule.default as unknown as typeof originalNodeFetch;
     interceptorEnabled = true;
 
     // Create intercepting fetch
-    nodeFetchModule.default = async function interceptedNodeFetch(
+    const interceptedNodeFetch = async function interceptedNodeFetch(
       url: string | Request,
       init?: Record<string, unknown>
     ): Promise<Response> {
@@ -75,6 +77,9 @@ export async function enableNodeFetchInterception(): Promise<void> {
       }
     };
 
+    // Install the intercepted fetch
+    nodeFetchModule.default = interceptedNodeFetch as unknown as typeof nodeFetchModule.default;
+
     logger.debug('Node-fetch interception enabled for HAR recording');
   } catch (error) {
     logger.debug('Failed to enable node-fetch interception', { error });
@@ -90,7 +95,7 @@ export async function disableNodeFetchInterception(): Promise<void> {
   try {
     const nodeFetchModule = await import('node-fetch');
     if (nodeFetchModule) {
-      nodeFetchModule.default = originalNodeFetch;
+      nodeFetchModule.default = originalNodeFetch as unknown as typeof nodeFetchModule.default;
     }
   } catch {
     // Ignore errors during cleanup

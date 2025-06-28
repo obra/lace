@@ -19,7 +19,7 @@ export function enableFetchInterception(): void {
   // Create intercepting fetch
   const interceptedFetch = async function interceptedFetch(
     input: string | Request | URL,
-    init?: Record<string, unknown>
+    init?: globalThis.RequestInit
   ): Promise<Response> {
     const harRecorder = getHARRecorder();
 
@@ -45,7 +45,13 @@ export function enableFetchInterception(): void {
 
       // Record to HAR synchronously to ensure it completes before process exits
       try {
-        await harRecorder.recordFetchRequest(url, init || {}, startTime, responseForHAR, endTime);
+        await harRecorder.recordFetchRequest(
+          url,
+          (init as Record<string, unknown>) || {},
+          startTime,
+          responseForHAR,
+          endTime
+        );
       } catch (error) {
         logger.error('Failed to record fetch request to HAR', { error, url });
       }
@@ -68,7 +74,7 @@ export function enableFetchInterception(): void {
 
   // Mark the intercepted function and install it
   (interceptedFetch as typeof fetch & { __laceIntercepted: boolean }).__laceIntercepted = true;
-  globalThis.fetch = interceptedFetch;
+  globalThis.fetch = interceptedFetch as typeof fetch;
 
   logger.debug('Global fetch interception enabled for HAR recording');
 }
