@@ -21,7 +21,6 @@ interface TimelineContentProps {
   viewportState: ViewportState;
   viewportActions: ViewportActions;
   itemRefs: React.MutableRefObject<Map<number, unknown>>;
-  currentFocusId?: string;
 }
 
 export function TimelineContent({
@@ -29,7 +28,6 @@ export function TimelineContent({
   viewportState,
   viewportActions,
   itemRefs,
-  currentFocusId,
 }: TimelineContentProps) {
   return (
     <React.Fragment>
@@ -54,7 +52,6 @@ export function TimelineContent({
               selectedLine={viewportState.selectedLine}
               itemStartLine={viewportState.itemPositions[index] || 0}
               onToggle={viewportActions.triggerRemeasurement}
-              currentFocusId={currentFocusId}
             />
           </Box>
         );
