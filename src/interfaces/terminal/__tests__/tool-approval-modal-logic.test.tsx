@@ -1,4 +1,4 @@
-// ABOUTME: Logic tests for ToolApprovalModal component 
+// ABOUTME: Logic tests for ToolApprovalModal component
 // ABOUTME: Tests the component behavior by directly invoking the useInput handler
 
 import React from 'react';
@@ -17,7 +17,7 @@ vi.mock('ink', async () => {
     ...actual,
     useInput: (handler: (input: string, key: any) => void) => {
       capturedInputHandler = handler;
-    }
+    },
   };
 });
 
@@ -33,7 +33,7 @@ describe('ToolApprovalModal Logic', () => {
     return renderInkComponent(
       <ToolApprovalModal
         toolName="bash"
-        input={{ command: "ls" }}
+        input={{ command: 'ls' }}
         isReadOnly={false}
         onDecision={mockOnDecision}
         isVisible={isVisible}
@@ -44,9 +44,9 @@ describe('ToolApprovalModal Logic', () => {
   describe('keyboard input handling', () => {
     it('calls onDecision with ALLOW_ONCE when y is pressed', () => {
       renderModal();
-      
+
       expect(capturedInputHandler).toBeTruthy();
-      
+
       act(() => {
         capturedInputHandler!('y', {});
       });
@@ -56,7 +56,7 @@ describe('ToolApprovalModal Logic', () => {
 
     it('calls onDecision with ALLOW_ONCE when a is pressed', () => {
       renderModal();
-      
+
       act(() => {
         capturedInputHandler!('a', {});
       });
@@ -66,7 +66,7 @@ describe('ToolApprovalModal Logic', () => {
 
     it('calls onDecision with ALLOW_SESSION when s is pressed', () => {
       renderModal();
-      
+
       act(() => {
         capturedInputHandler!('s', {});
       });
@@ -76,7 +76,7 @@ describe('ToolApprovalModal Logic', () => {
 
     it('calls onDecision with DENY when n is pressed', () => {
       renderModal();
-      
+
       act(() => {
         capturedInputHandler!('n', {});
       });
@@ -86,7 +86,7 @@ describe('ToolApprovalModal Logic', () => {
 
     it('calls onDecision with DENY when d is pressed', () => {
       renderModal();
-      
+
       act(() => {
         capturedInputHandler!('d', {});
       });
@@ -96,7 +96,7 @@ describe('ToolApprovalModal Logic', () => {
 
     it('ignores input when not visible', () => {
       renderModal(false);
-      
+
       act(() => {
         capturedInputHandler!('y', {});
       });
@@ -106,15 +106,15 @@ describe('ToolApprovalModal Logic', () => {
 
     it('handles arrow navigation correctly', () => {
       const { lastFrame } = renderModal();
-      
+
       // Initial state should show first option selected
       expect(lastFrame()).toContain('▶ y) Allow Once');
-      
+
       // Simulate down arrow - this should update internal state
       act(() => {
         capturedInputHandler!('', { downArrow: true });
       });
-      
+
       // Now simulate Enter to see which option is selected
       act(() => {
         capturedInputHandler!('', { return: true });
@@ -126,7 +126,7 @@ describe('ToolApprovalModal Logic', () => {
 
     it('handles Enter key selection correctly', () => {
       renderModal();
-      
+
       // First navigate to the third option (Deny)
       act(() => {
         capturedInputHandler!('', { downArrow: true });
@@ -134,7 +134,7 @@ describe('ToolApprovalModal Logic', () => {
       act(() => {
         capturedInputHandler!('', { downArrow: true });
       });
-      
+
       // Then press Enter
       act(() => {
         capturedInputHandler!('', { return: true });

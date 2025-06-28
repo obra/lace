@@ -3,7 +3,14 @@
 
 import { readdir, stat, access } from 'fs/promises';
 import { join } from 'path';
-import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 
 export class FileFindTool implements Tool {
   name = 'file_find';
@@ -12,7 +19,7 @@ export class FileFindTool implements Tool {
     readOnlyHint: true,
     idempotentHint: true,
   };
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       pattern: { type: 'string', description: 'File name pattern or glob (e.g., "*.ts", "test*")' },
@@ -32,7 +39,7 @@ export class FileFindTool implements Tool {
     required: ['pattern'],
   };
 
-  async executeTool(input: Record<string, unknown>, _context?: ToolContext): Promise<ToolResult> {
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     const {
       pattern,
       path = '.',
@@ -40,7 +47,7 @@ export class FileFindTool implements Tool {
       caseSensitive = false,
       maxDepth = 10,
       includeHidden = false,
-    } = input as {
+    } = call.arguments as {
       pattern: string;
       path?: string;
       type?: 'file' | 'directory' | 'both';
@@ -50,7 +57,7 @@ export class FileFindTool implements Tool {
     };
 
     if (!pattern || typeof pattern !== 'string') {
-      return createErrorResult('Pattern must be a non-empty string');
+      return createErrorResult('Pattern must be a non-empty string', call.id);
     }
 
     try {
@@ -69,14 +76,20 @@ export class FileFindTool implements Tool {
       const resultText =
         matches.length > 0 ? matches.join('\n') : `No files found matching pattern: ${pattern}`;
 
-      return createSuccessResult([
-        {
-          type: 'text',
-          text: resultText,
-        },
-      ]);
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: resultText,
+          },
+        ],
+        call.id
+      );
     } catch (error) {
-      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred');
+      return createErrorResult(
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
   }
 

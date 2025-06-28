@@ -42,7 +42,7 @@ class MockProvider extends AIProvider {
     if (this.delay > 0) {
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => resolve(this.mockResponse), this.delay);
-        
+
         if (signal) {
           signal.addEventListener('abort', () => {
             clearTimeout(timeout);
@@ -72,8 +72,8 @@ describe('SIGINT Integration Tests', () => {
       usage: {
         promptTokens: 10,
         completionTokens: 5,
-        totalTokens: 15
-      }
+        totalTokens: 15,
+      },
     };
 
     provider = new MockProvider(mockResponse, 100); // 100ms delay for testing
@@ -87,7 +87,7 @@ describe('SIGINT Integration Tests', () => {
       toolExecutor,
       threadManager,
       threadId,
-      tools: []
+      tools: [],
     });
 
     await agent.start();
@@ -108,9 +108,9 @@ describe('SIGINT Integration Tests', () => {
 
       // Start a slow operation
       const messagePromise = agent.sendMessage('Test message');
-      
+
       // Wait for operation to start
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Act - abort the operation
       const wasAborted = agent.abort();
@@ -135,7 +135,7 @@ describe('SIGINT Integration Tests', () => {
     it('should emit turn_start and turn_complete events during normal operation', async () => {
       // Arrange
       const events: string[] = [];
-      
+
       agent.on('turn_start', () => events.push('turn_start'));
       agent.on('turn_complete', () => events.push('turn_complete'));
       agent.on('turn_aborted', () => events.push('turn_aborted'));
@@ -152,14 +152,14 @@ describe('SIGINT Integration Tests', () => {
     it('should emit turn_start and turn_aborted events when operation is aborted', async () => {
       // Arrange
       const events: string[] = [];
-      
+
       agent.on('turn_start', () => events.push('turn_start'));
       agent.on('turn_complete', () => events.push('turn_complete'));
       agent.on('turn_aborted', () => events.push('turn_aborted'));
 
       // Start operation and abort it
       const messagePromise = agent.sendMessage('Test message');
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       agent.abort();
       await messagePromise;
 
@@ -174,7 +174,7 @@ describe('SIGINT Integration Tests', () => {
     it('should provide turn metrics in turn_start event', async () => {
       // Arrange
       let turnStartData: any = null;
-      
+
       agent.on('turn_start', (data) => {
         turnStartData = data;
       });
@@ -194,7 +194,7 @@ describe('SIGINT Integration Tests', () => {
     it('should provide turn metrics in turn_complete event', async () => {
       // Arrange
       let turnCompleteData: any = null;
-      
+
       agent.on('turn_complete', (data) => {
         turnCompleteData = data;
       });
@@ -212,14 +212,14 @@ describe('SIGINT Integration Tests', () => {
     it('should provide turn metrics in turn_aborted event', async () => {
       // Arrange
       let turnAbortedData: any = null;
-      
+
       agent.on('turn_aborted', (data) => {
         turnAbortedData = data;
       });
 
       // Start operation and abort
       const messagePromise = agent.sendMessage('Test message');
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       agent.abort();
       await messagePromise;
 
@@ -235,7 +235,7 @@ describe('SIGINT Integration Tests', () => {
     it('should transition agent state correctly during normal operation', async () => {
       // Arrange
       const states: string[] = [];
-      
+
       agent.on('state_change', ({ to }) => {
         states.push(to);
       });
@@ -251,7 +251,7 @@ describe('SIGINT Integration Tests', () => {
     it('should return to idle state after abort', async () => {
       // Arrange - start operation
       const messagePromise = agent.sendMessage('Test message');
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Verify we're not idle
       expect(agent.getCurrentState()).not.toBe('idle');
@@ -270,9 +270,13 @@ describe('SIGINT Integration Tests', () => {
       // Arrange
       let turnStarted = false;
       let turnCompleted = false;
-      
-      agent.on('turn_start', () => { turnStarted = true; });
-      agent.on('turn_complete', () => { turnCompleted = false; });
+
+      agent.on('turn_start', () => {
+        turnStarted = true;
+      });
+      agent.on('turn_complete', () => {
+        turnCompleted = false;
+      });
 
       // Act
       await agent.sendMessage('Test message');
@@ -286,13 +290,17 @@ describe('SIGINT Integration Tests', () => {
       // Arrange
       let turnStarted = false;
       let turnAborted = false;
-      
-      agent.on('turn_start', () => { turnStarted = true; });
-      agent.on('turn_aborted', () => { turnAborted = true; });
+
+      agent.on('turn_start', () => {
+        turnStarted = true;
+      });
+      agent.on('turn_aborted', () => {
+        turnAborted = true;
+      });
 
       // Start operation
       const messagePromise = agent.sendMessage('Test message');
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Act - abort
       agent.abort();

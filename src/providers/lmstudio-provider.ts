@@ -241,7 +241,7 @@ export class LMStudioProvider extends AIProvider {
           function: {
             name: tool.name,
             description: tool.description,
-            parameters: tool.input_schema,
+            parameters: tool.inputSchema,
           },
         })),
       };
@@ -303,7 +303,7 @@ export class LMStudioProvider extends AIProvider {
         for (const result of msg.toolResults) {
           lmMessages.push({
             role: 'tool',
-            content: result.output,
+            content: result.content.map((block) => block.text || '').join('\n'),
             tool_call_id: result.id,
           });
         }

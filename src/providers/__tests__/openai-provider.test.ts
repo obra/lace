@@ -43,7 +43,7 @@ describe('OpenAIProvider', () => {
     mockTool = {
       name: 'test_tool',
       description: 'A test tool',
-      input_schema: {
+      inputSchema: {
         type: 'object',
         properties: {
           action: { type: 'string', description: 'Action to perform' },
@@ -112,7 +112,7 @@ describe('OpenAIProvider', () => {
           function: {
             name: 'test_tool',
             description: 'A test tool',
-            parameters: mockTool.input_schema,
+            parameters: mockTool.inputSchema,
           },
         },
       ]);

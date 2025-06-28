@@ -3,10 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import React from 'react';
-import { 
-  renderInkComponent, 
-  stripAnsi
-} from './helpers/ink-test-utils.js';
+import { renderInkComponent, stripAnsi } from './helpers/ink-test-utils.js';
 import TextRenderer from '../components/text-renderer.js';
 
 describe('TextRenderer Component', () => {
@@ -14,7 +11,7 @@ describe('TextRenderer Component', () => {
     lines: ['Hello world'],
     cursorLine: 0,
     cursorColumn: 0,
-    isFocused: true
+    isFocused: true,
   };
 
   describe('basic rendering', () => {
@@ -35,12 +32,7 @@ describe('TextRenderer Component', () => {
 
     it('should handle empty props gracefully', () => {
       const { lastFrame } = renderInkComponent(
-        <TextRenderer
-          lines={[]}
-          cursorLine={0}
-          cursorColumn={0}
-          isFocused={false}
-        />
+        <TextRenderer lines={[]} cursorLine={0} cursorColumn={0} isFocused={false} />
       );
       const output = lastFrame();
 
@@ -51,12 +43,7 @@ describe('TextRenderer Component', () => {
   describe('focus handling', () => {
     it('should render focused content', () => {
       const { lastFrame } = renderInkComponent(
-        <TextRenderer
-          lines={['Hello world']}
-          cursorLine={0}
-          cursorColumn={0}
-          isFocused={true}
-        />
+        <TextRenderer lines={['Hello world']} cursorLine={0} cursorColumn={0} isFocused={true} />
       );
       const output = lastFrame() || '';
 
@@ -66,12 +53,7 @@ describe('TextRenderer Component', () => {
 
     it('should render unfocused content', () => {
       const { lastFrame } = renderInkComponent(
-        <TextRenderer
-          lines={['Hello world']}
-          cursorLine={0}
-          cursorColumn={0}
-          isFocused={false}
-        />
+        <TextRenderer lines={['Hello world']} cursorLine={0} cursorColumn={0} isFocused={false} />
       );
       const output = lastFrame() || '';
 
@@ -81,12 +63,7 @@ describe('TextRenderer Component', () => {
 
     it('should handle empty content when focused', () => {
       const { lastFrame } = renderInkComponent(
-        <TextRenderer
-          lines={['']}
-          cursorLine={0}
-          cursorColumn={0}
-          isFocused={true}
-        />
+        <TextRenderer lines={['']} cursorLine={0} cursorColumn={0} isFocused={true} />
       );
       const output = lastFrame() || '';
 
@@ -106,7 +83,7 @@ describe('TextRenderer Component', () => {
         />
       );
       const output = lastFrame() || '';
-      
+
       // Should display all lines (strip ANSI codes since cursor is present)
       const cleanOutput = stripAnsi(output);
       expect(cleanOutput).toContain('First line');
@@ -168,7 +145,7 @@ describe('TextRenderer Component', () => {
 
     it('should show custom placeholder text', () => {
       const customPlaceholder = 'Start typing your code...';
-      
+
       const { lastFrame } = renderInkComponent(
         <TextRenderer
           lines={['']}
@@ -255,22 +232,18 @@ describe('TextRenderer Component', () => {
       );
       const multiOutput = multiFrame() || '';
       expect(multiOutput).toContain('Content on second line');
-      // Note: The placeholder logic only applies to single empty line, 
+      // Note: The placeholder logic only applies to single empty line,
       // so with multiple lines it renders all lines normally
     });
   });
 
   describe('edge cases', () => {
     it('should handle long lines without crashing', () => {
-      const longLine = 'This is a very long line that might wrap or need special handling in the terminal interface when it exceeds normal terminal width limits';
-      
+      const longLine =
+        'This is a very long line that might wrap or need special handling in the terminal interface when it exceeds normal terminal width limits';
+
       const { lastFrame } = renderInkComponent(
-        <TextRenderer
-          lines={[longLine]}
-          cursorLine={0}
-          cursorColumn={10}
-          isFocused={true}
-        />
+        <TextRenderer lines={[longLine]} cursorLine={0} cursorColumn={10} isFocused={true} />
       );
       const output = lastFrame() || '';
 
@@ -297,12 +270,7 @@ describe('TextRenderer Component', () => {
 
     it('should handle negative cursor positions gracefully', () => {
       const { lastFrame } = renderInkComponent(
-        <TextRenderer
-          lines={['Test content']}
-          cursorLine={-1}
-          cursorColumn={-5}
-          isFocused={true}
-        />
+        <TextRenderer lines={['Test content']} cursorLine={-1} cursorColumn={-5} isFocused={true} />
       );
       const output = lastFrame() || '';
 
@@ -312,12 +280,7 @@ describe('TextRenderer Component', () => {
 
     it('should handle empty lines array', () => {
       const { lastFrame } = renderInkComponent(
-        <TextRenderer
-          lines={[]}
-          cursorLine={0}
-          cursorColumn={0}
-          isFocused={true}
-        />
+        <TextRenderer lines={[]} cursorLine={0} cursorColumn={0} isFocused={true} />
       );
       const output = lastFrame() || '';
 
@@ -345,9 +308,7 @@ describe('TextRenderer Component', () => {
 
   describe('React component behavior', () => {
     it('should re-render when props change', () => {
-      const { rerender, lastFrame } = renderInkComponent(
-        <TextRenderer {...defaultProps} />
-      );
+      const { rerender, lastFrame } = renderInkComponent(<TextRenderer {...defaultProps} />);
 
       // Initial render
       let output = lastFrame() || '';
@@ -355,12 +316,7 @@ describe('TextRenderer Component', () => {
 
       // Update props
       rerender(
-        <TextRenderer
-          lines={['Updated text']}
-          cursorLine={0}
-          cursorColumn={0}
-          isFocused={true}
-        />
+        <TextRenderer lines={['Updated text']} cursorLine={0} cursorColumn={0} isFocused={true} />
       );
 
       // Should show updated content
@@ -370,12 +326,7 @@ describe('TextRenderer Component', () => {
 
     it('should handle focus state changes', () => {
       const { rerender, lastFrame } = renderInkComponent(
-        <TextRenderer
-          lines={['Test']}
-          cursorLine={0}
-          cursorColumn={0}
-          isFocused={true}
-        />
+        <TextRenderer lines={['Test']} cursorLine={0} cursorColumn={0} isFocused={true} />
       );
 
       // Initially focused - should render content
@@ -383,14 +334,7 @@ describe('TextRenderer Component', () => {
       expect(stripAnsi(output)).toContain('Test');
 
       // Change to unfocused - should still render content
-      rerender(
-        <TextRenderer
-          lines={['Test']}
-          cursorLine={0}
-          cursorColumn={0}
-          isFocused={false}
-        />
-      );
+      rerender(<TextRenderer lines={['Test']} cursorLine={0} cursorColumn={0} isFocused={false} />);
 
       output = lastFrame() || '';
       expect(output).toContain('Test');

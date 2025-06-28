@@ -17,7 +17,7 @@ vi.mock('ink', async () => {
     ...actual,
     useInput: (handler: (input: string, key: any) => void) => {
       capturedInputHandler = handler;
-    }
+    },
   };
 });
 
@@ -45,7 +45,7 @@ describe('ToolApprovalModal', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls -la" }}
+          input={{ command: 'ls -la' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={false}
@@ -63,7 +63,7 @@ describe('ToolApprovalModal', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls -la" }}
+          input={{ command: 'ls -la' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -82,7 +82,7 @@ describe('ToolApprovalModal', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="read"
-          input={{ file: "test.txt" }}
+          input={{ file: 'test.txt' }}
           isReadOnly={true}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -97,7 +97,7 @@ describe('ToolApprovalModal', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "rm -rf /" }}
+          input={{ command: 'rm -rf /' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -112,7 +112,7 @@ describe('ToolApprovalModal', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "echo hello" }}
+          input={{ command: 'echo hello' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -144,9 +144,9 @@ describe('ToolApprovalModal', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="tool"
-          input={{ 
-            files: ["file1.txt", "file2.txt"], 
-            options: { recursive: true, force: false }
+          input={{
+            files: ['file1.txt', 'file2.txt'],
+            options: { recursive: true, force: false },
           }}
           isReadOnly={false}
           onDecision={mockOnDecision}
@@ -165,7 +165,7 @@ describe('ToolApprovalModal', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls" }}
+          input={{ command: 'ls' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -181,7 +181,7 @@ describe('ToolApprovalModal', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls" }}
+          input={{ command: 'ls' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -197,7 +197,7 @@ describe('ToolApprovalModal', () => {
       renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls" }}
+          input={{ command: 'ls' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -213,7 +213,7 @@ describe('ToolApprovalModal', () => {
       renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls" }}
+          input={{ command: 'ls' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -229,7 +229,7 @@ describe('ToolApprovalModal', () => {
       renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls" }}
+          input={{ command: 'ls' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -245,7 +245,7 @@ describe('ToolApprovalModal', () => {
       renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "rm file" }}
+          input={{ command: 'rm file' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -261,7 +261,7 @@ describe('ToolApprovalModal', () => {
       renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "rm file" }}
+          input={{ command: 'rm file' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -277,7 +277,7 @@ describe('ToolApprovalModal', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls" }}
+          input={{ command: 'ls' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -299,12 +299,12 @@ describe('ToolApprovalModal', () => {
     it('selects highlighted option with Enter', () => {
       // Reset handler to ensure clean state
       capturedInputHandler = null;
-      
+
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           key="enter-test" // Force new component instance
           toolName="bash"
-          input={{ command: "ls" }}
+          input={{ command: 'ls' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -330,7 +330,7 @@ describe('ToolApprovalModal', () => {
       renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls" }}
+          input={{ command: 'ls' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={false}
@@ -348,7 +348,7 @@ describe('ToolApprovalModal', () => {
       const { lastFrame, rerender } = renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls" }}
+          input={{ command: 'ls' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -364,7 +364,7 @@ describe('ToolApprovalModal', () => {
       rerender(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls" }}
+          input={{ command: 'ls' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={false}
@@ -374,7 +374,7 @@ describe('ToolApprovalModal', () => {
       rerender(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls" }}
+          input={{ command: 'ls' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -382,7 +382,7 @@ describe('ToolApprovalModal', () => {
       );
 
       // Wait for effect to process
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       // Should be back to first option
       expect(lastFrame()).toContain('▶ y) Allow Once');

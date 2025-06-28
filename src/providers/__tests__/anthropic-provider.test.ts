@@ -43,7 +43,7 @@ describe('AnthropicProvider', () => {
     mockTool = {
       name: 'test_tool',
       description: 'A test tool',
-      input_schema: {
+      inputSchema: {
         type: 'object',
         properties: {
           action: { type: 'string', description: 'Action to perform' },
@@ -103,7 +103,7 @@ describe('AnthropicProvider', () => {
         tools: [{
           name: 'test_tool',
           description: 'A test tool',
-          input_schema: mockTool.input_schema,
+          input_schema: mockTool.inputSchema,
         }],
       }, { signal: undefined });
     });
@@ -194,7 +194,7 @@ describe('AnthropicProvider', () => {
         tools: [{
           name: 'test_tool',
           description: 'A test tool',
-          input_schema: mockTool.input_schema,
+          input_schema: mockTool.inputSchema,
         }],
       }, { signal: undefined });
     });

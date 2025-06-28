@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { OllamaProvider } from '../ollama-provider.js';
-import { Tool, ToolContext } from '../../tools/types.js';
+import { Tool, ToolCall, ToolContext, ToolResult } from '../../tools/types.js';
 import { logger } from '../../utils/logger.js';
 import { checkProviderAvailability } from '../../__tests__/utils/provider-test-helpers.js';
 
@@ -11,7 +11,7 @@ import { checkProviderAvailability } from '../../__tests__/utils/provider-test-h
 class MockTool implements Tool {
   name = 'mock_tool';
   description = 'A mock tool for testing';
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       action: { type: 'string', description: 'Action to perform' },
@@ -20,10 +20,13 @@ class MockTool implements Tool {
     required: ['action'],
   };
 
-  async executeTool(input: Record<string, unknown>, _context?: ToolContext) {
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     return {
+      id: call.id,
       isError: false,
-      content: [{ type: 'text' as const, text: `Mock executed: ${JSON.stringify(input)}` }],
+      content: [
+        { type: 'text' as const, text: `Mock executed: ${JSON.stringify(call.arguments)}` },
+      ],
     };
   }
 }

@@ -19,7 +19,7 @@ describe('ToolApprovalModal Basic', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls -la" }}
+          input={{ command: 'ls -la' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -38,7 +38,7 @@ describe('ToolApprovalModal Basic', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="read"
-          input={{ file: "test.txt" }}
+          input={{ file: 'test.txt' }}
           isReadOnly={true}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -54,7 +54,7 @@ describe('ToolApprovalModal Basic', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "rm -rf /" }}
+          input={{ command: 'rm -rf /' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -70,7 +70,7 @@ describe('ToolApprovalModal Basic', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "echo hello" }}
+          input={{ command: 'echo hello' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -88,7 +88,7 @@ describe('ToolApprovalModal Basic', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls" }}
+          input={{ command: 'ls' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}
@@ -105,7 +105,7 @@ describe('ToolApprovalModal Basic', () => {
       const { lastFrame } = renderInkComponent(
         <ToolApprovalModal
           toolName="bash"
-          input={{ command: "ls" }}
+          input={{ command: 'ls' }}
           isReadOnly={false}
           onDecision={mockOnDecision}
           isVisible={true}

@@ -174,7 +174,7 @@ describe('Agent Token Tracking Integration', () => {
       const mockTool: Tool = {
         name: 'test_tool',
         description: 'Test tool for token tracking',
-        input_schema: {
+        inputSchema: {
           type: 'object',
           properties: {
             test: { type: 'string' },
@@ -271,7 +271,7 @@ describe('Agent Token Tracking Integration', () => {
       const mockTool: Tool = {
         name: 'test_tool',
         description: 'Test tool',
-        input_schema: { type: 'object', properties: {}, required: [] },
+        inputSchema: { type: 'object', properties: {}, required: [] },
         executeTool: vi.fn().mockResolvedValue({
           success: true,
           output: 'Tool result',

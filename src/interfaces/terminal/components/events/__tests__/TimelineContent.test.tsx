@@ -10,8 +10,12 @@ import { TimelineContent } from '../TimelineContent.js';
 
 // Mock TimelineItem component
 vi.mock('../TimelineItem.js', () => ({
-  TimelineItem: ({ item, isSelected, currentFocusId }: any) => 
-    React.createElement(Text, {}, `TLI:${item.type}:${isSelected ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}`)
+  TimelineItem: ({ item, isSelected, currentFocusId }: any) =>
+    React.createElement(
+      Text,
+      {},
+      `TLI:${item.type}:${isSelected ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}`
+    ),
 }));
 
 vi.mock('../../../../../utils/logger.js', () => ({
@@ -19,8 +23,8 @@ vi.mock('../../../../../utils/logger.js', () => ({
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
-    error: vi.fn()
-  }
+    error: vi.fn(),
+  },
 }));
 
 describe('TimelineContent Component', () => {
@@ -39,7 +43,7 @@ describe('TimelineContent Component', () => {
         id: `item-${i}`,
         type: 'user_message',
         timestamp: new Date(`2024-01-01T10:0${i}:00Z`),
-        content: `Message ${i}`
+        content: `Message ${i}`,
       });
     }
     return {
@@ -47,8 +51,8 @@ describe('TimelineContent Component', () => {
       metadata: {
         eventCount: itemCount,
         messageCount: itemCount,
-        lastActivity: new Date()
-      }
+        lastActivity: new Date(),
+      },
     };
   };
 
@@ -56,22 +60,20 @@ describe('TimelineContent Component', () => {
     viewportState: {
       selectedItemIndex: 0,
       selectedLine: 0,
-      itemPositions: [0, 5, 10]
+      itemPositions: [0, 5, 10],
     },
     viewportActions: {
-      triggerRemeasurement: mockTriggerRemeasurement
+      triggerRemeasurement: mockTriggerRemeasurement,
     },
     itemRefs: mockItemRefs,
-    currentFocusId: 'timeline'
+    currentFocusId: 'timeline',
   });
 
   describe('Basic rendering', () => {
     it('should render all timeline items', () => {
       const timeline = createMockTimeline(3);
 
-      const { lastFrame } = render(
-        <TimelineContent timeline={timeline} {...getDefaultProps()} />
-      );
+      const { lastFrame } = render(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
 
       const frame = lastFrame();
       expect(frame).toContain('TLI:user_message:FOCUS:timeline'); // First item focused
@@ -81,9 +83,7 @@ describe('TimelineContent Component', () => {
     it('should handle empty timeline', () => {
       const timeline = createMockTimeline(0);
 
-      const { lastFrame } = render(
-        <TimelineContent timeline={timeline} {...getDefaultProps()} />
-      );
+      const { lastFrame } = render(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
 
       expect(lastFrame()).toBe('');
     });
@@ -91,9 +91,7 @@ describe('TimelineContent Component', () => {
     it('should render single item timeline', () => {
       const timeline = createMockTimeline(1);
 
-      const { lastFrame } = render(
-        <TimelineContent timeline={timeline} {...getDefaultProps()} />
-      );
+      const { lastFrame } = render(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
 
       expect(lastFrame()).toContain('TLI:user_message:FOCUS:timeline');
     });
@@ -105,15 +103,11 @@ describe('TimelineContent Component', () => {
       const viewportState = {
         selectedItemIndex: 1, // Second item focused
         selectedLine: 0,
-        itemPositions: [0, 5, 10]
+        itemPositions: [0, 5, 10],
       };
 
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          {...getDefaultProps()}
-          viewportState={viewportState}
-        />
+        <TimelineContent timeline={timeline} {...getDefaultProps()} viewportState={viewportState} />
       );
 
       const frame = lastFrame();
@@ -121,7 +115,7 @@ describe('TimelineContent Component', () => {
       // Should have exactly one focused item (index 1)
       const focusedMatches = frame!.match(/:FOCUS:/g);
       expect(focusedMatches).toHaveLength(1);
-      
+
       // Should have two unfocused items (indices 0 and 2)
       const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
       expect(unfocusedMatches).toHaveLength(2);
@@ -132,15 +126,11 @@ describe('TimelineContent Component', () => {
       const viewportState = {
         selectedItemIndex: 5, // Out of bounds
         selectedLine: 0,
-        itemPositions: [0, 5]
+        itemPositions: [0, 5],
       };
 
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          {...getDefaultProps()}
-          viewportState={viewportState}
-        />
+        <TimelineContent timeline={timeline} {...getDefaultProps()} viewportState={viewportState} />
       );
 
       const frame = lastFrame();
@@ -148,7 +138,7 @@ describe('TimelineContent Component', () => {
       // All items should be unfocused when selectedItemIndex is out of bounds
       const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
       expect(unfocusedMatches).toHaveLength(2);
-      
+
       const focusedMatches = frame!.match(/:FOCUS:/g);
       expect(focusedMatches).toBeNull();
     });
@@ -158,15 +148,11 @@ describe('TimelineContent Component', () => {
       const viewportState = {
         selectedItemIndex: -1, // Negative index
         selectedLine: 0,
-        itemPositions: [0, 5]
+        itemPositions: [0, 5],
       };
 
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          {...getDefaultProps()}
-          viewportState={viewportState}
-        />
+        <TimelineContent timeline={timeline} {...getDefaultProps()} viewportState={viewportState} />
       );
 
       const frame = lastFrame();
@@ -174,7 +160,7 @@ describe('TimelineContent Component', () => {
       // All items should be unfocused when selectedItemIndex is negative
       const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
       expect(unfocusedMatches).toHaveLength(2);
-      
+
       const focusedMatches = frame!.match(/:FOCUS:/g);
       expect(focusedMatches).toBeNull();
     });
@@ -187,11 +173,7 @@ describe('TimelineContent Component', () => {
       const timeline = createMockTimeline(1);
 
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          {...getDefaultProps()}
-          currentFocusId="custom-focus"
-        />
+        <TimelineContent timeline={timeline} {...getDefaultProps()} currentFocusId="custom-focus" />
       );
 
       expect(lastFrame()).toContain('custom-focus');
@@ -202,17 +184,13 @@ describe('TimelineContent Component', () => {
       const viewportState = {
         selectedItemIndex: 0,
         selectedLine: 10,
-        itemPositions: [100, 200] // Custom positions
+        itemPositions: [100, 200], // Custom positions
       };
 
       // Since our mock doesn't expose the detailed props, we test by ensuring
       // the component renders without errors with the position data
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          {...getDefaultProps()}
-          viewportState={viewportState}
-        />
+        <TimelineContent timeline={timeline} {...getDefaultProps()} viewportState={viewportState} />
       );
 
       expect(lastFrame()).toContain('TLI:user_message:FOCUS');
@@ -223,15 +201,11 @@ describe('TimelineContent Component', () => {
       const viewportState = {
         selectedItemIndex: 0,
         selectedLine: 0,
-        itemPositions: [] // Empty positions array
+        itemPositions: [], // Empty positions array
       };
 
       const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          {...getDefaultProps()}
-          viewportState={viewportState}
-        />
+        <TimelineContent timeline={timeline} {...getDefaultProps()} viewportState={viewportState} />
       );
 
       // Should render without crashing (fallback to 0 for missing positions)
@@ -244,22 +218,15 @@ describe('TimelineContent Component', () => {
       const timeline = createMockTimeline(1);
       // These props are passed through but don't affect our mock output
       // This test verifies the props are accepted without errors
-      const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          {...getDefaultProps()}
-        />
-      );
+      const { lastFrame } = render(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
 
       expect(lastFrame()).toContain('TLI:user_message');
     });
 
     it('should call triggerRemeasurement through onToggle', () => {
       const timeline = createMockTimeline(1);
-      
-      render(
-        <TimelineContent timeline={timeline} {...getDefaultProps()} />
-      );
+
+      render(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
 
       // The onToggle prop is passed to TimelineItem, but we can't easily trigger it
       // in this test since our mock doesn't expose the callback. This test verifies
@@ -276,35 +243,33 @@ describe('TimelineContent Component', () => {
             id: 'user-1',
             type: 'user_message',
             timestamp: new Date('2024-01-01T10:00:00Z'),
-            content: 'Hello'
+            content: 'Hello',
           },
           {
             id: 'agent-1',
             type: 'agent_message',
             timestamp: new Date('2024-01-01T10:01:00Z'),
-            content: 'Hi there'
+            content: 'Hi there',
           },
           {
             type: 'tool_execution',
             timestamp: new Date('2024-01-01T10:02:00Z'),
             callId: 'call-1',
             call: {
-              toolName: 'bash',
-              input: { command: 'ls' },
-              callId: 'call-1'
-            }
-          }
+              id: 'call-1',
+              name: 'bash',
+              arguments: { command: 'ls' },
+            },
+          },
         ],
         metadata: {
           eventCount: 3,
           messageCount: 2,
-          lastActivity: new Date('2024-01-01T10:02:00Z')
-        }
+          lastActivity: new Date('2024-01-01T10:02:00Z'),
+        },
       };
 
-      const { lastFrame } = render(
-        <TimelineContent timeline={timeline} {...getDefaultProps()} />
-      );
+      const { lastFrame } = render(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
 
       const frame = lastFrame();
       expect(frame).toContain('TLI:user_message:FOCUS'); // First item focused
@@ -316,22 +281,18 @@ describe('TimelineContent Component', () => {
   describe('Key generation and refs', () => {
     it('should generate unique keys for timeline items', () => {
       const timeline = createMockTimeline(3);
-      
+
       // This is tested implicitly - if keys weren't unique, React would warn
       // The test passing without warnings indicates proper key generation
-      const { lastFrame } = render(
-        <TimelineContent timeline={timeline} {...getDefaultProps()} />
-      );
+      const { lastFrame } = render(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
 
       expect(lastFrame()).toContain('TLI:user_message');
     });
 
     it('should manage itemRefs correctly', () => {
       const timeline = createMockTimeline(2);
-      
-      render(
-        <TimelineContent timeline={timeline} {...getDefaultProps()} />
-      );
+
+      render(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
 
       // ItemRefs should be managed (though we can't test the exact ref values
       // since they're set asynchronously)
@@ -343,12 +304,7 @@ describe('TimelineContent Component', () => {
     it('should handle component without errors', () => {
       const timeline = createMockTimeline(1);
 
-      const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          {...getDefaultProps()}
-        />
-      );
+      const { lastFrame } = render(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
 
       expect(lastFrame()).toContain('TLI:user_message');
     });
@@ -356,12 +312,7 @@ describe('TimelineContent Component', () => {
     it('should handle empty expand state maps', () => {
       const timeline = createMockTimeline(1);
 
-      const { lastFrame } = render(
-        <TimelineContent 
-          timeline={timeline} 
-          {...getDefaultProps()}
-        />
-      );
+      const { lastFrame } = render(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
 
       expect(lastFrame()).toContain('TLI:user_message');
     });

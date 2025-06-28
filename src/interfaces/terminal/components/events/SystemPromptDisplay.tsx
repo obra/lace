@@ -16,21 +16,27 @@ interface SystemPromptDisplayProps {
   onToggle?: () => void;
 }
 
-export function SystemPromptDisplay({ event, isStreaming, isFocused, isSelected, onToggle }: SystemPromptDisplayProps) {
+export function SystemPromptDisplay({
+  event,
+  isStreaming,
+  isFocused,
+  isSelected,
+  onToggle,
+}: SystemPromptDisplayProps) {
   const systemPrompt = event.data as string;
   const [isExpanded, setIsExpanded] = useState(false);
-  
+
   // Handle expansion toggle events
   const toggleExpansion = () => {
     setIsExpanded(!isExpanded);
     onToggle?.();
   };
-  
+
   // Listen for expansion toggle events when selected
   useTimelineExpansionToggle(isSelected || false, toggleExpansion);
-  
+
   return (
-    <TimelineEntryCollapsibleBox 
+    <TimelineEntryCollapsibleBox
       key={`system-prompt-${event.id}`}
       label={`${UI_SYMBOLS.TOOL} System Prompt`}
       isExpanded={isExpanded}
@@ -42,7 +48,9 @@ export function SystemPromptDisplay({ event, isStreaming, isFocused, isSelected,
       isSelected={isSelected}
       onToggle={onToggle}
     >
-      <Text color="blue" wrap="wrap">{systemPrompt}</Text>
+      <Text color="blue" wrap="wrap">
+        {systemPrompt}
+      </Text>
     </TimelineEntryCollapsibleBox>
   );
 }

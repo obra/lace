@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, AgentConfig } from '../agent.js';
 import { AIProvider } from '../../providers/base-provider.js';
 import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool, ToolResult, ToolContext } from '../../tools/types.js';
+import { Tool, ToolCall, ToolResult, ToolContext } from '../../tools/types.js';
 import { ToolExecutor } from '../../tools/executor.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 
@@ -35,7 +35,7 @@ class MockProvider extends AIProvider {
 class MockTool implements Tool {
   name = 'mock_tool';
   description = 'A mock tool for testing';
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       action: { type: 'string', description: 'Action to perform' },
@@ -45,8 +45,8 @@ class MockTool implements Tool {
 
   constructor(private result: ToolResult) {}
 
-  async executeTool(_input: Record<string, unknown>, _context?: ToolContext): Promise<ToolResult> {
-    return this.result;
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
+    return { ...this.result, id: call.id };
   }
 }
 
@@ -304,8 +304,8 @@ describe('Enhanced Agent', () => {
     it('should execute tools and emit events', async () => {
       const events: Array<{ type: string; data?: any }> = [];
 
-      agent.on('tool_call_start', (data) => events.push({ type: 'tool_start', data }));
-      agent.on('tool_call_complete', (data) => events.push({ type: 'tool_complete', data }));
+      agent.on('tool_call_start', (data) => events.push({ type: 'tool_call_start', data }));
+      agent.on('tool_call_complete', (data) => events.push({ type: 'tool_call_complete', data }));
       agent.on('state_change', ({ from, to }) =>
         events.push({ type: 'state_change', data: `${from}->${to}` })
       );
@@ -316,7 +316,7 @@ describe('Enhanced Agent', () => {
       expect(toolEvents).toHaveLength(2);
 
       expect(toolEvents[0]).toEqual({
-        type: 'tool_start',
+        type: 'tool_call_start',
         data: {
           toolName: 'mock_tool',
           input: { action: 'test' },
@@ -347,19 +347,17 @@ describe('Enhanced Agent', () => {
       const toolCalls = events.filter((e) => e.type === 'TOOL_CALL');
       expect(toolCalls).toHaveLength(1);
       expect(toolCalls[0].data).toEqual({
-        toolName: 'mock_tool',
-        input: { action: 'test' },
-        callId: 'call_123',
+        id: 'call_123',
+        name: 'mock_tool',
+        arguments: { action: 'test' },
       });
 
       const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(1);
-      expect(toolResults[0].data).toEqual({
-        callId: 'call_123',
-        output: 'Tool executed successfully',
-        success: true,
-        error: undefined,
-      });
+      const toolResult = toolResults[0].data as ToolResult;
+      expect(toolResult.id).toBe('call_123');
+      expect(toolResult.isError).toBe(false);
+      expect(toolResult.content[0].text).toBe('Tool executed successfully');
     });
 
     it('should handle tool execution errors gracefully', async () => {
@@ -517,9 +515,9 @@ describe('Enhanced Agent', () => {
     it('should handle orphaned tool results gracefully', () => {
       threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test');
       threadManager.addEvent(threadId, 'TOOL_RESULT', {
-        callId: 'missing-call-id',
-        output: 'Some output',
-        success: true,
+        id: 'missing-call-id',
+        content: [{ type: 'text', text: 'Some output' }],
+        isError: false,
       });
 
       // Should not throw error
@@ -532,9 +530,9 @@ describe('Enhanced Agent', () => {
     it('should handle orphaned tool calls gracefully', () => {
       threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test');
       threadManager.addEvent(threadId, 'TOOL_CALL', {
-        toolName: 'bash',
-        input: { command: 'ls' },
-        callId: 'orphaned-call',
+        name: 'bash',
+        arguments: { command: 'ls' },
+        id: 'orphaned-call',
       });
 
       // Should not throw error
@@ -674,8 +672,8 @@ describe('Enhanced Agent', () => {
       expect(toolCalls).toHaveLength(2);
       expect(toolResults).toHaveLength(2);
 
-      expect((toolCalls[0].data as any).toolName).toBe('tool_1');
-      expect((toolCalls[1].data as any).toolName).toBe('tool_2');
+      expect((toolCalls[0].data as ToolCall).name).toBe('tool_1');
+      expect((toolCalls[1].data as ToolCall).name).toBe('tool_2');
     });
   });
 

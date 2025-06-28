@@ -22,19 +22,27 @@ interface EventDisplayProps {
   onToggle?: () => void;
 }
 
-export function EventDisplay({ event, isStreaming, isFocused, isSelected, focusedLine, itemStartLine, onToggle }: EventDisplayProps) {
+export function EventDisplay({
+  event,
+  isStreaming,
+  isFocused,
+  isSelected,
+  focusedLine,
+  itemStartLine,
+  onToggle,
+}: EventDisplayProps) {
   const componentMap = {
-    'TOOL_CALL': ToolCallDisplay,
-    'TOOL_RESULT': ToolResultDisplay,
-    'USER_MESSAGE': UserMessageDisplay,
-    'AGENT_MESSAGE': AgentMessageDisplay,
-    'LOCAL_SYSTEM_MESSAGE': SystemMessageDisplay,
-    'SYSTEM_PROMPT': SystemPromptDisplay,
-    'USER_SYSTEM_PROMPT': UserSystemPromptDisplay,
+    TOOL_CALL: ToolCallDisplay,
+    TOOL_RESULT: ToolResultDisplay,
+    USER_MESSAGE: UserMessageDisplay,
+    AGENT_MESSAGE: AgentMessageDisplay,
+    LOCAL_SYSTEM_MESSAGE: SystemMessageDisplay,
+    SYSTEM_PROMPT: SystemPromptDisplay,
+    USER_SYSTEM_PROMPT: UserSystemPromptDisplay,
   } as const;
 
   const Component = componentMap[event.type];
-  
+
   if (!Component) {
     // Fallback for unknown event types
     return (
@@ -48,7 +56,13 @@ export function EventDisplay({ event, isStreaming, isFocused, isSelected, focuse
 
   return (
     <Box flexDirection="column">
-      <Component event={event} isStreaming={isStreaming} isFocused={isFocused} isSelected={isSelected} onToggle={onToggle} />
+      <Component
+        event={event}
+        isStreaming={isStreaming}
+        isFocused={isFocused}
+        isSelected={isSelected}
+        onToggle={onToggle}
+      />
     </Box>
   );
 }

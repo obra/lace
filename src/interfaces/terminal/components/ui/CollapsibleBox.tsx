@@ -16,17 +16,16 @@ interface CollapsibleBoxProps {
   isSelected?: boolean; // Whether this specific box is selected (for visual indication)
 }
 
-export function CollapsibleBox({ 
-  children, 
-  label, 
+export function CollapsibleBox({
+  children,
+  label,
   summary,
   isExpanded,
   maxHeight,
   borderStyle = 'round',
   borderColor = 'gray',
-  isSelected = false
+  isSelected = false,
 }: CollapsibleBoxProps) {
-  
   return (
     <Box flexDirection="column">
       {label && (
@@ -35,24 +34,21 @@ export function CollapsibleBox({
             {isExpanded ? UI_SYMBOLS.EXPANDED : UI_SYMBOLS.COLLAPSED} {label}
           </Text>
           {isSelected && (
-            <Text color="gray"> ({UI_SYMBOLS.ARROW_LEFT} {UI_SYMBOLS.ARROW_RIGHT} to toggle)</Text>
+            <Text color="gray">
+              {' '}
+              ({UI_SYMBOLS.ARROW_LEFT} {UI_SYMBOLS.ARROW_RIGHT} to toggle)
+            </Text>
           )}
         </Box>
       )}
-      
+
       {isExpanded ? (
-        <Box 
-          flexDirection="column"
-          marginLeft={2}
-        >
+        <Box flexDirection="column" marginLeft={2}>
           {children}
         </Box>
       ) : (
         summary && (
-          <Box 
-            flexDirection="column"
-            marginLeft={2}
-          >
+          <Box flexDirection="column" marginLeft={2}>
             {summary}
           </Box>
         )

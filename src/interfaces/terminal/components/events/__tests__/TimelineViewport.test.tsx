@@ -10,7 +10,7 @@ import { Timeline } from '../../../../thread-processor.js';
 
 // Mock external dependencies that aren't core to the component logic
 vi.mock('../../../../../utils/use-stdout-dimensions.js', () => ({
-  default: () => [80, 30] // width, height
+  default: () => [80, 30], // width, height
 }));
 
 vi.mock('../../../../../utils/logger.js', () => ({
@@ -18,8 +18,8 @@ vi.mock('../../../../../utils/logger.js', () => ({
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
-    error: vi.fn()
-  }
+    error: vi.fn(),
+  },
 }));
 
 describe('TimelineViewport', () => {
@@ -30,25 +30,25 @@ describe('TimelineViewport', () => {
         id: `item-${i}`,
         type: 'user_message' as const,
         timestamp: new Date(Date.now() + i * 1000),
-        content: `Message ${i}`
+        content: `Message ${i}`,
       });
     }
-    return { 
+    return {
       items,
       metadata: {
         eventCount: itemCount,
         messageCount: itemCount,
-        lastActivity: new Date()
-      }
+        lastActivity: new Date(),
+      },
     };
   };
 
   it('should render viewport container with children', () => {
     const timeline = createMockTimeline(3);
-    
+
     const { lastFrame } = render(
       <TimelineViewport timeline={timeline}>
-        {({ timeline: tl, viewportState, itemRefs }) => 
+        {({ timeline: tl, viewportState, itemRefs }) =>
           tl.items.map((item, index) => (
             <Text key={`${item.type}-${index}`}>
               {item.type === 'user_message' ? item.content : `Item ${index}`}
@@ -57,7 +57,7 @@ describe('TimelineViewport', () => {
         }
       </TimelineViewport>
     );
-    
+
     // Should render timeline content through children render prop
     // Note: cursor overlay covers first character, so we see '>essage 0' instead of 'Message 0'
     expect(lastFrame()).toContain('essage 0');
@@ -68,7 +68,7 @@ describe('TimelineViewport', () => {
   it('should provide viewport state to children', () => {
     const timeline = createMockTimeline(2);
     let capturedState: any = null;
-    
+
     render(
       <TimelineViewport timeline={timeline}>
         {({ viewportState }) => {
@@ -77,7 +77,7 @@ describe('TimelineViewport', () => {
         }}
       </TimelineViewport>
     );
-    
+
     // Should provide viewport state
     expect(capturedState).toBeDefined();
     expect(capturedState.selectedLine).toBeDefined();
@@ -90,7 +90,7 @@ describe('TimelineViewport', () => {
   it('should provide viewport actions to children', () => {
     const timeline = createMockTimeline(2);
     let capturedActions: any = null;
-    
+
     render(
       <TimelineViewport timeline={timeline}>
         {({ viewportActions }) => {
@@ -99,7 +99,7 @@ describe('TimelineViewport', () => {
         }}
       </TimelineViewport>
     );
-    
+
     // Should provide viewport actions
     expect(capturedActions).toBeDefined();
     expect(capturedActions.triggerRemeasurement).toBeTypeOf('function');
@@ -108,7 +108,7 @@ describe('TimelineViewport', () => {
   it('should provide itemRefs to children', () => {
     const timeline = createMockTimeline(2);
     let capturedRefs: any = null;
-    
+
     render(
       <TimelineViewport timeline={timeline}>
         {({ itemRefs }) => {
@@ -117,7 +117,7 @@ describe('TimelineViewport', () => {
         }}
       </TimelineViewport>
     );
-    
+
     // Should provide item refs
     expect(capturedRefs).toBeDefined();
     expect(capturedRefs.current).toBeInstanceOf(Map);
@@ -125,35 +125,31 @@ describe('TimelineViewport', () => {
 
   it('should render cursor overlay', () => {
     const timeline = createMockTimeline(1);
-    
+
     const { lastFrame } = render(
-      <TimelineViewport timeline={timeline}>
-        {() => <Text>Content</Text>}
-      </TimelineViewport>
+      <TimelineViewport timeline={timeline}>{() => <Text>Content</Text>}</TimelineViewport>
     );
-    
+
     // Should contain cursor indicator
     expect(lastFrame()).toContain('>');
   });
 
   it('should handle empty timeline', () => {
-    const timeline: Timeline = { 
+    const timeline: Timeline = {
       items: [],
       metadata: {
         eventCount: 0,
         messageCount: 0,
-        lastActivity: new Date()
-      }
+        lastActivity: new Date(),
+      },
     };
-    
+
     const { lastFrame } = render(
       <TimelineViewport timeline={timeline}>
-        {({ timeline: tl }) => (
-          <Text>Items: {tl.items.length}</Text>
-        )}
+        {({ timeline: tl }) => <Text>Items: {tl.items.length}</Text>}
       </TimelineViewport>
     );
-    
+
     // Should render without crashing
     // Note: cursor overlay covers first character
     expect(lastFrame()).toContain('tems: 0');
@@ -161,17 +157,13 @@ describe('TimelineViewport', () => {
 
   it('should accept focus configuration', () => {
     const timeline = createMockTimeline(1);
-    
+
     const { lastFrame } = render(
-      <TimelineViewport 
-        timeline={timeline} 
-        focusId="test-focus" 
-        parentFocusId="parent-focus"
-      >
+      <TimelineViewport timeline={timeline} focusId="test-focus" parentFocusId="parent-focus">
         {() => <Text>Focused content</Text>}
       </TimelineViewport>
     );
-    
+
     // Should render without crashing with focus props
     // Note: cursor overlay covers first character
     expect(lastFrame()).toContain('ocused content');

@@ -1,7 +1,14 @@
 // ABOUTME: Delegate tool for spawning subagents with specific tasks
 // ABOUTME: Enables efficient token usage by delegating to cheaper models
 
-import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 import { ApprovalDecision } from '../approval-types.js';
 import { Agent } from '../../agents/agent.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
@@ -29,7 +36,7 @@ Examples:
     openWorldHint: true,
   };
 
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       title: {
@@ -66,13 +73,13 @@ Examples:
   private parentToolExecutor?: ToolExecutor;
   private defaultTimeout: number = 300000; // 5 minutes default
 
-  async executeTool(input: Record<string, unknown>, _context?: ToolContext): Promise<ToolResult> {
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     const {
       title,
       prompt,
       expected_response,
       model = 'anthropic:claude-3-5-haiku-latest',
-    } = input as {
+    } = call.arguments as {
       title: string;
       prompt: string;
       expected_response: string;
@@ -81,22 +88,23 @@ Examples:
 
     // Validate inputs
     if (!title || typeof title !== 'string') {
-      return createErrorResult('Title must be a non-empty string');
+      return createErrorResult('Title must be a non-empty string', call.id);
     }
 
     if (!prompt || typeof prompt !== 'string') {
-      return createErrorResult('Prompt must be a non-empty string');
+      return createErrorResult('Prompt must be a non-empty string', call.id);
     }
 
     if (!expected_response || typeof expected_response !== 'string') {
-      return createErrorResult('Expected response must be a non-empty string');
+      return createErrorResult('Expected response must be a non-empty string', call.id);
     }
 
     // Parse provider:model format
     const [providerName, modelName] = model.split(':');
     if (!providerName || !modelName) {
       return createErrorResult(
-        'Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3.5-haiku-latest")'
+        'Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3.5-haiku-latest")',
+        call.id
       );
     }
 
@@ -104,19 +112,23 @@ Examples:
       // Create provider for subagent
       const provider = await this.createProvider(providerName, modelName, expected_response);
       if (!provider) {
-        return createErrorResult(`Unknown provider: ${providerName}`);
+        return createErrorResult(`Unknown provider: ${providerName}`, call.id);
       }
 
       // Use shared thread manager from parent (avoids multiple SQLite connections)
       if (!this.threadManager) {
-        return createErrorResult('Delegate tool not properly initialized - missing ThreadManager');
+        return createErrorResult(
+          'Delegate tool not properly initialized - missing ThreadManager',
+          call.id
+        );
       }
       const threadManager = this.threadManager;
 
       // Create restricted tool executor for subagent (remove delegate to prevent recursion)
       if (!this.parentToolExecutor) {
         return createErrorResult(
-          'Delegate tool not properly initialized - missing parent ToolExecutor'
+          'Delegate tool not properly initialized - missing parent ToolExecutor',
+          call.id
         );
       }
 
@@ -212,12 +224,16 @@ Examples:
         logger.debug('DelegateTool: Subagent finished, returning result', {
           combinedResponseLength: combinedResponse.length,
         });
-        return createSuccessResult([
-          {
-            type: 'text',
-            text: combinedResponse || 'Subagent completed without response',
-          },
-        ]);
+        return createSuccessResult(
+          [
+            {
+              type: 'text',
+              text: combinedResponse || 'Subagent completed without response',
+            },
+          ],
+          call.id,
+          { threadId: subagentThreadId }
+        );
       } catch (error) {
         logger.error('DelegateTool: Error during subagent execution', {
           error: error instanceof Error ? error.message : String(error),
@@ -228,12 +244,16 @@ Examples:
         }
 
         return createErrorResult(
-          error instanceof Error ? `Subagent error: ${error.message}` : 'Unknown error occurred'
+          error instanceof Error ? `Subagent error: ${error.message}` : 'Unknown error occurred',
+          call.id
         );
       }
     } catch (error) {
       return createErrorResult(
-        error instanceof Error ? `Provider setup error: ${error.message}` : 'Unknown error occurred'
+        error instanceof Error
+          ? `Provider setup error: ${error.message}`
+          : 'Unknown error occurred',
+        call.id
       );
     }
   }

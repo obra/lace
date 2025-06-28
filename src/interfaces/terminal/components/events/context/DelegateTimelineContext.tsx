@@ -17,7 +17,10 @@ interface DelegateTimelineProviderProps {
   delegateTimelines: Map<string, Timeline>;
 }
 
-export function DelegateTimelineProvider({ children, delegateTimelines }: DelegateTimelineProviderProps) {
+export function DelegateTimelineProvider({
+  children,
+  delegateTimelines,
+}: DelegateTimelineProviderProps) {
   const contextValue: DelegateTimelineContextValue = {
     getDelegateTimeline: (threadId: string) => delegateTimelines.get(threadId),
     getAllDelegateTimelines: () => delegateTimelines,

@@ -1,4 +1,4 @@
-// ABOUTME: Tests for turn state integration and terminal interface logic  
+// ABOUTME: Tests for turn state integration and terminal interface logic
 // ABOUTME: Validates turn state management responds correctly to Agent lifecycle events
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -43,7 +43,7 @@ class MockProvider extends AIProvider {
     if (this.delay > 0) {
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => resolve(this.mockResponse), this.delay);
-        
+
         if (signal) {
           signal.addEventListener('abort', () => {
             clearTimeout(timeout);
@@ -74,8 +74,8 @@ describe('Turn State Integration Tests', () => {
       usage: {
         promptTokens: 10,
         completionTokens: 5,
-        totalTokens: 15
-      }
+        totalTokens: 15,
+      },
     };
 
     provider = new MockProvider(mockResponse, 100); // 100ms delay for testing
@@ -89,7 +89,7 @@ describe('Turn State Integration Tests', () => {
       toolExecutor,
       threadManager,
       threadId,
-      tools: []
+      tools: [],
     });
 
     await agent.start();
@@ -117,9 +117,15 @@ describe('Turn State Integration Tests', () => {
       let turnCompleted = false;
       let turnAborted = false;
 
-      agent.on('turn_start', () => { turnStarted = true; });
-      agent.on('turn_complete', () => { turnCompleted = true; });
-      agent.on('turn_aborted', () => { turnAborted = true; });
+      agent.on('turn_start', () => {
+        turnStarted = true;
+      });
+      agent.on('turn_complete', () => {
+        turnCompleted = true;
+      });
+      agent.on('turn_aborted', () => {
+        turnAborted = true;
+      });
 
       // Act - normal operation
       await agent.sendMessage('Test message');
@@ -135,12 +141,16 @@ describe('Turn State Integration Tests', () => {
       let turnStarted = false;
       let turnAborted = false;
 
-      agent.on('turn_start', () => { turnStarted = true; });
-      agent.on('turn_aborted', () => { turnAborted = true; });
+      agent.on('turn_start', () => {
+        turnStarted = true;
+      });
+      agent.on('turn_aborted', () => {
+        turnAborted = true;
+      });
 
       // Act - start and abort operation
       const messagePromise = agent.sendMessage('Test message');
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       agent.abort();
       await messagePromise;
 
@@ -154,7 +164,7 @@ describe('Turn State Integration Tests', () => {
     it('should handle approval requests correctly', async () => {
       // Arrange
       let approvalRequested = false;
-      
+
       agent.on('approval_request', () => {
         approvalRequested = true;
       });
@@ -178,7 +188,7 @@ describe('Turn State Integration Tests', () => {
 
       // Assert
       expect(approvalPromise).toBeInstanceOf(Promise);
-      
+
       // Resolve the approval to prevent hanging
       setTimeout(() => {
         agent.emit('approval_request', {
@@ -198,15 +208,15 @@ describe('Turn State Integration Tests', () => {
     it('should handle agent errors gracefully', async () => {
       // Arrange
       let errorCaught = false;
-      
+
       agent.on('error', () => {
         errorCaught = true;
       });
 
       // Act
-      agent.emit('error', { 
+      agent.emit('error', {
         error: new Error('Test error'),
-        context: { phase: 'test', threadId: 'test-thread' }
+        context: { phase: 'test', threadId: 'test-thread' },
       });
 
       // Assert
@@ -218,7 +228,9 @@ describe('Turn State Integration Tests', () => {
       terminalInterface['isRunning'] = true; // Access private property for testing
 
       // Act & Assert
-      await expect(terminalInterface.startInteractive()).rejects.toThrow('Terminal interface is already running');
+      await expect(terminalInterface.startInteractive()).rejects.toThrow(
+        'Terminal interface is already running'
+      );
     });
   });
 
@@ -262,7 +274,7 @@ describe('Turn State Integration Tests', () => {
     it('should handle token usage updates', async () => {
       // Arrange
       let tokenUsageReceived = false;
-      
+
       agent.on('token_usage_update', () => {
         tokenUsageReceived = true;
       });
@@ -272,8 +284,8 @@ describe('Turn State Integration Tests', () => {
         usage: {
           promptTokens: 100,
           completionTokens: 50,
-          totalTokens: 150
-        }
+          totalTokens: 150,
+        },
       });
 
       // Assert
@@ -283,7 +295,7 @@ describe('Turn State Integration Tests', () => {
     it('should handle token budget warnings', async () => {
       // Arrange
       let budgetWarningReceived = false;
-      
+
       agent.on('token_budget_warning', () => {
         budgetWarningReceived = true;
       });
@@ -292,7 +304,7 @@ describe('Turn State Integration Tests', () => {
       agent.emit('token_budget_warning', {
         message: 'Budget warning',
         usage: { totalTokens: 1000 },
-        recommendations: {}
+        recommendations: {},
       });
 
       // Assert

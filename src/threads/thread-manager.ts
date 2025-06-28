@@ -3,7 +3,8 @@
 
 import { EventEmitter } from 'events';
 import { ThreadPersistence } from './persistence.js';
-import { Thread, ThreadEvent, EventType, ToolCallData, ToolResultData } from './types.js';
+import { Thread, ThreadEvent, EventType } from './types.js';
+import { ToolCall, ToolResult } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
 
 export interface ThreadSessionInfo {
@@ -126,11 +127,7 @@ export class ThreadManager extends EventEmitter {
     }
   }
 
-  addEvent(
-    threadId: string,
-    type: EventType,
-    data: string | ToolCallData | ToolResultData
-  ): ThreadEvent {
+  addEvent(threadId: string, type: EventType, data: string | ToolCall | ToolResult): ThreadEvent {
     const thread = this.getThread(threadId);
     if (!thread) {
       throw new Error(`Thread ${threadId} not found`);
@@ -197,12 +194,15 @@ export class ThreadManager extends EventEmitter {
     // Modify the actual events in memory - that's it
     for (const event of thread.events) {
       if (event.type === 'TOOL_RESULT') {
-        const toolResult = event.data as ToolResultData;
-        const originalOutput = toolResult.output || '';
-        const originalTokens = this._estimateTokens(originalOutput);
+        const toolResult = event.data as ToolResult;
+        const originalText = toolResult.content?.[0]?.text || '';
+        const originalTokens = this._estimateTokens(originalText);
 
-        toolResult.output = this._truncateToolResult(originalOutput);
-        const newTokens = this._estimateTokens(toolResult.output);
+        const truncatedText = this._truncateToolResult(originalText);
+        if (toolResult.content && toolResult.content[0]) {
+          toolResult.content[0].text = truncatedText;
+        }
+        const newTokens = this._estimateTokens(truncatedText);
 
         if (newTokens < originalTokens) {
           compactedCount++;

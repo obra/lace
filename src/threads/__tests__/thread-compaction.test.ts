@@ -19,9 +19,9 @@ describe('Thread Compaction', () => {
     const longOutput = Array(300).fill('word').join(' ');
 
     threadManager.addEvent(threadId, 'TOOL_RESULT', {
-      callId: 'test-call',
-      output: longOutput,
-      success: true,
+      id: 'test-call',
+      content: [{ type: 'text', text: longOutput }],
+      isError: false,
     });
 
     threadManager.compact(threadId);
@@ -30,17 +30,17 @@ describe('Thread Compaction', () => {
     const toolResultEvent = events.find((e) => e.type === 'TOOL_RESULT');
     const toolResult = toolResultEvent?.data as any;
 
-    expect(toolResult.output).toContain('... [truncated 100 more words of tool output]');
-    expect(toolResult.output.split(' ').length).toBeLessThanOrEqual(210); // ~200 words + truncation message
+    expect(toolResult.content[0].text).toContain('... [truncated 100 more words of tool output]');
+    expect(toolResult.content[0].text.split(' ').length).toBeLessThanOrEqual(210); // ~200 words + truncation message
   });
 
   it('should leave short tool results unchanged', () => {
     const shortOutput = 'This is a short output with only ten words here.';
 
     threadManager.addEvent(threadId, 'TOOL_RESULT', {
-      callId: 'test-call',
-      output: shortOutput,
-      success: true,
+      id: 'test-call',
+      content: [{ type: 'text', text: shortOutput }],
+      isError: false,
     });
 
     threadManager.compact(threadId);
@@ -49,7 +49,7 @@ describe('Thread Compaction', () => {
     const toolResultEvent = events.find((e) => e.type === 'TOOL_RESULT');
     const toolResult = toolResultEvent?.data as any;
 
-    expect(toolResult.output).toBe(shortOutput); // Unchanged
+    expect(toolResult.content[0].text).toBe(shortOutput); // Unchanged
   });
 
   it('should add system message after compaction with token savings', () => {
@@ -59,9 +59,9 @@ describe('Thread Compaction', () => {
     threadManager.createThread(threadId);
 
     threadManager.addEvent(threadId, 'TOOL_RESULT', {
-      callId: 'test-call',
-      output: Array(300).fill('word').join(' '), // Long output
-      success: true,
+      id: 'test-call',
+      content: [{ type: 'text', text: Array(300).fill('word').join(' ') }], // Long output
+      isError: false,
     });
 
     const eventsBefore = threadManager.getEvents(threadId);
@@ -82,9 +82,9 @@ describe('Thread Compaction', () => {
   it('should skip system messages in conversation building', () => {
     threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
     threadManager.addEvent(threadId, 'TOOL_RESULT', {
-      callId: 'test-call',
-      output: Array(300).fill('word').join(' '),
-      success: true,
+      id: 'test-call',
+      content: [{ type: 'text', text: Array(300).fill('word').join(' ') }],
+      isError: false,
     });
 
     threadManager.compact(threadId); // Adds system message
@@ -99,15 +99,15 @@ describe('Thread Compaction', () => {
 
   it('should handle multiple tool results', () => {
     threadManager.addEvent(threadId, 'TOOL_RESULT', {
-      callId: 'call-1',
-      output: Array(300).fill('word').join(' '), // Long
-      success: true,
+      id: 'call-1',
+      content: [{ type: 'text', text: Array(300).fill('word').join(' ') }], // Long
+      isError: false,
     });
 
     threadManager.addEvent(threadId, 'TOOL_RESULT', {
-      callId: 'call-2',
-      output: 'Short output', // Short
-      success: true,
+      id: 'call-2',
+      content: [{ type: 'text', text: 'Short output' }], // Short
+      isError: false,
     });
 
     threadManager.compact(threadId);
@@ -120,9 +120,9 @@ describe('Thread Compaction', () => {
 
   it('should report no tokens saved when no compaction occurs', () => {
     threadManager.addEvent(threadId, 'TOOL_RESULT', {
-      callId: 'test-call',
-      output: 'Short output', // Under 200 words, won't be compacted
-      success: true,
+      id: 'test-call',
+      content: [{ type: 'text', text: 'Short output' }], // Under 200 words, won't be compacted
+      isError: false,
     });
 
     threadManager.compact(threadId);

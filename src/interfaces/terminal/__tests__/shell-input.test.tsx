@@ -10,7 +10,7 @@ import * as TextBufferModule from '../hooks/use-text-buffer.js';
 
 // Mock the useTextBuffer hook
 vi.mock('../hooks/use-text-buffer.js', () => ({
-  useTextBuffer: vi.fn()
+  useTextBuffer: vi.fn(),
 }));
 
 // Mock the TextRenderer component to simplify testing
@@ -23,7 +23,7 @@ vi.mock('../components/text-renderer.js', async () => {
         return React.createElement(Text, {}, placeholder);
       }
       return React.createElement(Text, {}, lines.join('\\n'));
-    }
+    },
   };
 });
 
@@ -32,14 +32,14 @@ describe('ShellInput Component', () => {
     value: '',
     placeholder: 'Type your message...',
     focusId: 'test-input',
-    autoFocus: false
+    autoFocus: false,
   };
 
   const defaultBufferState = {
     lines: [''],
     cursorLine: 0,
     cursorColumn: 0,
-    preferredColumn: 0
+    preferredColumn: 0,
   };
 
   const defaultBufferOps = {
@@ -52,7 +52,7 @@ describe('ShellInput Component', () => {
     killLine: vi.fn(),
     killLineBackward: vi.fn(),
     getCurrentLine: vi.fn(() => ''),
-    pasteFromClipboard: vi.fn(() => Promise.resolve())
+    pasteFromClipboard: vi.fn(() => Promise.resolve()),
   };
 
   beforeEach(() => {
@@ -96,19 +96,16 @@ describe('ShellInput Component', () => {
           lines: ['Hello world'],
           cursorLine: 0,
           cursorColumn: 11,
-          preferredColumn: 0
+          preferredColumn: 0,
         },
         {
           ...defaultBufferOps,
-          getText: vi.fn(() => 'Hello world')
-        }
+          getText: vi.fn(() => 'Hello world'),
+        },
       ]);
 
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          {...defaultProps}
-          value="Hello world"
-        />
+        <ShellInput {...defaultProps} value="Hello world" />
       );
       const output = lastFrame() || '';
 
@@ -123,19 +120,15 @@ describe('ShellInput Component', () => {
         defaultBufferState,
         {
           ...defaultBufferOps,
-          setText: mockSetText
-        }
+          setText: mockSetText,
+        },
       ]);
 
-      const { rerender } = renderInkComponent(
-        <ShellInput {...defaultProps} value="" />
-      );
+      const { rerender } = renderInkComponent(<ShellInput {...defaultProps} value="" />);
 
       // Change the value prop and wait for effects
       act(() => {
-        rerender(
-          <ShellInput {...defaultProps} value="New value" />
-        );
+        rerender(<ShellInput {...defaultProps} value="New value" />);
       });
 
       // Should call setText with new value
@@ -151,12 +144,12 @@ describe('ShellInput Component', () => {
           lines: ['Line 1', 'Line 2', 'Line 3'],
           cursorLine: 1,
           cursorColumn: 3,
-          preferredColumn: 0
+          preferredColumn: 0,
         },
         {
           ...defaultBufferOps,
-          getText: vi.fn(() => 'Line 1\\nLine 2\\nLine 3')
-        }
+          getText: vi.fn(() => 'Line 1\\nLine 2\\nLine 3'),
+        },
       ]);
 
       const { lastFrame } = renderInkComponent(<ShellInput {...defaultProps} />);
@@ -172,28 +165,23 @@ describe('ShellInput Component', () => {
   describe('callbacks', () => {
     it('should call onChange when buffer text changes', () => {
       const mockOnChange = vi.fn();
-      
+
       const mockUseTextBuffer = vi.mocked(TextBufferModule.useTextBuffer);
       mockUseTextBuffer.mockReturnValue([
         {
           lines: ['Changed text'],
           cursorLine: 0,
           cursorColumn: 12,
-          preferredColumn: 0
+          preferredColumn: 0,
         },
         {
           ...defaultBufferOps,
-          getText: vi.fn(() => 'Changed text')
-        }
+          getText: vi.fn(() => 'Changed text'),
+        },
       ]);
 
       act(() => {
-        renderInkComponent(
-          <ShellInput
-            {...defaultProps}
-            onChange={mockOnChange}
-          />
-        );
+        renderInkComponent(<ShellInput {...defaultProps} onChange={mockOnChange} />);
       });
 
       // The component should call onChange with the text from getText
@@ -202,14 +190,8 @@ describe('ShellInput Component', () => {
 
     it('should not call onChange if text hasnt changed', () => {
       const mockOnChange = vi.fn();
-      
-      renderInkComponent(
-        <ShellInput
-          {...defaultProps}
-          value=""
-          onChange={mockOnChange}
-        />
-      );
+
+      renderInkComponent(<ShellInput {...defaultProps} value="" onChange={mockOnChange} />);
 
       // Should not call onChange if the text is the same as the value prop
       expect(mockOnChange).not.toHaveBeenCalled();
@@ -217,12 +199,9 @@ describe('ShellInput Component', () => {
 
     it('should provide onSubmit callback', () => {
       const mockOnSubmit = vi.fn();
-      
+
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          {...defaultProps}
-          onSubmit={mockOnSubmit}
-        />
+        <ShellInput {...defaultProps} onSubmit={mockOnSubmit} />
       );
 
       // Component should render without error when onSubmit is provided
@@ -232,12 +211,7 @@ describe('ShellInput Component', () => {
 
   describe('focus handling', () => {
     it('should handle autoFocus prop', () => {
-      const { lastFrame } = renderInkComponent(
-        <ShellInput
-          {...defaultProps}
-          autoFocus={true}
-        />
-      );
+      const { lastFrame } = renderInkComponent(<ShellInput {...defaultProps} autoFocus={true} />);
 
       // Should render without error when autoFocus is set
       expect(lastFrame()).toBeDefined();
@@ -245,10 +219,7 @@ describe('ShellInput Component', () => {
 
     it('should handle custom focusId', () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          {...defaultProps}
-          focusId="custom-focus-id"
-        />
+        <ShellInput {...defaultProps} focusId="custom-focus-id" />
       );
 
       // Should render without error with custom focus ID
@@ -259,12 +230,9 @@ describe('ShellInput Component', () => {
   describe('placeholder behavior', () => {
     it('should show custom placeholder', () => {
       const customPlaceholder = 'Enter your command...';
-      
+
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          {...defaultProps}
-          placeholder={customPlaceholder}
-        />
+        <ShellInput {...defaultProps} placeholder={customPlaceholder} />
       );
       const output = lastFrame() || '';
 
@@ -273,12 +241,9 @@ describe('ShellInput Component', () => {
 
     it('should pass placeholder to TextRenderer', () => {
       const customPlaceholder = 'Custom placeholder text';
-      
+
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          {...defaultProps}
-          placeholder={customPlaceholder}
-        />
+        <ShellInput {...defaultProps} placeholder={customPlaceholder} />
       );
       const output = lastFrame() || '';
 
@@ -295,12 +260,12 @@ describe('ShellInput Component', () => {
           lines: ['Buffer content'],
           cursorLine: 0,
           cursorColumn: 5,
-          preferredColumn: 0
+          preferredColumn: 0,
         },
         {
           ...defaultBufferOps,
-          getText: vi.fn(() => 'Buffer content')
-        }
+          getText: vi.fn(() => 'Buffer content'),
+        },
       ]);
 
       const { lastFrame } = renderInkComponent(<ShellInput {...defaultProps} />);
@@ -311,12 +276,7 @@ describe('ShellInput Component', () => {
     });
 
     it('should initialize useTextBuffer with value prop', () => {
-      renderInkComponent(
-        <ShellInput
-          {...defaultProps}
-          value="Initial value"
-        />
-      );
+      renderInkComponent(<ShellInput {...defaultProps} value="Initial value" />);
 
       // useTextBuffer should be called with the initial value
       const mockUseTextBuffer = vi.mocked(TextBufferModule.useTextBuffer);
@@ -326,9 +286,7 @@ describe('ShellInput Component', () => {
 
   describe('edge cases', () => {
     it('should handle missing props gracefully', () => {
-      const { lastFrame } = renderInkComponent(
-        <ShellInput />
-      );
+      const { lastFrame } = renderInkComponent(<ShellInput />);
 
       // Should render without crashing even with minimal props
       expect(lastFrame()).toBeDefined();
@@ -336,11 +294,7 @@ describe('ShellInput Component', () => {
 
     it('should handle undefined callbacks', () => {
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          {...defaultProps}
-          onSubmit={undefined}
-          onChange={undefined}
-        />
+        <ShellInput {...defaultProps} onSubmit={undefined} onChange={undefined} />
       );
 
       // Should render without error when callbacks are undefined
@@ -348,12 +302,7 @@ describe('ShellInput Component', () => {
     });
 
     it('should handle empty string value', () => {
-      const { lastFrame } = renderInkComponent(
-        <ShellInput
-          {...defaultProps}
-          value=""
-        />
-      );
+      const { lastFrame } = renderInkComponent(<ShellInput {...defaultProps} value="" />);
 
       // Should handle empty string value
       expect(lastFrame()).toBeDefined();
@@ -378,19 +327,16 @@ describe('ShellInput Component', () => {
           lines: ['Some text content'],
           cursorLine: 0,
           cursorColumn: 17,
-          preferredColumn: 0
+          preferredColumn: 0,
         },
         {
           ...defaultBufferOps,
-          getText: vi.fn(() => 'Some text content')
-        }
+          getText: vi.fn(() => 'Some text content'),
+        },
       ]);
 
       const { lastFrame } = renderInkComponent(
-        <ShellInput
-          {...defaultProps}
-          value="Some text content"
-        />
+        <ShellInput {...defaultProps} value="Some text content" />
       );
       const output = lastFrame() || '';
 

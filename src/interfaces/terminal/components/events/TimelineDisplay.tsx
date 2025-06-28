@@ -15,19 +15,26 @@ interface TimelineDisplayProps {
   bottomSectionHeight?: number;
 }
 
-export default function TimelineDisplay({ timeline, focusId, parentFocusId, bottomSectionHeight }: TimelineDisplayProps) {
+export default function TimelineDisplay({
+  timeline,
+  focusId,
+  parentFocusId,
+  bottomSectionHeight,
+}: TimelineDisplayProps) {
   const { isFocused } = useFocus({ id: focusId || 'timeline' });
   const { focus } = useFocusManager();
-  
 
   // Handle item-specific interactions
-  const handleItemInteraction = useCallback((selectedItemIndex: number, input: string, key: any) => {
-    if (key.leftArrow || key.rightArrow) {
-      // Emit expansion toggle event - only selected item will respond
-      emitExpansionToggle();
-    }
-    // Other interactions (return key, etc.) can be handled here in the future
-  }, []);
+  const handleItemInteraction = useCallback(
+    (selectedItemIndex: number, input: string, key: any) => {
+      if (key.leftArrow || key.rightArrow) {
+        // Emit expansion toggle event - only selected item will respond
+        emitExpansionToggle();
+      }
+      // Other interactions (return key, etc.) can be handled here in the future
+    },
+    []
+  );
 
   return (
     <TimelineViewport
@@ -37,7 +44,7 @@ export default function TimelineDisplay({ timeline, focusId, parentFocusId, bott
       bottomSectionHeight={bottomSectionHeight}
       onItemInteraction={handleItemInteraction}
     >
-      {({ timeline: tl, viewportState, viewportActions, itemRefs }) => 
+      {({ timeline: tl, viewportState, viewportActions, itemRefs }) => (
         <TimelineContent
           timeline={tl}
           viewportState={viewportState}
@@ -45,7 +52,7 @@ export default function TimelineDisplay({ timeline, focusId, parentFocusId, bott
           itemRefs={itemRefs}
           currentFocusId={focusId}
         />
-      }
+      )}
     </TimelineViewport>
   );
 }

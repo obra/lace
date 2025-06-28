@@ -17,7 +17,7 @@ describe('Tool Interface with MCP Annotations', () => {
       const tool: Tool = {
         name: 'test_tool',
         description: 'A test tool',
-        input_schema: {
+        inputSchema: {
           type: 'object',
           properties: {
             input: { type: 'string' },
@@ -45,7 +45,7 @@ describe('Tool Interface with MCP Annotations', () => {
       const tool: Tool = {
         name: 'simple_tool',
         description: 'A simple tool',
-        input_schema: {
+        inputSchema: {
           type: 'object',
           properties: {},
           required: [],
@@ -60,7 +60,7 @@ describe('Tool Interface with MCP Annotations', () => {
       const tool: Tool = {
         name: 'partial_tool',
         description: 'Tool with partial annotations',
-        input_schema: {
+        inputSchema: {
           type: 'object',
           properties: {},
           required: [],

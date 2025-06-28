@@ -38,10 +38,10 @@ describe('ShellInput Paste Functionality', () => {
   describe('basic paste functionality', () => {
     it('should paste simple text at cursor position', async () => {
       const { result } = renderHook(() => useTextBuffer('Hello World'));
-      
+
       // Mock clipboard content (pbpaste on macOS)
       mockReadSync.mockReturnValue('PASTED');
-      
+
       act(() => {
         const [, ops] = result.current;
         ops.setCursorPosition(0, 5); // After "Hello"
@@ -56,7 +56,7 @@ describe('ShellInput Paste Functionality', () => {
 
       // Wait for async clipboard operation
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       const [state] = result.current;
@@ -66,9 +66,9 @@ describe('ShellInput Paste Functionality', () => {
 
     it('should paste text at beginning of line', async () => {
       const { result } = renderHook(() => useTextBuffer('World'));
-      
+
       mockReadSync.mockReturnValue('Hello ');
-      
+
       act(() => {
         const [, ops] = result.current;
         ops.setCursorPosition(0, 0); // Beginning of line
@@ -80,7 +80,7 @@ describe('ShellInput Paste Functionality', () => {
       });
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       const [state] = result.current;
@@ -90,9 +90,9 @@ describe('ShellInput Paste Functionality', () => {
 
     it('should paste text at end of line', async () => {
       const { result } = renderHook(() => useTextBuffer('Hello'));
-      
+
       mockReadSync.mockReturnValue(' World');
-      
+
       act(() => {
         const [, ops] = result.current;
         ops.moveCursor('end'); // End of line
@@ -104,7 +104,7 @@ describe('ShellInput Paste Functionality', () => {
       });
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       const [state] = result.current;
@@ -116,9 +116,9 @@ describe('ShellInput Paste Functionality', () => {
   describe('multi-line paste functionality', () => {
     it('should paste multi-line text correctly', async () => {
       const { result } = renderHook(() => useTextBuffer('Start End'));
-      
+
       mockReadSync.mockReturnValue('Line1\nLine2\nLine3');
-      
+
       act(() => {
         const [, ops] = result.current;
         ops.setCursorPosition(0, 5); // After "Start"
@@ -130,7 +130,7 @@ describe('ShellInput Paste Functionality', () => {
       });
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       const [state] = result.current;
@@ -141,9 +141,9 @@ describe('ShellInput Paste Functionality', () => {
 
     it('should handle pasting text with empty lines', async () => {
       const { result } = renderHook(() => useTextBuffer('Before After'));
-      
+
       mockReadSync.mockReturnValue('Middle\n\nContent');
-      
+
       act(() => {
         const [, ops] = result.current;
         ops.setCursorPosition(0, 6); // After "Before"
@@ -155,7 +155,7 @@ describe('ShellInput Paste Functionality', () => {
       });
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       const [state] = result.current;
@@ -166,9 +166,9 @@ describe('ShellInput Paste Functionality', () => {
 
     it('should handle pasting into middle of multi-line document', async () => {
       const { result } = renderHook(() => useTextBuffer('Line 1\nLine 2\nLine 3'));
-      
+
       mockReadSync.mockReturnValue('Inserted\nText');
-      
+
       act(() => {
         const [, ops] = result.current;
         ops.setCursorPosition(1, 4); // After "Line" in "Line 2"
@@ -180,7 +180,7 @@ describe('ShellInput Paste Functionality', () => {
       });
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       const [state] = result.current;
@@ -193,9 +193,9 @@ describe('ShellInput Paste Functionality', () => {
   describe('special content paste handling', () => {
     it('should handle pasting special characters', async () => {
       const { result } = renderHook(() => useTextBuffer('Test'));
-      
+
       mockReadSync.mockReturnValue('Special: !@#$%^&*()');
-      
+
       act(() => {
         const [, ops] = result.current;
         ops.moveCursor('end');
@@ -207,7 +207,7 @@ describe('ShellInput Paste Functionality', () => {
       });
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       const [state] = result.current;
@@ -216,17 +216,17 @@ describe('ShellInput Paste Functionality', () => {
 
     it('should handle pasting very long single line', async () => {
       const { result } = renderHook(() => useTextBuffer(''));
-      
+
       const longText = 'A'.repeat(1000);
       mockReadSync.mockReturnValue(longText);
-      
+
       act(() => {
         const [, ops] = result.current;
         ops.pasteFromClipboard();
       });
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       const [state] = result.current;
@@ -236,9 +236,9 @@ describe('ShellInput Paste Functionality', () => {
 
     it('should handle pasting text with tabs and special whitespace', async () => {
       const { result } = renderHook(() => useTextBuffer('Start'));
-      
+
       mockReadSync.mockReturnValue('\tTabbed\n  Spaced');
-      
+
       act(() => {
         const [, ops] = result.current;
         ops.moveCursor('end');
@@ -250,7 +250,7 @@ describe('ShellInput Paste Functionality', () => {
       });
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       const [state] = result.current;
@@ -261,16 +261,18 @@ describe('ShellInput Paste Functionality', () => {
   describe('paste error handling', () => {
     it('should handle clipboard read errors gracefully', async () => {
       const { result } = renderHook(() => useTextBuffer('Original'));
-      
-      mockReadSync.mockImplementation(() => { throw new Error('Clipboard access denied'); });
-      
+
+      mockReadSync.mockImplementation(() => {
+        throw new Error('Clipboard access denied');
+      });
+
       act(() => {
         const [, ops] = result.current;
         ops.pasteFromClipboard();
       });
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       const [state] = result.current;
@@ -281,9 +283,9 @@ describe('ShellInput Paste Functionality', () => {
 
     it('should handle empty clipboard content', async () => {
       const { result } = renderHook(() => useTextBuffer('Test'));
-      
+
       mockReadSync.mockReturnValue('');
-      
+
       act(() => {
         const [, ops] = result.current;
         ops.moveCursor('end');
@@ -295,7 +297,7 @@ describe('ShellInput Paste Functionality', () => {
       });
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       const [state] = result.current;
@@ -305,16 +307,16 @@ describe('ShellInput Paste Functionality', () => {
 
     it('should handle undefined/null clipboard content', async () => {
       const { result } = renderHook(() => useTextBuffer('Test'));
-      
+
       mockReadSync.mockReturnValue('');
-      
+
       act(() => {
         const [, ops] = result.current;
         ops.pasteFromClipboard();
       });
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       const [state] = result.current;
@@ -326,10 +328,10 @@ describe('ShellInput Paste Functionality', () => {
     it('should support Ctrl+V paste on non-Mac platforms', () => {
       // Mock non-Mac platform
       Object.defineProperty(process, 'platform', { value: 'linux' });
-      
+
       const onSubmit = vi.fn();
       const { container } = render(<ShellInput onSubmit={onSubmit} />);
-      
+
       // This test will verify keyboard integration once we implement it
       expect(container).toBeTruthy();
     });
@@ -337,10 +339,10 @@ describe('ShellInput Paste Functionality', () => {
     it('should support Cmd+V paste on Mac platforms', () => {
       // Mock Mac platform
       Object.defineProperty(process, 'platform', { value: 'darwin' });
-      
+
       const onSubmit = vi.fn();
       const { container } = render(<ShellInput onSubmit={onSubmit} />);
-      
+
       // This test will verify keyboard integration once we implement it
       expect(container).toBeTruthy();
     });
@@ -349,9 +351,9 @@ describe('ShellInput Paste Functionality', () => {
   describe('paste interaction with existing functionality', () => {
     it('should update preferredColumn after paste operation', async () => {
       const { result } = renderHook(() => useTextBuffer('Line 1\nShort'));
-      
+
       mockReadSync.mockReturnValue('Pasted content');
-      
+
       act(() => {
         const [, ops] = result.current;
         ops.setCursorPosition(1, 5); // End of "Short"
@@ -359,7 +361,7 @@ describe('ShellInput Paste Functionality', () => {
       });
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       // Move up then down to test preferredColumn
@@ -377,9 +379,9 @@ describe('ShellInput Paste Functionality', () => {
 
     it('should work correctly with undo/redo if implemented', async () => {
       const { result } = renderHook(() => useTextBuffer('Original'));
-      
+
       mockReadSync.mockReturnValue(' Added');
-      
+
       act(() => {
         const [, ops] = result.current;
         ops.moveCursor('end');
@@ -387,7 +389,7 @@ describe('ShellInput Paste Functionality', () => {
       });
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       const [state] = result.current;
@@ -397,9 +399,9 @@ describe('ShellInput Paste Functionality', () => {
 
     it('should maintain document integrity after paste operations', async () => {
       const { result } = renderHook(() => useTextBuffer('A\nB\nC'));
-      
+
       mockReadSync.mockReturnValue('X\nY');
-      
+
       act(() => {
         const [, ops] = result.current;
         ops.setCursorPosition(1, 1); // After "B"
@@ -407,12 +409,12 @@ describe('ShellInput Paste Functionality', () => {
       });
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       const [state, ops] = result.current;
       expect(state.lines).toEqual(['A', 'BX', 'Y', 'C']);
-      
+
       // Verify document can still be manipulated normally
       act(() => {
         ops.setText(ops.getText()); // Round-trip through getText/setText

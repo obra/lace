@@ -287,14 +287,14 @@ describe('CLI Integration', () => {
       manager1.addEvent(threadId, 'USER_MESSAGE', 'What files are here?');
       manager1.addEvent(threadId, 'AGENT_MESSAGE', 'Let me check the files');
       manager1.addEvent(threadId, 'TOOL_CALL', {
-        toolName: 'bash',
-        input: { command: 'ls' },
-        callId: 'call_123',
+        id: 'call_123',
+        name: 'bash',
+        arguments: { command: 'ls' },
       });
       manager1.addEvent(threadId, 'TOOL_RESULT', {
-        callId: 'call_123',
-        output: 'file1.txt\nfile2.txt',
-        success: true,
+        id: 'call_123',
+        content: [{ type: 'text', text: 'file1.txt\nfile2.txt' }],
+        isError: false,
       });
       await manager1.close();
 

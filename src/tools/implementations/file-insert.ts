@@ -2,7 +2,14 @@
 // ABOUTME: Supports both line-based insertion and end-of-file appending
 
 import { readFile, writeFile } from 'fs/promises';
-import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 
 export class FileInsertTool implements Tool {
   name = 'file_insert';
@@ -14,7 +21,7 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
     destructiveHint: true,
   };
 
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       path: {
@@ -33,8 +40,8 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
     required: ['path', 'content'],
   };
 
-  async executeTool(input: Record<string, unknown>, _context?: ToolContext): Promise<ToolResult> {
-    const { path, content, line } = input as {
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
+    const { path, content, line } = call.arguments as {
       path: string;
       content: string;
       line?: number;
@@ -42,15 +49,15 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
 
     // Input validation
     if (!path || typeof path !== 'string') {
-      return createErrorResult('Path must be a non-empty string');
+      return createErrorResult('Path must be a non-empty string', call.id);
     }
 
     if (typeof content !== 'string') {
-      return createErrorResult('Content must be a string');
+      return createErrorResult('Content must be a string', call.id);
     }
 
     if (line !== undefined && (typeof line !== 'number' || line < 1)) {
-      return createErrorResult('Line must be a positive number (1-based)');
+      return createErrorResult('Line must be a positive number (1-based)', call.id);
     }
 
     try {
@@ -70,7 +77,10 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
       } else {
         // Insert at specific line
         if (line > lines.length) {
-          return createErrorResult(`Line ${line} exceeds file length (${lines.length} lines)`);
+          return createErrorResult(
+            `Line ${line} exceeds file length (${lines.length} lines)`,
+            call.id
+          );
         }
 
         // Insert after the specified line
@@ -84,14 +94,20 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
 
       const addedLines = content.split('\n').length;
 
-      return createSuccessResult([
-        {
-          type: 'text',
-          text: `${operation} in ${path} (+${addedLines} line${addedLines === 1 ? '' : 's'})`,
-        },
-      ]);
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: `${operation} in ${path} (+${addedLines} line${addedLines === 1 ? '' : 's'})`,
+          },
+        ],
+        call.id
+      );
     } catch (error) {
-      return createErrorResult(error instanceof Error ? error.message : 'Unknown error occurred');
+      return createErrorResult(
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
   }
 }

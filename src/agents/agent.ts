@@ -8,11 +8,11 @@ import {
   ProviderToolCall,
   ProviderToolResult,
 } from '../providers/base-provider.js';
-import { Tool, ToolResult } from '../tools/types.js';
+import { Tool, ToolCall, ToolResult } from '../tools/types.js';
 import { ToolExecutor } from '../tools/executor.js';
 import { ApprovalDecision } from '../tools/approval-types.js';
 import { ThreadManager } from '../threads/thread-manager.js';
-import { ThreadEvent, ToolCallData, ToolResultData } from '../threads/types.js';
+import { ThreadEvent } from '../threads/types.js';
 import { logger } from '../utils/logger.js';
 import { StopReasonHandler } from '../token-management/stop-reason-handler.js';
 import { TokenBudgetManager } from '../token-management/token-budget-manager.js';
@@ -30,13 +30,7 @@ export interface AgentConfig {
 
 export interface AgentResponse {
   content: string;
-  toolCalls: ToolCall[];
-}
-
-export interface ToolCall {
-  id: string;
-  name: string;
-  input: Record<string, unknown>;
+  toolCalls: ProviderToolCall[];
 }
 
 export type AgentState = 'idle' | 'thinking' | 'tool_execution' | 'streaming';
@@ -534,7 +528,7 @@ export class Agent extends EventEmitter {
     };
   }
 
-  private async _executeToolCalls(toolCalls: ToolCall[]): Promise<void> {
+  private async _executeToolCalls(toolCalls: ProviderToolCall[]): Promise<void> {
     this._setState('tool_execution');
 
     logger.debug('AGENT: Processing tool calls', {
@@ -543,30 +537,33 @@ export class Agent extends EventEmitter {
       toolCalls: toolCalls.map((tc) => ({ id: tc.id, name: tc.name })),
     });
 
-    for (const toolCall of toolCalls) {
+    for (const providerToolCall of toolCalls) {
       logger.debug('AGENT: Executing individual tool call', {
         threadId: this._threadId,
-        toolCallId: toolCall.id,
-        toolName: toolCall.name,
+        toolCallId: providerToolCall.id,
+        toolName: providerToolCall.name,
       });
 
+      // Convert ProviderToolCall to ToolCall format
+      const toolCall: ToolCall = {
+        id: providerToolCall.id,
+        name: providerToolCall.name,
+        arguments: providerToolCall.input,
+      };
+
       // Add tool call to thread
-      this._threadManager.addEvent(this._threadId, 'TOOL_CALL', {
-        toolName: toolCall.name,
-        input: toolCall.input,
-        callId: toolCall.id,
-      });
+      this._threadManager.addEvent(this._threadId, 'TOOL_CALL', toolCall);
 
       // Emit tool call start event
       this.emit('tool_call_start', {
-        toolName: toolCall.name,
-        input: toolCall.input,
-        callId: toolCall.id,
+        toolName: providerToolCall.name,
+        input: providerToolCall.input,
+        callId: providerToolCall.id,
       });
 
       try {
         // Execute tool
-        const result = await this._toolExecutor.executeTool(toolCall.name, toolCall.input, {
+        const result = await this._toolExecutor.executeTool(toolCall, {
           threadId: this._threadId,
         });
 
@@ -574,8 +571,8 @@ export class Agent extends EventEmitter {
 
         logger.debug('AGENT: Tool execution completed', {
           threadId: this._threadId,
-          toolCallId: toolCall.id,
-          toolName: toolCall.name,
+          toolCallId: providerToolCall.id,
+          toolName: providerToolCall.name,
           success: !result.isError,
           outputLength: outputText.length,
           hasError: result.isError,
@@ -583,48 +580,39 @@ export class Agent extends EventEmitter {
 
         // Emit tool call complete event
         this.emit('tool_call_complete', {
-          toolName: toolCall.name,
+          toolName: providerToolCall.name,
           result,
-          callId: toolCall.id,
+          callId: providerToolCall.id,
         });
 
         // Add tool result to thread
-        this._threadManager.addEvent(this._threadId, 'TOOL_RESULT', {
-          callId: toolCall.id,
-          output: outputText,
-          success: !result.isError,
-          error: result.isError ? result.content[0]?.text || 'Unknown error' : undefined,
-        });
+        this._threadManager.addEvent(this._threadId, 'TOOL_RESULT', result);
 
         // Add tool output tokens to current turn metrics (estimated)
         this._addTokensToCurrentTurn('in', this._estimateTokens(outputText));
       } catch (error: unknown) {
         logger.error('AGENT: Tool execution error', {
           threadId: this._threadId,
-          toolCallId: toolCall.id,
-          toolName: toolCall.name,
+          toolCallId: providerToolCall.id,
+          toolName: providerToolCall.name,
           error: error instanceof Error ? error.message : String(error),
         });
 
         // Create a failed tool result
         const failedResult: ToolResult = {
+          id: providerToolCall.id,
           content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
           isError: true,
         };
 
         this.emit('tool_call_complete', {
-          toolName: toolCall.name,
+          toolName: providerToolCall.name,
           result: failedResult,
-          callId: toolCall.id,
+          callId: providerToolCall.id,
         });
 
         // Add failed tool result to thread
-        this._threadManager.addEvent(this._threadId, 'TOOL_RESULT', {
-          callId: toolCall.id,
-          output: '',
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        this._threadManager.addEvent(this._threadId, 'TOOL_RESULT', failedResult);
       }
     }
   }
@@ -677,11 +665,11 @@ export class Agent extends EventEmitter {
 
           // If we find a TOOL_CALL, it belongs to this agent message
           if (nextEvent.type === 'TOOL_CALL') {
-            const toolCall = nextEvent.data as ToolCallData;
+            const eventToolCall = nextEvent.data as ToolCall;
             toolCallsForThisMessage.push({
-              id: toolCall.callId,
-              name: toolCall.toolName,
-              input: toolCall.input,
+              id: eventToolCall.id,
+              name: eventToolCall.name,
+              input: eventToolCall.arguments,
             });
             processedEventIndices.add(nextIndex); // Mark as processed
           }
@@ -703,7 +691,7 @@ export class Agent extends EventEmitter {
         messages.push(message);
       } else if (event.type === 'TOOL_CALL') {
         // If we reach here, it's an orphaned tool call (no preceding AGENT_MESSAGE)
-        const toolCall = event.data as ToolCallData;
+        const toolCall = event.data as ToolCall;
 
         // Create an assistant message with just the tool call
         messages.push({
@@ -711,24 +699,23 @@ export class Agent extends EventEmitter {
           content: '',
           toolCalls: [
             {
-              id: toolCall.callId,
-              name: toolCall.toolName,
-              input: toolCall.input,
+              id: toolCall.id,
+              name: toolCall.name,
+              input: toolCall.arguments,
             },
           ],
         });
       } else if (event.type === 'TOOL_RESULT') {
-        const toolResult = event.data as ToolResultData;
+        const toolResult = event.data as ToolResult;
 
         // Look ahead to see if there are more tool results to group together
         const toolResultsForThisMessage: ProviderToolResult[] = [];
 
-        // Add this tool result
+        // Convert from ToolResult to ProviderToolResult format
         toolResultsForThisMessage.push({
-          id: toolResult.callId,
-          output: toolResult.output || '',
-          success: toolResult.success,
-          error: toolResult.error,
+          id: toolResult.id || '',
+          content: toolResult.content,
+          isError: toolResult.isError,
         });
 
         // Look for consecutive tool results
@@ -741,12 +728,12 @@ export class Agent extends EventEmitter {
             break;
           }
 
-          const nextToolResult = nextEvent.data as ToolResultData;
+          const nextToolResult = nextEvent.data as ToolResult;
+          // Convert from ToolResult to ProviderToolResult format
           toolResultsForThisMessage.push({
-            id: nextToolResult.callId,
-            output: nextToolResult.output || '',
-            success: nextToolResult.success,
-            error: nextToolResult.error,
+            id: nextToolResult.id || '',
+            content: nextToolResult.content,
+            isError: nextToolResult.isError,
           });
 
           processedEventIndices.add(nextIndex); // Mark as processed

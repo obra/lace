@@ -23,7 +23,7 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
   focusId = 'autocomplete',
   onSelect,
   onCancel,
-  onNavigate
+  onNavigate,
 }) => {
   const { isFocused } = useFocus({ id: focusId, autoFocus: isVisible });
   const { focus } = useFocusManager();
@@ -36,36 +36,39 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
   }, [isVisible, items.length, focus, focusId]);
 
   // Handle keyboard input
-  useInput((input, key) => {
-    if (!isFocused) return;
+  useInput(
+    (input, key) => {
+      if (!isFocused) return;
 
-    if (key.escape) {
-      // Return focus to shell input and cancel autocomplete
-      focus('shell-input');
-      onCancel?.();
-      return;
-    }
-
-    if (key.return || key.tab || key.rightArrow) {
-      // Select the current item
-      const selectedItem = items[selectedIndex];
-      if (selectedItem && onSelect) {
+      if (key.escape) {
+        // Return focus to shell input and cancel autocomplete
         focus('shell-input');
-        onSelect(selectedItem);
+        onCancel?.();
+        return;
       }
-      return;
-    }
 
-    if (key.upArrow) {
-      onNavigate?.('up');
-      return;
-    }
+      if (key.return || key.tab || key.rightArrow) {
+        // Select the current item
+        const selectedItem = items[selectedIndex];
+        if (selectedItem && onSelect) {
+          focus('shell-input');
+          onSelect(selectedItem);
+        }
+        return;
+      }
 
-    if (key.downArrow) {
-      onNavigate?.('down');
-      return;
-    }
-  }, { isActive: isFocused });
+      if (key.upArrow) {
+        onNavigate?.('up');
+        return;
+      }
+
+      if (key.downArrow) {
+        onNavigate?.('down');
+        return;
+      }
+    },
+    { isActive: isFocused }
+  );
 
   if (!isVisible || items.length === 0) {
     return null;
@@ -81,14 +84,15 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
       {visibleItems.map((item, index) => {
         const actualIndex = startIndex + index;
         const isSelected = actualIndex === selectedIndex;
-        
+
         return (
-          <Text 
+          <Text
             key={`${actualIndex}-${item}`}
-            color={isSelected ? "yellow" : "dim"}
-            backgroundColor={isFocused && isSelected ? "blue" : undefined}
+            color={isSelected ? 'yellow' : 'dim'}
+            backgroundColor={isFocused && isSelected ? 'blue' : undefined}
           >
-            {isSelected ? '> ' : '  '}{item.trim()}
+            {isSelected ? '> ' : '  '}
+            {item.trim()}
           </Text>
         );
       })}

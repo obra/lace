@@ -33,8 +33,9 @@ export function useDelegateThreadExtraction(
       logger.debug('Extracting delegate thread ID', { callId: item.callId });
 
       // Strategy 1: Look for thread ID in tool result
-      if (item.result && typeof item.result.output === 'string') {
-        const match = item.result.output.match(/Thread: ([^)]+)/);
+      const resultText = item.result?.content?.[0]?.text;
+      if (resultText) {
+        const match = resultText.match(/Thread: ([^)]+)/);
         if (match) {
           logger.debug('Found thread ID in tool result', { threadId: match[1] });
           return match[1];

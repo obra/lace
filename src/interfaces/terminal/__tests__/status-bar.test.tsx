@@ -14,9 +14,7 @@ describe('StatusBar', () => {
   };
 
   it('renders basic provider information', () => {
-    const { lastFrame } = renderInkComponent(
-      <StatusBar {...basicProps} />
-    );
+    const { lastFrame } = renderInkComponent(<StatusBar {...basicProps} />);
 
     const frame = lastFrame();
     expect(frame).toContain(UI_SYMBOLS.PROVIDER + ' anthropic');
@@ -25,10 +23,7 @@ describe('StatusBar', () => {
 
   it('shows model name when provided', () => {
     const { lastFrame } = renderInkComponent(
-      <StatusBar 
-        {...basicProps}
-        modelName="claude-sonnet-4"
-      />
+      <StatusBar {...basicProps} modelName="claude-sonnet-4" />
     );
 
     const frame = lastFrame();
@@ -37,10 +32,7 @@ describe('StatusBar', () => {
 
   it('shows full thread ID without truncation', () => {
     const { lastFrame } = renderInkComponent(
-      <StatusBar 
-        {...basicProps}
-        threadId="12345678901234567890"
-      />
+      <StatusBar {...basicProps} threadId="12345678901234567890" />
     );
 
     const frame = lastFrame();
@@ -48,12 +40,7 @@ describe('StatusBar', () => {
   });
 
   it('shows short thread ID as-is', () => {
-    const { lastFrame } = renderInkComponent(
-      <StatusBar 
-        {...basicProps}
-        threadId="abc123"
-      />
-    );
+    const { lastFrame } = renderInkComponent(<StatusBar {...basicProps} threadId="abc123" />);
 
     const frame = lastFrame();
     expect(frame).toContain(UI_SYMBOLS.FOLDER + ' abc123');
@@ -61,7 +48,7 @@ describe('StatusBar', () => {
 
   it('formats cumulative tokens in k format for large numbers', () => {
     const { lastFrame } = renderInkComponent(
-      <StatusBar 
+      <StatusBar
         {...basicProps}
         cumulativeTokens={{
           totalTokens: 2500,
@@ -77,7 +64,7 @@ describe('StatusBar', () => {
 
   it('formats cumulative tokens as exact numbers for small numbers', () => {
     const { lastFrame } = renderInkComponent(
-      <StatusBar 
+      <StatusBar
         {...basicProps}
         cumulativeTokens={{
           totalTokens: 250,
@@ -92,42 +79,28 @@ describe('StatusBar', () => {
   });
 
   it('shows 0 tokens when no cumulative tokens provided', () => {
-    const { lastFrame } = renderInkComponent(
-      <StatusBar {...basicProps} />
-    );
+    const { lastFrame } = renderInkComponent(<StatusBar {...basicProps} />);
 
     const frame = lastFrame();
     expect(frame).toContain(`${UI_SYMBOLS.TOKEN_IN}0 ${UI_SYMBOLS.TOKEN_OUT}0`);
   });
 
   it('shows processing status when isProcessing is true', () => {
-    const { lastFrame } = renderInkComponent(
-      <StatusBar 
-        {...basicProps}
-        isProcessing={true}
-      />
-    );
+    const { lastFrame } = renderInkComponent(<StatusBar {...basicProps} isProcessing={true} />);
 
     const frame = lastFrame();
     expect(frame).toContain(UI_SYMBOLS.LIGHTNING + ' Processing');
   });
 
   it('shows ready status when not processing', () => {
-    const { lastFrame } = renderInkComponent(
-      <StatusBar 
-        {...basicProps}
-        isProcessing={false}
-      />
-    );
+    const { lastFrame } = renderInkComponent(<StatusBar {...basicProps} isProcessing={false} />);
 
     const frame = lastFrame();
     expect(frame).toContain(UI_SYMBOLS.READY + ' Ready');
   });
 
   it('handles missing thread ID gracefully', () => {
-    const { lastFrame } = renderInkComponent(
-      <StatusBar {...basicProps} />
-    );
+    const { lastFrame } = renderInkComponent(<StatusBar {...basicProps} />);
 
     const frame = lastFrame();
     expect(frame).toContain(UI_SYMBOLS.FOLDER + ' no-thread');

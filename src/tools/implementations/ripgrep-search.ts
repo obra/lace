@@ -3,7 +3,14 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Tool, ToolResult, ToolContext, createSuccessResult, createErrorResult } from '../types.js';
+import {
+  Tool,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createSuccessResult,
+  createErrorResult,
+} from '../types.js';
 
 const execAsync = promisify(exec);
 
@@ -21,7 +28,7 @@ export class RipgrepSearchTool implements Tool {
     idempotentHint: true,
     openWorldHint: true,
   };
-  input_schema = {
+  inputSchema = {
     type: 'object' as const,
     properties: {
       pattern: { type: 'string', description: 'Text pattern to search for' },
@@ -42,7 +49,7 @@ export class RipgrepSearchTool implements Tool {
     required: ['pattern'],
   };
 
-  async executeTool(input: Record<string, unknown>, _context?: ToolContext): Promise<ToolResult> {
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     const {
       pattern,
       path = '.',
@@ -52,7 +59,7 @@ export class RipgrepSearchTool implements Tool {
       excludePattern,
       maxResults = 100,
       contextLines = 0,
-    } = input as {
+    } = call.arguments as {
       pattern: string;
       path?: string;
       caseSensitive?: boolean;
@@ -64,7 +71,7 @@ export class RipgrepSearchTool implements Tool {
     };
 
     if (!pattern || typeof pattern !== 'string') {
-      return createErrorResult('Pattern must be a non-empty string');
+      return createErrorResult('Pattern must be a non-empty string', call.id);
     }
 
     try {
@@ -90,22 +97,28 @@ export class RipgrepSearchTool implements Tool {
         const matches = this.parseRipgrepOutput(stdout);
         const resultText = this.formatResults(matches, pattern);
 
-        return createSuccessResult([
-          {
-            type: 'text',
-            text: resultText,
-          },
-        ]);
+        return createSuccessResult(
+          [
+            {
+              type: 'text',
+              text: resultText,
+            },
+          ],
+          call.id
+        );
       } catch (execError: unknown) {
         // ripgrep exits with code 1 when no matches found
         const err = execError as { code?: number; message?: string };
         if (err.code === 1) {
-          return createSuccessResult([
-            {
-              type: 'text',
-              text: `No matches found for pattern: ${pattern}`,
-            },
-          ]);
+          return createSuccessResult(
+            [
+              {
+                type: 'text',
+                text: `No matches found for pattern: ${pattern}`,
+              },
+            ],
+            call.id
+          );
         }
 
         // Other errors (e.g., invalid regex, file not found)
@@ -123,7 +136,7 @@ export class RipgrepSearchTool implements Tool {
         }
       }
 
-      return createErrorResult(errorMessage);
+      return createErrorResult(errorMessage, call.id);
     }
   }
 

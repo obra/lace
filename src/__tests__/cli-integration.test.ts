@@ -162,7 +162,7 @@ describe('CLI Orchestration', () => {
       tools.forEach((tool) => {
         expect(tool.name).toBeDefined();
         expect(tool.description).toBeDefined();
-        expect(tool.input_schema).toBeDefined();
+        expect(tool.inputSchema).toBeDefined();
         expect(typeof tool.executeTool).toBe('function');
       });
     });

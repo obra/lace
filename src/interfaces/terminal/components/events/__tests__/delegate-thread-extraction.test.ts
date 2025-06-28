@@ -13,8 +13,8 @@ function extractDelegateThreadId(
   delegateTimelines: Map<string, Timeline>
 ): string | null {
   // Strategy 1: Look for thread ID in tool result
-  if (item.result && typeof item.result.output === 'string') {
-    const match = item.result.output.match(/Thread: ([^)]+)/);
+  if (item.result && typeof item.result?.content?.[0]?.text === 'string') {
+    const match = item.result?.content?.[0]?.text.match(/Thread: ([^)]+)/);
     if (match) {
       return match[1];
     }
@@ -38,21 +38,21 @@ describe('Delegate Thread Extraction (Baseline)', () => {
   const createMockToolExecution = (
     callId: string,
     timestamp: Date,
-    result?: { output?: string; success?: boolean }
+    result?: { content?: Array<{ type: 'text'; text: string }>; isError?: boolean }
   ): ToolExecutionItem => ({
     type: 'tool_execution',
     timestamp,
     callId,
     call: {
-      toolName: 'delegate',
-      input: { prompt: 'test' },
-      callId,
+      id: callId,
+      name: 'delegate',
+      arguments: { prompt: 'test' },
     },
     result: result
       ? {
-          callId,
-          output: result.output || '',
-          success: result.success ?? true,
+          id: callId,
+          content: result.content || [],
+          isError: result.isError || false,
         }
       : undefined,
   });
@@ -76,8 +76,8 @@ describe('Delegate Thread Extraction (Baseline)', () => {
   describe('Strategy 1: Regex parsing from tool result', () => {
     it('should extract thread ID from tool result output', () => {
       const toolItem = createMockToolExecution('call-123', new Date('2024-01-01T10:00:00Z'), {
-        output: 'Thread: delegate-thread-456',
-        success: true,
+        content: [{ type: 'text', text: 'Thread: delegate-thread-456' }],
+        isError: false,
       });
 
       const delegateTimelines = new Map([
@@ -91,8 +91,13 @@ describe('Delegate Thread Extraction (Baseline)', () => {
     it('should handle complex thread ID formats', () => {
       // The regex pattern /Thread: ([^\)]+)/ captures until closing parenthesis
       const toolItem = createMockToolExecution('call-123', new Date('2024-01-01T10:00:00Z'), {
-        output: 'Some output text Thread: lace_20240101_complex_id_123) more text',
-        success: true,
+        content: [
+          {
+            type: 'text',
+            text: 'Some output text Thread: lace_20240101_complex_id_123) more text',
+          },
+        ],
+        isError: false,
       });
 
       const delegateTimelines = new Map([
@@ -105,8 +110,8 @@ describe('Delegate Thread Extraction (Baseline)', () => {
 
     it('should return null when no thread pattern found in result', () => {
       const toolItem = createMockToolExecution('call-123', new Date('2024-01-01T10:00:00Z'), {
-        output: 'No thread information here',
-        success: true,
+        content: [{ type: 'text', text: 'No thread information here' }],
+        isError: false,
       });
 
       // Use a delegate timeline that's outside the 5-second temporal window
@@ -124,14 +129,14 @@ describe('Delegate Thread Extraction (Baseline)', () => {
         timestamp: new Date('2024-01-01T10:00:00Z'),
         callId: 'call-123',
         call: {
-          toolName: 'delegate',
-          input: { prompt: 'test' },
-          callId: 'call-123',
+          id: 'call-123',
+          name: 'delegate',
+          arguments: { prompt: 'test' },
         },
         result: {
-          callId: 'call-123',
-          output: { some: 'object' } as any,
-          success: true,
+          id: 'call-123',
+          content: [{ type: 'text', text: 'some object' }],
+          isError: false,
         },
       };
 
@@ -167,8 +172,8 @@ describe('Delegate Thread Extraction (Baseline)', () => {
       const delegateTimestamp = new Date('2024-01-01T10:00:02Z'); // 2 seconds later
 
       const toolItem = createMockToolExecution('call-123', toolTimestamp, {
-        output: 'No thread ID here',
-        success: true,
+        content: [{ type: 'text', text: 'No thread ID here' }],
+        isError: false,
       });
 
       const delegateTimelines = new Map([
@@ -184,8 +189,8 @@ describe('Delegate Thread Extraction (Baseline)', () => {
       const delegateTimestamp = new Date('2024-01-01T10:00:02Z'); // 3 seconds before
 
       const toolItem = createMockToolExecution('call-123', toolTimestamp, {
-        output: 'No thread ID here',
-        success: true,
+        content: [{ type: 'text', text: 'No thread ID here' }],
+        isError: false,
       });
 
       const delegateTimelines = new Map([
@@ -201,8 +206,8 @@ describe('Delegate Thread Extraction (Baseline)', () => {
       const delegateTimestamp = new Date('2024-01-01T10:00:06Z'); // 6 seconds later
 
       const toolItem = createMockToolExecution('call-123', toolTimestamp, {
-        output: 'No thread ID here',
-        success: true,
+        content: [{ type: 'text', text: 'No thread ID here' }],
+        isError: false,
       });
 
       const delegateTimelines = new Map([
@@ -219,8 +224,8 @@ describe('Delegate Thread Extraction (Baseline)', () => {
       const delegate2Timestamp = new Date('2024-01-01T10:00:03Z'); // 3 seconds later
 
       const toolItem = createMockToolExecution('call-123', toolTimestamp, {
-        output: 'No thread ID here',
-        success: true,
+        content: [{ type: 'text', text: 'No thread ID here' }],
+        isError: false,
       });
 
       const delegateTimelines = new Map([
@@ -236,8 +241,8 @@ describe('Delegate Thread Extraction (Baseline)', () => {
 
     it('should handle empty delegate timelines', () => {
       const toolItem = createMockToolExecution('call-123', new Date('2024-01-01T10:00:00Z'), {
-        output: 'No thread ID here',
-        success: true,
+        content: [{ type: 'text', text: 'No thread ID here' }],
+        isError: false,
       });
 
       const delegateTimelines = new Map<string, Timeline>();
@@ -248,8 +253,8 @@ describe('Delegate Thread Extraction (Baseline)', () => {
 
     it('should handle delegate timeline with no items', () => {
       const toolItem = createMockToolExecution('call-123', new Date('2024-01-01T10:00:00Z'), {
-        output: 'No thread ID here',
-        success: true,
+        content: [{ type: 'text', text: 'No thread ID here' }],
+        isError: false,
       });
 
       const emptyTimeline: Timeline = {
@@ -274,8 +279,8 @@ describe('Delegate Thread Extraction (Baseline)', () => {
       const delegateTimestamp = new Date('2024-01-01T10:00:01Z'); // Close enough for temporal
 
       const toolItem = createMockToolExecution('call-123', toolTimestamp, {
-        output: 'Thread: explicit-thread-id',
-        success: true,
+        content: [{ type: 'text', text: 'Thread: explicit-thread-id' }],
+        isError: false,
       });
 
       const delegateTimelines = new Map([
@@ -292,8 +297,8 @@ describe('Delegate Thread Extraction (Baseline)', () => {
       const delegateTimestamp = new Date('2024-01-01T10:00:01Z');
 
       const toolItem = createMockToolExecution('call-123', toolTimestamp, {
-        output: 'No valid thread pattern here',
-        success: true,
+        content: [{ type: 'text', text: 'No valid thread pattern here' }],
+        isError: false,
       });
 
       const delegateTimelines = new Map([
