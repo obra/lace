@@ -53,14 +53,17 @@ export default function TimelineDisplay({
         });
         
         if (selectedItem && canTimelineItemAcceptFocus(selectedItem)) {
-          // Emit a focus entry event that the DelegateToolRenderer can listen for
-          logger.debug('TimelineDisplay: Emitting timeline focus entry event', {
+          // Focus implies expansion - expand the item before entering focus mode
+          logger.debug('TimelineDisplay: Emitting expand and focus entry events', {
             selectedItemIndex,
             selectedItemType: selectedItem.type,
             selectedItemCallName: (selectedItem as any).call?.name,
           });
           
-          // Emit focus entry event to the selected timeline item
+          // First expand the item (focus implies expansion)
+          emitExpand();
+          
+          // Then emit focus entry event to the selected timeline item
           emitFocusEntry();
         } else {
           logger.debug('TimelineDisplay: Item cannot accept focus or does not exist');
