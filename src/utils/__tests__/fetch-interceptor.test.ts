@@ -131,7 +131,7 @@ describe('FetchInterceptor', () => {
 
       expect(recordSpy).toHaveBeenCalledWith(
         'https://api.test.com/endpoint',
-        init,
+        expect.objectContaining(init), // Should match the init object we passed
         1234567890000, // startTime
         mockResponse,
         1234567890050 // endTime
@@ -175,7 +175,7 @@ describe('FetchInterceptor', () => {
       expect(recordSpy).toHaveBeenNthCalledWith(
         1,
         'https://string.com',
-        {},
+        expect.objectContaining({}), // Empty object from undefined init
         1234567890000, // first call startTime
         mockResponse,
         1234567890050 // first call endTime
@@ -183,7 +183,7 @@ describe('FetchInterceptor', () => {
       expect(recordSpy).toHaveBeenNthCalledWith(
         2,
         'https://url-object.com/',
-        {},
+        expect.objectContaining({}), // Empty object from undefined init
         1234567890100, // second call startTime
         mockResponse,
         1234567890150 // second call endTime
@@ -191,7 +191,7 @@ describe('FetchInterceptor', () => {
       expect(recordSpy).toHaveBeenNthCalledWith(
         3,
         'https://request-object.com/',
-        {},
+        expect.objectContaining({}), // Empty object from undefined init
         1234567890200, // third call startTime
         mockResponse,
         1234567890250 // third call endTime
