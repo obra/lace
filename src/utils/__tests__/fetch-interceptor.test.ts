@@ -27,6 +27,9 @@ describe('FetchInterceptor', () => {
     globalThis.fetch = mockFetch;
     mockFetch.mockClear();
 
+    // Mock Date.now for predictable timestamps
+    vi.spyOn(Date, 'now').mockReturnValue(1234567890000);
+
     // Disable any existing interception
     disableFetchInterception();
     disableHARRecording();
@@ -36,6 +39,7 @@ describe('FetchInterceptor', () => {
     disableFetchInterception();
     disableHARRecording();
     globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
 
     if (existsSync(TEST_HAR_FILE)) {
       unlinkSync(TEST_HAR_FILE);
@@ -120,9 +124,9 @@ describe('FetchInterceptor', () => {
       expect(recordSpy).toHaveBeenCalledWith(
         'https://api.test.com/endpoint',
         init,
-        expect.any(Number),
+        1234567890000,
         mockResponse,
-        expect.any(Number)
+        1234567890000
       );
     });
 
@@ -164,25 +168,25 @@ describe('FetchInterceptor', () => {
         1,
         'https://string.com',
         {},
-        expect.any(Number),
+        1234567890000,
         mockResponse,
-        expect.any(Number)
+        1234567890000
       );
       expect(recordSpy).toHaveBeenNthCalledWith(
         2,
         'https://url-object.com/',
         {},
-        expect.any(Number),
+        1234567890000,
         mockResponse,
-        expect.any(Number)
+        1234567890000
       );
       expect(recordSpy).toHaveBeenNthCalledWith(
         3,
         'https://request-object.com/',
         {},
-        expect.any(Number),
+        1234567890000,
         mockResponse,
-        expect.any(Number)
+        1234567890000
       );
     });
 
