@@ -9,14 +9,14 @@ import { logger } from '../../../../utils/logger.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
 import { useThreadManager, useThreadProcessor } from '../../terminal-interface.js';
 import { calculateTokens, formatTokenCount } from '../../../../utils/token-estimation.js';
+import { useLaceFocus, FocusRegions } from '../../focus/index.js';
 
 interface DelegationBoxProps {
   toolCall: Extract<TimelineItemType, { type: 'tool_execution' }>;
-  parentFocusId?: string; // Focus ID of the parent timeline for escape hierarchy
   onToggle?: () => void;
 }
 
-export function DelegationBox({ toolCall, parentFocusId, onToggle }: DelegationBoxProps) {
+export function DelegationBox({ toolCall, onToggle }: DelegationBoxProps) {
   // Extract delegate thread ID from tool result metadata
   const extractDelegateThreadId = (item: Extract<TimelineItemType, { type: 'tool_execution' }>) => {
     const threadId = item.result?.metadata?.threadId;
@@ -24,9 +24,9 @@ export function DelegationBox({ toolCall, parentFocusId, onToggle }: DelegationB
   };
 
   const delegateThreadId = extractDelegateThreadId(toolCall);
-  if (!delegateThreadId) {
-    return null; // No delegate thread to display
-  }
+
+  // Set up focus management for this delegation (only if threadId exists)
+  const { takeFocus } = useLaceFocus(delegateThreadId ? FocusRegions.delegate(delegateThreadId) : 'none');
 
   // Get thread data from context
   const threadManager = useThreadManager();
@@ -35,8 +35,26 @@ export function DelegationBox({ toolCall, parentFocusId, onToggle }: DelegationB
   // Manage own expansion state
   const [expanded, setExpanded] = useState(true); // Default to expanded for delegation
 
-  // Fetch and process delegate thread data
+  // Take focus when expanded (so user can navigate within delegation)
+  const handleExpand = () => {
+    setExpanded(true);
+    takeFocus(); // Push focus to this delegation
+  };
+
+  const handleCollapse = () => {
+    setExpanded(false);
+    // Focus will automatically return to previous context via escape
+  };
+
+  // Fetch and process delegate thread data (only if threadId exists)
   const timeline = useMemo(() => {
+    if (!delegateThreadId) {
+      return {
+        items: [],
+        metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
+      };
+    }
+
     try {
       const events = threadManager.getEvents(delegateThreadId);
       const processed = threadProcessor.processThreads(events);
@@ -52,6 +70,11 @@ export function DelegationBox({ toolCall, parentFocusId, onToggle }: DelegationB
       };
     }
   }, [delegateThreadId, threadManager, threadProcessor]);
+
+  // Early return after all hooks are called
+  if (!delegateThreadId) {
+    return null; // No delegate thread to display
+  }
 
   logger.debug('DelegationBox: Rendering', {
     threadId: delegateThreadId,
@@ -116,8 +139,6 @@ export function DelegationBox({ toolCall, parentFocusId, onToggle }: DelegationB
         <Box flexDirection="column" paddingLeft={2}>
           <TimelineDisplay
             timeline={timeline}
-            focusId={`delegate-${delegateThreadId}`}
-            parentFocusId={parentFocusId}
           />
         </Box>
       )}

@@ -4,33 +4,57 @@
 import React from 'react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { act } from '@testing-library/react';
-import { renderInkComponent } from './helpers/ink-test-utils.js';
+import { renderInkComponentWithFocus } from './helpers/ink-test-utils.js';
 import ToolApprovalModal from '../components/tool-approval-modal.js';
 import { ApprovalDecision } from '../../../tools/approval-types.js';
 
-// Create a wrapper component that exposes the useInput handler for testing
-let capturedInputHandler: ((input: string, key: any) => void) | null = null;
+// Capture the useInput handler for direct testing
+let capturedInputHandlers: ((input: string, key: any) => void)[] = [];
 
 vi.mock('ink', async () => {
   const actual = await vi.importActual('ink');
   return {
     ...actual,
-    useInput: (handler: (input: string, key: any) => void) => {
-      capturedInputHandler = handler;
+    useInput: (handler: (input: string, key: any) => void, options?: { isActive?: boolean }) => {
+      // Only capture handlers that are active (or don't specify isActive)
+      if (options?.isActive !== false) {
+        capturedInputHandlers.push(handler);
+      }
     },
   };
 });
+
+// Mock the focus system to ensure the modal is focused in tests
+vi.mock('../focus/index.js', async () => {
+  const actual = await vi.importActual('../focus/index.js');
+  return {
+    ...actual,
+    useLaceFocus: vi.fn(() => ({ isFocused: true, takeFocus: vi.fn() })),
+    ModalWrapper: ({ children, isOpen }: any) => isOpen ? children : null,
+  };
+});
+
+// Helper function to simulate keyboard input by calling all handlers
+const simulateKeyPress = (input: string, key: any = {}) => {
+  if (capturedInputHandlers.length > 0) {
+    act(() => {
+      // Call all captured handlers
+      capturedInputHandlers.forEach(handler => handler(input, key));
+    });
+  }
+};
 
 describe('ToolApprovalModal Logic', () => {
   let mockOnDecision: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockOnDecision = vi.fn();
-    capturedInputHandler = null;
+    capturedInputHandlers = [];
+    vi.clearAllMocks();
   });
 
   const renderModal = (isVisible = true) => {
-    return renderInkComponent(
+    return renderInkComponentWithFocus(
       <ToolApprovalModal
         toolName="bash"
         input={{ command: 'ls' }}
@@ -42,24 +66,20 @@ describe('ToolApprovalModal Logic', () => {
   };
 
   describe('keyboard input handling', () => {
-    it('calls onDecision with ALLOW_ONCE when y is pressed', () => {
+    it('calls onDecision with ALLOW_ONCE when a is pressed', () => {
       renderModal();
+      
+      expect(capturedInputHandlers.length).toBeGreaterThan(0);
 
-      expect(capturedInputHandler).toBeTruthy();
-
-      act(() => {
-        capturedInputHandler!('y', {});
-      });
+      simulateKeyPress('a');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.ALLOW_ONCE);
     });
 
-    it('calls onDecision with ALLOW_ONCE when a is pressed', () => {
+    it('calls onDecision with ALLOW_ONCE when y is pressed', () => {
       renderModal();
 
-      act(() => {
-        capturedInputHandler!('a', {});
-      });
+      simulateKeyPress('y');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.ALLOW_ONCE);
     });
@@ -67,9 +87,7 @@ describe('ToolApprovalModal Logic', () => {
     it('calls onDecision with ALLOW_SESSION when s is pressed', () => {
       renderModal();
 
-      act(() => {
-        capturedInputHandler!('s', {});
-      });
+      simulateKeyPress('s');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.ALLOW_SESSION);
     });
@@ -77,9 +95,7 @@ describe('ToolApprovalModal Logic', () => {
     it('calls onDecision with DENY when n is pressed', () => {
       renderModal();
 
-      act(() => {
-        capturedInputHandler!('n', {});
-      });
+      simulateKeyPress('n');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.DENY);
     });
@@ -87,9 +103,7 @@ describe('ToolApprovalModal Logic', () => {
     it('calls onDecision with DENY when d is pressed', () => {
       renderModal();
 
-      act(() => {
-        capturedInputHandler!('d', {});
-      });
+      simulateKeyPress('d');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.DENY);
     });
@@ -97,9 +111,7 @@ describe('ToolApprovalModal Logic', () => {
     it('ignores input when not visible', () => {
       renderModal(false);
 
-      act(() => {
-        capturedInputHandler!('y', {});
-      });
+      simulateKeyPress('y');
 
       expect(mockOnDecision).not.toHaveBeenCalled();
     });
@@ -111,14 +123,10 @@ describe('ToolApprovalModal Logic', () => {
       expect(lastFrame()).toContain('▶ y) Allow Once');
 
       // Simulate down arrow - this should update internal state
-      act(() => {
-        capturedInputHandler!('', { downArrow: true });
-      });
+      simulateKeyPress('', { downArrow: true });
 
       // Now simulate Enter to see which option is selected
-      act(() => {
-        capturedInputHandler!('', { return: true });
-      });
+      simulateKeyPress('', { return: true });
 
       // Should have called the second option (ALLOW_SESSION)
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.ALLOW_SESSION);
@@ -128,17 +136,11 @@ describe('ToolApprovalModal Logic', () => {
       renderModal();
 
       // First navigate to the third option (Deny)
-      act(() => {
-        capturedInputHandler!('', { downArrow: true });
-      });
-      act(() => {
-        capturedInputHandler!('', { downArrow: true });
-      });
+      simulateKeyPress('', { downArrow: true });
+      simulateKeyPress('', { downArrow: true });
 
       // Then press Enter
-      act(() => {
-        capturedInputHandler!('', { return: true });
-      });
+      simulateKeyPress('', { return: true });
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.DENY);
     });

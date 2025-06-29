@@ -2,10 +2,12 @@
 // ABOUTME: Handles keyboard input and manages text buffer state
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Box, Text, useInput, useFocus } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import { useTextBuffer } from '../hooks/use-text-buffer.js';
 import TextRenderer from './text-renderer.js';
 import FileAutocomplete from './file-autocomplete.js';
+import { FocusRegions, useLaceFocus } from '../focus/index.js';
+import { logger } from '../../../utils/logger.js';
 
 // Keyboard shortcut system - list-based approach
 type KeyboardShortcut = string[]; // e.g., ['ctrl', 'a'] or ['meta', 'shift', 'z']
@@ -64,7 +66,6 @@ const matchesAction = (input: string, key: any, action: string): boolean => {
 interface ShellInputProps {
   value?: string;
   placeholder?: string;
-  focusId?: string;
   autoFocus?: boolean;
   disabled?: boolean;
   onSubmit?: (value: string) => void;
@@ -74,25 +75,16 @@ interface ShellInputProps {
 const ShellInput: React.FC<ShellInputProps> = ({
   value = '',
   placeholder = 'Type your message...',
-  focusId = 'text-editor',
   autoFocus = false,
   disabled = false,
   onSubmit,
   onChange,
 }) => {
-  // Safe focus handling - avoid useFocus in test environments where raw mode may not work reliably
-  const [isFocused, setIsFocused] = useState(autoFocus);
-
-  // Only use useFocus if we're in a real terminal environment
-  const useRealFocus =
-    process.env.NODE_ENV !== 'test' &&
-    typeof process.stdin?.isTTY === 'boolean' &&
-    process.stdin.isTTY;
-
-  const focusResult = useRealFocus
-    ? useFocus({ id: focusId, autoFocus: autoFocus && !disabled })
-    : null;
-  const actualIsFocused = useRealFocus ? focusResult?.isFocused : isFocused && !disabled;
+  // Use Lace focus system
+  const { isFocused, takeFocus } = useLaceFocus(FocusRegions.shell);
+  const actualIsFocused = isFocused && !disabled;
+  
+  // No auto-focus logic needed - provider handles initial focus
   const [bufferState, bufferOps] = useTextBuffer(value);
 
   // Autocomplete state
@@ -290,6 +282,17 @@ const ShellInput: React.FC<ShellInputProps> = ({
     (input, key) => {
       // Do nothing if disabled
       if (disabled) {
+        return;
+      }
+
+      // Handle Escape key for autocomplete only - global escape handled by provider
+      if (key.escape) {
+        if (autocompleteVisible) {
+          // If autocomplete is visible, close it and stay in shell
+          hideAutocomplete();
+          return;
+        }
+        // Let provider handle global escape (will navigate to timeline)
         return;
       }
 
@@ -508,7 +511,6 @@ const ShellInput: React.FC<ShellInputProps> = ({
             selectedIndex={autocompleteSelectedIndex}
             isVisible={autocompleteVisible}
             maxItems={5}
-            focusId="autocomplete"
             onSelect={handleAutocompleteSelect}
             onCancel={handleAutocompleteCancel}
             onNavigate={handleAutocompleteNavigate}

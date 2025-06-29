@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { renderInkComponent } from './helpers/ink-test-utils.js';
+import { renderInkComponentWithFocus } from './helpers/ink-test-utils.js';
 import ToolApprovalModal from '../components/tool-approval-modal.js';
 import { ApprovalDecision } from '../../../tools/approval-types.js';
 
@@ -16,7 +16,7 @@ describe('ToolApprovalModal', () => {
 
   describe('rendering', () => {
     it('renders modal when visible', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls -la' }}
@@ -33,7 +33,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('shows read-only tools correctly', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="read"
           input={{ file: 'test.txt' }}
@@ -49,7 +49,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('formats input parameters', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'echo hello', flags: ['--verbose'] }}
@@ -66,7 +66,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('shows all approval options', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}

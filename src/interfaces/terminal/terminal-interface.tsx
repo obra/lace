@@ -27,6 +27,7 @@ import type { UserInterface } from '../../commands/types.js';
 import { ThreadEvent } from '../../threads/types.js';
 import { ThreadProcessor } from '../thread-processor.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
+import { LaceFocusProvider } from './focus/index.js';
 
 // ThreadProcessor context for interface-level caching
 const ThreadProcessorContext = createContext<ThreadProcessor | null>(null);
@@ -211,8 +212,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     resolve: (decision: ApprovalDecision) => void;
   } | null>(null);
 
-  // Focus management with disabled automatic cycling
-  const { focus, focusNext, focusPrevious, disableFocus } = useFocusManager();
 
   // Interface context functions
   const showAlert = useCallback(
@@ -232,25 +231,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     setAlert(null);
   }, []);
 
-  // Disable automatic Tab cycling to prevent conflicts with autocomplete
-  useEffect(() => {
-    disableFocus();
-  }, [disableFocus]);
-
-  // Global keyboard shortcuts for manual focus switching
-  useInput(
-    useCallback(
-      (input, key) => {
-        if (key.escape) {
-          // Escape toggles between shell input and timeline
-          focusNext();
-        }
-        // Tab is NOT handled here - let ShellInput handle it for autocomplete
-      },
-      [focusNext]
-    ),
-    { isActive: !approvalRequest }
-  );
 
   // Sync events from agent's thread (including delegate threads)
   const syncEvents = useCallback(() => {
@@ -272,11 +252,10 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       if (approvalRequest) {
         approvalRequest.resolve(decision);
         setApprovalRequest(null);
-        // Return focus to shell input when modal closes (for typing)
-        focus('shell-input');
+        // Focus automatically returns via LaceFocusProvider when modal closes
       }
     },
-    [approvalRequest, focus]
+    [approvalRequest]
   );
 
   // Setup event handlers for Agent events
@@ -649,20 +628,10 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       });
     });
 
-    // Set initial focus to shell input (for typing)
-    focus('shell-input');
-  }, [agent, addMessage, syncEvents, focus]);
+    // Initial focus is handled by LaceFocusProvider default stack
+  }, [agent, addMessage, syncEvents]);
 
-  // Focus approval modal when it appears
-  useEffect(() => {
-    if (approvalRequest) {
-      // Use setTimeout to ensure the modal is rendered before focusing
-      const timeoutId = setTimeout(() => {
-        focus('approval-modal');
-      }, 0);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [approvalRequest, focus]);
+  // Approval modal focus is handled by ModalWrapper automatically
 
   // Measure bottom section height for viewport calculations
   useEffect(() => {
@@ -677,9 +646,10 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   }, [events.length, ephemeralMessages.length, currentInput]); // Re-measure when content or input changes
 
   return (
-    <ThreadProcessorContext.Provider value={threadProcessor}>
-      <ThreadManagerContext.Provider value={agent.threadManager}>
-        <InterfaceContext.Provider value={{ showAlert, clearAlert }}>
+    <LaceFocusProvider>
+      <ThreadProcessorContext.Provider value={threadProcessor}>
+        <ThreadManagerContext.Provider value={agent.threadManager}>
+          <InterfaceContext.Provider value={{ showAlert, clearAlert }}>
         {/* SIGINT Handler */}
         <SigintHandler agent={agent} showAlert={showAlert} />
 
@@ -728,7 +698,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
                     ]
                   : []),
               ]}
-              focusId="timeline"
               bottomSectionHeight={bottomSectionHeight}
             />
             </TimelineExpansionProvider>
@@ -742,7 +711,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               isReadOnly={approvalRequest.isReadOnly}
               onDecision={handleApprovalDecision}
               isVisible={true}
-              focusId="approval-modal"
             />
           )}
 
@@ -780,16 +748,16 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
                 }
                 onSubmit={handleSubmit}
                 onChange={setCurrentInput}
-                focusId="shell-input"
                 autoFocus={false}
                 disabled={false} // Allow typing during processing, submission is controlled in handleSubmit
               />
             </Box>
           </Box>
         </Box>
-        </InterfaceContext.Provider>
-      </ThreadManagerContext.Provider>
-    </ThreadProcessorContext.Provider>
+          </InterfaceContext.Provider>
+        </ThreadManagerContext.Provider>
+      </ThreadProcessorContext.Provider>
+    </LaceFocusProvider>
   );
 };
 

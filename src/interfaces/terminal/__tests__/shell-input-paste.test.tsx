@@ -8,6 +8,7 @@ import { act } from '@testing-library/react';
 import React from 'react';
 import ShellInput from '../components/shell-input.js';
 import { useTextBuffer } from '../hooks/use-text-buffer.js';
+import { LaceFocusProvider } from '../focus/focus-provider.js';
 
 // Mock clipboardy for Node.js clipboard access
 const mockReadSync = vi.fn();
@@ -23,6 +24,14 @@ vi.mock('clipboardy', () => ({
 const originalPlatform = process.platform;
 
 describe('ShellInput Paste Functionality', () => {
+  // Helper to render with focus provider
+  const renderWithFocus = (component: React.ReactElement) => {
+    return render(
+      <LaceFocusProvider>
+        {component}
+      </LaceFocusProvider>
+    );
+  };
   beforeEach(() => {
     // Reset mocks
     mockReadSync.mockClear();
@@ -330,7 +339,7 @@ describe('ShellInput Paste Functionality', () => {
       Object.defineProperty(process, 'platform', { value: 'linux' });
 
       const onSubmit = vi.fn();
-      const { container } = render(<ShellInput onSubmit={onSubmit} />);
+      const { container } = renderWithFocus(<ShellInput onSubmit={onSubmit} />);
 
       // This test will verify keyboard integration once we implement it
       expect(container).toBeTruthy();
@@ -341,7 +350,7 @@ describe('ShellInput Paste Functionality', () => {
       Object.defineProperty(process, 'platform', { value: 'darwin' });
 
       const onSubmit = vi.fn();
-      const { container } = render(<ShellInput onSubmit={onSubmit} />);
+      const { container } = renderWithFocus(<ShellInput onSubmit={onSubmit} />);
 
       // This test will verify keyboard integration once we implement it
       expect(container).toBeTruthy();

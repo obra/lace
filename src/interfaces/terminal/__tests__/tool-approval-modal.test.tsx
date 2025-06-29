@@ -4,7 +4,7 @@
 import React from 'react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { act } from '@testing-library/react';
-import { renderInkComponent, stripAnsi } from './helpers/ink-test-utils.js';
+import { renderInkComponentWithFocus, stripAnsi } from './helpers/ink-test-utils.js';
 import ToolApprovalModal from '../components/tool-approval-modal.js';
 import { ApprovalDecision } from '../../../tools/approval-types.js';
 
@@ -15,9 +15,22 @@ vi.mock('ink', async () => {
   const actual = await vi.importActual('ink');
   return {
     ...actual,
-    useInput: (handler: (input: string, key: any) => void) => {
-      capturedInputHandler = handler;
+    useInput: (handler: (input: string, key: any) => void, options?: { isActive?: boolean }) => {
+      // Only capture handlers that are active (or don't specify isActive)
+      if (options?.isActive !== false) {
+        capturedInputHandler = handler;
+      }
     },
+  };
+});
+
+// Mock the focus system to ensure the modal is focused in tests
+vi.mock('../focus/index.js', async () => {
+  const actual = await vi.importActual('../focus/index.js');
+  return {
+    ...actual,
+    useLaceFocus: vi.fn(() => ({ isFocused: true, takeFocus: vi.fn() })),
+    ModalWrapper: ({ children, isOpen }: any) => isOpen ? children : null,
   };
 });
 
@@ -42,7 +55,7 @@ describe('ToolApprovalModal', () => {
 
   describe('visibility', () => {
     it('renders minimal output when not visible', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls -la' }}
@@ -60,7 +73,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('renders modal when visible', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls -la' }}
@@ -79,7 +92,7 @@ describe('ToolApprovalModal', () => {
 
   describe('tool information display', () => {
     it('shows read-only tool correctly', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="read"
           input={{ file: 'test.txt' }}
@@ -94,7 +107,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('shows destructive tool correctly', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'rm -rf /' }}
@@ -109,7 +122,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('formats simple input parameters', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'echo hello' }}
@@ -125,7 +138,7 @@ describe('ToolApprovalModal', () => {
 
     it('truncates long input parameters', () => {
       const longCommand = 'a'.repeat(200);
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: longCommand }}
@@ -141,7 +154,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('formats complex input parameters', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="tool"
           input={{
@@ -162,7 +175,7 @@ describe('ToolApprovalModal', () => {
 
   describe('options display', () => {
     it('shows all approval options', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -178,7 +191,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('shows help text', () => {
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -193,8 +206,8 @@ describe('ToolApprovalModal', () => {
   });
 
   describe('keyboard interactions', () => {
-    it('calls onDecision with ALLOW_ONCE when y is pressed', () => {
-      renderInkComponent(
+    it('calls onDecision with ALLOW_ONCE when y is pressed', async () => {
+      renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -203,14 +216,17 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
+
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       simulateKeyPress('y');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.ALLOW_ONCE);
     });
 
-    it('calls onDecision with ALLOW_ONCE when a is pressed', () => {
-      renderInkComponent(
+    it('calls onDecision with ALLOW_ONCE when a is pressed', async () => {
+      renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -219,14 +235,17 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
+
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       simulateKeyPress('a');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.ALLOW_ONCE);
     });
 
-    it('calls onDecision with ALLOW_SESSION when s is pressed', () => {
-      renderInkComponent(
+    it('calls onDecision with ALLOW_SESSION when s is pressed', async () => {
+      renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -235,14 +254,17 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
+
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       simulateKeyPress('s');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.ALLOW_SESSION);
     });
 
-    it('calls onDecision with DENY when n is pressed', () => {
-      renderInkComponent(
+    it('calls onDecision with DENY when n is pressed', async () => {
+      renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'rm file' }}
@@ -251,14 +273,17 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
+
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       simulateKeyPress('n');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.DENY);
     });
 
-    it('calls onDecision with DENY when d is pressed', () => {
-      renderInkComponent(
+    it('calls onDecision with DENY when d is pressed', async () => {
+      renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'rm file' }}
@@ -268,13 +293,16 @@ describe('ToolApprovalModal', () => {
         />
       );
 
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
       simulateKeyPress('d');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.DENY);
     });
 
-    it('navigates options with arrow keys', () => {
-      const { lastFrame } = renderInkComponent(
+    it('navigates options with arrow keys', async () => {
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -283,6 +311,9 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
+
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       // Initial state should highlight first option
       expect(lastFrame()).toContain('▶ y) Allow Once');
@@ -296,11 +327,11 @@ describe('ToolApprovalModal', () => {
       expect(lastFrame()).toContain('▶ n) Deny');
     });
 
-    it('selects highlighted option with Enter', () => {
+    it('selects highlighted option with Enter', async () => {
       // Reset handler to ensure clean state
       capturedInputHandler = null;
 
-      const { lastFrame } = renderInkComponent(
+      const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           key="enter-test" // Force new component instance
           toolName="bash"
@@ -310,6 +341,9 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
+
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       // Verify we start at first option
       expect(lastFrame()).toContain('▶ y) Allow Once');
@@ -327,7 +361,7 @@ describe('ToolApprovalModal', () => {
     });
 
     it('ignores input when not visible', () => {
-      renderInkComponent(
+      renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -345,7 +379,7 @@ describe('ToolApprovalModal', () => {
 
   describe('state management', () => {
     it('resets selection when becoming visible', async () => {
-      const { lastFrame, rerender } = renderInkComponent(
+      const { lastFrame, rerender } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
           input={{ command: 'ls' }}
@@ -354,6 +388,9 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
+
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       // Navigate to second option
       simulateKeyPress('', { downArrow: true }); // Down arrow

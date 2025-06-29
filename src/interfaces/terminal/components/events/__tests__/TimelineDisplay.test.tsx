@@ -6,6 +6,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import TimelineDisplay from '../TimelineDisplay.js';
 import { Timeline, TimelineItem } from '../../../../thread-processor.js';
+import { LaceFocusProvider } from '../../../focus/focus-provider.js';
 
 // Mock expansion hooks
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
@@ -38,6 +39,15 @@ vi.mock('../../terminal-interface.js', () => ({
   }),
 }));
 
+// Helper to render with focus provider (available to all tests)
+const renderWithFocus = (component: React.ReactElement) => {
+  return render(
+    <LaceFocusProvider>
+      {component}
+    </LaceFocusProvider>
+  );
+};
+
 describe('TimelineDisplay Viewport Behavior', () => {
   const createMockTimeline = (itemCount: number): Timeline => {
     const items: TimelineItem[] = [];
@@ -61,7 +71,7 @@ describe('TimelineDisplay Viewport Behavior', () => {
 
   it('should render timeline with viewport container', () => {
     const timeline = createMockTimeline(3);
-    const { lastFrame } = render(<TimelineDisplay timeline={timeline} />);
+    const { lastFrame } = renderWithFocus(<TimelineDisplay timeline={timeline} />);
 
     // Should render timeline items
     expect(lastFrame()).toContain('Message 0');
@@ -71,7 +81,7 @@ describe('TimelineDisplay Viewport Behavior', () => {
 
   it('should show scroll indicators when content exceeds viewport', () => {
     const timeline = createMockTimeline(20); // More items than viewport can show
-    const { lastFrame } = render(<TimelineDisplay timeline={timeline} bottomSectionHeight={5} />);
+    const { lastFrame } = renderWithFocus(<TimelineDisplay timeline={timeline} bottomSectionHeight={5} />);
 
     // Should show content but we can't easily test scroll indicators in unit tests
     // due to measurement complexity - this is better tested in integration tests
@@ -87,7 +97,7 @@ describe('TimelineDisplay Viewport Behavior', () => {
         lastActivity: new Date(),
       },
     };
-    const { lastFrame } = render(<TimelineDisplay timeline={timeline} />);
+    const { lastFrame } = renderWithFocus(<TimelineDisplay timeline={timeline} />);
 
     // Should render without crashing
     expect(lastFrame()).toBeDefined();
@@ -95,7 +105,7 @@ describe('TimelineDisplay Viewport Behavior', () => {
 
   it('should render cursor overlay', () => {
     const timeline = createMockTimeline(3);
-    const { lastFrame } = render(<TimelineDisplay timeline={timeline} />);
+    const { lastFrame } = renderWithFocus(<TimelineDisplay timeline={timeline} />);
 
     // Should contain cursor indicator
     expect(lastFrame()).toContain('>');
@@ -103,7 +113,7 @@ describe('TimelineDisplay Viewport Behavior', () => {
 
   it('should handle focus management', () => {
     const timeline = createMockTimeline(3);
-    const { lastFrame } = render(<TimelineDisplay timeline={timeline} focusId="test-focus" />);
+    const { lastFrame } = renderWithFocus(<TimelineDisplay timeline={timeline} />);
 
     // Should render without crashing when focused
     expect(lastFrame()).toBeDefined();
@@ -135,7 +145,7 @@ describe('TimelineDisplay Viewport Behavior', () => {
       },
     };
 
-    const { lastFrame } = render(<TimelineDisplay timeline={timeline} />);
+    const { lastFrame } = renderWithFocus(<TimelineDisplay timeline={timeline} />);
 
     // Should render tool execution
     expect(lastFrame()).toContain('bash');
@@ -167,7 +177,7 @@ describe('TimelineDisplay Viewport Behavior', () => {
       },
     };
 
-    const { lastFrame } = render(<TimelineDisplay timeline={timeline} />);
+    const { lastFrame } = renderWithFocus(<TimelineDisplay timeline={timeline} />);
 
     // Should render delegate tool
     expect(lastFrame()).toContain('delegate');
@@ -197,7 +207,7 @@ describe('TimelineDisplay Viewport State Management', () => {
 
   it('should initialize with reasonable defaults', () => {
     const timeline = createMockTimeline(5);
-    const { lastFrame } = render(<TimelineDisplay timeline={timeline} />);
+    const { lastFrame } = renderWithFocus(<TimelineDisplay timeline={timeline} />);
 
     // Should render without errors
     expect(lastFrame()).toBeDefined();

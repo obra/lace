@@ -2,14 +2,14 @@
 // ABOUTME: Focusable autocomplete that handles its own keyboard input and navigation
 
 import React, { useEffect } from 'react';
-import { Box, Text, useInput, useFocus, useFocusManager } from 'ink';
+import { Box, Text, useInput } from 'ink';
+import { useLaceFocus, FocusRegions, useLaceFocusContext } from '../focus/index.js';
 
 interface FileAutocompleteProps {
   items: string[];
   selectedIndex: number;
   isVisible: boolean;
   maxItems?: number;
-  focusId?: string;
   onSelect?: (item: string) => void;
   onCancel?: () => void;
   onNavigate?: (direction: 'up' | 'down') => void;
@@ -20,20 +20,19 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
   selectedIndex,
   isVisible,
   maxItems = 5,
-  focusId = 'autocomplete',
   onSelect,
   onCancel,
   onNavigate,
 }) => {
-  const { isFocused } = useFocus({ id: focusId, autoFocus: isVisible });
-  const { focus } = useFocusManager();
+  const { isFocused, takeFocus } = useLaceFocus(FocusRegions.autocomplete);
+  const { pushFocus } = useLaceFocusContext();
 
   // Take focus when becoming visible
   useEffect(() => {
     if (isVisible && items.length > 0) {
-      focus(focusId);
+      takeFocus();
     }
-  }, [isVisible, items.length, focus, focusId]);
+  }, [isVisible, items.length]); // Removed takeFocus to prevent infinite loop
 
   // Handle keyboard input
   useInput(
@@ -41,9 +40,9 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
       if (!isFocused) return;
 
       if (key.escape) {
-        // Return focus to shell input and cancel autocomplete
-        focus('shell-input');
         onCancel?.();
+        // Return focus to shell input when canceling autocomplete
+        pushFocus(FocusRegions.shell);
         return;
       }
 
@@ -51,9 +50,10 @@ const FileAutocomplete: React.FC<FileAutocompleteProps> = ({
         // Select the current item
         const selectedItem = items[selectedIndex];
         if (selectedItem && onSelect) {
-          focus('shell-input');
           onSelect(selectedItem);
         }
+        // Return focus to shell input after selection
+        pushFocus(FocusRegions.shell);
         return;
       }
 

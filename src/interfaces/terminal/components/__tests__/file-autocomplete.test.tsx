@@ -5,11 +5,20 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
 import FileAutocomplete from '../file-autocomplete.js';
+import { LaceFocusProvider } from '../../focus/focus-provider.js';
 
 describe('FileAutocomplete', () => {
+  // Helper to render with focus provider
+  const renderWithFocus = (component: React.ReactElement) => {
+    return render(
+      <LaceFocusProvider>
+        {component}
+      </LaceFocusProvider>
+    );
+  };
   describe('visibility', () => {
     it('should render nothing when not visible', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithFocus(
         <FileAutocomplete
           items={['src/', 'app.ts']}
           selectedIndex={0}
@@ -22,7 +31,7 @@ describe('FileAutocomplete', () => {
     });
 
     it('should render nothing when no items', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithFocus(
         <FileAutocomplete items={[]} selectedIndex={0} isVisible={true} maxItems={5} />
       );
 
@@ -32,7 +41,7 @@ describe('FileAutocomplete', () => {
 
   describe('basic rendering', () => {
     it('should render file and directory items', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithFocus(
         <FileAutocomplete
           items={['src/', 'package.json', 'README.md']}
           selectedIndex={0}
@@ -48,7 +57,7 @@ describe('FileAutocomplete', () => {
     });
 
     it('should highlight the selected item', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithFocus(
         <FileAutocomplete
           items={['src/', 'app.ts', 'test.ts']}
           selectedIndex={1}
@@ -78,7 +87,7 @@ describe('FileAutocomplete', () => {
     ];
 
     it('should show only maxItems when list is longer', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithFocus(
         <FileAutocomplete items={manyItems} selectedIndex={0} isVisible={true} maxItems={3} />
       );
 
@@ -92,7 +101,7 @@ describe('FileAutocomplete', () => {
     });
 
     it('should scroll to show selected item at top', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithFocus(
         <FileAutocomplete
           items={manyItems}
           selectedIndex={4} // item5.ts
@@ -110,7 +119,7 @@ describe('FileAutocomplete', () => {
     });
 
     it('should handle selection at the end of list', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithFocus(
         <FileAutocomplete
           items={manyItems}
           selectedIndex={6} // last item
@@ -131,7 +140,7 @@ describe('FileAutocomplete', () => {
     it('should default to 5 maxItems', () => {
       const manyItems = Array.from({ length: 10 }, (_, i) => `item${i}.ts`);
 
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithFocus(
         <FileAutocomplete
           items={manyItems}
           selectedIndex={0}
@@ -150,7 +159,7 @@ describe('FileAutocomplete', () => {
     it('should respect custom maxItems', () => {
       const manyItems = Array.from({ length: 10 }, (_, i) => `item${i}.ts`);
 
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithFocus(
         <FileAutocomplete items={manyItems} selectedIndex={0} isVisible={true} maxItems={2} />
       );
 
@@ -164,7 +173,7 @@ describe('FileAutocomplete', () => {
 
   describe('item selection states', () => {
     it('should handle selectedIndex of 0', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithFocus(
         <FileAutocomplete
           items={['first.ts', 'second.ts']}
           selectedIndex={0}
@@ -179,7 +188,7 @@ describe('FileAutocomplete', () => {
     });
 
     it('should handle negative selectedIndex gracefully', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithFocus(
         <FileAutocomplete
           items={['first.ts', 'second.ts']}
           selectedIndex={-1}
@@ -195,7 +204,7 @@ describe('FileAutocomplete', () => {
     });
 
     it('should handle selectedIndex beyond array length', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithFocus(
         <FileAutocomplete
           items={['first.ts', 'second.ts']}
           selectedIndex={10}
@@ -213,7 +222,7 @@ describe('FileAutocomplete', () => {
 
   describe('clean minimal styling', () => {
     it('should have minimal output without borders or decorations', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithFocus(
         <FileAutocomplete
           items={['src/', 'app.ts']}
           selectedIndex={0}
@@ -238,7 +247,7 @@ describe('FileAutocomplete', () => {
     });
 
     it('should use simple selection indicator', () => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithFocus(
         <FileAutocomplete
           items={['selected.ts', 'unselected.ts']}
           selectedIndex={0}

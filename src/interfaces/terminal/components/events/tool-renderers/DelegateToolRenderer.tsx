@@ -161,7 +161,7 @@ export function DelegateToolRenderer({
         <Box flexDirection="column">
           <Text color="yellow">Delegation:</Text>
           <Box marginLeft={2}>
-            <DelegationBox toolCall={item} parentFocusId="timeline" onToggle={onToggle} />
+            <DelegationBox toolCall={item} onToggle={onToggle} />
           </Box>
         </Box>
       )}

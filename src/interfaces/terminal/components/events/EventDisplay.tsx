@@ -15,7 +15,6 @@ import { UserSystemPromptDisplay } from './UserSystemPromptDisplay.js';
 interface EventDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
-  isFocused?: boolean; // Whether this component has keyboard focus
   isSelected?: boolean; // Whether timeline cursor is on this item (for CollapsibleBox)
   focusedLine?: number;
   itemStartLine?: number;
@@ -25,7 +24,6 @@ interface EventDisplayProps {
 export function EventDisplay({
   event,
   isStreaming,
-  isFocused,
   isSelected,
   focusedLine,
   itemStartLine,
@@ -59,7 +57,6 @@ export function EventDisplay({
       <Component
         event={event}
         isStreaming={isStreaming}
-        isFocused={isFocused}
         isSelected={isSelected}
         onToggle={onToggle}
       />

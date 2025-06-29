@@ -9,7 +9,6 @@ interface ToolRendererErrorBoundaryProps {
   children: ReactNode;
   item: Extract<Timeline['items'][0], { type: 'tool_execution' }>;
   isSelected: boolean;
-  isFocused: boolean;
   onToggle?: () => void;
 }
 
@@ -54,7 +53,6 @@ export class ToolRendererErrorBoundary extends Component<
         <GenericToolRenderer
           item={errorItem}
           isSelected={this.props.isSelected}
-          isFocused={this.props.isFocused}
           onToggle={this.props.onToggle}
         />
       );

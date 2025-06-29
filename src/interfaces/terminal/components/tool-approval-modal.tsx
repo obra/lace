@@ -2,8 +2,9 @@
 // ABOUTME: Shows tool information, risk level, and parameters with clear approval options
 
 import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput, useFocus } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import { ApprovalDecision } from '../../../tools/approval-types.js';
+import { ModalWrapper, useLaceFocus, FocusRegions } from '../focus/index.js';
 
 export interface ToolApprovalModalProps {
   toolName: string;
@@ -11,7 +12,6 @@ export interface ToolApprovalModalProps {
   isReadOnly?: boolean;
   onDecision: (decision: ApprovalDecision) => void;
   isVisible: boolean;
-  focusId?: string;
 }
 
 const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
@@ -20,10 +20,9 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
   isReadOnly = false,
   onDecision,
   isVisible,
-  focusId,
 }) => {
   const [selectedOption, setSelectedOption] = useState(0);
-  const { isFocused } = useFocus({ id: focusId, autoFocus: true });
+  const { isFocused } = useLaceFocus(FocusRegions.modal('approval'));
 
   // Reset selection when modal becomes visible
   useEffect(() => {
@@ -59,11 +58,9 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
     } else if (inputChar === 'n' || inputChar === 'd') {
       onDecision(ApprovalDecision.DENY);
     }
-  });
+  }, { isActive: isVisible && isFocused });
 
-  if (!isVisible) {
-    return null;
-  }
+  // ModalWrapper handles visibility, so we just render the content
 
   // Format input parameters for display
   const formatInput = (value: unknown): string => {
@@ -101,7 +98,11 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
   ];
 
   return (
-    <Box flexDirection="column" borderStyle="double" borderColor="yellow" padding={1} marginY={1}>
+    <ModalWrapper
+      focusId={FocusRegions.modal('approval')}
+      isOpen={isVisible}
+    >
+      <Box flexDirection="column" borderStyle="double" borderColor="yellow" padding={1} marginY={1}>
       {/* Header */}
       <Box justifyContent="center" marginBottom={1}>
         <Text bold color="yellow">
@@ -153,7 +154,8 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
           Keys: y/a=allow once, s=session, n/d=deny, ↑↓=navigate, Enter=select
         </Text>
       </Box>
-    </Box>
+      </Box>
+    </ModalWrapper>
   );
 };
 
