@@ -4,7 +4,7 @@
 import React from 'react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { act } from '@testing-library/react';
-import { renderInkComponent } from './helpers/ink-test-utils.js';
+import { renderInkComponentWithFocus } from './helpers/ink-test-utils.js';
 import ToolApprovalModal from '../components/tool-approval-modal.js';
 import { ApprovalDecision } from '../../../tools/approval-types.js';
 
@@ -30,7 +30,7 @@ describe('ToolApprovalModal Logic', () => {
   });
 
   const renderModal = (isVisible = true) => {
-    return renderInkComponent(
+    return renderInkComponentWithFocus(
       <ToolApprovalModal
         toolName="bash"
         input={{ command: 'ls' }}

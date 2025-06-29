@@ -290,13 +290,12 @@ describe('TimelineContent (Baseline)', () => {
           timeline={timeline}
           itemRefs={mockItemRefs}
           {...defaultProps}
-          currentFocusId="custom-focus"
         />
       );
 
       const frame = lastFrame();
       expect(frame).toBeDefined();
-      expect(frame!).toContain('custom-focus');
+      expect(frame!).toContain('TLI:user_message');
     });
 
     it('should call triggerRemeasurement when TimelineItem onToggle is triggered', () => {

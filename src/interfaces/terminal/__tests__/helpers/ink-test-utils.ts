@@ -173,9 +173,7 @@ interface RenderResult {
  * Renders an Ink component wrapped with LaceFocusProvider for focus system testing
  */
 export function renderInkComponentWithFocus(tree: React.ReactElement): RenderResult {
-  return renderInkComponent(
-    React.createElement(LaceFocusProvider, { children: tree })
-  );
+  return renderInkComponent(React.createElement(LaceFocusProvider, { children: tree }));
 }
 
 export function renderInkComponent(tree: React.ReactElement): RenderResult {

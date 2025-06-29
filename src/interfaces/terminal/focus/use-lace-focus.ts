@@ -96,7 +96,7 @@ export function useLaceFocus(id: string, options: UseLaceFocusOptions = {}): Use
   // 1. Ink considers it focused (it's the active component)
   // 2. Lace's focus stack has it as the current focus
   const isFocused = inkIsFocused && isFocusActive(id);
-  
+
   // Debug logging for focus state
   React.useEffect(() => {
     logger.debug(`useLaceFocus[${id}]: Focus state changed`, {
