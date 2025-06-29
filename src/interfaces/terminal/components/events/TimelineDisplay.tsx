@@ -29,11 +29,19 @@ export default function TimelineDisplay({
   // Handle item-specific interactions
   const handleItemInteraction = useCallback(
     (selectedItemIndex: number, input: string, key: any, itemRefs?: React.MutableRefObject<Map<number, any>>) => {
+      logger.debug('TimelineDisplay: handleItemInteraction called', {
+        selectedItemIndex,
+        key: Object.keys(key).filter(k => (key as any)[k]).join('+'),
+        focusRegion,
+      });
+      
       if (key.leftArrow) {
         // Left arrow collapses the selected item
+        logger.debug('TimelineDisplay: Emitting collapse event', { focusRegion });
         emitCollapse();
       } else if (key.rightArrow) {
-        // Right arrow expands the selected item
+        // Right arrow expands the selected item  
+        logger.debug('TimelineDisplay: Emitting expand event', { focusRegion });
         emitExpand();
       } else if (key.return) {
         // Return key enters focusable timeline items
