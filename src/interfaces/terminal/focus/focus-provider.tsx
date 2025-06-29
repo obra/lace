@@ -1,7 +1,7 @@
 // ABOUTME: React context provider for hierarchical focus management in terminal UI
 // ABOUTME: Wraps Ink's focus system with stack-based navigation and global keyboard handling
 
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo } from 'react';
 import { useFocusManager, useInput } from 'ink';
 import { FocusStack } from './focus-stack.js';
 import { FocusRegions } from './focus-regions.js';
@@ -193,13 +193,16 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
   // Global escape handling via useInput above - pops the focus stack
   // Components use pushFocus() to navigate deeper into the hierarchy
 
-  const contextValue: LaceFocusContextValue = {
+  // Memoize context value to prevent unnecessary re-renders of all consumers
+  // This is critical for FocusLifecycleWrapper stability - when context functions
+  // change, useEffect dependencies trigger cleanup and re-focus
+  const contextValue: LaceFocusContextValue = useMemo(() => ({
     currentFocus,
     pushFocus,
     popFocus,
     getFocusStack,
     isFocusActive,
-  };
+  }), [currentFocus, pushFocus, popFocus, getFocusStack, isFocusActive]);
 
   return (
     <LaceFocusContext.Provider value={contextValue}>
