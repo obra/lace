@@ -136,7 +136,14 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
       focusId,
       newFocus,
     });
-    inkFocus.focus(focusId);
+    try {
+      inkFocus.focus(focusId);
+    } catch (error) {
+      logger.warn('LaceFocusProvider: Failed to focus component', {
+        focusId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     
     logger.debug('LaceFocusProvider: pushFocus completed', {
       newCurrentFocus: newFocus,
@@ -155,7 +162,14 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
       logger.debug('LaceFocusProvider: Calling inkFocus.focus (pop)', {
         focusId: newFocus,
       });
-      inkFocus.focus(newFocus);
+      try {
+        inkFocus.focus(newFocus);
+      } catch (error) {
+        logger.warn('LaceFocusProvider: Failed to focus component on pop', {
+          focusId: newFocus,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
       
       return newFocus;
     }

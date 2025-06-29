@@ -37,26 +37,26 @@ function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRenderer
   const [debugInfo, setDebugInfo] = React.useState<string>('');
 
   React.useEffect(() => {
-    let cancelled = false;
+    const abortController = new AbortController();
     setDebugInfo(`Looking for ${item.call.name}ToolRenderer...`);
 
     getToolRenderer(item.call.name)
       .then((renderer) => {
-        if (!cancelled) {
+        if (!abortController.signal.aborted) {
           setToolRenderer(() => renderer);
           setIsLoading(false);
           setDebugInfo(renderer ? `Found: ${renderer.name}` : 'Not found, using Generic');
         }
       })
       .catch((error) => {
-        if (!cancelled) {
+        if (!abortController.signal.aborted) {
           setIsLoading(false);
           setDebugInfo(`Error: ${error.message}`);
         }
       });
 
     return () => {
-      cancelled = true;
+      abortController.abort();
     };
   }, [item.call.name]);
 
