@@ -126,7 +126,7 @@ describe('DelegationBox', () => {
         arguments: { task: 'Test task' },
       },
       result: {
-        content: [{ type: 'text', text: 'Delegation complete' }],
+        content: [{ type: 'text' as const, text: 'Delegation complete' }],
         isError: false,
         // No metadata or empty metadata - should return null
       },

@@ -58,7 +58,7 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
     } else if (inputChar === 'n' || inputChar === 'd') {
       onDecision(ApprovalDecision.DENY);
     }
-  });
+  }, { isActive: isVisible && isFocused });
 
   // ModalWrapper handles visibility, so we just render the content
 

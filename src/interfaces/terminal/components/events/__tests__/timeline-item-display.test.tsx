@@ -18,20 +18,20 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
 
 // Mock all the display components
 vi.mock('../EventDisplay.js', () => ({
-  EventDisplay: ({ event, isFocused }: any) =>
+  EventDisplay: ({ event }: any) =>
     React.createElement(
       Text,
       {},
-      `EventDisplay:${event.type}:${isFocused ? 'focused' : 'unfocused'}`
+      `EventDisplay:${event.type}`
     ),
 }));
 
 vi.mock('../ToolExecutionDisplay.js', () => ({
-  ToolExecutionDisplay: ({ callEvent, isFocused }: any) =>
+  ToolExecutionDisplay: ({ callEvent }: any) =>
     React.createElement(
       Text,
       {},
-      `ToolExecutionDisplay:${callEvent.data.name}:collapsed:${isFocused ? 'focused' : 'unfocused'}`
+      `ToolExecutionDisplay:${callEvent.data.name}:collapsed`
     ),
 }));
 
@@ -48,11 +48,11 @@ vi.mock('../DelegationBox.js', () => ({
 }));
 
 vi.mock('../../message-display.js', () => ({
-  default: ({ message, isFocused }: any) =>
+  default: ({ message }: any) =>
     React.createElement(
       Text,
       {},
-      `MessageDisplay:${message.type}:${isFocused ? 'focused' : 'unfocused'}`
+      `MessageDisplay:${message.type}`
     ),
 }));
 
@@ -106,7 +106,6 @@ function TimelineItemDisplay({
           timestamp: item.timestamp,
           data: item.content,
         },
-        isFocused: isSelected,
         focusedLine: selectedLine,
         itemStartLine,
         onToggle,
@@ -121,7 +120,6 @@ function TimelineItemDisplay({
           timestamp: item.timestamp,
           data: item.content,
         },
-        isFocused: isSelected,
         focusedLine: selectedLine,
         itemStartLine,
         onToggle,
@@ -136,7 +134,6 @@ function TimelineItemDisplay({
           timestamp: item.timestamp,
           data: item.content,
         },
-        isFocused: isSelected,
         focusedLine: selectedLine,
         itemStartLine,
         onToggle,
@@ -199,7 +196,6 @@ function TimelineItemDisplay({
                 key: 'tool',
                 callEvent: callEvent,
                 resultEvent: resultEvent,
-                isFocused: isSelected,
               }),
               React.createElement(DelegationBox, {
                 key: 'delegation',
@@ -228,7 +224,6 @@ function TimelineItemDisplay({
       return React.createElement(ToolExecutionDisplay, {
         callEvent: callEvent,
         resultEvent: resultEvent,
-        isFocused: isSelected,
       });
 
     case 'ephemeral_message':
@@ -238,7 +233,6 @@ function TimelineItemDisplay({
           content: item.content,
           timestamp: item.timestamp,
         },
-        isFocused: isSelected,
       });
 
     default:
@@ -283,7 +277,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         React.createElement(TimelineItemDisplay, { item, ...defaultProps })
       );
 
-      expect(lastFrame()).toContain('EventDisplay:USER_MESSAGE:unfocused');
+      expect(lastFrame()).toContain('EventDisplay:USER_MESSAGE');
     });
 
     it('should pass focus state to EventDisplay', () => {
@@ -298,7 +292,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         React.createElement(TimelineItemDisplay, { item, ...defaultProps, isSelected: true })
       );
 
-      expect(lastFrame()).toContain('EventDisplay:USER_MESSAGE:focused');
+      expect(lastFrame()).toContain('EventDisplay:USER_MESSAGE');
     });
   });
 
@@ -315,7 +309,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         React.createElement(TimelineItemDisplay, { item, ...defaultProps })
       );
 
-      expect(lastFrame()).toContain('EventDisplay:AGENT_MESSAGE:unfocused');
+      expect(lastFrame()).toContain('EventDisplay:AGENT_MESSAGE');
     });
   });
 
@@ -333,7 +327,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         React.createElement(TimelineItemDisplay, { item, ...defaultProps })
       );
 
-      expect(lastFrame()).toContain('EventDisplay:SYSTEM_PROMPT:unfocused');
+      expect(lastFrame()).toContain('EventDisplay:SYSTEM_PROMPT');
     });
 
     it('should use default event type when originalEventType missing', () => {
@@ -348,7 +342,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         React.createElement(TimelineItemDisplay, { item, ...defaultProps })
       );
 
-      expect(lastFrame()).toContain('EventDisplay:LOCAL_SYSTEM_MESSAGE:unfocused');
+      expect(lastFrame()).toContain('EventDisplay:LOCAL_SYSTEM_MESSAGE');
     });
   });
 
@@ -374,7 +368,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         React.createElement(TimelineItemDisplay, { item, ...defaultProps })
       );
 
-      expect(lastFrame()).toContain('ToolExecutionDisplay:bash:collapsed:unfocused');
+      expect(lastFrame()).toContain('ToolExecutionDisplay:bash:collapsed');
     });
 
     it('should start collapsed by default with self-managed state', () => {
@@ -401,7 +395,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         })
       );
 
-      expect(lastFrame()).toContain('ToolExecutionDisplay:bash:collapsed:unfocused');
+      expect(lastFrame()).toContain('ToolExecutionDisplay:bash:collapsed');
     });
 
     it('should handle tool execution without result', () => {
@@ -421,7 +415,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         React.createElement(TimelineItemDisplay, { item, ...defaultProps })
       );
 
-      expect(lastFrame()).toContain('ToolExecutionDisplay:file-read:collapsed:unfocused');
+      expect(lastFrame()).toContain('ToolExecutionDisplay:file-read:collapsed');
     });
   });
 
@@ -472,7 +466,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
       );
 
       const frame = lastFrame();
-      expect(frame).toContain('ToolExecutionDisplay:delegate:collapsed:unfocused');
+      expect(frame).toContain('ToolExecutionDisplay:delegate:collapsed');
       expect(frame).toContain('DelegationBox:delegate-thread-456:expanded');
     });
 
@@ -542,7 +536,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
       );
 
       const frame = lastFrame();
-      expect(frame).toContain('ToolExecutionDisplay:delegate:collapsed:unfocused');
+      expect(frame).toContain('ToolExecutionDisplay:delegate:collapsed');
       expect(frame).not.toContain('DelegationBox');
     });
 
@@ -567,7 +561,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
       );
 
       const frame = lastFrame();
-      expect(frame).toContain('ToolExecutionDisplay:delegate:collapsed:unfocused');
+      expect(frame).toContain('ToolExecutionDisplay:delegate:collapsed');
       expect(frame).not.toContain('DelegationBox');
     });
   });
@@ -585,7 +579,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         React.createElement(TimelineItemDisplay, { item, ...defaultProps })
       );
 
-      expect(lastFrame()).toContain('MessageDisplay:info:unfocused');
+      expect(lastFrame()).toContain('MessageDisplay:info');
     });
 
     it('should pass focus state to MessageDisplay', () => {
@@ -604,7 +598,7 @@ describe('TimelineItemDisplay (Baseline)', () => {
         })
       );
 
-      expect(lastFrame()).toContain('MessageDisplay:warning:focused');
+      expect(lastFrame()).toContain('MessageDisplay:warning');
     });
   });
 

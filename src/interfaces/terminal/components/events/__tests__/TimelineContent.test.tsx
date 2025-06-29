@@ -11,11 +11,11 @@ import { LaceFocusProvider } from '../../../focus/focus-provider.js';
 
 // Mock TimelineItem component
 vi.mock('../TimelineItem.js', () => ({
-  TimelineItem: ({ item, isSelected, currentFocusId }: any) =>
+  TimelineItem: ({ item, isSelected }: any) =>
     React.createElement(
       Text,
       {},
-      `TLI:${item.type}:${isSelected ? 'FOCUS' : 'UNFOCUS'}:${currentFocusId}`
+      `TLI:${item.type}:${isSelected ? 'FOCUS' : 'UNFOCUS'}:timeline`
     ),
 }));
 
@@ -75,7 +75,6 @@ describe('TimelineContent Component', () => {
       triggerRemeasurement: mockTriggerRemeasurement,
     },
     itemRefs: mockItemRefs,
-    currentFocusId: 'timeline',
   });
 
   describe('Basic rendering', () => {

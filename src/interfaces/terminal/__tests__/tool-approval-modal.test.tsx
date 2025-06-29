@@ -15,9 +15,22 @@ vi.mock('ink', async () => {
   const actual = await vi.importActual('ink');
   return {
     ...actual,
-    useInput: (handler: (input: string, key: any) => void) => {
-      capturedInputHandler = handler;
+    useInput: (handler: (input: string, key: any) => void, options?: { isActive?: boolean }) => {
+      // Only capture handlers that are active (or don't specify isActive)
+      if (options?.isActive !== false) {
+        capturedInputHandler = handler;
+      }
     },
+  };
+});
+
+// Mock the focus system to ensure the modal is focused in tests
+vi.mock('../focus/index.js', async () => {
+  const actual = await vi.importActual('../focus/index.js');
+  return {
+    ...actual,
+    useLaceFocus: vi.fn(() => ({ isFocused: true, takeFocus: vi.fn() })),
+    ModalWrapper: ({ children, isOpen }: any) => isOpen ? children : null,
   };
 });
 
@@ -193,7 +206,7 @@ describe('ToolApprovalModal', () => {
   });
 
   describe('keyboard interactions', () => {
-    it('calls onDecision with ALLOW_ONCE when y is pressed', () => {
+    it('calls onDecision with ALLOW_ONCE when y is pressed', async () => {
       renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
@@ -203,13 +216,16 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
+
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       simulateKeyPress('y');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.ALLOW_ONCE);
     });
 
-    it('calls onDecision with ALLOW_ONCE when a is pressed', () => {
+    it('calls onDecision with ALLOW_ONCE when a is pressed', async () => {
       renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
@@ -219,13 +235,16 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
+
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       simulateKeyPress('a');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.ALLOW_ONCE);
     });
 
-    it('calls onDecision with ALLOW_SESSION when s is pressed', () => {
+    it('calls onDecision with ALLOW_SESSION when s is pressed', async () => {
       renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
@@ -236,12 +255,15 @@ describe('ToolApprovalModal', () => {
         />
       );
 
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
       simulateKeyPress('s');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.ALLOW_SESSION);
     });
 
-    it('calls onDecision with DENY when n is pressed', () => {
+    it('calls onDecision with DENY when n is pressed', async () => {
       renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
@@ -251,13 +273,16 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
+
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       simulateKeyPress('n');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.DENY);
     });
 
-    it('calls onDecision with DENY when d is pressed', () => {
+    it('calls onDecision with DENY when d is pressed', async () => {
       renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
@@ -268,12 +293,15 @@ describe('ToolApprovalModal', () => {
         />
       );
 
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
       simulateKeyPress('d');
 
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.DENY);
     });
 
-    it('navigates options with arrow keys', () => {
+    it('navigates options with arrow keys', async () => {
       const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
           toolName="bash"
@@ -283,6 +311,9 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
+
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       // Initial state should highlight first option
       expect(lastFrame()).toContain('▶ y) Allow Once');
@@ -296,7 +327,7 @@ describe('ToolApprovalModal', () => {
       expect(lastFrame()).toContain('▶ n) Deny');
     });
 
-    it('selects highlighted option with Enter', () => {
+    it('selects highlighted option with Enter', async () => {
       // Reset handler to ensure clean state
       capturedInputHandler = null;
 
@@ -310,6 +341,9 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
+
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       // Verify we start at first option
       expect(lastFrame()).toContain('▶ y) Allow Once');
@@ -354,6 +388,9 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
+
+      // Wait for focus to be established
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       // Navigate to second option
       simulateKeyPress('', { downArrow: true }); // Down arrow
