@@ -16,7 +16,8 @@ import { ThreadManager } from './threads/thread-manager.js';
 import { getLaceDbPath } from './config/lace-dir.js';
 import { logger } from './utils/logger.js';
 import { parseArgs, validateProvider } from './cli/args.js';
-import { TerminalInterface } from './interfaces/terminal/terminal-interface.js';
+// Conditional import to avoid fullscreen-ink in prompt mode
+// import { TerminalInterface } from './interfaces/terminal/terminal-interface.js';
 import { NonInteractiveInterface } from './interfaces/non-interactive-interface.js';
 import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
 import { enableTrafficLogging } from './utils/traffic-logger.js';
@@ -153,19 +154,20 @@ async function main() {
     delegateTool.setDependencies(threadManager, toolExecutor);
   }
 
-  // Create interface (always use terminal interface since CLIInterface is removed)
-  const cli = new TerminalInterface(agent);
-
-  // Set up tool approval system: CLI policies apply globally
-  const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);
-  agent.toolExecutor.setApprovalCallback(policyCallback);
-
   // Handle single prompt mode (non-interactive)
   if (options.prompt) {
     const nonInteractive = new NonInteractiveInterface(agent);
     await nonInteractive.executePrompt(options.prompt);
     process.exit(0);
   }
+
+  // Dynamic import for interactive mode only to avoid fullscreen-ink side effects
+  const { TerminalInterface } = await import('./interfaces/terminal/terminal-interface.js');
+  const cli = new TerminalInterface(agent);
+
+  // Set up tool approval system: CLI policies apply globally
+  const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);
+  agent.toolExecutor.setApprovalCallback(policyCallback);
 
   // Start interactive mode
   await cli.startInteractive();

@@ -185,6 +185,16 @@ export class Agent extends EventEmitter {
     this._isRunning = false;
     this._clearProgressTimer();
     this._setState('idle');
+
+    // Clean up provider resources
+    try {
+      await this._provider.cleanup();
+    } catch (cleanupError) {
+      logger.warn('Provider cleanup failed during stop', {
+        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      });
+    }
+
     await this._threadManager.close();
     logger.info('AGENT: Stopped', { threadId: this._threadId });
   }
@@ -384,6 +394,15 @@ export class Agent extends EventEmitter {
         error: error instanceof Error ? error : new Error(String(error)),
         context: { phase: 'conversation_processing', threadId: this._threadId },
       });
+
+      // Clean up provider resources on error to prevent hanging connections
+      try {
+        await this._provider.cleanup();
+      } catch (cleanupError) {
+        logger.warn('Provider cleanup failed', {
+          error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+        });
+      }
     } finally {
       this._abortController = null;
     }
