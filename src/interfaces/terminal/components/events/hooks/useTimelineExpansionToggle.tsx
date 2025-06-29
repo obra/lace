@@ -1,10 +1,34 @@
 // ABOUTME: Hook and emitters for timeline expansion events using event emitter pattern
-// ABOUTME: Provides directional expand/collapse events and shared state management for timeline items
+// ABOUTME: Allows timeline-level controls to send expand/collapse events to selected timeline items
+//
+// ARCHITECTURE OVERVIEW:
+// =====================
+// This module implements a timeline-to-item communication system for expansion controls:
+//
+// 1. TIMELINE LEVEL (sender):
+//    - Uses useExpansionExpand() and useExpansionCollapse() hooks
+//    - Typically called from keyboard shortcuts or UI controls
+//    - Emits expansion events through the ExpansionEmitter
+//
+// 2. TIMELINE ITEMS (receivers):
+//    - Use useTimelineItemExpansion() hook which includes event listeners
+//    - Only listen to events when isSelected=true (the current timeline cursor position)
+//    - Maintain their own individual expansion state
+//
+// 3. CONTEXT SCOPING:
+//    - Each TimelineExpansionProvider creates an isolated ExpansionEmitter
+//    - Multiple conversations/timelines don't interfere with each other
+//    - Events only affect items within the same provider scope
+//
+// EXAMPLE FLOW:
+// - User presses 'e' key in timeline → Timeline calls emitExpand()
+// - Only the currently selected timeline item receives the expand event
+// - That item updates its own expansion state and re-renders
 
 import React, { useCallback, useEffect, useState, createContext, useContext } from 'react';
 import { logger } from '../../../../../utils/logger.js';
 
-// Event emitter for expansion events
+// Event emitter for timeline-to-item expansion communication
 class ExpansionEmitter {
   private expandListeners: Set<() => void> = new Set();
   private collapseListeners: Set<() => void> = new Set();
@@ -56,7 +80,7 @@ const ExpansionEmitterContext = createContext<ExpansionEmitter | null>(null);
 // Provider component for timeline expansion context
 // NOTE: Each provider instance creates its own ExpansionEmitter, so different
 // conversation views or timeline instances will have isolated expansion state.
-// This ensures expand/collapse events only affect items within the same timeline.
+// This allows timeline-level controls to communicate with their own timeline items.
 export function TimelineExpansionProvider({ children }: { children: React.ReactNode }) {
   const [emitter] = useState(() => new ExpansionEmitter());
   return (
@@ -75,7 +99,9 @@ function useExpansionEmitter(): ExpansionEmitter {
   return emitter;
 }
 
-// Export hooks to emit directional events  
+// Hooks for timeline-level controls to emit expansion events
+// These are used by Timeline components to send expand/collapse commands
+// to the currently selected timeline item (e.g., from keyboard shortcuts)
 export function useExpansionExpand() {
   const emitter = useExpansionEmitter();
   return useCallback(() => emitter.emitExpand(), [emitter]);
@@ -86,7 +112,16 @@ export function useExpansionCollapse() {
   return useCallback(() => emitter.emitCollapse(), [emitter]);
 }
 
-// Combined hook that provides complete expansion state management
+// Hook for timeline items to manage expansion state and listen for timeline events
+// This hook provides:
+// 1. Individual expansion state management for each timeline item
+// 2. Event listener registration that only listens when isSelected=true
+// 3. Directional expand/collapse methods for manual control
+//
+// Usage by timeline items:
+// - Call this hook with isSelected indicating if this item has the timeline cursor
+// - When isSelected=true, this item will respond to timeline-level expand/collapse events
+// - Use onExpand/onCollapse for manual expansion control (e.g., mouse clicks)
 export function useTimelineItemExpansion(isSelected: boolean, onExpansionChange?: (expanded: boolean) => void): {
   isExpanded: boolean;
   onExpand: () => void;
@@ -95,6 +130,7 @@ export function useTimelineItemExpansion(isSelected: boolean, onExpansionChange?
   const [isExpanded, setIsExpanded] = useState(false);
   const emitter = useExpansionEmitter();
 
+  // Internal expansion state management
   const expand = useCallback(() => {
     setIsExpanded(true);
     onExpansionChange?.(true);
@@ -105,6 +141,7 @@ export function useTimelineItemExpansion(isSelected: boolean, onExpansionChange?
     onExpansionChange?.(false);
   }, [onExpansionChange]);
 
+  // Public API for manual expansion control
   const onExpand = useCallback(() => {
     if (!isExpanded) {
       expand();
@@ -117,9 +154,11 @@ export function useTimelineItemExpansion(isSelected: boolean, onExpansionChange?
     }
   }, [isExpanded, collapse]);
 
-  // Listen for directional expansion events when selected
+  // KEY FEATURE: Listen for timeline-level expansion events when this item is selected
+  // This enables keyboard shortcuts and other timeline controls to expand/collapse
+  // the currently selected item without each timeline needing to track item state
   useEffect(() => {
-    if (!isSelected) return;
+    if (!isSelected) return; // Only the selected item responds to timeline events
 
     const unsubscribeExpand = emitter.subscribeExpand(expand);
     const unsubscribeCollapse = emitter.subscribeCollapse(collapse);

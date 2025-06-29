@@ -46,6 +46,12 @@ export function DelegateToolRenderer({
   onToggle,
 }: DelegateToolRendererProps) {
   // Use shared expansion management for consistent behavior
+  // This hook provides:
+  // 1. Individual expansion state for this tool renderer
+  // 2. Event listeners that activate when isSelected=true (timeline cursor on this item)
+  // 3. Manual expand/collapse methods for direct user interaction
+  // When the timeline emits expand/collapse events (e.g., keyboard shortcuts),
+  // only the currently selected item will respond and change its expansion state.
   const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
     isSelected || false,
     (expanded) => onToggle?.()

@@ -695,6 +695,13 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
           {/* Timeline - takes remaining space */}
           <Box flexGrow={1} ref={timelineContainerRef}>
+            {/* 
+              TimelineExpansionProvider creates an isolated expansion event system for this conversation.
+              - Timeline-level controls (keyboard shortcuts) can emit expand/collapse events
+              - Only the currently selected timeline item will respond to these events
+              - Each conversation has its own provider, so multiple conversations don't interfere
+              - See hooks/useTimelineExpansionToggle.tsx for architecture details
+            */}
             <TimelineExpansionProvider>
               <ConversationDisplay
               events={events}
