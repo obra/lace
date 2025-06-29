@@ -32,78 +32,76 @@ export class ProviderRegistry {
     const currentFile = fileURLToPath(import.meta.url);
     const providersDir = dirname(currentFile);
 
-    // Find all provider files matching *-provider.ts pattern
-    const providerFiles = await glob('*-provider.js', {
-      cwd: providersDir.replace('/src/', '/dist/'),
-      absolute: true,
-      ignore: 'base-provider.js',
-    });
-
-    // Also check for TypeScript files in development
-    const tsProviderFiles = await glob('*-provider.ts', {
+    // Use a single, more efficient glob operation
+    const providerFiles = await glob('*-provider.{js,ts}', {
       cwd: providersDir,
       absolute: true,
-      ignore: '**/base-provider.ts',
+      ignore: ['**/base-provider.*', '**/dist/**'],
     });
 
-    // Use TS files if available (development), otherwise use JS files (production)
-    const filesToProcess = tsProviderFiles.length > 0 ? tsProviderFiles : providerFiles;
+    // Process files with timeout to prevent hanging
+    const timeout = 5000; // 5 seconds timeout per provider
+    const promises = providerFiles.map(file => 
+      Promise.race([
+        ProviderRegistry.processProviderFile(file, registry),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error(`Timeout processing ${file}`)), timeout)
+        )
+      ]).catch(() => {
+        // Silently skip files that can't be processed or timeout
+      })
+    );
 
-    for (const file of filesToProcess) {
-      try {
-        const module = await import(file);
-
-        // Check all exports in the module
-        for (const exportedValue of Object.values(module)) {
-          if (ProviderRegistry.isProviderClass(exportedValue)) {
-            const ProviderClass = exportedValue as new (...args: unknown[]) => AIProvider;
-
-            // Create instance with default configuration
-            let provider: AIProvider;
-            try {
-              // Try with empty config first
-              provider = new ProviderClass({});
-            } catch {
-              // Some providers might need specific config, create with minimal config
-              try {
-                // For providers that require API keys, use placeholder values for discovery
-                const defaultConfig = {
-                  apiKey: 'discovery-mode-placeholder',
-                  baseURL: 'https://api.placeholder.com',
-                };
-                provider = new ProviderClass(defaultConfig);
-              } catch {
-                // Create a minimal placeholder provider for discovery purposes
-                class PlaceholderProvider extends AIProvider {
-                  get providerName() {
-                    return ProviderClass.name.toLowerCase().replace('provider', '');
-                  }
-                  get defaultModel() {
-                    return 'discovery-model';
-                  }
-                  get supportsStreaming() {
-                    return true;
-                  }
-                  async createResponse(): Promise<ProviderResponse> {
-                    throw new Error('Provider not properly configured');
-                  }
-                }
-
-                const placeholderProvider = new PlaceholderProvider({});
-                registry.registerProvider(placeholderProvider);
-                continue;
-              }
-            }
-
-            registry.registerProvider(provider);
-          }
-        }
-      } catch {
-        // Skip files that can't be imported or have errors
-      }
-    }
+    await Promise.all(promises);
 
     return registry;
+  }
+
+  private static async processProviderFile(file: string, registry: ProviderRegistry): Promise<void> {
+    try {
+      const module = await import(file);
+
+      // Check all exports in the module
+      for (const exportedValue of Object.values(module)) {
+        if (ProviderRegistry.isProviderClass(exportedValue)) {
+          const ProviderClass = exportedValue as new (...args: unknown[]) => AIProvider;
+
+          // Create instance with default configuration - simplified approach
+          let provider: AIProvider;
+          try {
+            // Try with empty config first
+            provider = new ProviderClass({});
+          } catch {
+            // Try with placeholder config
+            try {
+              const placeholderConfig = {
+                apiKey: 'discovery-placeholder',
+                baseURL: 'https://placeholder.api',
+              };
+              provider = new ProviderClass(placeholderConfig);
+            } catch {
+              // Create minimal placeholder without instantiating actual provider
+              const providerName = ProviderClass.name.toLowerCase().replace('provider', '');
+              const placeholder = new (class extends AIProvider {
+                get providerName() { return providerName; }
+                get defaultModel() { return 'default'; }
+                get supportsStreaming() { return true; }
+                async createResponse(): Promise<ProviderResponse> {
+                  throw new Error('Provider not configured');
+                }
+              })({});
+              
+              registry.registerProvider(placeholder);
+              continue;
+            }
+          }
+
+          registry.registerProvider(provider);
+        }
+      }
+    } catch {
+      // Skip files that can't be imported
+    }
   }
 
   static isProviderClass(value: unknown): boolean {
