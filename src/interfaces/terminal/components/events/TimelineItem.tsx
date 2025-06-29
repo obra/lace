@@ -1,7 +1,7 @@
 // ABOUTME: Individual timeline item component with dynamic tool renderer discovery
 // ABOUTME: Handles all timeline item types with unified expansion behavior and automatic tool renderer selection
 
-import React, { Suspense, useImperativeHandle, useRef, forwardRef } from 'react';
+import React, { Suspense, useImperativeHandle, useRef, forwardRef, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import {
   Timeline,
@@ -88,18 +88,19 @@ const DynamicToolRenderer = forwardRef<TimelineItemRef, DynamicToolRendererProps
     };
   }, [item.call.name]);
 
-  if (isLoading) {
-    // Add debug info to loading state
-    const debugItem = {
-      ...item,
-      call: {
-        ...item.call,
-        arguments: {
-          ...item.call.arguments,
-          _debug: debugInfo,
-        },
+  // Memoize debugItem to prevent object recreation on every render
+  const debugItem = useMemo(() => ({
+    ...item,
+    call: {
+      ...item.call,
+      arguments: {
+        ...item.call.arguments,
+        _debug: debugInfo,
       },
-    };
+    },
+  }), [item, debugInfo]);
+
+  if (isLoading) {
     return (
       <GenericToolRenderer
         item={debugItem}
@@ -110,18 +111,6 @@ const DynamicToolRenderer = forwardRef<TimelineItemRef, DynamicToolRendererProps
   }
 
   const RendererComponent = ToolRenderer || GenericToolRenderer;
-
-  // Add debug info to final render
-  const debugItem = {
-    ...item,
-    call: {
-      ...item.call,
-      arguments: {
-        ...item.call.arguments,
-        _debug: debugInfo,
-      },
-    },
-  };
 
   return (
     <RendererComponent
