@@ -19,6 +19,7 @@ import { ConversationDisplay } from './components/events/ConversationDisplay.js'
 import { TimelineExpansionProvider } from './components/events/hooks/useTimelineExpansionToggle.js';
 import { withFullScreen } from 'fullscreen-ink';
 import StatusBar from './components/status-bar.js';
+import { FocusDebugPanel } from './components/FocusDebugPanel.js';
 import { Agent, CurrentTurnMetrics } from '../../agents/agent.js';
 import { ApprovalCallback, ApprovalDecision } from '../../tools/approval-types.js';
 import { CommandRegistry } from '../../commands/registry.js';
@@ -714,8 +715,11 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             />
           )}
 
-          {/* Bottom section - status bar, input anchored to bottom */}
+          {/* Bottom section - debug panel, status bar, input anchored to bottom */}
           <Box flexDirection="column" flexShrink={0} ref={bottomSectionRef}>
+            {/* Focus debug panel - takes natural height */}
+            <FocusDebugPanel />
+            
             {/* Status bar - takes natural height */}
             <StatusBar
               providerName={agent.providerName || 'unknown'}

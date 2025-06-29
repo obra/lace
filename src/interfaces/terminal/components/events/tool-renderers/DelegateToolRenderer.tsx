@@ -1,19 +1,20 @@
 // ABOUTME: Specialized tool renderer for delegate tool executions with inline delegation timeline display
 // ABOUTME: Combines tool execution display with delegation timeline using TimelineEntryCollapsibleBox for consistency
 
-import React, { useState, useMemo } from 'react';
-import { Box, Text } from 'ink';
+import React, { useState, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { Box, Text, useInput } from 'ink';
 import { TimelineEntryCollapsibleBox } from '../../ui/TimelineEntryCollapsibleBox.js';
 import { ToolCall, ToolResult } from '../../../../../tools/types.js';
 import { CompactOutput } from '../../ui/CompactOutput.js';
 import { CodeDisplay } from '../../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
-import { useTimelineItemExpansion } from '../hooks/useTimelineExpansionToggle.js';
+import { useTimelineItemExpansion, useTimelineItemFocusEntry } from '../hooks/useTimelineExpansionToggle.js';
 import { useThreadManager, useThreadProcessor } from '../../../terminal-interface.js';
 import { calculateTokens, formatTokenCount } from '../../../../../utils/token-estimation.js';
-import { useLaceFocus, FocusRegions } from '../../../focus/index.js';
+import { useLaceFocus, FocusRegions, FocusLifecycleWrapper } from '../../../focus/index.js';
 import TimelineDisplay from '../TimelineDisplay.js';
 import { logger } from '../../../../../utils/logger.js';
+import { TimelineItemRef } from '../../timeline-item-focus.js';
 import {
   extractDelegateThreadId,
   isThreadComplete,
@@ -48,18 +49,71 @@ function isJsonOutput(output: string): boolean {
   );
 }
 
-export function DelegateToolRenderer({
+export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRendererProps>(({
   item,
   isStreaming,
   isSelected,
   _isFocused,
   onToggle,
-}: DelegateToolRendererProps) {
+}, ref) => {
   // Use shared expansion management for consistent behavior
   const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
     isSelected || false,
     (_expanded) => onToggle?.()
   );
+
+  // Focus state management
+  const [isEntered, setIsEntered] = useState(false);
+  const delegateThreadId = useMemo(() => extractDelegateThreadId(item), [item]);
+  const { isFocused } = useLaceFocus(delegateThreadId ? FocusRegions.delegate(delegateThreadId) : 'none', { autoFocus: false });
+
+  // Handle keyboard input when focused
+  useInput((input: string, key: any) => {
+    if (!isFocused) return;
+    
+    if (key.escape) {
+      setIsEntered(false); // Will trigger focus pop via FocusLifecycleWrapper
+    }
+    // Other keys could be forwarded to embedded timeline if needed
+  }, { isActive: isFocused });
+
+  // Handle focus entry events from timeline
+  const handleFocusEntry = useCallback(() => {
+    logger.debug('DelegateToolRenderer: handleFocusEntry called', {
+      delegateThreadId,
+    });
+    if (delegateThreadId) {
+      setIsEntered(true);
+      logger.debug('DelegateToolRenderer: setIsEntered(true) called via event', {
+        delegateThreadId,
+        focusId: FocusRegions.delegate(delegateThreadId),
+      });
+    } else {
+      logger.warn('DelegateToolRenderer: handleFocusEntry called but no delegateThreadId');
+    }
+  }, [delegateThreadId]);
+
+  // Listen for focus entry events when this item is selected
+  useTimelineItemFocusEntry(isSelected || false, handleFocusEntry);
+
+  // Expose enterFocus method through ref (kept for compatibility)
+  useImperativeHandle(ref, () => ({
+    enterFocus: () => {
+      logger.debug('DelegateToolRenderer: enterFocus called via ref', {
+        delegateThreadId,
+        currentIsEntered: isEntered,
+      });
+      if (delegateThreadId) {
+        setIsEntered(true);
+        logger.debug('DelegateToolRenderer: setIsEntered(true) called via ref', {
+          delegateThreadId,
+          focusId: FocusRegions.delegate(delegateThreadId),
+        });
+      } else {
+        logger.warn('DelegateToolRenderer: enterFocus called but no delegateThreadId');
+      }
+    },
+  }), [delegateThreadId, isEntered]);
 
   // Create handler that works with TimelineEntryCollapsibleBox interface
   const handleExpandedChange = (expanded: boolean) => {
@@ -81,11 +135,7 @@ export function DelegateToolRenderer({
   const delegateTask = ((input.task || input.prompt) as string) || 'Unknown task';
   const statusIcon = success ? UI_SYMBOLS.SUCCESS : result ? UI_SYMBOLS.ERROR : UI_SYMBOLS.PENDING;
 
-  // Extract delegate thread ID from result metadata
-  const delegateThreadId = extractDelegateThreadId(item);
-
-  // Set up focus management for this delegation (only if threadId exists)
-  useLaceFocus(delegateThreadId ? FocusRegions.delegate(delegateThreadId) : 'none');
+  // Extract delegate thread ID from result metadata (moved to focus section above)
 
   // Get thread data from context
   const threadManager = useThreadManager();
@@ -117,7 +167,7 @@ export function DelegateToolRenderer({
         metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
       };
     }
-  }, [delegateThreadId, threadManager, threadProcessor]);
+  }, [delegateThreadId]);
 
   // Determine delegation status
   const isComplete = isThreadComplete(timeline);
@@ -252,15 +302,23 @@ export function DelegateToolRenderer({
   );
 
   return (
-    <TimelineEntryCollapsibleBox
-      label={`delegate "${delegateTask}"`}
-      summary={delegateSummary}
-      isExpanded={isExpanded}
-      onExpandedChange={handleExpandedChange}
-      isSelected={isSelected}
-      onToggle={onToggle}
+    <FocusLifecycleWrapper
+      focusId={delegateThreadId ? FocusRegions.delegate(delegateThreadId) : 'none'}
+      isActive={isEntered}
+      renderWhenInactive={true}
+      onFocusRestored={() => setIsEntered(false)}
     >
-      {expandedContent}
-    </TimelineEntryCollapsibleBox>
+      <TimelineEntryCollapsibleBox
+        label={`delegate "${delegateTask}"`}
+        summary={delegateSummary}
+        isExpanded={isExpanded}
+        onExpandedChange={handleExpandedChange}
+        isSelected={isSelected}
+        isFocused={isFocused}
+        onToggle={onToggle}
+      >
+        {expandedContent}
+      </TimelineEntryCollapsibleBox>
+    </FocusLifecycleWrapper>
   );
-}
+});

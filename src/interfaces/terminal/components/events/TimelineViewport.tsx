@@ -12,7 +12,7 @@ import { FocusRegions, useLaceFocus } from '../../focus/index.js';
 interface TimelineViewportProps {
   timeline: Timeline;
   bottomSectionHeight?: number;
-  onItemInteraction?: (selectedItemIndex: number, input: string, key: any) => void;
+  onItemInteraction?: (selectedItemIndex: number, input: string, key: any, itemRefs?: React.MutableRefObject<Map<number, any>>) => void;
   children: (props: {
     timeline: Timeline;
     viewportState: {
@@ -89,9 +89,9 @@ export function TimelineViewport({
       } else if (input === 'G') {
         viewport.navigateToBottom();
       } else if (key.leftArrow || key.rightArrow || key.return) {
-        // Forward item interactions to parent
+        // Forward item interactions to parent with itemRefs
         if (onItemInteraction) {
-          onItemInteraction(viewport.selectedItemIndex, input, key);
+          onItemInteraction(viewport.selectedItemIndex, input, key, itemRefs);
         }
       }
     },

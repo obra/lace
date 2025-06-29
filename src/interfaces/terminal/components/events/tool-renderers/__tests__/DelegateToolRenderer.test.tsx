@@ -63,6 +63,7 @@ vi.mock('../../hooks/useTimelineExpansionToggle.js', () => ({
     onExpand: vi.fn(),
     onCollapse: vi.fn(),
   }),
+  useTimelineItemFocusEntry: vi.fn(),
 }));
 
 vi.mock('../../../../terminal-interface.js', () => ({
@@ -83,10 +84,11 @@ vi.mock('../../../../../../utils/token-estimation.js', () => ({
 }));
 
 vi.mock('../../../../focus/index.js', () => ({
-  useLaceFocus: () => ({}),
+  useLaceFocus: () => ({ isFocused: false }),
   FocusRegions: {
     delegate: (threadId: string) => `delegate-${threadId}`,
   },
+  FocusLifecycleWrapper: ({ children }: any) => children,
 }));
 
 vi.mock('../../TimelineDisplay.js', () => ({

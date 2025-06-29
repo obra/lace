@@ -15,6 +15,7 @@ interface TimelineEntryCollapsibleBoxProps {
   borderStyle?: 'single' | 'double' | 'round';
   borderColor?: string;
   isSelected?: boolean;
+  isFocused?: boolean;
   onToggle?: () => void; // Called when expanded/collapsed to trigger height re-measurement
 }
 
@@ -28,6 +29,7 @@ export function TimelineEntryCollapsibleBox({
   borderStyle,
   borderColor,
   isSelected = false,
+  isFocused = false,
   onToggle,
 }: TimelineEntryCollapsibleBoxProps) {
   return (
@@ -41,6 +43,7 @@ export function TimelineEntryCollapsibleBox({
         borderStyle={borderStyle}
         borderColor={borderColor}
         isSelected={isSelected}
+        isFocused={isFocused}
       />
     </Box>
   );
