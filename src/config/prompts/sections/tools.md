@@ -35,11 +35,11 @@
 
 ## Key Principles
 
-1. **Read before writing** - Always understand existing code first
+1. **Read before writing** - Always understand existing files and context first
 2. **Exact matches for edits** - file_edit requires precise text matching
 3. **Parallel when possible** - Run independent tool calls together
 4. **Handle failures gracefully** - File not found? Use file_find. Edit failed? Check exact text
-
+5. **User rejections** - If the user rejects a tool call, stop and ask them what you should do instead
 ## Shell Command Guidelines
 - Warn before destructive operations
 - Use non-interactive flags (`-y`, `--non-interactive`)

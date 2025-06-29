@@ -703,17 +703,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             </TimelineExpansionProvider>
           </Box>
 
-          {/* Tool approval modal */}
-          {approvalRequest && (
-            <ToolApprovalModal
-              toolName={approvalRequest.toolName}
-              input={approvalRequest.input}
-              isReadOnly={approvalRequest.isReadOnly}
-              onDecision={handleApprovalDecision}
-              isVisible={true}
-            />
-          )}
-
           {/* Bottom section - status bar, input anchored to bottom */}
           <Box flexDirection="column" flexShrink={0} ref={bottomSectionRef}>
             {/* Status bar - takes natural height */}
@@ -728,14 +717,21 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               turnMetrics={currentTurnMetrics}
             />
 
-            {/* Input area - takes natural height */}
+            {/* Input area or modal - takes natural height */}
             <Box>
-              <ShellInput
-                value={currentInput}
-                placeholder={
-                  approvalRequest
-                    ? 'Tool approval required...'
-                    : isTurnActive && currentTurnMetrics
+              {approvalRequest ? (
+                <ToolApprovalModal
+                  toolName={approvalRequest.toolName}
+                  input={approvalRequest.input}
+                  isReadOnly={approvalRequest.isReadOnly}
+                  onDecision={handleApprovalDecision}
+                  isVisible={true}
+                />
+              ) : (
+                <ShellInput
+                  value={currentInput}
+                  placeholder={
+                    isTurnActive && currentTurnMetrics
                       ? (() => {
                           const elapsedSeconds = Math.floor(currentTurnMetrics.elapsedMs / 1000);
                           const duration =
@@ -745,12 +741,13 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
                           return `Processing... ⏱️ ${duration} | Press Ctrl+C to abort`;
                         })()
                       : 'Type your message...'
-                }
-                onSubmit={handleSubmit}
-                onChange={setCurrentInput}
-                autoFocus={false}
-                disabled={false} // Allow typing during processing, submission is controlled in handleSubmit
-              />
+                  }
+                  onSubmit={handleSubmit}
+                  onChange={setCurrentInput}
+                  autoFocus={false}
+                  disabled={false} // Allow typing during processing, submission is controlled in handleSubmit
+                />
+              )}
             </Box>
           </Box>
         </Box>

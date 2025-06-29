@@ -50,7 +50,7 @@ export const UI_SYMBOLS = {
   PROVIDER: '◉', // Provider/brain indicator
   FOLDER: '▣', // Thread/folder indicator
   MESSAGE: '◈', // Message count indicator
-  LIGHTNING: '⚡', // Processing indicator
+  LIGHTNING: '.', // Processing indicator
   READY: '✓', // Ready status indicator
 } as const;
 
