@@ -36,7 +36,9 @@ export function CollapsibleBox({
           {isSelected && (
             <Text color="gray">
               {' '}
-              ({UI_SYMBOLS.ARROW_LEFT} {UI_SYMBOLS.ARROW_RIGHT} to toggle)
+              ({isExpanded 
+                ? `${UI_SYMBOLS.ARROW_LEFT} to close`
+                : `${UI_SYMBOLS.ARROW_RIGHT} to open`})
             </Text>
           )}
         </Box>

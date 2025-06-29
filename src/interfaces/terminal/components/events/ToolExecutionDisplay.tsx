@@ -1,7 +1,7 @@
 // ABOUTME: Unified display component for TOOL_CALL and TOOL_RESULT events with navigation
 // ABOUTME: Shows tool execution with compact output, input/output truncation, and expansion controls
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
 import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
 import { ThreadEvent } from '../../../../threads/types.js';
@@ -9,7 +9,7 @@ import { ToolCall, ToolResult } from '../../../../tools/types.js';
 import { CompactOutput } from '../ui/CompactOutput.js';
 import { CodeDisplay } from '../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
-import { useTimelineExpansionToggle } from './hooks/useTimelineExpansionToggle.js';
+import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
 
 interface ToolExecutionDisplayProps {
   callEvent: ThreadEvent;
@@ -38,17 +38,19 @@ export function ToolExecutionDisplay({
   isSelected,
   onToggle,
 }: ToolExecutionDisplayProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const toolCallData = callEvent.data as ToolCall;
 
-  // Handle expansion toggle events
-  const toggleExpansion = () => {
-    setIsExpanded(!isExpanded);
-    onToggle?.();
-  };
+  // Use shared expansion state management
+  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected || false, (expanded) => onToggle?.());
 
-  // Listen for expansion toggle events when selected
-  useTimelineExpansionToggle(isSelected || false, toggleExpansion);
+  // Create handler that works with TimelineEntryCollapsibleBox interface
+  const handleExpandedChange = (expanded: boolean) => {
+    if (expanded) {
+      onExpand();
+    } else {
+      onCollapse();
+    }
+  };
   const { name: toolName, arguments: input } = toolCallData;
 
   const toolResultData = resultEvent?.data as ToolResult | undefined;
@@ -180,10 +182,7 @@ export function ToolExecutionDisplay({
       label={`${toolName}${toolCommand ? ` ${toolCommand}` : ''}`}
       summary={toolSummary}
       isExpanded={isExpanded}
-      onExpandedChange={(expanded) => {
-        setIsExpanded(expanded);
-        onToggle?.();
-      }}
+      onExpandedChange={handleExpandedChange}
       isSelected={isSelected}
       onToggle={onToggle}
     >

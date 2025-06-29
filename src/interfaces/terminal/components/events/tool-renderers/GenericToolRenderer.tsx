@@ -1,14 +1,14 @@
 // ABOUTME: Generic tool renderer component using TimelineEntryCollapsibleBox
 // ABOUTME: Provides consistent expansion behavior for any tool execution with input/output display
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
 import { TimelineEntryCollapsibleBox } from '../../ui/TimelineEntryCollapsibleBox.js';
 import { ToolCall, ToolResult } from '../../../../../tools/types.js';
 import { CompactOutput } from '../../ui/CompactOutput.js';
 import { CodeDisplay } from '../../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
-import { useTimelineExpansionToggle } from '../hooks/useTimelineExpansionToggle.js';
+import { useTimelineItemExpansion } from '../hooks/useTimelineExpansionToggle.js';
 
 // Extract tool execution timeline item type
 type ToolExecutionItem = {
@@ -25,8 +25,6 @@ interface GenericToolRendererProps {
   isSelected?: boolean; // Whether timeline cursor is on this item
   isFocused?: boolean; // Whether this item has keyboard focus
   onToggle?: () => void;
-  isExpanded?: boolean;
-  onExpandedChange?: (expanded: boolean) => void;
 }
 
 // Default props for optional boolean values
@@ -52,25 +50,21 @@ export function GenericToolRenderer({
   isSelected = defaultProps.isSelected,
   isFocused = defaultProps.isFocused,
   onToggle,
-  isExpanded: controlledExpanded,
-  onExpandedChange,
 }: GenericToolRendererProps) {
-  // Use controlled expansion if provided, otherwise manage internally
-  const [internalExpanded, setInternalExpanded] = useState(false);
-  const isExpanded = controlledExpanded ?? internalExpanded;
+  // Use shared expansion management for consistent behavior
+  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
+    isSelected,
+    (expanded) => onToggle?.()
+  );
 
-  // Handle expansion toggle events
-  const toggleExpansion = () => {
-    if (onExpandedChange) {
-      onExpandedChange(!isExpanded);
+  // Create handler that works with TimelineEntryCollapsibleBox interface
+  const handleExpandedChange = (expanded: boolean) => {
+    if (expanded) {
+      onExpand();
     } else {
-      setInternalExpanded(!isExpanded);
+      onCollapse();
     }
-    onToggle?.();
   };
-
-  // Listen for expansion toggle events when selected
-  useTimelineExpansionToggle(isSelected, toggleExpansion);
 
   const { call, result } = item;
   const { name: toolName, arguments: input } = call;
@@ -185,14 +179,6 @@ export function GenericToolRenderer({
     </Box>
   );
 
-  const handleExpandedChange = (expanded: boolean) => {
-    if (onExpandedChange) {
-      onExpandedChange(expanded);
-    } else {
-      setInternalExpanded(expanded);
-    }
-    onToggle?.();
-  };
 
   return (
     <TimelineEntryCollapsibleBox

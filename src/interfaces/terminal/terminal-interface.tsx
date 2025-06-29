@@ -16,6 +16,7 @@ import useStdoutDimensions from '../../utils/use-stdout-dimensions.js';
 import ShellInput from './components/shell-input.js';
 import ToolApprovalModal from './components/tool-approval-modal.js';
 import { ConversationDisplay } from './components/events/ConversationDisplay.js';
+import { TimelineExpansionProvider } from './components/events/hooks/useTimelineExpansionToggle.js';
 import { withFullScreen } from 'fullscreen-ink';
 import StatusBar from './components/status-bar.js';
 import { Agent, CurrentTurnMetrics } from '../../agents/agent.js';
@@ -694,7 +695,15 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
           {/* Timeline - takes remaining space */}
           <Box flexGrow={1} ref={timelineContainerRef}>
-            <ConversationDisplay
+            {/* 
+              TimelineExpansionProvider creates an isolated expansion event system for this conversation.
+              - Timeline-level controls (keyboard shortcuts) can emit expand/collapse events
+              - Only the currently selected timeline item will respond to these events
+              - Each conversation has its own provider, so multiple conversations don't interfere
+              - See hooks/useTimelineExpansionToggle.tsx for architecture details
+            */}
+            <TimelineExpansionProvider>
+              <ConversationDisplay
               events={events}
               ephemeralMessages={[
                 ...ephemeralMessages,
@@ -722,6 +731,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               focusId="timeline"
               bottomSectionHeight={bottomSectionHeight}
             />
+            </TimelineExpansionProvider>
           </Box>
 
           {/* Tool approval modal */}

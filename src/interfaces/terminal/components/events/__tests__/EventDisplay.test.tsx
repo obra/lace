@@ -2,12 +2,21 @@
 // ABOUTME: Validates that each event type maps to correct display component
 
 import React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import { EventDisplay } from '../EventDisplay.js';
 import { ThreadEvent } from '../../../../../threads/types.js';
 import { ToolCall, ToolResult } from '../../../../../tools/types.js';
 import { UI_SYMBOLS } from '../../../theme.js';
+
+// Mock expansion hook
+vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
+  useTimelineItemExpansion: () => ({
+    isExpanded: false,
+    onExpand: vi.fn(),
+    onCollapse: vi.fn(),
+  }),
+}));
 
 describe('EventDisplay', () => {
   it('should render USER_MESSAGE events', () => {
@@ -89,7 +98,7 @@ describe('EventDisplay', () => {
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
-    expect(lastFrame()).toContain(UI_SYMBOLS.INFO + '  System');
+    expect(lastFrame()).toContain(UI_SYMBOLS.INFO + ' System');
     expect(lastFrame()).toContain('System notification');
   });
 

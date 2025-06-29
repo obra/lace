@@ -64,6 +64,14 @@ vi.mock('../../../../theme.js', () => ({
   },
 }));
 
+vi.mock('../../hooks/useTimelineExpansionToggle.js', () => ({
+  useTimelineItemExpansion: () => ({
+    isExpanded: false,
+    onExpand: vi.fn(),
+    onCollapse: vi.fn(),
+  }),
+}));
+
 describe('DelegateToolRenderer', () => {
   const createDelegateExecutionItem = (
     input: Record<string, unknown> = { task: 'Calculate 3+6' },
@@ -220,22 +228,13 @@ describe('DelegateToolRenderer', () => {
       expect(lastFrame()).toContain('Expanded: false');
     });
 
-    it('should use controlled expansion when provided', () => {
+    it('should use shared expansion state from hook', () => {
       const item = createDelegateExecutionItem();
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
 
-      expect(lastFrame()).toContain('Expanded: true');
-    });
-
-    it('should call onExpandedChange when provided', () => {
-      const item = createDelegateExecutionItem();
-      const onExpandedChange = vi.fn();
-
-      render(<DelegateToolRenderer item={item} onExpandedChange={onExpandedChange} />);
-
-      // onExpandedChange is passed to TimelineEntryCollapsibleBox
-      expect(onExpandedChange).not.toHaveBeenCalled(); // Not called during render
+      // Expansion is now managed by the hook system
+      expect(lastFrame()).toContain('Expanded: false');
     });
   });
 
@@ -250,56 +249,58 @@ describe('DelegateToolRenderer', () => {
       expect(frame).toContain('Expanded: false');
     });
 
-    it('should show input, output and delegation details when expanded', () => {
+    it('should show delegate summary when collapsed', () => {
       const item = createDelegateExecutionItem(
         { task: 'Calculate sum' },
         createSuccessResult('Thread: delegate-thread-456')
       );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateContent]');
-      expect(frame).toContain('Expanded: true');
+      expect(frame).toContain('[DelegateSummary]');
+      expect(frame).toContain('Expanded: false');
     });
 
-    it('should show delegation box when thread ID is found and expanded', () => {
+    it('should show delegate summary when thread ID is found but collapsed', () => {
       const item = createDelegateExecutionItem(
         { task: 'Calculate sum' },
         createSuccessResult('Thread: delegate-thread-456')
       );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateContent]');
+      expect(frame).toContain('[DelegateSummary]');
+      expect(frame).toContain('Expanded: false');
     });
 
-    it('should not show delegation box when no thread ID found', () => {
+    it('should show delegate summary when no thread ID found', () => {
       const item = createDelegateExecutionItem(
         { task: 'Calculate sum' },
         createSuccessResult('No thread created')
       );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateContent]');
+      expect(frame).toContain('[DelegateSummary]');
+      expect(frame).toContain('Expanded: false');
     });
   });
 
   describe('Error handling', () => {
-    it('should display error message when delegation fails', () => {
+    it('should display delegate summary when delegation fails', () => {
       const item = createDelegateExecutionItem(
         { task: 'Calculate sum' },
         createErrorResult('Failed to create delegate thread')
       );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateContent]');
-      expect(frame).toContain('Expanded: true');
+      expect(frame).toContain('[DelegateSummary]');
+      expect(frame).toContain('Expanded: false');
     });
 
     it('should handle missing error message gracefully', () => {
@@ -310,10 +311,11 @@ describe('DelegateToolRenderer', () => {
       };
       const item = createDelegateExecutionItem({ task: 'Calculate sum' }, result);
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateContent]');
+      expect(frame).toContain('[DelegateSummary]');
+      expect(frame).toContain('Expanded: false');
     });
 
     it('should handle missing output gracefully', () => {
@@ -324,10 +326,11 @@ describe('DelegateToolRenderer', () => {
       };
       const item = createDelegateExecutionItem({ task: 'Calculate sum' }, result);
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateContent]');
+      expect(frame).toContain('[DelegateSummary]');
+      expect(frame).toContain('Expanded: false');
     });
   });
 
@@ -388,11 +391,12 @@ describe('DelegateToolRenderer', () => {
       };
       const item = createDelegateExecutionItem(complexInput);
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isExpanded={true} />);
+      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateContent]');
+      expect(frame).toContain('[DelegateSummary]');
       expect(frame).toContain('delegate "Process data analysis"');
+      expect(frame).toContain('Expanded: false');
     });
 
     it('should handle empty input objects', () => {

@@ -7,6 +7,17 @@ import { render } from 'ink-testing-library';
 import TimelineDisplay from '../TimelineDisplay.js';
 import { Timeline, TimelineItem } from '../../../../thread-processor.js';
 
+// Mock expansion hooks
+vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
+  useExpansionExpand: () => vi.fn(),
+  useExpansionCollapse: () => vi.fn(),
+  useTimelineItemExpansion: () => ({
+    isExpanded: false,
+    onExpand: vi.fn(),
+    onCollapse: vi.fn(),
+  }),
+}));
+
 // Mock the external dependencies
 vi.mock('../../../../../utils/use-stdout-dimensions.js', () => ({
   default: () => [80, 30], // width, height

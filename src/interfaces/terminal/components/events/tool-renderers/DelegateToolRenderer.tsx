@@ -1,7 +1,7 @@
 // ABOUTME: Specialized tool renderer for delegate tool executions with delegation timeline display
 // ABOUTME: Combines tool execution display with DelegationBox using TimelineEntryCollapsibleBox for consistency
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
 import { TimelineEntryCollapsibleBox } from '../../ui/TimelineEntryCollapsibleBox.js';
 import { DelegationBox } from '../DelegationBox.js';
@@ -9,7 +9,7 @@ import { ToolCall, ToolResult } from '../../../../../tools/types.js';
 import { CompactOutput } from '../../ui/CompactOutput.js';
 import { CodeDisplay } from '../../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
-import { useTimelineExpansionToggle } from '../hooks/useTimelineExpansionToggle.js';
+import { useTimelineItemExpansion } from '../hooks/useTimelineExpansionToggle.js';
 
 // Extract tool execution timeline item type
 type ToolExecutionItem = {
@@ -26,8 +26,6 @@ interface DelegateToolRendererProps {
   isSelected?: boolean; // Whether timeline cursor is on this item
   isFocused?: boolean; // Whether this item has keyboard focus
   onToggle?: () => void;
-  isExpanded?: boolean;
-  onExpandedChange?: (expanded: boolean) => void;
 }
 
 function isJsonOutput(output: string): boolean {
@@ -46,26 +44,27 @@ export function DelegateToolRenderer({
   isSelected,
   isFocused,
   onToggle,
-  isExpanded: controlledExpanded,
-  onExpandedChange,
 }: DelegateToolRendererProps) {
-  // Use controlled expansion if provided, otherwise manage internally
-  const [internalExpanded, setInternalExpanded] = useState(false);
-  const isExpanded = controlledExpanded ?? internalExpanded;
+  // Use shared expansion management for consistent behavior
+  // This hook provides:
+  // 1. Individual expansion state for this tool renderer
+  // 2. Event listeners that activate when isSelected=true (timeline cursor on this item)
+  // 3. Manual expand/collapse methods for direct user interaction
+  // When the timeline emits expand/collapse events (e.g., keyboard shortcuts),
+  // only the currently selected item will respond and change its expansion state.
+  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
+    isSelected || false,
+    (expanded) => onToggle?.()
+  );
 
-  // Handle expansion toggle events
-  const toggleExpansion = () => {
-    const newExpanded = !isExpanded;
-    if (onExpandedChange) {
-      onExpandedChange(newExpanded);
+  // Create handler that works with TimelineEntryCollapsibleBox interface
+  const handleExpandedChange = (expanded: boolean) => {
+    if (expanded) {
+      onExpand();
     } else {
-      setInternalExpanded(newExpanded);
+      onCollapse();
     }
-    onToggle?.();
   };
-
-  // Listen for expansion toggle events when selected
-  useTimelineExpansionToggle(isSelected || false, toggleExpansion);
 
   const { call, result } = item;
   const { arguments: input } = call;
@@ -169,14 +168,6 @@ export function DelegateToolRenderer({
     </Box>
   );
 
-  const handleExpandedChange = (expanded: boolean) => {
-    if (onExpandedChange) {
-      onExpandedChange(expanded);
-    } else {
-      setInternalExpanded(expanded);
-    }
-    onToggle?.();
-  };
 
   return (
     <TimelineEntryCollapsibleBox

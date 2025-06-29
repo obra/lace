@@ -8,6 +8,15 @@ import { Text } from 'ink';
 import { Timeline, TimelineItem as TimelineItemType } from '../../../../thread-processor.js';
 import { TimelineItem } from '../TimelineItem.js';
 
+// Mock expansion hook
+vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
+  useTimelineItemExpansion: () => ({
+    isExpanded: false,
+    onExpand: vi.fn(),
+    onCollapse: vi.fn(),
+  }),
+}));
+
 // Mock all the display components
 vi.mock('../EventDisplay.js', () => ({
   EventDisplay: ({ event, isFocused }: any) =>

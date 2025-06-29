@@ -6,7 +6,7 @@ import { Box, useInput, useFocus, useFocusManager } from 'ink';
 import { Timeline, TimelineItem } from '../../../thread-processor.js';
 import { TimelineViewport } from './TimelineViewport.js';
 import { TimelineContent } from './TimelineContent.js';
-import { emitExpansionToggle } from './hooks/useTimelineExpansionToggle.js';
+import { useExpansionExpand, useExpansionCollapse } from './hooks/useTimelineExpansionToggle.js';
 
 interface TimelineDisplayProps {
   timeline: Timeline;
@@ -23,17 +23,24 @@ export default function TimelineDisplay({
 }: TimelineDisplayProps) {
   const { isFocused } = useFocus({ id: focusId || 'timeline' });
   const { focus } = useFocusManager();
+  
+  // Get expansion emitters
+  const emitExpand = useExpansionExpand();
+  const emitCollapse = useExpansionCollapse();
 
   // Handle item-specific interactions
   const handleItemInteraction = useCallback(
     (selectedItemIndex: number, input: string, key: any) => {
-      if (key.leftArrow || key.rightArrow) {
-        // Emit expansion toggle event - only selected item will respond
-        emitExpansionToggle();
+      if (key.leftArrow) {
+        // Left arrow collapses the selected item
+        emitCollapse();
+      } else if (key.rightArrow) {
+        // Right arrow expands the selected item
+        emitExpand();
       }
       // Other interactions (return key, etc.) can be handled here in the future
     },
-    []
+    [emitCollapse, emitExpand]
   );
 
   return (

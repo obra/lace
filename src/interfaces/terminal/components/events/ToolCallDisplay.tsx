@@ -1,14 +1,14 @@
 // ABOUTME: Specialized display component for TOOL_CALL events with expandable input parameters
 // ABOUTME: Shows tool name, call ID, and collapsible JSON input for debugging
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
 import { ToolCall } from '../../../../tools/types.js';
 import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
 import { CodeDisplay } from '../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
-import { useTimelineExpansionToggle } from './hooks/useTimelineExpansionToggle.js';
+import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
 
 interface ToolCallDisplayProps {
   event: ThreadEvent;
@@ -27,16 +27,18 @@ export function ToolCallDisplay({
 }: ToolCallDisplayProps) {
   const toolCallData = event.data as ToolCall;
   const { name: toolName, arguments: input, id: callId } = toolCallData;
-  const [isExpanded, setIsExpanded] = useState(false);
 
-  // Handle expansion toggle events
-  const toggleExpansion = () => {
-    setIsExpanded(!isExpanded);
-    onToggle?.();
+  // Use shared expansion state management
+  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected || false, (expanded) => onToggle?.());
+
+  // Create handler that works with TimelineEntryCollapsibleBox interface
+  const handleExpandedChange = (expanded: boolean) => {
+    if (expanded) {
+      onExpand();
+    } else {
+      onCollapse();
+    }
   };
-
-  // Listen for expansion toggle events when selected
-  useTimelineExpansionToggle(isSelected || false, toggleExpansion);
 
   const headerSummary = (
     <Box>
@@ -54,10 +56,7 @@ export function ToolCallDisplay({
       label="Input Parameters"
       summary={headerSummary}
       isExpanded={isExpanded}
-      onExpandedChange={(expanded) => {
-        setIsExpanded(expanded);
-        onToggle?.();
-      }}
+      onExpandedChange={handleExpandedChange}
       maxHeight={10}
       borderColor={UI_COLORS.TOOL}
       isSelected={isSelected}
