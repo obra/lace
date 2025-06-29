@@ -67,14 +67,33 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRend
   const delegateThreadId = useMemo(() => extractDelegateThreadId(item), [item]);
   const { isFocused } = useLaceFocus(delegateThreadId ? FocusRegions.delegate(delegateThreadId) : 'none', { autoFocus: false });
 
-  // Handle keyboard input when focused
+  // Handle keyboard input when focused - HIGH PRIORITY to intercept before TimelineDisplay
   useInput((input: string, key: any) => {
     if (!isFocused) return;
     
     if (key.escape) {
+      logger.debug('DelegateToolRenderer: Escape pressed, exiting delegate focus', {
+        delegateThreadId,
+        focusId: delegateThreadId ? FocusRegions.delegate(delegateThreadId) : 'none',
+      });
       setIsEntered(false); // Will trigger focus pop via FocusLifecycleWrapper
+      return; // Consume the event
     }
-    // Other keys could be forwarded to embedded timeline if needed
+    
+    if (key.leftArrow) {
+      logger.debug('DelegateToolRenderer: Left arrow pressed, collapsing delegate timeline locally');
+      setDelegationExpanded(false);
+      return; // Consume the event to prevent main timeline from collapsing
+    }
+    
+    if (key.rightArrow) {
+      logger.debug('DelegateToolRenderer: Right arrow pressed, expanding delegate timeline locally');
+      setDelegationExpanded(true);
+      return; // Consume the event to prevent main timeline from expanding
+    }
+    
+    // Let other keys (up/down arrows, return, etc.) pass through to embedded TimelineDisplay
+    // The embedded timeline will handle navigation within the delegate context
   }, { isActive: isFocused });
 
   // Handle focus entry events from timeline
@@ -141,8 +160,8 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRend
   const threadManager = useThreadManager();
   const threadProcessor = useThreadProcessor();
 
-  // Manage delegation expansion state
-  const [delegationExpanded] = useState(true); // Default to expanded for delegation
+  // Manage delegation expansion state - mutable for local control
+  const [delegationExpanded, setDelegationExpanded] = useState(true); // Default to expanded for delegation
 
   // Fetch and process delegate thread data (only if threadId exists)
   const timeline = useMemo(() => {
@@ -291,6 +310,7 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRend
               {/* Content */}
               {delegationExpanded && (
                 <Box flexDirection="column" paddingLeft={2}>
+                  {/* Wrap TimelineDisplay to isolate key events from main timeline */}
                   <TimelineDisplay 
                     timeline={timeline} 
                     focusRegion={delegateThreadId ? FocusRegions.delegate(delegateThreadId) : undefined}
