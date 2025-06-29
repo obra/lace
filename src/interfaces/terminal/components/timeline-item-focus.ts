@@ -87,7 +87,7 @@ export function isDelegateToolCallResult(result: unknown): boolean {
   }
 
   // For delegate tool results, the thread ID is stored in metadata.threadId
-  const threadId = result.metadata?.threadId;
+  const threadId = (result as any).metadata?.threadId;
   return typeof threadId === 'string' && threadId.length > 0;
 }
 

@@ -96,10 +96,8 @@ export function useTimelineViewport({
       });
       if (newItemStart !== undefined) {
         setSelectedLine(newItemStart);
-        // Reset flag after a delay
-        setTimeout(() => {
-          setItemToReselectAfterMeasurement(-1);
-        }, 50);
+        // Reset flag immediately - no timer needed
+        setItemToReselectAfterMeasurement(-1);
       }
     }
   }, [itemPositions, itemToReselectAfterMeasurement]);

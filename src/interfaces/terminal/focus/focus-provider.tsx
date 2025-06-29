@@ -1,7 +1,7 @@
 // ABOUTME: React context provider for hierarchical focus management in terminal UI
 // ABOUTME: Wraps Ink's focus system with stack-based navigation and global keyboard handling
 
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo, useRef } from 'react';
 import { useFocusManager, useInput } from 'ink';
 import { FocusStack } from './focus-stack.js';
 import { FocusRegions } from './focus-regions.js';
@@ -68,8 +68,8 @@ interface LaceFocusProviderProps {
  */
 export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
   const inkFocus = useFocusManager();
-  const [focusStack] = useState(() => new FocusStack());
-  const [currentFocus, setCurrentFocus] = useState(focusStack.current());
+  const focusStackRef = useRef(new FocusStack());
+  const [currentFocus, setCurrentFocus] = useState(focusStackRef.current.current());
 
   // Set initial focus ONCE only - the infinite loop bug fix
   useEffect(() => {
@@ -92,13 +92,13 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
     if (key.escape) {
       logger.debug('LaceFocusProvider: Global escape pressed', {
         currentFocus,
-        stackBefore: focusStack.getStack(),
+        stackBefore: focusStackRef.current.getStack(),
       });
       
       // Vi-like behavior: shell escape goes to timeline using focusNext
       if (currentFocus === FocusRegions.shell) {
         // From shell, navigate to timeline using focusNext (which works)
-        const newFocus = focusStack.push(FocusRegions.timeline);
+        const newFocus = focusStackRef.current.push(FocusRegions.timeline);
         setCurrentFocus(newFocus);
         inkFocus.focusNext(); // Use focusNext instead of focus(id)
         logger.debug('LaceFocusProvider: Shell -> Timeline navigation (using focusNext)');
@@ -107,14 +107,14 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
         const newFocus = popFocus();
         logger.debug('LaceFocusProvider: Timeline -> Shell navigation', {
           newFocus,
-          stackAfter: focusStack.getStack(),
+          stackAfter: focusStackRef.current.getStack(),
         });
       } else {
         // From anywhere else (modals, etc), pop back
         const newFocus = popFocus();
         logger.debug('LaceFocusProvider: Pop focus completed', {
           newFocus,
-          stackAfter: focusStack.getStack(),
+          stackAfter: focusStackRef.current.getStack(),
         });
       }
     }
@@ -125,11 +125,11 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
    */
   const pushFocus = useCallback((focusId: string) => {
     logger.debug('LaceFocusProvider: pushFocus called', {
-      fromFocus: currentFocus,
+      fromFocus: focusStackRef.current.current(),
       toFocus: focusId,
-      stackBefore: focusStack.getStack(),
+      stackBefore: focusStackRef.current.getStack(),
     });
-    const newFocus = focusStack.push(focusId);
+    const newFocus = focusStackRef.current.push(focusId);
     setCurrentFocus(newFocus);
     
     logger.debug('LaceFocusProvider: Calling inkFocus.focus', {
@@ -147,15 +147,15 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
     
     logger.debug('LaceFocusProvider: pushFocus completed', {
       newCurrentFocus: newFocus,
-      stackAfter: focusStack.getStack(),
+      stackAfter: focusStackRef.current.getStack(),
     });
-  }, [inkFocus, focusStack, currentFocus]);
+  }, [inkFocus]); // Removed focusStack dependency - now stable ref
 
   /**
    * Pop the current focus and return to the previous one
    */
   const popFocus = useCallback(() => {
-    const newFocus = focusStack.pop();
+    const newFocus = focusStackRef.current.pop();
     if (newFocus) {
       setCurrentFocus(newFocus);
       
@@ -174,35 +174,36 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
       return newFocus;
     }
     return undefined;
-  }, [inkFocus, focusStack]);
+  }, [inkFocus]); // Removed focusStack dependency - now stable ref
 
   /**
    * Get a copy of the current focus stack for debugging
    */
   const getFocusStack = useCallback(() => {
-    return focusStack.getStack();
-  }, [focusStack]);
+    return focusStackRef.current.getStack();
+  }, []); // No dependencies - stable ref
 
   /**
    * Check if a specific focus ID is currently active
    */
   const isFocusActive = useCallback((focusId: string) => {
-    return currentFocus === focusId;
-  }, [currentFocus]);
+    return focusStackRef.current.current() === focusId;
+  }, []); // No dependencies - stable ref
 
   // Global escape handling via useInput above - pops the focus stack
   // Components use pushFocus() to navigate deeper into the hierarchy
 
   // Memoize context value to prevent unnecessary re-renders of all consumers
-  // This is critical for FocusLifecycleWrapper stability - when context functions
-  // change, useEffect dependencies trigger cleanup and re-focus
+  // CRITICAL: Only depend on currentFocus, not the callback functions
+  // When callbacks change due to currentFocus changing, it causes re-render cycles
+  // that trigger FocusLifecycleWrapper cleanup and destroy focus
   const contextValue: LaceFocusContextValue = useMemo(() => ({
     currentFocus,
     pushFocus,
     popFocus,
     getFocusStack,
     isFocusActive,
-  }), [currentFocus, pushFocus, popFocus, getFocusStack, isFocusActive]);
+  }), [currentFocus]); // ONLY depend on currentFocus to break re-render cycle
 
   return (
     <LaceFocusContext.Provider value={contextValue}>
