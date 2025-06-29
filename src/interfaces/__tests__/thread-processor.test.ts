@@ -517,7 +517,9 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const processedEvents = processor.processThreads(events).items.filter(item => item.type !== 'ephemeral_message') as ProcessedThreadItems;
+      const processedEvents = processor
+        .processThreads(events)
+        .items.filter((item) => item.type !== 'ephemeral_message') as ProcessedThreadItems;
       const ephemeralItems = processor.processEphemeralEvents(ephemeralMessages);
       const timeline = processor.buildTimeline(processedEvents, ephemeralItems);
 
@@ -746,7 +748,9 @@ describe('ThreadProcessor', () => {
         },
       ];
 
-      const processedEvents = processor.processThreads(events).items.filter(item => item.type !== 'ephemeral_message') as ProcessedThreadItems;
+      const processedEvents = processor
+        .processThreads(events)
+        .items.filter((item) => item.type !== 'ephemeral_message') as ProcessedThreadItems;
       const ephemeralItems = processor.processEphemeralEvents(ephemeralMessages);
       const timeline = processor.buildTimeline(processedEvents, ephemeralItems);
 

@@ -19,6 +19,7 @@ import { parseArgs, validateProvider } from './cli/args.js';
 import { TerminalInterface } from './interfaces/terminal/terminal-interface.js';
 import { NonInteractiveInterface } from './interfaces/non-interactive-interface.js';
 import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
+import { enableTrafficLogging } from './utils/traffic-logger.js';
 
 // Create provider based on CLI option
 async function createProvider(
@@ -77,10 +78,17 @@ async function main() {
 
   // Initialize logging
   logger.configure(options.logLevel, options.logFile);
+
+  // Initialize traffic logging if requested
+  if (options.harFile) {
+    await enableTrafficLogging(options.harFile);
+  }
+
   logger.info('Starting Lace Agent', {
     provider: options.provider,
     model: options.model || 'default',
     logLevel: options.logLevel,
+    harRecording: !!options.harFile,
   });
 
   // Show configuration file locations on first startup
