@@ -26,8 +26,8 @@ vi.mock('../../../ui/TimelineEntryCollapsibleBox.js', () => ({
 }));
 
 vi.mock('../../../ui/CompactOutput.js', () => ({
-  CompactOutput: ({ output, language, maxLines }: any) =>
-    React.createElement(Text, {}, `[CompactOutput] ${output} (${language}, max: ${maxLines})`),
+  CompactOutput: ({ output, language }: any) =>
+    React.createElement(Text, {}, `[CompactOutput] ${output} (${language})`),
 }));
 
 vi.mock('../../../ui/CodeDisplay.js', () => ({
@@ -35,25 +35,18 @@ vi.mock('../../../ui/CodeDisplay.js', () => ({
     React.createElement(Text, {}, `[CodeDisplay] ${code} (${language})`),
 }));
 
-vi.mock('../../DelegationBox.js', () => ({
-  DelegationBox: ({ toolCall }: any) => {
-    // Extract delegate thread ID from metadata like the real component
-    const extractDelegateThreadId = (item: any) => {
-      const threadId = item.result?.metadata?.threadId;
-      return threadId && typeof threadId === 'string' ? threadId : null;
-    };
-    const threadId = extractDelegateThreadId(toolCall);
-    return React.createElement(Text, {}, `[DelegationBox] Thread: ${threadId || 'No thread'}`);
-  },
-}));
-
-vi.mock('../../../../theme.js', () => ({
+vi.mock('../../../../../../theme.js', () => ({
   UI_SYMBOLS: {
     TOOL: '🔧',
     SUCCESS: '✓',
     ERROR: '✗',
     PENDING: '⏳',
     DELEGATE: '🤝',
+    WORKING: '⚡',
+    TOKEN_IN: '↑',
+    TOKEN_OUT: '↓',
+    COLLAPSE_HINT: '←',
+    EXPAND_HINT: '→',
   },
   UI_COLORS: {
     TOOL: 'blue',
@@ -70,6 +63,52 @@ vi.mock('../../hooks/useTimelineExpansionToggle.js', () => ({
     onExpand: vi.fn(),
     onCollapse: vi.fn(),
   }),
+}));
+
+vi.mock('../../../../terminal-interface.js', () => ({
+  useThreadManager: () => ({
+    getEvents: vi.fn(() => []),
+  }),
+  useThreadProcessor: () => ({
+    processThreads: vi.fn(() => ({
+      items: [],
+      metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
+    })),
+  }),
+}));
+
+vi.mock('../../../../../../utils/token-estimation.js', () => ({
+  calculateTokens: () => ({ tokensIn: 100, tokensOut: 50 }),
+  formatTokenCount: (count: number) => count.toString(),
+}));
+
+vi.mock('../../../../focus/index.js', () => ({
+  useLaceFocus: () => ({}),
+  FocusRegions: {
+    delegate: (threadId: string) => `delegate-${threadId}`,
+  },
+}));
+
+vi.mock('../../TimelineDisplay.js', () => ({
+  default: ({ timeline }: any) =>
+    React.createElement(Text, {}, `[TimelineDisplay] Items: ${timeline.items.length}`),
+}));
+
+vi.mock('../../../../../../utils/logger.js', () => ({
+  logger: {
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+vi.mock('../../utils/timeline-utils.js', () => ({
+  extractDelegateThreadId: (item: any) => {
+    const threadId = item.result?.metadata?.threadId;
+    return threadId && typeof threadId === 'string' ? threadId : null;
+  },
+  isThreadComplete: () => false,
+  extractTaskFromTimeline: () => 'Test Task',
+  calculateDuration: () => '5s',
 }));
 
 describe('DelegateToolRenderer', () => {
@@ -422,7 +461,7 @@ describe('DelegateToolRenderer', () => {
 
       const frame = lastFrame();
       expect(frame).toContain('[DelegateBox] delegate "Analyze logs"');
-      // DelegationBox component should be rendered for tools with metadata threadId
+      // Delegation content should be rendered for tools with metadata threadId
     });
 
     it('should show delegation active status when thread ID present in metadata', () => {
@@ -437,7 +476,7 @@ describe('DelegateToolRenderer', () => {
       const { lastFrame } = render(<DelegateToolRenderer item={item} />);
 
       expect(lastFrame()).toContain('[DelegateBox] delegate "Complete analysis"');
-      // DelegationBox component should be rendered for completed delegate tasks
+      // Delegation content should be rendered for completed delegate tasks
     });
 
     it('should not show delegation info when no thread ID in metadata', () => {

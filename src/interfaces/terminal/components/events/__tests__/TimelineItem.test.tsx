@@ -1,58 +1,38 @@
-// ABOUTME: Tests for extracted TimelineItem component
-// ABOUTME: Verifies all timeline item types render correctly and delegate logic works properly
+// ABOUTME: Tests for TimelineItem component with dynamic tool renderer discovery
+// ABOUTME: Verifies timeline item rendering, tool renderer selection, and expansion behavior
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
-import { Text } from 'ink';
-import { Timeline, TimelineItem as TimelineItemType } from '../../../../thread-processor.js';
 import { TimelineItem } from '../TimelineItem.js';
+import { TimelineItem as TimelineItemType } from '../../../../thread-processor.js';
+import { Text } from 'ink';
+import { TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
 
-// Mock expansion hook
-vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
-  useTimelineItemExpansion: () => ({
-    isExpanded: false,
-    onExpand: vi.fn(),
-    onCollapse: vi.fn(),
-  }),
-}));
-
-// Mock all the display components
+// Mock dependencies
 vi.mock('../EventDisplay.js', () => ({
-  EventDisplay: ({ event }: any) =>
-    React.createElement(
+  EventDisplay: ({ event }: any) => {
+    return React.createElement(
       Text,
       {},
       `EventDisplay:${event.type}`
-    ),
+    );
+  },
 }));
 
 vi.mock('../tool-renderers/GenericToolRenderer.js', () => ({
-  GenericToolRenderer: ({ item, isFocused }: any) =>
-    React.createElement(
+  GenericToolRenderer: ({ item, isSelected }: any) => {
+    const focusState = isSelected ? 'FOCUS' : 'UNFOCUS';
+    return React.createElement(
       Text,
       {},
-      `GenericToolRenderer:${item.call.name}:${isFocused ? 'focused' : 'unfocused'}`
-    ),
+      `GenericToolRenderer:${item.call.name}:${focusState.toLowerCase()}:timeline`
+    );
+  },
 }));
 
 vi.mock('../tool-renderers/getToolRenderer.js', () => ({
   getToolRenderer: vi.fn().mockResolvedValue(null), // Always return null to use GenericToolRenderer
-}));
-
-vi.mock('../DelegationBox.js', () => ({
-  DelegationBox: ({ toolCall }: any) => {
-    // Extract delegate thread ID from tool result like the real component
-    const extractDelegateThreadId = (item: any) => {
-      if (!item.result?.output) return null;
-      const match = item.result.output.match(/Thread:\s*([^\s]+)/);
-      return match ? match[1] : null;
-    };
-    const threadId = extractDelegateThreadId(toolCall);
-    // Return null if no thread ID found, just like the real component
-    if (!threadId) return null;
-    return React.createElement(Text, {}, `DelegationBox:${threadId}:expanded`);
-  },
 }));
 
 vi.mock('../../message-display.js', () => ({
@@ -73,8 +53,6 @@ vi.mock('../../../../../utils/logger.js', () => ({
   },
 }));
 
-// Note: useDelegateThreadExtraction hook was removed - DelegationBox now self-sufficient
-
 describe('TimelineItem Component', () => {
   const mockOnToggle = vi.fn();
 
@@ -89,6 +67,15 @@ describe('TimelineItem Component', () => {
     onToggle: mockOnToggle,
   };
 
+  // Helper to render with TimelineExpansionProvider
+  const renderWithProvider = (component: React.ReactElement) => {
+    return render(
+      <TimelineExpansionProvider>
+        {component}
+      </TimelineExpansionProvider>
+    );
+  };
+
   describe('user_message items', () => {
     it('should render user message with EventDisplay', () => {
       const item: TimelineItemType = {
@@ -98,7 +85,7 @@ describe('TimelineItem Component', () => {
         content: 'Hello world',
       };
 
-      const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
+      const { lastFrame } = renderWithProvider(<TimelineItem item={item} {...defaultProps} />);
 
       expect(lastFrame()).toContain('EventDisplay:USER_MESSAGE');
     });
@@ -111,7 +98,7 @@ describe('TimelineItem Component', () => {
         content: 'Hello world',
       };
 
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithProvider(
         <TimelineItem item={item} {...defaultProps} isSelected={true} />
       );
 
@@ -128,7 +115,7 @@ describe('TimelineItem Component', () => {
         content: 'Hello back',
       };
 
-      const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
+      const { lastFrame } = renderWithProvider(<TimelineItem item={item} {...defaultProps} />);
 
       expect(lastFrame()).toContain('EventDisplay:AGENT_MESSAGE');
     });
@@ -144,7 +131,7 @@ describe('TimelineItem Component', () => {
         originalEventType: 'SYSTEM_PROMPT',
       };
 
-      const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
+      const { lastFrame } = renderWithProvider(<TimelineItem item={item} {...defaultProps} />);
 
       expect(lastFrame()).toContain('EventDisplay:SYSTEM_PROMPT');
     });
@@ -157,7 +144,7 @@ describe('TimelineItem Component', () => {
         content: 'System notification',
       };
 
-      const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
+      const { lastFrame } = renderWithProvider(<TimelineItem item={item} {...defaultProps} />);
 
       expect(lastFrame()).toContain('EventDisplay:LOCAL_SYSTEM_MESSAGE');
     });
@@ -181,9 +168,9 @@ describe('TimelineItem Component', () => {
         },
       };
 
-      const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
+      const { lastFrame } = renderWithProvider(<TimelineItem item={item} {...defaultProps} />);
 
-      expect(lastFrame()).toContain('GenericToolRenderer:bash:unfocused');
+      expect(lastFrame()).toContain('GenericToolRenderer:bash:unfocus:timeline');
     });
 
     it('should start collapsed by default with self-managed state', () => {
@@ -203,30 +190,14 @@ describe('TimelineItem Component', () => {
         },
       };
 
-      const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
+      const { lastFrame } = renderWithProvider(<TimelineItem item={item} {...defaultProps} />);
 
-      expect(lastFrame()).toContain('GenericToolRenderer:bash:unfocused');
+      expect(lastFrame()).toContain('GenericToolRenderer:bash:unfocus:timeline');
     });
   });
 
   describe('delegate tool execution items', () => {
-    const createDelegateTimeline = (): Timeline => ({
-      items: [
-        {
-          id: 'delegate-msg-1',
-          type: 'user_message',
-          timestamp: new Date('2024-01-01T10:00:01Z'),
-          content: 'Delegate task',
-        },
-      ],
-      metadata: {
-        eventCount: 1,
-        messageCount: 1,
-        lastActivity: new Date('2024-01-01T10:00:01Z'),
-      },
-    });
-
-    it('should render delegate tool with DelegationBox when thread found', () => {
+    it('should render delegate tool with GenericToolRenderer when no specific renderer found', () => {
       const item: TimelineItemType = {
         type: 'tool_execution',
         timestamp: new Date('2024-01-01T10:00:00Z'),
@@ -243,10 +214,10 @@ describe('TimelineItem Component', () => {
         },
       };
 
-      const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
+      const { lastFrame } = renderWithProvider(<TimelineItem item={item} {...defaultProps} />);
 
       const frame = lastFrame();
-      expect(frame).toContain('GenericToolRenderer:delegate:unfocused');
+      expect(frame).toContain('GenericToolRenderer:delegate:unfocus:timeline');
     });
 
     it('should start expanded by default with self-managed state', () => {
@@ -266,10 +237,10 @@ describe('TimelineItem Component', () => {
         },
       };
 
-      const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
+      const { lastFrame } = renderWithProvider(<TimelineItem item={item} {...defaultProps} />);
 
       const frame = lastFrame();
-      expect(frame).toContain('GenericToolRenderer:delegate:unfocused');
+      expect(frame).toContain('GenericToolRenderer:delegate:unfocus:timeline');
     });
 
     it('should fall back to regular tool display when no delegate thread found', () => {
@@ -289,13 +260,13 @@ describe('TimelineItem Component', () => {
         },
       };
 
-      const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
+      const { lastFrame } = renderWithProvider(<TimelineItem item={item} {...defaultProps} />);
 
       const frame = lastFrame();
-      expect(frame).toContain('GenericToolRenderer:delegate:unfocused');
+      expect(frame).toContain('GenericToolRenderer:delegate:unfocus:timeline');
     });
 
-    it('should render delegate tools with DelegationBox', () => {
+    it('should render delegate tools with GenericToolRenderer', () => {
       const item: TimelineItemType = {
         type: 'tool_execution',
         timestamp: new Date('2024-01-01T10:00:00Z'),
@@ -307,10 +278,10 @@ describe('TimelineItem Component', () => {
         },
       };
 
-      render(<TimelineItem item={item} {...defaultProps} />);
+      renderWithProvider(<TimelineItem item={item} {...defaultProps} />);
 
-      // The extractDelegateThreadId logic is now internal to DelegationBox
-      // This test verifies that delegate tools render correctly
+      // The delegate tool extraction logic is now handled by the DelegateToolRenderer
+      // This test verifies that delegate tools render correctly with GenericToolRenderer fallback
     });
   });
 
@@ -323,7 +294,7 @@ describe('TimelineItem Component', () => {
         messageType: 'info',
       };
 
-      const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
+      const { lastFrame } = renderWithProvider(<TimelineItem item={item} {...defaultProps} />);
 
       expect(lastFrame()).toContain('MessageDisplay:info');
     });
@@ -336,7 +307,7 @@ describe('TimelineItem Component', () => {
         messageType: 'warning',
       };
 
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithProvider(
         <TimelineItem item={item} {...defaultProps} isSelected={true} />
       );
 
@@ -353,7 +324,7 @@ describe('TimelineItem Component', () => {
         content: 'Unknown content',
       } as any;
 
-      const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
+      const { lastFrame } = renderWithProvider(<TimelineItem item={item} {...defaultProps} />);
 
       expect(lastFrame()).toContain('Unknown timeline item type');
     });
@@ -372,9 +343,9 @@ describe('TimelineItem Component', () => {
         },
       };
 
-      render(<TimelineItem item={item} {...defaultProps} />);
+      renderWithProvider(<TimelineItem item={item} {...defaultProps} />);
 
-      // Note: delegate extraction is now handled directly by DelegationBox
+      // Note: delegate extraction is now handled by the DelegateToolRenderer when it's used
     });
   });
 });
