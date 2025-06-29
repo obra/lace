@@ -14,6 +14,7 @@ interface CollapsibleBoxProps {
   borderStyle?: 'single' | 'double' | 'round' | 'classic' | 'bold' | 'arrow';
   borderColor?: string;
   isSelected?: boolean; // Whether this specific box is selected (for visual indication)
+  isFocused?: boolean; // Whether this box has keyboard focus (stronger visual indication)
 }
 
 export function CollapsibleBox({
@@ -25,20 +26,32 @@ export function CollapsibleBox({
   borderStyle = 'round',
   borderColor = 'gray',
   isSelected = false,
+  isFocused = false,
 }: CollapsibleBoxProps) {
+  // Determine visual styling based on focus and selection state
+  const labelColor = isFocused ? 'yellow' : borderColor;
+  const hintColor = isFocused ? 'yellow' : 'gray';
+  const showHint = isSelected || isFocused;
+
   return (
     <Box flexDirection="column">
       {label && (
         <Box>
-          <Text color={borderColor}>
+          <Text color={labelColor}>
             {isExpanded ? UI_SYMBOLS.EXPANDED : UI_SYMBOLS.COLLAPSED} {label}
           </Text>
-          {isSelected && (
-            <Text color="gray">
+          {isFocused && (
+            <Text color="yellow">
+              {' '}
+              [FOCUSED - ESC to exit]
+            </Text>
+          )}
+          {showHint && !isFocused && (
+            <Text color={hintColor}>
               {' '}
               ({isExpanded 
                 ? `${UI_SYMBOLS.ARROW_LEFT} to close`
-                : `${UI_SYMBOLS.ARROW_RIGHT} to open`})
+                : `${UI_SYMBOLS.ARROW_RIGHT} to open | RETURN to focus`})
             </Text>
           )}
         </Box>

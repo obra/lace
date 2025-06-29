@@ -28,10 +28,11 @@
 import React, { useCallback, useEffect, useState, createContext, useContext } from 'react';
 import { logger } from '../../../../../utils/logger.js';
 
-// Event emitter for timeline-to-item expansion communication
+// Event emitter for timeline-to-item expansion and focus communication
 class ExpansionEmitter {
   private expandListeners: Set<() => void> = new Set();
   private collapseListeners: Set<() => void> = new Set();
+  private focusEntryListeners: Set<() => void> = new Set();
 
   subscribeExpand(listener: () => void): () => void {
     this.expandListeners.add(listener);
@@ -44,6 +45,13 @@ class ExpansionEmitter {
     this.collapseListeners.add(listener);
     return () => {
       this.collapseListeners.delete(listener);
+    };
+  }
+
+  subscribeFocusEntry(listener: () => void): () => void {
+    this.focusEntryListeners.add(listener);
+    return () => {
+      this.focusEntryListeners.delete(listener);
     };
   }
 
@@ -68,6 +76,19 @@ class ExpansionEmitter {
         logger.error('Error in collapse listener', {
           error: error instanceof Error ? error.message : String(error),
           operation: 'collapse',
+        });
+      }
+    });
+  }
+
+  emitFocusEntry(): void {
+    this.focusEntryListeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (error) {
+        logger.error('Error in focus entry listener', {
+          error: error instanceof Error ? error.message : String(error),
+          operation: 'focus-entry',
         });
       }
     });
@@ -110,6 +131,30 @@ export function useExpansionExpand() {
 export function useExpansionCollapse() {
   const emitter = useExpansionEmitter();
   return useCallback(() => emitter.emitCollapse(), [emitter]);
+}
+
+export function useTimelineFocusEntry() {
+  const emitter = useExpansionEmitter();
+  return useCallback(() => emitter.emitFocusEntry(), [emitter]);
+}
+
+// Hook for timeline items to listen for focus entry events
+// This hook provides event listener registration that only listens when isSelected=true
+// Usage by timeline items that can accept focus (like delegate tools):
+// - Call this hook with isSelected indicating if this item has the timeline cursor
+// - When isSelected=true, this item will respond to timeline-level focus entry events
+export function useTimelineItemFocusEntry(isSelected: boolean, onFocusEntry?: () => void): void {
+  const emitter = useExpansionEmitter();
+
+  useEffect(() => {
+    if (!isSelected || !onFocusEntry) return; // Only the selected item responds to focus entry events
+
+    const unsubscribeFocusEntry = emitter.subscribeFocusEntry(onFocusEntry);
+
+    return () => {
+      unsubscribeFocusEntry();
+    };
+  }, [isSelected, onFocusEntry, emitter]);
 }
 
 // Hook for timeline items to manage expansion state and listen for timeline events

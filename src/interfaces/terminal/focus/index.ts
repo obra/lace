@@ -7,3 +7,4 @@ export type { StaticFocusRegion, DynamicFocusRegion } from './focus-regions.js';
 export { LaceFocusProvider, useLaceFocusContext } from './focus-provider.js';
 export { useLaceFocus } from './use-lace-focus.js';
 export { ModalWrapper } from './modal-wrapper.js';
+export { FocusLifecycleWrapper } from './focus-lifecycle-wrapper.js';

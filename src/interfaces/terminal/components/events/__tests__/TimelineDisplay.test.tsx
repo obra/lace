@@ -12,6 +12,7 @@ import { LaceFocusProvider } from '../../../focus/focus-provider.js';
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
   useExpansionExpand: () => vi.fn(),
   useExpansionCollapse: () => vi.fn(),
+  useTimelineFocusEntry: () => vi.fn(),
   useTimelineItemExpansion: () => ({
     isExpanded: false,
     onExpand: vi.fn(),
