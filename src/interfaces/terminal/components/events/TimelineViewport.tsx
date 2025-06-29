@@ -12,6 +12,7 @@ import { FocusRegions, useLaceFocus } from '../../focus/index.js';
 interface TimelineViewportProps {
   timeline: Timeline;
   bottomSectionHeight?: number;
+  focusRegion?: string; // Optional focus region ID, defaults to FocusRegions.timeline
   onItemInteraction?: (selectedItemIndex: number, input: string, key: any, itemRefs?: React.MutableRefObject<Map<number, any>>) => void;
   children: (props: {
     timeline: Timeline;
@@ -32,11 +33,12 @@ interface TimelineViewportProps {
 export function TimelineViewport({
   timeline,
   bottomSectionHeight,
+  focusRegion,
   onItemInteraction,
   children,
 }: TimelineViewportProps) {
-  // Use Lace focus system
-  const { isFocused, takeFocus } = useLaceFocus(FocusRegions.timeline, { autoFocus: false });
+  // Use Lace focus system with custom focus region or default
+  const { isFocused, takeFocus } = useLaceFocus(focusRegion || FocusRegions.timeline, { autoFocus: false });
   const [, terminalHeight] = useStdoutDimensions();
 
   // Item refs for measurement

@@ -13,11 +13,13 @@ import { logger } from '../../../../utils/logger.js';
 interface TimelineDisplayProps {
   timeline: Timeline;
   bottomSectionHeight?: number;
+  focusRegion?: string; // Optional focus region ID for timeline viewport
 }
 
 export default function TimelineDisplay({
   timeline,
   bottomSectionHeight,
+  focusRegion,
 }: TimelineDisplayProps) {
   // Get expansion and focus entry emitters
   const emitExpand = useExpansionExpand();
@@ -64,6 +66,7 @@ export default function TimelineDisplay({
     <TimelineViewport
       timeline={timeline}
       bottomSectionHeight={bottomSectionHeight}
+      focusRegion={focusRegion}
       onItemInteraction={handleItemInteraction}
     >
       {({ timeline: tl, viewportState, viewportActions, itemRefs }) => (
