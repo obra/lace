@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { MockedFunction } from 'vitest';
 import { render } from 'ink-testing-library';
 import { Text, Box } from 'ink';
 import {
@@ -37,12 +38,8 @@ describe('Timeline Expansion Architecture Integration', () => {
         return (
           <Box flexDirection="column">
             <Text>Timeline Controls:</Text>
-            <Text onClick={() => { emitExpand(); expansionEvents.push('expand-emitted'); }} data-testid="expand-button">
-              Emit Expand
-            </Text>
-            <Text onClick={() => { emitCollapse(); expansionEvents.push('collapse-emitted'); }} data-testid="collapse-button">
-              Emit Collapse
-            </Text>
+            <Text>Emit Expand (simulated)</Text>
+            <Text>Emit Collapse (simulated)</Text>
             
             <MockTimelineItem 
               id="item1" 
@@ -59,9 +56,7 @@ describe('Timeline Expansion Architecture Integration', () => {
               }}
             />
             
-            <Text onClick={() => setSelectedItem('item2')} data-testid="select-item2">
-              Select Item 2
-            </Text>
+            <Text>Select Item 2 (simulated)</Text>
           </Box>
         );
       }
@@ -78,8 +73,8 @@ describe('Timeline Expansion Architecture Integration', () => {
 
       // Verify the test components render correctly
       expect(lastFrame()).toContain('Timeline Controls:');
-      expect(lastFrame()).toContain('Emit Expand');
-      expect(lastFrame()).toContain('Emit Collapse');
+      expect(lastFrame()).toContain('Emit Expand (simulated)');
+      expect(lastFrame()).toContain('Emit Collapse (simulated)');
       expect(lastFrame()).toContain('Item item1: [SELECTED] [collapsed]');
       expect(lastFrame()).toContain('Item item2: [unselected] [collapsed]');
 
@@ -105,18 +100,8 @@ describe('Timeline Expansion Architecture Integration', () => {
         {children}
         {/* Simulate timeline controls - these would normally be triggered by keyboard */}
         <Box>
-          <Text 
-            onFocus={() => emitExpand()} 
-            data-testid="expand-trigger" 
-          >
-            Expand Trigger
-          </Text>
-          <Text 
-            onFocus={() => emitCollapse()} 
-            data-testid="collapse-trigger"
-          >
-            Collapse Trigger
-          </Text>
+          <Text>Expand Trigger (simulated)</Text>
+          <Text>Collapse Trigger (simulated)</Text>
         </Box>
       </Box>
     );
@@ -138,22 +123,22 @@ describe('Timeline Expansion Architecture Integration', () => {
       <Box>
         <Text>Item {id}: {isSelected ? '[SELECTED]' : '[unselected]'} </Text>
         <Text>{isExpanded ? '[EXPANDED]' : '[collapsed]'}</Text>
-        <Text onClick={onExpand} data-testid={`manual-expand-${id}`}>Expand</Text>
-        <Text onClick={onCollapse} data-testid={`manual-collapse-${id}`}>Collapse</Text>
+        <Text>Expand (simulated)</Text>
+        <Text>Collapse (simulated)</Text>
       </Box>
     );
   }
 
   describe('Basic timeline-to-item communication', () => {
     it('should expand only the selected item when timeline emits expand', () => {
-      let expandCallbacks: Record<string, vi.Mock> = {};
+      let expandCallbacks: Record<string, MockedFunction<(expanded: boolean) => void>> = {};
       
       function TestComponent() {
         const [selectedItem, setSelectedItem] = useState('item1');
         
         // Track expansion changes for verification
-        expandCallbacks.item1 = vi.fn();
-        expandCallbacks.item2 = vi.fn();
+        expandCallbacks.item1 = vi.fn() as MockedFunction<(expanded: boolean) => void>;
+        expandCallbacks.item2 = vi.fn() as MockedFunction<(expanded: boolean) => void>;
 
         return (
           <TimelineExpansionProvider>
@@ -168,9 +153,7 @@ describe('Timeline Expansion Architecture Integration', () => {
                 isSelected={selectedItem === 'item2'} 
                 onExpansionChange={expandCallbacks.item2}
               />
-              <Text onClick={() => setSelectedItem('item2')} data-testid="select-item2">
-                Select Item 2
-              </Text>
+              <Text>Select Item 2 (simulated)</Text>
             </MockTimeline>
           </TimelineExpansionProvider>
         );
@@ -224,8 +207,14 @@ describe('Timeline Expansion Architecture Integration', () => {
 
   describe('Context isolation between timeline instances', () => {
     it('should isolate expansion events between different timeline providers', () => {
-      const timeline1Callbacks = { item1: vi.fn(), item2: vi.fn() };
-      const timeline2Callbacks = { item3: vi.fn(), item4: vi.fn() };
+      const timeline1Callbacks = { 
+        item1: vi.fn() as MockedFunction<(expanded: boolean) => void>, 
+        item2: vi.fn() as MockedFunction<(expanded: boolean) => void> 
+      };
+      const timeline2Callbacks = { 
+        item3: vi.fn() as MockedFunction<(expanded: boolean) => void>, 
+        item4: vi.fn() as MockedFunction<(expanded: boolean) => void> 
+      };
 
       function MultiTimelineTest() {
         return (
@@ -282,7 +271,7 @@ describe('Timeline Expansion Architecture Integration', () => {
 
   describe('Selection state behavior', () => {
     it('should only listen to timeline events when item is selected', () => {
-      const expansionCallback = vi.fn();
+      const expansionCallback = vi.fn() as MockedFunction<(expanded: boolean) => void>;
 
       function SelectionTest() {
         const [isSelected, setIsSelected] = useState(false);
@@ -295,9 +284,7 @@ describe('Timeline Expansion Architecture Integration', () => {
                 isSelected={isSelected} 
                 onExpansionChange={expansionCallback}
               />
-              <Text onClick={() => setIsSelected(!isSelected)} data-testid="toggle-selection">
-                Toggle Selection
-              </Text>
+              <Text>Toggle Selection (simulated)</Text>
             </MockTimeline>
           </TimelineExpansionProvider>
         );
@@ -341,7 +328,7 @@ describe('Timeline Expansion Architecture Integration', () => {
 
   describe('Manual expansion controls', () => {
     it('should support both timeline-triggered and manual expansion', () => {
-      const expansionCallback = vi.fn();
+      const expansionCallback = vi.fn() as MockedFunction<(expanded: boolean) => void>;
 
       function ManualControlTest() {
         return (
@@ -385,8 +372,8 @@ describe('Hook usage patterns', () => {
       <Box>
         <Text>Item {id}: {isSelected ? '[SELECTED]' : '[unselected]'} </Text>
         <Text>{isExpanded ? '[EXPANDED]' : '[collapsed]'}</Text>
-        <Text onClick={onExpand} data-testid={`manual-expand-${id}`}>Expand</Text>
-        <Text onClick={onCollapse} data-testid={`manual-collapse-${id}`}>Collapse</Text>
+        <Text>Expand (simulated)</Text>
+        <Text>Collapse (simulated)</Text>
       </Box>
     );
   }
