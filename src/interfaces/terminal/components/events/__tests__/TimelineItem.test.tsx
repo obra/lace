@@ -19,11 +19,11 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
 
 // Mock all the display components
 vi.mock('../EventDisplay.js', () => ({
-  EventDisplay: ({ event, isFocused }: any) =>
+  EventDisplay: ({ event }: any) =>
     React.createElement(
       Text,
       {},
-      `EventDisplay:${event.type}:${isFocused ? 'focused' : 'unfocused'}`
+      `EventDisplay:${event.type}`
     ),
 }));
 
@@ -56,11 +56,11 @@ vi.mock('../DelegationBox.js', () => ({
 }));
 
 vi.mock('../../message-display.js', () => ({
-  default: ({ message, isFocused }: any) =>
+  default: ({ message }: any) =>
     React.createElement(
       Text,
       {},
-      `MessageDisplay:${message.type}:${isFocused ? 'focused' : 'unfocused'}`
+      `MessageDisplay:${message.type}`
     ),
 }));
 
@@ -84,11 +84,9 @@ describe('TimelineItem Component', () => {
 
   const defaultProps = {
     isSelected: false,
-    isFocused: false,
     selectedLine: 0,
     itemStartLine: 0,
     onToggle: mockOnToggle,
-    currentFocusId: 'timeline',
   };
 
   describe('user_message items', () => {
@@ -102,10 +100,10 @@ describe('TimelineItem Component', () => {
 
       const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
 
-      expect(lastFrame()).toContain('EventDisplay:USER_MESSAGE:unfocused');
+      expect(lastFrame()).toContain('EventDisplay:USER_MESSAGE');
     });
 
-    it('should pass focus state to EventDisplay', () => {
+    it('should render user message when selected', () => {
       const item: TimelineItemType = {
         id: 'msg-1',
         type: 'user_message',
@@ -117,7 +115,7 @@ describe('TimelineItem Component', () => {
         <TimelineItem item={item} {...defaultProps} isSelected={true} />
       );
 
-      expect(lastFrame()).toContain('EventDisplay:USER_MESSAGE:focused');
+      expect(lastFrame()).toContain('EventDisplay:USER_MESSAGE');
     });
   });
 
@@ -132,7 +130,7 @@ describe('TimelineItem Component', () => {
 
       const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
 
-      expect(lastFrame()).toContain('EventDisplay:AGENT_MESSAGE:unfocused');
+      expect(lastFrame()).toContain('EventDisplay:AGENT_MESSAGE');
     });
   });
 
@@ -148,7 +146,7 @@ describe('TimelineItem Component', () => {
 
       const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
 
-      expect(lastFrame()).toContain('EventDisplay:SYSTEM_PROMPT:unfocused');
+      expect(lastFrame()).toContain('EventDisplay:SYSTEM_PROMPT');
     });
 
     it('should use default event type when originalEventType missing', () => {
@@ -161,7 +159,7 @@ describe('TimelineItem Component', () => {
 
       const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
 
-      expect(lastFrame()).toContain('EventDisplay:LOCAL_SYSTEM_MESSAGE:unfocused');
+      expect(lastFrame()).toContain('EventDisplay:LOCAL_SYSTEM_MESSAGE');
     });
   });
 
@@ -327,10 +325,10 @@ describe('TimelineItem Component', () => {
 
       const { lastFrame } = render(<TimelineItem item={item} {...defaultProps} />);
 
-      expect(lastFrame()).toContain('MessageDisplay:info:unfocused');
+      expect(lastFrame()).toContain('MessageDisplay:info');
     });
 
-    it('should pass focus state to MessageDisplay', () => {
+    it('should render ephemeral message when selected', () => {
       const item: TimelineItemType = {
         type: 'ephemeral_message',
         timestamp: new Date('2024-01-01T10:00:00Z'),
@@ -342,7 +340,7 @@ describe('TimelineItem Component', () => {
         <TimelineItem item={item} {...defaultProps} isSelected={true} />
       );
 
-      expect(lastFrame()).toContain('MessageDisplay:warning:focused');
+      expect(lastFrame()).toContain('MessageDisplay:warning');
     });
   });
 

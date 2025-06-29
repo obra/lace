@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import React from 'react';
 import { act } from '@testing-library/react';
-import { renderInkComponentWithFocus, stripAnsi } from './helpers/ink-test-utils.js';
+import { renderInkComponent, stripAnsi } from './helpers/ink-test-utils.js';
 import ShellInput from '../components/shell-input.js';
 import * as TextBufferModule from '../hooks/use-text-buffer.js';
 import { LaceFocusProvider } from '../focus/index.js';
@@ -19,11 +19,13 @@ vi.mock('../components/text-renderer.js', async () => {
   const { Text } = await import('ink');
   return {
     default: ({ lines, placeholder, isFocused }: any) => {
-      // Simple mock that shows what we care about for testing
-      if (!isFocused && lines.length === 1 && lines[0] === '') {
-        return React.createElement(Text, {}, placeholder);
+      // Show content if there's actual text, otherwise show placeholder
+      const hasContent = lines.length > 0 && lines[0] !== '';
+      if (hasContent) {
+        return React.createElement(Text, {}, lines.join('\\n'));
       }
-      return React.createElement(Text, {}, lines.join('\\n'));
+      // Always show placeholder when there's no content (focused or not)
+      return React.createElement(Text, {}, placeholder || '');
     },
   };
 });
@@ -69,7 +71,7 @@ describe('ShellInput Component', () => {
 
   describe('basic rendering', () => {
     it('should render shell input structure', () => {
-      const { lastFrame } = renderInkComponentWithFocus(<TestWrapper><ShellInput {...defaultProps} /></TestWrapper>);
+      const { lastFrame } = renderInkComponent(<TestWrapper><ShellInput {...defaultProps} /></TestWrapper>);
       const output = lastFrame() || '';
 
       // Should render input with placeholder
@@ -77,7 +79,7 @@ describe('ShellInput Component', () => {
     });
 
     it('should render prompt indicator', () => {
-      const { lastFrame } = renderInkComponentWithFocus(<TestWrapper><ShellInput {...defaultProps} /></TestWrapper>);
+      const { lastFrame } = renderInkComponent(<TestWrapper><ShellInput {...defaultProps} /></TestWrapper>);
       const output = lastFrame() || '';
 
       // Should render the > prompt
@@ -85,7 +87,7 @@ describe('ShellInput Component', () => {
     });
 
     it('should render without crashing', () => {
-      const { lastFrame } = renderInkComponentWithFocus(<TestWrapper><ShellInput {...defaultProps} /></TestWrapper>);
+      const { lastFrame } = renderInkComponent(<TestWrapper><ShellInput {...defaultProps} /></TestWrapper>);
       const output = lastFrame();
 
       expect(output).toBeDefined();
@@ -109,7 +111,7 @@ describe('ShellInput Component', () => {
         },
       ]);
 
-      const { lastFrame } = renderInkComponentWithFocus(
+      const { lastFrame } = renderInkComponent(
         <TestWrapper><ShellInput {...defaultProps} value="Hello world" /></TestWrapper>
       );
       const output = lastFrame() || '';
@@ -129,7 +131,7 @@ describe('ShellInput Component', () => {
         },
       ]);
 
-      const { rerender } = renderInkComponentWithFocus(<TestWrapper><ShellInput {...defaultProps} value="" /></TestWrapper>);
+      const { rerender } = renderInkComponent(<TestWrapper><ShellInput {...defaultProps} value="" /></TestWrapper>);
 
       // Change the value prop and wait for effects
       act(() => {
@@ -157,7 +159,7 @@ describe('ShellInput Component', () => {
         },
       ]);
 
-      const { lastFrame } = renderInkComponentWithFocus(<TestWrapper><ShellInput {...defaultProps} /></TestWrapper>);
+      const { lastFrame } = renderInkComponent(<TestWrapper><ShellInput {...defaultProps} /></TestWrapper>);
       const output = lastFrame() || '';
 
       // Should display multi-line content
@@ -186,7 +188,7 @@ describe('ShellInput Component', () => {
       ]);
 
       act(() => {
-        renderInkComponentWithFocus(<TestWrapper><ShellInput {...defaultProps} onChange={mockOnChange} /></TestWrapper>);
+        renderInkComponent(<TestWrapper><ShellInput {...defaultProps} onChange={mockOnChange} /></TestWrapper>);
       });
 
       // The component should call onChange with the text from getText
@@ -196,7 +198,7 @@ describe('ShellInput Component', () => {
     it('should not call onChange if text hasnt changed', () => {
       const mockOnChange = vi.fn();
 
-      renderInkComponentWithFocus(<TestWrapper><ShellInput {...defaultProps} value="" onChange={mockOnChange} /></TestWrapper>);
+      renderInkComponent(<TestWrapper><ShellInput {...defaultProps} value="" onChange={mockOnChange} /></TestWrapper>);
 
       // Should not call onChange if the text is the same as the value prop
       expect(mockOnChange).not.toHaveBeenCalled();
@@ -205,7 +207,7 @@ describe('ShellInput Component', () => {
     it('should provide onSubmit callback', () => {
       const mockOnSubmit = vi.fn();
 
-      const { lastFrame } = renderInkComponentWithFocus(
+      const { lastFrame } = renderInkComponent(
         <TestWrapper><ShellInput {...defaultProps} onSubmit={mockOnSubmit} /></TestWrapper>
       );
 
@@ -216,14 +218,14 @@ describe('ShellInput Component', () => {
 
   describe('focus handling', () => {
     it('should handle autoFocus prop', () => {
-      const { lastFrame } = renderInkComponentWithFocus(<TestWrapper><ShellInput {...defaultProps} autoFocus={true} /></TestWrapper>);
+      const { lastFrame } = renderInkComponent(<TestWrapper><ShellInput {...defaultProps} autoFocus={true} /></TestWrapper>);
 
       // Should render without error when autoFocus is set
       expect(lastFrame()).toBeDefined();
     });
 
     it('should handle custom focusId', () => {
-      const { lastFrame } = renderInkComponentWithFocus(
+      const { lastFrame } = renderInkComponent(
         <TestWrapper>
           <ShellInput {...defaultProps} />
         </TestWrapper>
@@ -238,7 +240,7 @@ describe('ShellInput Component', () => {
     it('should show custom placeholder', () => {
       const customPlaceholder = 'Enter your command...';
 
-      const { lastFrame } = renderInkComponentWithFocus(
+      const { lastFrame } = renderInkComponent(
         <TestWrapper><ShellInput {...defaultProps} placeholder={customPlaceholder} /></TestWrapper>
       );
       const output = lastFrame() || '';
@@ -249,7 +251,7 @@ describe('ShellInput Component', () => {
     it('should pass placeholder to TextRenderer', () => {
       const customPlaceholder = 'Custom placeholder text';
 
-      const { lastFrame } = renderInkComponentWithFocus(
+      const { lastFrame } = renderInkComponent(
         <TestWrapper><ShellInput {...defaultProps} placeholder={customPlaceholder} /></TestWrapper>
       );
       const output = lastFrame() || '';
@@ -275,7 +277,7 @@ describe('ShellInput Component', () => {
         },
       ]);
 
-      const { lastFrame } = renderInkComponentWithFocus(<TestWrapper><ShellInput {...defaultProps} /></TestWrapper>);
+      const { lastFrame } = renderInkComponent(<TestWrapper><ShellInput {...defaultProps} /></TestWrapper>);
       const output = lastFrame() || '';
 
       // Should pass the buffer content to TextRenderer
@@ -283,7 +285,7 @@ describe('ShellInput Component', () => {
     });
 
     it('should initialize useTextBuffer with value prop', () => {
-      renderInkComponentWithFocus(<TestWrapper><ShellInput {...defaultProps} value="Initial value" /></TestWrapper>);
+      renderInkComponent(<TestWrapper><ShellInput {...defaultProps} value="Initial value" /></TestWrapper>);
 
       // useTextBuffer should be called with the initial value
       const mockUseTextBuffer = vi.mocked(TextBufferModule.useTextBuffer);
@@ -293,14 +295,14 @@ describe('ShellInput Component', () => {
 
   describe('edge cases', () => {
     it('should handle missing props gracefully', () => {
-      const { lastFrame } = renderInkComponentWithFocus(<TestWrapper><ShellInput /></TestWrapper>);
+      const { lastFrame } = renderInkComponent(<TestWrapper><ShellInput /></TestWrapper>);
 
       // Should render without crashing even with minimal props
       expect(lastFrame()).toBeDefined();
     });
 
     it('should handle undefined callbacks', () => {
-      const { lastFrame } = renderInkComponentWithFocus(
+      const { lastFrame } = renderInkComponent(
         <TestWrapper><ShellInput {...defaultProps} onSubmit={undefined} onChange={undefined} /></TestWrapper>
       );
 
@@ -309,7 +311,7 @@ describe('ShellInput Component', () => {
     });
 
     it('should handle empty string value', () => {
-      const { lastFrame } = renderInkComponentWithFocus(<TestWrapper><ShellInput {...defaultProps} value="" /></TestWrapper>);
+      const { lastFrame } = renderInkComponent(<TestWrapper><ShellInput {...defaultProps} value="" /></TestWrapper>);
 
       // Should handle empty string value
       expect(lastFrame()).toBeDefined();
@@ -318,7 +320,7 @@ describe('ShellInput Component', () => {
 
   describe('component structure', () => {
     it('should render expected component hierarchy', () => {
-      const { lastFrame } = renderInkComponentWithFocus(<TestWrapper><ShellInput {...defaultProps} /></TestWrapper>);
+      const { lastFrame } = renderInkComponent(<TestWrapper><ShellInput {...defaultProps} /></TestWrapper>);
       const output = lastFrame() || '';
 
       // Should contain the prompt and TextRenderer output
@@ -342,7 +344,7 @@ describe('ShellInput Component', () => {
         },
       ]);
 
-      const { lastFrame } = renderInkComponentWithFocus(
+      const { lastFrame } = renderInkComponent(
         <TestWrapper><ShellInput {...defaultProps} value="Some text content" /></TestWrapper>
       );
       const output = lastFrame() || '';

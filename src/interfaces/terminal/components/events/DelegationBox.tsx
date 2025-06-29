@@ -24,12 +24,9 @@ export function DelegationBox({ toolCall, onToggle }: DelegationBoxProps) {
   };
 
   const delegateThreadId = extractDelegateThreadId(toolCall);
-  if (!delegateThreadId) {
-    return null; // No delegate thread to display
-  }
 
-  // Set up focus management for this delegation
-  const { takeFocus } = useLaceFocus(FocusRegions.delegate(delegateThreadId));
+  // Set up focus management for this delegation (only if threadId exists)
+  const { takeFocus } = useLaceFocus(delegateThreadId ? FocusRegions.delegate(delegateThreadId) : 'none');
 
   // Get thread data from context
   const threadManager = useThreadManager();
@@ -49,8 +46,15 @@ export function DelegationBox({ toolCall, onToggle }: DelegationBoxProps) {
     // Focus will automatically return to previous context via escape
   };
 
-  // Fetch and process delegate thread data
+  // Fetch and process delegate thread data (only if threadId exists)
   const timeline = useMemo(() => {
+    if (!delegateThreadId) {
+      return {
+        items: [],
+        metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
+      };
+    }
+
     try {
       const events = threadManager.getEvents(delegateThreadId);
       const processed = threadProcessor.processThreads(events);
@@ -66,6 +70,11 @@ export function DelegationBox({ toolCall, onToggle }: DelegationBoxProps) {
       };
     }
   }, [delegateThreadId, threadManager, threadProcessor]);
+
+  // Early return after all hooks are called
+  if (!delegateThreadId) {
+    return null; // No delegate thread to display
+  }
 
   logger.debug('DelegationBox: Rendering', {
     threadId: delegateThreadId,
