@@ -1,7 +1,7 @@
 // ABOUTME: Generic focus lifecycle management wrapper for terminal UI components
 // ABOUTME: Handles automatic focus stack push/pop based on isActive state changes
 
-import React, { useEffect, ReactNode } from 'react';
+import React, { useEffect, ReactNode, useRef } from 'react';
 import { useLaceFocusContext } from './focus-provider.js';
 import { logger } from '../../../utils/logger.js';
 
@@ -95,6 +95,11 @@ export function FocusLifecycleWrapper({
   onFocusRestored,
 }: FocusLifecycleWrapperProps) {
   const { pushFocus, popFocus } = useLaceFocusContext();
+  const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isActiveRef = useRef(isActive);
+  
+  // Update ref to track current active state
+  isActiveRef.current = isActive;
 
   // Handle focus lifecycle when active state changes
   useEffect(() => {
@@ -102,6 +107,12 @@ export function FocusLifecycleWrapper({
       focusId,
       isActive,
     });
+    
+    // Clear any pending cleanup
+    if (cleanupTimeoutRef.current) {
+      clearTimeout(cleanupTimeoutRef.current);
+      cleanupTimeoutRef.current = null;
+    }
     
     if (isActive) {
       // Component is becoming active - push focus
@@ -113,13 +124,24 @@ export function FocusLifecycleWrapper({
       
       // Return cleanup function for when component becomes inactive
       return () => {
-        logger.debug('FocusLifecycleWrapper: cleanup - calling popFocus', {
-          focusId,
-        });
-        const restoredFocus = popFocus();
-        if (restoredFocus) {
-          onFocusRestored?.();
-        }
+        // Add small delay to prevent immediate cleanup during re-render cycles
+        cleanupTimeoutRef.current = setTimeout(() => {
+          // Only cleanup if still inactive after delay
+          if (!isActiveRef.current) {
+            logger.debug('FocusLifecycleWrapper: delayed cleanup - calling popFocus', {
+              focusId,
+            });
+            const restoredFocus = popFocus();
+            if (restoredFocus) {
+              onFocusRestored?.();
+            }
+          } else {
+            logger.debug('FocusLifecycleWrapper: cleanup cancelled - component became active again', {
+              focusId,
+            });
+          }
+          cleanupTimeoutRef.current = null;
+        }, 10); // 10ms delay to survive React re-render cycles
       };
     }
     
