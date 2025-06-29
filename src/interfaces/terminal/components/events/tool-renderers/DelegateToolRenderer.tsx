@@ -291,7 +291,10 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRend
               {/* Content */}
               {delegationExpanded && (
                 <Box flexDirection="column" paddingLeft={2}>
-                  <TimelineDisplay timeline={timeline} />
+                  <TimelineDisplay 
+                    timeline={timeline} 
+                    focusRegion={delegateThreadId ? FocusRegions.delegate(delegateThreadId) : undefined}
+                  />
                 </Box>
               )}
             </Box>
