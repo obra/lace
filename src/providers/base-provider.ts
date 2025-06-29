@@ -99,6 +99,13 @@ export abstract class AIProvider extends EventEmitter {
     // This base implementation provides a safe default
     return 'stop';
   }
+
+  // Cleanup method to close connections and free resources
+  async cleanup(): Promise<void> {
+    // Default implementation - providers can override for specific cleanup
+    // Remove all event listeners to prevent memory leaks
+    this.removeAllListeners();
+  }
 }
 
 export interface ProviderToolCall {

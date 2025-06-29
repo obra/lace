@@ -977,4 +977,63 @@ describe('Enhanced Agent', () => {
       expect(assistantMessages).toHaveLength(0);
     });
   });
+
+  describe('conversation_complete event emission', () => {
+    it('should emit conversation_complete after tool execution chain completes', async () => {
+      // This test currently FAILS - demonstrating the bug
+      let conversationCompleteEmitted = false;
+
+      // Create a tool that will be called
+      const mockTool = new MockTool({
+        isError: false,
+        content: [{ type: 'text', text: 'Tool executed successfully' }],
+      });
+
+      // Create provider that returns tool calls, then a final response
+      let callCount = 0;
+      const mockProvider = new MockProvider({
+        content: 'Initial response',
+        toolCalls: [],
+      });
+
+      vi.spyOn(mockProvider, 'createResponse').mockImplementation(async (..._args) => {
+        callCount++;
+        if (callCount === 1) {
+          // First call: return tool calls
+          return {
+            content: 'Using tool',
+            toolCalls: [
+              {
+                id: 'call_123',
+                name: 'mock_tool',
+                input: { action: 'test' },
+              },
+            ],
+          };
+        } else {
+          // Second call: return final response with no tool calls
+          return {
+            content: 'Final response after tool execution',
+            toolCalls: [],
+          };
+        }
+      });
+
+      const toolExecutor = new ToolExecutor();
+      toolExecutor.registerTool(mockTool.name, mockTool);
+
+      agent = createAgent({ provider: mockProvider, tools: [mockTool], toolExecutor });
+      await agent.start();
+
+      // Listen for conversation_complete event
+      agent.once('conversation_complete', () => {
+        conversationCompleteEmitted = true;
+      });
+
+      await agent.sendMessage('Use the tool');
+
+      // This assertion will FAIL with current implementation
+      expect(conversationCompleteEmitted).toBe(true);
+    });
+  });
 });

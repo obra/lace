@@ -640,4 +640,17 @@ export class LMStudioProvider extends AIProvider {
       tokensPerSecond: responseLength / 4, // Rough tokens estimate
     };
   }
+
+  async cleanup(): Promise<void> {
+    // Clean up cached model reference to help with garbage collection
+    this._cachedModel = null;
+    this._cachedModelId = null;
+
+    // Call parent cleanup to remove event listeners
+    await super.cleanup();
+
+    // Note: LMStudio SDK doesn't expose explicit connection close methods
+    // The WebSocket connections should be cleaned up when the client object is GC'd
+    // In practice, we force exit the process to ensure cleanup
+  }
 }

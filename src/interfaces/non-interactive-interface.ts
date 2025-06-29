@@ -60,10 +60,18 @@ export class NonInteractiveInterface implements UserInterface {
     });
 
     // Send message and wait for conversation to complete
-    await this.agent.sendMessage(prompt);
-    await conversationComplete;
-
-    // Save and exit
-    await this.agent.stop();
+    // If sendMessage throws, don't wait for conversationComplete (fixes race condition)
+    try {
+      await this.agent.sendMessage(prompt);
+      await conversationComplete;
+    } finally {
+      // Always clean up agent resources, even on error
+      try {
+        await this.agent.stop();
+      } catch (stopError) {
+        // Log but don't throw stop errors - the original error is more important
+        console.error('Failed to stop agent:', stopError);
+      }
+    }
   }
 }

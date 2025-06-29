@@ -1,0 +1,34 @@
+// ABOUTME: Test for race condition in NonInteractiveInterface error handling
+// ABOUTME: Ensures errors from sendMessage don't bypass the conversationComplete promise
+
+import { describe, it, expect, vi } from 'vitest';
+import { NonInteractiveInterface } from '../non-interactive-interface.js';
+import { Agent } from '../../agents/agent.js';
+import { EventEmitter } from 'events';
+
+describe('NonInteractiveInterface Race Condition', () => {
+  it('should handle errors from sendMessage without hanging', async () => {
+    // Create a mock agent that throws an error from sendMessage
+    const mockEventEmitter = new EventEmitter();
+    const mockAgent = {
+      providerName: 'test-provider',
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn().mockResolvedValue(undefined),
+      sendMessage: vi.fn().mockRejectedValue(new Error('Provider connection failed')),
+      // EventEmitter methods
+      once: mockEventEmitter.once.bind(mockEventEmitter),
+      on: mockEventEmitter.on.bind(mockEventEmitter),
+      off: mockEventEmitter.off.bind(mockEventEmitter),
+      emit: mockEventEmitter.emit.bind(mockEventEmitter),
+    } as unknown as Agent;
+
+    const nonInteractive = new NonInteractiveInterface(mockAgent);
+
+    // This should reject with the error, not hang indefinitely
+    await expect(nonInteractive.executePrompt('test prompt')).rejects.toThrow(
+      'Provider connection failed'
+    );
+
+    // Should not hang - test will timeout if it does
+  }, 5000); // 5 second timeout to catch hanging
+});
