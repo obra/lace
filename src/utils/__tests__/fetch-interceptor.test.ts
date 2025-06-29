@@ -27,8 +27,16 @@ describe('FetchInterceptor', () => {
     globalThis.fetch = mockFetch;
     mockFetch.mockClear();
 
-    // Mock Date.now for predictable timestamps
-    vi.spyOn(Date, 'now').mockReturnValue(1234567890000);
+    // Mock Date.now for predictable timestamps - reset for each test
+    const dateSpy = vi.spyOn(Date, 'now');
+    dateSpy.mockClear();
+
+    // Each fetch call uses 2 Date.now() calls (start and end)
+    // Set up enough mock values for all tests
+    for (let i = 0; i < 20; i++) {
+      dateSpy.mockReturnValueOnce(1234567890000 + i * 100); // startTime
+      dateSpy.mockReturnValueOnce(1234567890000 + i * 100 + 50); // endTime
+    }
 
     // Disable any existing interception
     disableFetchInterception();
@@ -124,9 +132,9 @@ describe('FetchInterceptor', () => {
       expect(recordSpy).toHaveBeenCalledWith(
         'https://api.test.com/endpoint',
         init,
-        1234567890000,
+        1234567890000, // startTime
         mockResponse,
-        1234567890000
+        1234567890050 // endTime
       );
     });
 
@@ -168,25 +176,25 @@ describe('FetchInterceptor', () => {
         1,
         'https://string.com',
         {},
-        1234567890000,
+        1234567890000, // first call startTime
         mockResponse,
-        1234567890000
+        1234567890050 // first call endTime
       );
       expect(recordSpy).toHaveBeenNthCalledWith(
         2,
         'https://url-object.com/',
         {},
-        1234567890000,
+        1234567890100, // second call startTime
         mockResponse,
-        1234567890000
+        1234567890150 // second call endTime
       );
       expect(recordSpy).toHaveBeenNthCalledWith(
         3,
         'https://request-object.com/',
         {},
-        1234567890000,
+        1234567890200, // third call startTime
         mockResponse,
-        1234567890000
+        1234567890250 // third call endTime
       );
     });
 
