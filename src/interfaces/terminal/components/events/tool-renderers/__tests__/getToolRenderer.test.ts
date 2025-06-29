@@ -194,7 +194,9 @@ describe('Integration scenarios', () => {
     // Since DelegateToolRenderer.js now exists, this should find the real component
     const renderer = await getToolRenderer('delegate');
     expect(renderer).toBeTruthy();
-    expect(typeof renderer).toBe('function');
+    // React components (especially forwardRef components) are objects, not functions
+    expect(typeof renderer).toBe('object');
+    expect(renderer).toHaveProperty('$$typeof'); // React component symbol
   });
 
   it('should provide fallback path when specific renderer not found', async () => {

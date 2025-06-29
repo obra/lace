@@ -42,6 +42,13 @@ vi.mock('../../../focus/index.js', () => ({
     takeFocus: () => { mockFocusState[id] = true; },
     isInFocusPath: false,
   }),
+  useLaceFocusContext: () => ({
+    currentFocus: 'timeline',
+    pushFocus: vi.fn(),
+    popFocus: vi.fn(),
+    getFocusStack: () => ['shell-input', 'timeline'],
+    isFocusActive: (id: string) => id === 'timeline',
+  }),
   FocusRegions: {
     timeline: 'timeline',
     delegate: (threadId: string) => `delegate-${threadId}`,

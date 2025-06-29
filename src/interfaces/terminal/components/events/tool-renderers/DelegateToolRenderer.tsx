@@ -8,7 +8,7 @@ import { ToolCall, ToolResult } from '../../../../../tools/types.js';
 import { CompactOutput } from '../../ui/CompactOutput.js';
 import { CodeDisplay } from '../../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
-import { useTimelineItemExpansion, useTimelineItemFocusEntry } from '../hooks/useTimelineExpansionToggle.js';
+import { useTimelineItemExpansion, useTimelineItemFocusEntry, TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
 import { useThreadManager, useThreadProcessor } from '../../../terminal-interface.js';
 import { calculateTokens, formatTokenCount } from '../../../../../utils/token-estimation.js';
 import { useLaceFocus, FocusRegions, FocusLifecycleWrapper } from '../../../focus/index.js';
@@ -67,33 +67,19 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRend
   const delegateThreadId = useMemo(() => extractDelegateThreadId(item), [item]);
   const { isFocused } = useLaceFocus(delegateThreadId ? FocusRegions.delegate(delegateThreadId) : 'none', { autoFocus: false });
 
-  // Handle keyboard input when focused - HIGH PRIORITY to intercept before TimelineDisplay
+  // Handle keyboard input when focused - only for focus management
   useInput((input: string, key: any) => {
     if (!isFocused) return;
     
     if (key.escape) {
-      logger.debug('DelegateToolRenderer: Escape pressed, exiting delegate focus', {
-        delegateThreadId,
-        focusId: delegateThreadId ? FocusRegions.delegate(delegateThreadId) : 'none',
-      });
-      setIsEntered(false); // Will trigger focus pop via FocusLifecycleWrapper
-      return; // Consume the event
+      logger.debug('DelegateToolRenderer: Escape pressed, exiting delegate focus');
+      setIsEntered(false); // Let FocusLifecycleWrapper handle popFocus
+      return;
     }
     
-    if (key.leftArrow) {
-      logger.debug('DelegateToolRenderer: Left arrow pressed, collapsing delegate timeline locally');
-      setDelegationExpanded(false);
-      return; // Consume the event to prevent main timeline from collapsing
-    }
+    // Let embedded TimelineViewport handle all navigation keys
+    // Don't try to "consume" events - Ink broadcasts to all handlers
     
-    if (key.rightArrow) {
-      logger.debug('DelegateToolRenderer: Right arrow pressed, expanding delegate timeline locally');
-      setDelegationExpanded(true);
-      return; // Consume the event to prevent main timeline from expanding
-    }
-    
-    // Let other keys (up/down arrows, return, etc.) pass through to embedded TimelineDisplay
-    // The embedded timeline will handle navigation within the delegate context
   }, { isActive: isFocused });
 
   // Handle focus entry events from timeline
@@ -310,11 +296,13 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRend
               {/* Content */}
               {delegationExpanded && (
                 <Box flexDirection="column" paddingLeft={2}>
-                  {/* Wrap TimelineDisplay to isolate key events from main timeline */}
-                  <TimelineDisplay 
-                    timeline={timeline} 
-                    focusRegion={delegateThreadId ? FocusRegions.delegate(delegateThreadId) : undefined}
-                  />
+                  {/* Wrap TimelineDisplay with its own expansion provider to isolate events */}
+                  <TimelineExpansionProvider>
+                    <TimelineDisplay 
+                      timeline={timeline} 
+                      focusRegion={delegateThreadId ? FocusRegions.delegate(delegateThreadId) : undefined}
+                    />
+                  </TimelineExpansionProvider>
                 </Box>
               )}
             </Box>

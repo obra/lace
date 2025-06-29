@@ -19,10 +19,15 @@ export class FocusStack {
 
   /**
    * Push a new focus context onto the stack.
+   * Prevents duplicate consecutive pushes of the same focus ID.
    * @param focusId - The focus ID to push
    * @returns The pushed focus ID
    */
   push(focusId: string): string {
+    // Prevent pushing the same focus ID consecutively
+    if (this.current() === focusId) {
+      return focusId; // Already on top, don't push again
+    }
     this.stack.push(focusId);
     return focusId;
   }
