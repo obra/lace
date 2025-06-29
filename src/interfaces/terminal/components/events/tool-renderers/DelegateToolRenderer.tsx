@@ -1,15 +1,25 @@
-// ABOUTME: Specialized tool renderer for delegate tool executions with delegation timeline display
-// ABOUTME: Combines tool execution display with DelegationBox using TimelineEntryCollapsibleBox for consistency
+// ABOUTME: Specialized tool renderer for delegate tool executions with inline delegation timeline display
+// ABOUTME: Combines tool execution display with delegation timeline using TimelineEntryCollapsibleBox for consistency
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { TimelineEntryCollapsibleBox } from '../../ui/TimelineEntryCollapsibleBox.js';
-import { DelegationBox } from '../DelegationBox.js';
 import { ToolCall, ToolResult } from '../../../../../tools/types.js';
 import { CompactOutput } from '../../ui/CompactOutput.js';
 import { CodeDisplay } from '../../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
 import { useTimelineItemExpansion } from '../hooks/useTimelineExpansionToggle.js';
+import { useThreadManager, useThreadProcessor } from '../../../terminal-interface.js';
+import { calculateTokens, formatTokenCount } from '../../../../../utils/token-estimation.js';
+import { useLaceFocus, FocusRegions } from '../../../focus/index.js';
+import TimelineDisplay from '../TimelineDisplay.js';
+import { logger } from '../../../../../utils/logger.js';
+import {
+  extractDelegateThreadId,
+  isThreadComplete,
+  extractTaskFromTimeline,
+  calculateDuration,
+} from '../utils/timeline-utils.js';
 
 // Extract tool execution timeline item type
 type ToolExecutionItem = {
@@ -24,7 +34,7 @@ interface DelegateToolRendererProps {
   item: ToolExecutionItem;
   isStreaming?: boolean;
   isSelected?: boolean; // Whether timeline cursor is on this item
-  isFocused?: boolean; // Whether this item has keyboard focus
+  _isFocused?: boolean; // Whether this item has keyboard focus (unused)
   onToggle?: () => void;
 }
 
@@ -42,19 +52,13 @@ export function DelegateToolRenderer({
   item,
   isStreaming,
   isSelected,
-  isFocused,
+  _isFocused,
   onToggle,
 }: DelegateToolRendererProps) {
   // Use shared expansion management for consistent behavior
-  // This hook provides:
-  // 1. Individual expansion state for this tool renderer
-  // 2. Event listeners that activate when isSelected=true (timeline cursor on this item)
-  // 3. Manual expand/collapse methods for direct user interaction
-  // When the timeline emits expand/collapse events (e.g., keyboard shortcuts),
-  // only the currently selected item will respond and change its expansion state.
   const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
     isSelected || false,
-    (expanded) => onToggle?.()
+    (_expanded) => onToggle?.()
   );
 
   // Create handler that works with TimelineEntryCollapsibleBox interface
@@ -78,12 +82,48 @@ export function DelegateToolRenderer({
   const statusIcon = success ? UI_SYMBOLS.SUCCESS : result ? UI_SYMBOLS.ERROR : UI_SYMBOLS.PENDING;
 
   // Extract delegate thread ID from result metadata
-  const extractDelegateThreadId = (item: ToolExecutionItem) => {
-    const threadId = item.result?.metadata?.threadId;
-    return threadId && typeof threadId === 'string' ? threadId : null;
-  };
-
   const delegateThreadId = extractDelegateThreadId(item);
+
+  // Set up focus management for this delegation (only if threadId exists)
+  useLaceFocus(delegateThreadId ? FocusRegions.delegate(delegateThreadId) : 'none');
+
+  // Get thread data from context
+  const threadManager = useThreadManager();
+  const threadProcessor = useThreadProcessor();
+
+  // Manage delegation expansion state
+  const [delegationExpanded] = useState(true); // Default to expanded for delegation
+
+  // Fetch and process delegate thread data (only if threadId exists)
+  const timeline = useMemo(() => {
+    if (!delegateThreadId) {
+      return {
+        items: [],
+        metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
+      };
+    }
+
+    try {
+      const events = threadManager.getEvents(delegateThreadId);
+      const processed = threadProcessor.processThreads(events);
+      return processed; // processThreads now returns Timeline directly
+    } catch (error) {
+      logger.error('Failed to load delegate thread', {
+        threadId: delegateThreadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {
+        items: [],
+        metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
+      };
+    }
+  }, [delegateThreadId, threadManager, threadProcessor]);
+
+  // Determine delegation status
+  const isComplete = isThreadComplete(timeline);
+  const taskDescription = extractTaskFromTimeline(timeline);
+  const duration = calculateDuration(timeline);
+  const tokens = calculateTokens(timeline);
 
   // Create compact summary for collapsed state
   const delegateSummary = (
@@ -156,18 +196,60 @@ export function DelegateToolRenderer({
         </Box>
       )}
 
-      {/* Delegation details when expanded */}
+      {/* Inline delegation details when expanded */}
       {delegateThreadId && (
         <Box flexDirection="column">
           <Text color="yellow">Delegation:</Text>
           <Box marginLeft={2}>
-            <DelegationBox toolCall={item} onToggle={onToggle} />
+            <Box
+              flexDirection="column"
+              borderStyle="round"
+              borderColor={isComplete ? 'green' : 'yellow'}
+              padding={1}
+              marginY={1}
+            >
+              {/* Header */}
+              <Box justifyContent="space-between" marginBottom={delegationExpanded ? 1 : 0}>
+                <Box>
+                  <Text color={UI_COLORS.DELEGATE}>{UI_SYMBOLS.DELEGATE} </Text>
+                  <Text color="gray">{delegateThreadId}</Text>
+                  <Text color="white"> ({taskDescription})</Text>
+                </Box>
+                <Box>
+                  {isComplete ? (
+                    <Text color={UI_COLORS.SUCCESS}>
+                      {UI_SYMBOLS.SUCCESS} Complete ({duration}){' '}
+                    </Text>
+                  ) : (
+                    <Text color={UI_COLORS.PENDING}>
+                      {UI_SYMBOLS.WORKING} Working... ({duration}){' '}
+                    </Text>
+                  )}
+                  <Text color="gray">
+                    {UI_SYMBOLS.TOKEN_IN}
+                    {formatTokenCount(tokens.tokensIn)} {UI_SYMBOLS.TOKEN_OUT}
+                    {formatTokenCount(tokens.tokensOut)}{' '}
+                  </Text>
+                  <Text color="cyan">
+                    {delegationExpanded
+                      ? `[${UI_SYMBOLS.COLLAPSE_HINT} Collapse]`
+                      : `[${UI_SYMBOLS.EXPAND_HINT} Expand]`}
+                  </Text>
+                </Box>
+              </Box>
+
+              {/* Content */}
+              {delegationExpanded && (
+                <Box flexDirection="column" paddingLeft={2}>
+                  <TimelineDisplay timeline={timeline} />
+                </Box>
+              )}
+            </Box>
           </Box>
         </Box>
       )}
     </Box>
   );
-
 
   return (
     <TimelineEntryCollapsibleBox
