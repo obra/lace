@@ -237,10 +237,11 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
 }
 
 async function getProviderHelpText(): Promise<string> {
-  const registry = await ProviderRegistry.createWithAutoDiscovery();
-  const providers = registry.getProviderNames().sort();
+  // Use static list for help to avoid slow auto-discovery during --help
+  // This matches the providers that are auto-discovered but without the performance cost
+  const knownProviders = ['anthropic', 'openai', 'lmstudio', 'ollama'].sort();
 
-  return `Choose AI provider: ${providers.join(', ')}`;
+  return `Choose AI provider: ${knownProviders.join(', ')}`;
 }
 
 export function validateProvider(provider: string, registry: ProviderRegistry): void {
