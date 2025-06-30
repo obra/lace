@@ -4,7 +4,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { measureElement, DOMElement } from 'ink';
 import { Timeline } from '../../../../thread-processor.js';
-import { logger } from '../../../../../utils/logger.js';
 
 export interface ViewportState {
   selectedLine: number;
@@ -12,6 +11,7 @@ export interface ViewportState {
   itemPositions: number[];
   totalContentHeight: number;
   selectedItemIndex: number;
+  measurementTrigger: number;
 }
 
 export interface ViewportActions {
@@ -64,39 +64,40 @@ export function useTimelineViewport({
 
   // Measure actual individual item heights after render
   useEffect(() => {
-    const positions: number[] = [];
-    let currentPosition = 0;
+    // Defer measurement to ensure DOM has updated after expansion/collapse
+    const measureAfterDOMUpdate = () => {
+      const positions: number[] = [];
+      let currentPosition = 0;
+      const measuredHeights: number[] = [];
 
-    for (let i = 0; i < timeline.items.length; i++) {
-      positions[i] = currentPosition;
+      for (let i = 0; i < timeline.items.length; i++) {
+        positions[i] = currentPosition;
 
-      const itemRef = itemRefs.current.get(i);
-      if (itemRef && typeof itemRef === 'object' && 'nodeName' in itemRef) {
-        const { height } = measureElement(itemRef as DOMElement);
-        currentPosition += height;
-      } else {
-        // Only use fallback until ref is available
-        currentPosition += 3;
+        const itemRef = itemRefs.current.get(i);
+        if (itemRef && typeof itemRef === 'object' && 'nodeName' in itemRef) {
+          const { height } = measureElement(itemRef as DOMElement);
+          measuredHeights[i] = height;
+          currentPosition += height;
+        } else {
+          // Only use fallback until ref is available
+          measuredHeights[i] = 3;
+          currentPosition += 3;
+        }
       }
-    }
 
-    setItemPositions(positions);
-    setTotalContentHeight(currentPosition);
+      setItemPositions(positions);
+      setTotalContentHeight(currentPosition);
+    };
+
+    measureAfterDOMUpdate();
   }, [timeline.items, itemRefs, measurementTrigger]);
 
   // After re-measurement, reselect the first line of the remembered item
   useEffect(() => {
     if (itemToReselectAfterMeasurement >= 0 && itemPositions.length > 0) {
       const newItemStart = itemPositions[itemToReselectAfterMeasurement];
-      logger.debug('useTimelineViewport: CollapsibleBox toggle - after remeasurement', {
-        itemToReselectAfterMeasurement,
-        newItemStart,
-        itemPositions: itemPositions.slice(0, 5),
-        willSetSelectedLine: newItemStart,
-      });
       if (newItemStart !== undefined) {
         setSelectedLine(newItemStart);
-        // Reset flag immediately - no timer needed
         setItemToReselectAfterMeasurement(-1);
       }
     }
@@ -182,15 +183,9 @@ export function useTimelineViewport({
   const triggerRemeasurement = useCallback(() => {
     // Remember which item is currently selected before re-measurement
     const currentSelectedItemIndex = getSelectedItemIndex();
-    logger.debug('useTimelineViewport: CollapsibleBox toggle - before remeasurement', {
-      currentSelectedItemIndex,
-      selectedLine,
-      totalContentHeight,
-      itemPositions: itemPositions.slice(0, 5), // First 5 to avoid spam
-    });
     setItemToReselectAfterMeasurement(currentSelectedItemIndex);
     setMeasurementTrigger((prev) => prev + 1);
-  }, [getSelectedItemIndex, selectedLine, totalContentHeight, itemPositions]);
+  }, [getSelectedItemIndex]);
 
   return {
     // State
@@ -199,6 +194,7 @@ export function useTimelineViewport({
     itemPositions,
     totalContentHeight,
     selectedItemIndex: getSelectedItemIndex(),
+    measurementTrigger,
 
     // Actions
     setSelectedLine,

@@ -55,6 +55,13 @@ export function TimelineContent({
           <Box
             key={getTimelineItemKey(item, index)}
             flexDirection="column"
+            ref={(ref) => {
+              if (ref) {
+                itemRefs.current.set(index, ref);
+              } else {
+                itemRefs.current.delete(index);
+              }
+            }}
           >
             <TimelineItem
               item={item}

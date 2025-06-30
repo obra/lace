@@ -1,19 +1,21 @@
 // ABOUTME: Viewport container component for timeline display with scrolling and navigation
 // ABOUTME: Manages viewport state and keyboard input, renders content and scroll indicators
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Box, useInput, Text, useFocus } from 'ink';
 import useStdoutDimensions from '../../../../utils/use-stdout-dimensions.js';
 import { Timeline } from '../../../thread-processor.js';
 import { useTimelineViewport } from './hooks/useTimelineViewport.js';
 import { logger } from '../../../../utils/logger.js';
 import { FocusRegions, useLaceFocus, useLaceFocusContext } from '../../focus/index.js';
+import { RenderDebugPanel } from '../debug/RenderDebugPanel.js';
 
 interface TimelineViewportProps {
   timeline: Timeline;
   bottomSectionHeight?: number;
   focusRegion?: string; // Optional focus region ID, defaults to FocusRegions.timeline
   onItemInteraction?: (selectedItemIndex: number, input: string, key: any, itemRefs?: React.MutableRefObject<Map<number, any>>) => void;
+  isTimelineLayoutDebugVisible?: boolean;
   children: (props: {
     timeline: Timeline;
     viewportState: {
@@ -22,6 +24,7 @@ interface TimelineViewportProps {
       itemPositions: number[];
       totalContentHeight: number;
       selectedItemIndex: number;
+      measurementTrigger: number;
     };
     viewportActions: {
       triggerRemeasurement: () => void;
@@ -35,11 +38,13 @@ export function TimelineViewport({
   bottomSectionHeight,
   focusRegion,
   onItemInteraction,
+  isTimelineLayoutDebugVisible,
   children,
 }: TimelineViewportProps) {
   // Use Lace focus system with custom focus region or default
   const { isFocused, takeFocus } = useLaceFocus(focusRegion || FocusRegions.timeline, { autoFocus: false });
   const [, terminalHeight] = useStdoutDimensions();
+
 
   // Item refs for measurement
   const itemRefs = useRef<Map<number, any>>(new Map());
@@ -150,6 +155,7 @@ export function TimelineViewport({
               itemPositions: viewport.itemPositions,
               totalContentHeight: viewport.totalContentHeight,
               selectedItemIndex: viewport.selectedItemIndex,
+              measurementTrigger: viewport.measurementTrigger,
             },
             viewportActions: {
               triggerRemeasurement: viewport.triggerRemeasurement,
@@ -178,6 +184,21 @@ export function TimelineViewport({
           <Text color="dim">↓ content below ↓</Text>
         </Box>
       )}
+
+      {/* Debug panel */}
+      <RenderDebugPanel
+        isVisible={!!isTimelineLayoutDebugVisible}
+        timeline={timeline}
+        viewportState={{
+          selectedLine: viewport.selectedLine,
+          lineScrollOffset: viewport.lineScrollOffset,
+          itemPositions: viewport.itemPositions,
+          totalContentHeight: viewport.totalContentHeight,
+          selectedItemIndex: viewport.selectedItemIndex,
+          measurementTrigger: viewport.measurementTrigger,
+        }}
+        onClose={() => {}}
+      />
     </Box>
   );
 }
