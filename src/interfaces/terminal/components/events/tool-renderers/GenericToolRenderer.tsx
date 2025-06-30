@@ -1,7 +1,7 @@
 // ABOUTME: Generic tool renderer component using TimelineEntryCollapsibleBox
 // ABOUTME: Provides consistent expansion behavior for any tool execution with input/output display
 
-import React from 'react';
+import React, { forwardRef, useImperativeHandle } from 'react';
 import { Box, Text } from 'ink';
 import { TimelineEntryCollapsibleBox } from '../../ui/TimelineEntryCollapsibleBox.js';
 import { ToolCall, ToolResult } from '../../../../../tools/types.js';
@@ -9,6 +9,7 @@ import { CompactOutput } from '../../ui/CompactOutput.js';
 import { CodeDisplay } from '../../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
 import { useTimelineItemExpansion } from '../hooks/useTimelineExpansionToggle.js';
+import { TimelineItemRef } from '../../timeline-item-focus.js';
 
 // Extract tool execution timeline item type
 type ToolExecutionItem = {
@@ -42,12 +43,18 @@ function isJsonOutput(output: string): boolean {
   );
 }
 
-export function GenericToolRenderer({
+export const GenericToolRenderer = forwardRef<TimelineItemRef, GenericToolRendererProps>(({
   item,
   isStreaming = defaultProps.isStreaming,
   isSelected = defaultProps.isSelected,
   onToggle,
-}: GenericToolRendererProps) {
+}, ref) => {
+  // Generic tool renderer doesn't support focus entry (only specific tools like delegate do)
+  useImperativeHandle(ref, () => ({
+    enterFocus: () => {
+      // No-op for generic tool renderer
+    },
+  }), []);
   // Use shared expansion management for consistent behavior
   const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
     isSelected,
@@ -189,4 +196,4 @@ export function GenericToolRenderer({
       {expandedContent}
     </TimelineEntryCollapsibleBox>
   );
-}
+});

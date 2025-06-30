@@ -1,8 +1,8 @@
 // ABOUTME: Modal wrapper component for automatic focus management in terminal UI
-// ABOUTME: Handles focus stack push/pop lifecycle for modal components
+// ABOUTME: Thin wrapper around FocusLifecycleWrapper with modal-specific behavior
 
-import React, { useEffect, ReactNode } from 'react';
-import { useLaceFocusContext } from './focus-provider.js';
+import React, { ReactNode } from 'react';
+import { FocusLifecycleWrapper } from './focus-lifecycle-wrapper.js';
 
 /**
  * Props for the ModalWrapper component
@@ -42,6 +42,7 @@ interface ModalWrapperProps {
  * - Automatically pops focus from the stack when the modal closes
  * - Ensures proper cleanup if the component unmounts while open
  * - Provides callbacks for focus lifecycle events
+ * - Hides content when modal is closed (modal-specific behavior)
  * 
  * The focus management is tied to the `isOpen` prop, making it easy to integrate
  * with existing modal state management.
@@ -91,32 +92,15 @@ export function ModalWrapper({
   onFocusActivated,
   onFocusRestored,
 }: ModalWrapperProps) {
-  const { pushFocus, popFocus } = useLaceFocusContext();
-
-  // Handle focus lifecycle when modal opens/closes
-  useEffect(() => {
-    if (isOpen) {
-      // Modal is opening - push focus
-      pushFocus(focusId);
-      onFocusActivated?.();
-      
-      // Return cleanup function for when modal closes
-      return () => {
-        const restoredFocus = popFocus();
-        if (restoredFocus) {
-          onFocusRestored?.();
-        }
-      };
-    }
-    
-    // If modal is not open, no cleanup needed
-    return undefined;
-  }, [isOpen, focusId, pushFocus, popFocus, onFocusActivated, onFocusRestored]);
-
-  // Only render children when modal is open
-  if (!isOpen) {
-    return null;
-  }
-
-  return <React.Fragment>{children}</React.Fragment>;
+  return (
+    <FocusLifecycleWrapper
+      focusId={focusId}
+      isActive={isOpen}
+      renderWhenInactive={false}
+      onFocusActivated={onFocusActivated}
+      onFocusRestored={onFocusRestored}
+    >
+      {children}
+    </FocusLifecycleWrapper>
+  );
 }

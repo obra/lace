@@ -1,7 +1,7 @@
 // ABOUTME: Individual timeline item component with dynamic tool renderer discovery
 // ABOUTME: Handles all timeline item types with unified expansion behavior and automatic tool renderer selection
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useImperativeHandle, useRef, forwardRef, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import {
   Timeline,
@@ -14,6 +14,8 @@ import { GenericToolRenderer } from './tool-renderers/GenericToolRenderer.js';
 import { getToolRenderer } from './tool-renderers/getToolRenderer.js';
 import { ToolRendererErrorBoundary } from './ToolRendererErrorBoundary.js';
 import MessageDisplay from '../message-display.js';
+import { TimelineItemRef, canTimelineItemAcceptFocus } from '../timeline-item-focus.js';
+import { logger } from '../../../../utils/logger.js';
 
 interface TimelineItemProps {
   item: TimelineItemType;
@@ -31,10 +33,36 @@ interface DynamicToolRendererProps {
   onExpansionToggle?: () => void;
 }
 
-function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRendererProps) {
+const DynamicToolRenderer = forwardRef<TimelineItemRef, DynamicToolRendererProps>(({ item, isSelected, onToggle }, ref) => {
   const [ToolRenderer, setToolRenderer] = React.useState<React.ComponentType<unknown> | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [debugInfo, setDebugInfo] = React.useState<string>('');
+  const toolRendererRef = useRef<TimelineItemRef>(null);
+
+  // Expose enterFocus method through ref
+  useImperativeHandle(ref, () => {
+    logger.debug('DynamicToolRenderer: useImperativeHandle setting up ref', {
+      toolName: item.call.name,
+      hasRef: !!ref,
+    });
+    return {
+      enterFocus: () => {
+        // Only delegate to tool renderer if this item can accept focus
+        const canAcceptFocus = canTimelineItemAcceptFocus(item);
+        logger.debug('DynamicToolRenderer: enterFocus called', {
+          canAcceptFocus,
+          hasToolRendererRef: !!toolRendererRef.current,
+          hasEnterFocus: !!toolRendererRef.current?.enterFocus,
+          toolName: item.call.name,
+          callId: item.callId,
+          timestamp: item.timestamp,
+        });
+        if (canAcceptFocus) {
+          toolRendererRef.current?.enterFocus?.();
+        }
+      },
+    };
+  }, [item.call.name, item.callId, item.result]);
 
   React.useEffect(() => {
     const abortController = new AbortController();
@@ -60,18 +88,19 @@ function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRenderer
     };
   }, [item.call.name]);
 
-  if (isLoading) {
-    // Add debug info to loading state
-    const debugItem = {
-      ...item,
-      call: {
-        ...item.call,
-        arguments: {
-          ...item.call.arguments,
-          _debug: debugInfo,
-        },
+  // Memoize debugItem to prevent object recreation on every render
+  const debugItem = useMemo(() => ({
+    ...item,
+    call: {
+      ...item.call,
+      arguments: {
+        ...item.call.arguments,
+        _debug: debugInfo,
       },
-    };
+    },
+  }), [item, debugInfo]);
+
+  if (isLoading) {
     return (
       <GenericToolRenderer
         item={debugItem}
@@ -83,34 +112,30 @@ function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRenderer
 
   const RendererComponent = ToolRenderer || GenericToolRenderer;
 
-  // Add debug info to final render
-  const debugItem = {
-    ...item,
-    call: {
-      ...item.call,
-      arguments: {
-        ...item.call.arguments,
-        _debug: debugInfo,
-      },
-    },
-  };
-
   return (
     <RendererComponent
+      ref={toolRendererRef}
       item={debugItem}
       isSelected={isSelected}
       onToggle={onToggle}
     />
   );
-}
+});
 
-export function TimelineItem({
+export const TimelineItem = forwardRef<TimelineItemRef, TimelineItemProps>(({
   item,
   isSelected,
   selectedLine,
   itemStartLine,
   onToggle,
-}: TimelineItemProps) {
+}, ref) => {
+  // For non-focusable items, provide a no-op ref
+  useImperativeHandle(ref, () => ({
+    enterFocus: () => {
+      // No-op for non-focusable items
+    },
+  }), []);
+
   switch (item.type) {
     case 'user_message':
       return (
@@ -171,9 +196,10 @@ export function TimelineItem({
           onToggle={onToggle}
         >
           <DynamicToolRenderer
+            ref={ref}
             item={item}
             isSelected={isSelected}
-              onToggle={onToggle}
+            onToggle={onToggle}
           />
         </ToolRendererErrorBoundary>
       );
@@ -196,4 +222,4 @@ export function TimelineItem({
         </Box>
       );
   }
-}
+});

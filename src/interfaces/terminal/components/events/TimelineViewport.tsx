@@ -7,12 +7,13 @@ import useStdoutDimensions from '../../../../utils/use-stdout-dimensions.js';
 import { Timeline } from '../../../thread-processor.js';
 import { useTimelineViewport } from './hooks/useTimelineViewport.js';
 import { logger } from '../../../../utils/logger.js';
-import { FocusRegions, useLaceFocus } from '../../focus/index.js';
+import { FocusRegions, useLaceFocus, useLaceFocusContext } from '../../focus/index.js';
 
 interface TimelineViewportProps {
   timeline: Timeline;
   bottomSectionHeight?: number;
-  onItemInteraction?: (selectedItemIndex: number, input: string, key: any) => void;
+  focusRegion?: string; // Optional focus region ID, defaults to FocusRegions.timeline
+  onItemInteraction?: (selectedItemIndex: number, input: string, key: any, itemRefs?: React.MutableRefObject<Map<number, any>>) => void;
   children: (props: {
     timeline: Timeline;
     viewportState: {
@@ -32,11 +33,12 @@ interface TimelineViewportProps {
 export function TimelineViewport({
   timeline,
   bottomSectionHeight,
+  focusRegion,
   onItemInteraction,
   children,
 }: TimelineViewportProps) {
-  // Use Lace focus system
-  const { isFocused, takeFocus } = useLaceFocus(FocusRegions.timeline, { autoFocus: false });
+  // Use Lace focus system with custom focus region or default
+  const { isFocused, takeFocus } = useLaceFocus(focusRegion || FocusRegions.timeline, { autoFocus: false });
   const [, terminalHeight] = useStdoutDimensions();
 
   // Item refs for measurement
@@ -64,6 +66,9 @@ export function TimelineViewport({
     viewport.totalContentHeight > 0 &&
     viewport.lineScrollOffset + viewportLines < viewport.totalContentHeight;
 
+  // Get focus context to check for delegate focus
+  const { currentFocus } = useLaceFocusContext();
+  
   // Handle keyboard navigation
   useInput(
     (input, key) => {
@@ -71,8 +76,27 @@ export function TimelineViewport({
         key,
         input,
         isFocused,
+        currentFocus,
+        focusRegion: focusRegion || FocusRegions.timeline,
         isActive: isFocused && viewport.totalContentHeight > 0,
       });
+
+      // Don't handle keys if focus is in a delegate context and this is the main timeline
+      const isMainTimeline = (focusRegion || FocusRegions.timeline) === FocusRegions.timeline;
+      const isInDelegateContext = currentFocus.startsWith('delegate-');
+      
+      logger.debug('TimelineViewport: Key handling decision', {
+        currentFocus,
+        focusRegion: focusRegion || FocusRegions.timeline,
+        isMainTimeline,
+        isInDelegateContext,
+        willIgnore: isMainTimeline && isInDelegateContext,
+      });
+      
+      if (isMainTimeline && isInDelegateContext) {
+        logger.debug('TimelineViewport: Ignoring key in main timeline while in delegate context');
+        return; // Let delegate timeline handle all keys
+      }
 
       // No escape handling - provider handles global escape to pop focus stack
 
@@ -89,9 +113,16 @@ export function TimelineViewport({
       } else if (input === 'G') {
         viewport.navigateToBottom();
       } else if (key.leftArrow || key.rightArrow || key.return) {
-        // Forward item interactions to parent
+        // Forward item interactions to parent with itemRefs
+        logger.debug('TimelineViewport: Forwarding item interaction', {
+          currentFocus,
+          focusRegion: focusRegion || FocusRegions.timeline,
+          selectedItemIndex: viewport.selectedItemIndex,
+          key: Object.keys(key).filter(k => (key as any)[k]).join('+'),
+          hasCallback: !!onItemInteraction,
+        });
         if (onItemInteraction) {
-          onItemInteraction(viewport.selectedItemIndex, input, key);
+          onItemInteraction(viewport.selectedItemIndex, input, key, itemRefs);
         }
       }
     },

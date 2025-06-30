@@ -19,6 +19,7 @@ import { ConversationDisplay } from './components/events/ConversationDisplay.js'
 import { TimelineExpansionProvider } from './components/events/hooks/useTimelineExpansionToggle.js';
 import { withFullScreen } from 'fullscreen-ink';
 import StatusBar from './components/status-bar.js';
+import { FocusDebugPanel } from './components/FocusDebugPanel.js';
 import { Agent, CurrentTurnMetrics } from '../../agents/agent.js';
 import { ApprovalCallback, ApprovalDecision } from '../../tools/approval-types.js';
 import { CommandRegistry } from '../../commands/registry.js';
@@ -203,6 +204,9 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
   // Delegation tracking state
   const [isDelegating, setIsDelegating] = useState(false);
+
+  // Focus debug panel state
+  const [isFocusDebugVisible, setIsFocusDebugVisible] = useState(false);
 
   // Tool approval modal state
   const [approvalRequest, setApprovalRequest] = useState<{
@@ -523,8 +527,13 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       exit(): void {
         process.exit(0);
       },
+
+      toggleFocusDebugPanel(): boolean {
+        setIsFocusDebugVisible(prev => !prev);
+        return !isFocusDebugVisible;
+      },
     }),
-    [agent, addMessage]
+    [agent, addMessage, isFocusDebugVisible]
   );
 
   // Handle slash commands using new command system
@@ -703,8 +712,22 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             </TimelineExpansionProvider>
           </Box>
 
-          {/* Bottom section - status bar, input anchored to bottom */}
+          {/* Tool approval modal */}
+          {approvalRequest && (
+            <ToolApprovalModal
+              toolName={approvalRequest.toolName}
+              input={approvalRequest.input}
+              isReadOnly={approvalRequest.isReadOnly}
+              onDecision={handleApprovalDecision}
+              isVisible={true}
+            />
+          )}
+
+          {/* Bottom section - debug panel, status bar, input anchored to bottom */}
           <Box flexDirection="column" flexShrink={0} ref={bottomSectionRef}>
+            {/* Focus debug panel - takes natural height, only shown when enabled */}
+            {isFocusDebugVisible && <FocusDebugPanel />}
+            
             {/* Status bar - takes natural height */}
             <StatusBar
               providerName={agent.providerName || 'unknown'}

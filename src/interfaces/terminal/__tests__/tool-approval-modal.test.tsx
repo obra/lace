@@ -32,6 +32,13 @@ vi.mock('../focus/index.js', async () => {
       takeFocus: vi.fn(),
       isInFocusPath: true 
     })),
+    useLaceFocusContext: () => ({
+      currentFocus: 'modal-approval',
+      pushFocus: vi.fn(),
+      popFocus: vi.fn(),
+      getFocusStack: () => ['shell-input', 'modal-approval'],
+      isFocusActive: (id: string) => id === 'modal-approval',
+    }),
     ModalWrapper: ({ children, isOpen }: any) => isOpen ? children : null,
   };
 });
