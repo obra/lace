@@ -42,13 +42,13 @@ describe('getToolRenderer', () => {
 
     it('should return null for non-existent underscore tool names', async () => {
       // Test underscore tool names that don't exist
-      const result = await getToolRenderer('file_write');
+      const result = await getToolRenderer('nonexistent_tool');
       expect(result).toBeNull();
     });
 
     it('should return null for non-existent complex tool names', async () => {
       // Test complex tool names that don't exist
-      const result = await getToolRenderer('ripgrep-search');
+      const result = await getToolRenderer('definitely-nonexistent-tool');
       expect(result).toBeNull();
     });
   });
@@ -58,7 +58,8 @@ describe('getToolRenderer', () => {
       // Test with delegate tool which exists and uses named export
       const result = await getToolRenderer('delegate');
       expect(result).toBeTruthy();
-      expect(typeof result).toBe('function');
+      // DelegateToolRenderer is a forwardRef component, so it's an object with render function
+      expect(typeof result).toBe('object');
     });
 
     it('should handle case where module exists but has no matching exports', async () => {

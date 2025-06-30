@@ -43,7 +43,6 @@ export function TimelineEntryCollapsibleBox({
         borderStyle={borderStyle}
         borderColor={borderColor}
         isSelected={isSelected}
-        isFocused={isFocused}
       />
     </Box>
   );

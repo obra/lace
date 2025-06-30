@@ -99,7 +99,7 @@ export function useToolRenderer(
   );
 
   // Create standardized compact summary
-  const compactSummary = result && success && !outputData.isEmpty && (
+  const compactSummary = result && success && (
     <Box marginTop={1}>
       <Box flexDirection="column">
         {stats && <Text color="gray">{stats}</Text>}
