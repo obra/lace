@@ -70,98 +70,118 @@ Implement custom tool renderers for file-list, file-search, file-write, and file
 - Expanded view: marginTop={1} before stats, then raw output
 - No duplication of header info in expanded content
 
-### FileSearchToolRenderer
+### FileSearchToolRenderer ✅ COMPLETED
 
-**Collapsed**: `Search: "useState" in /src - 12 matches across 5 files`
-
-**Expanded**:
-- Grouped by file path
-- Line numbers with content
-- Search term highlighting
-
-**Implementation**:
-- Parse "Found X matches" format
-- Group matches by file
-- Extract line numbers and content
-
-### FileWriteToolRenderer
-
-**Collapsed**: `Write: /path/to/file.txt - 247 characters`
-
-**Expanded**:
-- File path with context
-- Character count details
-- Content preview (first 3 lines)
-
-**Implementation**:
-- Extract path and character count from success message
-- Handle creation vs overwrite indication
-
-### FileEditToolRenderer
-
-**Collapsed**: `Edit: /path/to/file.ts - 1 replacement (45 → 47 lines)`
-
-**Expanded**:
-- Line count comparison
-- Text change preview
-- Replacement context
-
-**Implementation**:
-- Parse line count changes from output
-- Show before/after text context
-- Handle single replacement requirement
-
-## House Style for Collapsed/Expanded Views
-
-### Label Structure
-Always use React.Fragment for inline elements in labels:
-```typescript
-const fancyLabel = (
-  <React.Fragment>
-    <Text color={UI_COLORS.TOOL}>Tool Name: </Text>
-    <Text color="white">{primaryInfo}</Text>
-    <Text color="gray">{secondaryInfo}</Text>
-    <Text color="gray">  </Text>
-    <Text color={success ? UI_COLORS.SUCCESS : UI_COLORS.ERROR}>
-      {statusIcon}
-    </Text>
-    {streaming && <Text color="gray"> (action...)</Text>}
-  </React.Fragment>
-);
+**Collapsed**: `Search: "useState" in current directory  ✓`
+```
+12 matches across 5 files
+src/components/Button.tsx:
+  15: const [state, setState] = useState(false);
+... and more
 ```
 
-### Collapsed Summary
-Show preview content with marginTop={1}, no marginLeft:
-```typescript
-const compactSummary = result && success && (
-  <Box marginTop={1}>
-    <Text color="gray">{statsOrCounts}</Text>
-    {previewLines.map((line, i) => (
-      <Text key={i} color="gray">{line}</Text>
-    ))}
-    {truncated && <Text color="gray">... and X more lines</Text>}
-  </Box>
-);
+**Implementation Learnings**:
+- Parse "Found X match(es)" pattern for statistics
+- Count unique files by filtering file path lines
+- Preview shows first few result lines without "Found" header
+- Handle "No matches found" empty state
+- Parameters: case-sensitive, whole words, include/exclude patterns
+
+### FileWriteToolRenderer ✅ COMPLETED
+
+**Collapsed**: `Write: /path/to/file.txt  ✓`
+```
+247 characters
+const hello = "world";
+console.log(hello);
+... and more
 ```
 
-### Expanded Content
-Start with marginTop={1} for spacing, then show full content:
-```typescript
-const expandedContent = (
-  <Box flexDirection="column">
-    <Box marginTop={1}>
-      <Text color={UI_COLORS.SUCCESS}>{statsOrSummary}</Text>
-    </Box>
-    <Text>{fullOutput}</Text>
-  </Box>
-);
+**Implementation Learnings**:
+- Parse "Successfully wrote X characters to path" message
+- Format character counts with K/M suffixes for large files
+- Preview shows first 2 lines of written content
+- Expanded view shows 5 lines with truncation count
+- Content preview from input, not output parsing
+
+### FileEditToolRenderer ✅ COMPLETED
+
+**Collapsed**: `Edit: /path/to/file.ts  ✓`
+```
+1 replacement (45 → 47 lines)
+- const old = "value";
+... and more
 ```
 
-### Key Rules
+**Implementation Learnings**:
+- Parse "Successfully replaced text in path (X lines → Y lines)"
+- Preview shows removed text with red "- " prefix
+- Expanded view shows full diff with +/- indicators
+- Line count changes clearly displayed
+- Uses input old_text/new_text for diff display
+
+## Standardized Tool Renderer Architecture
+
+### useToolRenderer Hook ✅ IMPLEMENTED
+
+All tool renderers now use the standardized `useToolRenderer` hook to eliminate boilerplate and ensure consistency:
+
+```typescript
+import { useToolRenderer, ToolRendererProps } from './useToolRenderer.js';
+
+export function MyToolRenderer({ item, isStreaming, isSelected, onToggle }: ToolRendererProps) {
+  const { timelineEntry } = useToolRenderer(
+    item,
+    {
+      toolName: 'My Tool',
+      streamingAction: 'processing...',
+      getPrimaryInfo: (input) => input.primaryField as string,
+      getSecondaryInfo: (input) => input.options ? `(${input.options})` : '',
+      parseOutput: (result, input) => {
+        // Tool-specific parsing logic
+        return {
+          success: boolean,
+          isEmpty?: boolean,
+          stats?: string,
+          previewContent?: React.ReactNode,
+          mainContent?: React.ReactNode,
+          errorMessage?: string
+        };
+      }
+    },
+    isStreaming,
+    isSelected,
+    onToggle
+  );
+
+  return timelineEntry;
+}
+```
+
+### Configuration Interface
+```typescript
+interface ToolRendererConfig {
+  toolName: string;                    // Display name in label
+  streamingAction: string;             // Text shown during streaming
+  getPrimaryInfo: (input) => string;   // Main info (file path, command, etc.)
+  getSecondaryInfo?: (input) => string; // Optional secondary info (params, flags)
+  parseOutput: (result, input) => ToolOutputData; // Tool-specific parsing
+}
+```
+
+### Standardized Patterns
+- **Label Structure**: Automatic generation with consistent colors and spacing
+- **Expansion Management**: Shared state management via useTimelineItemExpansion
+- **Error Handling**: Consistent error display with red styling
+- **Preview/Main Content**: Structured separation between collapsed and expanded views
+- **Empty State Handling**: Standardized "No results" display
+
+### House Style Rules
 - **No header duplication**: Expanded content never repeats label info
 - **Spacing**: marginTop={1} before stats, no extra margins for raw output
 - **Colors**: UI_COLORS.TOOL (cyan), SUCCESS (green), ERROR (red)
 - **Streaming states**: Show "(action...)" in gray for active operations
+- **Empty states**: Graceful handling with isEmpty flag
 
 ## Common Patterns
 
@@ -197,12 +217,17 @@ function limitLines(text: string, maxLines: number) {
 }
 ```
 
-## Implementation Order
+## Implementation Status
 
-1. **FileListToolRenderer** - Most complex tree parsing
-2. **FileSearchToolRenderer** - Grouped output handling  
-3. **FileWriteToolRenderer** - Simplest success message parsing
-4. **FileEditToolRenderer** - Line count and replacement display
+1. **FileListToolRenderer** ✅ - Most complex tree parsing
+2. **FileSearchToolRenderer** ✅ - Grouped output handling  
+3. **FileWriteToolRenderer** ✅ - Simplest success message parsing
+4. **FileEditToolRenderer** ✅ - Line count and replacement display
+5. **BashToolRenderer** ✅ - Refactored to use standardized hook
+6. **useToolRenderer Hook** ✅ - Standardized architecture implemented
+
+### Renderers Not Migrated
+- **DelegateToolRenderer** - Complex delegation handling, kept original implementation
 
 ## File Structure
 
