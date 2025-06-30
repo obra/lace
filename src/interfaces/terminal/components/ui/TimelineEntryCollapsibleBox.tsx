@@ -7,7 +7,7 @@ import { CollapsibleBox } from './CollapsibleBox.js';
 
 interface TimelineEntryCollapsibleBoxProps {
   children: React.ReactNode;
-  label?: string;
+  label?: string | React.ReactNode;
   summary?: React.ReactNode;
   isExpanded: boolean;
   onExpandedChange: (expanded: boolean) => void;

@@ -2,6 +2,7 @@
 // ABOUTME: Maps tool names to specific renderer components or returns null for GenericToolRenderer fallback
 
 import React from 'react';
+import { logger } from '../../../../../utils/logger.js';
 
 /**
  * Dynamic tool renderer discovery function
@@ -22,12 +23,41 @@ export async function getToolRenderer(
     const componentName = toolNameToComponentName(toolName);
     const fileName = `./${componentName}.js`; // .js extension for compiled output
 
+    logger.debug('Tool renderer discovery', {
+      toolName,
+      componentName,
+      fileName,
+      action: 'attempting_load',
+    });
+
     // Attempt dynamic import
     const module = await import(fileName);
+    const moduleKeys = Object.keys(module);
+
+    logger.debug('Tool renderer module loaded', {
+      toolName,
+      moduleKeys,
+      hasDefault: !!module.default,
+      hasNamedExport: !!module[componentName],
+    });
 
     // Return the default export or named export matching component name
-    return module.default || module[componentName] || null;
-  } catch {
+    const renderer = module.default || module[componentName] || null;
+
+    logger.info('Tool renderer discovery result', {
+      toolName,
+      found: !!renderer,
+      rendererName: renderer?.name,
+      usedExport: module.default ? 'default' : module[componentName] ? 'named' : 'none',
+    });
+
+    return renderer;
+  } catch (error: any) {
+    logger.debug('Tool renderer discovery failed', {
+      toolName,
+      error: error?.message,
+      fallback: 'GenericToolRenderer',
+    });
     // Return null if component not found - caller should use GenericToolRenderer
     return null;
   }
