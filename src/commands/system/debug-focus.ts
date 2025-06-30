@@ -6,7 +6,6 @@ import type { Command, UserInterface } from '../types.js';
 export const debugFocusCommand: Command = {
   name: 'debug-focus',
   description: 'Toggle focus debug panel visibility (default: off)',
-  aliases: ['df'],
 
   async execute(args: string, ui: UserInterface): Promise<void> {
     // Check if the UI supports focus debug panel toggling
