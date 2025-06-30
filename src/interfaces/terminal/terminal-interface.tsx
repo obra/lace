@@ -205,6 +205,9 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   // Delegation tracking state
   const [isDelegating, setIsDelegating] = useState(false);
 
+  // Focus debug panel state
+  const [isFocusDebugVisible, setIsFocusDebugVisible] = useState(false);
+
   // Tool approval modal state
   const [approvalRequest, setApprovalRequest] = useState<{
     toolName: string;
@@ -524,8 +527,13 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       exit(): void {
         process.exit(0);
       },
+
+      toggleFocusDebugPanel(): boolean {
+        setIsFocusDebugVisible(prev => !prev);
+        return !isFocusDebugVisible;
+      },
     }),
-    [agent, addMessage]
+    [agent, addMessage, isFocusDebugVisible]
   );
 
   // Handle slash commands using new command system
@@ -717,8 +725,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
           {/* Bottom section - debug panel, status bar, input anchored to bottom */}
           <Box flexDirection="column" flexShrink={0} ref={bottomSectionRef}>
-            {/* Focus debug panel - takes natural height */}
-            <FocusDebugPanel />
+            {/* Focus debug panel - takes natural height, only shown when enabled */}
+            {isFocusDebugVisible && <FocusDebugPanel />}
             
             {/* Status bar - takes natural height */}
             <StatusBar

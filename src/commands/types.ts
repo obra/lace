@@ -15,6 +15,9 @@ export interface UserInterface {
   displayMessage(message: string): void;
   clearSession(): void; // Recreate agent + thread
   exit(): void;
+
+  // Optional debug functionality
+  toggleFocusDebugPanel?(): boolean; // Returns new visibility state
 }
 
 /**
