@@ -7,14 +7,13 @@ import { UI_SYMBOLS } from '../../theme.js';
 
 interface CollapsibleBoxProps {
   children: React.ReactNode;
-  label?: string;
+  label?: string | React.ReactNode;
   summary?: React.ReactNode; // Content to show when collapsed
   isExpanded: boolean; // Controlled state from parent
   maxHeight?: number;
   borderStyle?: 'single' | 'double' | 'round' | 'classic' | 'bold' | 'arrow';
   borderColor?: string;
   isSelected?: boolean; // Whether this specific box is selected (for visual indication)
-  isFocused?: boolean; // Whether this box has keyboard focus (stronger visual indication)
 }
 
 export function CollapsibleBox({
@@ -26,32 +25,23 @@ export function CollapsibleBox({
   borderStyle = 'round',
   borderColor = 'gray',
   isSelected = false,
-  isFocused = false,
 }: CollapsibleBoxProps) {
-  // Determine visual styling based on focus and selection state
-  const labelColor = isFocused ? 'yellow' : borderColor;
-  const hintColor = isFocused ? 'yellow' : 'gray';
-  const showHint = isSelected || isFocused;
-
   return (
     <Box flexDirection="column">
       {label && (
         <Box>
-          <Text color={labelColor}>
-            {isExpanded ? UI_SYMBOLS.EXPANDED : UI_SYMBOLS.COLLAPSED} {label}
-          </Text>
-          {isFocused && (
-            <Text color="yellow">
-              {' '}
-              [FOCUSED - ESC to exit]
-            </Text>
+          <Text color={borderColor}>{isExpanded ? UI_SYMBOLS.EXPANDED : UI_SYMBOLS.COLLAPSED}</Text>
+          {typeof label === 'string' ? (
+            <Text color={borderColor}>{label}</Text>
+          ) : (
+            label
           )}
-          {showHint && !isFocused && (
-            <Text color={hintColor}>
+          {isSelected && (
+            <Text color="gray">
               {' '}
               ({isExpanded 
                 ? `${UI_SYMBOLS.ARROW_LEFT} to close`
-                : `${UI_SYMBOLS.ARROW_RIGHT} to open | RETURN to focus`})
+                : `${UI_SYMBOLS.ARROW_RIGHT} to open`})
             </Text>
           )}
         </Box>

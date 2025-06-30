@@ -1,7 +1,7 @@
 // ABOUTME: Individual timeline item component with dynamic tool renderer discovery
 // ABOUTME: Handles all timeline item types with unified expansion behavior and automatic tool renderer selection
 
-import React, { Suspense, useImperativeHandle, useRef, forwardRef, useMemo } from 'react';
+import React, { Suspense } from 'react';
 import { Box, Text } from 'ink';
 import {
   Timeline,
@@ -14,7 +14,6 @@ import { GenericToolRenderer } from './tool-renderers/GenericToolRenderer.js';
 import { getToolRenderer } from './tool-renderers/getToolRenderer.js';
 import { ToolRendererErrorBoundary } from './ToolRendererErrorBoundary.js';
 import MessageDisplay from '../message-display.js';
-import { TimelineItemRef, canTimelineItemAcceptFocus } from '../timeline-item-focus.js';
 import { logger } from '../../../../utils/logger.js';
 
 interface TimelineItemProps {
@@ -33,53 +32,49 @@ interface DynamicToolRendererProps {
   onExpansionToggle?: () => void;
 }
 
-const DynamicToolRenderer = forwardRef<TimelineItemRef, DynamicToolRendererProps>(({ item, isSelected, onToggle }, ref) => {
+function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRendererProps) {
   const [ToolRenderer, setToolRenderer] = React.useState<React.ComponentType<unknown> | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [debugInfo, setDebugInfo] = React.useState<string>('');
-  const toolRendererRef = useRef<TimelineItemRef>(null);
-
-  // Expose enterFocus method through ref
-  useImperativeHandle(ref, () => {
-    logger.debug('DynamicToolRenderer: useImperativeHandle setting up ref', {
-      toolName: item.call.name,
-      hasRef: !!ref,
-    });
-    return {
-      enterFocus: () => {
-        // Only delegate to tool renderer if this item can accept focus
-        const canAcceptFocus = canTimelineItemAcceptFocus(item);
-        logger.debug('DynamicToolRenderer: enterFocus called', {
-          canAcceptFocus,
-          hasToolRendererRef: !!toolRendererRef.current,
-          hasEnterFocus: !!toolRendererRef.current?.enterFocus,
-          toolName: item.call.name,
-          callId: item.callId,
-          timestamp: item.timestamp,
-        });
-        if (canAcceptFocus) {
-          toolRendererRef.current?.enterFocus?.();
-        }
-      },
-    };
-  }, [item.call.name, item.callId, item.result]);
 
   React.useEffect(() => {
     const abortController = new AbortController();
     setDebugInfo(`Looking for ${item.call.name}ToolRenderer...`);
+
+    logger.debug('DynamicToolRenderer: Starting renderer discovery', {
+      toolName: item.call.name,
+      callId: item.callId
+    });
 
     getToolRenderer(item.call.name)
       .then((renderer) => {
         if (!abortController.signal.aborted) {
           setToolRenderer(() => renderer);
           setIsLoading(false);
-          setDebugInfo(renderer ? `Found: ${renderer.name}` : 'Not found, using Generic');
+          const debugMsg = renderer ? `Found: ${renderer.name}` : 'Not found, using Generic';
+          setDebugInfo(debugMsg);
+          
+          logger.info('DynamicToolRenderer: Renderer resolution complete', {
+            toolName: item.call.name,
+            callId: item.callId,
+            found: !!renderer,
+            rendererName: renderer?.name,
+            willUseGeneric: !renderer
+          });
         }
       })
       .catch((error) => {
         if (!abortController.signal.aborted) {
           setIsLoading(false);
-          setDebugInfo(`Error: ${error.message}`);
+          const errorMsg = `Error: ${error.message}`;
+          setDebugInfo(errorMsg);
+          
+          logger.error('DynamicToolRenderer: Renderer discovery error', {
+            toolName: item.call.name,
+            callId: item.callId,
+            error: error.message,
+            willUseGeneric: true
+          });
         }
       });
 
@@ -88,19 +83,18 @@ const DynamicToolRenderer = forwardRef<TimelineItemRef, DynamicToolRendererProps
     };
   }, [item.call.name]);
 
-  // Memoize debugItem to prevent object recreation on every render
-  const debugItem = useMemo(() => ({
-    ...item,
-    call: {
-      ...item.call,
-      arguments: {
-        ...item.call.arguments,
-        _debug: debugInfo,
-      },
-    },
-  }), [item, debugInfo]);
-
   if (isLoading) {
+    // Add debug info to loading state
+    const debugItem = {
+      ...item,
+      call: {
+        ...item.call,
+        arguments: {
+          ...item.call.arguments,
+          _debug: debugInfo,
+        },
+      },
+    };
     return (
       <GenericToolRenderer
         item={debugItem}
@@ -112,30 +106,34 @@ const DynamicToolRenderer = forwardRef<TimelineItemRef, DynamicToolRendererProps
 
   const RendererComponent = ToolRenderer || GenericToolRenderer;
 
+  // Add debug info to final render
+  const debugItem = {
+    ...item,
+    call: {
+      ...item.call,
+      arguments: {
+        ...item.call.arguments,
+        _debug: debugInfo,
+      },
+    },
+  };
+
   return (
     <RendererComponent
-      ref={toolRendererRef}
       item={debugItem}
       isSelected={isSelected}
       onToggle={onToggle}
     />
   );
-});
+}
 
-export const TimelineItem = forwardRef<TimelineItemRef, TimelineItemProps>(({
+export function TimelineItem({
   item,
   isSelected,
   selectedLine,
   itemStartLine,
   onToggle,
-}, ref) => {
-  // For non-focusable items, provide a no-op ref
-  useImperativeHandle(ref, () => ({
-    enterFocus: () => {
-      // No-op for non-focusable items
-    },
-  }), []);
-
+}: TimelineItemProps) {
   switch (item.type) {
     case 'user_message':
       return (
@@ -196,10 +194,9 @@ export const TimelineItem = forwardRef<TimelineItemRef, TimelineItemProps>(({
           onToggle={onToggle}
         >
           <DynamicToolRenderer
-            ref={ref}
             item={item}
             isSelected={isSelected}
-            onToggle={onToggle}
+              onToggle={onToggle}
           />
         </ToolRendererErrorBoundary>
       );
@@ -222,4 +219,4 @@ export const TimelineItem = forwardRef<TimelineItemRef, TimelineItemProps>(({
         </Box>
       );
   }
-});
+}

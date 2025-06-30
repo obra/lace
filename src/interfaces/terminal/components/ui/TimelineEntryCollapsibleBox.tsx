@@ -7,7 +7,7 @@ import { CollapsibleBox } from './CollapsibleBox.js';
 
 interface TimelineEntryCollapsibleBoxProps {
   children: React.ReactNode;
-  label?: string;
+  label?: string | React.ReactNode;
   summary?: React.ReactNode;
   isExpanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
@@ -43,7 +43,6 @@ export function TimelineEntryCollapsibleBox({
         borderStyle={borderStyle}
         borderColor={borderColor}
         isSelected={isSelected}
-        isFocused={isFocused}
       />
     </Box>
   );
