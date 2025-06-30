@@ -18,12 +18,14 @@ interface ConversationDisplayProps {
   events: ThreadEvent[];
   ephemeralMessages: Message[];
   bottomSectionHeight?: number;
+  isTimelineLayoutDebugVisible?: boolean;
 }
 
 export function ConversationDisplay({
   events,
   ephemeralMessages,
   bottomSectionHeight,
+  isTimelineLayoutDebugVisible,
 }: ConversationDisplayProps) {
   // Use shared ThreadProcessor from context
   const threadProcessor = useThreadProcessor();
@@ -54,6 +56,7 @@ export function ConversationDisplay({
       <TimelineDisplay
         timeline={mainTimeline}
         bottomSectionHeight={bottomSectionHeight}
+        isTimelineLayoutDebugVisible={isTimelineLayoutDebugVisible}
       />
     </Box>
   );

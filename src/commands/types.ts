@@ -18,6 +18,7 @@ export interface UserInterface {
 
   // Optional debug functionality
   toggleFocusDebugPanel?(): boolean; // Returns new visibility state
+  toggleTimelineLayoutDebugPanel?(): boolean; // Returns new visibility state
 }
 
 /**

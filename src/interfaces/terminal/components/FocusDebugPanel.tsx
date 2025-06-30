@@ -50,6 +50,7 @@ export function FocusDebugPanel({}: FocusDebugPanelProps) {
   
   return (
     <Box borderStyle="single" borderColor="gray" paddingX={1}>
+      <Box flexDirection="row">
       <Box flexDirection="column">
         <Text color="cyan" bold>🔧 Focus Debug Panel</Text>
         
@@ -72,8 +73,9 @@ export function FocusDebugPanel({}: FocusDebugPanelProps) {
           <Text color="yellow">Last Action: </Text>
           <Text color="white">{lastAction}</Text>
         </Box>
+      </Box>
         
-        <Box marginTop={1}>
+        <Box marginTop={1} flexDirection="column">
           <Text color="cyan" bold>Focus History (last 5):</Text>
           {focusHistory.map((entry, index) => (
             <Box key={index} marginLeft={2}>

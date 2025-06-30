@@ -208,6 +208,9 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   // Focus debug panel state
   const [isFocusDebugVisible, setIsFocusDebugVisible] = useState(false);
 
+  // Timeline layout debug panel state
+  const [isTimelineLayoutDebugVisible, setIsTimelineLayoutDebugVisible] = useState(false);
+
   // Tool approval modal state
   const [approvalRequest, setApprovalRequest] = useState<{
     toolName: string;
@@ -532,8 +535,13 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         setIsFocusDebugVisible(prev => !prev);
         return !isFocusDebugVisible;
       },
+
+      toggleTimelineLayoutDebugPanel(): boolean {
+        setIsTimelineLayoutDebugVisible(prev => !prev);
+        return !isTimelineLayoutDebugVisible;
+      },
     }),
-    [agent, addMessage, isFocusDebugVisible]
+    [agent, addMessage, isFocusDebugVisible, isTimelineLayoutDebugVisible]
   );
 
   // Handle slash commands using new command system
@@ -708,6 +716,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
                   : []),
               ]}
               bottomSectionHeight={bottomSectionHeight}
+              isTimelineLayoutDebugVisible={isTimelineLayoutDebugVisible}
             />
             </TimelineExpansionProvider>
           </Box>
