@@ -10,6 +10,7 @@ import { CompactOutput } from '../ui/CompactOutput.js';
 import { CodeDisplay } from '../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
 import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
+import { type MarkerStatus } from '../ui/SideMarkerRenderer.js';
 
 interface ToolExecutionDisplayProps {
   callEvent: ThreadEvent;
@@ -61,6 +62,7 @@ export function ToolExecutionDisplay({
   );
   const output = firstTextBlock?.text;
   const error = toolResultData?.isError ? output : undefined;
+  const markerStatus: MarkerStatus = isStreaming ? 'pending' : success ? 'success' : toolResultData ? 'error' : 'none';
 
   // Determine tool command for compact header
   const getToolCommand = (toolName: string, input: Record<string, unknown>): string => {
@@ -185,6 +187,7 @@ export function ToolExecutionDisplay({
       onExpandedChange={handleExpandedChange}
       isSelected={isSelected}
       onToggle={onToggle}
+      status={markerStatus}
     >
       {expandedContent}
     </TimelineEntryCollapsibleBox>

@@ -58,9 +58,9 @@ export function ToolCallDisplay({
       isExpanded={isExpanded}
       onExpandedChange={handleExpandedChange}
       maxHeight={10}
-      borderColor={UI_COLORS.TOOL}
       isSelected={isSelected}
       onToggle={onToggle}
+      status={isStreaming ? 'pending' : 'none'}
     >
       <CodeDisplay code={JSON.stringify(input)} language="json" />
     </TimelineEntryCollapsibleBox>

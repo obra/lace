@@ -46,6 +46,12 @@ export const UI_SYMBOLS = {
   EXPAND_HINT: '▸', // Expansion hint
   COLLAPSE_HINT: '▾', // Collapse hint
 
+  // Toolbox markers
+  TOOLBOX_SINGLE: '⊂', // Single line toolbox marker
+  TOOLBOX_TOP: '╭', // Multi-line toolbox top marker
+  TOOLBOX_MIDDLE: '│', // Multi-line toolbox middle marker
+  TOOLBOX_BOTTOM: '╰', // Multi-line toolbox bottom marker
+
   // Status bar symbols
   PROVIDER: '◉', // Provider/brain indicator
   FOLDER: '▣', // Thread/folder indicator
@@ -76,4 +82,16 @@ export const UI_COLORS = {
   FOCUSED: 'cyan',
   UNFOCUSED: 'gray',
   EXPANDABLE: 'gray',
+
+  // Toolbox status colors (unfocused)
+  TOOLBOX_NONE: 'gray',
+  TOOLBOX_PENDING: 'yellow',
+  TOOLBOX_SUCCESS: 'green',
+  TOOLBOX_ERROR: 'red',
+
+  // Toolbox status colors (focused/bright)
+  TOOLBOX_NONE_BRIGHT: 'white',
+  TOOLBOX_PENDING_BRIGHT: 'yellowBright',
+  TOOLBOX_SUCCESS_BRIGHT: 'greenBright',
+  TOOLBOX_ERROR_BRIGHT: 'redBright',
 } as const;

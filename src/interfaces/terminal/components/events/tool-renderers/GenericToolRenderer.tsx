@@ -10,6 +10,7 @@ import { CodeDisplay } from '../../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
 import { useTimelineItemExpansion } from '../hooks/useTimelineExpansionToggle.js';
 import { TimelineItemRef } from '../../timeline-item-focus.js';
+import { type MarkerStatus } from '../../ui/SideMarkerRenderer.js';
 
 // Extract tool execution timeline item type
 type ToolExecutionItem = {
@@ -76,6 +77,7 @@ export const GenericToolRenderer = forwardRef<TimelineItemRef, GenericToolRender
   const success = result ? !result.isError : true;
   const output = result?.content?.[0]?.text;
   const error = result?.isError ? output : undefined;
+  const markerStatus: MarkerStatus = isStreaming ? 'pending' : success ? 'success' : result ? 'error' : 'none';
 
   // Generate tool command summary for compact header
   const getToolCommand = (toolName: string, input: Record<string, unknown>): string => {
@@ -192,6 +194,7 @@ export const GenericToolRenderer = forwardRef<TimelineItemRef, GenericToolRender
       onExpandedChange={handleExpandedChange}
       isSelected={isSelected}
       onToggle={onToggle}
+      status={markerStatus}
     >
       {expandedContent}
     </TimelineEntryCollapsibleBox>

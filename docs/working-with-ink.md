@@ -210,6 +210,143 @@ it('should populate itemRefs map with DOM elements', () => {
 });
 ```
 
+## Advanced Patterns: Dynamic Content Measurement
+
+### The Circular Measurement Problem
+
+When building components that render differently based on measured content, you can encounter circular dependencies:
+
+```typescript
+// ❌ PROBLEMATIC: Measuring your own rendered output
+function SideMarkerRenderer({ children }) {
+  const [height, setHeight] = useState(1);
+  const ref = useRef();
+  
+  useEffect(() => {
+    if (ref.current) {
+      // This measures the component INCLUDING the markers we just rendered
+      const { height } = measureElement(ref.current);
+      setHeight(height); // This changes the markers, changing the height!
+    }
+  }, [children]);
+  
+  // Renders markers based on measured height
+  return (
+    <Box ref={ref} flexDirection="row">
+      <SideMarkers height={height} />
+      {children}
+    </Box>
+  );
+}
+```
+
+**Solution**: Measure only the content, not the entire component:
+
+```typescript
+// ✅ CORRECT: Measure only the content portion
+function SideMarkerRenderer({ children, isExpanded }) {
+  const [height, setHeight] = useState(1);
+  const contentRef = useRef();
+  
+  useEffect(() => {
+    // Reset height when expansion state changes to force re-measurement
+    setHeight(1);
+    
+    const measureAfterDOMUpdate = () => {
+      if (contentRef.current && typeof contentRef.current === 'object' && 'nodeName' in contentRef.current) {
+        try {
+          const { height } = measureElement(contentRef.current as DOMElement);
+          setHeight(Math.max(1, height));
+        } catch (error) {
+          setHeight(1); // Fallback
+        }
+      }
+    };
+    
+    // Defer measurement to ensure DOM has updated
+    const timeoutId = setTimeout(measureAfterDOMUpdate, 1);
+    return () => clearTimeout(timeoutId);
+  }, [children, isExpanded]);
+  
+  return (
+    <Box flexDirection="row">
+      <SideMarkers height={height} />
+      <Box ref={contentRef} flexGrow={1}>
+        {children}
+      </Box>
+    </Box>
+  );
+}
+```
+
+### Measurement Timing and State Changes
+
+One of the trickiest aspects of Ink development is getting measurement timing right, especially with collapsible content:
+
+```typescript
+// ❌ WRONG: Measuring immediately after state change
+const [isExpanded, setIsExpanded] = useState(false);
+
+useEffect(() => {
+  // DOM hasn't updated yet!
+  const { height } = measureElement(ref.current);
+  updateMarkers(height);
+}, [isExpanded]); // Fires immediately when state changes
+
+// ✅ CORRECT: Deferring measurement after DOM updates
+useEffect(() => {
+  // Reset to default when expansion state changes
+  setMeasuredHeight(1);
+  
+  const measureAfterDOMUpdate = () => {
+    if (contentRef.current) {
+      try {
+        const { height } = measureElement(contentRef.current);
+        setMeasuredHeight(Math.max(1, height));
+      } catch (error) {
+        setMeasuredHeight(1);
+      }
+    }
+  };
+  
+  // Small delay ensures CollapsibleBox has re-rendered its content
+  const timeoutId = setTimeout(measureAfterDOMUpdate, 1);
+  return () => clearTimeout(timeoutId);
+}, [children, isExpanded]);
+```
+
+### Managing Component Dependencies
+
+When building components that depend on each other's measurements:
+
+```typescript
+// Parent component manages measurement coordination
+function TimelineEntryCollapsibleBox({ isExpanded, onToggle }) {
+  const prevExpandedRef = useRef();
+  
+  // Detect expansion state changes and trigger external remeasurement
+  useEffect(() => {
+    const prevExpanded = prevExpandedRef.current;
+    const currentExpanded = isExpanded;
+
+    // Only trigger on actual changes, not initial mount
+    if (prevExpanded !== undefined && prevExpanded !== currentExpanded) {
+      onToggle?.(); // Tells parent to remeasure the entire timeline
+    }
+
+    prevExpandedRef.current = currentExpanded;
+  }, [isExpanded, onToggle]);
+  
+  return (
+    <SideMarkerRenderer isExpanded={isExpanded}>
+      <CollapsibleBox isExpanded={isExpanded}>
+        {children}
+      </CollapsibleBox>
+    </SideMarkerRenderer>
+  );
+}
+```
+
 ## Common Pitfalls
 
 ### 1. Missing Refs for Measurement
@@ -218,11 +355,11 @@ it('should populate itemRefs map with DOM elements', () => {
 
 ### 2. Timing Issues with State Updates
 **Problem**: Measurements happen before DOM updates complete
-**Solution**: Use `useEffect` dependencies to coordinate timing
+**Solution**: Use `setTimeout` or proper `useEffect` dependencies to defer measurement
 
 ### 3. Infinite Re-render Loops
 **Problem**: State updates trigger measurements which trigger more state updates
-**Solution**: Use previous state refs to detect actual changes
+**Solution**: Use previous state refs to detect actual changes, avoid `measuredHeight` in useEffect dependencies
 
 ### 4. Focus System Conflicts
 **Problem**: Multiple components fighting for keyboard input
@@ -230,16 +367,76 @@ it('should populate itemRefs map with DOM elements', () => {
 
 ### 5. Hard-coded Heights
 **Problem**: Using fixed heights instead of measuring actual content
-**Solution**: Always use `measureElement()` for dynamic content
+**Solution**: Always use `measureElement()` for dynamic content, but provide explicit overrides when needed
+
+### 6. Circular Measurement Dependencies
+**Problem**: Component measures its own rendered output, creating feedback loops
+**Solution**: Measure only the content portion, not the entire component including decorations
+
+### 7. Stale DOM Measurements
+**Problem**: Measuring collapsed content returns expanded content height
+**Solution**: Reset measurements when state changes, defer measurement to ensure DOM updates
 
 ## Best Practices
 
 1. **Always Provide Fallbacks**: Measurement can fail, provide sensible defaults
-2. **Coordinate State Changes**: Use callbacks to trigger remeasurement after content changes
+2. **Coordinate State Changes**: Use callbacks to trigger remeasurement after content changes  
 3. **Test Incrementally**: Complex Ink layouts are hard to debug, test each piece separately
 4. **Use Debug Panels**: Create debug panels to visualize state during development
 5. **Follow React Patterns**: Ink is still React - use hooks, effects, and callbacks properly
 6. **Minimize Renders**: Ink renders to terminal, excessive renders cause flicker
+7. **Measure Content, Not Decorations**: Only measure the variable content, not static UI elements
+8. **Reset Before Re-measuring**: Clear stale measurements when state changes to avoid incorrect heights
+9. **Defer Measurement**: Use `setTimeout` to ensure DOM updates complete before measuring
+10. **Explicit Heights When Possible**: Provide explicit height hints in tests and known scenarios
+
+## Toolbox-Style Marker Pattern
+
+A successful pattern we developed for status-based visual indicators:
+
+```typescript
+// Status-based markers that replace traditional borders
+type MarkerStatus = 'none' | 'pending' | 'success' | 'error';
+
+function SideMarkerRenderer({ status, contentHeight, isExpanded, children }) {
+  // Characters vary by content height
+  const markers = getMarkerCharacters(contentHeight ?? measuredHeight);
+  
+  // Colors vary by status and selection state  
+  const color = getMarkerColor(status, isSelected);
+  
+  if (markers.single) {
+    return (
+      <Box flexDirection="row">
+        <Text color={color}>{markers.single} </Text>
+        <Box ref={contentRef} flexGrow={1}>{children}</Box>
+      </Box>
+    );
+  }
+  
+  // Multi-line with top/middle/bottom markers
+  return (
+    <Box flexDirection="row">
+      <SideMarkers markers={markers} color={color} />
+      <Box ref={contentRef} flexGrow={1}>{children}</Box>
+    </Box>
+  );
+}
+
+// Character selection based on height
+function getMarkerCharacters(height: number) {
+  if (height === 1) return { single: '⊂' };
+  if (height === 2) return { top: '╭', bottom: '╰' };
+  return { top: '╭', middle: '│', bottom: '╰' };
+}
+```
+
+**Key insights:**
+- Single character for single-line content (`⊂`)
+- Top/bottom brackets for two-line content (`╭` `╰`)  
+- Top/middle/bottom for multi-line content (`╭` `│` `╰`)
+- Status-based colors (none=gray, pending=yellow, success=green, error=red)
+- Bright variants when focused/selected
 
 ## Performance Considerations
 
@@ -255,5 +452,79 @@ it('should populate itemRefs map with DOM elements', () => {
 3. **Use React DevTools**: Still works with Ink for component tree inspection
 4. **Test in Isolation**: Extract complex logic into testable hooks
 5. **Check Ref Population**: Ensure refs are actually being set before measurement
+6. **Console.log Measurement Values**: Track `measuredHeight` vs `actualHeight` vs `contentHeight` 
+7. **Test Collapse/Expand Cycles**: Many measurement bugs only show up during state transitions
+8. **Check useEffect Dependencies**: Missing dependencies cause stale measurements
+9. **Verify DOM Element Types**: `measureElement()` requires valid DOMElement, check with `'nodeName' in ref`
+10. **Add Explicit Height Props**: For testing and debugging, pass known heights to bypass measurement
+
+## Testing Strategies for Complex Ink Components
+
+### Unit Test Patterns
+
+```typescript
+// Test logic separately from rendering
+describe('measurement logic', () => {
+  it('should calculate correct marker characters', () => {
+    expect(getMarkerCharacters(1)).toEqual({ single: '⊂' });
+    expect(getMarkerCharacters(3)).toEqual({ top: '╭', middle: '│', bottom: '╰' });
+  });
+
+  it('should apply correct colors based on status', () => {
+    expect(getMarkerColor('success', false)).toBe('green');
+    expect(getMarkerColor('success', true)).toBe('greenBright');
+  });
+});
+
+// Test with explicit heights to avoid measurement issues
+describe('component rendering', () => {
+  it('should render correct markers for different heights', () => {
+    const { lastFrame } = render(
+      <SideMarkerRenderer status="success" contentHeight={3}>
+        <Text>Multi-line content</Text>
+      </SideMarkerRenderer>
+    );
+    
+    expect(lastFrame()).toContain('╭');
+    expect(lastFrame()).toContain('│');
+    expect(lastFrame()).toContain('╰');
+  });
+});
+```
+
+### Integration Test Patterns
+
+```typescript
+// Test the coordination between components
+it('should update markers when expansion state changes', () => {
+  const { rerender, lastFrame } = render(
+    <TimelineEntryCollapsibleBox 
+      isExpanded={false} 
+      status="success"
+      contentHeight={1} // Explicit for collapsed
+    >
+      <Text>Summary</Text>
+    </TimelineEntryCollapsibleBox>
+  );
+
+  expect(lastFrame()).toContain('⊂'); // Single line marker
+
+  rerender(
+    <TimelineEntryCollapsibleBox 
+      isExpanded={true} 
+      status="success"
+      contentHeight={4} // Explicit for expanded
+    >
+      <Text>Line 1</Text>
+      <Text>Line 2</Text>
+      <Text>Line 3</Text>
+      <Text>Line 4</Text>
+    </TimelineEntryCollapsibleBox>
+  );
+
+  expect(lastFrame()).toContain('╭');
+  expect(lastFrame()).toContain('╰');
+});
+```
 
 This document should be updated as we discover new patterns and solutions for Ink development.

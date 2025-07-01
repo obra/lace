@@ -5,7 +5,7 @@ import React from 'react';
 import { Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
 import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
-import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
+import { UI_SYMBOLS } from '../../theme.js';
 import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
 
 interface SystemPromptDisplayProps {
@@ -43,9 +43,9 @@ export function SystemPromptDisplay({
       label={`${UI_SYMBOLS.TOOL} System Prompt`}
       isExpanded={isExpanded}
       onExpandedChange={handleExpandedChange}
-      borderColor={UI_COLORS.INFO}
       isSelected={isSelected}
       onToggle={onToggle}
+      status="none"
     >
       <Text color="blue" wrap="wrap">
         {systemPrompt}

@@ -1,9 +1,10 @@
-// ABOUTME: Specialized CollapsibleBox for timeline entries with consistent spacing
-// ABOUTME: Provides standardized bottom padding for timeline event displays
+// ABOUTME: Timeline entry component with toolbox-style side markers and collapsible content
+// ABOUTME: Uses SideMarkerRenderer for status-based visual indicators and consistent spacing
 
 import React, { useEffect, useRef } from 'react';
 import { Box } from 'ink';
 import { CollapsibleBox } from './CollapsibleBox.js';
+import { SideMarkerRenderer, type MarkerStatus } from './SideMarkerRenderer.js';
 
 interface TimelineEntryCollapsibleBoxProps {
   children: React.ReactNode;
@@ -12,11 +13,13 @@ interface TimelineEntryCollapsibleBoxProps {
   isExpanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   maxHeight?: number;
-  borderStyle?: 'single' | 'double' | 'round';
-  borderColor?: string;
   isSelected?: boolean;
   isFocused?: boolean;
   onToggle?: () => void; // Called when expanded/collapsed to trigger height re-measurement
+  
+  // SideMarkerRenderer props
+  status?: MarkerStatus;
+  contentHeight?: number; // Override automatic height detection
 }
 
 export function TimelineEntryCollapsibleBox({
@@ -26,11 +29,11 @@ export function TimelineEntryCollapsibleBox({
   isExpanded,
   onExpandedChange,
   maxHeight,
-  borderStyle,
-  borderColor,
   isSelected = false,
   isFocused = false,
   onToggle,
+  status = 'none',
+  contentHeight,
 }: TimelineEntryCollapsibleBoxProps) {
   const prevExpandedRef = useRef<boolean | undefined>(undefined);
 
@@ -47,18 +50,27 @@ export function TimelineEntryCollapsibleBox({
     prevExpandedRef.current = currentExpanded;
   }, [isExpanded, onToggle]);
 
+  // Always use SideMarkerRenderer for consistent toolbox-style markers
+  // Provides status-based visual indicators that replace traditional borders
   return (
     <Box paddingBottom={1}>
-      <CollapsibleBox
-        children={children}
-        label={label}
-        summary={summary}
+      <SideMarkerRenderer
+        status={status}
+        isSelected={isSelected || isFocused}
+        contentHeight={contentHeight}
         isExpanded={isExpanded}
-        maxHeight={maxHeight}
-        borderStyle={borderStyle}
-        borderColor={borderColor}
-        isSelected={isSelected}
-      />
+      >
+        <CollapsibleBox
+          children={children}
+          label={label}
+          summary={summary}
+          isExpanded={isExpanded}
+          maxHeight={maxHeight}
+          borderStyle={undefined}
+          borderColor={undefined}
+          isSelected={isSelected}
+        />
+      </SideMarkerRenderer>
     </Box>
   );
 }
