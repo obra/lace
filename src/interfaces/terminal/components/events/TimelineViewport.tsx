@@ -25,9 +25,12 @@ interface TimelineViewportProps {
       totalContentHeight: number;
       selectedItemIndex: number;
       measurementTrigger: number;
+      isAutoScrolling: boolean;
     };
     viewportActions: {
       triggerRemeasurement: () => void;
+      smoothScrollToLine: (targetLine: number) => void;
+      cancelAutoScroll: () => void;
     };
     itemRefs: React.MutableRefObject<Map<number, any>>;
   }) => React.ReactNode;
@@ -59,6 +62,7 @@ export function TimelineViewport({
     timeline,
     viewportLines,
     itemRefs,
+    isFocused,
   });
 
   // Measure scroll indicator heights
@@ -101,6 +105,11 @@ export function TimelineViewport({
       if (isMainTimeline && isInDelegateContext) {
         logger.debug('TimelineViewport: Ignoring key in main timeline while in delegate context');
         return; // Let delegate timeline handle all keys
+      }
+
+      // Cancel any auto-scroll on user input
+      if (viewport.isAutoScrolling) {
+        viewport.cancelAutoScroll();
       }
 
       // No escape handling - provider handles global escape to pop focus stack
@@ -156,9 +165,12 @@ export function TimelineViewport({
               totalContentHeight: viewport.totalContentHeight,
               selectedItemIndex: viewport.selectedItemIndex,
               measurementTrigger: viewport.measurementTrigger,
+              isAutoScrolling: viewport.isAutoScrolling,
             },
             viewportActions: {
               triggerRemeasurement: viewport.triggerRemeasurement,
+              smoothScrollToLine: viewport.smoothScrollToLine,
+              cancelAutoScroll: viewport.cancelAutoScroll,
             },
             itemRefs,
           })}
@@ -196,6 +208,7 @@ export function TimelineViewport({
           totalContentHeight: viewport.totalContentHeight,
           selectedItemIndex: viewport.selectedItemIndex,
           measurementTrigger: viewport.measurementTrigger,
+          isAutoScrolling: viewport.isAutoScrolling,
         }}
         onClose={() => {}}
       />

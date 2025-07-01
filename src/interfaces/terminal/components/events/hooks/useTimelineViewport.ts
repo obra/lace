@@ -5,6 +5,12 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { measureElement, DOMElement } from 'ink';
 import { Timeline } from '../../../../thread-processor.js';
 
+export interface AutoScrollState {
+  isAutoScrolling: boolean;
+  targetLine: number;
+  animationId: ReturnType<typeof setInterval> | null;
+}
+
 export interface ViewportState {
   selectedLine: number;
   lineScrollOffset: number;
@@ -12,6 +18,7 @@ export interface ViewportState {
   totalContentHeight: number;
   selectedItemIndex: number;
   measurementTrigger: number;
+  isAutoScrolling: boolean;
 }
 
 export interface ViewportActions {
@@ -25,18 +32,26 @@ export interface ViewportActions {
   navigatePageDown: () => void;
   navigateToTop: () => void;
   navigateToBottom: () => void;
+  smoothScrollToLine: (targetLine: number) => void;
+  cancelAutoScroll: () => void;
 }
 
 export interface UseTimelineViewportOptions {
   timeline: Timeline;
   viewportLines: number;
   itemRefs: React.MutableRefObject<Map<number, unknown>>;
+  isFocused?: boolean;
 }
+
+// Animation configuration
+const ANIMATION_INTERVAL_MS = 50; // 20 FPS
+const JUMP_THRESHOLD = 1; // Lines - jump if closer than this
 
 export function useTimelineViewport({
   timeline,
   viewportLines,
   itemRefs,
+  isFocused = false,
 }: UseTimelineViewportOptions): ViewportState & ViewportActions {
   const [selectedLine, setSelectedLine] = useState<number>(0);
   const [lineScrollOffset, setLineScrollOffset] = useState<number>(0);
@@ -45,6 +60,11 @@ export function useTimelineViewport({
   const [measurementTrigger, setMeasurementTrigger] = useState<number>(0);
   const [itemToReselectAfterMeasurement, setItemToReselectAfterMeasurement] = useState<number>(-1);
   const [lastTimelineItemCount, setLastTimelineItemCount] = useState<number>(0);
+  const [autoScrollState, setAutoScrollState] = useState<AutoScrollState>({
+    isAutoScrolling: false,
+    targetLine: 0,
+    animationId: null,
+  });
 
   // Calculate which item contains the selected line
   const getSelectedItemIndex = useCallback(() => {
@@ -122,26 +142,130 @@ export function useTimelineViewport({
     setLastTimelineItemCount(timeline.items.length);
   }, [timeline.items.length]);
 
-  // Initialize to bottom when NEW CONTENT is added (but not during refocus after toggle)
+  // Auto-scroll logic
+  const shouldAutoScroll = useCallback(() => {
+    return !isFocused;
+  }, [isFocused]);
+
+  const cancelAutoScroll = useCallback(() => {
+    if (autoScrollState.animationId) {
+      clearInterval(autoScrollState.animationId);
+    }
+    setAutoScrollState({
+      isAutoScrolling: false,
+      targetLine: 0,
+      animationId: null,
+    });
+  }, [autoScrollState.animationId]);
+
+  const smoothScrollToLine = useCallback(
+    (targetLine: number) => {
+      if (!shouldAutoScroll()) return;
+
+      const distance = Math.abs(targetLine - selectedLine);
+      if (distance <= JUMP_THRESHOLD) {
+        setSelectedLine(targetLine);
+        return;
+      }
+
+      // Cancel any existing animation
+      if (autoScrollState.animationId) {
+        clearInterval(autoScrollState.animationId);
+      }
+
+      // Start new animation
+      const animationId = setInterval(() => {
+        setSelectedLine((current) => {
+          const diff = targetLine - current;
+          if (Math.abs(diff) <= 1) {
+            clearInterval(animationId);
+            setAutoScrollState((prev) => ({
+              ...prev,
+              isAutoScrolling: false,
+              animationId: null,
+            }));
+            return targetLine;
+          }
+          return current + Math.sign(diff);
+        });
+      }, ANIMATION_INTERVAL_MS);
+
+      setAutoScrollState({
+        isAutoScrolling: true,
+        targetLine,
+        animationId,
+      });
+    },
+    [selectedLine, shouldAutoScroll, autoScrollState.animationId]
+  );
+
+  // Cancel auto-scroll when focus is gained
+  useEffect(() => {
+    if (isFocused && autoScrollState.isAutoScrolling) {
+      cancelAutoScroll();
+    }
+  }, [isFocused, autoScrollState.isAutoScrolling, cancelAutoScroll]);
+
+  // Cleanup animation on unmount
+  useEffect(() => {
+    return () => {
+      if (autoScrollState.animationId) {
+        clearInterval(autoScrollState.animationId);
+      }
+    };
+  }, [autoScrollState.animationId]);
+
+  // Initialize to bottom when NEW CONTENT is added, content height changes, or on initial load
   useEffect(() => {
     const hasNewContent = timeline.items.length > lastTimelineItemCount;
+    const isInitialLoad = lastTimelineItemCount === 0 && timeline.items.length > 0;
 
-    if (totalContentHeight > 0 && itemToReselectAfterMeasurement === -1 && hasNewContent) {
-      // Only scroll to bottom for NEW timeline items, not height changes due to expansion
+    // Auto-scroll when:
+    // 1. New items are added (hasNewContent)
+    // 2. Initial load with content
+    // 3. Content height increases (streaming content)
+    const shouldScrollToBottom = (hasNewContent || isInitialLoad) && totalContentHeight > 0;
+
+    if (shouldScrollToBottom) {
       const bottomLine = Math.max(0, totalContentHeight - 1);
-      setSelectedLine(bottomLine);
 
-      // Scroll to show the bottom
+      if (shouldAutoScroll()) {
+        // Use smooth scroll when not focused
+        smoothScrollToLine(bottomLine);
+      } else {
+        // Jump directly when focused
+        setSelectedLine(bottomLine);
+      }
+
+      // Scroll viewport to show the bottom
       const maxScroll = Math.max(0, totalContentHeight - viewportLines);
       setLineScrollOffset(maxScroll);
     }
   }, [
     totalContentHeight,
     viewportLines,
-    itemToReselectAfterMeasurement,
     timeline.items.length,
     lastTimelineItemCount,
+    shouldAutoScroll,
+    smoothScrollToLine,
   ]);
+
+  // Track content height changes for streaming updates
+  const [lastContentHeight, setLastContentHeight] = useState<number>(0);
+
+  useEffect(() => {
+    // Auto-scroll on content height increase (streaming)
+    if (totalContentHeight > lastContentHeight && lastContentHeight > 0 && shouldAutoScroll()) {
+      const bottomLine = Math.max(0, totalContentHeight - 1);
+      smoothScrollToLine(bottomLine);
+
+      // Update viewport scroll to show bottom
+      const maxScroll = Math.max(0, totalContentHeight - viewportLines);
+      setLineScrollOffset(maxScroll);
+    }
+
+    setLastContentHeight(totalContentHeight);
+  }, [totalContentHeight, lastContentHeight, shouldAutoScroll, smoothScrollToLine, viewportLines]);
 
   // Navigation functions - pure, testable logic
   const navigateUp = useCallback(() => {
@@ -195,6 +319,7 @@ export function useTimelineViewport({
     totalContentHeight,
     selectedItemIndex: getSelectedItemIndex(),
     measurementTrigger,
+    isAutoScrolling: autoScrollState.isAutoScrolling,
 
     // Actions
     setSelectedLine,
@@ -207,5 +332,7 @@ export function useTimelineViewport({
     navigatePageDown,
     navigateToTop,
     navigateToBottom,
+    smoothScrollToLine,
+    cancelAutoScroll,
   };
 }
