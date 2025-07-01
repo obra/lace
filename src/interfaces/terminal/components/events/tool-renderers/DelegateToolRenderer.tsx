@@ -15,6 +15,7 @@ import { useLaceFocus, FocusRegions, FocusLifecycleWrapper } from '../../../focu
 import TimelineDisplay from '../TimelineDisplay.js';
 import { logger } from '../../../../../utils/logger.js';
 import { TimelineItemRef } from '../../timeline-item-focus.js';
+import { type MarkerStatus } from '../../ui/SideMarkerRenderer.js';
 import {
   extractDelegateThreadId,
   isThreadComplete,
@@ -135,6 +136,7 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRend
   const success = result ? !result.isError : true;
   const output = result?.content?.[0]?.text;
   const error = result?.isError ? output : undefined;
+  const markerStatus: MarkerStatus = isStreaming ? 'pending' : success ? 'success' : result ? 'error' : 'none';
 
   // Extract delegate task from input
   const delegateTask = ((input.task || input.prompt) as string) || 'Unknown task';
@@ -327,6 +329,7 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRend
         isSelected={isSelected}
         isFocused={isFocused}
         onToggle={onToggle}
+        status={markerStatus}
       >
         {expandedContent}
       </TimelineEntryCollapsibleBox>

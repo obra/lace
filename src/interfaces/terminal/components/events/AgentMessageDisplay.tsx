@@ -76,6 +76,7 @@ export function AgentMessageDisplay({
       onExpandedChange={handleExpandedChange}
       isSelected={isSelected}
       onToggle={onToggle}
+      status={isStreaming ? 'pending' : 'success'}
     >
       <Box flexDirection="column">
         <MarkdownDisplay content={displayContent} showIcon={true} dimmed={!isFocused} />
