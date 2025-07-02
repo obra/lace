@@ -79,42 +79,104 @@ export function clearAllTaskStores(): void {
 
 export class TaskAddTool extends BaseTool {
   name = 'task_add';
-  description = 'Add a new task to the session task list';
+  description = 'Add one or more tasks to the session task list. Supports both single task (string) and multiple tasks (array of strings) for bulk operations.';
   annotations = {
     idempotentHint: false,
   };
   inputSchema = {
     type: 'object' as const,
     properties: {
-      description: { type: 'string', description: 'Task description' },
+      tasks: {
+        oneOf: [
+          { type: 'string', description: 'Single task description' },
+          { 
+            type: 'array', 
+            items: { type: 'string' },
+            description: 'Array of task descriptions for bulk addition',
+            minItems: 1
+          }
+        ],
+        description: 'Task description(s) - can be a single string or array of strings'
+      },
     },
-    required: ['description'],
+    required: ['tasks'],
   };
 
   async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
     try {
-      const description = this.validateNonEmptyStringParam(call.arguments.description, 'description', call.id);
+      const tasks = call.arguments.tasks;
+      let taskDescriptions: string[] = [];
+      
+      if (typeof tasks === 'string') {
+        // Single task as string
+        taskDescriptions.push(this.validateNonEmptyStringParam(tasks, 'tasks', call.id));
+      } else if (Array.isArray(tasks)) {
+        // Multiple tasks as array
+        if (tasks.length === 0) {
+          return this.createStructuredError(
+            'Tasks array cannot be empty',
+            'Provide at least one task description in the array',
+            'Empty tasks array provided',
+            call.id
+          );
+        }
+        
+        for (let i = 0; i < tasks.length; i++) {
+          const task = this.validateNonEmptyStringParam(tasks[i], `tasks[${i}]`, call.id);
+          taskDescriptions.push(task);
+        }
+      } else {
+        return this.createStructuredError(
+          'Tasks parameter must be a string or array of strings',
+          'Use either "tasks": "single task" or "tasks": ["task1", "task2"]',
+          `Received ${typeof tasks}`,
+          call.id
+        );
+      }
 
+      // Add tasks to store
       const taskStore = getTaskStore(context?.threadId);
-      const task = taskStore.addTask(description.trim());
+      const addedTasks: Task[] = [];
+      
+      for (const desc of taskDescriptions) {
+        const task = taskStore.addTask(desc.trim());
+        addedTasks.push(task);
+      }
 
-      return createSuccessResult(
-        [
-          {
-            type: 'text',
-            text: `Added task #${task.id}: ${task.description}`,
-          },
-        ],
-        call.id
-      );
+      // Format response
+      if (addedTasks.length === 1) {
+        // Single task response
+        const task = addedTasks[0];
+        return createSuccessResult(
+          [
+            {
+              type: 'text',
+              text: `Added task #${task.id}: ${task.description}`,
+            },
+          ],
+          call.id
+        );
+      } else {
+        // Multiple tasks response
+        const taskLines = addedTasks.map(task => `#${task.id}: ${task.description}`);
+        return createSuccessResult(
+          [
+            {
+              type: 'text',
+              text: `Added ${addedTasks.length} tasks:\n${taskLines.join('\n')}`,
+            },
+          ],
+          call.id
+        );
+      }
     } catch (error) {
       if (error instanceof ValidationError) {
         return error.toolResult;
       }
 
       return this.createStructuredError(
-        'Failed to add task',
-        'Provide a valid task description and try again',
+        'Failed to add tasks',
+        'Provide valid task descriptions and try again',
         error instanceof Error ? error.message : 'Unknown error occurred',
         call.id
       );
