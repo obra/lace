@@ -87,7 +87,7 @@ describe('FileEditTool', () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('No exact matches found');
+    expect(result.content[0].text).toContain('No exact matches found for the specified text');
   });
 
   it('should fail when multiple matches exist', async () => {
@@ -102,7 +102,7 @@ describe('FileEditTool', () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Found 2 matches');
+    expect(result.content[0].text).toContain('Found 2 matches for the specified text');
   });
 
   it('should validate input parameters', async () => {
@@ -115,7 +115,9 @@ describe('FileEditTool', () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Path must be a non-empty string');
+    expect(result.content[0].text).toBe(
+      "Parameter 'path' must be non-empty string. Provide a valid non-empty string value. Parameter cannot be empty"
+    );
   });
 
   it('should handle file not found', async () => {
@@ -128,6 +130,8 @@ describe('FileEditTool', () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('ENOENT');
+    expect(result.content[0].text).toBe(
+      'Unknown error occurred. Check the input parameters and try again. File edit operation'
+    );
   });
 });

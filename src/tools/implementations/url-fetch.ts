@@ -139,6 +139,7 @@ export class UrlFetchTool extends BaseTool {
   private turndownService: TurndownService;
 
   constructor() {
+    super();
     this.registerCleanup();
     this.turndownService = new TurndownService({
       headingStyle: 'atx',
@@ -156,7 +157,8 @@ export class UrlFetchTool extends BaseTool {
       'header',
       'nav',
       'footer',
-    ] as any);
+    ]);
+    // Remove specific HTML elements
   }
 
   validateUrl(url: string): void {
@@ -207,29 +209,22 @@ export class UrlFetchTool extends BaseTool {
   async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     try {
       const url = this.validateNonEmptyStringParam(call.arguments.url, 'url', call.id);
-      const method = this.validateOptionalParam(
-        call.arguments.method,
-        'method',
-        (value) => {
-          if (typeof value !== 'string' || !VALID_HTTP_METHODS.includes(value as HttpMethod)) {
-            throw new Error(`Must be one of: ${VALID_HTTP_METHODS.join(', ')}`);
-          }
-          return value as HttpMethod;
-        },
-        call.id
-      ) ?? 'GET';
+      const method = call.arguments.method
+        ? this.validateEnumParam(call.arguments.method, 'method', VALID_HTTP_METHODS, call.id)
+        : ('GET' as HttpMethod);
 
-      const headers = this.validateOptionalParam(
-        call.arguments.headers,
-        'headers',
-        (value) => {
-          if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-            throw new Error('Must be an object with string values');
-          }
-          return value as Record<string, string>;
-        },
-        call.id
-      ) ?? {};
+      const headers =
+        this.validateOptionalParam(
+          call.arguments.headers,
+          'headers',
+          (value) => {
+            if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+              throw new Error('Must be an object with string values');
+            }
+            return value as Record<string, string>;
+          },
+          call.id
+        ) ?? {};
 
       const body = this.validateOptionalParam(
         call.arguments.body,
@@ -238,44 +233,53 @@ export class UrlFetchTool extends BaseTool {
         call.id
       );
 
-      const timeout = this.validateOptionalParam(
-        call.arguments.timeout,
-        'timeout',
-        (value) => this.validateNumberParam(value, 'timeout', call.id, { min: MIN_TIMEOUT, max: MAX_TIMEOUT, integer: true }),
-        call.id
-      ) ?? DEFAULT_TIMEOUT;
+      const timeout =
+        call.arguments.timeout !== undefined
+          ? this.validateNumberParam(call.arguments.timeout, 'timeout', call.id, {
+              min: MIN_TIMEOUT,
+              max: MAX_TIMEOUT,
+              integer: true,
+            })
+          : DEFAULT_TIMEOUT;
 
-      const maxSize = this.validateOptionalParam(
-        call.arguments.maxSize,
-        'maxSize',
-        (value) => this.validateNumberParam(value, 'maxSize', call.id, { min: MIN_SIZE, max: MAX_SIZE_LIMIT, integer: true }),
-        call.id
-      ) ?? DEFAULT_MAX_SIZE;
+      const maxSize =
+        call.arguments.maxSize !== undefined
+          ? this.validateNumberParam(call.arguments.maxSize, 'maxSize', call.id, {
+              min: MIN_SIZE,
+              max: MAX_SIZE_LIMIT,
+              integer: true,
+            })
+          : DEFAULT_MAX_SIZE;
 
-      const followRedirects = this.validateOptionalParam(
-        call.arguments.followRedirects,
-        'followRedirects',
-        (value) => this.validateBooleanParam(value, 'followRedirects'),
-        call.id
-      ) ?? true;
+      const followRedirects =
+        this.validateOptionalParam(
+          call.arguments.followRedirects,
+          'followRedirects',
+          (value) => this.validateBooleanParam(value, 'followRedirects'),
+          call.id
+        ) ?? true;
 
-      const returnContent = this.validateOptionalParam(
-        call.arguments.returnContent,
-        'returnContent',
-        (value) => this.validateBooleanParam(value, 'returnContent'),
-        call.id
-      ) ?? true;
+      const returnContent =
+        this.validateOptionalParam(
+          call.arguments.returnContent,
+          'returnContent',
+          (value) => this.validateBooleanParam(value, 'returnContent'),
+          call.id
+        ) ?? true;
 
-      return await this.performFetch({
-        url,
-        method,
-        headers,
-        body,
-        timeout,
-        maxSize,
-        followRedirects,
-        returnContent,
-      }, call.id);
+      return await this.performFetch(
+        {
+          url,
+          method: method!,
+          headers: headers!,
+          body,
+          timeout: timeout!,
+          maxSize: maxSize!,
+          followRedirects: followRedirects!,
+          returnContent: returnContent!,
+        },
+        call.id
+      );
     } catch (error) {
       if (error instanceof ValidationError) {
         return error.toolResult;
@@ -308,8 +312,8 @@ export class UrlFetchTool extends BaseTool {
           },
           request: {
             url,
-            method,
-            headers,
+            method: method!,
+            headers: headers!,
           },
         },
         callId
@@ -327,10 +331,10 @@ export class UrlFetchTool extends BaseTool {
       signal: AbortSignal;
       body?: string;
     } = {
-      method,
+      method: method!,
       headers: {
         'User-Agent': 'Lace/1.0 (AI Assistant)',
-        ...headers,
+        ...headers!,
       },
       redirect: followRedirects ? 'follow' : 'manual',
       signal: controller.signal,
@@ -380,8 +384,8 @@ export class UrlFetchTool extends BaseTool {
             },
             request: {
               url,
-              method,
-              headers,
+              method: method!,
+              headers: headers!,
               finalUrl,
               redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
               timing,
@@ -393,7 +397,7 @@ export class UrlFetchTool extends BaseTool {
               bodyPreview,
             },
           },
-          call.id
+          callId
         );
       }
 
@@ -402,7 +406,7 @@ export class UrlFetchTool extends BaseTool {
       const size = contentLength ? parseInt(contentLength, 10) : 0;
 
       // Check size limits
-      if (size > maxSize) {
+      if (size > maxSize!) {
         return this.createRichError(
           {
             error: {
@@ -411,8 +415,8 @@ export class UrlFetchTool extends BaseTool {
             },
             request: {
               url,
-              method,
-              headers,
+              method: method!,
+              headers: headers!,
               finalUrl,
               redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
               timing,
@@ -424,7 +428,7 @@ export class UrlFetchTool extends BaseTool {
               size,
             },
           },
-          call.id
+          callId
         );
       }
 
@@ -432,7 +436,7 @@ export class UrlFetchTool extends BaseTool {
       const buffer = await response.arrayBuffer();
       const actualSize = buffer.byteLength;
 
-      if (actualSize > maxSize) {
+      if (actualSize > maxSize!) {
         return this.createRichError(
           {
             error: {
@@ -441,8 +445,8 @@ export class UrlFetchTool extends BaseTool {
             },
             request: {
               url,
-              method,
-              headers,
+              method: method!,
+              headers: headers!,
               finalUrl,
               redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
               timing,
@@ -454,13 +458,13 @@ export class UrlFetchTool extends BaseTool {
               size: actualSize,
             },
           },
-          call.id
+          callId
         );
       }
 
       // Handle small responses inline
       if (actualSize <= INLINE_CONTENT_LIMIT) {
-        return this.handleInlineContent(buffer, contentType, url, returnContent, call.id);
+        return this.handleInlineContent(buffer, contentType, url, returnContent!, callId);
       }
 
       // Handle large responses with temp files
@@ -469,8 +473,8 @@ export class UrlFetchTool extends BaseTool {
         contentType,
         url,
         actualSize,
-        returnContent,
-        call.id
+        returnContent!,
+        callId
       );
     } catch (error) {
       clearTimeout(timeoutId);
@@ -486,8 +490,8 @@ export class UrlFetchTool extends BaseTool {
             },
             request: {
               url,
-              method,
-              headers,
+              method: method!,
+              headers: headers!,
               timing,
             },
           });
@@ -510,12 +514,12 @@ export class UrlFetchTool extends BaseTool {
             },
             request: {
               url,
-              method,
-              headers,
+              method: method!,
+              headers: headers!,
               timing,
             },
           },
-          call.id
+          callId
         );
       }
 
@@ -527,12 +531,12 @@ export class UrlFetchTool extends BaseTool {
           },
           request: {
             url,
-            method,
-            headers,
+            method: method!,
+            headers: headers!,
             timing,
           },
         },
-        call.id
+        callId
       );
     }
   }

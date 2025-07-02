@@ -1,12 +1,7 @@
 // ABOUTME: File reading tool with optional line range support
 // ABOUTME: Safe file access for code inspection and analysis
 
-import {
-  ToolCall,
-  ToolResult,
-  ToolContext,
-  createSuccessResult,
-} from '../types.js';
+import { ToolCall, ToolResult, ToolContext } from '../types.js';
 import { BaseTool, ValidationError } from '../base-tool.js';
 
 export class FileReadTool extends BaseTool {
@@ -66,9 +61,7 @@ export class FileReadTool extends BaseTool {
         if (startLine !== undefined) {
           this.validateLineNumber(startLine, content, 'startLine', call.id);
         }
-        if (endLine !== undefined) {
-          this.validateLineNumber(endLine, content, 'endLine', call.id);
-        }
+        // For endLine, we allow it to exceed file length (will just return available lines)
 
         resultLines = lines.slice(start, end);
       }

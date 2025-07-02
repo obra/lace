@@ -120,22 +120,33 @@ export abstract class BaseTool implements Tool {
       throw new ValidationError(error);
     }
 
-    if (options?.min !== undefined && value < options.min) {
+    if (options?.min !== undefined && options?.max !== undefined) {
+      if (value < options.min || value > options.max) {
+        const error = this.createValidationError(
+          paramName,
+          'valid',
+          `Value outside allowed range`,
+          callId,
+          `Use a value between ${options.min} and ${options.max}`
+        );
+        throw new ValidationError(error);
+      }
+    } else if (options?.min !== undefined && value < options.min) {
       const error = this.createValidationError(
         paramName,
-        `number >= ${options.min}`,
-        `Received ${value}`,
-        callId
+        'valid',
+        `Value too small`,
+        callId,
+        `Use a value >= ${options.min}`
       );
       throw new ValidationError(error);
-    }
-
-    if (options?.max !== undefined && value > options.max) {
+    } else if (options?.max !== undefined && value > options.max) {
       const error = this.createValidationError(
         paramName,
-        `number <= ${options.max}`,
-        `Received ${value}`,
-        callId
+        'valid',
+        `Value too large`,
+        callId,
+        `Use a value <= ${options.max}`
       );
       throw new ValidationError(error);
     }
@@ -166,6 +177,46 @@ export abstract class BaseTool implements Tool {
       throw new ValidationError(error);
     }
     return value;
+  }
+
+  /**
+   * Validates that a parameter is one of the allowed enum values
+   */
+  protected validateEnumParam<T extends string>(
+    value: unknown,
+    paramName: string,
+    allowedValues: readonly T[],
+    callId?: string
+  ): T {
+    if (value === undefined || value === null) {
+      const error = this.createValidationError(
+        paramName,
+        'string',
+        'Parameter is required',
+        callId
+      );
+      throw new ValidationError(error);
+    }
+    if (typeof value !== 'string') {
+      const error = this.createValidationError(
+        paramName,
+        'string',
+        `Received ${typeof value}`,
+        callId
+      );
+      throw new ValidationError(error);
+    }
+    if (!allowedValues.includes(value as T)) {
+      const error = this.createValidationError(
+        paramName,
+        'valid value',
+        `Received ${value}`,
+        callId,
+        `Must be one of: ${allowedValues.join(', ')}`
+      );
+      throw new ValidationError(error);
+    }
+    return value as T;
   }
 
   /**
@@ -305,9 +356,11 @@ export abstract class BaseTool implements Tool {
     paramName: string,
     expectedType: string,
     context: string,
-    callId?: string
+    callId?: string,
+    customSolution?: string
   ): ToolResult {
-    const message = `PROBLEM: Parameter '${paramName}' must be ${expectedType}. SOLUTION: Provide a valid ${expectedType} value. CONTEXT: ${context}`;
+    const solution = customSolution || `Provide a valid ${expectedType} value`;
+    const message = `Parameter '${paramName}' must be ${expectedType}. ${solution}. ${context}`;
     return createErrorResult(message, callId);
   }
 
@@ -321,7 +374,7 @@ export abstract class BaseTool implements Tool {
     solution: string,
     callId?: string
   ): ToolResult {
-    const message = `PROBLEM: ${problem} at path '${path}'. SOLUTION: ${solution}. CONTEXT: File system operation '${errorType}' failed`;
+    const message = `${problem} at path '${path}'. ${solution}. File system operation '${errorType}' failed`;
     return createErrorResult(message, callId);
   }
 
@@ -334,7 +387,7 @@ export abstract class BaseTool implements Tool {
     context: string,
     callId?: string
   ): ToolResult {
-    const message = `PROBLEM: ${problem}. SOLUTION: ${solution}. CONTEXT: ${context}`;
+    const message = `${problem}. ${solution}. ${context}`;
     return createErrorResult(message, callId);
   }
 

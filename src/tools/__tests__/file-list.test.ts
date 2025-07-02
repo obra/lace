@@ -179,7 +179,7 @@ describe('FileListTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('ENOENT');
+      expect(result.content[0].text).toContain('Directory listing failed');
     });
 
     it('should return empty result for empty directory', async () => {

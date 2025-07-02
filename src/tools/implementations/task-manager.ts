@@ -1,12 +1,7 @@
 // ABOUTME: Session-based task management tools for tracking work items
 // ABOUTME: In-memory task storage for current session workflow management
 
-import {
-  ToolCall,
-  ToolResult,
-  ToolContext,
-  createSuccessResult,
-} from '../types.js';
+import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
 import { BaseTool, ValidationError } from '../base-tool.js';
 
 interface Task {
@@ -79,7 +74,8 @@ export function clearAllTaskStores(): void {
 
 export class TaskAddTool extends BaseTool {
   name = 'task_add';
-  description = 'Add one or more tasks to the session task list. Supports both single task (string) and multiple tasks (array of strings) for bulk operations.';
+  description =
+    'Add one or more tasks to the session task list. Supports both single task (string) and multiple tasks (array of strings) for bulk operations.';
   annotations = {
     idempotentHint: false,
   };
@@ -87,16 +83,9 @@ export class TaskAddTool extends BaseTool {
     type: 'object' as const,
     properties: {
       tasks: {
-        oneOf: [
-          { type: 'string', description: 'Single task description' },
-          { 
-            type: 'array', 
-            items: { type: 'string' },
-            description: 'Array of task descriptions for bulk addition',
-            minItems: 1
-          }
-        ],
-        description: 'Task description(s) - can be a single string or array of strings'
+        type: 'string',
+        description:
+          'Task description(s) - can be a single string or array of strings (JSON array format)',
       },
     },
     required: ['tasks'],
@@ -106,12 +95,47 @@ export class TaskAddTool extends BaseTool {
     try {
       const tasks = call.arguments.tasks;
       let taskDescriptions: string[] = [];
-      
+
       if (typeof tasks === 'string') {
-        // Single task as string
-        taskDescriptions.push(this.validateNonEmptyStringParam(tasks, 'tasks', call.id));
+        // Check if it's a JSON array string
+        if (tasks.trim().startsWith('[') && tasks.trim().endsWith(']')) {
+          try {
+            const parsed = JSON.parse(tasks);
+            if (Array.isArray(parsed)) {
+              if (parsed.length === 0) {
+                return this.createStructuredError(
+                  'Tasks array cannot be empty',
+                  'Provide at least one task description in the array',
+                  'Empty tasks array provided',
+                  call.id
+                );
+              }
+              for (let i = 0; i < parsed.length; i++) {
+                const task = this.validateNonEmptyStringParam(parsed[i], `tasks[${i}]`, call.id);
+                taskDescriptions.push(task);
+              }
+            } else {
+              return this.createStructuredError(
+                'Parsed JSON is not an array',
+                'Provide a valid JSON array of strings',
+                'JSON parsed to non-array type',
+                call.id
+              );
+            }
+          } catch (parseError) {
+            return this.createStructuredError(
+              'Invalid JSON array format',
+              'Provide either a single task string or valid JSON array like ["task1", "task2"]',
+              parseError instanceof Error ? parseError.message : 'JSON parse error',
+              call.id
+            );
+          }
+        } else {
+          // Single task as regular string
+          taskDescriptions.push(this.validateNonEmptyStringParam(tasks, 'tasks', call.id));
+        }
       } else if (Array.isArray(tasks)) {
-        // Multiple tasks as array
+        // Direct array support (for backward compatibility)
         if (tasks.length === 0) {
           return this.createStructuredError(
             'Tasks array cannot be empty',
@@ -120,7 +144,7 @@ export class TaskAddTool extends BaseTool {
             call.id
           );
         }
-        
+
         for (let i = 0; i < tasks.length; i++) {
           const task = this.validateNonEmptyStringParam(tasks[i], `tasks[${i}]`, call.id);
           taskDescriptions.push(task);
@@ -128,7 +152,7 @@ export class TaskAddTool extends BaseTool {
       } else {
         return this.createStructuredError(
           'Tasks parameter must be a string or array of strings',
-          'Use either "tasks": "single task" or "tasks": ["task1", "task2"]',
+          'Use either "tasks": "single task" or "tasks": "[\\"task1\\", \\"task2\\"]"',
           `Received ${typeof tasks}`,
           call.id
         );
@@ -137,7 +161,7 @@ export class TaskAddTool extends BaseTool {
       // Add tasks to store
       const taskStore = getTaskStore(context?.threadId);
       const addedTasks: Task[] = [];
-      
+
       for (const desc of taskDescriptions) {
         const task = taskStore.addTask(desc.trim());
         addedTasks.push(task);
@@ -158,7 +182,7 @@ export class TaskAddTool extends BaseTool {
         );
       } else {
         // Multiple tasks response
-        const taskLines = addedTasks.map(task => `#${task.id}: ${task.description}`);
+        const taskLines = addedTasks.map((task) => `#${task.id}: ${task.description}`);
         return createSuccessResult(
           [
             {
@@ -204,41 +228,42 @@ export class TaskListTool extends BaseTool {
 
   async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
     try {
-      const includeCompleted = this.validateOptionalParam(
-        call.arguments.includeCompleted,
-        'includeCompleted',
-        (value) => this.validateBooleanParam(value, 'includeCompleted'),
-        call.id
-      ) ?? false;
+      const includeCompleted =
+        this.validateOptionalParam(
+          call.arguments.includeCompleted,
+          'includeCompleted',
+          (value) => this.validateBooleanParam(value, 'includeCompleted'),
+          call.id
+        ) ?? false;
 
-    const taskStore = getTaskStore(context?.threadId);
-    const tasks = taskStore.getTasks(includeCompleted);
+      const taskStore = getTaskStore(context?.threadId);
+      const tasks = taskStore.getTasks(includeCompleted);
 
-    if (tasks.length === 0) {
-      const message = includeCompleted ? 'No tasks found' : 'No pending tasks';
-      return createSuccessResult(
-        [
-          {
-            type: 'text',
-            text: message,
-          },
-        ],
-        call.id
-      );
-    }
+      if (tasks.length === 0) {
+        const message = includeCompleted ? 'No tasks found' : 'No pending tasks';
+        return createSuccessResult(
+          [
+            {
+              type: 'text',
+              text: message,
+            },
+          ],
+          call.id
+        );
+      }
 
-    const taskLines = tasks.map((task) => {
-      const status = task.completed ? '✓' : '○';
-      const timestamp =
-        task.completed && task.completedAt
-          ? ` (completed ${task.completedAt.toLocaleTimeString()})`
-          : '';
-      return `${status} #${task.id}: ${task.description}${timestamp}`;
-    });
+      const taskLines = tasks.map((task) => {
+        const status = task.completed ? '✓' : '○';
+        const timestamp =
+          task.completed && task.completedAt
+            ? ` (completed ${task.completedAt.toLocaleTimeString()})`
+            : '';
+        return `${status} #${task.id}: ${task.description}${timestamp}`;
+      });
 
-    const summary = includeCompleted
-      ? `Tasks (${tasks.filter((t) => !t.completed).length} pending, ${tasks.filter((t) => t.completed).length} completed):`
-      : `Pending tasks (${tasks.length}):`;
+      const summary = includeCompleted
+        ? `Tasks (${tasks.filter((t) => !t.completed).length} pending, ${tasks.filter((t) => t.completed).length} completed):`
+        : `Pending tasks (${tasks.length}):`;
 
       return createSuccessResult(
         [

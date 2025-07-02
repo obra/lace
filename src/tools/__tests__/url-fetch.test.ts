@@ -130,19 +130,18 @@ describe('UrlFetchTool', () => {
       const result = await tool.executeTool(createTestToolCall('url_fetch', {}));
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('VALIDATION ERROR');
-      expect(result.content[0].text).toContain('URL is required and must be a non-empty string');
-      expect(result.content[0].text).toContain('REQUEST:');
-      expect(result.content[0].text).toContain('Diagnostic data:');
+      expect(result.content[0].text).toBe(
+        "Parameter 'url' must be string. Provide a valid string value. Parameter is required"
+      );
     });
 
     it('should handle empty URL parameter', async () => {
       const result = await tool.executeTool(createTestToolCall('url_fetch', { url: '' }));
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('VALIDATION ERROR');
-      expect(result.content[0].text).toContain('URL is required and must be a non-empty string');
-      expect(result.content[0].text).toContain('REQUEST:');
+      expect(result.content[0].text).toBe(
+        "Parameter 'url' must be non-empty string. Provide a valid non-empty string value. Parameter cannot be empty"
+      );
     });
 
     it('should handle invalid timeout values', async () => {
@@ -154,8 +153,8 @@ describe('UrlFetchTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain(
-        'Timeout must be between 1000 and 120000 milliseconds'
+      expect(result.content[0].text).toBe(
+        "Parameter 'timeout' must be valid. Use a value between 1000 and 120000. Value outside allowed range"
       );
     });
 
@@ -168,7 +167,9 @@ describe('UrlFetchTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Max size must be between 1024 and 104857600 bytes');
+      expect(result.content[0].text).toBe(
+        "Parameter 'maxSize' must be valid. Use a value between 1024 and 104857600. Value outside allowed range"
+      );
     });
 
     it('should handle invalid method values', async () => {
@@ -180,7 +181,9 @@ describe('UrlFetchTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Method must be one of: GET, POST');
+      expect(result.content[0].text).toBe(
+        "Parameter 'method' must be valid value. Must be one of: GET, POST. Received INVALID"
+      );
     });
   });
 

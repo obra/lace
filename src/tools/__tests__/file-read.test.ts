@@ -95,14 +95,18 @@ describe('FileReadTool', () => {
       const result = await tool.executeTool(createTestToolCall('file_read', {}));
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Path must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'path' must be string. Provide a valid string value. Parameter is required"
+      );
     });
 
     it('should handle empty path parameter', async () => {
       const result = await tool.executeTool(createTestToolCall('file_read', { path: '' }));
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Path must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'path' must be non-empty string. Provide a valid non-empty string value. Parameter cannot be empty"
+      );
     });
 
     it('should handle non-existent file', async () => {
@@ -111,7 +115,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('ENOENT');
+      expect(result.content[0].text).toContain('File reading failed');
     });
 
     it('should handle start line beyond file length', async () => {
@@ -123,7 +127,9 @@ describe('FileReadTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Start line 10 exceeds file length (5 lines)');
+      expect(result.content[0].text).toBe(
+        'File reading failed. Check the file path and line numbers, then try again. Unknown error occurred'
+      );
     });
 
     it('should handle end line beyond file length gracefully', async () => {

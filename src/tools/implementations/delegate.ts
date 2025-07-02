@@ -77,20 +77,27 @@ Examples:
     try {
       const title = this.validateNonEmptyStringParam(call.arguments.title, 'title', call.id);
       const prompt = this.validateNonEmptyStringParam(call.arguments.prompt, 'prompt', call.id);
-      const expected_response = this.validateNonEmptyStringParam(call.arguments.expected_response, 'expected_response', call.id);
-      const model = this.validateOptionalParam(
-        call.arguments.model,
-        'model',
-        (value) => {
-          const modelStr = this.validateStringParam(value, 'model');
-          const [providerName, modelName] = modelStr.split(':');
-          if (!providerName || !modelName) {
-            throw new Error('Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3.5-haiku-latest")');
-          }
-          return modelStr;
-        },
+      const expected_response = this.validateNonEmptyStringParam(
+        call.arguments.expected_response,
+        'expected_response',
         call.id
-      ) ?? 'anthropic:claude-3-5-haiku-latest';
+      );
+      const model =
+        this.validateOptionalParam(
+          call.arguments.model,
+          'model',
+          (value) => {
+            const modelStr = this.validateStringParam(value, 'model');
+            const [providerName, modelName] = modelStr.split(':');
+            if (!providerName || !modelName) {
+              throw new Error(
+                'Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3.5-haiku-latest")'
+              );
+            }
+            return modelStr;
+          },
+          call.id
+        ) ?? 'anthropic:claude-3-5-haiku-latest';
 
       return await this.performDelegation({ title, prompt, expected_response, model }, call.id);
     } catch (error) {
@@ -107,7 +114,10 @@ Examples:
     }
   }
 
-  private async performDelegation(params: { title: string; prompt: string; expected_response: string; model: string }, callId?: string): Promise<ToolResult> {
+  private async performDelegation(
+    params: { title: string; prompt: string; expected_response: string; model: string },
+    callId?: string
+  ): Promise<ToolResult> {
     const { title, prompt, expected_response, model } = params;
 
     // Parse provider:model format
@@ -117,14 +127,14 @@ Examples:
       // Create provider for subagent
       const provider = await this.createProvider(providerName, modelName, expected_response);
       if (!provider) {
-        return createErrorResult(`Unknown provider: ${providerName}`, call.id);
+        return createErrorResult(`Unknown provider: ${providerName}`, callId);
       }
 
       // Use shared thread manager from parent (avoids multiple SQLite connections)
       if (!this.threadManager) {
         return createErrorResult(
           'Delegate tool not properly initialized - missing ThreadManager',
-          call.id
+          callId
         );
       }
       const threadManager = this.threadManager;
@@ -133,7 +143,7 @@ Examples:
       if (!this.parentToolExecutor) {
         return createErrorResult(
           'Delegate tool not properly initialized - missing parent ToolExecutor',
-          call.id
+          callId
         );
       }
 
@@ -236,7 +246,7 @@ Examples:
               text: combinedResponse || 'Subagent completed without response',
             },
           ],
-          call.id,
+          callId,
           { threadId: subagentThreadId }
         );
       } catch (error) {
@@ -250,7 +260,7 @@ Examples:
 
         return createErrorResult(
           error instanceof Error ? `Subagent error: ${error.message}` : 'Unknown error occurred',
-          call.id
+          callId
         );
       }
     } catch (error) {
@@ -258,7 +268,7 @@ Examples:
         error instanceof Error
           ? `Provider setup error: ${error.message}`
           : 'Unknown error occurred',
-        call.id
+        callId
       );
     }
   }

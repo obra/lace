@@ -2,12 +2,7 @@
 // ABOUTME: Essential tool for precise code modifications and refactoring
 
 import { writeFile } from 'fs/promises';
-import {
-  ToolCall,
-  ToolResult,
-  ToolContext,
-  createSuccessResult,
-} from '../types.js';
+import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
 import { BaseTool, ValidationError } from '../base-tool.js';
 
 export class FileEditTool extends BaseTool {
@@ -48,7 +43,6 @@ The old_text must appear exactly once in the file.`;
     };
 
     try {
-      return await this.wrapAsync(async () => {
       // Input validation using base class methods
       this.validateNonEmptyStringParam(path, 'path', call.id);
       this.validateStringParam(old_text, 'old_text', call.id);
@@ -104,12 +98,16 @@ The old_text must appear exactly once in the file.`;
         ],
         call.id
       );
-      }, call.id, 'File edit operation');
     } catch (error) {
-      if (error instanceof Error && 'isError' in error && 'content' in error) {
-        return error as ToolResult;
+      if (error instanceof ValidationError) {
+        return error.toolResult;
       }
-      throw error;
+      return this.createStructuredError(
+        'Unknown error occurred',
+        'Check the input parameters and try again',
+        'File edit operation',
+        call.id
+      );
     }
   }
 
@@ -119,11 +117,11 @@ The old_text must appear exactly once in the file.`;
   private createFilePreview(content: string, _searchText: string): string {
     const lines = content.split('\n');
     const totalLines = lines.length;
-    
+
     if (totalLines <= 10) {
       return `File content preview:\n${content.slice(0, 200)}${content.length > 200 ? '...' : ''}`;
     }
-    
+
     // Show first few lines and last few lines for larger files
     const preview = lines.slice(0, 3).concat(['...'], lines.slice(-3)).join('\n');
     return `File content preview:\n${preview}`;
@@ -135,13 +133,13 @@ The old_text must appear exactly once in the file.`;
   private findMatchLocations(content: string, searchText: string): string {
     const lines = content.split('\n');
     const matchLines: number[] = [];
-    
+
     for (let i = 0; i < lines.length; i++) {
       if (lines.slice(i).join('\n').startsWith(searchText)) {
         matchLines.push(i + 1);
       }
     }
-    
+
     return matchLines.length > 0 ? matchLines.join(', ') : 'unknown';
   }
 

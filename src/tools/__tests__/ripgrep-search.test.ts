@@ -294,7 +294,9 @@ describe('RipgrepSearchTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'pattern' must be string. Provide a valid string value. Parameter is required"
+      );
     });
 
     it('should handle empty pattern parameter', async () => {
@@ -303,7 +305,9 @@ describe('RipgrepSearchTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'pattern' must be non-empty string. Provide a valid non-empty string value. Parameter cannot be empty"
+      );
     });
 
     it('should handle non-string pattern parameter', async () => {
@@ -312,7 +316,9 @@ describe('RipgrepSearchTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'pattern' must be string. Provide a valid string value. Received number"
+      );
     });
 
     it('should handle non-existent directory', async () => {

@@ -49,7 +49,7 @@ describe('FileWriteTool', () => {
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe(
-        `Successfully wrote ${content.length} characters to ${testFile}`
+        `Successfully wrote ${content.length} bytes to ${testFile}`
       );
 
       const written = await readFile(testFile, 'utf-8');
@@ -117,7 +117,9 @@ describe('FileWriteTool', () => {
       const result = await tool.executeTool(createTestToolCall('file_write', { content: 'test' }));
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Path must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'path' must be string. Provide a valid string value. Parameter is required"
+      );
     });
 
     it('should handle empty path parameter', async () => {
@@ -126,7 +128,9 @@ describe('FileWriteTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Path must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'path' must be non-empty string. Provide a valid non-empty string value. Parameter cannot be empty"
+      );
     });
 
     it('should handle missing content parameter', async () => {
@@ -135,7 +139,9 @@ describe('FileWriteTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Content must be a string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'content' must be string. Provide a valid string value. Parameter is required"
+      );
     });
 
     it('should handle non-string content parameter', async () => {
@@ -147,7 +153,9 @@ describe('FileWriteTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Content must be a string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'content' must be string. Provide a valid string value. Received number"
+      );
     });
   });
 
