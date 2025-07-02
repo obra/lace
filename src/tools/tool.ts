@@ -1,19 +1,64 @@
 // ABOUTME: Base class for all tools with schema-based validation
 // ABOUTME: Provides automatic parameter validation and JSON schema generation
 
-// Minimal stub to allow tests to run - will be implemented next
+import { ZodType, ZodError } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
+import type { ToolResult, ToolContext, ToolInputSchema } from './types.js';
+
 export abstract class Tool {
   abstract name: string;
   abstract description: string;
-  abstract schema: unknown;
+  abstract schema: ZodType;
 
-  get inputSchema(): unknown {
-    throw new Error('Not implemented yet');
+  // Generate JSON Schema for AI providers
+  get inputSchema(): ToolInputSchema {
+    const jsonSchema = zodToJsonSchema(this.schema, {
+      name: this.name,
+      $refStrategy: 'none',
+    });
+
+    // Handle case where zodToJsonSchema returns a $ref structure
+    if ('$ref' in jsonSchema && jsonSchema.definitions) {
+      const refKey = jsonSchema.$ref.replace('#/definitions/', '');
+      const actualSchema = jsonSchema.definitions[refKey];
+      return actualSchema as ToolInputSchema;
+    }
+
+    return jsonSchema as ToolInputSchema;
   }
 
-  async execute(_args: unknown, _context?: unknown): Promise<unknown> {
-    throw new Error('Not implemented yet');
+  // Public execute method that handles validation
+  async execute(args: unknown, context?: ToolContext): Promise<ToolResult> {
+    try {
+      const validated = this.schema.parse(args);
+      return await this.executeValidated(validated, context);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return this.formatValidationError(error);
+      }
+      throw error;
+    }
   }
 
-  protected abstract executeValidated(_args: unknown, _context?: unknown): Promise<unknown>;
+  // Implement this in subclasses with validated args
+  protected abstract executeValidated(args: unknown, context?: ToolContext): Promise<ToolResult>;
+
+  private formatValidationError(error: ZodError): ToolResult {
+    const issues = error.issues
+      .map((issue) => {
+        const path = issue.path.length > 0 ? issue.path.join('.') : 'root';
+        return `${path}: ${issue.message}`;
+      })
+      .join('; ');
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Validation failed: ${issues}. Check parameter types and values.`,
+        },
+      ],
+      isError: true,
+    };
+  }
 }
