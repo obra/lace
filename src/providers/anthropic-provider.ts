@@ -29,6 +29,35 @@ export class AnthropicProvider extends AIProvider {
     });
   }
 
+  // Provider-specific token counting using Anthropic's beta API
+  async countTokens(messages: ProviderMessage[], tools: Tool[] = []): Promise<number | null> {
+    try {
+      // Convert to Anthropic format
+      const anthropicMessages = convertToAnthropicFormat(messages);
+      const systemPrompt = this.getEffectiveSystemPrompt(messages);
+
+      // Convert tools to Anthropic format
+      const anthropicTools: Anthropic.Tool[] = tools.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.inputSchema,
+      }));
+
+      // Use beta API to count tokens
+      const result = await this._anthropic.beta.messages.countTokens({
+        model: this.modelName,
+        messages: anthropicMessages,
+        system: systemPrompt,
+        tools: anthropicTools,
+      });
+
+      return result.input_tokens;
+    } catch (error) {
+      logger.debug('Token counting failed, falling back to estimation', { error });
+      return null; // Fall back to estimation
+    }
+  }
+
   get providerName(): string {
     return 'anthropic';
   }
@@ -39,6 +68,40 @@ export class AnthropicProvider extends AIProvider {
 
   get supportsStreaming(): boolean {
     return true;
+  }
+
+  get contextWindow(): number {
+    const model = this.modelName.toLowerCase();
+
+    // All Claude 3 and Claude 4 models support 200k context
+    if (model.includes('claude')) {
+      return 200000;
+    }
+
+    // Fallback to base implementation
+    return super.contextWindow;
+  }
+
+  get maxCompletionTokens(): number {
+    const model = this.modelName.toLowerCase();
+
+    // Claude 3.5 and Claude 4 models support 8192 output tokens
+    if (
+      model.includes('claude-3-5') ||
+      model.includes('claude-4') ||
+      model.includes('claude-sonnet-4') ||
+      model.includes('claude-opus-4')
+    ) {
+      return 8192;
+    }
+
+    // Claude 3 models support 4096 output tokens
+    if (model.includes('claude-3')) {
+      return 4096;
+    }
+
+    // Use configured value or fallback
+    return this._config.maxTokens || 4096;
   }
 
   private _createRequestPayload(

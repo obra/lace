@@ -80,9 +80,26 @@ export abstract class AIProvider extends EventEmitter {
     return this._config.model || this.defaultModel;
   }
 
+  // Model capability getters - providers should override based on their models
+  get contextWindow(): number {
+    // Conservative default - providers should override
+    return 8192;
+  }
+
+  get maxCompletionTokens(): number {
+    // Use configured value or conservative default
+    return this._config.maxTokens || 4096;
+  }
+
   // Token estimation utility for streaming
   protected estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);
+  }
+
+  // Provider-specific token counting - providers can override for accurate counts
+  async countTokens(messages: ProviderMessage[], _tools: Tool[] = []): Promise<number | null> {
+    // Default implementation returns null to indicate estimation should be used
+    return null;
   }
 
   // System prompt handling with fallback logic
