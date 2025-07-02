@@ -107,7 +107,7 @@ export function useProjectContext(): UseProjectContextResult {
       execSync('git rev-parse --git-dir', {
         stdio: 'pipe',
         encoding: 'utf8',
-        timeout: 2000,
+        timeout: 1000,
       });
 
       // Get branch name
@@ -127,7 +127,7 @@ export function useProjectContext(): UseProjectContextResult {
       const statusOutput = execSync('git status --porcelain', {
         stdio: 'pipe',
         encoding: 'utf8',
-        timeout: 2000,
+        timeout: 1000,
       });
 
       const gitStatus = parseGitStatus(statusOutput, branch);
@@ -194,9 +194,6 @@ export function useProjectContext(): UseProjectContextResult {
       setIsRefreshing(true);
 
       try {
-        // Small delay to avoid blocking UI during rapid refresh calls
-        await new Promise((resolve) => setTimeout(resolve, 10));
-
         const cwd = process.cwd();
         const displayPath = formatDisplayPath(cwd);
         const gitInfo = getGitInfo();
