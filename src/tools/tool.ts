@@ -44,6 +44,35 @@ export abstract class Tool {
   // Implement this in subclasses with validated args
   protected abstract executeValidated(args: unknown, context?: ToolContext): Promise<ToolResult>;
 
+  // Output helpers for consistent result construction
+
+  // Public API for creating results
+  protected createResult(content: string | object, metadata?: Record<string, any>): ToolResult {
+    return this._makeResult({ content, metadata, isError: false });
+  }
+
+  protected createError(content: string | object, metadata?: Record<string, any>): ToolResult {
+    return this._makeResult({ content, metadata, isError: true });
+  }
+
+  // Private implementation
+  private _makeResult(options: {
+    content: string | object;
+    metadata?: Record<string, any>;
+    isError: boolean;
+  }): ToolResult {
+    const text =
+      typeof options.content === 'string'
+        ? options.content
+        : JSON.stringify(options.content, null, 2);
+
+    return {
+      content: [{ type: 'text', text }],
+      isError: options.isError,
+      ...(options.metadata && { metadata: options.metadata }),
+    };
+  }
+
   private formatValidationError(error: ZodError): ToolResult {
     const issues = error.issues
       .map((issue) => {

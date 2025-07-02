@@ -48,10 +48,7 @@ export class FileReadTool extends Tool {
       if (!args.startLine && !args.endLine) {
         const sizeError = await this.validateFileSizeForWholeRead(args.path);
         if (sizeError) {
-          return {
-            content: [{ type: 'text', text: sizeError }],
-            isError: true,
-          };
+          return this.createError(sizeError);
         }
       }
 
@@ -59,15 +56,9 @@ export class FileReadTool extends Tool {
       if (args.startLine && args.endLine) {
         const rangeSize = args.endLine - args.startLine + 1;
         if (rangeSize > MAX_RANGE_SIZE) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `Range too large (${rangeSize} lines). Use smaller ranges (max ${MAX_RANGE_SIZE} lines per read) to avoid context overflow and performance issues.`,
-              },
-            ],
-            isError: true,
-          };
+          return this.createError(
+            `Range too large (${rangeSize} lines). Use smaller ranges (max ${MAX_RANGE_SIZE} lines per read) to avoid context overflow and performance issues.`
+          );
         }
       }
 
@@ -77,15 +68,9 @@ export class FileReadTool extends Tool {
 
       // Validate line numbers against actual file content
       if (args.startLine && args.startLine > lines.length) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Line ${args.startLine} exceeds file length (${lines.length} lines). Use a line number between 1 and ${lines.length}.`,
-            },
-          ],
-          isError: true,
-        };
+        return this.createError(
+          `Line ${args.startLine} exceeds file length (${lines.length} lines). Use a line number between 1 and ${lines.length}.`
+        );
       }
 
       // Apply line range if specified
@@ -102,20 +87,11 @@ export class FileReadTool extends Tool {
         linesReturned = resultLines.length;
       }
 
-      return {
-        content: [
-          {
-            type: 'text',
-            text: resultContent,
-          },
-        ],
-        isError: false,
-        metadata: {
-          totalLines: lines.length,
-          linesReturned,
-          fileSize: this.formatFileSize(content.length),
-        },
-      };
+      return this.createResult(resultContent, {
+        totalLines: lines.length,
+        linesReturned,
+        fileSize: this.formatFileSize(content.length),
+      });
     } catch (error: any) {
       // Handle file not found with helpful suggestions
       if (error.code === 'ENOENT') {
@@ -123,41 +99,21 @@ export class FileReadTool extends Tool {
         const suggestionText =
           suggestions.length > 0 ? `\n\nSimilar files: ${suggestions.join(', ')}` : '';
 
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `File not found: ${args.path}${suggestionText}`,
-            },
-          ],
-          isError: true,
-        };
+        return this.createError(`File not found: ${args.path}${suggestionText}`);
       }
 
       // Handle permission errors
       if (error.code === 'EACCES') {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Permission denied accessing file: ${args.path}. Check file permissions and try again.`,
-            },
-          ],
-          isError: true,
-        };
+        return this.createError(
+          `Permission denied accessing file: ${args.path}. Check file permissions and try again.`
+        );
       }
 
       // Handle other file system errors
       if (error.code) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `File system error (${error.code}): ${error.message}. Check the file path and try again.`,
-            },
-          ],
-          isError: true,
-        };
+        return this.createError(
+          `File system error (${error.code}): ${error.message}. Check the file path and try again.`
+        );
       }
 
       // Re-throw unexpected errors

@@ -1,41 +1,37 @@
-// ABOUTME: Comprehensive tests for BashTool implementation
-// ABOUTME: Tests command execution, error handling, and success/failure distinction
+// ABOUTME: Tests for schema-based bash tool implementation
+// ABOUTME: Validates command execution, error handling, and success/failure distinction
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { BashTool } from '../implementations/bash.js';
 
-describe('BashTool', () => {
-  let bashTool: BashTool;
+describe('BashTool with schema validation', () => {
+  const tool = new BashTool();
 
-  beforeEach(() => {
-    bashTool = new BashTool();
-  });
-
-  describe('Tool metadata', () => {
+  describe('tool metadata', () => {
     it('should have correct name and description', () => {
-      expect(bashTool.name).toBe('bash');
-      expect(bashTool.description).toBe(
+      expect(tool.name).toBe('bash');
+      expect(tool.description).toBe(
         "Use bash to execute unix commands to achieve the user's goals. Be smart and careful."
       );
     });
 
-    it('should have proper input schema', () => {
-      const schema = bashTool.inputSchema;
+    it('should have correct input schema', () => {
+      const schema = tool.inputSchema;
       expect(schema.type).toBe('object');
       expect(schema.properties.command).toBeDefined();
       expect(schema.properties.command.type).toBe('string');
-      expect(schema.properties.command.minLength).toBe(1);
       expect(schema.required).toContain('command');
     });
 
-    it('should be marked as destructive', () => {
-      expect(bashTool.annotations?.destructiveHint).toBe(true);
+    it('should have annotations for policy system', () => {
+      expect(tool.annotations?.destructiveHint).toBe(true);
+      expect(tool.annotations?.openWorldHint).toBe(true);
     });
   });
 
-  describe('Input validation', () => {
+  describe('input validation', () => {
     it('should reject empty command', async () => {
-      const result = await bashTool.execute({ command: '' });
+      const result = await tool.execute({ command: '' });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
@@ -43,14 +39,14 @@ describe('BashTool', () => {
     });
 
     it('should reject non-string command', async () => {
-      const result = await bashTool.execute({ command: 123 });
+      const result = await tool.execute({ command: 123 });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should reject missing command', async () => {
-      const result = await bashTool.execute({});
+      const result = await tool.execute({});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
@@ -58,9 +54,9 @@ describe('BashTool', () => {
     });
   });
 
-  describe('Successful command execution (exit code 0)', () => {
+  describe('successful command execution (exit code 0)', () => {
     it('should execute simple commands successfully', async () => {
-      const result = await bashTool.execute({ command: 'echo "hello world"' });
+      const result = await tool.execute({ command: 'echo "hello world"' });
 
       expect(result.isError).toBe(false);
 
@@ -71,7 +67,7 @@ describe('BashTool', () => {
     });
 
     it('should handle commands with no output', async () => {
-      const result = await bashTool.execute({ command: 'true' });
+      const result = await tool.execute({ command: 'true' });
 
       expect(result.isError).toBe(false);
 
@@ -82,10 +78,10 @@ describe('BashTool', () => {
     });
   });
 
-  describe('Command execution with non-zero exit codes', () => {
+  describe('command execution with non-zero exit codes', () => {
     it('should handle commands that return non-zero exit codes as tool success', async () => {
       // `false` command always returns exit code 1
-      const result = await bashTool.execute({ command: 'false' });
+      const result = await tool.execute({ command: 'false' });
 
       // Tool should succeed because it executed the command successfully
       expect(result.isError).toBe(false);
@@ -96,7 +92,7 @@ describe('BashTool', () => {
     });
 
     it('should handle grep with no matches (exit code 1)', async () => {
-      const result = await bashTool.execute({
+      const result = await tool.execute({
         command: 'echo "hello" | grep "world"',
       });
 
@@ -109,7 +105,7 @@ describe('BashTool', () => {
 
     it('should handle linter-style commands with issues found', async () => {
       // Create a temporary file with issues, then "lint" it
-      const result = await bashTool.execute({
+      const result = await tool.execute({
         command: 'echo "  spaces  " | wc -w && exit 1', // Simulate linter finding issues
       });
 
@@ -121,9 +117,9 @@ describe('BashTool', () => {
     });
   });
 
-  describe('Command execution failures', () => {
+  describe('command execution failures', () => {
     it('should handle not found as tool failure', async () => {
-      const result = await bashTool.execute({
+      const result = await tool.execute({
         command: 'nonexistentcommand12345',
       });
 
@@ -138,7 +134,7 @@ describe('BashTool', () => {
     });
 
     it('should handle not found in sequence as tool success', async () => {
-      const result = await bashTool.execute({
+      const result = await tool.execute({
         command: 'echo "before"; nonexistentcommand12345; echo "Exit code: $?"',
       });
 
@@ -153,7 +149,7 @@ describe('BashTool', () => {
 
     it('should handle permission denied', async () => {
       // Try to read a file that doesn't exist with strict permissions
-      const result = await bashTool.execute({
+      const result = await tool.execute({
         command: 'cat /root/nonexistent 2>/dev/null || echo "permission issue" >&2 && exit 126',
       });
 
@@ -165,9 +161,9 @@ describe('BashTool', () => {
     });
   });
 
-  describe('Output handling', () => {
+  describe('output handling', () => {
     it('should capture both stdout and stderr', async () => {
-      const result = await bashTool.execute({
+      const result = await tool.execute({
         command: 'echo "to stdout" && echo "to stderr" >&2',
       });
 
@@ -180,7 +176,7 @@ describe('BashTool', () => {
     });
 
     it('should handle large output', async () => {
-      const result = await bashTool.execute({
+      const result = await tool.execute({
         command: 'for i in {1..100}; do echo "line $i"; done',
       });
 
@@ -194,7 +190,7 @@ describe('BashTool', () => {
     });
 
     it('should handle unicode and special characters', async () => {
-      const result = await bashTool.execute({
+      const result = await tool.execute({
         command: 'echo "Hello 🌍 World! Special: àáâãäå"',
       });
 
@@ -208,7 +204,7 @@ describe('BashTool', () => {
 
   describe('JSON output structure', () => {
     it('should always return valid JSON in output field', async () => {
-      const result = await bashTool.execute({ command: 'echo "test"' });
+      const result = await tool.execute({ command: 'echo "test"' });
 
       expect(result.isError).toBe(false);
       expect(() => JSON.parse(result.content[0].text)).not.toThrow();
@@ -222,7 +218,7 @@ describe('BashTool', () => {
 
     it('should maintain JSON structure even for complex output', async () => {
       // Command that outputs JSON itself
-      const result = await bashTool.execute({
+      const result = await tool.execute({
         command: 'echo \'{"test": "value", "number": 42}\'',
       });
 
@@ -238,10 +234,10 @@ describe('BashTool', () => {
     });
   });
 
-  describe('Real-world scenarios based on observed behavior', () => {
+  describe('real-world scenarios based on observed behavior', () => {
     it('should handle ESLint finding issues (exit 1) as tool success', async () => {
       // This matches what I observed when running ESLint that found issues
-      const result = await bashTool.execute({
+      const result = await tool.execute({
         command: 'echo "src/file.ts:1:1 error Delete spaces" && exit 1',
       });
 
@@ -254,7 +250,7 @@ describe('BashTool', () => {
 
     it('should handle false command (exit 1) as tool success', async () => {
       // Observed: 'false' command shows as ✅ Tool completed
-      const result = await bashTool.execute({ command: 'false' });
+      const result = await tool.execute({ command: 'false' });
 
       expect(result.isError).toBe(false); // ✅ Tool completed
 
@@ -266,7 +262,7 @@ describe('BashTool', () => {
 
     it('should handle echo with success (exit 0) as tool success', async () => {
       // Observed: 'echo' commands show as ✅ Tool completed
-      const result = await bashTool.execute({ command: 'echo "hello"' });
+      const result = await tool.execute({ command: 'echo "hello"' });
 
       expect(result.isError).toBe(false); // ✅ Tool completed
 
@@ -278,7 +274,7 @@ describe('BashTool', () => {
 
     it('should handle grep with no matches as tool success', async () => {
       // grep returns exit 1 when no matches found, but tool should succeed
-      const result = await bashTool.execute({
+      const result = await tool.execute({
         command: 'echo "hello" | grep "xyz"',
       });
 
@@ -291,7 +287,7 @@ describe('BashTool', () => {
 
     it('should match the behavior I observed with command sequences', async () => {
       // Based on: echo "Testing not found"; nonexistentcommand12345; echo "Exit code was: $?"
-      const result = await bashTool.execute({
+      const result = await tool.execute({
         command: 'echo "Testing"; nonexistentcmd123; echo "After error"',
       });
 
