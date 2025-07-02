@@ -47,6 +47,7 @@ export class FileListTool implements Tool {
         type: 'number',
         description: 'Number of entries before summarizing (default: 50)',
       },
+      maxResults: { type: 'number', description: 'Maximum number of total results (default: 50)' },
     },
     required: [],
   };
@@ -59,6 +60,7 @@ export class FileListTool implements Tool {
       recursive = false,
       maxDepth = 3,
       summaryThreshold = 50,
+      maxResults = 50,
     } = call.arguments as {
       path?: string;
       pattern?: string;
@@ -66,21 +68,34 @@ export class FileListTool implements Tool {
       recursive?: boolean;
       maxDepth?: number;
       summaryThreshold?: number;
+      maxResults?: number;
     };
 
     try {
+      const resultCounter = { count: 0, truncated: false };
       const tree = await this.buildTree(path, {
         pattern,
         includeHidden,
         recursive,
         maxDepth,
         summaryThreshold,
+        maxResults,
         currentDepth: 0,
+        resultCounter,
       });
 
       // If tree has no children, return "No files found"
-      const output =
-        tree.children && tree.children.length > 0 ? this.formatTree(tree) : 'No files found';
+      let output = '';
+      if (tree.children && tree.children.length > 0) {
+        output = this.formatTree(tree);
+
+        // Add truncation message if we hit the limit
+        if (resultCounter.truncated) {
+          output += `\n\nResults limited to ${maxResults}. Use maxResults parameter to see more.`;
+        }
+      } else {
+        output = 'No files found';
+      }
 
       return createSuccessResult(
         [
@@ -197,7 +212,9 @@ export class FileListTool implements Tool {
       recursive: boolean;
       maxDepth: number;
       summaryThreshold: number;
+      maxResults: number;
       currentDepth: number;
+      resultCounter: { count: number; truncated: boolean };
     }
   ): Promise<TreeNode> {
     const dirName = dirPath.split('/').pop() || dirPath;
@@ -228,6 +245,12 @@ export class FileListTool implements Tool {
 
       // Process children normally
       for (const item of items) {
+        // Early termination if we've reached the result limit
+        if (options.resultCounter.count >= options.maxResults) {
+          options.resultCounter.truncated = true;
+          break;
+        }
+
         if (!options.includeHidden && item.startsWith('.')) {
           continue;
         }
@@ -247,6 +270,7 @@ export class FileListTool implements Tool {
               // Only include if it has matching children
               if (childNode.children && childNode.children.length > 0) {
                 children.push(childNode);
+                options.resultCounter.count++;
               }
             }
             continue;
@@ -258,12 +282,14 @@ export class FileListTool implements Tool {
               currentDepth: options.currentDepth + 1,
             });
             children.push(childNode);
+            options.resultCounter.count++;
           } else {
             children.push({
               name: item,
               path: fullPath,
               type: 'directory',
             });
+            options.resultCounter.count++;
           }
         } else {
           // For files, check pattern matching
@@ -277,6 +303,7 @@ export class FileListTool implements Tool {
             type: 'file',
             size: stats.size,
           });
+          options.resultCounter.count++;
         }
       }
 
