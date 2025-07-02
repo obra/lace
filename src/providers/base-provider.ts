@@ -96,6 +96,12 @@ export abstract class AIProvider extends EventEmitter {
     return Math.ceil(text.length / 4);
   }
 
+  // Provider-specific token counting - providers can override for accurate counts
+  async countTokens(messages: ProviderMessage[], _tools: Tool[] = []): Promise<number | null> {
+    // Default implementation returns null to indicate estimation should be used
+    return null;
+  }
+
   // System prompt handling with fallback logic
   protected getEffectiveSystemPrompt(messages: ProviderMessage[]): string {
     const systemMessage = messages.find((msg) => msg.role === 'system');

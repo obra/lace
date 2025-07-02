@@ -312,20 +312,37 @@ export class Agent extends EventEmitter {
 
       // Check context window before making request
       const contextWindow = this._provider.contextWindow;
-      const estimatedPromptTokens = this._estimateConversationTokens(conversation);
       const maxOutputTokens = this._provider.maxCompletionTokens;
 
-      if (estimatedPromptTokens + maxOutputTokens > contextWindow) {
-        const percentage = Math.floor((estimatedPromptTokens / contextWindow) * 100);
+      // Try provider-specific token counting first, fall back to estimation
+      let promptTokens: number;
+      const providerCount = await this._provider.countTokens(conversation, this._tools);
+      if (providerCount !== null) {
+        promptTokens = providerCount;
+        logger.debug('Using provider-specific token count', {
+          threadId: this._threadId,
+          promptTokens,
+          provider: this._provider.providerName,
+        });
+      } else {
+        promptTokens = this._estimateConversationTokens(conversation);
+        logger.debug('Using estimated token count', {
+          threadId: this._threadId,
+          promptTokens,
+        });
+      }
+
+      if (promptTokens + maxOutputTokens > contextWindow) {
+        const percentage = Math.floor((promptTokens / contextWindow) * 100);
 
         this.emit('error', {
           error: new Error(
-            `Context window exceeded: ${estimatedPromptTokens} tokens (${percentage}% of ${contextWindow})`
+            `Context window exceeded: ${promptTokens} tokens (${percentage}% of ${contextWindow})`
           ),
           context: {
             phase: 'pre_request_validation',
             threadId: this._threadId,
-            estimatedPromptTokens,
+            estimatedPromptTokens: promptTokens,
             contextWindow,
             maxOutputTokens,
           },
@@ -333,7 +350,7 @@ export class Agent extends EventEmitter {
 
         logger.error('Request blocked by context window limit', {
           threadId: this._threadId,
-          estimatedPromptTokens,
+          promptTokens,
           contextWindow,
           maxOutputTokens,
           percentage,
@@ -341,13 +358,13 @@ export class Agent extends EventEmitter {
 
         this._setState('idle');
         return;
-      } else if (estimatedPromptTokens > contextWindow * 0.9) {
+      } else if (promptTokens > contextWindow * 0.9) {
         // Emit warning if over 90% of context
         logger.warn('Context window nearly full', {
           threadId: this._threadId,
-          estimatedPromptTokens,
+          promptTokens,
           contextWindow,
-          percentage: Math.floor((estimatedPromptTokens / contextWindow) * 100),
+          percentage: Math.floor((promptTokens / contextWindow) * 100),
         });
       }
 
@@ -913,32 +930,59 @@ export class Agent extends EventEmitter {
   private _estimateConversationTokens(messages: ProviderMessage[]): number {
     let totalTokens = 0;
 
-    for (const message of messages) {
-      // Estimate message content tokens
-      totalTokens += this._estimateTokens(message.content);
+    try {
+      for (const message of messages) {
+        // Estimate message content tokens
+        totalTokens += this._estimateTokens(message.content || '');
 
-      // Add overhead for message structure (role, etc)
-      totalTokens += 4; // Approximate overhead per message
+        // Add overhead for message structure (role, etc)
+        totalTokens += 4; // Approximate overhead per message
 
-      // Estimate tool calls if present
-      if (message.toolCalls) {
-        for (const toolCall of message.toolCalls) {
-          totalTokens += this._estimateTokens(JSON.stringify(toolCall.input));
-          totalTokens += 10; // Tool call structure overhead
+        // Estimate tool calls if present
+        if (message.toolCalls) {
+          for (const toolCall of message.toolCalls) {
+            try {
+              totalTokens += this._estimateTokens(JSON.stringify(toolCall.input));
+              totalTokens += 10; // Tool call structure overhead
+            } catch {
+              // Handle circular references or other JSON errors
+              totalTokens += 50; // Conservative estimate for failed serialization
+            }
+          }
+        }
+
+        // Estimate tool results if present
+        if (message.toolResults) {
+          for (const result of message.toolResults) {
+            try {
+              const resultText = result.content.map((block) => block.text || '').join('');
+              totalTokens += this._estimateTokens(resultText);
+              totalTokens += 10; // Tool result structure overhead
+            } catch {
+              // Handle any content processing errors
+              totalTokens += 50; // Conservative estimate
+            }
+          }
         }
       }
 
-      // Estimate tool results if present
-      if (message.toolResults) {
-        for (const result of message.toolResults) {
-          const resultText = result.content.map((block) => block.text || '').join('');
-          totalTokens += this._estimateTokens(resultText);
-          totalTokens += 10; // Tool result structure overhead
-        }
+      // Sanity check
+      if (!Number.isFinite(totalTokens) || totalTokens < 0) {
+        logger.warn('Invalid token estimation, using fallback', {
+          calculatedTokens: totalTokens,
+          messageCount: messages.length,
+        });
+        return messages.length * 100; // Fallback: rough estimate per message
       }
+
+      return totalTokens;
+    } catch (error) {
+      logger.error('Error estimating conversation tokens', {
+        error: error instanceof Error ? error.message : String(error),
+        messageCount: messages.length,
+      });
+      return messages.length * 100; // Fallback: rough estimate per message
     }
-
-    return totalTokens;
   }
 
   private _addTokensToCurrentTurn(direction: 'in' | 'out', tokens: number): void {

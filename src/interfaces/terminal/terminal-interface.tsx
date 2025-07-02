@@ -30,6 +30,7 @@ import { ThreadProcessor } from '../thread-processor.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 import { LaceFocusProvider } from './focus/index.js';
 import { useProjectContext } from './hooks/use-project-context.js';
+import { logger } from '../../utils/logger.js';
 
 // ThreadProcessor context for interface-level caching
 const ThreadProcessorContext = createContext<ThreadProcessor | null>(null);
@@ -199,6 +200,9 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     totalTokens: number;
   } | null>(null);
 
+  // Debounce timer for token usage updates during streaming
+  const tokenUpdateDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   // Turn tracking state
   const [isTurnActive, setIsTurnActive] = useState(false);
   const [currentTurnId, setCurrentTurnId] = useState<string | null>(null);
@@ -266,6 +270,52 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       setEvents([...threadEvents]);
     }
   }, [agent]);
+
+  // Initialize token counts for resumed conversations
+  useEffect(() => {
+    const threadId = agent.threadManager.getCurrentThreadId();
+    if (threadId) {
+      const events = agent.threadManager.getEvents(threadId);
+      
+      // If we have existing events, estimate the current context size
+      if (events.length > 0) {
+        // Simple estimation based on event content with error handling
+        let estimatedTokens = 0;
+        events.forEach(event => {
+          try {
+            if (typeof event.data === 'string') {
+              estimatedTokens += Math.ceil(event.data.length / 4);
+            } else if (event.data && typeof event.data === 'object') {
+              // Handle circular references and other JSON stringify errors
+              const jsonStr = JSON.stringify(event.data);
+              estimatedTokens += Math.ceil(jsonStr.length / 4);
+            }
+          } catch (error) {
+            // Skip events that can't be stringified
+            logger.debug('Failed to estimate tokens for event', { 
+              eventType: event.type, 
+              error: error instanceof Error ? error.message : String(error) 
+            });
+          }
+        });
+        
+        // Initialize cumulative tokens for resumed conversation
+        setCumulativeTokens(prev => {
+          // Only initialize if we haven't tracked anything yet
+          if (prev.totalTokens === 0 && estimatedTokens > 0) {
+            return {
+              promptTokens: estimatedTokens,
+              completionTokens: 0,  // We don't know past completions
+              totalTokens: estimatedTokens,  // Conservative estimate
+              contextGrowth: 0,  // Reset growth tracking
+              lastPromptTokens: estimatedTokens,  // Set baseline for deltas
+            };
+          }
+          return prev;
+        });
+      }
+    }
+  }, []); // Run once on mount
 
   // Add an ephemeral message
   const addMessage = useCallback((message: Message) => {
@@ -357,9 +407,25 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               (usage.completionTokens || usage.completion_tokens || 0),
         };
 
-        // Only update if we have meaningful token counts (avoid progressive estimates)
-        if (newUsage.promptTokens > 0 || newUsage.totalTokens > 0) {
+        // Debounce streaming updates to avoid excessive re-renders
+        if (tokenUpdateDebounceRef.current) {
+          clearTimeout(tokenUpdateDebounceRef.current);
+        }
+
+        // During streaming, only update immediately if we have prompt tokens (first update)
+        // Otherwise debounce completion token updates
+        if (newUsage.promptTokens > 0 && !lastProviderUsageRef.current?.promptTokens) {
+          // First update with prompt tokens - update immediately
           lastProviderUsageRef.current = newUsage;
+        } else {
+          // Debounce subsequent updates (streaming completion tokens)
+          tokenUpdateDebounceRef.current = setTimeout(() => {
+            // Only update if we have meaningful token counts
+            if (newUsage.promptTokens > 0 || newUsage.totalTokens > 0) {
+              lastProviderUsageRef.current = newUsage;
+            }
+            tokenUpdateDebounceRef.current = null;
+          }, 200); // 200ms debounce for streaming updates
         }
       }
     };
@@ -425,19 +491,51 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       const providerUsage = lastProviderUsageRef.current;
       if (providerUsage) {
         setCumulativeTokens((prev) => {
-          // Calculate the delta in prompt tokens (context growth)
-          const promptDelta = providerUsage.promptTokens - prev.lastPromptTokens;
-          const contextGrowth = prev.lastPromptTokens === 0 
-            ? providerUsage.promptTokens  // First turn includes system prompt
-            : promptDelta;                 // Subsequent turns show growth
+          // For resumed conversations, we need to detect if this is truly the first turn
+          // or if we're resuming with existing context
+          const isFirstTurnEver = prev.lastPromptTokens === 0 && prev.totalTokens === 0;
+          
+          try {
+            // Calculate the delta in prompt tokens (context growth)
+            const promptDelta = providerUsage.promptTokens - prev.lastPromptTokens;
+            const contextGrowth = isFirstTurnEver
+              ? providerUsage.promptTokens  // First turn ever includes system prompt
+              : promptDelta > 0 
+                ? promptDelta               // Normal growth
+                : 0;                        // Handle negative deltas (shouldn't happen)
 
-          return {
-            promptTokens: providerUsage.promptTokens,  // Current context size
-            completionTokens: prev.completionTokens + providerUsage.completionTokens,  // Total outputs
-            totalTokens: prev.totalTokens + contextGrowth + providerUsage.completionTokens,  // Actual usage
-            contextGrowth: prev.contextGrowth + contextGrowth,  // Total context growth
-            lastPromptTokens: providerUsage.promptTokens,  // For next turn's delta
-          };
+            // Validate calculations
+            const newCompletionTokens = prev.completionTokens + providerUsage.completionTokens;
+            const newTotalTokens = prev.totalTokens + contextGrowth + providerUsage.completionTokens;
+            
+            // Sanity checks
+            if (!Number.isFinite(newCompletionTokens) || !Number.isFinite(newTotalTokens) ||
+                newCompletionTokens < 0 || newTotalTokens < 0) {
+              logger.error('Invalid token calculation', {
+                prev,
+                providerUsage,
+                contextGrowth,
+                newCompletionTokens,
+                newTotalTokens,
+              });
+              return prev; // Keep previous state on error
+            }
+
+            return {
+              promptTokens: providerUsage.promptTokens,  // Current context size
+              completionTokens: newCompletionTokens,  // Total outputs
+              totalTokens: newTotalTokens,  // Actual usage
+              contextGrowth: prev.contextGrowth + contextGrowth,  // Total context growth
+              lastPromptTokens: providerUsage.promptTokens,  // For next turn's delta
+            };
+          } catch (error) {
+            logger.error('Error calculating token usage', {
+              error: error instanceof Error ? error.message : String(error),
+              prev,
+              providerUsage,
+            });
+            return prev; // Keep previous state on error
+          }
         });
 
         // Clear the provider usage after using it
@@ -506,6 +604,12 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       agent.off('turn_progress', handleTurnProgress);
       agent.off('turn_complete', handleTurnComplete);
       agent.off('turn_aborted', handleTurnAborted);
+      
+      // Clear any pending debounced updates
+      if (tokenUpdateDebounceRef.current) {
+        clearTimeout(tokenUpdateDebounceRef.current);
+        tokenUpdateDebounceRef.current = null;
+      }
     };
   }, [agent, addMessage, syncEvents, streamingContent]);
 
