@@ -3,12 +3,13 @@
 
 import { ZodType, ZodError } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import type { ToolResult, ToolContext, ToolInputSchema } from './types.js';
+import type { ToolResult, ToolContext, ToolInputSchema, ToolAnnotations } from './types.js';
 
 export abstract class Tool {
   abstract name: string;
   abstract description: string;
   abstract schema: ZodType;
+  annotations?: ToolAnnotations;
 
   // Generate JSON Schema for AI providers
   get inputSchema(): ToolInputSchema {

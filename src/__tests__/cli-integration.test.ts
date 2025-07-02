@@ -163,7 +163,10 @@ describe('CLI Orchestration', () => {
         expect(tool.name).toBeDefined();
         expect(tool.description).toBeDefined();
         expect(tool.inputSchema).toBeDefined();
-        expect(typeof tool.executeTool).toBe('function');
+        // Tools can have either executeTool (old interface) or execute (new interface)
+        const hasOldInterface = typeof tool.executeTool === 'function';
+        const hasNewInterface = typeof tool.execute === 'function';
+        expect(hasOldInterface || hasNewInterface).toBe(true);
       });
     });
   });
