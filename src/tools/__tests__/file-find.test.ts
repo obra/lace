@@ -72,6 +72,7 @@ describe('FileFindTool', () => {
             type: 'boolean',
             description: 'Include hidden files/directories (default: false)',
           },
+          maxResults: { type: 'number', description: 'Maximum number of results (default: 50)' },
         },
         required: ['pattern'],
       });
@@ -331,7 +332,9 @@ describe('FileFindTool', () => {
       const result = await tool.executeTool(createTestToolCall('file_find', { path: testDir }));
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'pattern' must be string. Provide a valid string value. Parameter is required"
+      );
     });
 
     it('should handle empty pattern parameter', async () => {
@@ -340,7 +343,9 @@ describe('FileFindTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'pattern' must be non-empty string. Provide a valid non-empty string value. Parameter cannot be empty"
+      );
     });
 
     it('should handle non-string pattern parameter', async () => {
@@ -349,7 +354,9 @@ describe('FileFindTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'pattern' must be string. Provide a valid string value. Received number"
+      );
     });
 
     it('should handle non-existent directory', async () => {
@@ -361,7 +368,7 @@ describe('FileFindTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('ENOENT');
+      expect(result.content[0].text).toContain('File search failed');
     });
   });
 
@@ -406,6 +413,98 @@ describe('FileFindTool', () => {
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
       expect(output).toContain(join(testDir, 'src', 'app.ts'));
+    });
+  });
+
+  describe('result limiting', () => {
+    it('should default to 50 results maximum', () => {
+      expect(tool.inputSchema.properties.maxResults.description).toContain('default: 50');
+    });
+
+    it('should limit total results to 50 by default', async () => {
+      // Create many files to exceed 50 results
+      for (let i = 0; i < 60; i++) {
+        await writeFile(join(testDir, `limittest${i}.txt`), 'content');
+      }
+
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: 'limittest*.txt',
+          path: testDir,
+        })
+      );
+
+      expect(result.isError).toBe(false);
+      const output = result.content[0].text!;
+      const lines = output.split('\n');
+
+      expect(lines.length).toBe(51); // 50 files + 1 truncation message
+      expect(output).toContain('Results limited to 50');
+    });
+
+    it('should respect custom maxResults parameter', async () => {
+      // Create 30 files
+      for (let i = 0; i < 30; i++) {
+        await writeFile(join(testDir, `customlimit${i}.txt`), 'content');
+      }
+
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: 'customlimit*.txt',
+          path: testDir,
+          maxResults: 20,
+        })
+      );
+
+      expect(result.isError).toBe(false);
+      const output = result.content[0].text!;
+      const lines = output.split('\n');
+
+      expect(lines.length).toBe(21); // 20 files + 1 truncation message
+      expect(output).toContain('Results limited to 20');
+    });
+
+    it('should not show truncation message when under limit', async () => {
+      // Create only 10 files
+      for (let i = 0; i < 10; i++) {
+        await writeFile(join(testDir, `underlimit${i}.txt`), 'content');
+      }
+
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: 'underlimit*.txt',
+          path: testDir,
+        })
+      );
+
+      expect(result.isError).toBe(false);
+      const output = result.content[0].text!;
+      expect(output).not.toContain('Results limited to');
+    });
+
+    it('should limit results across subdirectories', async () => {
+      // Create subdirectories with many files
+      for (let dir = 0; dir < 5; dir++) {
+        const subDir = join(testDir, `subdirtest${dir}`);
+        await mkdir(subDir);
+        for (let i = 0; i < 15; i++) {
+          await writeFile(join(subDir, `subtest${i}.txt`), 'content');
+        }
+      }
+
+      const result = await tool.executeTool(
+        createTestToolCall('file_find', {
+          pattern: 'subtest*.txt',
+          path: testDir,
+        })
+      );
+
+      expect(result.isError).toBe(false);
+      const output = result.content[0].text!;
+      const lines = output.split('\n');
+
+      expect(lines.length).toBe(51); // 50 files + 1 truncation message
+      expect(output).toContain('Results limited to 50');
     });
   });
 

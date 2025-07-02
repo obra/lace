@@ -3,14 +3,9 @@
 
 import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
-import {
-  Tool,
-  ToolCall,
-  ToolResult,
-  ToolContext,
-  createSuccessResult,
-  createErrorResult,
-} from '../types.js';
+import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
+import { BaseTool, ValidationError } from '../base-tool.js';
+import { TOOL_LIMITS } from '../constants.js';
 
 interface FileEntry {
   name: string;
@@ -28,7 +23,7 @@ interface TreeNode {
   size?: number;
 }
 
-export class FileListTool implements Tool {
+export class FileListTool extends BaseTool {
   name = 'file_list';
   description = 'List files and directories with optional filtering';
   annotations = {
@@ -47,40 +42,110 @@ export class FileListTool implements Tool {
         type: 'number',
         description: 'Number of entries before summarizing (default: 50)',
       },
+      maxResults: { type: 'number', description: 'Maximum number of total results (default: 50)' },
     },
     required: [],
   };
 
   async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-    const {
-      path = '.',
-      pattern,
-      includeHidden = false,
-      recursive = false,
-      maxDepth = 3,
-      summaryThreshold = 50,
-    } = call.arguments as {
-      path?: string;
-      pattern?: string;
-      includeHidden?: boolean;
-      recursive?: boolean;
-      maxDepth?: number;
-      summaryThreshold?: number;
-    };
-
     try {
+      const path =
+        this.validateOptionalParam(
+          call.arguments.path,
+          'path',
+          (value) => this.validateNonEmptyStringParam(value, 'path'),
+          call.id
+        ) ?? '.';
+
+      const pattern = this.validateOptionalParam(
+        call.arguments.pattern,
+        'pattern',
+        (value) => this.validateStringParam(value, 'pattern'),
+        call.id
+      );
+
+      const includeHidden =
+        this.validateOptionalParam(
+          call.arguments.includeHidden,
+          'includeHidden',
+          (value) => this.validateBooleanParam(value, 'includeHidden'),
+          call.id
+        ) ?? false;
+
+      const recursive =
+        this.validateOptionalParam(
+          call.arguments.recursive,
+          'recursive',
+          (value) => this.validateBooleanParam(value, 'recursive'),
+          call.id
+        ) ?? false;
+
+      const maxDepth =
+        this.validateOptionalParam(
+          call.arguments.maxDepth,
+          'maxDepth',
+          (value) =>
+            this.validateNumberParam(value, 'maxDepth', call.id, {
+              min: TOOL_LIMITS.MIN_DEPTH,
+              max: TOOL_LIMITS.MAX_LIST_DEPTH,
+              integer: true,
+            }),
+          call.id
+        ) ?? TOOL_LIMITS.DEFAULT_LIST_DEPTH;
+
+      const summaryThreshold =
+        this.validateOptionalParam(
+          call.arguments.summaryThreshold,
+          'summaryThreshold',
+          (value) =>
+            this.validateNumberParam(value, 'summaryThreshold', call.id, {
+              min: TOOL_LIMITS.MIN_SUMMARY_THRESHOLD,
+              max: TOOL_LIMITS.MAX_SUMMARY_THRESHOLD,
+              integer: true,
+            }),
+          call.id
+        ) ?? TOOL_LIMITS.DEFAULT_SUMMARY_THRESHOLD;
+
+      const maxResults =
+        this.validateOptionalParam(
+          call.arguments.maxResults,
+          'maxResults',
+          (value) =>
+            this.validateNumberParam(value, 'maxResults', call.id, {
+              min: TOOL_LIMITS.MIN_SEARCH_RESULTS,
+              max: TOOL_LIMITS.MAX_SEARCH_RESULTS,
+              integer: true,
+            }),
+          call.id
+        ) ?? TOOL_LIMITS.DEFAULT_SEARCH_RESULTS;
+
+      // Validate directory exists before listing
+      await this.validateDirectoryExists(path, call.id);
+
+      const resultCounter = { count: 0, truncated: false };
       const tree = await this.buildTree(path, {
         pattern,
         includeHidden,
         recursive,
         maxDepth,
         summaryThreshold,
+        maxResults,
         currentDepth: 0,
+        resultCounter,
       });
 
       // If tree has no children, return "No files found"
-      const output =
-        tree.children && tree.children.length > 0 ? this.formatTree(tree) : 'No files found';
+      let output = '';
+      if (tree.children && tree.children.length > 0) {
+        output = this.formatTree(tree);
+
+        // Add truncation message if we hit the limit
+        if (resultCounter.truncated) {
+          output += `\n\nResults limited to ${maxResults}. Use maxResults parameter to see more.`;
+        }
+      } else {
+        output = 'No files found';
+      }
 
       return createSuccessResult(
         [
@@ -92,7 +157,13 @@ export class FileListTool implements Tool {
         call.id
       );
     } catch (error) {
-      return createErrorResult(
+      if (error instanceof ValidationError) {
+        return error.toolResult;
+      }
+
+      return this.createStructuredError(
+        'Directory listing failed',
+        'Check the directory path and parameters, then try again',
         error instanceof Error ? error.message : 'Unknown error occurred',
         call.id
       );
@@ -197,7 +268,9 @@ export class FileListTool implements Tool {
       recursive: boolean;
       maxDepth: number;
       summaryThreshold: number;
+      maxResults: number;
       currentDepth: number;
+      resultCounter: { count: number; truncated: boolean };
     }
   ): Promise<TreeNode> {
     const dirName = dirPath.split('/').pop() || dirPath;
@@ -228,6 +301,12 @@ export class FileListTool implements Tool {
 
       // Process children normally
       for (const item of items) {
+        // Early termination if we've reached the result limit
+        if (options.resultCounter.count >= options.maxResults) {
+          options.resultCounter.truncated = true;
+          break;
+        }
+
         if (!options.includeHidden && item.startsWith('.')) {
           continue;
         }
@@ -247,6 +326,7 @@ export class FileListTool implements Tool {
               // Only include if it has matching children
               if (childNode.children && childNode.children.length > 0) {
                 children.push(childNode);
+                options.resultCounter.count++;
               }
             }
             continue;
@@ -258,12 +338,14 @@ export class FileListTool implements Tool {
               currentDepth: options.currentDepth + 1,
             });
             children.push(childNode);
+            options.resultCounter.count++;
           } else {
             children.push({
               name: item,
               path: fullPath,
               type: 'directory',
             });
+            options.resultCounter.count++;
           }
         } else {
           // For files, check pattern matching
@@ -277,6 +359,7 @@ export class FileListTool implements Tool {
             type: 'file',
             size: stats.size,
           });
+          options.resultCounter.count++;
         }
       }
 

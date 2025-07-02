@@ -2,13 +2,13 @@
 // ABOUTME: Enables efficient token usage by delegating to cheaper models
 
 import {
-  Tool,
   ToolCall,
   ToolResult,
   ToolContext,
   createSuccessResult,
   createErrorResult,
 } from '../types.js';
+import { BaseTool, ValidationError } from '../base-tool.js';
 import { ApprovalDecision } from '../approval-types.js';
 import { Agent } from '../../agents/agent.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
@@ -21,7 +21,7 @@ import { TokenBudgetConfig } from '../../token-management/types.js';
 import { getEnvVar } from '../../config/env-loader.js';
 import { logger } from '../../utils/logger.js';
 
-export class DelegateTool implements Tool {
+export class DelegateTool extends BaseTool {
   name = 'delegate';
   description = `Delegate a specific task to a subagent using a less expensive model.
 Ideal for research, data extraction, log analysis, or any focused task with clear outputs.
@@ -74,52 +74,67 @@ Examples:
   private defaultTimeout: number = 300000; // 5 minutes default
 
   async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-    const {
-      title,
-      prompt,
-      expected_response,
-      model = 'anthropic:claude-3-5-haiku-latest',
-    } = call.arguments as {
-      title: string;
-      prompt: string;
-      expected_response: string;
-      model?: string;
-    };
+    try {
+      const title = this.validateNonEmptyStringParam(call.arguments.title, 'title', call.id);
+      const prompt = this.validateNonEmptyStringParam(call.arguments.prompt, 'prompt', call.id);
+      const expected_response = this.validateNonEmptyStringParam(
+        call.arguments.expected_response,
+        'expected_response',
+        call.id
+      );
+      const model =
+        this.validateOptionalParam(
+          call.arguments.model,
+          'model',
+          (value) => {
+            const modelStr = this.validateStringParam(value, 'model');
+            const [providerName, modelName] = modelStr.split(':');
+            if (!providerName || !modelName) {
+              throw new Error(
+                'Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3.5-haiku-latest")'
+              );
+            }
+            return modelStr;
+          },
+          call.id
+        ) ?? 'anthropic:claude-3-5-haiku-latest';
 
-    // Validate inputs
-    if (!title || typeof title !== 'string') {
-      return createErrorResult('Title must be a non-empty string', call.id);
-    }
+      return await this.performDelegation({ title, prompt, expected_response, model }, call.id);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return error.toolResult;
+      }
 
-    if (!prompt || typeof prompt !== 'string') {
-      return createErrorResult('Prompt must be a non-empty string', call.id);
-    }
-
-    if (!expected_response || typeof expected_response !== 'string') {
-      return createErrorResult('Expected response must be a non-empty string', call.id);
-    }
-
-    // Parse provider:model format
-    const [providerName, modelName] = model.split(':');
-    if (!providerName || !modelName) {
-      return createErrorResult(
-        'Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3.5-haiku-latest")',
+      return this.createStructuredError(
+        'Delegate tool validation failed',
+        'Check the title, prompt, expected_response, and model parameters',
+        error instanceof Error ? error.message : 'Unknown error occurred',
         call.id
       );
     }
+  }
+
+  private async performDelegation(
+    params: { title: string; prompt: string; expected_response: string; model: string },
+    callId?: string
+  ): Promise<ToolResult> {
+    const { title, prompt, expected_response, model } = params;
+
+    // Parse provider:model format
+    const [providerName, modelName] = model.split(':');
 
     try {
       // Create provider for subagent
       const provider = await this.createProvider(providerName, modelName, expected_response);
       if (!provider) {
-        return createErrorResult(`Unknown provider: ${providerName}`, call.id);
+        return createErrorResult(`Unknown provider: ${providerName}`, callId);
       }
 
       // Use shared thread manager from parent (avoids multiple SQLite connections)
       if (!this.threadManager) {
         return createErrorResult(
           'Delegate tool not properly initialized - missing ThreadManager',
-          call.id
+          callId
         );
       }
       const threadManager = this.threadManager;
@@ -128,7 +143,7 @@ Examples:
       if (!this.parentToolExecutor) {
         return createErrorResult(
           'Delegate tool not properly initialized - missing parent ToolExecutor',
-          call.id
+          callId
         );
       }
 
@@ -231,7 +246,7 @@ Examples:
               text: combinedResponse || 'Subagent completed without response',
             },
           ],
-          call.id,
+          callId,
           { threadId: subagentThreadId }
         );
       } catch (error) {
@@ -245,7 +260,7 @@ Examples:
 
         return createErrorResult(
           error instanceof Error ? `Subagent error: ${error.message}` : 'Unknown error occurred',
-          call.id
+          callId
         );
       }
     } catch (error) {
@@ -253,7 +268,7 @@ Examples:
         error instanceof Error
           ? `Provider setup error: ${error.message}`
           : 'Unknown error occurred',
-        call.id
+        callId
       );
     }
   }

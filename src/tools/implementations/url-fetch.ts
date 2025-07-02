@@ -7,13 +7,13 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import TurndownService from 'turndown';
 import {
-  Tool,
   ToolCall,
   ToolResult,
   ToolContext,
   createSuccessResult,
   createErrorResult,
 } from '../types.js';
+import { BaseTool, ValidationError } from '../base-tool.js';
 import { logger } from '../../utils/logger.js';
 
 // Constants for configuration and validation
@@ -70,7 +70,7 @@ interface RichErrorContext {
   };
 }
 
-export class UrlFetchTool implements Tool {
+export class UrlFetchTool extends BaseTool {
   name = 'url_fetch';
   description =
     'Fetch content from web URLs with intelligent content handling. WARNING: Returned content can be very large and may exceed token limits. Consider delegating URL fetching to a subtask to avoid overwhelming the main conversation.';
@@ -139,6 +139,7 @@ export class UrlFetchTool implements Tool {
   private turndownService: TurndownService;
 
   constructor() {
+    super();
     this.registerCleanup();
     this.turndownService = new TurndownService({
       headingStyle: 'atx',
@@ -156,7 +157,8 @@ export class UrlFetchTool implements Tool {
       'header',
       'nav',
       'footer',
-    ] as any);
+    ]);
+    // Remove specific HTML elements
   }
 
   validateUrl(url: string): void {
@@ -205,35 +207,95 @@ export class UrlFetchTool implements Tool {
   }
 
   async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-    // Validate required properties before destructuring
-    if (!call.arguments.url || typeof call.arguments.url !== 'string') {
-      return this.createRichError(
+    try {
+      const url = this.validateNonEmptyStringParam(call.arguments.url, 'url', call.id);
+      const method = call.arguments.method
+        ? this.validateEnumParam(call.arguments.method, 'method', VALID_HTTP_METHODS, call.id)
+        : ('GET' as HttpMethod);
+
+      const headers =
+        this.validateOptionalParam(
+          call.arguments.headers,
+          'headers',
+          (value) => {
+            if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+              throw new Error('Must be an object with string values');
+            }
+            return value as Record<string, string>;
+          },
+          call.id
+        ) ?? {};
+
+      const body = this.validateOptionalParam(
+        call.arguments.body,
+        'body',
+        (value) => this.validateStringParam(value, 'body'),
+        call.id
+      );
+
+      const timeout =
+        call.arguments.timeout !== undefined
+          ? this.validateNumberParam(call.arguments.timeout, 'timeout', call.id, {
+              min: MIN_TIMEOUT,
+              max: MAX_TIMEOUT,
+              integer: true,
+            })
+          : DEFAULT_TIMEOUT;
+
+      const maxSize =
+        call.arguments.maxSize !== undefined
+          ? this.validateNumberParam(call.arguments.maxSize, 'maxSize', call.id, {
+              min: MIN_SIZE,
+              max: MAX_SIZE_LIMIT,
+              integer: true,
+            })
+          : DEFAULT_MAX_SIZE;
+
+      const followRedirects =
+        this.validateOptionalParam(
+          call.arguments.followRedirects,
+          'followRedirects',
+          (value) => this.validateBooleanParam(value, 'followRedirects'),
+          call.id
+        ) ?? true;
+
+      const returnContent =
+        this.validateOptionalParam(
+          call.arguments.returnContent,
+          'returnContent',
+          (value) => this.validateBooleanParam(value, 'returnContent'),
+          call.id
+        ) ?? true;
+
+      return await this.performFetch(
         {
-          error: {
-            type: 'validation',
-            message: 'URL is required and must be a non-empty string',
-          },
-          request: {
-            url: String(call.arguments.url || 'undefined'),
-            method: 'GET',
-            headers: {},
-            timing: { start: Date.now() },
-          },
+          url,
+          method: method!,
+          headers: headers!,
+          body,
+          timeout: timeout!,
+          maxSize: maxSize!,
+          followRedirects: followRedirects!,
+          returnContent: returnContent!,
         },
         call.id
       );
-    }
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return error.toolResult;
+      }
 
-    const {
-      url,
-      method = 'GET',
-      headers = {},
-      body,
-      timeout = DEFAULT_TIMEOUT,
-      maxSize = DEFAULT_MAX_SIZE,
-      followRedirects = true,
-      returnContent = true,
-    } = call.arguments as unknown as UrlFetchInput;
+      return this.createStructuredError(
+        'URL fetch validation failed',
+        'Check the URL and parameters, then try again',
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
+    }
+  }
+
+  private async performFetch(params: UrlFetchInput, callId?: string): Promise<ToolResult> {
+    const { url, method, headers, body, timeout, maxSize, followRedirects, returnContent } = params;
 
     const timing: RequestTiming = {
       start: Date.now(),
@@ -250,83 +312,11 @@ export class UrlFetchTool implements Tool {
           },
           request: {
             url,
-            method,
-            headers,
+            method: method!,
+            headers: headers!,
           },
         },
-        call.id
-      );
-    }
-
-    if (typeof timeout !== 'number' || timeout < MIN_TIMEOUT || timeout > MAX_TIMEOUT) {
-      return this.createRichError(
-        {
-          error: {
-            type: 'validation',
-            message: `Timeout must be between ${MIN_TIMEOUT} and ${MAX_TIMEOUT} milliseconds`,
-          },
-          request: {
-            url,
-            method,
-            headers,
-          },
-        },
-        call.id
-      );
-    }
-
-    if (typeof maxSize !== 'number' || maxSize < MIN_SIZE || maxSize > MAX_SIZE_LIMIT) {
-      return this.createRichError(
-        {
-          error: {
-            type: 'validation',
-            message: `Max size must be between ${MIN_SIZE} and ${MAX_SIZE_LIMIT} bytes`,
-          },
-          request: {
-            url,
-            method,
-            headers,
-          },
-        },
-        call.id
-      );
-    }
-
-    if (!VALID_HTTP_METHODS.includes(method as HttpMethod)) {
-      return this.createRichError(
-        {
-          error: {
-            type: 'validation',
-            message: `Method must be one of: ${VALID_HTTP_METHODS.join(', ')}`,
-          },
-          request: {
-            url,
-            method,
-            headers,
-          },
-        },
-        call.id
-      );
-    }
-
-    // Validate returnContent parameter
-    if (
-      call.arguments.returnContent !== undefined &&
-      typeof call.arguments.returnContent !== 'boolean'
-    ) {
-      return this.createRichError(
-        {
-          error: {
-            type: 'validation',
-            message: 'returnContent must be a boolean value',
-          },
-          request: {
-            url,
-            method,
-            headers,
-          },
-        },
-        call.id
+        callId
       );
     }
 
@@ -341,10 +331,10 @@ export class UrlFetchTool implements Tool {
       signal: AbortSignal;
       body?: string;
     } = {
-      method,
+      method: method!,
       headers: {
         'User-Agent': 'Lace/1.0 (AI Assistant)',
-        ...headers,
+        ...headers!,
       },
       redirect: followRedirects ? 'follow' : 'manual',
       signal: controller.signal,
@@ -394,8 +384,8 @@ export class UrlFetchTool implements Tool {
             },
             request: {
               url,
-              method,
-              headers,
+              method: method!,
+              headers: headers!,
               finalUrl,
               redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
               timing,
@@ -407,7 +397,7 @@ export class UrlFetchTool implements Tool {
               bodyPreview,
             },
           },
-          call.id
+          callId
         );
       }
 
@@ -416,7 +406,7 @@ export class UrlFetchTool implements Tool {
       const size = contentLength ? parseInt(contentLength, 10) : 0;
 
       // Check size limits
-      if (size > maxSize) {
+      if (size > maxSize!) {
         return this.createRichError(
           {
             error: {
@@ -425,8 +415,8 @@ export class UrlFetchTool implements Tool {
             },
             request: {
               url,
-              method,
-              headers,
+              method: method!,
+              headers: headers!,
               finalUrl,
               redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
               timing,
@@ -438,7 +428,7 @@ export class UrlFetchTool implements Tool {
               size,
             },
           },
-          call.id
+          callId
         );
       }
 
@@ -446,7 +436,7 @@ export class UrlFetchTool implements Tool {
       const buffer = await response.arrayBuffer();
       const actualSize = buffer.byteLength;
 
-      if (actualSize > maxSize) {
+      if (actualSize > maxSize!) {
         return this.createRichError(
           {
             error: {
@@ -455,8 +445,8 @@ export class UrlFetchTool implements Tool {
             },
             request: {
               url,
-              method,
-              headers,
+              method: method!,
+              headers: headers!,
               finalUrl,
               redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
               timing,
@@ -468,13 +458,13 @@ export class UrlFetchTool implements Tool {
               size: actualSize,
             },
           },
-          call.id
+          callId
         );
       }
 
       // Handle small responses inline
       if (actualSize <= INLINE_CONTENT_LIMIT) {
-        return this.handleInlineContent(buffer, contentType, url, returnContent, call.id);
+        return this.handleInlineContent(buffer, contentType, url, returnContent!, callId);
       }
 
       // Handle large responses with temp files
@@ -483,8 +473,8 @@ export class UrlFetchTool implements Tool {
         contentType,
         url,
         actualSize,
-        returnContent,
-        call.id
+        returnContent!,
+        callId
       );
     } catch (error) {
       clearTimeout(timeoutId);
@@ -500,8 +490,8 @@ export class UrlFetchTool implements Tool {
             },
             request: {
               url,
-              method,
-              headers,
+              method: method!,
+              headers: headers!,
               timing,
             },
           });
@@ -524,12 +514,12 @@ export class UrlFetchTool implements Tool {
             },
             request: {
               url,
-              method,
-              headers,
+              method: method!,
+              headers: headers!,
               timing,
             },
           },
-          call.id
+          callId
         );
       }
 
@@ -541,12 +531,12 @@ export class UrlFetchTool implements Tool {
           },
           request: {
             url,
-            method,
-            headers,
+            method: method!,
+            headers: headers!,
             timing,
           },
         },
-        call.id
+        callId
       );
     }
   }

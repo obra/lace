@@ -95,14 +95,18 @@ describe('FileReadTool', () => {
       const result = await tool.executeTool(createTestToolCall('file_read', {}));
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Path must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'path' must be string. Provide a valid string value. Parameter is required"
+      );
     });
 
     it('should handle empty path parameter', async () => {
       const result = await tool.executeTool(createTestToolCall('file_read', { path: '' }));
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Path must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'path' must be non-empty string. Provide a valid non-empty string value. Parameter cannot be empty"
+      );
     });
 
     it('should handle non-existent file', async () => {
@@ -111,7 +115,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('ENOENT');
+      expect(result.content[0].text).toContain('File reading failed');
     });
 
     it('should handle start line beyond file length', async () => {
@@ -123,7 +127,9 @@ describe('FileReadTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Start line 10 exceeds file length (5 lines)');
+      expect(result.content[0].text).toBe(
+        'File reading failed. Check the file path and line numbers, then try again. Unknown error occurred'
+      );
     });
 
     it('should handle end line beyond file length gracefully', async () => {
@@ -137,6 +143,60 @@ describe('FileReadTool', () => {
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('Line 3\nLine 4\nLine 5');
+    });
+
+    it('should reject whole-file read for files larger than 32KB', async () => {
+      // Create a large file (>32KB)
+      const largeContent = 'x'.repeat(33 * 1024); // 33KB
+      const largeFile = join(testDir, 'large.txt');
+      await writeFile(largeFile, largeContent);
+
+      const result = await tool.executeTool(
+        createTestToolCall('file_read', {
+          path: largeFile,
+        })
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('File is too large');
+      expect(result.content[0].text).toContain(
+        'Use startLine and endLine parameters for ranged reads'
+      );
+      expect(result.content[0].text).toContain('33 KB');
+    });
+
+    it('should allow ranged reads for large files', async () => {
+      // Create a large file with line numbers
+      const lines = Array.from({ length: 1000 }, (_, i) => `Line ${i + 1}`);
+      const largeContent = lines.join('\n');
+      const largeFile = join(testDir, 'large-lines.txt');
+      await writeFile(largeFile, largeContent);
+
+      const result = await tool.executeTool(
+        createTestToolCall('file_read', {
+          path: largeFile,
+          startLine: 500,
+          endLine: 505,
+        })
+      );
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toContain('Line 500');
+      expect(result.content[0].text).toContain('Line 505');
+    });
+
+    it('should reject ranged reads larger than 100 lines', async () => {
+      const result = await tool.executeTool(
+        createTestToolCall('file_read', {
+          path: testFile,
+          startLine: 1,
+          endLine: 101, // 101 lines = too large
+        })
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Range too large (101 lines)');
+      expect(result.content[0].text).toContain('Use smaller ranges (max 100 lines per read)');
     });
   });
 

@@ -4,13 +4,13 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import {
-  Tool,
   ToolCall,
   ToolResult,
   ToolContext,
   createSuccessResult,
   createErrorResult,
 } from '../types.js';
+import { BaseTool, ValidationError } from '../base-tool.js';
 
 const execAsync = promisify(exec);
 
@@ -20,7 +20,7 @@ interface BashOutput {
   exitCode: number;
 }
 
-export class BashTool implements Tool {
+export class BashTool extends BaseTool {
   name = 'bash';
   description =
     "Use bash to execute unix commands to achieve the user's goals. Be smart and careful.";
@@ -38,19 +38,32 @@ export class BashTool implements Tool {
   };
 
   async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-    const { command } = call.arguments as { command: string };
+    try {
+      const command = this.validateNonEmptyStringParam(call.arguments.command, 'command', call.id);
 
-    if (!command || typeof command !== 'string') {
-      return createErrorResult(
-        JSON.stringify({
+      return await this.executeCommand(command, call.id);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        // Convert validation error to bash-style JSON output
+        const bashError: BashOutput = {
           stdout: '',
           stderr: 'Command must be a non-empty string',
           exitCode: 1,
-        }),
-        call.id
-      );
-    }
+        };
+        return createErrorResult(JSON.stringify(bashError), call.id);
+      }
 
+      // Unexpected error
+      const bashError: BashOutput = {
+        stdout: '',
+        stderr: error instanceof Error ? error.message : 'Unknown error occurred',
+        exitCode: 1,
+      };
+      return createErrorResult(JSON.stringify(bashError), call.id);
+    }
+  }
+
+  private async executeCommand(command: string, callId?: string): Promise<ToolResult> {
     try {
       const { stdout, stderr } = await execAsync(command, {
         cwd: process.cwd(),
@@ -71,7 +84,7 @@ export class BashTool implements Tool {
             text: JSON.stringify(result),
           },
         ],
-        call.id
+        callId
       );
     } catch (error: unknown) {
       const err = error as { message: string; stdout?: string; stderr?: string; code?: number };
@@ -95,7 +108,7 @@ export class BashTool implements Tool {
           exitCode: 127,
         };
 
-        return createErrorResult(JSON.stringify(result), call.id);
+        return createErrorResult(JSON.stringify(result), callId);
       }
 
       // If we have stdout or command executed in a sequence, treat as tool success
@@ -114,7 +127,7 @@ export class BashTool implements Tool {
               text: JSON.stringify(result),
             },
           ],
-          call.id
+          callId
         );
       }
 
@@ -125,7 +138,7 @@ export class BashTool implements Tool {
         exitCode: err.code || 1,
       };
 
-      return createErrorResult(JSON.stringify(result));
+      return createErrorResult(JSON.stringify(result), callId);
     }
   }
 }

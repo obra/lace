@@ -101,6 +101,82 @@ describe('RipgrepSearchTool', () => {
     });
   });
 
+  describe('result limiting', () => {
+    it('should default to 50 results maximum', () => {
+      expect(tool.inputSchema.properties.maxResults.description).toContain('default: 50');
+    });
+
+    it('should limit total results to 50 by default', async () => {
+      // Create many files with matches to exceed 50 results
+      // Use a unique pattern to avoid interference from existing test files
+      for (let i = 0; i < 20; i++) {
+        await writeFile(
+          join(testDir, `match${i}.txt`),
+          `uniquepattern ${i}\nuniquepattern again ${i}\nuniquepattern third ${i}`
+        );
+      }
+
+      const result = await tool.executeTool(
+        createTestToolCall('ripgrep_search', {
+          pattern: 'uniquepattern',
+          path: testDir,
+        })
+      );
+
+      expect(result.isError).toBe(false);
+      const output = result.content[0].text!;
+
+      // Count actual matches in output (lines with file:line: format)
+      const matchLines = output.split('\n').filter(
+        (line) => line.match(/^\s+\d+: .*uniquepattern/) // Indented lines with line numbers
+      );
+
+      expect(matchLines.length).toBe(50);
+      expect(output).toContain('Results limited to 50');
+    });
+
+    it('should respect custom maxResults for total limit', async () => {
+      // Create files with many matches
+      for (let i = 0; i < 10; i++) {
+        await writeFile(
+          join(testDir, `custom${i}.txt`),
+          `custompattern ${i}\ncustompattern again ${i}`
+        );
+      }
+
+      const result = await tool.executeTool(
+        createTestToolCall('ripgrep_search', {
+          pattern: 'custompattern',
+          path: testDir,
+          maxResults: 15,
+        })
+      );
+
+      expect(result.isError).toBe(false);
+      const output = result.content[0].text!;
+
+      const matchLines = output
+        .split('\n')
+        .filter((line) => line.match(/^\s+\d+: .*custompattern/));
+
+      expect(matchLines.length).toBe(15);
+      expect(output).toContain('Results limited to 15');
+    });
+
+    it('should not show truncation message when under limit', async () => {
+      const result = await tool.executeTool(
+        createTestToolCall('ripgrep_search', {
+          pattern: 'hello',
+          path: testDir,
+        })
+      );
+
+      expect(result.isError).toBe(false);
+      const output = result.content[0].text!;
+      expect(output).not.toContain('Results limited to');
+    });
+  });
+
   describe('search options', () => {
     it('should respect case sensitivity', async () => {
       const caseInsensitive = await tool.executeTool(
@@ -218,7 +294,9 @@ describe('RipgrepSearchTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'pattern' must be string. Provide a valid string value. Parameter is required"
+      );
     });
 
     it('should handle empty pattern parameter', async () => {
@@ -227,7 +305,9 @@ describe('RipgrepSearchTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'pattern' must be non-empty string. Provide a valid non-empty string value. Parameter cannot be empty"
+      );
     });
 
     it('should handle non-string pattern parameter', async () => {
@@ -236,7 +316,9 @@ describe('RipgrepSearchTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Pattern must be a non-empty string');
+      expect(result.content[0].text).toBe(
+        "Parameter 'pattern' must be string. Provide a valid string value. Received number"
+      );
     });
 
     it('should handle non-existent directory', async () => {

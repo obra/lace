@@ -3,14 +3,9 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import {
-  Tool,
-  ToolCall,
-  ToolResult,
-  ToolContext,
-  createSuccessResult,
-  createErrorResult,
-} from '../types.js';
+import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
+import { BaseTool, ValidationError } from '../base-tool.js';
+import { TOOL_LIMITS } from '../constants.js';
 
 const execAsync = promisify(exec);
 
@@ -20,7 +15,7 @@ interface SearchMatch {
   content: string;
 }
 
-export class RipgrepSearchTool implements Tool {
+export class RipgrepSearchTool extends BaseTool {
   name = 'ripgrep_search';
   description = 'Fast text search across files using ripgrep';
   annotations = {
@@ -43,38 +38,79 @@ export class RipgrepSearchTool implements Tool {
         type: 'string',
         description: 'File pattern to exclude (e.g., "*.test.ts")',
       },
-      maxResults: { type: 'number', description: 'Maximum number of results (default: 100)' },
+      maxResults: { type: 'number', description: 'Maximum number of results (default: 50)' },
       contextLines: { type: 'number', description: 'Lines of context around matches (default: 0)' },
     },
     required: ['pattern'],
   };
 
   async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-    const {
-      pattern,
-      path = '.',
-      caseSensitive = false,
-      wholeWord = false,
-      includePattern,
-      excludePattern,
-      maxResults = 100,
-      contextLines = 0,
-    } = call.arguments as {
-      pattern: string;
-      path?: string;
-      caseSensitive?: boolean;
-      wholeWord?: boolean;
-      includePattern?: string;
-      excludePattern?: string;
-      maxResults?: number;
-      contextLines?: number;
-    };
-
-    if (!pattern || typeof pattern !== 'string') {
-      return createErrorResult('Pattern must be a non-empty string', call.id);
-    }
-
     try {
+      const pattern = this.validateNonEmptyStringParam(call.arguments.pattern, 'pattern', call.id);
+      const path =
+        this.validateOptionalParam(
+          call.arguments.path,
+          'path',
+          (value) => this.validateNonEmptyStringParam(value, 'path'),
+          call.id
+        ) ?? '.';
+
+      const caseSensitive =
+        this.validateOptionalParam(
+          call.arguments.caseSensitive,
+          'caseSensitive',
+          (value) => this.validateBooleanParam(value, 'caseSensitive'),
+          call.id
+        ) ?? false;
+
+      const wholeWord =
+        this.validateOptionalParam(
+          call.arguments.wholeWord,
+          'wholeWord',
+          (value) => this.validateBooleanParam(value, 'wholeWord'),
+          call.id
+        ) ?? false;
+
+      const includePattern = this.validateOptionalParam(
+        call.arguments.includePattern,
+        'includePattern',
+        (value) => this.validateStringParam(value, 'includePattern'),
+        call.id
+      );
+
+      const excludePattern = this.validateOptionalParam(
+        call.arguments.excludePattern,
+        'excludePattern',
+        (value) => this.validateStringParam(value, 'excludePattern'),
+        call.id
+      );
+
+      const maxResults =
+        this.validateOptionalParam(
+          call.arguments.maxResults,
+          'maxResults',
+          (value) =>
+            this.validateNumberParam(value, 'maxResults', call.id, {
+              min: TOOL_LIMITS.MIN_SEARCH_RESULTS,
+              max: TOOL_LIMITS.MAX_SEARCH_RESULTS,
+              integer: true,
+            }),
+          call.id
+        ) ?? TOOL_LIMITS.DEFAULT_SEARCH_RESULTS;
+
+      const contextLines =
+        this.validateOptionalParam(
+          call.arguments.contextLines,
+          'contextLines',
+          (value) =>
+            this.validateNumberParam(value, 'contextLines', call.id, {
+              min: 0,
+              max: 10,
+              integer: true,
+            }),
+          call.id
+        ) ?? 0;
+
       const args = this.buildRipgrepArgs({
         pattern,
         path,
@@ -94,8 +130,8 @@ export class RipgrepSearchTool implements Tool {
           maxBuffer: 10485760, // 10MB buffer
         });
 
-        const matches = this.parseRipgrepOutput(stdout);
-        const resultText = this.formatResults(matches, pattern);
+        const matches = this.parseRipgrepOutput(stdout, maxResults);
+        const resultText = this.formatResults(matches, pattern, maxResults);
 
         return createSuccessResult(
           [
@@ -125,18 +161,31 @@ export class RipgrepSearchTool implements Tool {
         throw execError;
       }
     } catch (error) {
-      let errorMessage = 'Unknown error occurred';
+      if (error instanceof ValidationError) {
+        return error.toolResult;
+      }
 
       if (error instanceof Error) {
-        errorMessage = error.message;
-
         // Check if ripgrep is not installed
-        if (errorMessage.includes('command not found') || errorMessage.includes('not recognized')) {
-          errorMessage = 'ripgrep (rg) command not found. Please install ripgrep to use this tool.';
+        if (
+          error.message.includes('command not found') ||
+          error.message.includes('not recognized')
+        ) {
+          return this.createStructuredError(
+            'ripgrep (rg) command not found',
+            'Install ripgrep to use this tool: brew install ripgrep (macOS) or apt-get install ripgrep (Linux)',
+            'Search tool dependency missing',
+            call.id
+          );
         }
       }
 
-      return createErrorResult(errorMessage, call.id);
+      return this.createStructuredError(
+        'Search operation failed',
+        'Check the search pattern and directory path, then try again',
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
   }
 
@@ -168,9 +217,8 @@ export class RipgrepSearchTool implements Tool {
       args.push('--glob', `!"${options.excludePattern}"`);
     }
 
-    if (options.maxResults > 0) {
-      args.push('--max-count', options.maxResults.toString());
-    }
+    // Note: We don't use --max-count here as it limits per file
+    // Instead, we limit total results in parseRipgrepOutput
 
     if (options.contextLines > 0) {
       args.push('--context', options.contextLines.toString());
@@ -183,7 +231,7 @@ export class RipgrepSearchTool implements Tool {
     return args;
   }
 
-  private parseRipgrepOutput(output: string): SearchMatch[] {
+  private parseRipgrepOutput(output: string, maxResults: number): SearchMatch[] {
     if (!output.trim()) {
       return [];
     }
@@ -200,18 +248,28 @@ export class RipgrepSearchTool implements Tool {
           lineNumber: parseInt(match[2], 10),
           content: match[3],
         });
+
+        // Limit total results across all files
+        if (matches.length >= maxResults) {
+          break;
+        }
       }
     }
 
     return matches;
   }
 
-  private formatResults(matches: SearchMatch[], pattern: string): string {
+  private formatResults(matches: SearchMatch[], pattern: string, maxResults: number): string {
     if (matches.length === 0) {
       return `No matches found for pattern: ${pattern}`;
     }
 
     const resultLines = [`Found ${matches.length} match${matches.length === 1 ? '' : 'es'}:\n`];
+
+    // Add truncation message if we hit the limit
+    if (matches.length === maxResults) {
+      resultLines.push(`Results limited to ${maxResults}. Use maxResults parameter to see more.\n`);
+    }
 
     // Group matches by file
     const fileGroups = new Map<string, SearchMatch[]>();

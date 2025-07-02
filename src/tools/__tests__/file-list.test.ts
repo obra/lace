@@ -179,7 +179,7 @@ describe('FileListTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('ENOENT');
+      expect(result.content[0].text).toContain('Directory listing failed');
     });
 
     it('should return empty result for empty directory', async () => {
@@ -355,8 +355,8 @@ describe('FileListTool', () => {
     });
 
     it('should not summarize top-level directories regardless of size', async () => {
-      // Create many files in root
-      for (let i = 0; i < 60; i++) {
+      // Create many files in root but stay under maxResults limit
+      for (let i = 0; i < 30; i++) {
         await writeFile(join(testDir, `root${i}.txt`), `content${i}`);
       }
 
@@ -364,15 +364,17 @@ describe('FileListTool', () => {
         createTestToolCall('file_list', {
           path: testDir,
           summaryThreshold: 10,
+          maxResults: 100, // Increase to avoid hitting result limit
         })
       );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text!;
 
-      // Should still show all files at root level
+      // Should still show all files at root level (not hit result limit or summarization)
       expect(output).toContain('root0.txt');
-      expect(output).toContain('root59.txt');
+      expect(output).toContain('root29.txt');
+      expect(output).not.toContain('Results limited to'); // Should not be truncated
     });
 
     it('should count files and directories correctly in summaries', async () => {
@@ -438,12 +440,114 @@ describe('FileListTool', () => {
     });
   });
 
+  describe('result limiting', () => {
+    it('should default to 50 results maximum', () => {
+      expect(tool.inputSchema.properties.maxResults.description).toContain('default: 50');
+    });
+
+    it('should limit total results to 50 by default', async () => {
+      // Create many files to exceed 50 results
+      for (let i = 0; i < 60; i++) {
+        await writeFile(join(testDir, `limitfile${i}.txt`), 'content');
+      }
+
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+        })
+      );
+
+      expect(result.isError).toBe(false);
+      const output = result.content[0].text!;
+
+      // Count tree nodes (excluding the root node name line)
+      const lines = output.split('\n').filter((line) => line.includes('├') || line.includes('└'));
+
+      expect(lines.length).toBe(50);
+      expect(output).toContain('Results limited to 50');
+    });
+
+    it('should respect custom maxResults parameter', async () => {
+      // Create 30 files
+      for (let i = 0; i < 30; i++) {
+        await writeFile(join(testDir, `customfile${i}.txt`), 'content');
+      }
+
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          maxResults: 20,
+        })
+      );
+
+      expect(result.isError).toBe(false);
+      const output = result.content[0].text!;
+
+      const lines = output.split('\n').filter((line) => line.includes('├') || line.includes('└'));
+
+      expect(lines.length).toBe(20);
+      expect(output).toContain('Results limited to 20');
+    });
+
+    it('should not show truncation message when under limit', async () => {
+      // Create only 10 files
+      for (let i = 0; i < 10; i++) {
+        await writeFile(join(testDir, `underfile${i}.txt`), 'content');
+      }
+
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+        })
+      );
+
+      expect(result.isError).toBe(false);
+      const output = result.content[0].text!;
+      expect(output).not.toContain('Results limited to');
+    });
+
+    it('should limit results across subdirectories when recursive', async () => {
+      // Create subdirectories with many files
+      for (let dir = 0; dir < 10; dir++) {
+        const subDir = join(testDir, `subdir${dir}`);
+        await mkdir(subDir);
+        for (let i = 0; i < 10; i++) {
+          await writeFile(join(subDir, `subfile${i}.txt`), 'content');
+        }
+      }
+
+      const result = await tool.executeTool(
+        createTestToolCall('file_list', {
+          path: testDir,
+          recursive: true,
+        })
+      );
+
+      expect(result.isError).toBe(false);
+      const output = result.content[0].text!;
+
+      const lines = output.split('\n').filter((line) => line.includes('├') || line.includes('└'));
+
+      // Should be limited to 50 total tree items (files + directories)
+      expect(lines.length).toBeLessThanOrEqual(50);
+      expect(output).toContain('Results limited to 50');
+    });
+  });
+
   describe('input schema', () => {
     it('should include summaryThreshold parameter', () => {
       expect(tool.inputSchema.properties).toHaveProperty('summaryThreshold');
       expect(tool.inputSchema.properties.summaryThreshold).toEqual({
         type: 'number',
         description: 'Number of entries before summarizing (default: 50)',
+      });
+    });
+
+    it('should include maxResults parameter', () => {
+      expect(tool.inputSchema.properties).toHaveProperty('maxResults');
+      expect(tool.inputSchema.properties.maxResults).toEqual({
+        type: 'number',
+        description: 'Maximum number of total results (default: 50)',
       });
     });
   });

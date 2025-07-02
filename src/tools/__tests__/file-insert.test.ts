@@ -87,7 +87,7 @@ describe('FileInsertTool', () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Line 5 exceeds file length');
+    expect(result.content[0].text).toContain('File insertion failed');
   });
 
   it('should validate input parameters', async () => {
@@ -99,7 +99,7 @@ describe('FileInsertTool', () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Path must be a non-empty string');
+    expect(result.content[0].text).toContain("Parameter 'path' must be non-empty string");
   });
 
   it('should validate line number', async () => {
@@ -114,6 +114,6 @@ describe('FileInsertTool', () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Line must be a positive number');
+    expect(result.content[0].text).toContain("Parameter 'line' must be valid");
   });
 });
