@@ -29,3 +29,6 @@ export function createTestToolCall(
 export function createToolCallFactory(toolName: string) {
   return (args: Record<string, unknown>, id?: string) => createTestToolCall(toolName, args, id);
 }
+
+// Re-export temp directory utilities for convenience
+export { createTempDir, createTestTempDir, withTempDir } from './temp-utils.js';
