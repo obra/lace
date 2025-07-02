@@ -150,12 +150,24 @@ export function useTimelineViewport({
     shouldAutoJump,
   ]);
 
-  // Track content height changes for streaming updates
+  // Track content height changes for streaming updates and initial positioning
   const [lastContentHeight, setLastContentHeight] = useState<number>(0);
+  const [hasInitiallyPositioned, setHasInitiallyPositioned] = useState<boolean>(false);
 
   useEffect(() => {
+    // Handle initial positioning when measurement becomes available (addresses race condition)
+    if (totalContentHeight > 0 && !hasInitiallyPositioned && timeline.items.length > 0) {
+      const bottomLine = Math.max(0, totalContentHeight - 1);
+      setSelectedLine(bottomLine);
+
+      // Update viewport scroll to show bottom
+      const maxScroll = Math.max(0, totalContentHeight - viewportLines);
+      setLineScrollOffset(maxScroll);
+
+      setHasInitiallyPositioned(true);
+    }
     // Jump to bottom on content height increase (streaming)
-    if (totalContentHeight > lastContentHeight && lastContentHeight > 0 && shouldAutoJump()) {
+    else if (totalContentHeight > lastContentHeight && lastContentHeight > 0 && shouldAutoJump()) {
       const bottomLine = Math.max(0, totalContentHeight - 1);
       setSelectedLine(bottomLine);
 
@@ -165,7 +177,21 @@ export function useTimelineViewport({
     }
 
     setLastContentHeight(totalContentHeight);
-  }, [totalContentHeight, lastContentHeight, shouldAutoJump, viewportLines]);
+  }, [
+    totalContentHeight,
+    lastContentHeight,
+    hasInitiallyPositioned,
+    timeline.items.length,
+    shouldAutoJump,
+    viewportLines,
+  ]);
+
+  // Reset positioning flag when timeline becomes empty (new conversation)
+  useEffect(() => {
+    if (timeline.items.length === 0) {
+      setHasInitiallyPositioned(false);
+    }
+  }, [timeline.items.length]);
 
   // Navigation functions - pure, testable logic
   const navigateUp = useCallback(() => {
