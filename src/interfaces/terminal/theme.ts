@@ -48,7 +48,9 @@ export const UI_SYMBOLS = {
 
   // Toolbox markers
   TOOLBOX_SINGLE: '⊂', // Single line toolbox marker
+  TOOLBOX_SINGLE_EXPANDABLE: '⤹', // Single line expandable toolbox marker
   TOOLBOX_TOP: '╭', // Multi-line toolbox top marker
+  TOOLBOX_TOP_EXPANDABLE: '⤹', // Multi-line expandable toolbox top marker
   TOOLBOX_MIDDLE: '│', // Multi-line toolbox middle marker
   TOOLBOX_BOTTOM: '╰', // Multi-line toolbox bottom marker
 

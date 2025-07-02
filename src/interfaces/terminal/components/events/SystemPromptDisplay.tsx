@@ -46,6 +46,7 @@ export function SystemPromptDisplay({
       isSelected={isSelected}
       onToggle={onToggle}
       status="none"
+      isExpandable={true}
     >
       <Text color="blue" wrap="wrap">
         {systemPrompt}

@@ -89,19 +89,19 @@ export function useToolRenderer(
   // Create standardized fancy label
   const fancyLabel = (
     <React.Fragment>
-      <Text color={UI_COLORS.TOOL}>{config.toolName}: </Text>
-      <Text color="white">{primaryInfo}</Text>
-      {secondaryInfo && <Text color="gray">{secondaryInfo}</Text>}
-      <Text color="gray">  </Text>
       <Text color={success ? UI_COLORS.SUCCESS : UI_COLORS.ERROR}>
         {statusIcon}
       </Text>
+      <Text color="gray"> </Text>
+      <Text color={UI_COLORS.TOOL}>{config.toolName}: </Text>
+      <Text color="white">{primaryInfo}</Text>
+      {secondaryInfo && <Text color="gray">{secondaryInfo}</Text>}
       {isStreaming && <Text color="gray"> ({config.streamingAction})</Text>}
     </React.Fragment>
   );
 
   // Create standardized compact summary
-  const compactSummary = result && success && (
+  const compactSummary = result && success && (stats || previewContent) && (
     <Box marginTop={1}>
       <Box flexDirection="column">
         {stats && <Text color="gray">{stats}</Text>}
@@ -153,6 +153,7 @@ export function useToolRenderer(
       isSelected={isSelected}
       onToggle={onToggle}
       status={markerStatus}
+      isExpandable={true}
     >
       {expandedContent}
     </TimelineEntryCollapsibleBox>

@@ -81,37 +81,32 @@ export function BashToolRenderer({
         const stats = exitCodeDisplay || undefined;
 
         // Create preview content (stdout for success, stderr for failure)
-        const previewContent = bashOutput && (
-          <Box flexDirection="column">
-            {commandSuccess ? (
-              // Show stdout preview for successful commands
-              stdout && (() => {
-                const { lines, truncated, remaining } = limitLines(stdout, 3);
-                return (
-                  <Box flexDirection="column">
-                    <Text>{lines.join('\n')}</Text>
-                    {truncated && (
-                      <Text color="gray">(+ {remaining} lines)</Text>
-                    )}
-                  </Box>
-                );
-              })()
-            ) : (
-              // Show stderr preview for failed commands
-              stderr && (() => {
-                const { lines, truncated, remaining } = limitLines(stderr, 3);
-                return (
-                  <Box flexDirection="column">
-                    <Text color="red">{lines.join('\n')}</Text>
-                    {truncated && (
-                      <Text color="gray">(+ {remaining} lines)</Text>
-                    )}
-                  </Box>
-                );
-              })()
-            )}
-          </Box>
-        );
+        let previewContent = null;
+        if (bashOutput) {
+          if (commandSuccess && stdout) {
+            // Show stdout preview for successful commands
+            const { lines, truncated, remaining } = limitLines(stdout, 3);
+            previewContent = (
+              <Box flexDirection="column">
+                <Text>{lines.join('\n')}</Text>
+                {truncated && (
+                  <Text color="gray">(+ {remaining} lines)</Text>
+                )}
+              </Box>
+            );
+          } else if (!commandSuccess && stderr) {
+            // Show stderr preview for failed commands
+            const { lines, truncated, remaining } = limitLines(stderr, 3);
+            previewContent = (
+              <Box flexDirection="column">
+                <Text color="red">{lines.join('\n')}</Text>
+                {truncated && (
+                  <Text color="gray">(+ {remaining} lines)</Text>
+                )}
+              </Box>
+            );
+          }
+        }
 
         // Create main content for expanded view
         const mainContent = (

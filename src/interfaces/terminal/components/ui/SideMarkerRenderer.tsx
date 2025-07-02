@@ -12,25 +12,26 @@ interface SideMarkerRendererProps {
   isSelected: boolean;
   contentHeight?: number; // Optional override for content height
   isExpanded?: boolean; // Whether the content is expanded (for measurement timing)
+  isExpandable?: boolean; // Whether the content can be expanded (affects marker symbols)
   children: React.ReactNode;
 }
 
-export function getMarkerCharacters(height: number): {
+export function getMarkerCharacters(height: number, isExpandable: boolean = false, isExpanded: boolean = false): {
   top?: string;
   middle?: string;
   bottom?: string;
   single?: string;
 } {
   if (height === 1) {
-    return { single: UI_SYMBOLS.TOOLBOX_SINGLE };
+    return { single: isExpandable ? UI_SYMBOLS.TOOLBOX_SINGLE_EXPANDABLE : UI_SYMBOLS.TOOLBOX_SINGLE };
   } else if (height === 2) {
     return { 
-      top: UI_SYMBOLS.TOOLBOX_TOP, 
+      top: (isExpandable && !isExpanded) ? UI_SYMBOLS.TOOLBOX_TOP_EXPANDABLE : UI_SYMBOLS.TOOLBOX_TOP, 
       bottom: UI_SYMBOLS.TOOLBOX_BOTTOM 
     };
   } else {
     return {
-      top: UI_SYMBOLS.TOOLBOX_TOP,
+      top: (isExpandable && !isExpanded) ? UI_SYMBOLS.TOOLBOX_TOP_EXPANDABLE : UI_SYMBOLS.TOOLBOX_TOP,
       middle: UI_SYMBOLS.TOOLBOX_MIDDLE,
       bottom: UI_SYMBOLS.TOOLBOX_BOTTOM
     };
@@ -52,6 +53,7 @@ export function SideMarkerRenderer({
   isSelected, 
   contentHeight: providedHeight, 
   isExpanded,
+  isExpandable = false,
   children 
 }: SideMarkerRendererProps) {
   const contentRef = useRef<any>(null);
@@ -92,7 +94,7 @@ export function SideMarkerRenderer({
   
   // Use provided height if available, otherwise use measured height
   const actualHeight = providedHeight ?? measuredHeight;
-  const markers = getMarkerCharacters(actualHeight);
+  const markers = getMarkerCharacters(actualHeight, isExpandable, isExpanded);
   const color = getMarkerColor(status, isSelected);
   
   if (markers.single) {

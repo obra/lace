@@ -30,7 +30,6 @@ export function CollapsibleBox({
     <Box flexDirection="column">
       {label && (
         <Box>
-          <Text color={borderColor}>{isExpanded ? UI_SYMBOLS.EXPANDED : UI_SYMBOLS.COLLAPSED}</Text>
           {typeof label === 'string' ? (
             <Text color={borderColor}>{label}</Text>
           ) : (

@@ -20,6 +20,7 @@ interface TimelineEntryCollapsibleBoxProps {
   // SideMarkerRenderer props
   status?: MarkerStatus;
   contentHeight?: number; // Override automatic height detection
+  isExpandable?: boolean; // Whether content can be expanded
 }
 
 export function TimelineEntryCollapsibleBox({
@@ -34,6 +35,7 @@ export function TimelineEntryCollapsibleBox({
   onToggle,
   status = 'none',
   contentHeight,
+  isExpandable = false,
 }: TimelineEntryCollapsibleBoxProps) {
   const prevExpandedRef = useRef<boolean | undefined>(undefined);
 
@@ -53,12 +55,13 @@ export function TimelineEntryCollapsibleBox({
   // Always use SideMarkerRenderer for consistent toolbox-style markers
   // Provides status-based visual indicators that replace traditional borders
   return (
-    <Box paddingBottom={1}>
+    <Box marginBottom={1}>
       <SideMarkerRenderer
         status={status}
         isSelected={isSelected || isFocused}
         contentHeight={contentHeight}
         isExpanded={isExpanded}
+        isExpandable={isExpandable}
       >
         <CollapsibleBox
           children={children}

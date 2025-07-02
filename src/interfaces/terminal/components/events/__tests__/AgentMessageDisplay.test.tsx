@@ -75,7 +75,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       // Should show collapsed state with Agent Response label
       expect(lastFrame()).toContain('Agent Response');
       expect(lastFrame()).toContain('/thought for 2 words/');
-      expect(lastFrame()).toContain(UI_SYMBOLS.COLLAPSED);
+      expect(lastFrame()).toContain(UI_SYMBOLS.TOOLBOX_SINGLE_EXPANDABLE);
     });
 
     it('should not use collapsible for messages without thinking blocks', () => {
@@ -143,7 +143,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       );
 
       const frame = lastFrame();
-      expect(frame).toContain(UI_SYMBOLS.COLLAPSED);
+      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE_EXPANDABLE);
       expect(frame).toContain('Agent Response');
       // Should show summary content with thinking marker
       expect(frame).toContain('/thought for 2 words/');
