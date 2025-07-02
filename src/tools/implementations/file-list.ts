@@ -4,13 +4,12 @@
 import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import {
-  Tool,
   ToolCall,
   ToolResult,
   ToolContext,
   createSuccessResult,
-  createErrorResult,
 } from '../types.js';
+import { BaseTool, ValidationError } from '../base-tool.js';
 
 interface FileEntry {
   name: string;
@@ -28,7 +27,7 @@ interface TreeNode {
   size?: number;
 }
 
-export class FileListTool implements Tool {
+export class FileListTool extends BaseTool {
   name = 'file_list';
   description = 'List files and directories with optional filtering';
   annotations = {
@@ -53,25 +52,59 @@ export class FileListTool implements Tool {
   };
 
   async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-    const {
-      path = '.',
-      pattern,
-      includeHidden = false,
-      recursive = false,
-      maxDepth = 3,
-      summaryThreshold = 50,
-      maxResults = 50,
-    } = call.arguments as {
-      path?: string;
-      pattern?: string;
-      includeHidden?: boolean;
-      recursive?: boolean;
-      maxDepth?: number;
-      summaryThreshold?: number;
-      maxResults?: number;
-    };
-
     try {
+      const path = this.validateOptionalParam(
+        call.arguments.path,
+        'path',
+        (value) => this.validateNonEmptyStringParam(value, 'path'),
+        call.id
+      ) ?? '.';
+
+      const pattern = this.validateOptionalParam(
+        call.arguments.pattern,
+        'pattern',
+        (value) => this.validateStringParam(value, 'pattern'),
+        call.id
+      );
+
+      const includeHidden = this.validateOptionalParam(
+        call.arguments.includeHidden,
+        'includeHidden',
+        (value) => this.validateBooleanParam(value, 'includeHidden'),
+        call.id
+      ) ?? false;
+
+      const recursive = this.validateOptionalParam(
+        call.arguments.recursive,
+        'recursive',
+        (value) => this.validateBooleanParam(value, 'recursive'),
+        call.id
+      ) ?? false;
+
+      const maxDepth = this.validateOptionalParam(
+        call.arguments.maxDepth,
+        'maxDepth',
+        (value) => this.validateNumberParam(value, 'maxDepth', call.id, { min: 1, max: 10, integer: true }),
+        call.id
+      ) ?? 3;
+
+      const summaryThreshold = this.validateOptionalParam(
+        call.arguments.summaryThreshold,
+        'summaryThreshold',
+        (value) => this.validateNumberParam(value, 'summaryThreshold', call.id, { min: 1, max: 200, integer: true }),
+        call.id
+      ) ?? 50;
+
+      const maxResults = this.validateOptionalParam(
+        call.arguments.maxResults,
+        'maxResults',
+        (value) => this.validateNumberParam(value, 'maxResults', call.id, { min: 1, max: 1000, integer: true }),
+        call.id
+      ) ?? 50;
+
+      // Validate directory exists before listing
+      await this.validateDirectoryExists(path, call.id);
+
       const resultCounter = { count: 0, truncated: false };
       const tree = await this.buildTree(path, {
         pattern,
@@ -107,7 +140,13 @@ export class FileListTool implements Tool {
         call.id
       );
     } catch (error) {
-      return createErrorResult(
+      if (error instanceof ValidationError) {
+        return error.toolResult;
+      }
+
+      return this.createStructuredError(
+        'Directory listing failed',
+        'Check the directory path and parameters, then try again',
         error instanceof Error ? error.message : 'Unknown error occurred',
         call.id
       );

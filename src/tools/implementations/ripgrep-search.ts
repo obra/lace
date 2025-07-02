@@ -4,13 +4,12 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import {
-  Tool,
   ToolCall,
   ToolResult,
   ToolContext,
   createSuccessResult,
-  createErrorResult,
 } from '../types.js';
+import { BaseTool, ValidationError } from '../base-tool.js';
 
 const execAsync = promisify(exec);
 
@@ -20,7 +19,7 @@ interface SearchMatch {
   content: string;
 }
 
-export class RipgrepSearchTool implements Tool {
+export class RipgrepSearchTool extends BaseTool {
   name = 'ripgrep_search';
   description = 'Fast text search across files using ripgrep';
   annotations = {
@@ -50,31 +49,57 @@ export class RipgrepSearchTool implements Tool {
   };
 
   async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-    const {
-      pattern,
-      path = '.',
-      caseSensitive = false,
-      wholeWord = false,
-      includePattern,
-      excludePattern,
-      maxResults = 50,
-      contextLines = 0,
-    } = call.arguments as {
-      pattern: string;
-      path?: string;
-      caseSensitive?: boolean;
-      wholeWord?: boolean;
-      includePattern?: string;
-      excludePattern?: string;
-      maxResults?: number;
-      contextLines?: number;
-    };
-
-    if (!pattern || typeof pattern !== 'string') {
-      return createErrorResult('Pattern must be a non-empty string', call.id);
-    }
-
     try {
+      const pattern = this.validateNonEmptyStringParam(call.arguments.pattern, 'pattern', call.id);
+      const path = this.validateOptionalParam(
+        call.arguments.path,
+        'path',
+        (value) => this.validateNonEmptyStringParam(value, 'path'),
+        call.id
+      ) ?? '.';
+      
+      const caseSensitive = this.validateOptionalParam(
+        call.arguments.caseSensitive,
+        'caseSensitive',
+        (value) => this.validateBooleanParam(value, 'caseSensitive'),
+        call.id
+      ) ?? false;
+
+      const wholeWord = this.validateOptionalParam(
+        call.arguments.wholeWord,
+        'wholeWord',
+        (value) => this.validateBooleanParam(value, 'wholeWord'),
+        call.id
+      ) ?? false;
+
+      const includePattern = this.validateOptionalParam(
+        call.arguments.includePattern,
+        'includePattern',
+        (value) => this.validateStringParam(value, 'includePattern'),
+        call.id
+      );
+
+      const excludePattern = this.validateOptionalParam(
+        call.arguments.excludePattern,
+        'excludePattern',
+        (value) => this.validateStringParam(value, 'excludePattern'),
+        call.id
+      );
+
+      const maxResults = this.validateOptionalParam(
+        call.arguments.maxResults,
+        'maxResults',
+        (value) => this.validateNumberParam(value, 'maxResults', call.id, { min: 1, max: 1000, integer: true }),
+        call.id
+      ) ?? 50;
+
+      const contextLines = this.validateOptionalParam(
+        call.arguments.contextLines,
+        'contextLines',
+        (value) => this.validateNumberParam(value, 'contextLines', call.id, { min: 0, max: 10, integer: true }),
+        call.id
+      ) ?? 0;
+
       const args = this.buildRipgrepArgs({
         pattern,
         path,
@@ -125,18 +150,28 @@ export class RipgrepSearchTool implements Tool {
         throw execError;
       }
     } catch (error) {
-      let errorMessage = 'Unknown error occurred';
+      if (error instanceof ValidationError) {
+        return error.toolResult;
+      }
 
       if (error instanceof Error) {
-        errorMessage = error.message;
-
         // Check if ripgrep is not installed
-        if (errorMessage.includes('command not found') || errorMessage.includes('not recognized')) {
-          errorMessage = 'ripgrep (rg) command not found. Please install ripgrep to use this tool.';
+        if (error.message.includes('command not found') || error.message.includes('not recognized')) {
+          return this.createStructuredError(
+            'ripgrep (rg) command not found',
+            'Install ripgrep to use this tool: brew install ripgrep (macOS) or apt-get install ripgrep (Linux)',
+            'Search tool dependency missing',
+            call.id
+          );
         }
       }
 
-      return createErrorResult(errorMessage, call.id);
+      return this.createStructuredError(
+        'Search operation failed',
+        'Check the search pattern and directory path, then try again',
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
   }
 
