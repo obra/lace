@@ -29,6 +29,7 @@ import { ThreadEvent } from '../../threads/types.js';
 import { ThreadProcessor } from '../thread-processor.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 import { LaceFocusProvider } from './focus/index.js';
+import { useProjectContext } from './hooks/use-project-context.js';
 
 // ThreadProcessor context for interface-level caching
 const ThreadProcessorContext = createContext<ThreadProcessor | null>(null);
@@ -210,6 +211,16 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
   // Timeline layout debug panel state
   const [isTimelineLayoutDebugVisible, setIsTimelineLayoutDebugVisible] = useState(false);
+
+  // Project context hook for double status bar
+  const { context: projectContext, refreshContext } = useProjectContext();
+
+  // Refresh project context when processing completes (tools may have changed git status)
+  useEffect(() => {
+    if (!isProcessing) {
+      refreshContext();
+    }
+  }, [isProcessing, refreshContext]);
 
   // Tool approval modal state
   const [approvalRequest, setApprovalRequest] = useState<{
@@ -747,6 +758,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               messageCount={events.length + ephemeralMessages.length}
               isTurnActive={isTurnActive}
               turnMetrics={currentTurnMetrics}
+              projectContext={projectContext}
             />
 
             {/* Input area or modal - takes natural height */}
