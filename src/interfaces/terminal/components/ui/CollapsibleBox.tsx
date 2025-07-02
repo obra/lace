@@ -26,6 +26,9 @@ export function CollapsibleBox({
   borderColor = 'gray',
   isSelected = false,
 }: CollapsibleBoxProps) {
+  // Only show expand/collapse hints if there's actually expandable content
+  const hasExpandableContent = children || summary;
+  
   return (
     <Box flexDirection="column">
       {label && (
@@ -35,7 +38,7 @@ export function CollapsibleBox({
           ) : (
             label
           )}
-          {isSelected && (
+          {isSelected && hasExpandableContent && (
             <Text color="gray">
               {' '}
               ({isExpanded 
