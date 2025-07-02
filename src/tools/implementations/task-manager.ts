@@ -2,13 +2,12 @@
 // ABOUTME: In-memory task storage for current session workflow management
 
 import {
-  Tool,
   ToolCall,
   ToolResult,
   ToolContext,
   createSuccessResult,
-  createErrorResult,
 } from '../types.js';
+import { BaseTool, ValidationError } from '../base-tool.js';
 
 interface Task {
   id: string;
@@ -78,7 +77,7 @@ export function clearAllTaskStores(): void {
   taskStores.clear();
 }
 
-export class TaskAddTool implements Tool {
+export class TaskAddTool extends BaseTool {
   name = 'task_add';
   description = 'Add a new task to the session task list';
   annotations = {
@@ -93,28 +92,37 @@ export class TaskAddTool implements Tool {
   };
 
   async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
-    const { description } = call.arguments as { description: string };
+    try {
+      const description = this.validateNonEmptyStringParam(call.arguments.description, 'description', call.id);
 
-    if (!description || typeof description !== 'string' || description.trim() === '') {
-      return createErrorResult('Description must be a non-empty string', call.id);
+      const taskStore = getTaskStore(context?.threadId);
+      const task = taskStore.addTask(description.trim());
+
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: `Added task #${task.id}: ${task.description}`,
+          },
+        ],
+        call.id
+      );
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return error.toolResult;
+      }
+
+      return this.createStructuredError(
+        'Failed to add task',
+        'Provide a valid task description and try again',
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
-
-    const taskStore = getTaskStore(context?.threadId);
-    const task = taskStore.addTask(description.trim());
-
-    return createSuccessResult(
-      [
-        {
-          type: 'text',
-          text: `Added task #${task.id}: ${task.description}`,
-        },
-      ],
-      call.id
-    );
   }
 }
 
-export class TaskListTool implements Tool {
+export class TaskListTool extends BaseTool {
   name = 'task_list';
   description = 'List current session tasks';
   annotations = {
@@ -133,7 +141,13 @@ export class TaskListTool implements Tool {
   };
 
   async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
-    const { includeCompleted = false } = call.arguments as { includeCompleted?: boolean };
+    try {
+      const includeCompleted = this.validateOptionalParam(
+        call.arguments.includeCompleted,
+        'includeCompleted',
+        (value) => this.validateBooleanParam(value, 'includeCompleted'),
+        call.id
+      ) ?? false;
 
     const taskStore = getTaskStore(context?.threadId);
     const tasks = taskStore.getTasks(includeCompleted);
@@ -164,19 +178,31 @@ export class TaskListTool implements Tool {
       ? `Tasks (${tasks.filter((t) => !t.completed).length} pending, ${tasks.filter((t) => t.completed).length} completed):`
       : `Pending tasks (${tasks.length}):`;
 
-    return createSuccessResult(
-      [
-        {
-          type: 'text',
-          text: `${summary}\n${taskLines.join('\n')}`,
-        },
-      ],
-      call.id
-    );
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: `${summary}\n${taskLines.join('\n')}`,
+          },
+        ],
+        call.id
+      );
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return error.toolResult;
+      }
+
+      return this.createStructuredError(
+        'Failed to list tasks',
+        'Check the parameters and try again',
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
+    }
   }
 }
 
-export class TaskCompleteTool implements Tool {
+export class TaskCompleteTool extends BaseTool {
   name = 'task_complete';
   description = 'Mark a task as completed';
   annotations = {
@@ -191,27 +217,41 @@ export class TaskCompleteTool implements Tool {
   };
 
   async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
-    const { id } = call.arguments as { id: string };
+    try {
+      const id = this.validateNonEmptyStringParam(call.arguments.id, 'id', call.id);
 
-    if (!id || typeof id !== 'string') {
-      return createErrorResult('Task ID must be a non-empty string', call.id);
+      const taskStore = getTaskStore(context?.threadId);
+      const task = taskStore.completeTask(id);
+
+      if (!task) {
+        return this.createStructuredError(
+          `Task #${id} not found`,
+          'Check the task ID and ensure the task exists',
+          'Task lookup failed',
+          call.id
+        );
+      }
+
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: `Completed task #${task.id}: ${task.description}`,
+          },
+        ],
+        call.id
+      );
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return error.toolResult;
+      }
+
+      return this.createStructuredError(
+        'Failed to complete task',
+        'Provide a valid task ID and try again',
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
-
-    const taskStore = getTaskStore(context?.threadId);
-    const task = taskStore.completeTask(id);
-
-    if (!task) {
-      return createErrorResult(`Task #${id} not found`, call.id);
-    }
-
-    return createSuccessResult(
-      [
-        {
-          type: 'text',
-          text: `Completed task #${task.id}: ${task.description}`,
-        },
-      ],
-      call.id
-    );
   }
 }

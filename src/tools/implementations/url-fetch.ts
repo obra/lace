@@ -7,13 +7,13 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import TurndownService from 'turndown';
 import {
-  Tool,
   ToolCall,
   ToolResult,
   ToolContext,
   createSuccessResult,
   createErrorResult,
 } from '../types.js';
+import { BaseTool, ValidationError } from '../base-tool.js';
 import { logger } from '../../utils/logger.js';
 
 // Constants for configuration and validation
@@ -70,7 +70,7 @@ interface RichErrorContext {
   };
 }
 
-export class UrlFetchTool implements Tool {
+export class UrlFetchTool extends BaseTool {
   name = 'url_fetch';
   description =
     'Fetch content from web URLs with intelligent content handling. WARNING: Returned content can be very large and may exceed token limits. Consider delegating URL fetching to a subtask to avoid overwhelming the main conversation.';
@@ -205,35 +205,93 @@ export class UrlFetchTool implements Tool {
   }
 
   async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-    // Validate required properties before destructuring
-    if (!call.arguments.url || typeof call.arguments.url !== 'string') {
-      return this.createRichError(
-        {
-          error: {
-            type: 'validation',
-            message: 'URL is required and must be a non-empty string',
-          },
-          request: {
-            url: String(call.arguments.url || 'undefined'),
-            method: 'GET',
-            headers: {},
-            timing: { start: Date.now() },
-          },
+    try {
+      const url = this.validateNonEmptyStringParam(call.arguments.url, 'url', call.id);
+      const method = this.validateOptionalParam(
+        call.arguments.method,
+        'method',
+        (value) => {
+          if (typeof value !== 'string' || !VALID_HTTP_METHODS.includes(value as HttpMethod)) {
+            throw new Error(`Must be one of: ${VALID_HTTP_METHODS.join(', ')}`);
+          }
+          return value as HttpMethod;
         },
+        call.id
+      ) ?? 'GET';
+
+      const headers = this.validateOptionalParam(
+        call.arguments.headers,
+        'headers',
+        (value) => {
+          if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+            throw new Error('Must be an object with string values');
+          }
+          return value as Record<string, string>;
+        },
+        call.id
+      ) ?? {};
+
+      const body = this.validateOptionalParam(
+        call.arguments.body,
+        'body',
+        (value) => this.validateStringParam(value, 'body'),
+        call.id
+      );
+
+      const timeout = this.validateOptionalParam(
+        call.arguments.timeout,
+        'timeout',
+        (value) => this.validateNumberParam(value, 'timeout', call.id, { min: MIN_TIMEOUT, max: MAX_TIMEOUT, integer: true }),
+        call.id
+      ) ?? DEFAULT_TIMEOUT;
+
+      const maxSize = this.validateOptionalParam(
+        call.arguments.maxSize,
+        'maxSize',
+        (value) => this.validateNumberParam(value, 'maxSize', call.id, { min: MIN_SIZE, max: MAX_SIZE_LIMIT, integer: true }),
+        call.id
+      ) ?? DEFAULT_MAX_SIZE;
+
+      const followRedirects = this.validateOptionalParam(
+        call.arguments.followRedirects,
+        'followRedirects',
+        (value) => this.validateBooleanParam(value, 'followRedirects'),
+        call.id
+      ) ?? true;
+
+      const returnContent = this.validateOptionalParam(
+        call.arguments.returnContent,
+        'returnContent',
+        (value) => this.validateBooleanParam(value, 'returnContent'),
+        call.id
+      ) ?? true;
+
+      return await this.performFetch({
+        url,
+        method,
+        headers,
+        body,
+        timeout,
+        maxSize,
+        followRedirects,
+        returnContent,
+      }, call.id);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return error.toolResult;
+      }
+
+      return this.createStructuredError(
+        'URL fetch validation failed',
+        'Check the URL and parameters, then try again',
+        error instanceof Error ? error.message : 'Unknown error occurred',
         call.id
       );
     }
+  }
 
-    const {
-      url,
-      method = 'GET',
-      headers = {},
-      body,
-      timeout = DEFAULT_TIMEOUT,
-      maxSize = DEFAULT_MAX_SIZE,
-      followRedirects = true,
-      returnContent = true,
-    } = call.arguments as unknown as UrlFetchInput;
+  private async performFetch(params: UrlFetchInput, callId?: string): Promise<ToolResult> {
+    const { url, method, headers, body, timeout, maxSize, followRedirects, returnContent } = params;
 
     const timing: RequestTiming = {
       start: Date.now(),
@@ -254,79 +312,7 @@ export class UrlFetchTool implements Tool {
             headers,
           },
         },
-        call.id
-      );
-    }
-
-    if (typeof timeout !== 'number' || timeout < MIN_TIMEOUT || timeout > MAX_TIMEOUT) {
-      return this.createRichError(
-        {
-          error: {
-            type: 'validation',
-            message: `Timeout must be between ${MIN_TIMEOUT} and ${MAX_TIMEOUT} milliseconds`,
-          },
-          request: {
-            url,
-            method,
-            headers,
-          },
-        },
-        call.id
-      );
-    }
-
-    if (typeof maxSize !== 'number' || maxSize < MIN_SIZE || maxSize > MAX_SIZE_LIMIT) {
-      return this.createRichError(
-        {
-          error: {
-            type: 'validation',
-            message: `Max size must be between ${MIN_SIZE} and ${MAX_SIZE_LIMIT} bytes`,
-          },
-          request: {
-            url,
-            method,
-            headers,
-          },
-        },
-        call.id
-      );
-    }
-
-    if (!VALID_HTTP_METHODS.includes(method as HttpMethod)) {
-      return this.createRichError(
-        {
-          error: {
-            type: 'validation',
-            message: `Method must be one of: ${VALID_HTTP_METHODS.join(', ')}`,
-          },
-          request: {
-            url,
-            method,
-            headers,
-          },
-        },
-        call.id
-      );
-    }
-
-    // Validate returnContent parameter
-    if (
-      call.arguments.returnContent !== undefined &&
-      typeof call.arguments.returnContent !== 'boolean'
-    ) {
-      return this.createRichError(
-        {
-          error: {
-            type: 'validation',
-            message: 'returnContent must be a boolean value',
-          },
-          request: {
-            url,
-            method,
-            headers,
-          },
-        },
-        call.id
+        callId
       );
     }
 
