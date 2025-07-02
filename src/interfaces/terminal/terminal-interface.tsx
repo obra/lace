@@ -721,16 +721,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             </TimelineExpansionProvider>
           </Box>
 
-          {/* Tool approval modal */}
-          {approvalRequest && (
-            <ToolApprovalModal
-              toolName={approvalRequest.toolName}
-              input={approvalRequest.input}
-              isReadOnly={approvalRequest.isReadOnly}
-              onDecision={handleApprovalDecision}
-              isVisible={true}
-            />
-          )}
 
           {/* Bottom section - debug panel, status bar, input anchored to bottom */}
           <Box flexDirection="column" flexShrink={0} ref={bottomSectionRef}>
