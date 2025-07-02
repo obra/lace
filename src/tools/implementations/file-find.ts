@@ -35,6 +35,7 @@ export class FileFindTool implements Tool {
         type: 'boolean',
         description: 'Include hidden files/directories (default: false)',
       },
+      maxResults: { type: 'number', description: 'Maximum number of results (default: 50)' },
     },
     required: ['pattern'],
   };
@@ -47,6 +48,7 @@ export class FileFindTool implements Tool {
       caseSensitive = false,
       maxDepth = 10,
       includeHidden = false,
+      maxResults = 50,
     } = call.arguments as {
       pattern: string;
       path?: string;
@@ -54,6 +56,7 @@ export class FileFindTool implements Tool {
       caseSensitive?: boolean;
       maxDepth?: number;
       includeHidden?: boolean;
+      maxResults?: number;
     };
 
     if (!pattern || typeof pattern !== 'string') {
@@ -70,11 +73,27 @@ export class FileFindTool implements Tool {
         caseSensitive,
         maxDepth,
         includeHidden,
+        maxResults,
         currentDepth: 0,
       });
 
-      const resultText =
-        matches.length > 0 ? matches.join('\n') : `No files found matching pattern: ${pattern}`;
+      const limitedMatches = matches.slice(0, maxResults);
+      const resultLines: string[] = [];
+
+      if (limitedMatches.length > 0) {
+        resultLines.push(...limitedMatches);
+
+        // Add truncation message if we hit the limit
+        if (matches.length > maxResults) {
+          resultLines.push(
+            `Results limited to ${maxResults}. Use maxResults parameter to see more.`
+          );
+        }
+      } else {
+        resultLines.push(`No files found matching pattern: ${pattern}`);
+      }
+
+      const resultText = resultLines.join('\n');
 
       return createSuccessResult(
         [
@@ -101,6 +120,7 @@ export class FileFindTool implements Tool {
       caseSensitive: boolean;
       maxDepth: number;
       includeHidden: boolean;
+      maxResults: number;
       currentDepth: number;
     }
   ): Promise<string[]> {
@@ -133,6 +153,11 @@ export class FileFindTool implements Tool {
 
           if (shouldInclude && this.matchesPattern(item, options.pattern, options.caseSensitive)) {
             matches.push(fullPath);
+
+            // Early termination: collect more than maxResults to detect truncation later
+            if (matches.length > options.maxResults) {
+              return matches;
+            }
           }
 
           // Recurse into directories
@@ -142,6 +167,11 @@ export class FileFindTool implements Tool {
               currentDepth: options.currentDepth + 1,
             });
             matches.push(...subMatches);
+
+            // Early termination: collect more than maxResults to detect truncation later
+            if (matches.length > options.maxResults) {
+              return matches;
+            }
           }
         } catch {
           // Skip items we can't stat (permission issues, broken symlinks, etc.)
