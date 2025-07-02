@@ -1,5 +1,5 @@
 // ABOUTME: Custom hook for timeline viewport state management including scrolling and selection
-// ABOUTME: Encapsulates measurement, keyboard navigation, and auto-scroll behavior
+// ABOUTME: Encapsulates measurement, keyboard navigation, and auto-jump to latest content
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { measureElement, DOMElement } from 'ink';
@@ -31,12 +31,14 @@ export interface UseTimelineViewportOptions {
   timeline: Timeline;
   viewportLines: number;
   itemRefs: React.MutableRefObject<Map<number, unknown>>;
+  isFocused?: boolean;
 }
 
 export function useTimelineViewport({
   timeline,
   viewportLines,
   itemRefs,
+  isFocused = false,
 }: UseTimelineViewportOptions): ViewportState & ViewportActions {
   const [selectedLine, setSelectedLine] = useState<number>(0);
   const [lineScrollOffset, setLineScrollOffset] = useState<number>(0);
@@ -122,26 +124,76 @@ export function useTimelineViewport({
     setLastTimelineItemCount(timeline.items.length);
   }, [timeline.items.length]);
 
-  // Initialize to bottom when NEW CONTENT is added (but not during refocus after toggle)
+  // Focus-aware positioning - only jump to latest when timeline not focused
+  const shouldAutoJump = useCallback(() => {
+    return !isFocused;
+  }, [isFocused]);
+
+  // Helper to jump to bottom with viewport scroll
+  const jumpToBottom = useCallback(() => {
+    const bottomLine = Math.max(0, totalContentHeight - 1);
+    setSelectedLine(bottomLine);
+
+    // Update viewport scroll to show bottom
+    const maxScroll = Math.max(0, totalContentHeight - viewportLines);
+    setLineScrollOffset(maxScroll);
+  }, [totalContentHeight, viewportLines]);
+
+  // Jump to bottom when NEW CONTENT is added or on initial load
   useEffect(() => {
     const hasNewContent = timeline.items.length > lastTimelineItemCount;
+    const isInitialLoad = lastTimelineItemCount === 0 && timeline.items.length > 0;
 
-    if (totalContentHeight > 0 && itemToReselectAfterMeasurement === -1 && hasNewContent) {
-      // Only scroll to bottom for NEW timeline items, not height changes due to expansion
-      const bottomLine = Math.max(0, totalContentHeight - 1);
-      setSelectedLine(bottomLine);
-
-      // Scroll to show the bottom
-      const maxScroll = Math.max(0, totalContentHeight - viewportLines);
-      setLineScrollOffset(maxScroll);
+    if ((hasNewContent || isInitialLoad) && totalContentHeight > 0 && shouldAutoJump()) {
+      jumpToBottom();
     }
   }, [
     totalContentHeight,
     viewportLines,
-    itemToReselectAfterMeasurement,
     timeline.items.length,
     lastTimelineItemCount,
+    shouldAutoJump,
+    jumpToBottom,
   ]);
+
+  // Track content height changes for streaming updates and initial positioning
+  const [lastContentHeight, setLastContentHeight] = useState<number>(0);
+  const [hasInitiallyPositioned, setHasInitiallyPositioned] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Handle initial positioning when measurement becomes available (addresses race condition)
+    if (totalContentHeight > 0 && !hasInitiallyPositioned && timeline.items.length > 0) {
+      const bottomLine = Math.max(0, totalContentHeight - 1);
+      setSelectedLine(bottomLine);
+
+      // Update viewport scroll to show bottom
+      const maxScroll = Math.max(0, totalContentHeight - viewportLines);
+      setLineScrollOffset(maxScroll);
+
+      setHasInitiallyPositioned(true);
+    }
+    // Jump to bottom on content height increase (streaming)
+    else if (totalContentHeight > lastContentHeight && lastContentHeight > 0 && shouldAutoJump()) {
+      jumpToBottom();
+    }
+
+    setLastContentHeight(totalContentHeight);
+  }, [
+    totalContentHeight,
+    lastContentHeight,
+    hasInitiallyPositioned,
+    timeline.items.length,
+    shouldAutoJump,
+    viewportLines,
+    jumpToBottom,
+  ]);
+
+  // Reset positioning flag when timeline becomes empty (new conversation)
+  useEffect(() => {
+    if (timeline.items.length === 0) {
+      setHasInitiallyPositioned(false);
+    }
+  }, [timeline.items.length]);
 
   // Navigation functions - pure, testable logic
   const navigateUp = useCallback(() => {

@@ -59,6 +59,7 @@ export function TimelineViewport({
     timeline,
     viewportLines,
     itemRefs,
+    isFocused,
   });
 
   // Measure scroll indicator heights
@@ -102,6 +103,7 @@ export function TimelineViewport({
         logger.debug('TimelineViewport: Ignoring key in main timeline while in delegate context');
         return; // Let delegate timeline handle all keys
       }
+
 
       // No escape handling - provider handles global escape to pop focus stack
 
