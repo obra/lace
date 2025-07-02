@@ -7,6 +7,8 @@ import {
   ToolCall,
   ToolResult,
   ToolContext,
+  ToolInputSchema,
+  ContentBlock,
   createSuccessResult,
   createErrorResult,
 } from './types.js';
@@ -27,7 +29,7 @@ export class ValidationError extends Error {
 export abstract class BaseTool implements Tool {
   abstract name: string;
   abstract description: string;
-  abstract inputSchema: Record<string, unknown>;
+  abstract inputSchema: ToolInputSchema;
   abstract annotations?: Record<string, unknown>;
 
   abstract executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult>;
@@ -425,7 +427,7 @@ export abstract class BaseTool implements Tool {
    * Creates a success result with helpful metadata
    */
   protected createSuccessWithMetadata(
-    content: unknown[],
+    content: ContentBlock[],
     metadata: Record<string, unknown>,
     callId?: string
   ): ToolResult {

@@ -1,18 +1,17 @@
 // ABOUTME: File finding tool using name patterns and glob matching
 // ABOUTME: Recursively searches for files matching specified patterns
 
-import { readdir, stat, access } from 'fs/promises';
+import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import {
-  Tool,
   ToolCall,
   ToolResult,
   ToolContext,
   createSuccessResult,
-  createErrorResult,
 } from '../types.js';
+import { BaseTool, ValidationError } from '../base-tool.js';
 
-export class FileFindTool implements Tool {
+export class FileFindTool extends BaseTool {
   name = 'file_find';
   description = 'Find files by name pattern or glob';
   annotations = {
@@ -41,31 +40,58 @@ export class FileFindTool implements Tool {
   };
 
   async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-    const {
-      pattern,
-      path = '.',
-      type = 'both',
-      caseSensitive = false,
-      maxDepth = 10,
-      includeHidden = false,
-      maxResults = 50,
-    } = call.arguments as {
-      pattern: string;
-      path?: string;
-      type?: 'file' | 'directory' | 'both';
-      caseSensitive?: boolean;
-      maxDepth?: number;
-      includeHidden?: boolean;
-      maxResults?: number;
-    };
-
-    if (!pattern || typeof pattern !== 'string') {
-      return createErrorResult('Pattern must be a non-empty string', call.id);
-    }
-
     try {
-      // Check if path exists and is accessible
-      await access(path);
+      const pattern = this.validateNonEmptyStringParam(call.arguments.pattern, 'pattern', call.id);
+      const path = this.validateOptionalParam(
+        call.arguments.path,
+        'path',
+        (value) => this.validateNonEmptyStringParam(value, 'path'),
+        call.id
+      ) ?? '.';
+      
+      const type = this.validateOptionalParam(
+        call.arguments.type,
+        'type',
+        (value) => {
+          const validTypes = ['file', 'directory', 'both'] as const;
+          if (typeof value !== 'string' || !validTypes.includes(value as typeof validTypes[number])) {
+            throw new Error(`Must be one of: ${validTypes.join(', ')}`);
+          }
+          return value as 'file' | 'directory' | 'both';
+        },
+        call.id
+      ) ?? 'both';
+
+      const caseSensitive = this.validateOptionalParam(
+        call.arguments.caseSensitive,
+        'caseSensitive',
+        (value) => this.validateBooleanParam(value, 'caseSensitive'),
+        call.id
+      ) ?? false;
+
+      const maxDepth = this.validateOptionalParam(
+        call.arguments.maxDepth,
+        'maxDepth',
+        (value) => this.validateNumberParam(value, 'maxDepth', call.id, { min: 1, max: 20, integer: true }),
+        call.id
+      ) ?? 10;
+
+      const includeHidden = this.validateOptionalParam(
+        call.arguments.includeHidden,
+        'includeHidden',
+        (value) => this.validateBooleanParam(value, 'includeHidden'),
+        call.id
+      ) ?? false;
+
+      const maxResults = this.validateOptionalParam(
+        call.arguments.maxResults,
+        'maxResults',
+        (value) => this.validateNumberParam(value, 'maxResults', call.id, { min: 1, max: 1000, integer: true }),
+        call.id
+      ) ?? 50;
+
+      // Validate directory exists before searching
+      await this.validateDirectoryExists(path, call.id);
 
       const matches = await this.findFiles(path, {
         pattern,
@@ -105,7 +131,13 @@ export class FileFindTool implements Tool {
         call.id
       );
     } catch (error) {
-      return createErrorResult(
+      if (error instanceof ValidationError) {
+        return error.toolResult;
+      }
+      
+      return this.createStructuredError(
+        'File search failed',
+        'Check the directory path and search parameters, then try again',
         error instanceof Error ? error.message : 'Unknown error occurred',
         call.id
       );
