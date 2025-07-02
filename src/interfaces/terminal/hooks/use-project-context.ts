@@ -107,7 +107,7 @@ export function useProjectContext(): UseProjectContextResult {
       execSync('git rev-parse --git-dir', {
         stdio: 'pipe',
         encoding: 'utf8',
-        timeout: 1000,
+        timeout: 2000,
       });
 
       // Get branch name
@@ -116,7 +116,7 @@ export function useProjectContext(): UseProjectContextResult {
         const branchOutput = execSync('git branch --show-current', {
           stdio: 'pipe',
           encoding: 'utf8',
-          timeout: 1000,
+          timeout: 2000,
         }).trim();
         branch = branchOutput || undefined; // Empty string becomes undefined (detached HEAD)
       } catch {
@@ -127,7 +127,7 @@ export function useProjectContext(): UseProjectContextResult {
       const statusOutput = execSync('git status --porcelain', {
         stdio: 'pipe',
         encoding: 'utf8',
-        timeout: 1000,
+        timeout: 2000,
       });
 
       const gitStatus = parseGitStatus(statusOutput, branch);
