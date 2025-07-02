@@ -3,6 +3,7 @@
 
 import { ToolCall, ToolResult, ToolContext } from '../types.js';
 import { BaseTool, ValidationError } from '../base-tool.js';
+import { stat } from 'fs/promises';
 
 export class FileReadTool extends BaseTool {
   name = 'file_read';
@@ -46,6 +47,26 @@ export class FileReadTool extends BaseTool {
           'Invalid line range specified',
           call.id
         );
+      }
+
+      // Validate range size limit (100 lines max)
+      if (startLine !== undefined && endLine !== undefined) {
+        const rangeSize = endLine - startLine + 1;
+        const MAX_RANGE_SIZE = 100;
+        if (rangeSize > MAX_RANGE_SIZE) {
+          const error = this.createStructuredError(
+            `Range too large (${rangeSize} lines)`,
+            `Use smaller ranges (max ${MAX_RANGE_SIZE} lines per read)`,
+            'Large ranges can cause context overflow and performance issues',
+            call.id
+          );
+          throw new ValidationError(error);
+        }
+      }
+
+      // Check file size before reading whole file (unless using range)
+      if (startLine === undefined && endLine === undefined) {
+        await this.validateFileSizeForWholeRead(path, call.id);
       }
 
       // Read file and split into lines
@@ -95,6 +116,29 @@ export class FileReadTool extends BaseTool {
         error instanceof Error ? error.message : 'Unknown error occurred',
         call.id
       );
+    }
+  }
+
+  private async validateFileSizeForWholeRead(filePath: string, callId?: string): Promise<void> {
+    const MAX_FILE_SIZE = 32 * 1024; // 32KB limit for whole file reads
+
+    try {
+      const fileStats = await stat(filePath);
+      if (fileStats.size > MAX_FILE_SIZE) {
+        const fileSizeFormatted = this.formatFileSize(fileStats.size);
+        const error = this.createStructuredError(
+          `File is too large (${fileSizeFormatted}) for whole-file read`,
+          `Use startLine and endLine parameters for ranged reads (e.g., startLine: 1, endLine: 100)`,
+          `File size limit is ${this.formatFileSize(MAX_FILE_SIZE)} for whole-file reads`,
+          callId
+        );
+        throw new ValidationError(error);
+      }
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+      // If we can't stat the file, let readFileWithContext handle the error
     }
   }
 }

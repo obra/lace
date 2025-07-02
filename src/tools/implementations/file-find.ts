@@ -3,12 +3,7 @@
 
 import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
-import {
-  ToolCall,
-  ToolResult,
-  ToolContext,
-  createSuccessResult,
-} from '../types.js';
+import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
 import { BaseTool, ValidationError } from '../base-tool.js';
 
 export class FileFindTool extends BaseTool {
@@ -42,53 +37,72 @@ export class FileFindTool extends BaseTool {
   async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     try {
       const pattern = this.validateNonEmptyStringParam(call.arguments.pattern, 'pattern', call.id);
-      const path = this.validateOptionalParam(
-        call.arguments.path,
-        'path',
-        (value) => this.validateNonEmptyStringParam(value, 'path'),
-        call.id
-      ) ?? '.';
-      
-      const type = this.validateOptionalParam(
-        call.arguments.type,
-        'type',
-        (value) => {
-          const validTypes = ['file', 'directory', 'both'] as const;
-          if (typeof value !== 'string' || !validTypes.includes(value as typeof validTypes[number])) {
-            throw new Error(`Must be one of: ${validTypes.join(', ')}`);
-          }
-          return value as 'file' | 'directory' | 'both';
-        },
-        call.id
-      ) ?? 'both';
+      const path =
+        this.validateOptionalParam(
+          call.arguments.path,
+          'path',
+          (value) => this.validateNonEmptyStringParam(value, 'path'),
+          call.id
+        ) ?? '.';
 
-      const caseSensitive = this.validateOptionalParam(
-        call.arguments.caseSensitive,
-        'caseSensitive',
-        (value) => this.validateBooleanParam(value, 'caseSensitive'),
-        call.id
-      ) ?? false;
+      const type =
+        this.validateOptionalParam(
+          call.arguments.type,
+          'type',
+          (value) => {
+            const validTypes = ['file', 'directory', 'both'] as const;
+            if (
+              typeof value !== 'string' ||
+              !validTypes.includes(value as (typeof validTypes)[number])
+            ) {
+              throw new Error(`Must be one of: ${validTypes.join(', ')}`);
+            }
+            return value as 'file' | 'directory' | 'both';
+          },
+          call.id
+        ) ?? 'both';
 
-      const maxDepth = this.validateOptionalParam(
-        call.arguments.maxDepth,
-        'maxDepth',
-        (value) => this.validateNumberParam(value, 'maxDepth', call.id, { min: 1, max: 20, integer: true }),
-        call.id
-      ) ?? 10;
+      const caseSensitive =
+        this.validateOptionalParam(
+          call.arguments.caseSensitive,
+          'caseSensitive',
+          (value) => this.validateBooleanParam(value, 'caseSensitive'),
+          call.id
+        ) ?? false;
 
-      const includeHidden = this.validateOptionalParam(
-        call.arguments.includeHidden,
-        'includeHidden',
-        (value) => this.validateBooleanParam(value, 'includeHidden'),
-        call.id
-      ) ?? false;
+      const maxDepth =
+        this.validateOptionalParam(
+          call.arguments.maxDepth,
+          'maxDepth',
+          (value) =>
+            this.validateNumberParam(value, 'maxDepth', call.id, {
+              min: 1,
+              max: 20,
+              integer: true,
+            }),
+          call.id
+        ) ?? 10;
 
-      const maxResults = this.validateOptionalParam(
-        call.arguments.maxResults,
-        'maxResults',
-        (value) => this.validateNumberParam(value, 'maxResults', call.id, { min: 1, max: 1000, integer: true }),
-        call.id
-      ) ?? 50;
+      const includeHidden =
+        this.validateOptionalParam(
+          call.arguments.includeHidden,
+          'includeHidden',
+          (value) => this.validateBooleanParam(value, 'includeHidden'),
+          call.id
+        ) ?? false;
+
+      const maxResults =
+        this.validateOptionalParam(
+          call.arguments.maxResults,
+          'maxResults',
+          (value) =>
+            this.validateNumberParam(value, 'maxResults', call.id, {
+              min: 1,
+              max: 1000,
+              integer: true,
+            }),
+          call.id
+        ) ?? 50;
 
       // Validate directory exists before searching
       await this.validateDirectoryExists(path, call.id);
@@ -107,7 +121,7 @@ export class FileFindTool extends BaseTool {
       const resultLines: string[] = [];
 
       if (limitedMatches.length > 0) {
-        resultLines.push(...limitedMatches);
+        resultLines.push(...limitedMatches.map((match) => this.formatFileEntry(match)));
 
         // Add truncation message if we hit the limit
         if (matches.length > maxResults) {
@@ -134,7 +148,7 @@ export class FileFindTool extends BaseTool {
       if (error instanceof ValidationError) {
         return error.toolResult;
       }
-      
+
       return this.createStructuredError(
         'File search failed',
         'Check the directory path and search parameters, then try again',
@@ -155,8 +169,8 @@ export class FileFindTool extends BaseTool {
       maxResults: number;
       currentDepth: number;
     }
-  ): Promise<string[]> {
-    const matches: string[] = [];
+  ): Promise<Array<{ path: string; size?: number; isDirectory: boolean }>> {
+    const matches: Array<{ path: string; size?: number; isDirectory: boolean }> = [];
 
     if (options.currentDepth > options.maxDepth) {
       return matches;
@@ -184,7 +198,11 @@ export class FileFindTool extends BaseTool {
             (options.type === 'directory' && isDirectory);
 
           if (shouldInclude && this.matchesPattern(item, options.pattern, options.caseSensitive)) {
-            matches.push(fullPath);
+            matches.push({
+              path: fullPath,
+              size: isFile ? stats.size : undefined,
+              isDirectory,
+            });
 
             // Early termination: collect more than maxResults to detect truncation later
             if (matches.length > options.maxResults) {
@@ -214,7 +232,16 @@ export class FileFindTool extends BaseTool {
       // Skip directories we can't read
     }
 
-    return matches.sort();
+    return matches.sort((a, b) => a.path.localeCompare(b.path));
+  }
+
+  private formatFileEntry(entry: { path: string; size?: number; isDirectory: boolean }): string {
+    if (entry.isDirectory) {
+      return entry.path;
+    } else {
+      const sizeStr = entry.size !== undefined ? ` (${this.formatFileSize(entry.size)})` : '';
+      return `${entry.path}${sizeStr}`;
+    }
   }
 
   private matchesPattern(filename: string, pattern: string, caseSensitive: boolean): boolean {
