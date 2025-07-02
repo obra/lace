@@ -176,12 +176,20 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const [commandExecutor, setCommandExecutor] = useState<CommandExecutor | null>(null);
-  // Cumulative session token tracking
+  // Cumulative session token tracking with context awareness
   const [cumulativeTokens, setCumulativeTokens] = useState<{
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  }>({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+    promptTokens: number;      // Current context size (latest value)
+    completionTokens: number;   // Total completion tokens generated
+    totalTokens: number;        // Actual total tokens used (not double-counted)
+    contextGrowth: number;      // How much the context has grown since start
+    lastPromptTokens: number;   // Previous turn's prompt tokens for delta calculation
+  }>({ 
+    promptTokens: 0, 
+    completionTokens: 0, 
+    totalTokens: 0,
+    contextGrowth: 0,
+    lastPromptTokens: 0
+  });
 
   // Track the final token usage from provider for accurate cumulative totals
   // Use ref to avoid race conditions with rapid requests
@@ -413,25 +421,35 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       setCurrentTurnMetrics(null);
       setIsProcessing(false);
 
-      // Use provider's final token counts for accurate cumulative totals (includes system prompts, context, etc.)
+      // Use provider's final token counts for accurate cumulative totals
       const providerUsage = lastProviderUsageRef.current;
       if (providerUsage) {
-        setCumulativeTokens((prev) => ({
-          // Provider promptTokens includes entire conversation context, so accumulate completions only
-          promptTokens: providerUsage.promptTokens, // This is the total input context
-          completionTokens: prev.completionTokens + providerUsage.completionTokens, // Accumulate outputs
-          totalTokens:
-            providerUsage.promptTokens + (prev.completionTokens + providerUsage.completionTokens),
-        }));
+        setCumulativeTokens((prev) => {
+          // Calculate the delta in prompt tokens (context growth)
+          const promptDelta = providerUsage.promptTokens - prev.lastPromptTokens;
+          const contextGrowth = prev.lastPromptTokens === 0 
+            ? providerUsage.promptTokens  // First turn includes system prompt
+            : promptDelta;                 // Subsequent turns show growth
+
+          return {
+            promptTokens: providerUsage.promptTokens,  // Current context size
+            completionTokens: prev.completionTokens + providerUsage.completionTokens,  // Total outputs
+            totalTokens: prev.totalTokens + contextGrowth + providerUsage.completionTokens,  // Actual usage
+            contextGrowth: prev.contextGrowth + contextGrowth,  // Total context growth
+            lastPromptTokens: providerUsage.promptTokens,  // For next turn's delta
+          };
+        });
 
         // Clear the provider usage after using it
         lastProviderUsageRef.current = null;
       }
 
-      // Show completion message with turn summary (still use turn metrics for per-turn display)
+      // Show completion message with turn summary and context info
+      const contextSize = providerUsage?.promptTokens || 0;
+      const contextWarning = contextSize > 150000 ? ' ⚠️ Large context' : '';
       addMessage({
         type: 'system',
-        content: `Turn completed in ${Math.floor(metrics.elapsedMs / 1000)}s (↑${metrics.tokensIn} ↓${metrics.tokensOut} tokens)`,
+        content: `Turn completed in ${Math.floor(metrics.elapsedMs / 1000)}s (↑${metrics.tokensIn} ↓${metrics.tokensOut} tokens, context: ${Math.floor(contextSize/1000)}k${contextWarning})`,
         timestamp: new Date(),
       });
     };
@@ -741,7 +759,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             {/* Status bar - takes natural height */}
             <StatusBar
               providerName={agent.providerName || 'unknown'}
-              modelName={(agent as any)._provider?.defaultModel || undefined}
+              modelName={agent.provider?.modelName || undefined}
               threadId={agent.threadManager.getCurrentThreadId() || undefined}
               cumulativeTokens={cumulativeTokens}
               isProcessing={isProcessing}
@@ -749,6 +767,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               isTurnActive={isTurnActive}
               turnMetrics={currentTurnMetrics}
               projectContext={projectContext}
+              contextWindow={agent.provider?.contextWindow}
             />
 
             {/* Input area or modal - takes natural height */}

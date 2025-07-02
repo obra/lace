@@ -41,6 +41,40 @@ export class AnthropicProvider extends AIProvider {
     return true;
   }
 
+  get contextWindow(): number {
+    const model = this.modelName.toLowerCase();
+
+    // All Claude 3 and Claude 4 models support 200k context
+    if (model.includes('claude')) {
+      return 200000;
+    }
+
+    // Fallback to base implementation
+    return super.contextWindow;
+  }
+
+  get maxCompletionTokens(): number {
+    const model = this.modelName.toLowerCase();
+
+    // Claude 3.5 and Claude 4 models support 8192 output tokens
+    if (
+      model.includes('claude-3-5') ||
+      model.includes('claude-4') ||
+      model.includes('claude-sonnet-4') ||
+      model.includes('claude-opus-4')
+    ) {
+      return 8192;
+    }
+
+    // Claude 3 models support 4096 output tokens
+    if (model.includes('claude-3')) {
+      return 4096;
+    }
+
+    // Use configured value or fallback
+    return this._config.maxTokens || 4096;
+  }
+
   private _createRequestPayload(
     messages: ProviderMessage[],
     tools: Tool[]

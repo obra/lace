@@ -9,9 +9,11 @@ import { UI_SYMBOLS } from '../theme.js';
 import type { ProjectContext } from '../hooks/use-project-context.js';
 
 interface CumulativeTokens {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
+  promptTokens: number;      // Current context size
+  completionTokens: number;   // Total completion tokens
+  totalTokens: number;        // Actual total tokens used
+  contextGrowth?: number;     // How much context has grown
+  lastPromptTokens?: number;  // For delta calculation
 }
 
 interface StatusBarProps {
@@ -24,6 +26,7 @@ interface StatusBarProps {
   isTurnActive?: boolean;
   turnMetrics?: CurrentTurnMetrics | null;
   projectContext?: ProjectContext;
+  contextWindow?: number;  // Provider's context window limit
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({
@@ -36,9 +39,10 @@ const StatusBar: React.FC<StatusBarProps> = ({
   isTurnActive = false,
   turnMetrics = null,
   projectContext,
+  contextWindow,
 }) => {
-  // Format cumulative session tokens for display
-  const formatCumulativeTokens = (tokens?: CumulativeTokens) => {
+  // Format cumulative session tokens for display with context awareness
+  const formatCumulativeTokens = (tokens?: CumulativeTokens, contextLimit?: number) => {
     if (!tokens || tokens.totalTokens === 0) {
       return `${UI_SYMBOLS.TOKEN_IN}0 ${UI_SYMBOLS.TOKEN_OUT}0`;
     }
@@ -50,7 +54,16 @@ const StatusBar: React.FC<StatusBarProps> = ({
       return count.toString();
     };
 
-    return `${UI_SYMBOLS.TOKEN_IN}${formatCount(tokens.promptTokens)} ${UI_SYMBOLS.TOKEN_OUT}${formatCount(tokens.completionTokens)}`;
+    let contextDisplay = `${UI_SYMBOLS.TOKEN_IN}${formatCount(tokens.promptTokens)}`;
+    
+    // Add context percentage if we know the limit
+    if (contextLimit && contextLimit > 0) {
+      const percentage = Math.floor((tokens.promptTokens / contextLimit) * 100);
+      const warningLevel = percentage >= 90 ? ' 🚨' : percentage >= 75 ? ' ⚠️' : '';
+      contextDisplay += `/${formatCount(contextLimit)} (${percentage}%${warningLevel})`;
+    }
+
+    return `${contextDisplay} ${UI_SYMBOLS.TOKEN_OUT}${formatCount(tokens.completionTokens)}`;
   };
 
   // Format turn metrics for display
@@ -138,7 +151,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   if (isTurnActive && turnMetrics) {
     rightContent = `${formatTurnMetrics(turnMetrics)} • ${UI_SYMBOLS.LIGHTNING} Processing`;
   } else {
-    rightContent = `${UI_SYMBOLS.MESSAGE} ${messageCount} • ${formatCumulativeTokens(cumulativeTokens)} • ${isProcessing ? UI_SYMBOLS.LIGHTNING + ' Processing' : UI_SYMBOLS.READY + ' Ready'}`;
+    rightContent = `${UI_SYMBOLS.MESSAGE} ${messageCount} • ${formatCumulativeTokens(cumulativeTokens, contextWindow)} • ${isProcessing ? UI_SYMBOLS.LIGHTNING + ' Processing' : UI_SYMBOLS.READY + ' Ready'}`;
   }
 
   // Format project context row if available

@@ -51,6 +51,59 @@ export class OpenAIProvider extends AIProvider {
     return true;
   }
 
+  get contextWindow(): number {
+    const model = this.modelName.toLowerCase();
+
+    // GPT-4o and GPT-4-turbo models
+    if (model.includes('gpt-4o') || model.includes('gpt-4-turbo')) {
+      return 128000;
+    }
+
+    // O1 models
+    if (model === 'o1' || model === 'o1-preview') {
+      return 200000;
+    }
+    if (model === 'o1-mini') {
+      return 128000;
+    }
+
+    // GPT-3.5-turbo variants
+    if (model.includes('gpt-3.5-turbo-16k')) {
+      return 16384;
+    }
+    if (model.includes('gpt-3.5-turbo')) {
+      return 16384; // Latest versions support 16k
+    }
+
+    // Legacy GPT-4
+    if (model === 'gpt-4') {
+      return 8192;
+    }
+
+    // Fallback to base implementation
+    return super.contextWindow;
+  }
+
+  get maxCompletionTokens(): number {
+    const model = this.modelName.toLowerCase();
+
+    // O1 models have larger output limits
+    if (model === 'o1' || model === 'o1-preview') {
+      return 100000;
+    }
+    if (model === 'o1-mini') {
+      return 65536;
+    }
+
+    // GPT-4o models
+    if (model.includes('gpt-4o')) {
+      return 16384;
+    }
+
+    // Most other models default to 4096
+    return this._config.maxTokens || 4096;
+  }
+
   private _createRequestPayload(
     messages: ProviderMessage[],
     tools: Tool[],

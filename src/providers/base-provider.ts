@@ -80,6 +80,17 @@ export abstract class AIProvider extends EventEmitter {
     return this._config.model || this.defaultModel;
   }
 
+  // Model capability getters - providers should override based on their models
+  get contextWindow(): number {
+    // Conservative default - providers should override
+    return 8192;
+  }
+
+  get maxCompletionTokens(): number {
+    // Use configured value or conservative default
+    return this._config.maxTokens || 4096;
+  }
+
   // Token estimation utility for streaming
   protected estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);
