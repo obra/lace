@@ -124,7 +124,7 @@ export function useTimelineViewport({
     setLastTimelineItemCount(timeline.items.length);
   }, [timeline.items.length]);
 
-  // Auto-jump logic - always jumps directly when not focused
+  // Focus-aware positioning - only jump to latest when timeline not focused
   const shouldAutoJump = useCallback(() => {
     return !isFocused;
   }, [isFocused]);
