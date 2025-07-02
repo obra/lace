@@ -77,10 +77,7 @@ describe('FileReadTool with schema validation', () => {
       const tool = new FileReadTool();
       // Use relative path
       const relativePath = './test.txt';
-      const result = await tool.execute(
-        { path: relativePath },
-        undefined
-      );
+      const result = await tool.execute({ path: relativePath }, undefined);
 
       // Should work even though path gets normalized
       expect(result.isError).toBe(true); // Will fail because relative to cwd, not testDir
@@ -189,7 +186,7 @@ describe('FileReadTool with schema validation', () => {
       const result = await tool.execute({ path: '' });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Cannot be empty');
+      expect(result.content[0].text).toContain('File path cannot be empty');
     });
   });
 
@@ -258,7 +255,7 @@ describe('FileReadTool with schema validation', () => {
   describe('AI-optimized error messages', () => {
     it('provides actionable error messages that help avoid repeated failures', async () => {
       const tool = new FileReadTool();
-      
+
       // Test misspelled file
       const result = await tool.execute({
         path: join(testDir, 'nonexistent-flie.txt'), // 'file' misspelled
@@ -266,11 +263,11 @@ describe('FileReadTool with schema validation', () => {
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;
-      
+
       // Should provide specific, actionable guidance
       expect(message).toContain('File not found');
       expect(message).toContain('Similar files:');
-      
+
       // Should include enough context to avoid repeated failures
       expect(message.length).toBeGreaterThan(20); // Not just "file not found"
     });
@@ -285,7 +282,7 @@ describe('FileReadTool with schema validation', () => {
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;
-      
+
       // Should clearly explain what's wrong and how to fix it
       expect(message).toContain('endLine must be >= startLine');
       expect(message).toContain('Check parameter types and values');
