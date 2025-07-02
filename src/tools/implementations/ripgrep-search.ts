@@ -43,7 +43,7 @@ export class RipgrepSearchTool implements Tool {
         type: 'string',
         description: 'File pattern to exclude (e.g., "*.test.ts")',
       },
-      maxResults: { type: 'number', description: 'Maximum number of results (default: 100)' },
+      maxResults: { type: 'number', description: 'Maximum number of results (default: 50)' },
       contextLines: { type: 'number', description: 'Lines of context around matches (default: 0)' },
     },
     required: ['pattern'],
@@ -57,7 +57,7 @@ export class RipgrepSearchTool implements Tool {
       wholeWord = false,
       includePattern,
       excludePattern,
-      maxResults = 100,
+      maxResults = 50,
       contextLines = 0,
     } = call.arguments as {
       pattern: string;
@@ -94,8 +94,8 @@ export class RipgrepSearchTool implements Tool {
           maxBuffer: 10485760, // 10MB buffer
         });
 
-        const matches = this.parseRipgrepOutput(stdout);
-        const resultText = this.formatResults(matches, pattern);
+        const matches = this.parseRipgrepOutput(stdout, maxResults);
+        const resultText = this.formatResults(matches, pattern, maxResults);
 
         return createSuccessResult(
           [
@@ -168,9 +168,8 @@ export class RipgrepSearchTool implements Tool {
       args.push('--glob', `!"${options.excludePattern}"`);
     }
 
-    if (options.maxResults > 0) {
-      args.push('--max-count', options.maxResults.toString());
-    }
+    // Note: We don't use --max-count here as it limits per file
+    // Instead, we limit total results in parseRipgrepOutput
 
     if (options.contextLines > 0) {
       args.push('--context', options.contextLines.toString());
@@ -183,7 +182,7 @@ export class RipgrepSearchTool implements Tool {
     return args;
   }
 
-  private parseRipgrepOutput(output: string): SearchMatch[] {
+  private parseRipgrepOutput(output: string, maxResults: number): SearchMatch[] {
     if (!output.trim()) {
       return [];
     }
@@ -200,18 +199,28 @@ export class RipgrepSearchTool implements Tool {
           lineNumber: parseInt(match[2], 10),
           content: match[3],
         });
+
+        // Limit total results across all files
+        if (matches.length >= maxResults) {
+          break;
+        }
       }
     }
 
     return matches;
   }
 
-  private formatResults(matches: SearchMatch[], pattern: string): string {
+  private formatResults(matches: SearchMatch[], pattern: string, maxResults: number): string {
     if (matches.length === 0) {
       return `No matches found for pattern: ${pattern}`;
     }
 
     const resultLines = [`Found ${matches.length} match${matches.length === 1 ? '' : 'es'}:\n`];
+
+    // Add truncation message if we hit the limit
+    if (matches.length === maxResults) {
+      resultLines.push(`Results limited to ${maxResults}. Use maxResults parameter to see more.\n`);
+    }
 
     // Group matches by file
     const fileGroups = new Map<string, SearchMatch[]>();
