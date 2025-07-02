@@ -58,6 +58,15 @@ export const UI_SYMBOLS = {
   MESSAGE: '◈', // Message count indicator
   LIGHTNING: '.', // Processing indicator
   READY: '✓', // Ready status indicator
+
+  // Project context symbols (for double status bar)
+  GIT_BRANCH: '⎇', // Git branch indicator
+  GIT_MODIFIED: '±', // Modified files
+  GIT_STAGED: '+', // Staged files
+  GIT_DELETED: '-', // Deleted files
+  GIT_UNTRACKED: '?', // Untracked files
+  PATH_SEP: '•', // Path separator
+  GIT_ERROR: '!', // Git error indicator
 } as const;
 
 /**
