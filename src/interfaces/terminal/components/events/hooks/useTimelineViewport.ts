@@ -129,18 +129,23 @@ export function useTimelineViewport({
     return !isFocused;
   }, [isFocused]);
 
+  // Helper to jump to bottom with viewport scroll
+  const jumpToBottom = useCallback(() => {
+    const bottomLine = Math.max(0, totalContentHeight - 1);
+    setSelectedLine(bottomLine);
+
+    // Update viewport scroll to show bottom
+    const maxScroll = Math.max(0, totalContentHeight - viewportLines);
+    setLineScrollOffset(maxScroll);
+  }, [totalContentHeight, viewportLines]);
+
   // Jump to bottom when NEW CONTENT is added or on initial load
   useEffect(() => {
     const hasNewContent = timeline.items.length > lastTimelineItemCount;
     const isInitialLoad = lastTimelineItemCount === 0 && timeline.items.length > 0;
 
     if ((hasNewContent || isInitialLoad) && totalContentHeight > 0 && shouldAutoJump()) {
-      const bottomLine = Math.max(0, totalContentHeight - 1);
-      setSelectedLine(bottomLine);
-
-      // Scroll viewport to show the bottom
-      const maxScroll = Math.max(0, totalContentHeight - viewportLines);
-      setLineScrollOffset(maxScroll);
+      jumpToBottom();
     }
   }, [
     totalContentHeight,
@@ -148,6 +153,7 @@ export function useTimelineViewport({
     timeline.items.length,
     lastTimelineItemCount,
     shouldAutoJump,
+    jumpToBottom,
   ]);
 
   // Track content height changes for streaming updates and initial positioning
@@ -168,12 +174,7 @@ export function useTimelineViewport({
     }
     // Jump to bottom on content height increase (streaming)
     else if (totalContentHeight > lastContentHeight && lastContentHeight > 0 && shouldAutoJump()) {
-      const bottomLine = Math.max(0, totalContentHeight - 1);
-      setSelectedLine(bottomLine);
-
-      // Update viewport scroll to show bottom
-      const maxScroll = Math.max(0, totalContentHeight - viewportLines);
-      setLineScrollOffset(maxScroll);
+      jumpToBottom();
     }
 
     setLastContentHeight(totalContentHeight);
@@ -184,6 +185,7 @@ export function useTimelineViewport({
     timeline.items.length,
     shouldAutoJump,
     viewportLines,
+    jumpToBottom,
   ]);
 
   // Reset positioning flag when timeline becomes empty (new conversation)
