@@ -1,7 +1,7 @@
 // ABOUTME: React hook for project context including git status and current working directory
 // ABOUTME: Provides formatted path display and parsed git repository information with caching
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { execSync } from 'child_process';
 import * as os from 'os';
 import * as path from 'path';
@@ -41,6 +41,7 @@ export interface UseProjectContextResult {
 export function useProjectContext(): UseProjectContextResult {
   const [context, setContext] = useState<ProjectContext>(() => getInitialContext());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Get initial context synchronously to avoid loading states
   function getInitialContext(): ProjectContext {
@@ -60,11 +61,12 @@ export function useProjectContext(): UseProjectContextResult {
       };
     } catch (error) {
       const cwd = process.cwd();
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         cwd,
         displayPath: formatDisplayPath(cwd),
         isGitRepo: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: `Context initialization failed: ${errorMessage}`,
       };
     }
   }
@@ -105,7 +107,7 @@ export function useProjectContext(): UseProjectContextResult {
       execSync('git rev-parse --git-dir', {
         stdio: 'pipe',
         encoding: 'utf8',
-        timeout: 5000,
+        timeout: 2000,
       });
 
       // Get branch name
@@ -114,7 +116,7 @@ export function useProjectContext(): UseProjectContextResult {
         const branchOutput = execSync('git branch --show-current', {
           stdio: 'pipe',
           encoding: 'utf8',
-          timeout: 2000,
+          timeout: 1000,
         }).trim();
         branch = branchOutput || undefined; // Empty string becomes undefined (detached HEAD)
       } catch {
@@ -125,7 +127,7 @@ export function useProjectContext(): UseProjectContextResult {
       const statusOutput = execSync('git status --porcelain', {
         stdio: 'pipe',
         encoding: 'utf8',
-        timeout: 5000,
+        timeout: 2000,
       });
 
       const gitStatus = parseGitStatus(statusOutput, branch);
@@ -135,9 +137,10 @@ export function useProjectContext(): UseProjectContextResult {
         gitStatus,
       };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown git error';
       return {
         isGitRepo: false,
-        error: error instanceof Error ? error.message : 'Git command failed',
+        error: `Git error: ${errorMessage}`,
       };
     }
   }
@@ -179,33 +182,42 @@ export function useProjectContext(): UseProjectContextResult {
     };
   }
 
-  // Refresh context (for use after command completion)
+  // Refresh context with debouncing to prevent excessive git command execution
   const refreshContext = useCallback(async () => {
-    setIsRefreshing(true);
-
-    try {
-      // Run in next tick to avoid blocking UI
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      const cwd = process.cwd();
-      const displayPath = formatDisplayPath(cwd);
-      const gitInfo = getGitInfo();
-
-      setContext({
-        cwd,
-        displayPath,
-        isGitRepo: gitInfo.isGitRepo,
-        gitStatus: gitInfo.gitStatus,
-        error: gitInfo.error,
-      });
-    } catch (error) {
-      setContext((prev) => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      }));
-    } finally {
-      setIsRefreshing(false);
+    // Clear any pending refresh
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
     }
+
+    // Debounce rapid refresh calls
+    refreshTimeoutRef.current = setTimeout(async () => {
+      setIsRefreshing(true);
+
+      try {
+        // Small delay to avoid blocking UI during rapid refresh calls
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const cwd = process.cwd();
+        const displayPath = formatDisplayPath(cwd);
+        const gitInfo = getGitInfo();
+
+        setContext({
+          cwd,
+          displayPath,
+          isGitRepo: gitInfo.isGitRepo,
+          gitStatus: gitInfo.gitStatus,
+          error: gitInfo.error,
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        setContext((prev) => ({
+          ...prev,
+          error: `Context refresh failed: ${errorMessage}`,
+        }));
+      } finally {
+        setIsRefreshing(false);
+      }
+    }, 500); // 500ms debounce
   }, []);
 
   // Initialize context on mount (only if different from initial)
@@ -215,6 +227,15 @@ export function useProjectContext(): UseProjectContextResult {
       refreshContext();
     }
   }, []); // Empty deps - only run once on mount
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return {
     context,
