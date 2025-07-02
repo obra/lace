@@ -3,12 +3,7 @@
 
 import { writeFile, mkdir } from 'fs/promises';
 import { dirname } from 'path';
-import {
-  ToolCall,
-  ToolResult,
-  ToolContext,
-  createSuccessResult,
-} from '../types.js';
+import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
 import { BaseTool, ValidationError } from '../base-tool.js';
 
 export class FileWriteTool extends BaseTool {
@@ -34,17 +29,18 @@ export class FileWriteTool extends BaseTool {
     try {
       const path = this.validateNonEmptyStringParam(call.arguments.path, 'path', call.id);
       const content = this.validateStringParam(call.arguments.content, 'content', call.id);
-      const createDirs = this.validateOptionalParam(
-        call.arguments.createDirs,
-        'createDirs',
-        (value) => {
-          if (typeof value !== 'boolean') {
-            throw new Error(`Expected boolean, received ${typeof value}`);
-          }
-          return value;
-        },
-        call.id
-      ) ?? true;
+      const createDirs =
+        this.validateOptionalParam(
+          call.arguments.createDirs,
+          'createDirs',
+          (value) => {
+            if (typeof value !== 'boolean') {
+              throw new Error(`Expected boolean, received ${typeof value}`);
+            }
+            return value;
+          },
+          call.id
+        ) ?? true;
 
       if (createDirs) {
         const dir = dirname(path);
@@ -66,7 +62,7 @@ export class FileWriteTool extends BaseTool {
       if (error instanceof ValidationError) {
         return error.toolResult;
       }
-      
+
       if (error instanceof Error) {
         const nodeError = error as Error & { code?: string };
         if (nodeError.code === 'EACCES') {

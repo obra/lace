@@ -99,34 +99,37 @@ export class TaskAddTool extends BaseTool {
       if (typeof tasks === 'string') {
         // Check if it's a JSON array string
         if (tasks.trim().startsWith('[') && tasks.trim().endsWith(']')) {
+          let parsed: unknown;
           try {
-            const parsed = JSON.parse(tasks);
-            if (Array.isArray(parsed)) {
-              if (parsed.length === 0) {
-                return this.createStructuredError(
-                  'Tasks array cannot be empty',
-                  'Provide at least one task description in the array',
-                  'Empty tasks array provided',
-                  call.id
-                );
-              }
-              for (let i = 0; i < parsed.length; i++) {
-                const task = this.validateNonEmptyStringParam(parsed[i], `tasks[${i}]`, call.id);
-                taskDescriptions.push(task);
-              }
-            } else {
-              return this.createStructuredError(
-                'Parsed JSON is not an array',
-                'Provide a valid JSON array of strings',
-                'JSON parsed to non-array type',
-                call.id
-              );
-            }
+            parsed = JSON.parse(tasks);
           } catch (parseError) {
             return this.createStructuredError(
               'Invalid JSON array format',
               'Provide either a single task string or valid JSON array like ["task1", "task2"]',
               parseError instanceof Error ? parseError.message : 'JSON parse error',
+              call.id
+            );
+          }
+
+          if (Array.isArray(parsed)) {
+            if (parsed.length === 0) {
+              return this.createStructuredError(
+                'Tasks array cannot be empty',
+                'Provide at least one task description in the array',
+                'Empty tasks array provided',
+                call.id
+              );
+            }
+            // Validate each element (ValidationError will be caught by outer try-catch)
+            for (let i = 0; i < parsed.length; i++) {
+              const task = this.validateNonEmptyStringParam(parsed[i], `tasks[${i}]`, call.id);
+              taskDescriptions.push(task);
+            }
+          } else {
+            return this.createStructuredError(
+              'Parsed JSON is not an array',
+              'Provide a valid JSON array of strings',
+              'JSON parsed to non-array type',
               call.id
             );
           }

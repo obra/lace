@@ -104,6 +104,35 @@ describe('Task Management Tools', () => {
         expect(output).toContain('Second task');
         expect(output).toContain('Third task');
       });
+
+      it('should handle empty JSON array', async () => {
+        const result = await addTool.executeTool(createTestToolCall('task_add', { tasks: '[]' }), {
+          threadId: testThreadId,
+        });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain('Tasks array cannot be empty');
+      });
+
+      it('should handle malformed JSON', async () => {
+        const result = await addTool.executeTool(
+          createTestToolCall('task_add', { tasks: '["task1", invalid_json]' }), // Invalid JSON syntax
+          { threadId: testThreadId }
+        );
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain('Invalid JSON array format');
+      });
+
+      it('should handle non-string elements in array', async () => {
+        const result = await addTool.executeTool(
+          createTestToolCall('task_add', { tasks: '["valid", 123, null]' }),
+          { threadId: testThreadId }
+        );
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("Parameter 'tasks[1]' must be string");
+      });
     });
 
     describe('error handling', () => {

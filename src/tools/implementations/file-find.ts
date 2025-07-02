@@ -5,6 +5,7 @@ import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
 import { BaseTool, ValidationError } from '../base-tool.js';
+import { TOOL_LIMITS } from '../constants.js';
 
 export class FileFindTool extends BaseTool {
   name = 'file_find';
@@ -76,12 +77,12 @@ export class FileFindTool extends BaseTool {
           'maxDepth',
           (value) =>
             this.validateNumberParam(value, 'maxDepth', call.id, {
-              min: 1,
-              max: 20,
+              min: TOOL_LIMITS.MIN_DEPTH,
+              max: TOOL_LIMITS.MAX_DEPTH,
               integer: true,
             }),
           call.id
-        ) ?? 10;
+        ) ?? TOOL_LIMITS.DEFAULT_DEPTH;
 
       const includeHidden =
         this.validateOptionalParam(
@@ -97,12 +98,12 @@ export class FileFindTool extends BaseTool {
           'maxResults',
           (value) =>
             this.validateNumberParam(value, 'maxResults', call.id, {
-              min: 1,
-              max: 1000,
+              min: TOOL_LIMITS.MIN_SEARCH_RESULTS,
+              max: TOOL_LIMITS.MAX_SEARCH_RESULTS,
               integer: true,
             }),
           call.id
-        ) ?? 50;
+        ) ?? TOOL_LIMITS.DEFAULT_SEARCH_RESULTS;
 
       // Validate directory exists before searching
       await this.validateDirectoryExists(path, call.id);

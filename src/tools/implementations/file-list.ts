@@ -3,13 +3,9 @@
 
 import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
-import {
-  ToolCall,
-  ToolResult,
-  ToolContext,
-  createSuccessResult,
-} from '../types.js';
+import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
 import { BaseTool, ValidationError } from '../base-tool.js';
+import { TOOL_LIMITS } from '../constants.js';
 
 interface FileEntry {
   name: string;
@@ -53,12 +49,13 @@ export class FileListTool extends BaseTool {
 
   async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     try {
-      const path = this.validateOptionalParam(
-        call.arguments.path,
-        'path',
-        (value) => this.validateNonEmptyStringParam(value, 'path'),
-        call.id
-      ) ?? '.';
+      const path =
+        this.validateOptionalParam(
+          call.arguments.path,
+          'path',
+          (value) => this.validateNonEmptyStringParam(value, 'path'),
+          call.id
+        ) ?? '.';
 
       const pattern = this.validateOptionalParam(
         call.arguments.pattern,
@@ -67,40 +64,60 @@ export class FileListTool extends BaseTool {
         call.id
       );
 
-      const includeHidden = this.validateOptionalParam(
-        call.arguments.includeHidden,
-        'includeHidden',
-        (value) => this.validateBooleanParam(value, 'includeHidden'),
-        call.id
-      ) ?? false;
+      const includeHidden =
+        this.validateOptionalParam(
+          call.arguments.includeHidden,
+          'includeHidden',
+          (value) => this.validateBooleanParam(value, 'includeHidden'),
+          call.id
+        ) ?? false;
 
-      const recursive = this.validateOptionalParam(
-        call.arguments.recursive,
-        'recursive',
-        (value) => this.validateBooleanParam(value, 'recursive'),
-        call.id
-      ) ?? false;
+      const recursive =
+        this.validateOptionalParam(
+          call.arguments.recursive,
+          'recursive',
+          (value) => this.validateBooleanParam(value, 'recursive'),
+          call.id
+        ) ?? false;
 
-      const maxDepth = this.validateOptionalParam(
-        call.arguments.maxDepth,
-        'maxDepth',
-        (value) => this.validateNumberParam(value, 'maxDepth', call.id, { min: 1, max: 10, integer: true }),
-        call.id
-      ) ?? 3;
+      const maxDepth =
+        this.validateOptionalParam(
+          call.arguments.maxDepth,
+          'maxDepth',
+          (value) =>
+            this.validateNumberParam(value, 'maxDepth', call.id, {
+              min: TOOL_LIMITS.MIN_DEPTH,
+              max: TOOL_LIMITS.MAX_LIST_DEPTH,
+              integer: true,
+            }),
+          call.id
+        ) ?? TOOL_LIMITS.DEFAULT_LIST_DEPTH;
 
-      const summaryThreshold = this.validateOptionalParam(
-        call.arguments.summaryThreshold,
-        'summaryThreshold',
-        (value) => this.validateNumberParam(value, 'summaryThreshold', call.id, { min: 1, max: 200, integer: true }),
-        call.id
-      ) ?? 50;
+      const summaryThreshold =
+        this.validateOptionalParam(
+          call.arguments.summaryThreshold,
+          'summaryThreshold',
+          (value) =>
+            this.validateNumberParam(value, 'summaryThreshold', call.id, {
+              min: TOOL_LIMITS.MIN_SUMMARY_THRESHOLD,
+              max: TOOL_LIMITS.MAX_SUMMARY_THRESHOLD,
+              integer: true,
+            }),
+          call.id
+        ) ?? TOOL_LIMITS.DEFAULT_SUMMARY_THRESHOLD;
 
-      const maxResults = this.validateOptionalParam(
-        call.arguments.maxResults,
-        'maxResults',
-        (value) => this.validateNumberParam(value, 'maxResults', call.id, { min: 1, max: 1000, integer: true }),
-        call.id
-      ) ?? 50;
+      const maxResults =
+        this.validateOptionalParam(
+          call.arguments.maxResults,
+          'maxResults',
+          (value) =>
+            this.validateNumberParam(value, 'maxResults', call.id, {
+              min: TOOL_LIMITS.MIN_SEARCH_RESULTS,
+              max: TOOL_LIMITS.MAX_SEARCH_RESULTS,
+              integer: true,
+            }),
+          call.id
+        ) ?? TOOL_LIMITS.DEFAULT_SEARCH_RESULTS;
 
       // Validate directory exists before listing
       await this.validateDirectoryExists(path, call.id);

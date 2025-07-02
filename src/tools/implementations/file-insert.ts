@@ -1,13 +1,8 @@
 // ABOUTME: Insert content to files at specific lines or at the end
 // ABOUTME: Supports both line-based insertion and end-of-file appending
 
-import { readFile, writeFile } from 'fs/promises';
-import {
-  ToolCall,
-  ToolResult,
-  ToolContext,
-  createSuccessResult,
-} from '../types.js';
+import { writeFile } from 'fs/promises';
+import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
 import { BaseTool, ValidationError } from '../base-tool.js';
 
 export class FileInsertTool extends BaseTool {

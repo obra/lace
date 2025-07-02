@@ -3,13 +3,9 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import {
-  ToolCall,
-  ToolResult,
-  ToolContext,
-  createSuccessResult,
-} from '../types.js';
+import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
 import { BaseTool, ValidationError } from '../base-tool.js';
+import { TOOL_LIMITS } from '../constants.js';
 
 const execAsync = promisify(exec);
 
@@ -51,26 +47,29 @@ export class RipgrepSearchTool extends BaseTool {
   async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     try {
       const pattern = this.validateNonEmptyStringParam(call.arguments.pattern, 'pattern', call.id);
-      const path = this.validateOptionalParam(
-        call.arguments.path,
-        'path',
-        (value) => this.validateNonEmptyStringParam(value, 'path'),
-        call.id
-      ) ?? '.';
-      
-      const caseSensitive = this.validateOptionalParam(
-        call.arguments.caseSensitive,
-        'caseSensitive',
-        (value) => this.validateBooleanParam(value, 'caseSensitive'),
-        call.id
-      ) ?? false;
+      const path =
+        this.validateOptionalParam(
+          call.arguments.path,
+          'path',
+          (value) => this.validateNonEmptyStringParam(value, 'path'),
+          call.id
+        ) ?? '.';
 
-      const wholeWord = this.validateOptionalParam(
-        call.arguments.wholeWord,
-        'wholeWord',
-        (value) => this.validateBooleanParam(value, 'wholeWord'),
-        call.id
-      ) ?? false;
+      const caseSensitive =
+        this.validateOptionalParam(
+          call.arguments.caseSensitive,
+          'caseSensitive',
+          (value) => this.validateBooleanParam(value, 'caseSensitive'),
+          call.id
+        ) ?? false;
+
+      const wholeWord =
+        this.validateOptionalParam(
+          call.arguments.wholeWord,
+          'wholeWord',
+          (value) => this.validateBooleanParam(value, 'wholeWord'),
+          call.id
+        ) ?? false;
 
       const includePattern = this.validateOptionalParam(
         call.arguments.includePattern,
@@ -86,19 +85,31 @@ export class RipgrepSearchTool extends BaseTool {
         call.id
       );
 
-      const maxResults = this.validateOptionalParam(
-        call.arguments.maxResults,
-        'maxResults',
-        (value) => this.validateNumberParam(value, 'maxResults', call.id, { min: 1, max: 1000, integer: true }),
-        call.id
-      ) ?? 50;
+      const maxResults =
+        this.validateOptionalParam(
+          call.arguments.maxResults,
+          'maxResults',
+          (value) =>
+            this.validateNumberParam(value, 'maxResults', call.id, {
+              min: TOOL_LIMITS.MIN_SEARCH_RESULTS,
+              max: TOOL_LIMITS.MAX_SEARCH_RESULTS,
+              integer: true,
+            }),
+          call.id
+        ) ?? TOOL_LIMITS.DEFAULT_SEARCH_RESULTS;
 
-      const contextLines = this.validateOptionalParam(
-        call.arguments.contextLines,
-        'contextLines',
-        (value) => this.validateNumberParam(value, 'contextLines', call.id, { min: 0, max: 10, integer: true }),
-        call.id
-      ) ?? 0;
+      const contextLines =
+        this.validateOptionalParam(
+          call.arguments.contextLines,
+          'contextLines',
+          (value) =>
+            this.validateNumberParam(value, 'contextLines', call.id, {
+              min: 0,
+              max: 10,
+              integer: true,
+            }),
+          call.id
+        ) ?? 0;
 
       const args = this.buildRipgrepArgs({
         pattern,
@@ -156,7 +167,10 @@ export class RipgrepSearchTool extends BaseTool {
 
       if (error instanceof Error) {
         // Check if ripgrep is not installed
-        if (error.message.includes('command not found') || error.message.includes('not recognized')) {
+        if (
+          error.message.includes('command not found') ||
+          error.message.includes('not recognized')
+        ) {
           return this.createStructuredError(
             'ripgrep (rg) command not found',
             'Install ripgrep to use this tool: brew install ripgrep (macOS) or apt-get install ripgrep (Linux)',
