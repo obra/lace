@@ -200,6 +200,9 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     totalTokens: number;
   } | null>(null);
 
+  // Lock to prevent race conditions between token updates and turn completion
+  const tokenUpdateLockRef = useRef<boolean>(false);
+
   // Debounce timer for token usage updates during streaming
   const tokenUpdateDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -394,7 +397,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
     // Handle token usage updates - track the latest for accurate cumulative totals
     const handleTokenUsageUpdate = ({ usage }: { usage: any }) => {
-      if (usage && typeof usage === 'object') {
+      if (usage && typeof usage === 'object' && !tokenUpdateLockRef.current) {
         // Keep track of the most recent provider usage data
         // This includes system prompts and full context that turn metrics miss
         const newUsage = {
@@ -420,8 +423,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         } else {
           // Debounce subsequent updates (streaming completion tokens)
           tokenUpdateDebounceRef.current = setTimeout(() => {
-            // Only update if we have meaningful token counts
-            if (newUsage.promptTokens > 0 || newUsage.totalTokens > 0) {
+            // Only update if we have meaningful token counts and not locked
+            if ((newUsage.promptTokens > 0 || newUsage.totalTokens > 0) && !tokenUpdateLockRef.current) {
               lastProviderUsageRef.current = newUsage;
             }
             tokenUpdateDebounceRef.current = null;
@@ -487,12 +490,25 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       setCurrentTurnMetrics(null);
       setIsProcessing(false);
 
+      // Acquire lock to prevent race conditions with ongoing token updates
+      tokenUpdateLockRef.current = true;
+
+      // Clear any pending debounced updates before processing final tokens
+      if (tokenUpdateDebounceRef.current) {
+        clearTimeout(tokenUpdateDebounceRef.current);
+        tokenUpdateDebounceRef.current = null;
+      }
+
       // Use provider's final token counts for accurate cumulative totals
       const providerUsage = lastProviderUsageRef.current;
       if (providerUsage) {
         setCumulativeTokens((prev) => {
           // For resumed conversations, we need to detect if this is truly the first turn
-          // or if we're resuming with existing context
+          // or if we're resuming with existing context. We check BOTH conditions:
+          // - lastPromptTokens === 0: No previous prompt tokens tracked
+          // - totalTokens === 0: No tokens accumulated yet
+          // This ensures resumed conversations (which have totalTokens > 0 from init)
+          // are not treated as first turns.
           const isFirstTurnEver = prev.lastPromptTokens === 0 && prev.totalTokens === 0;
           
           try {
@@ -542,6 +558,9 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         lastProviderUsageRef.current = null;
       }
 
+      // Release lock
+      tokenUpdateLockRef.current = false;
+
       // Show completion message with turn summary and context info
       const contextSize = providerUsage?.promptTokens || 0;
       const contextWarning = contextSize > 150000 ? ' ⚠️ Large context' : '';
@@ -563,6 +582,17 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       setCurrentTurnId(null);
       setCurrentTurnMetrics(null);
       setIsProcessing(false);
+
+      // Acquire lock and clear any pending token updates
+      tokenUpdateLockRef.current = true;
+      if (tokenUpdateDebounceRef.current) {
+        clearTimeout(tokenUpdateDebounceRef.current);
+        tokenUpdateDebounceRef.current = null;
+      }
+      // Clear any partial provider usage data
+      lastProviderUsageRef.current = null;
+      // Release lock
+      tokenUpdateLockRef.current = false;
 
       // Show abort message with partial progress
       addMessage({
