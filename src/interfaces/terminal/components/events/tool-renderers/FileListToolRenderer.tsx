@@ -1,16 +1,177 @@
-// ABOUTME: Specialized renderer for file-list tool executions with tree structure display
-// ABOUTME: Shows directory trees with proper indentation, file sizes, and type indicators
+// ABOUTME: File list tool renderer using the new three-layer component architecture  
+// ABOUTME: Shows directory trees with proper indentation, file sizes, and statistics using clean component composition
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
-import { 
-  useToolRenderer, 
-  ToolRendererProps,
-  limitLines,
-  parseBasicToolResult 
-} from './useToolRenderer.js';
+import { useToolData, ToolExecutionItem } from '../hooks/useToolData.js';
+import { useToolState } from '../hooks/useToolState.js';
+import { ToolDisplay } from '../components/ToolDisplay.js';
+import { UI_COLORS } from '../../../theme.js';
 
-// Helper function to count tree elements for summary
+// File list tool-specific interfaces
+interface FileListToolRendererProps {
+  item: ToolExecutionItem;
+  isStreaming?: boolean;
+  isSelected?: boolean;
+  onToggle?: () => void;
+}
+
+interface FileListData {
+  isEmpty: boolean;
+  stats: {
+    files: number;
+    dirs: number;
+    lines: number;
+  };
+  parameters: string[];
+}
+
+/**
+ * Main File List tool renderer using three-layer architecture:
+ * 1. Data processing (useToolData + file-list-specific parsing)
+ * 2. State management (useToolState)
+ * 3. Display (ToolDisplay with file-list-specific components)
+ */
+export function FileListToolRenderer({ 
+  item, 
+  isStreaming = false, 
+  isSelected = false, 
+  onToggle 
+}: FileListToolRendererProps) {
+  
+  // Layer 1: Data processing
+  const toolData = useToolData(item);
+  const fileListData = useFileListData(item);
+  
+  // Layer 2: State management
+  const toolState = useToolState(toolData, isSelected, onToggle);
+  
+  // Layer 3: Display with file-list-specific components
+  return (
+    <ToolDisplay
+      toolData={toolData}
+      toolState={toolState}
+      isSelected={isSelected}
+      components={{
+        header: FileListHeader,
+        preview: FileListPreview,
+        content: FileListContent,
+      }}
+    />
+  );
+}
+
+/**
+ * Hook for parsing file-list-specific data
+ */
+function useFileListData(item: ToolExecutionItem): FileListData {
+  return useMemo(() => {
+    const { input } = item.call.arguments;
+    const output = item.result?.content?.[0]?.text || '';
+    
+    const isEmpty = output === 'No files found';
+    const stats = isEmpty ? { files: 0, dirs: 0, lines: 0 } : countTreeElements(output);
+    
+    // Extract parameters for display
+    const parameters: string[] = [];
+    if (input.recursive) parameters.push('recursive');
+    if (input.includeHidden) parameters.push('hidden files');
+    if (input.pattern) parameters.push(`pattern: ${input.pattern}`);
+    if (input.maxDepth && input.maxDepth !== 3) parameters.push(`depth: ${input.maxDepth}`);
+    
+    return {
+      isEmpty,
+      stats,
+      parameters,
+    };
+  }, [item]);
+}
+
+/**
+ * File list-specific header component
+ * Shows directory path and scan parameters
+ */
+function FileListHeader({ toolData }: { toolData: any }) {
+  const path = getDirectoryPath(toolData.input);
+  const fileListData = useFileListData({ call: { arguments: toolData.input }, result: toolData.result } as any);
+  const parameterText = fileListData.parameters.length > 0 ? ` (${fileListData.parameters.join(', ')})` : '';
+  
+  return (
+    <React.Fragment>
+      <Text color={UI_COLORS.TOOL}>File List: </Text>
+      <Text color="white">{path}</Text>
+      {parameterText && <Text color="gray">{parameterText}</Text>}
+      <Text color="gray">  </Text>
+      <Text color={toolData.success ? UI_COLORS.SUCCESS : UI_COLORS.ERROR}>
+        {toolData.statusIcon}
+      </Text>
+      {toolData.isStreaming && <Text color="gray"> (scanning...)</Text>}
+    </React.Fragment>
+  );
+}
+
+/**
+ * File list-specific preview component
+ * Shows first few lines of directory tree
+ */
+function FileListPreview({ toolData }: { toolData: any }) {
+  const fileListData = useFileListData({ call: { arguments: toolData.input }, result: toolData.result } as any);
+  
+  if (fileListData.isEmpty) {
+    return (
+      <Box marginTop={1}>
+        <Text color="gray">No files found</Text>
+      </Box>
+    );
+  }
+  
+  const lines = toolData.output.split('\n').slice(0, 3);
+  const hasMore = toolData.output.split('\n').length > 3;
+  
+  return (
+    <Box marginTop={1}>
+      <Box flexDirection="column">
+        <Text color="gray">{fileListData.stats.files} files, {fileListData.stats.dirs} directories</Text>
+        {lines.map((line: string, index: number) => (
+          <Text key={index} color="gray">{line}</Text>
+        ))}
+        {hasMore && (
+          <Text color="gray">... and {toolData.output.split('\n').length - 3} more lines</Text>
+        )}
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * File list-specific content component
+ * Shows full directory tree or empty state
+ */
+function FileListContent({ toolData }: { toolData: any }) {
+  const fileListData = useFileListData({ call: { arguments: toolData.input }, result: toolData.result } as any);
+  
+  if (fileListData.isEmpty) {
+    return (
+      <Box marginTop={1}>
+        <Text color="gray">No files found</Text>
+      </Box>
+    );
+  }
+  
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Box marginBottom={1}>
+        <Text color={UI_COLORS.SUCCESS}>
+          {fileListData.stats.files} files, {fileListData.stats.dirs} directories
+        </Text>
+      </Box>
+      <Text>{toolData.output}</Text>
+    </Box>
+  );
+}
+
+// Helper functions (extracted from original implementation)
+
 function countTreeElements(text: string): { files: number; dirs: number; lines: number } {
   const lines = text.split('\n');
   let files = 0;
@@ -27,99 +188,10 @@ function countTreeElements(text: string): { files: number; dirs: number; lines: 
   return { files, dirs, lines: lines.length };
 }
 
-// Helper function to extract directory path from arguments
 function getDirectoryPath(input: Record<string, unknown>): string {
   const path = input.path as string;
   if (!path || path === '.') {
     return 'current directory';
   }
   return path;
-}
-
-// Helper function to create parameter summary
-function getParameterSummary(input: Record<string, unknown>): string {
-  const parts: string[] = [];
-  
-  if (input.recursive) parts.push('recursive');
-  if (input.includeHidden) parts.push('hidden files');
-  if (input.pattern) parts.push(`pattern: ${input.pattern}`);
-  if (input.maxDepth && input.maxDepth !== 3) parts.push(`depth: ${input.maxDepth}`);
-  
-  return parts.length > 0 ? ` (${parts.join(', ')})` : '';
-}
-
-export function FileListToolRenderer({
-  item,
-  isStreaming = false,
-  isSelected = false,
-  onToggle,
-}: ToolRendererProps) {
-  
-  const { timelineEntry } = useToolRenderer(
-    item,
-    {
-      toolName: 'File List',
-      streamingAction: 'scanning...',
-      
-      getPrimaryInfo: (input) => getDirectoryPath(input),
-      getSecondaryInfo: (input) => getParameterSummary(input),
-      
-      parseOutput: (result, input) => {
-        const { success, output } = parseBasicToolResult(result);
-        
-        if (!success) {
-          return {
-            success: false,
-            errorMessage: output || 'Unknown error'
-          };
-        }
-
-        const isEmpty = output === 'No files found';
-        const stats = isEmpty ? { files: 0, dirs: 0, lines: 0 } : countTreeElements(output);
-        
-        // Create stats summary
-        const statsText = `${stats.files} files, ${stats.dirs} directories`;
-
-        // Create preview content for collapsed view
-        const previewContent = isEmpty ? (
-          <Text color="gray">No files found</Text>
-        ) : (
-          <Box flexDirection="column">
-            {/* Show first few lines of tree as preview */}
-            {(() => {
-              const { lines, truncated, remaining } = limitLines(output, 3);
-              return (
-                <Box flexDirection="column">
-                  {lines.map((line, index) => (
-                    <Text key={index} color="gray">
-                      {line}
-                    </Text>
-                  ))}
-                  {truncated && (
-                    <Text color="gray">... and {remaining} more lines</Text>
-                  )}
-                </Box>
-              );
-            })()}
-          </Box>
-        );
-
-        // Create main content for expanded view
-        const mainContent = isEmpty ? null : <Text>{output}</Text>;
-
-        return {
-          success,
-          isEmpty,
-          stats: statsText,
-          previewContent,
-          mainContent
-        };
-      }
-    },
-    isStreaming,
-    isSelected,
-    onToggle
-  );
-
-  return timelineEntry;
 }
