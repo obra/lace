@@ -89,11 +89,21 @@ export function TimelineEntry({
 
     if (prevExpanded !== undefined && prevExpanded !== currentExpanded) {
       onToggle?.();
-      // Schedule measurement after expansion change
+      
+      // Clear any pending measurements
       if (measureTimeoutRef.current) {
         clearTimeout(measureTimeoutRef.current);
       }
-      measureTimeoutRef.current = setTimeout(measureHeight, 50);
+      
+      // For collapse, measure immediately to update timeline height quickly
+      // For expand, use a short delay to let content render
+      if (!currentExpanded) {
+        // Collapsing - measure immediately
+        measureHeight();
+      } else {
+        // Expanding - small delay for content to render
+        measureTimeoutRef.current = setTimeout(measureHeight, 50);
+      }
     }
 
     prevExpandedRef.current = currentExpanded;
