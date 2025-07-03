@@ -1,15 +1,10 @@
-// ABOUTME: Delegate tool for spawning subagents with specific tasks
-// ABOUTME: Enables efficient token usage by delegating to cheaper models
+// ABOUTME: Schema-based delegate tool for spawning subagents with specific tasks using Zod validation
+// ABOUTME: Enables efficient token usage by delegating to cheaper models with enhanced parameter validation
 
-import {
-  ToolCall,
-  ToolResult,
-  ToolContext,
-  createSuccessResult,
-  createErrorResult,
-} from '../types.js';
-import { BaseTool, ValidationError } from '../base-tool.js';
-import { ApprovalDecision } from '../approval-types.js';
+import { z } from 'zod';
+import { Tool } from '../tool.js';
+import { NonEmptyString } from '../schemas/common.js';
+import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
 import { Agent } from '../../agents/agent.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 import { ToolExecutor } from '../executor.js';
@@ -21,7 +16,32 @@ import { TokenBudgetConfig } from '../../token-management/types.js';
 import { getEnvVar } from '../../config/env-loader.js';
 import { logger } from '../../utils/logger.js';
 
-export class DelegateTool extends BaseTool {
+// Model format validation
+const ModelFormat = z.string().refine(
+  (value) => {
+    const [providerName, modelName] = value.split(':');
+    return providerName && modelName;
+  },
+  {
+    message:
+      'Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3-5-haiku-latest")',
+  }
+);
+
+const delegateSchema = z.object({
+  title: NonEmptyString.describe(
+    'Short active voice sentence describing the task (e.g., "Find security vulnerabilities")'
+  ),
+  prompt: NonEmptyString.describe('Complete instructions for the subagent - be specific and clear'),
+  expected_response: NonEmptyString.describe(
+    'Description of the expected format/content of the response (guides the subagent)'
+  ),
+  model: ModelFormat.default('anthropic:claude-3-5-haiku-latest').describe(
+    'Provider and model in format "provider:model"'
+  ),
+});
+
+export class DelegateTool extends Tool {
   name = 'delegate';
   description = `Delegate a specific task to a subagent using a less expensive model.
 Ideal for research, data extraction, log analysis, or any focused task with clear outputs.
@@ -32,40 +52,9 @@ Examples:
 - title: "Search authentication logs", prompt: "grep through the application logs for authentication errors in the last hour", expected_response: "Timestamps and error messages for each auth failure"
 - title: "Count code statistics", prompt: "Count total lines of code, number of files, and test coverage percentage", expected_response: "JSON with {loc: number, files: number, coverage: number}"`;
 
-  annotations = {
+  schema = delegateSchema;
+  annotations: ToolAnnotations = {
     openWorldHint: true,
-  };
-
-  inputSchema = {
-    type: 'object' as const,
-    properties: {
-      title: {
-        type: 'string',
-        description:
-          'Short active voice sentence describing the task (e.g., "Find security vulnerabilities")',
-      },
-      prompt: {
-        type: 'string',
-        description: 'Complete instructions for the subagent - be specific and clear',
-      },
-      expected_response: {
-        type: 'string',
-        description:
-          'Description of the expected format/content of the response (guides the subagent)',
-      },
-      model: {
-        type: 'string',
-        description:
-          'Provider and model in format "provider:model" (default: "anthropic:claude-3-5-haiku-latest")',
-        examples: [
-          'anthropic:claude-3-5-haiku-latest',
-          'anthropic:claude-3-5-sonnet-latest',
-          'lmstudio:qwen2.5-coder-7b-instruct',
-          'ollama:qwen2.5-coder:3b',
-        ],
-      },
-    },
-    required: ['title', 'prompt', 'expected_response'],
   };
 
   // Dependencies injected by the main agent's context
@@ -73,51 +62,27 @@ Examples:
   private parentToolExecutor?: ToolExecutor;
   private defaultTimeout: number = 300000; // 5 minutes default
 
-  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(
+    args: z.infer<typeof delegateSchema>,
+    _context?: ToolContext
+  ): Promise<ToolResult> {
     try {
-      const title = this.validateNonEmptyStringParam(call.arguments.title, 'title', call.id);
-      const prompt = this.validateNonEmptyStringParam(call.arguments.prompt, 'prompt', call.id);
-      const expected_response = this.validateNonEmptyStringParam(
-        call.arguments.expected_response,
-        'expected_response',
-        call.id
-      );
-      const model =
-        this.validateOptionalParam(
-          call.arguments.model,
-          'model',
-          (value) => {
-            const modelStr = this.validateStringParam(value, 'model');
-            const [providerName, modelName] = modelStr.split(':');
-            if (!providerName || !modelName) {
-              throw new Error(
-                'Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3.5-haiku-latest")'
-              );
-            }
-            return modelStr;
-          },
-          call.id
-        ) ?? 'anthropic:claude-3-5-haiku-latest';
+      const { title, prompt, expected_response, model } = args;
 
-      return await this.performDelegation({ title, prompt, expected_response, model }, call.id);
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        return error.toolResult;
-      }
-
-      return this.createStructuredError(
-        'Delegate tool validation failed',
-        'Check the title, prompt, expected_response, and model parameters',
-        error instanceof Error ? error.message : 'Unknown error occurred',
-        call.id
+      return await this.performDelegation({ title, prompt, expected_response, model });
+    } catch (error: unknown) {
+      return this.createError(
+        `Delegate tool execution failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}. Check the parameters and try again.`
       );
     }
   }
 
-  private async performDelegation(
-    params: { title: string; prompt: string; expected_response: string; model: string },
-    callId?: string
-  ): Promise<ToolResult> {
+  private async performDelegation(params: {
+    title: string;
+    prompt: string;
+    expected_response: string;
+    model: string;
+  }): Promise<ToolResult> {
     const { title, prompt, expected_response, model } = params;
 
     // Parse provider:model format
@@ -127,23 +92,19 @@ Examples:
       // Create provider for subagent
       const provider = await this.createProvider(providerName, modelName, expected_response);
       if (!provider) {
-        return createErrorResult(`Unknown provider: ${providerName}`, callId);
+        return this.createError(`Unknown provider: ${providerName}`);
       }
 
       // Use shared thread manager from parent (avoids multiple SQLite connections)
       if (!this.threadManager) {
-        return createErrorResult(
-          'Delegate tool not properly initialized - missing ThreadManager',
-          callId
-        );
+        return this.createError('Delegate tool not properly initialized - missing ThreadManager');
       }
       const threadManager = this.threadManager;
 
       // Create restricted tool executor for subagent (remove delegate to prevent recursion)
       if (!this.parentToolExecutor) {
-        return createErrorResult(
-          'Delegate tool not properly initialized - missing parent ToolExecutor',
-          callId
+        return this.createError(
+          'Delegate tool not properly initialized - missing parent ToolExecutor'
         );
       }
 
@@ -239,16 +200,9 @@ Examples:
         logger.debug('DelegateTool: Subagent finished, returning result', {
           combinedResponseLength: combinedResponse.length,
         });
-        return createSuccessResult(
-          [
-            {
-              type: 'text',
-              text: combinedResponse || 'Subagent completed without response',
-            },
-          ],
-          callId,
-          { threadId: subagentThreadId }
-        );
+        return this.createResult(combinedResponse || 'Subagent completed without response', {
+          threadId: subagentThreadId,
+        });
       } catch (error) {
         logger.error('DelegateTool: Error during subagent execution', {
           error: error instanceof Error ? error.message : String(error),
@@ -258,17 +212,13 @@ Examples:
           subagent.removeAllListeners();
         }
 
-        return createErrorResult(
-          error instanceof Error ? `Subagent error: ${error.message}` : 'Unknown error occurred',
-          callId
+        return this.createError(
+          error instanceof Error ? `Subagent error: ${error.message}` : 'Unknown error occurred'
         );
       }
     } catch (error) {
-      return createErrorResult(
-        error instanceof Error
-          ? `Provider setup error: ${error.message}`
-          : 'Unknown error occurred',
-        callId
+      return this.createError(
+        error instanceof Error ? `Provider setup error: ${error.message}` : 'Unknown error occurred'
       );
     }
   }
@@ -341,8 +291,8 @@ IMPORTANT: Once you have gathered enough information to provide the expected res
     } else {
       // SAFE DEFAULT: If no approval callback, deny all tools
       childExecutor.setApprovalCallback({
-        async requestApproval(): Promise<ApprovalDecision> {
-          return ApprovalDecision.DENY;
+        async requestApproval() {
+          return 'deny' as const;
         },
       });
     }

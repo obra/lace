@@ -1,8 +1,10 @@
-// ABOUTME: Session-based task management tools for tracking work items
-// ABOUTME: In-memory task storage for current session workflow management
+// ABOUTME: Schema-based session task management tools for tracking work items with Zod validation
+// ABOUTME: In-memory task storage for current session workflow management with enhanced error handling
 
-import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
-import { BaseTool, ValidationError } from '../base-tool.js';
+import { z } from 'zod';
+import { Tool } from '../tool.js';
+import { NonEmptyString } from '../schemas/common.js';
+import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
 
 interface Task {
   id: string;
@@ -72,93 +74,68 @@ export function clearAllTaskStores(): void {
   taskStores.clear();
 }
 
-export class TaskAddTool extends BaseTool {
+// TaskAddTool schema - handle both single string and JSON array string
+const taskAddSchema = z.object({
+  tasks: NonEmptyString,
+});
+
+export class TaskAddTool extends Tool {
   name = 'task_add';
   description =
     'Add one or more tasks to the session task list. Supports both single task (string) and multiple tasks (array of strings) for bulk operations.';
-  annotations = {
+  schema = taskAddSchema;
+  annotations: ToolAnnotations = {
     idempotentHint: false,
   };
-  inputSchema = {
-    type: 'object' as const,
-    properties: {
-      tasks: {
-        type: 'string',
-        description:
-          'Task description(s) - can be a single string or array of strings (JSON array format)',
-      },
-    },
-    required: ['tasks'],
-  };
 
-  async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(
+    args: z.infer<typeof taskAddSchema>,
+    context?: ToolContext
+  ): Promise<ToolResult> {
     try {
-      const tasks = call.arguments.tasks;
+      const tasks = args.tasks;
       let taskDescriptions: string[] = [];
 
-      if (typeof tasks === 'string') {
-        // Check if it's a JSON array string
-        if (tasks.trim().startsWith('[') && tasks.trim().endsWith(']')) {
-          let parsed: unknown;
-          try {
-            parsed = JSON.parse(tasks);
-          } catch (parseError) {
-            return this.createStructuredError(
-              'Invalid JSON array format',
-              'Provide either a single task string or valid JSON array like ["task1", "task2"]',
-              parseError instanceof Error ? parseError.message : 'JSON parse error',
-              call.id
-            );
-          }
-
-          if (Array.isArray(parsed)) {
-            if (parsed.length === 0) {
-              return this.createStructuredError(
-                'Tasks array cannot be empty',
-                'Provide at least one task description in the array',
-                'Empty tasks array provided',
-                call.id
-              );
-            }
-            // Validate each element (ValidationError will be caught by outer try-catch)
-            for (let i = 0; i < parsed.length; i++) {
-              const task = this.validateNonEmptyStringParam(parsed[i], `tasks[${i}]`, call.id);
-              taskDescriptions.push(task);
-            }
-          } else {
-            return this.createStructuredError(
-              'Parsed JSON is not an array',
-              'Provide a valid JSON array of strings',
-              'JSON parsed to non-array type',
-              call.id
-            );
-          }
-        } else {
-          // Single task as regular string
-          taskDescriptions.push(this.validateNonEmptyStringParam(tasks, 'tasks', call.id));
-        }
-      } else if (Array.isArray(tasks)) {
-        // Direct array support (for backward compatibility)
-        if (tasks.length === 0) {
-          return this.createStructuredError(
-            'Tasks array cannot be empty',
-            'Provide at least one task description in the array',
-            'Empty tasks array provided',
-            call.id
+      // Check if it's a JSON array string
+      if (tasks.trim().startsWith('[') && tasks.trim().endsWith(']')) {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(tasks);
+        } catch (parseError) {
+          return this.createError(
+            `Invalid JSON array format. Provide either a single task string or valid JSON array like ["task1", "task2"]. JSON parse error: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`
           );
         }
 
-        for (let i = 0; i < tasks.length; i++) {
-          const task = this.validateNonEmptyStringParam(tasks[i], `tasks[${i}]`, call.id);
-          taskDescriptions.push(task);
+        if (Array.isArray(parsed)) {
+          if (parsed.length === 0) {
+            return this.createError(
+              'Tasks array cannot be empty. Provide at least one task description in the array.'
+            );
+          }
+
+          // Validate each element is a non-empty string
+          for (let i = 0; i < parsed.length; i++) {
+            if (typeof parsed[i] !== 'string') {
+              return this.createError(
+                `Invalid JSON array format. All elements must be strings. Element at index ${i} is ${typeof parsed[i]}.`
+              );
+            }
+            if ((parsed[i] as string).trim() === '') {
+              return this.createError(
+                `Invalid JSON array format. All elements must be non-empty strings. Element at index ${i} is empty.`
+              );
+            }
+            taskDescriptions.push((parsed[i] as string).trim());
+          }
+        } else {
+          return this.createError(
+            'Parsed JSON is not an array. Provide a valid JSON array of strings.'
+          );
         }
       } else {
-        return this.createStructuredError(
-          'Tasks parameter must be a string or array of strings',
-          'Use either "tasks": "single task" or "tasks": "[\\"task1\\", \\"task2\\"]"',
-          `Received ${typeof tasks}`,
-          call.id
-        );
+        // Single task as regular string
+        taskDescriptions.push(tasks.trim());
       }
 
       // Add tasks to store
@@ -166,7 +143,7 @@ export class TaskAddTool extends BaseTool {
       const addedTasks: Task[] = [];
 
       for (const desc of taskDescriptions) {
-        const task = taskStore.addTask(desc.trim());
+        const task = taskStore.addTask(desc);
         addedTasks.push(task);
       }
 
@@ -174,85 +151,47 @@ export class TaskAddTool extends BaseTool {
       if (addedTasks.length === 1) {
         // Single task response
         const task = addedTasks[0];
-        return createSuccessResult(
-          [
-            {
-              type: 'text',
-              text: `Added task #${task.id}: ${task.description}`,
-            },
-          ],
-          call.id
-        );
+        return this.createResult(`Added task #${task.id}: ${task.description}`);
       } else {
         // Multiple tasks response
         const taskLines = addedTasks.map((task) => `#${task.id}: ${task.description}`);
-        return createSuccessResult(
-          [
-            {
-              type: 'text',
-              text: `Added ${addedTasks.length} tasks:\n${taskLines.join('\n')}`,
-            },
-          ],
-          call.id
-        );
+        return this.createResult(`Added ${addedTasks.length} tasks:\n${taskLines.join('\n')}`);
       }
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        return error.toolResult;
-      }
-
-      return this.createStructuredError(
-        'Failed to add tasks',
-        'Provide valid task descriptions and try again',
-        error instanceof Error ? error.message : 'Unknown error occurred',
-        call.id
+    } catch (error: unknown) {
+      return this.createError(
+        `Failed to add tasks: ${error instanceof Error ? error.message : 'Unknown error occurred'}. Provide valid task descriptions and try again.`
       );
     }
   }
 }
 
-export class TaskListTool extends BaseTool {
+// TaskListTool schema
+const taskListSchema = z.object({
+  includeCompleted: z.boolean().default(false),
+});
+
+export class TaskListTool extends Tool {
   name = 'task_list';
   description = 'List current session tasks';
-  annotations = {
+  schema = taskListSchema;
+  annotations: ToolAnnotations = {
     readOnlyHint: true,
     idempotentHint: true,
   };
-  inputSchema = {
-    type: 'object' as const,
-    properties: {
-      includeCompleted: {
-        type: 'boolean',
-        description: 'Include completed tasks (default: false)',
-      },
-    },
-    required: [],
-  };
 
-  async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(
+    args: z.infer<typeof taskListSchema>,
+    context?: ToolContext
+  ): Promise<ToolResult> {
     try {
-      const includeCompleted =
-        this.validateOptionalParam(
-          call.arguments.includeCompleted,
-          'includeCompleted',
-          (value) => this.validateBooleanParam(value, 'includeCompleted'),
-          call.id
-        ) ?? false;
+      const { includeCompleted } = args;
 
       const taskStore = getTaskStore(context?.threadId);
       const tasks = taskStore.getTasks(includeCompleted);
 
       if (tasks.length === 0) {
         const message = includeCompleted ? 'No tasks found' : 'No pending tasks';
-        return createSuccessResult(
-          [
-            {
-              type: 'text',
-              text: message,
-            },
-          ],
-          call.id
-        );
+        return this.createResult(message);
       }
 
       const taskLines = tasks.map((task) => {
@@ -268,79 +207,48 @@ export class TaskListTool extends BaseTool {
         ? `Tasks (${tasks.filter((t) => !t.completed).length} pending, ${tasks.filter((t) => t.completed).length} completed):`
         : `Pending tasks (${tasks.length}):`;
 
-      return createSuccessResult(
-        [
-          {
-            type: 'text',
-            text: `${summary}\n${taskLines.join('\n')}`,
-          },
-        ],
-        call.id
-      );
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        return error.toolResult;
-      }
-
-      return this.createStructuredError(
-        'Failed to list tasks',
-        'Check the parameters and try again',
-        error instanceof Error ? error.message : 'Unknown error occurred',
-        call.id
+      return this.createResult(`${summary}\n${taskLines.join('\n')}`);
+    } catch (error: unknown) {
+      return this.createError(
+        `Failed to list tasks: ${error instanceof Error ? error.message : 'Unknown error occurred'}. Check the parameters and try again.`
       );
     }
   }
 }
 
-export class TaskCompleteTool extends BaseTool {
+// TaskCompleteTool schema
+const taskCompleteSchema = z.object({
+  id: NonEmptyString,
+});
+
+export class TaskCompleteTool extends Tool {
   name = 'task_complete';
   description = 'Mark a task as completed';
-  annotations = {
+  schema = taskCompleteSchema;
+  annotations: ToolAnnotations = {
     idempotentHint: false,
   };
-  inputSchema = {
-    type: 'object' as const,
-    properties: {
-      id: { type: 'string', description: 'Task ID to complete' },
-    },
-    required: ['id'],
-  };
 
-  async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(
+    args: z.infer<typeof taskCompleteSchema>,
+    context?: ToolContext
+  ): Promise<ToolResult> {
     try {
-      const id = this.validateNonEmptyStringParam(call.arguments.id, 'id', call.id);
+      const { id } = args;
 
       const taskStore = getTaskStore(context?.threadId);
       const task = taskStore.completeTask(id);
 
       if (!task) {
-        return this.createStructuredError(
-          `Task #${id} not found`,
-          'Check the task ID and ensure the task exists',
-          'Task lookup failed',
-          call.id
+        return this.createError(
+          `Task #${id} not found. Check the task ID and ensure the task exists.`
         );
       }
 
-      return createSuccessResult(
-        [
-          {
-            type: 'text',
-            text: `Completed task #${task.id}: ${task.description}`,
-          },
-        ],
-        call.id
-      );
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        return error.toolResult;
-      }
-
-      return this.createStructuredError(
-        'Failed to complete task',
-        'Provide a valid task ID and try again',
-        error instanceof Error ? error.message : 'Unknown error occurred',
-        call.id
+      return this.createResult(`Completed task #${task.id}: ${task.description}`);
+    } catch (error: unknown) {
+      return this.createError(
+        `Failed to complete task: ${error instanceof Error ? error.message : 'Unknown error occurred'}. Provide a valid task ID and try again.`
       );
     }
   }
