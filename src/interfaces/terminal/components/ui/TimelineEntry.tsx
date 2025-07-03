@@ -64,16 +64,16 @@ export function TimelineEntry({
   status = 'none',
   isExpandable = false,
 }: TimelineEntryProps) {
-  const contentRef = useRef<DOMElement | null>(null);
+  const contentAreaRef = useRef<DOMElement | null>(null);
   const [measuredHeight, setMeasuredHeight] = useState<number>(1);
   const prevExpandedRef = useRef<boolean | undefined>(undefined);
   const measureTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Debounced height measurement function
   const measureHeight = useCallback(() => {
-    if (contentRef.current) {
+    if (contentAreaRef.current) {
       try {
-        const { height } = measureElement(contentRef.current);
+        const { height } = measureElement(contentAreaRef.current);
         const newHeight = Math.max(1, height);
         setMeasuredHeight(prev => prev !== newHeight ? newHeight : prev);
       } catch (error) {
@@ -129,7 +129,7 @@ export function TimelineEntry({
   const actualContent = isExpanded ? children : (summary && summary);
   
   const contentArea = (
-    <Box flexDirection="column">
+    <Box ref={contentAreaRef} flexDirection="column">
       {label && (
         <Box marginBottom={0}>
           {typeof label === 'string' ? (
@@ -140,7 +140,7 @@ export function TimelineEntry({
         </Box>
       )}
       {actualContent && (
-        <Box ref={contentRef} marginLeft={label ? 2 : 0}>
+        <Box marginLeft={label ? 2 : 0}>
           {actualContent}
         </Box>
       )}
