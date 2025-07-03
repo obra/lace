@@ -1,7 +1,7 @@
-// ABOUTME: Individual timeline item component with dynamic tool renderer discovery
-// ABOUTME: Handles all timeline item types with unified expansion behavior and automatic tool renderer selection
+// ABOUTME: Individual timeline item component with clean tool renderer selection
+// ABOUTME: Handles all timeline item types with unified expansion behavior and registry-based tool renderer selection
 
-import React, { Suspense } from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
 import {
   Timeline,
@@ -10,11 +10,9 @@ import {
 } from '../../../thread-processor.js';
 import { EventType } from '../../../../threads/types.js';
 import { EventDisplay } from './EventDisplay.js';
-import { GenericToolRenderer } from './tool-renderers/GenericToolRenderer.js';
-import { getToolRenderer } from './tool-renderers/getToolRenderer.js';
+import { getToolRenderer } from './tool-renderers/toolRendererRegistry.js';
 import { ToolRendererErrorBoundary } from './ToolRendererErrorBoundary.js';
 import MessageDisplay from '../message-display.js';
-import { logger } from '../../../../utils/logger.js';
 
 interface TimelineItemProps {
   item: TimelineItemType;
@@ -25,102 +23,19 @@ interface TimelineItemProps {
   onExpansionToggle?: () => void; // Called when left/right arrows should toggle expansion
 }
 
-interface DynamicToolRendererProps {
+interface ToolRendererSelectorProps {
   item: Extract<TimelineItemType, { type: 'tool_execution' }>;
   isSelected: boolean; // Whether timeline cursor is on this item
   onToggle?: () => void;
-  onExpansionToggle?: () => void;
 }
 
-function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRendererProps) {
-  const [ToolRenderer, setToolRenderer] = React.useState<React.ComponentType<unknown> | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [debugInfo, setDebugInfo] = React.useState<string>('');
-
-  React.useEffect(() => {
-    const abortController = new AbortController();
-    setDebugInfo(`Looking for ${item.call.name}ToolRenderer...`);
-
-    logger.debug('DynamicToolRenderer: Starting renderer discovery', {
-      toolName: item.call.name,
-      callId: item.callId
-    });
-
-    getToolRenderer(item.call.name)
-      .then((renderer) => {
-        if (!abortController.signal.aborted) {
-          setToolRenderer(() => renderer);
-          setIsLoading(false);
-          const debugMsg = renderer ? `Found: ${renderer.name}` : 'Not found, using Generic';
-          setDebugInfo(debugMsg);
-          
-          logger.info('DynamicToolRenderer: Renderer resolution complete', {
-            toolName: item.call.name,
-            callId: item.callId,
-            found: !!renderer,
-            rendererName: renderer?.name,
-            willUseGeneric: !renderer
-          });
-        }
-      })
-      .catch((error) => {
-        if (!abortController.signal.aborted) {
-          setIsLoading(false);
-          const errorMsg = `Error: ${error.message}`;
-          setDebugInfo(errorMsg);
-          
-          logger.error('DynamicToolRenderer: Renderer discovery error', {
-            toolName: item.call.name,
-            callId: item.callId,
-            error: error.message,
-            willUseGeneric: true
-          });
-        }
-      });
-
-    return () => {
-      abortController.abort();
-    };
-  }, [item.call.name]);
-
-  if (isLoading) {
-    // Add debug info to loading state
-    const debugItem = {
-      ...item,
-      call: {
-        ...item.call,
-        arguments: {
-          ...item.call.arguments,
-          _debug: debugInfo,
-        },
-      },
-    };
-    return (
-      <GenericToolRenderer
-        item={debugItem}
-        isSelected={isSelected}
-        onToggle={onToggle}
-      />
-    );
-  }
-
-  const RendererComponent = ToolRenderer || GenericToolRenderer;
-
-  // Add debug info to final render
-  const debugItem = {
-    ...item,
-    call: {
-      ...item.call,
-      arguments: {
-        ...item.call.arguments,
-        _debug: debugInfo,
-      },
-    },
-  };
+function ToolRendererSelector({ item, isSelected, onToggle }: ToolRendererSelectorProps) {
+  // Get the appropriate renderer synchronously from registry
+  const ToolRenderer = getToolRenderer(item.call.name);
 
   return (
-    <RendererComponent
-      item={debugItem}
+    <ToolRenderer
+      item={item}
       isSelected={isSelected}
       onToggle={onToggle}
     />
@@ -193,10 +108,10 @@ export function TimelineItem({
           isSelected={isSelected}
           onToggle={onToggle}
         >
-          <DynamicToolRenderer
+          <ToolRendererSelector
             item={item}
             isSelected={isSelected}
-              onToggle={onToggle}
+            onToggle={onToggle}
           />
         </ToolRendererErrorBoundary>
       );
