@@ -1,5 +1,5 @@
 // ABOUTME: Clean, unified timeline entry component with integrated markers and hint system
-// ABOUTME: Replaces TimelineEntryCollapsibleBox and SideMarkerRenderer with single, consistent component
+// ABOUTME: Handles all timeline rendering with consistent expand/collapse behavior
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, Text, measureElement, DOMElement } from 'ink';
