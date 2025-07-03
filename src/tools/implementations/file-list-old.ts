@@ -1,12 +1,18 @@
-// ABOUTME: Schema-based directory listing tool with structured output
-// ABOUTME: Lists files and directories with tree formatting and Zod validation
+// ABOUTME: Directory listing tool with filtering capabilities
+// ABOUTME: Lists files and directories with optional pattern matching
 
-import { z } from 'zod';
 import { readdir, stat } from 'fs/promises';
-import { join, resolve } from 'path';
-import { Tool } from '../tool.js';
-import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
+import { join } from 'path';
+import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
+import { BaseTool, ValidationError } from '../base-tool.js';
 import { TOOL_LIMITS } from '../constants.js';
+
+interface FileEntry {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  size?: number;
+}
 
 interface TreeNode {
   name: string;
@@ -17,82 +23,104 @@ interface TreeNode {
   size?: number;
 }
 
-const fileListSchema = z.object({
-  path: z
-    .string()
-    .min(1, 'Path cannot be empty')
-    .transform((path) => resolve(path))
-    .default('.'),
-  pattern: z.string().optional(),
-  includeHidden: z.boolean().default(false),
-  recursive: z.boolean().default(false),
-  maxDepth: z
-    .number()
-    .int('Must be an integer')
-    .min(TOOL_LIMITS.MIN_DEPTH, `Must be at least ${TOOL_LIMITS.MIN_DEPTH}`)
-    .max(TOOL_LIMITS.MAX_LIST_DEPTH, `Must be at most ${TOOL_LIMITS.MAX_LIST_DEPTH}`)
-    .default(TOOL_LIMITS.DEFAULT_LIST_DEPTH),
-  summaryThreshold: z
-    .number()
-    .int('Must be an integer')
-    .min(TOOL_LIMITS.MIN_SUMMARY_THRESHOLD, `Must be at least ${TOOL_LIMITS.MIN_SUMMARY_THRESHOLD}`)
-    .max(TOOL_LIMITS.MAX_SUMMARY_THRESHOLD, `Must be at most ${TOOL_LIMITS.MAX_SUMMARY_THRESHOLD}`)
-    .default(TOOL_LIMITS.DEFAULT_SUMMARY_THRESHOLD),
-  maxResults: z
-    .number()
-    .int('Must be an integer')
-    .min(TOOL_LIMITS.MIN_SEARCH_RESULTS, `Must be at least ${TOOL_LIMITS.MIN_SEARCH_RESULTS}`)
-    .max(TOOL_LIMITS.MAX_SEARCH_RESULTS, `Must be at most ${TOOL_LIMITS.MAX_SEARCH_RESULTS}`)
-    .default(TOOL_LIMITS.DEFAULT_SEARCH_RESULTS),
-});
-
-export class FileListTool extends Tool {
+export class FileListTool extends BaseTool {
   name = 'file_list';
   description = 'List files and directories with optional filtering';
-  schema = fileListSchema;
-  annotations: ToolAnnotations = {
+  annotations = {
     readOnlyHint: true,
     idempotentHint: true,
   };
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      path: { type: 'string', description: 'Directory path to list (default: current directory)' },
+      pattern: { type: 'string', description: 'Glob pattern to filter files (optional)' },
+      includeHidden: { type: 'boolean', description: 'Include hidden files (default: false)' },
+      recursive: { type: 'boolean', description: 'List recursively (default: false)' },
+      maxDepth: { type: 'number', description: 'Maximum recursion depth (default: 3)' },
+      summaryThreshold: {
+        type: 'number',
+        description: 'Number of entries before summarizing (default: 50)',
+      },
+      maxResults: { type: 'number', description: 'Maximum number of total results (default: 50)' },
+    },
+    required: [],
+  };
 
-  private readonly ALWAYS_SUMMARIZE = new Set([
-    'node_modules',
-    '.git',
-    'dist',
-    'build',
-    'coverage',
-    '.next',
-    '.nuxt',
-    'vendor',
-    'venv',
-    '.venv',
-    '__pycache__',
-  ]);
-
-  protected async executeValidated(
-    args: z.infer<typeof fileListSchema>,
-    _context?: ToolContext
-  ): Promise<ToolResult> {
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     try {
-      const { path, pattern, includeHidden, recursive, maxDepth, summaryThreshold, maxResults } =
-        args;
+      const path =
+        this.validateOptionalParam(
+          call.arguments.path,
+          'path',
+          (value) => this.validateNonEmptyStringParam(value, 'path'),
+          call.id
+        ) ?? '.';
 
-      // Validate directory exists
-      try {
-        const pathStat = await stat(path);
-        if (!pathStat.isDirectory()) {
-          return this.createError(
-            `Path ${path} is not a directory. Specify a directory path to list.`
-          );
-        }
-      } catch (error: unknown) {
-        if (error instanceof Error && (error as Error & { code?: string }).code === 'ENOENT') {
-          return this.createError(
-            `Directory not found: ${path}. Ensure the directory exists before listing.`
-          );
-        }
-        throw error;
-      }
+      const pattern = this.validateOptionalParam(
+        call.arguments.pattern,
+        'pattern',
+        (value) => this.validateStringParam(value, 'pattern'),
+        call.id
+      );
+
+      const includeHidden =
+        this.validateOptionalParam(
+          call.arguments.includeHidden,
+          'includeHidden',
+          (value) => this.validateBooleanParam(value, 'includeHidden'),
+          call.id
+        ) ?? false;
+
+      const recursive =
+        this.validateOptionalParam(
+          call.arguments.recursive,
+          'recursive',
+          (value) => this.validateBooleanParam(value, 'recursive'),
+          call.id
+        ) ?? false;
+
+      const maxDepth =
+        this.validateOptionalParam(
+          call.arguments.maxDepth,
+          'maxDepth',
+          (value) =>
+            this.validateNumberParam(value, 'maxDepth', call.id, {
+              min: TOOL_LIMITS.MIN_DEPTH,
+              max: TOOL_LIMITS.MAX_LIST_DEPTH,
+              integer: true,
+            }),
+          call.id
+        ) ?? TOOL_LIMITS.DEFAULT_LIST_DEPTH;
+
+      const summaryThreshold =
+        this.validateOptionalParam(
+          call.arguments.summaryThreshold,
+          'summaryThreshold',
+          (value) =>
+            this.validateNumberParam(value, 'summaryThreshold', call.id, {
+              min: TOOL_LIMITS.MIN_SUMMARY_THRESHOLD,
+              max: TOOL_LIMITS.MAX_SUMMARY_THRESHOLD,
+              integer: true,
+            }),
+          call.id
+        ) ?? TOOL_LIMITS.DEFAULT_SUMMARY_THRESHOLD;
+
+      const maxResults =
+        this.validateOptionalParam(
+          call.arguments.maxResults,
+          'maxResults',
+          (value) =>
+            this.validateNumberParam(value, 'maxResults', call.id, {
+              min: TOOL_LIMITS.MIN_SEARCH_RESULTS,
+              max: TOOL_LIMITS.MAX_SEARCH_RESULTS,
+              integer: true,
+            }),
+          call.id
+        ) ?? TOOL_LIMITS.DEFAULT_SEARCH_RESULTS;
+
+      // Validate directory exists before listing
+      await this.validateDirectoryExists(path, call.id);
 
       const resultCounter = { count: 0, truncated: false };
       const tree = await this.buildTree(path, {
@@ -119,11 +147,118 @@ export class FileListTool extends Tool {
         output = 'No files found';
       }
 
-      return this.createResult(output);
-    } catch (error: unknown) {
-      return this.handleFileSystemError(error, args.path);
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: output,
+          },
+        ],
+        call.id
+      );
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return error.toolResult;
+      }
+
+      return this.createStructuredError(
+        'Directory listing failed',
+        'Check the directory path and parameters, then try again',
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
   }
+
+  private async listDirectory(
+    dirPath: string,
+    options: {
+      pattern?: string;
+      includeHidden: boolean;
+      recursive: boolean;
+      maxDepth: number;
+      currentDepth: number;
+    }
+  ): Promise<FileEntry[]> {
+    const entries: FileEntry[] = [];
+
+    try {
+      const items = await readdir(dirPath);
+
+      for (const item of items) {
+        if (!options.includeHidden && item.startsWith('.')) {
+          continue;
+        }
+
+        if (options.pattern && !this.matchesPattern(item, options.pattern)) {
+          continue;
+        }
+
+        const fullPath = join(dirPath, item);
+        const stats = await stat(fullPath);
+
+        const entry: FileEntry = {
+          name: item,
+          path: fullPath,
+          type: stats.isDirectory() ? 'directory' : 'file',
+        };
+
+        if (stats.isFile()) {
+          entry.size = stats.size;
+        }
+
+        entries.push(entry);
+
+        if (stats.isDirectory() && options.recursive && options.currentDepth < options.maxDepth) {
+          try {
+            const subEntries = await this.listDirectory(fullPath, {
+              ...options,
+              currentDepth: options.currentDepth + 1,
+            });
+            entries.push(...subEntries);
+          } catch {
+            // Skip directories we can't read during recursive traversal
+          }
+        }
+      }
+    } catch (error) {
+      // For the main directory, we want to propagate the error
+      // Only skip errors for recursive subdirectories
+      if (options.currentDepth === 0) {
+        throw error;
+      }
+      // For subdirectories, silently skip unreadable directories
+    }
+
+    return entries.sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type === 'directory' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  private matchesPattern(filename: string, pattern: string): boolean {
+    // Simple glob pattern matching
+    const regexPattern = pattern.replace(/\./g, '\\.').replace(/\*/g, '.*').replace(/\?/g, '.');
+
+    const regex = new RegExp(`^${regexPattern}$`, 'i');
+    return regex.test(filename);
+  }
+
+  private readonly ALWAYS_SUMMARIZE = new Set([
+    'node_modules',
+    '.git',
+    'dist',
+    'build',
+    'coverage',
+    '.next',
+    '.nuxt',
+    'vendor',
+    'venv',
+    '.venv',
+    '__pycache__',
+  ]);
 
   private async buildTree(
     dirPath: string,
@@ -280,17 +415,6 @@ export class FileListTool extends Tool {
     return { files: fileCount, dirs: dirCount };
   }
 
-  private matchesPattern(filename: string, pattern: string): boolean {
-    // Simple glob pattern matching
-    const regexPattern = pattern
-      .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape special regex chars except * and ?
-      .replace(/\*/g, '.*') // * matches any characters
-      .replace(/\?/g, '.'); // ? matches single character
-
-    const regex = new RegExp(`^${regexPattern}$`, 'i');
-    return regex.test(filename);
-  }
-
   private formatTree(node: TreeNode, prefix = '', isLast = true): string {
     const lines: string[] = [];
 
@@ -323,42 +447,5 @@ export class FileListTool extends Tool {
     }
 
     return lines.join('\n');
-  }
-
-  private handleFileSystemError(error: unknown, dirPath: string): ToolResult {
-    if (error instanceof Error) {
-      const nodeError = error as Error & { code?: string };
-
-      switch (nodeError.code) {
-        case 'ENOENT':
-          return this.createError(
-            `Directory not found: ${dirPath}. Ensure the directory exists before listing.`
-          );
-
-        case 'EACCES':
-          return this.createError(
-            `Permission denied accessing ${dirPath}. Check directory permissions or choose a different location. File system error: ${error.message}`
-          );
-
-        case 'ENOTDIR':
-          return this.createError(
-            `Path ${dirPath} is not a directory. Specify a directory path to list.`
-          );
-
-        default:
-          return this.createError(
-            `Directory listing failed: ${error.message}. Check the directory path and parameters, then try again.`
-          );
-      }
-    }
-
-    return this.createError(
-      `Directory listing failed due to unknown error. Check the directory path and parameters, then try again.`
-    );
-  }
-
-  // Public method for testing
-  validatePath(path: string): string {
-    return resolve(path);
   }
 }
