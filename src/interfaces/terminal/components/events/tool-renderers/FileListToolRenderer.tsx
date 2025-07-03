@@ -3,7 +3,7 @@
 
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
-import { useToolData, ToolExecutionItem } from '../hooks/useToolData.js';
+import { useToolData, ToolExecutionItem, ToolData } from '../hooks/useToolData.js';
 import { useToolState } from '../hooks/useToolState.js';
 import { ToolDisplay } from '../components/ToolDisplay.js';
 import { UI_COLORS } from '../../../theme.js';
@@ -47,15 +47,16 @@ export function FileListToolRenderer({
   const toolState = useToolState(toolData, isSelected, onToggle);
   
   // Layer 3: Display with file-list-specific components
+  // Pass computed data to avoid recomputation in child components
   return (
     <ToolDisplay
       toolData={toolData}
       toolState={toolState}
       isSelected={isSelected}
       components={{
-        header: FileListHeader,
-        preview: FileListPreview,
-        content: FileListContent,
+        header: (props) => <FileListHeader {...props} fileListData={fileListData} />,
+        preview: (props) => <FileListPreview {...props} fileListData={fileListData} />,
+        content: (props) => <FileListContent {...props} fileListData={fileListData} />,
       }}
     />
   );
@@ -91,9 +92,8 @@ function useFileListData(item: ToolExecutionItem): FileListData {
  * File list-specific header component
  * Shows directory path and scan parameters
  */
-function FileListHeader({ toolData }: { toolData: any }) {
+function FileListHeader({ toolData, fileListData }: { toolData: ToolData; fileListData: FileListData }) {
   const path = getDirectoryPath(toolData.input);
-  const fileListData = useFileListData({ call: { arguments: toolData.input }, result: toolData.result } as any);
   const parameterText = fileListData.parameters.length > 0 ? ` (${fileListData.parameters.join(', ')})` : '';
   
   return (
@@ -114,9 +114,7 @@ function FileListHeader({ toolData }: { toolData: any }) {
  * File list-specific preview component
  * Shows first few lines of directory tree
  */
-function FileListPreview({ toolData }: { toolData: any }) {
-  const fileListData = useFileListData({ call: { arguments: toolData.input }, result: toolData.result } as any);
-  
+function FileListPreview({ toolData, fileListData }: { toolData: ToolData; fileListData: FileListData }) {
   if (fileListData.isEmpty) {
     return (
       <Box marginTop={1}>
@@ -147,9 +145,7 @@ function FileListPreview({ toolData }: { toolData: any }) {
  * File list-specific content component
  * Shows full directory tree or empty state
  */
-function FileListContent({ toolData }: { toolData: any }) {
-  const fileListData = useFileListData({ call: { arguments: toolData.input }, result: toolData.result } as any);
-  
+function FileListContent({ toolData, fileListData }: { toolData: ToolData; fileListData: FileListData }) {
   if (fileListData.isEmpty) {
     return (
       <Box marginTop={1}>
