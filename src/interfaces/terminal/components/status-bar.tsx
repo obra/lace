@@ -162,20 +162,54 @@ const StatusBar: React.FC<StatusBarProps> = ({
     
     // Row 1: Original status bar
     const row1TotalLength = leftContent.length + rightContent.length;
-    const row1Padding = Math.max(0, currentWidth - row1TotalLength - 2);
+    const availableSpace = currentWidth - 3; // Account for leading/trailing spaces + terminal wrapping buffer
+    
+    let row1LeftContent = leftContent;
+    let row1RightContent = rightContent;
+    
+    // If content is too long, truncate to fit
+    if (row1TotalLength > availableSpace) {
+      const leftPriority = Math.floor(availableSpace * 0.6); // Give 60% to left content
+      const rightPriority = availableSpace - leftPriority;
+      
+      if (leftContent.length > leftPriority) {
+        row1LeftContent = leftContent.substring(0, leftPriority - 3) + '...';
+      }
+      if (rightContent.length > rightPriority) {
+        row1RightContent = '...' + rightContent.substring(rightContent.length - rightPriority + 3);
+      }
+    }
+    
+    const row1ActualLength = row1LeftContent.length + row1RightContent.length;
+    const row1Padding = Math.max(0, availableSpace - row1ActualLength);
     const row1PaddingStr = ' '.repeat(row1Padding);
 
     // Row 2: Project context with left/right layout like row 1
-    const row2LeftContent = projectContextData.leftContent;
-    const row2RightContent = projectContextData.rightContent;
+    let row2LeftContent = projectContextData.leftContent;
+    let row2RightContent = projectContextData.rightContent;
     const row2TotalLength = row2LeftContent.length + row2RightContent.length;
-    const row2Padding = Math.max(0, currentWidth - row2TotalLength - 2);
+    
+    // If content is too long, truncate to fit
+    if (row2TotalLength > availableSpace) {
+      const leftPriority = Math.floor(availableSpace * 0.7); // Give 70% to path (left content)
+      const rightPriority = availableSpace - leftPriority;
+      
+      if (row2LeftContent.length > leftPriority) {
+        row2LeftContent = row2LeftContent.substring(0, leftPriority - 3) + '...';
+      }
+      if (row2RightContent.length > rightPriority) {
+        row2RightContent = '...' + row2RightContent.substring(row2RightContent.length - rightPriority + 3);
+      }
+    }
+    
+    const row2ActualLength = row2LeftContent.length + row2RightContent.length;
+    const row2Padding = Math.max(0, availableSpace - row2ActualLength);
     const row2PaddingStr = ' '.repeat(row2Padding);
 
     return (
       <Box flexDirection="column">
         <Text backgroundColor="blueBright" color="black">
-          {' ' + leftContent + row1PaddingStr + rightContent + ' '}
+          {' ' + row1LeftContent + row1PaddingStr + row1RightContent + ' '}
         </Text>
         <Text backgroundColor="blueBright" color="black">
           {' ' + row2LeftContent + row2PaddingStr + row2RightContent + ' '}
@@ -185,12 +219,31 @@ const StatusBar: React.FC<StatusBarProps> = ({
   } else {
     // Single-row layout (original behavior)
     const totalContentLength = leftContent.length + rightContent.length;
-    const paddingNeeded = Math.max(0, currentWidth - totalContentLength - 2);
+    const availableSpace = currentWidth - 3; // Account for leading/trailing spaces + terminal wrapping buffer
+    
+    let finalLeftContent = leftContent;
+    let finalRightContent = rightContent;
+    
+    // If content is too long, truncate to fit
+    if (totalContentLength > availableSpace) {
+      const leftPriority = Math.floor(availableSpace * 0.6); // Give 60% to left content
+      const rightPriority = availableSpace - leftPriority;
+      
+      if (leftContent.length > leftPriority) {
+        finalLeftContent = leftContent.substring(0, leftPriority - 3) + '...';
+      }
+      if (rightContent.length > rightPriority) {
+        finalRightContent = '...' + rightContent.substring(rightContent.length - rightPriority + 3);
+      }
+    }
+    
+    const finalContentLength = finalLeftContent.length + finalRightContent.length;
+    const paddingNeeded = Math.max(0, availableSpace - finalContentLength);
     const padding = ' '.repeat(paddingNeeded);
 
     return (
       <Text backgroundColor="blueBright" color="black">
-        {' ' + leftContent + padding + rightContent + ' '}
+        {' ' + finalLeftContent + padding + finalRightContent + ' '}
       </Text>
     );
   }

@@ -1,9 +1,12 @@
-// ABOUTME: Display component for USER_MESSAGE events with consistent styling
-// ABOUTME: Shows user input with clear visual distinction from agent messages
+// ABOUTME: Display component for USER_MESSAGE events with collapsible formatting
+// ABOUTME: Shows user input in expandable boxes with auto-collapse for long messages
 
 import React from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
+import { TimelineEntry } from '../ui/TimelineEntry.js';
+import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
+import { UI_SYMBOLS } from '../../theme.js';
 
 interface UserMessageDisplayProps {
   event: ThreadEvent;
@@ -11,20 +14,121 @@ interface UserMessageDisplayProps {
   isFocused?: boolean;
   focusedLine?: number;
   itemStartLine?: number;
+  isSelected?: boolean;
+  onToggle?: () => void;
 }
 
-export function UserMessageDisplay({ event, isStreaming, isFocused }: UserMessageDisplayProps) {
-  const message = event.data as string;
+// Text processing utilities
+function trimEmptyLines(text: string): string {
+  const lines = text.split('\n');
+  
+  // Remove leading empty lines
+  while (lines.length > 0 && lines[0].trim() === '') {
+    lines.shift();
+  }
+  
+  // Remove trailing empty lines
+  while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+    lines.pop();
+  }
+  
+  // Reduce multiple consecutive empty lines to single empty line
+  const result: string[] = [];
+  let lastWasEmpty = false;
+  
+  for (const line of lines) {
+    const isEmpty = line.trim() === '';
+    
+    if (isEmpty) {
+      if (!lastWasEmpty) {
+        result.push(''); // Keep empty line but strip spaces
+      }
+      lastWasEmpty = true;
+    } else {
+      result.push(line.trim()); // Strip leading/trailing spaces from content lines
+      lastWasEmpty = false;
+    }
+  }
+  
+  return result.join('\n');
+}
 
-  return (
-    <Box flexDirection="column" marginBottom={1}>
-      <Box flexDirection="row">
-        <Text color="dim">&gt; </Text>
-        <Text wrap="wrap" dimColor={!isFocused}>
-          {message.trim()}
-        </Text>
-        {isStreaming && <Text color="gray"> (typing...)</Text>}
-      </Box>
+function truncateToLines(text: string, maxLines: number): { content: string; wasTruncated: boolean } {
+  const lines = text.split('\n');
+  
+  if (lines.length <= maxLines) {
+    return { content: text, wasTruncated: false };
+  }
+  
+  return {
+    content: lines.slice(0, maxLines).join('\n'),
+    wasTruncated: true
+  };
+}
+
+export function UserMessageDisplay({ 
+  event, 
+  isStreaming, 
+  isFocused = true, // Default to true since we don't have focus logic for user messages yet
+  focusedLine,
+  itemStartLine,
+  isSelected = false,
+  onToggle
+}: UserMessageDisplayProps) {
+  const rawMessage = event.data as string;
+  const trimmedMessage = trimEmptyLines(rawMessage);
+  const lines = trimmedMessage.split('\n');
+  const shouldAutoCollapse = lines.length > 8;
+  
+  // Use shared expansion state management
+  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
+    isSelected || false, 
+    (expanded) => onToggle?.()
+  );
+  
+  // For short messages, auto-expand on mount
+  React.useEffect(() => {
+    if (!shouldAutoCollapse && !isExpanded) {
+      onExpand();
+    }
+  }, [shouldAutoCollapse, isExpanded, onExpand]);
+  
+  const handleExpandedChange = (expanded: boolean) => {
+    if (expanded) {
+      onExpand();
+    } else {
+      onCollapse();
+    }
+  };
+  
+  // For collapsed state (> 8 lines), show truncated with ellipsis
+  const { content: displayContent, wasTruncated } = truncateToLines(trimmedMessage, 8);
+  
+  // Create the message display
+  const messageDisplay = (
+    <Box flexDirection="column">
+      <Text wrap="wrap" dimColor={!isFocused}>
+        "{isExpanded ? trimmedMessage : displayContent}"
+      </Text>
+      {!isExpanded && wasTruncated && (
+        <Text color="gray">...</Text>
+      )}
+      {isStreaming && <Text color="gray"> (typing...)</Text>}
     </Box>
+  );
+  
+  return (
+    <TimelineEntry
+      label={messageDisplay}
+      summary={null}
+      isExpanded={isExpanded}
+      onExpandedChange={handleExpandedChange}
+      isSelected={isSelected}
+      onToggle={onToggle}
+      status="none"
+      isExpandable={shouldAutoCollapse}
+    >
+      {null}
+    </TimelineEntry>
   );
 }

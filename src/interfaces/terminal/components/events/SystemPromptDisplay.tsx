@@ -4,7 +4,7 @@
 import React from 'react';
 import { Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
-import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
+import { TimelineEntry } from '../ui/TimelineEntry.js';
 import { UI_SYMBOLS } from '../../theme.js';
 import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
 
@@ -28,7 +28,7 @@ export function SystemPromptDisplay({
   // Use shared expansion state management
   const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected || false, (expanded) => onToggle?.());
 
-  // Create handler that works with TimelineEntryCollapsibleBox interface
+  // Create handler that works with TimelineEntry interface
   const handleExpandedChange = (expanded: boolean) => {
     if (expanded) {
       onExpand();
@@ -38,7 +38,7 @@ export function SystemPromptDisplay({
   };
 
   return (
-    <TimelineEntryCollapsibleBox
+    <TimelineEntry
       key={`system-prompt-${event.id}`}
       label={`${UI_SYMBOLS.TOOL} System Prompt`}
       isExpanded={isExpanded}
@@ -46,10 +46,11 @@ export function SystemPromptDisplay({
       isSelected={isSelected}
       onToggle={onToggle}
       status="none"
+      isExpandable={true}
     >
       <Text color="blue" wrap="wrap">
         {systemPrompt}
       </Text>
-    </TimelineEntryCollapsibleBox>
+    </TimelineEntry>
   );
 }

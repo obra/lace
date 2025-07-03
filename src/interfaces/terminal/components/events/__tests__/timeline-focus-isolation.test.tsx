@@ -71,6 +71,11 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
   useExpansionExpand: () => vi.fn(),
   useExpansionCollapse: () => vi.fn(),
   useTimelineFocusEntry: () => vi.fn(),
+  useTimelineItemExpansion: () => ({
+    isExpanded: false,
+    onExpand: vi.fn(),
+    onCollapse: vi.fn(),
+  }),
   TimelineExpansionProvider: ({ children }: any) => children,
 }));
 

@@ -202,6 +202,28 @@ export function TimelineItem({
       );
 
     case 'ephemeral_message':
+      // For assistant ephemeral messages, use EventDisplay with AgentMessageDisplay
+      // which provides proper thinking block handling and side indicators
+      if (item.messageType === 'assistant') {
+        return (
+          <EventDisplay
+            event={{
+              id: `ephemeral-${item.timestamp.getTime()}`,
+              threadId: '',
+              type: 'AGENT_MESSAGE',
+              timestamp: item.timestamp,
+              data: item.content,
+            }}
+            isSelected={isSelected}
+            focusedLine={selectedLine}
+            itemStartLine={itemStartLine}
+            onToggle={onToggle}
+            isStreaming={true}
+          />
+        );
+      }
+      
+      // For other ephemeral messages, use the original MessageDisplay
       return (
         <MessageDisplay
           message={{

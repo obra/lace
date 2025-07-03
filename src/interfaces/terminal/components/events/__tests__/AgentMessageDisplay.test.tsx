@@ -26,8 +26,8 @@ vi.mock('../ui/MarkdownDisplay.js', () => ({
     ),
 }));
 
-vi.mock('../ui/TimelineEntryCollapsibleBox.js', () => ({
-  TimelineEntryCollapsibleBox: ({
+vi.mock('../ui/TimelineEntry.js', () => ({
+  TimelineEntry: ({
     children,
     label,
     summary,
@@ -72,10 +72,9 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
         <AgentMessageDisplay event={event} isFocused={true} onToggle={mockOnToggle} />
       );
 
-      // Should show collapsed state with Agent Response label
-      expect(lastFrame()).toContain('Agent Response');
-      expect(lastFrame()).toContain('/thought for 2 words/');
-      expect(lastFrame()).toContain(UI_SYMBOLS.COLLAPSED);
+      // Should show collapsed state with thinking summary
+      expect(lastFrame()).toContain('thought for 2 words');
+      expect(lastFrame()).toContain(UI_SYMBOLS.TOOLBOX_SINGLE_EXPANDABLE);
     });
 
     it('should not use collapsible for messages without thinking blocks', () => {
@@ -103,7 +102,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
 
       const frame = lastFrame();
       expect(frame).toContain('Here is the response');
-      expect(frame).toContain('/thought for 6 words/'); // "This is some thinking content here" = 6 words
+      expect(frame).toContain('thought for 6 words'); // "This is some thinking content here" = 6 words
     });
 
     it('should handle multiple thinking blocks in summary', () => {
@@ -118,7 +117,8 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       const frame = lastFrame();
       expect(frame).toContain('Some text');
       expect(frame).toContain('Final response');
-      expect(frame).toContain('/thought for 6 words/'); // Total: "First thought" + "Second longer thought process" = 2 + 4 = 6 words
+      expect(frame).toContain('thought for 2 words'); // "First thought" = 2 words
+      expect(frame).toContain('thought for 4 words'); // "Second longer thought process" = 4 words
     });
 
     it('should handle thinking-only messages in collapsed state', () => {
@@ -129,7 +129,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       );
 
       const frame = lastFrame();
-      expect(frame).toContain('/thought for 4 words/'); // "Only thinking content here" = 4 words
+      expect(frame).toContain('thought for 4 words'); // "Only thinking content here" = 4 words
       expect(frame).not.toContain('MD:'); // No regular content to show
     });
   });
@@ -143,16 +143,15 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       );
 
       const frame = lastFrame();
-      expect(frame).toContain(UI_SYMBOLS.COLLAPSED);
-      expect(frame).toContain('Agent Response');
+      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE_EXPANDABLE);
       // Should show summary content with thinking marker
-      expect(frame).toContain('/thought for 2 words/');
+      expect(frame).toContain('thought for 2 words');
       expect(frame).toContain('Here is the response');
     });
   });
 
   describe('Props forwarding', () => {
-    it('should forward isFocused to TimelineEntryCollapsibleBox', () => {
+    it('should forward isFocused to TimelineEntry', () => {
       const event = createEvent('<think>Thinking</think>Content');
 
       const { lastFrame } = render(
@@ -160,8 +159,8 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       );
 
       // Test that the component renders with the focus prop forwarded to the mock
-      // The mock TimelineEntryCollapsibleBox should have isFocused=true
-      expect(lastFrame()).toContain('Agent Response');
+      // The mock TimelineEntry should have isFocused=true
+      expect(lastFrame()).toContain('thought for 1 word');
       expect(lastFrame()).toContain('Content');
     });
 

@@ -527,4 +527,284 @@ it('should update markers when expansion state changes', () => {
 });
 ```
 
+## Terminal Rendering and Width Calculations
+
+### The Terminal Wrapping Issue
+
+One critical issue when building status bars and full-width components is **terminal boundary wrapping**. Even when content mathematically fits within terminal width, Ink/terminals require a small buffer to prevent unwanted line wrapping.
+
+#### The Problem
+
+```typescript
+// ❌ PROBLEMATIC: Content exactly matches terminal width
+const terminalWidth = 120;
+const availableSpace = terminalWidth - 2; // Only account for leading/trailing spaces
+const content = buildStatusBar(leftContent, rightContent, availableSpace); // Results in 120 chars
+```
+
+**Result**: The last character (often a space) wraps to the next line, creating a "black blank square" or unwanted line break.
+
+#### Root Cause
+
+Terminals wrap text when content reaches **exactly** the terminal width. This happens because:
+1. Terminals don't distinguish between "fits exactly" and "overflows by 1"
+2. The cursor position after the last character can trigger wrapping
+3. Some terminals have edge cases with Unicode characters at boundaries
+
+#### The Solution
+
+```typescript
+// ✅ CORRECT: Account for terminal wrapping buffer
+const terminalWidth = useStdoutDimensions()[0];
+const availableSpace = terminalWidth - 3; // Leading space + trailing space + wrapping buffer
+
+const totalContentLength = leftContent.length + rightContent.length;
+let finalLeftContent = leftContent;
+let finalRightContent = rightContent;
+
+// Truncate if needed
+if (totalContentLength > availableSpace) {
+  // Truncation logic...
+}
+
+const finalContentLength = finalLeftContent.length + finalRightContent.length;
+const paddingNeeded = Math.max(0, availableSpace - finalContentLength);
+const padding = ' '.repeat(paddingNeeded);
+
+// This will be terminalWidth - 1 characters, preventing wrapping
+const statusBarContent = ' ' + finalLeftContent + padding + finalRightContent + ' ';
+```
+
+#### Why the Buffer Works
+
+- **Terminal width**: 120 characters
+- **Available space**: 117 characters (120 - 3)
+- **Final content**: 119 characters maximum (including leading/trailing spaces)
+- **Result**: Always 1 character shorter than terminal width, preventing wrap
+
+#### Debugging Terminal Wrapping
+
+When debugging wrapping issues:
+
+1. **Check actual vs expected length**:
+   ```typescript
+   console.log(`Terminal width: ${terminalWidth}`);
+   console.log(`Content length: ${content.length}`);
+   console.log(`Content: "${content}"`);
+   ```
+
+2. **Character-by-character analysis**:
+   ```typescript
+   for (let i = 0; i < content.length; i++) {
+     const char = content[i];
+     const code = char.charCodeAt(0);
+     console.log(`${i}: "${char}" (${code})`);
+   }
+   ```
+
+3. **Check for exact width matching**:
+   ```typescript
+   if (content.length >= terminalWidth) {
+     console.log('🚨 Content may wrap - exactly matches or exceeds terminal width');
+   }
+   ```
+
+#### Common Scenarios
+
+**Status Bars**: Always use 3-character buffer (`terminalWidth - 3`)
+
+**Full-Width Components**: Leave at least 1 character margin
+
+**Dynamic Content**: Account for Unicode character width variations
+
+**Testing**: Mock terminal width and verify content is always `< terminalWidth`
+
+#### Real-World Example: StatusBar Fix
+
+The Lace status bar was experiencing single-character wrapping during processing state. The fix:
+
+```typescript
+// Before: Wrapping occurred at exactly terminal width
+const availableSpace = currentWidth - 2;
+
+// After: Added buffer to prevent wrapping
+const availableSpace = currentWidth - 3; // Account for leading/trailing spaces + terminal wrapping buffer
+```
+
+This prevented the space character before "Processing" from wrapping to the next line as a "black blank square."
+
+## Text Rendering and ANSI Codes
+
+### Safe String Construction
+
+When building complex status bars with colors and formatting:
+
+```typescript
+// ✅ Build strings first, then apply formatting
+const plainContent = `${leftContent}${padding}${rightContent}`;
+console.log(`Plain content length: ${plainContent.length}`); // Accurate length
+
+return (
+  <Text backgroundColor="blueBright" color="black">
+    {plainContent}
+  </Text>
+);
+```
+
+**Key insight**: Always calculate lengths on plain strings before applying Ink formatting to avoid ANSI code interference.
+
+## Testing Terminal Rendering
+
+### Critical Testing Failure: Environment Mismatches
+
+**The Problem We Encountered**: Comprehensive tests were written to reproduce terminal wrapping issues, but they **completely failed to catch the bug** that was happening in the real application.
+
+#### Why The Tests Failed
+
+1. **Mock Environment vs Real Environment**:
+   ```typescript
+   // ❌ WRONG: Tests mocked useStdoutDimensions but Ink used different dimensions
+   vi.mock('../../../utils/use-stdout-dimensions.js', () => ({
+     default: vi.fn(() => [80, 24]), // Mocked to 80 columns
+   }));
+   
+   // But ink-test-utils.ts set process.stdout.columns = 130 (line 195)
+   // Creating a mismatch between what component thinks vs what Ink renders
+   ```
+
+2. **Test Environment Terminal Handling**:
+   - The `renderInkComponent` test utility creates its own stdout environment
+   - It sets `process.stdout.columns = 130` for consistent test rendering
+   - But mocked hooks returned different values (e.g., 80, 120)
+   - **Result**: Component calculated for one width, Ink rendered for another
+
+3. **Missing Real Terminal Simulation**:
+   ```typescript
+   // ❌ Tests that passed but didn't catch the bug
+   it('should reproduce single character wrapping during processing in wide terminal', () => {
+     mockUseStdoutDimensions.mockReturnValue([120, 24]);
+     
+     const { lastFrame } = renderInkComponent(<StatusBar {...props} />);
+     const frame = lastFrame();
+     
+     expect(frame).toBeDefined();
+     // This passed! But the real app was still broken
+   });
+   ```
+
+#### What We Learned About Test Design
+
+**Key Insight**: **Tests that mock the wrong things can give false confidence**
+
+1. **Environment Consistency is Critical**:
+   - If you mock `useStdoutDimensions`, ensure test environment matches
+   - Or don't mock it and let tests use actual terminal dimensions
+   - **Mocking terminal behavior is extremely difficult to get right**
+
+2. **Test the Real Integration**:
+   ```typescript
+   // ✅ Better approach: Test actual terminal rendering without mocks
+   it('should not wrap in real terminal environment', () => {
+     // Don't mock useStdoutDimensions - let it use real terminal
+     const { lastFrame } = renderInkComponent(<StatusBar {...props} />);
+     const frame = lastFrame();
+     const lines = frame.split('\n');
+     
+     // This would have caught the bug!
+     expect(lines.length).toBe(1);
+   });
+   ```
+
+3. **Reproducing User Experience**:
+   - The bug only manifested in **real terminal usage**
+   - Tests should simulate user's actual environment as closely as possible
+   - **Terminal rendering is fundamentally different from test rendering**
+
+#### Effective Testing Strategies for Terminal Issues
+
+1. **Manual Testing is Essential**:
+   ```bash
+   # Always test in actual terminal, not just automated tests
+   npm start
+   # Trigger the problematic state and visually inspect
+   ```
+
+2. **Minimal Reproductions Outside Test Framework**:
+   ```typescript
+   // Create standalone reproduction scripts
+   // src/debug/minimal-repro.tsx - runs in real terminal
+   npx tsx src/debug/minimal-repro.tsx
+   ```
+
+3. **Test Multiple Terminal Widths in Real Environment**:
+   ```bash
+   # Test at different terminal widths
+   printf '\e[8;24;80t'  # Resize to 80 columns
+   npm start
+   printf '\e[8;24;120t' # Resize to 120 columns  
+   npm start
+   ```
+
+4. **Visual Verification Tools**:
+   ```typescript
+   // Debug tools that show actual measurements vs expected
+   function StatusBarDebugView() {
+     const [width] = useStdoutDimensions();
+     const content = buildStatusBarContent();
+     
+     console.log(`Terminal: ${width}, Content: ${content.length}`);
+     if (content.length >= width) {
+       console.log('🚨 POTENTIAL WRAPPING');
+     }
+     
+     return <Text>{content}</Text>;
+   }
+   ```
+
+#### The False Security of Comprehensive Tests
+
+Our status bar tests were **extensive and detailed**:
+- Multiple terminal width scenarios (40, 60, 80, 118, 120 columns)
+- Character-by-character analysis 
+- Comparison of processing vs non-processing states
+- Padding calculation verification
+- Visual output inspection
+
+**But they all passed while the real app was broken!**
+
+This taught us that **comprehensive ≠ correct** when testing terminal applications.
+
+### Reproducing Wrapping Issues
+
+Create minimal reproductions that match real component logic:
+
+```typescript
+// Test exact component behavior in isolation
+function MinimalStatusBarTest() {
+  const terminalWidth = 120;
+  const leftContent = "◉ anthropic:claude-sonnet-4-20250514 • ▣ thread-abc123def456";
+  const rightContent = "⏱ 12s • ↑250 ↓150 • . Processing";
+  
+  // Use same calculation as real component
+  const availableSpace = terminalWidth - 3;
+  const contentLength = leftContent.length + rightContent.length;
+  const padding = ' '.repeat(Math.max(0, availableSpace - contentLength));
+  
+  const content = ` ${leftContent}${padding}${rightContent} `;
+  
+  return <Text backgroundColor="blueBright" color="black">{content}</Text>;
+}
+```
+
+**Key lesson**: This minimal reproduction **immediately** showed the wrapping issue when run in a real terminal, while comprehensive mocked tests missed it entirely.
+
+### Testing Guidelines for Terminal Applications
+
+1. **Always test manually in real terminals** - automated tests can miss critical rendering issues
+2. **Be very careful with mocking terminal dimensions** - mismatches between mocked and real environments cause false positives
+3. **Create debug tools and minimal reproductions** that run outside the test framework
+4. **Test visual output at different terminal sizes** manually
+5. **When tests pass but users report issues**, suspect environment mismatches in tests
+6. **Terminal rendering behavior is complex** - don't trust mocked environments for layout issues
+
 This document should be updated as we discover new patterns and solutions for Ink development.

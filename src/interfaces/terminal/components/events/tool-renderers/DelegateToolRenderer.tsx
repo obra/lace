@@ -1,9 +1,9 @@
 // ABOUTME: Specialized tool renderer for delegate tool executions with inline delegation timeline display
-// ABOUTME: Combines tool execution display with delegation timeline using TimelineEntryCollapsibleBox for consistency
+// ABOUTME: Combines tool execution display with delegation timeline using TimelineEntry for consistency
 
 import React, { useState, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { TimelineEntryCollapsibleBox } from '../../ui/TimelineEntryCollapsibleBox.js';
+import { TimelineEntry, type TimelineStatus } from '../../ui/TimelineEntry.js';
 import { ToolCall, ToolResult } from '../../../../../tools/types.js';
 import { CompactOutput } from '../../ui/CompactOutput.js';
 import { CodeDisplay } from '../../ui/CodeDisplay.js';
@@ -15,7 +15,6 @@ import { useLaceFocus, FocusRegions, FocusLifecycleWrapper } from '../../../focu
 import TimelineDisplay from '../TimelineDisplay.js';
 import { logger } from '../../../../../utils/logger.js';
 import { TimelineItemRef } from '../../timeline-item-focus.js';
-import { type MarkerStatus } from '../../ui/SideMarkerRenderer.js';
 import {
   extractDelegateThreadId,
   isThreadComplete,
@@ -121,7 +120,7 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRend
     },
   }), [delegateThreadId, isEntered]);
 
-  // Create handler that works with TimelineEntryCollapsibleBox interface
+  // Create handler that works with TimelineEntry interface
   const handleExpandedChange = (expanded: boolean) => {
     if (expanded) {
       onExpand();
@@ -136,7 +135,7 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRend
   const success = result ? !result.isError : true;
   const output = result?.content?.[0]?.text;
   const error = result?.isError ? output : undefined;
-  const markerStatus: MarkerStatus = isStreaming ? 'pending' : success ? 'success' : result ? 'error' : 'none';
+  const markerStatus: TimelineStatus = isStreaming ? 'pending' : success ? 'success' : result ? 'error' : 'none';
 
   // Extract delegate task from input
   const delegateTask = ((input.task || input.prompt) as string) || 'Unknown task';
@@ -321,7 +320,7 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRend
       renderWhenInactive={true}
       onFocusRestored={() => setIsEntered(false)}
     >
-      <TimelineEntryCollapsibleBox
+      <TimelineEntry
         label={`delegate "${delegateTask}"`}
         summary={delegateSummary}
         isExpanded={isExpanded}
@@ -330,9 +329,10 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRend
         isFocused={isFocused}
         onToggle={onToggle}
         status={markerStatus}
+        isExpandable={true}
       >
         {expandedContent}
-      </TimelineEntryCollapsibleBox>
+      </TimelineEntry>
     </FocusLifecycleWrapper>
   );
 });

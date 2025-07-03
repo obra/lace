@@ -1,11 +1,20 @@
-// ABOUTME: Tests for UserMessageDisplay component ensuring full content display
-// ABOUTME: Verifies user messages always show complete content without truncation or expansion
+// ABOUTME: Tests for UserMessageDisplay component with collapsible behavior
+// ABOUTME: Verifies user messages auto-collapse for long content and show proper expansion controls
 
 import React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import { UserMessageDisplay } from '../UserMessageDisplay.js';
 import { ThreadEvent } from '../../../../../threads/types.js';
+import { UI_SYMBOLS } from '../../../theme.js';
+
+vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
+  useTimelineItemExpansion: () => ({
+    isExpanded: false,
+    onExpand: vi.fn(),
+    onCollapse: vi.fn(),
+  }),
+}));
 
 describe('UserMessageDisplay', () => {
   const createUserMessageEvent = (content: string): ThreadEvent => ({
@@ -16,35 +25,32 @@ describe('UserMessageDisplay', () => {
     data: content,
   });
 
-  describe('Full content display', () => {
-    it('should display short user messages completely', () => {
+  describe('Collapsible content display', () => {
+    it('should display short user messages with non-expandable indicator', () => {
       const event = createUserMessageEvent('Hello world');
 
       const { lastFrame } = render(<UserMessageDisplay event={event} />);
 
-      expect(lastFrame()).toContain('Hello world');
+      const frame = lastFrame();
+      expect(frame).toContain('"Hello world"');
+      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE); // Non-expandable for short messages
     });
 
-    it('should display long user messages completely without truncation', () => {
-      const longMessage =
-        'This is a very long user message that would typically be truncated in other systems but should be displayed completely in our timeline. '.repeat(
-          10
-        );
+    it('should auto-collapse long user messages and show ellipsis', () => {
+      const longMessage = Array.from({ length: 10 }, (_, i) => `Line ${i + 1}: This is line content`).join('\n');
       const event = createUserMessageEvent(longMessage);
 
       const { lastFrame } = render(<UserMessageDisplay event={event} />);
 
       const frame = lastFrame();
-      // Content should be present (may be wrapped)
-      expect(frame).toContain('This is a very long user message');
-      expect(frame).toContain('displayed completely in our timeline');
-      // Should not have truncation indicators
-      expect(frame).not.toContain('...');
-      expect(frame).not.toContain('[truncated]');
-      expect(frame).not.toContain('more');
+      expect(frame).toContain('"Line 1: This is line content'); // Should show first line in quotes
+      expect(frame).toContain('Line 8: This is line content'); // Should show first 8 lines
+      expect(frame).not.toContain('Line 9: This is line content'); // Should not show beyond 8 lines
+      expect(frame).toContain('...'); // Should show ellipsis
+      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE_EXPANDABLE); // Expandable for long messages
     });
 
-    it('should display multiline user messages completely', () => {
+    it('should display short multiline user messages expanded', () => {
       const multilineMessage = `Line 1: This is the first line
 Line 2: This is the second line
 Line 3: This is the third line with more content
@@ -54,10 +60,11 @@ Line 4: Final line`;
       const { lastFrame } = render(<UserMessageDisplay event={event} />);
 
       const frame = lastFrame();
-      expect(frame).toContain('Line 1: This is the first line');
+      expect(frame).toContain('"Line 1: This is the first line');
       expect(frame).toContain('Line 2: This is the second line');
       expect(frame).toContain('Line 3: This is the third line with more content');
       expect(frame).toContain('Line 4: Final line');
+      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE); // Non-expandable for short messages
     });
 
     it('should display special characters and unicode completely', () => {
@@ -69,38 +76,34 @@ Line 4: Final line`;
       expect(lastFrame()).toContain(specialMessage);
     });
 
-    it('should trim whitespace but preserve content', () => {
-      const messageWithWhitespace = '   Content with leading and trailing spaces   ';
-      const event = createUserMessageEvent(messageWithWhitespace);
+    it('should trim empty lines and leading/trailing spaces', () => {
+      const messageWithEmptyLines = '\n\n   Content with leading and trailing spaces   \n\n';
+      const event = createUserMessageEvent(messageWithEmptyLines);
 
       const { lastFrame } = render(<UserMessageDisplay event={event} />);
 
       const frame = lastFrame();
-      expect(frame).toContain('Content with leading and trailing spaces');
+      expect(frame).toContain('"Content with leading and trailing spaces"');
       expect(frame).not.toContain('   Content'); // Should be trimmed
     });
   });
 
-  describe('No expansion behavior', () => {
-    it('should not have any expansion controls or indicators', () => {
+  describe('Expansion behavior', () => {
+    it('should have collapsible structure with appropriate indicators', () => {
       const event = createUserMessageEvent('Regular user message');
 
       const { lastFrame } = render(<UserMessageDisplay event={event} />);
 
       const frame = lastFrame();
-      expect(frame).not.toContain('[Expand]');
-      expect(frame).not.toContain('[Collapse]');
-      expect(frame).not.toContain('►');
-      expect(frame).not.toContain('▼');
-      expect(frame).not.toContain('Show more');
-      expect(frame).not.toContain('Show less');
+      expect(frame).toContain('"Regular user message"');
+      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE); // Non-expandable for short messages
     });
 
-    it('should not accept onToggle prop (interface verification)', () => {
+    it('should accept onToggle prop for expansion control', () => {
       const event = createUserMessageEvent('Test message');
 
-      // This should compile without onToggle prop
-      const { lastFrame } = render(<UserMessageDisplay event={event} />);
+      // This should compile with onToggle prop
+      const { lastFrame } = render(<UserMessageDisplay event={event} onToggle={() => {}} />);
 
       expect(lastFrame()).toContain('Test message');
     });
@@ -147,14 +150,14 @@ Line 4: Final line`;
   });
 
   describe('Visual formatting', () => {
-    it('should include user input prompt prefix', () => {
-      const event = createUserMessageEvent('Message with prefix');
+    it('should include quoted message content', () => {
+      const event = createUserMessageEvent('Message with label');
 
       const { lastFrame } = render(<UserMessageDisplay event={event} />);
 
       const frame = lastFrame();
-      expect(frame).toContain('>'); // User input prefix
-      expect(frame).toContain('Message with prefix');
+      expect(frame).toContain('"Message with label"');
+      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE);
     });
 
     it('should wrap long content appropriately', () => {
