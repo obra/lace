@@ -1,70 +1,112 @@
-// ABOUTME: Schema-based file finding tool with structured output
-// ABOUTME: Recursively searches for files using glob patterns with Zod validation
+// ABOUTME: File finding tool using name patterns and glob matching
+// ABOUTME: Recursively searches for files matching specified patterns
 
-import { z } from 'zod';
 import { readdir, stat } from 'fs/promises';
-import { join, resolve } from 'path';
-import { Tool } from '../tool.js';
-import { NonEmptyString } from '../schemas/common.js';
-import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
+import { join } from 'path';
+import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
+import { BaseTool, ValidationError } from '../base-tool.js';
 import { TOOL_LIMITS } from '../constants.js';
 
-const fileFindSchema = z.object({
-  pattern: NonEmptyString,
-  path: z
-    .string()
-    .min(1, 'Path cannot be empty')
-    .transform((path) => resolve(path))
-    .default('.'),
-  type: z.enum(['file', 'directory', 'both']).default('both'),
-  caseSensitive: z.boolean().default(false),
-  maxDepth: z
-    .number()
-    .int('Must be an integer')
-    .min(TOOL_LIMITS.MIN_DEPTH, `Must be at least ${TOOL_LIMITS.MIN_DEPTH}`)
-    .max(TOOL_LIMITS.MAX_DEPTH, `Must be at most ${TOOL_LIMITS.MAX_DEPTH}`)
-    .default(TOOL_LIMITS.DEFAULT_DEPTH),
-  includeHidden: z.boolean().default(false),
-  maxResults: z
-    .number()
-    .int('Must be an integer')
-    .min(TOOL_LIMITS.MIN_SEARCH_RESULTS, `Must be at least ${TOOL_LIMITS.MIN_SEARCH_RESULTS}`)
-    .max(TOOL_LIMITS.MAX_SEARCH_RESULTS, `Must be at most ${TOOL_LIMITS.MAX_SEARCH_RESULTS}`)
-    .default(TOOL_LIMITS.DEFAULT_SEARCH_RESULTS),
-});
-
-export class FileFindTool extends Tool {
+export class FileFindTool extends BaseTool {
   name = 'file_find';
   description = 'Find files by name pattern or glob';
-  schema = fileFindSchema;
-  annotations: ToolAnnotations = {
+  annotations = {
     readOnlyHint: true,
     idempotentHint: true,
   };
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      pattern: { type: 'string', description: 'File name pattern or glob (e.g., "*.ts", "test*")' },
+      path: { type: 'string', description: 'Directory to search in (default: current directory)' },
+      type: {
+        type: 'string',
+        description: 'Type of entries to find',
+        enum: ['file', 'directory', 'both'],
+      },
+      caseSensitive: { type: 'boolean', description: 'Case sensitive search (default: false)' },
+      maxDepth: { type: 'number', description: 'Maximum search depth (default: 10)' },
+      includeHidden: {
+        type: 'boolean',
+        description: 'Include hidden files/directories (default: false)',
+      },
+      maxResults: { type: 'number', description: 'Maximum number of results (default: 50)' },
+    },
+    required: ['pattern'],
+  };
 
-  protected async executeValidated(
-    args: z.infer<typeof fileFindSchema>,
-    _context?: ToolContext
-  ): Promise<ToolResult> {
+  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
     try {
-      const { pattern, path, type, caseSensitive, maxDepth, includeHidden, maxResults } = args;
+      const pattern = this.validateNonEmptyStringParam(call.arguments.pattern, 'pattern', call.id);
+      const path =
+        this.validateOptionalParam(
+          call.arguments.path,
+          'path',
+          (value) => this.validateNonEmptyStringParam(value, 'path'),
+          call.id
+        ) ?? '.';
 
-      // Validate directory exists
-      try {
-        const pathStat = await stat(path);
-        if (!pathStat.isDirectory()) {
-          return this.createError(
-            `Path ${path} is not a directory. Specify a directory path to search in.`
-          );
-        }
-      } catch (error: unknown) {
-        if (error instanceof Error && (error as Error & { code?: string }).code === 'ENOENT') {
-          return this.createError(
-            `Directory not found: ${path}. Ensure the directory exists before searching.`
-          );
-        }
-        throw error;
-      }
+      const type =
+        this.validateOptionalParam(
+          call.arguments.type,
+          'type',
+          (value) => {
+            const validTypes = ['file', 'directory', 'both'] as const;
+            if (
+              typeof value !== 'string' ||
+              !validTypes.includes(value as (typeof validTypes)[number])
+            ) {
+              throw new Error(`Must be one of: ${validTypes.join(', ')}`);
+            }
+            return value as 'file' | 'directory' | 'both';
+          },
+          call.id
+        ) ?? 'both';
+
+      const caseSensitive =
+        this.validateOptionalParam(
+          call.arguments.caseSensitive,
+          'caseSensitive',
+          (value) => this.validateBooleanParam(value, 'caseSensitive'),
+          call.id
+        ) ?? false;
+
+      const maxDepth =
+        this.validateOptionalParam(
+          call.arguments.maxDepth,
+          'maxDepth',
+          (value) =>
+            this.validateNumberParam(value, 'maxDepth', call.id, {
+              min: TOOL_LIMITS.MIN_DEPTH,
+              max: TOOL_LIMITS.MAX_DEPTH,
+              integer: true,
+            }),
+          call.id
+        ) ?? TOOL_LIMITS.DEFAULT_DEPTH;
+
+      const includeHidden =
+        this.validateOptionalParam(
+          call.arguments.includeHidden,
+          'includeHidden',
+          (value) => this.validateBooleanParam(value, 'includeHidden'),
+          call.id
+        ) ?? false;
+
+      const maxResults =
+        this.validateOptionalParam(
+          call.arguments.maxResults,
+          'maxResults',
+          (value) =>
+            this.validateNumberParam(value, 'maxResults', call.id, {
+              min: TOOL_LIMITS.MIN_SEARCH_RESULTS,
+              max: TOOL_LIMITS.MAX_SEARCH_RESULTS,
+              integer: true,
+            }),
+          call.id
+        ) ?? TOOL_LIMITS.DEFAULT_SEARCH_RESULTS;
+
+      // Validate directory exists before searching
+      await this.validateDirectoryExists(path, call.id);
 
       const matches = await this.findFiles(path, {
         pattern,
@@ -92,9 +134,28 @@ export class FileFindTool extends Tool {
         resultLines.push(`No files found matching pattern: ${pattern}`);
       }
 
-      return this.createResult(resultLines.join('\n'));
-    } catch (error: unknown) {
-      return this.handleFileSystemError(error, args.path);
+      const resultText = resultLines.join('\n');
+
+      return createSuccessResult(
+        [
+          {
+            type: 'text',
+            text: resultText,
+          },
+        ],
+        call.id
+      );
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return error.toolResult;
+      }
+
+      return this.createStructuredError(
+        'File search failed',
+        'Check the directory path and search parameters, then try again',
+        error instanceof Error ? error.message : 'Unknown error occurred',
+        call.id
+      );
     }
   }
 
@@ -184,19 +245,6 @@ export class FileFindTool extends Tool {
     }
   }
 
-  private formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 bytes';
-    if (bytes === 1) return '1 byte';
-    if (bytes < 1024) return `${bytes} bytes`;
-
-    const k = 1024;
-    const sizes = ['bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    const size = parseFloat((bytes / Math.pow(k, i)).toFixed(1));
-
-    return `${size} ${sizes[i]}`;
-  }
-
   private matchesPattern(filename: string, pattern: string, caseSensitive: boolean): boolean {
     const targetName = caseSensitive ? filename : filename.toLowerCase();
     const targetPattern = caseSensitive ? pattern : pattern.toLowerCase();
@@ -209,42 +257,5 @@ export class FileFindTool extends Tool {
 
     const regex = new RegExp(`^${regexPattern}$`);
     return regex.test(targetName);
-  }
-
-  private handleFileSystemError(error: unknown, dirPath: string): ToolResult {
-    if (error instanceof Error) {
-      const nodeError = error as Error & { code?: string };
-
-      switch (nodeError.code) {
-        case 'ENOENT':
-          return this.createError(
-            `Directory not found: ${dirPath}. Ensure the directory exists before searching.`
-          );
-
-        case 'EACCES':
-          return this.createError(
-            `Permission denied accessing ${dirPath}. Check directory permissions or choose a different location. File system error: ${error.message}`
-          );
-
-        case 'ENOTDIR':
-          return this.createError(
-            `Path ${dirPath} is not a directory. Specify a directory path to search in.`
-          );
-
-        default:
-          return this.createError(
-            `File search failed: ${error.message}. Check the directory path and search parameters, then try again.`
-          );
-      }
-    }
-
-    return this.createError(
-      `File search failed due to unknown error. Check the directory path and search parameters, then try again.`
-    );
-  }
-
-  // Public method for testing
-  validatePath(path: string): string {
-    return resolve(path);
   }
 }

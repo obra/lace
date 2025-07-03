@@ -1,8 +1,8 @@
 # Tool System Refactoring: Implementation Status
 
-## ✅ COMPLETED: Foundation + 4 Tools Migrated + Architecture Cleanup
+## ✅ COMPLETED: Foundation + 5 Tools Migrated + Architecture Cleanup
 
-**STATUS**: Foundation established with output helpers. FileRead, Bash, UrlFetch, and FileWrite tools successfully migrated to schema validation. Old Tool interface completely replaced with new schema-based Tool class. Executor and Agent updated to use only new Tool class. 4 tools migrated, 7 remaining.
+**STATUS**: Foundation established with output helpers. FileRead, Bash, UrlFetch, FileWrite, and FileInsert tools successfully migrated to schema validation. Old Tool interface completely replaced with new schema-based Tool class. Executor and Agent updated to use only new Tool class. 5 tools migrated, 6 remaining.
 
 ## Overview
 
@@ -52,7 +52,8 @@ src/tools/
     ├── bash.ts           # ✅ MIGRATED: Schema-based implementation with structured output
     ├── url-fetch.ts      # ✅ MIGRATED: Schema-based implementation with enhanced validation
     ├── file-write.ts     # ✅ MIGRATED: Schema-based implementation with enhanced error handling
-    └── ... (8 remaining tools to migrate)
+    ├── file-insert.ts    # ✅ MIGRATED: Schema-based implementation with line validation
+    └── ... (6 remaining tools to migrate)
 ```
 
 ### ✅ Problems SOLVED
@@ -879,7 +880,7 @@ For each remaining tool, follow the pattern:
 
 #### Day 6: Migrate File Write Tools  
 - ✅ **file-write.ts**: ✅ COMPLETED - Schema-based validation with enhanced error handling and structured output
-- **file-insert.ts**: Line number validation
+- ✅ **file-insert.ts**: ✅ COMPLETED - Line number validation with line range checking and structured output
 
 #### Day 7: Migrate Search Tools
 - **file-find.ts**: Complex options, pattern validation
