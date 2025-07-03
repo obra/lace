@@ -72,8 +72,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
         <AgentMessageDisplay event={event} isFocused={true} onToggle={mockOnToggle} />
       );
 
-      // Should show collapsed state with Agent Response label
-      expect(lastFrame()).toContain('Agent Response');
+      // Should show collapsed state with thinking summary
       expect(lastFrame()).toContain('thought for 2 words');
       expect(lastFrame()).toContain(UI_SYMBOLS.TOOLBOX_SINGLE_EXPANDABLE);
     });
@@ -145,7 +144,6 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
 
       const frame = lastFrame();
       expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE_EXPANDABLE);
-      expect(frame).toContain('Agent Response');
       // Should show summary content with thinking marker
       expect(frame).toContain('thought for 2 words');
       expect(frame).toContain('Here is the response');
@@ -162,7 +160,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
 
       // Test that the component renders with the focus prop forwarded to the mock
       // The mock TimelineEntryCollapsibleBox should have isFocused=true
-      expect(lastFrame()).toContain('Agent Response');
+      expect(lastFrame()).toContain('thought for 1 word');
       expect(lastFrame()).toContain('Content');
     });
 

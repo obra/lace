@@ -5,7 +5,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
 import { ToolCall } from '../../../../tools/types.js';
-import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
+import { TimelineEntry } from '../ui/TimelineEntry.js';
 import { CodeDisplay } from '../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
 import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
@@ -52,17 +52,17 @@ export function ToolCallDisplay({
   );
 
   return (
-    <TimelineEntryCollapsibleBox
+    <TimelineEntry
       label="Input Parameters"
       summary={headerSummary}
       isExpanded={isExpanded}
       onExpandedChange={handleExpandedChange}
-      maxHeight={10}
       isSelected={isSelected}
       onToggle={onToggle}
       status={isStreaming ? 'pending' : 'none'}
+      isExpandable={true}
     >
       <CodeDisplay code={JSON.stringify(input)} language="json" />
-    </TimelineEntryCollapsibleBox>
+    </TimelineEntry>
   );
 }

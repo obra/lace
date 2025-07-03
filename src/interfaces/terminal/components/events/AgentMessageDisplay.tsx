@@ -5,9 +5,10 @@ import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
 import { ThinkingAwareContent } from '../ui/ThinkingAwareContent.js';
-import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
+import { TimelineEntry } from '../ui/TimelineEntry.js';
 import { parseThinkingBlocks } from './utils/thinking-parser.js';
 import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
+import { UI_SYMBOLS } from '../../theme.js';
 
 interface AgentMessageDisplayProps {
   event: ThreadEvent;
@@ -29,8 +30,11 @@ export function AgentMessageDisplay({
   // Parse thinking blocks from message content
   const parsed = useMemo(() => parseThinkingBlocks(message), [message]);
 
-  // Use shared expansion state management
+  // Use shared expansion state management  
   const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected || false, (expanded) => onToggle?.());
+  
+  // Force expand when streaming to show the (thinking...) indicator
+  const effectiveIsExpanded = isExpanded || (isStreaming ?? false);
 
   // Create handler that works with TimelineEntryCollapsibleBox interface
   const handleExpandedChange = (expanded: boolean) => {
@@ -43,43 +47,24 @@ export function AgentMessageDisplay({
 
   // Check if content has any thinking blocks (completed or unclosed)
   const hasAnyThinking = parsed.hasThinking || message.includes('<think>');
-  
-  // If no thinking blocks at all, render directly without collapsible wrapper
-  if (!hasAnyThinking) {
-    return (
-      <Box flexDirection="column">
-        <ThinkingAwareContent 
-          content={message} 
-          showThinking={true} 
-          showIcon={true} 
-          dimmed={!isFocused} 
-        />
-        {isStreaming && (
-          <Box marginTop={1}>
-            <Text color="gray"> (thinking...)</Text>
-          </Box>
-        )}
-      </Box>
-    );
-  }
 
   // Determine whether to show thinking content or summary
-  const showThinking = isExpanded || (isStreaming ?? false);
+  const showThinking = effectiveIsExpanded;
+
 
   return (
-    <TimelineEntryCollapsibleBox
-      label="Agent Response"
+    <TimelineEntry
       summary={
-        isExpanded ? null : (
+        effectiveIsExpanded ? null : (
           <ThinkingAwareContent 
             content={message} 
             showThinking={false} 
             showIcon={true} 
-            dimmed={!isFocused} 
+            dimmed={!isFocused}
           />
         )
       }
-      isExpanded={isExpanded}
+      isExpanded={effectiveIsExpanded}
       onExpandedChange={handleExpandedChange}
       isSelected={isSelected}
       onToggle={onToggle}
@@ -91,7 +76,7 @@ export function AgentMessageDisplay({
           content={message} 
           showThinking={showThinking} 
           showIcon={true} 
-          dimmed={!isFocused} 
+          dimmed={!isFocused}
         />
         {isStreaming && (
           <Box marginTop={1}>
@@ -99,6 +84,6 @@ export function AgentMessageDisplay({
           </Box>
         )}
       </Box>
-    </TimelineEntryCollapsibleBox>
+    </TimelineEntry>
   );
 }

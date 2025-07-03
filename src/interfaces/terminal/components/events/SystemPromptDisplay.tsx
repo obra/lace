@@ -4,7 +4,7 @@
 import React from 'react';
 import { Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
-import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
+import { TimelineEntry } from '../ui/TimelineEntry.js';
 import { UI_SYMBOLS } from '../../theme.js';
 import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
 
@@ -38,7 +38,7 @@ export function SystemPromptDisplay({
   };
 
   return (
-    <TimelineEntryCollapsibleBox
+    <TimelineEntry
       key={`system-prompt-${event.id}`}
       label={`${UI_SYMBOLS.TOOL} System Prompt`}
       isExpanded={isExpanded}
@@ -51,6 +51,6 @@ export function SystemPromptDisplay({
       <Text color="blue" wrap="wrap">
         {systemPrompt}
       </Text>
-    </TimelineEntryCollapsibleBox>
+    </TimelineEntry>
   );
 }

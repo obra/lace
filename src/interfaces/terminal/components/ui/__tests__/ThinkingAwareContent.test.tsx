@@ -108,4 +108,5 @@ describe('ThinkingAwareContent', () => {
     expect(frame).not.toContain('thought for 0 words');
     expect(frame).toContain('Response');
   });
+
 });

@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
-import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
+import { TimelineEntry } from '../ui/TimelineEntry.js';
 import { UI_SYMBOLS } from '../../theme.js';
 
 interface UserMessageDisplayProps {
@@ -102,7 +102,7 @@ export function UserMessageDisplay({
   );
   
   return (
-    <TimelineEntryCollapsibleBox
+    <TimelineEntry
       label={messageDisplay}
       summary={null}
       isExpanded={isExpanded}
@@ -113,6 +113,6 @@ export function UserMessageDisplay({
       isExpandable={shouldAutoCollapse}
     >
       {null}
-    </TimelineEntryCollapsibleBox>
+    </TimelineEntry>
   );
 }
