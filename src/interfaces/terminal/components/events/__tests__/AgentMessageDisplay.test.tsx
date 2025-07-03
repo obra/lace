@@ -26,8 +26,8 @@ vi.mock('../ui/MarkdownDisplay.js', () => ({
     ),
 }));
 
-vi.mock('../ui/TimelineEntryCollapsibleBox.js', () => ({
-  TimelineEntryCollapsibleBox: ({
+vi.mock('../ui/TimelineEntry.js', () => ({
+  TimelineEntry: ({
     children,
     label,
     summary,
@@ -151,7 +151,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
   });
 
   describe('Props forwarding', () => {
-    it('should forward isFocused to TimelineEntryCollapsibleBox', () => {
+    it('should forward isFocused to TimelineEntry', () => {
       const event = createEvent('<think>Thinking</think>Content');
 
       const { lastFrame } = render(
@@ -159,7 +159,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       );
 
       // Test that the component renders with the focus prop forwarded to the mock
-      // The mock TimelineEntryCollapsibleBox should have isFocused=true
+      // The mock TimelineEntry should have isFocused=true
       expect(lastFrame()).toContain('thought for 1 word');
       expect(lastFrame()).toContain('Content');
     });

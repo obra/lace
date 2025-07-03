@@ -31,7 +31,7 @@ export function ToolCallDisplay({
   // Use shared expansion state management
   const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected || false, (expanded) => onToggle?.());
 
-  // Create handler that works with TimelineEntryCollapsibleBox interface
+  // Create handler that works with TimelineEntry interface
   const handleExpandedChange = (expanded: boolean) => {
     if (expanded) {
       onExpand();

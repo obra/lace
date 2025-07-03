@@ -3,11 +3,10 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { TimelineEntryCollapsibleBox } from '../../ui/TimelineEntryCollapsibleBox.js';
+import { TimelineEntry, type TimelineStatus } from '../../ui/TimelineEntry.js';
 import { ToolCall, ToolResult } from '../../../../../tools/types.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
 import { useTimelineItemExpansion } from '../hooks/useTimelineExpansionToggle.js';
-import { type MarkerStatus } from '../../ui/SideMarkerRenderer.js';
 
 // Extract tool execution timeline item type
 export type ToolExecutionItem = {
@@ -62,7 +61,7 @@ export function useToolRenderer(
     (expanded) => onToggle?.()
   );
 
-  // Create handler that works with TimelineEntryCollapsibleBox interface
+  // Create handler that works with TimelineEntry interface
   const handleExpandedChange = (expanded: boolean) => {
     if (expanded) {
       onExpand();
@@ -84,7 +83,7 @@ export function useToolRenderer(
 
   // Get status icon and marker status
   const statusIcon = success ? UI_SYMBOLS.SUCCESS : result ? UI_SYMBOLS.ERROR : UI_SYMBOLS.PENDING;
-  const markerStatus: MarkerStatus = isStreaming ? 'pending' : success ? 'success' : result ? 'error' : 'none';
+  const markerStatus: TimelineStatus = isStreaming ? 'pending' : success ? 'success' : result ? 'error' : 'none';
 
   // Create standardized fancy label
   const fancyLabel = (
@@ -145,7 +144,7 @@ export function useToolRenderer(
 
   // Return standardized timeline entry
   const timelineEntry = (
-    <TimelineEntryCollapsibleBox
+    <TimelineEntry
       label={fancyLabel}
       summary={compactSummary}
       isExpanded={isExpanded}
@@ -156,7 +155,7 @@ export function useToolRenderer(
       isExpandable={true}
     >
       {expandedContent}
-    </TimelineEntryCollapsibleBox>
+    </TimelineEntry>
   );
 
   return {

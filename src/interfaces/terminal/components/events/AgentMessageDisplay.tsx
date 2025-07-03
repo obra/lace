@@ -36,7 +36,7 @@ export function AgentMessageDisplay({
   // Force expand when streaming to show the (thinking...) indicator
   const effectiveIsExpanded = isExpanded || (isStreaming ?? false);
 
-  // Create handler that works with TimelineEntryCollapsibleBox interface
+  // Create handler that works with TimelineEntry interface
   const handleExpandedChange = (expanded: boolean) => {
     if (expanded) {
       onExpand();

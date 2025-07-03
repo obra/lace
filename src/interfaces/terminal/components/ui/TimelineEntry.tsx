@@ -106,8 +106,8 @@ export function TimelineEntry({
     return () => clearTimeout(timeoutId);
   }, [isExpanded, children]);
 
-  // Calculate layout values
-  const baseHeight = measuredHeight;
+  // Calculate layout values - force minimum 2 lines for expandable items
+  const baseHeight = isExpandable ? Math.max(2, measuredHeight) : measuredHeight;
   const markers = getMarkerCharacters(baseHeight, isExpandable, isExpanded);
   const color = getMarkerColor(status, isSelected || isFocused);
   
@@ -116,7 +116,7 @@ export function TimelineEntry({
     ? ` (${isExpanded 
         ? `${UI_SYMBOLS.ARROW_LEFT} to close`
         : `${UI_SYMBOLS.ARROW_RIGHT} to open`})`
-    : '';
+    : ' ';
 
   // Content area
   const contentArea = (
@@ -139,8 +139,8 @@ export function TimelineEntry({
     </Box>
   );
 
-  // Single line layout
-  if (markers.single) {
+  // Single line layout - but force multi-line for expandable items
+  if (markers.single && !isExpandable) {
     return (
       <Box marginBottom={1} flexDirection="column">
         <Box flexDirection="row">

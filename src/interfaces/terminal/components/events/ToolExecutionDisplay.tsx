@@ -3,14 +3,14 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
+import { TimelineEntry } from '../ui/TimelineEntry.js';
 import { ThreadEvent } from '../../../../threads/types.js';
 import { ToolCall, ToolResult } from '../../../../tools/types.js';
 import { CompactOutput } from '../ui/CompactOutput.js';
 import { CodeDisplay } from '../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
 import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
-import { type MarkerStatus } from '../ui/SideMarkerRenderer.js';
+import { type TimelineStatus } from '../ui/TimelineEntry.js';
 
 interface ToolExecutionDisplayProps {
   callEvent: ThreadEvent;
@@ -44,7 +44,7 @@ export function ToolExecutionDisplay({
   // Use shared expansion state management
   const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected || false, (expanded) => onToggle?.());
 
-  // Create handler that works with TimelineEntryCollapsibleBox interface
+  // Create handler that works with TimelineEntry interface
   const handleExpandedChange = (expanded: boolean) => {
     if (expanded) {
       onExpand();
@@ -62,7 +62,7 @@ export function ToolExecutionDisplay({
   );
   const output = firstTextBlock?.text;
   const error = toolResultData?.isError ? output : undefined;
-  const markerStatus: MarkerStatus = isStreaming ? 'pending' : success ? 'success' : toolResultData ? 'error' : 'none';
+  const markerStatus: TimelineStatus = isStreaming ? 'pending' : success ? 'success' : toolResultData ? 'error' : 'none';
 
   // Determine tool command for compact header
   const getToolCommand = (toolName: string, input: Record<string, unknown>): string => {
@@ -180,7 +180,7 @@ export function ToolExecutionDisplay({
   );
 
   return (
-    <TimelineEntryCollapsibleBox
+    <TimelineEntry
       label={`${toolName}${toolCommand ? ` ${toolCommand}` : ''}`}
       summary={toolSummary}
       isExpanded={isExpanded}
@@ -188,8 +188,9 @@ export function ToolExecutionDisplay({
       isSelected={isSelected}
       onToggle={onToggle}
       status={markerStatus}
+      isExpandable={true}
     >
       {expandedContent}
-    </TimelineEntryCollapsibleBox>
+    </TimelineEntry>
   );
 }

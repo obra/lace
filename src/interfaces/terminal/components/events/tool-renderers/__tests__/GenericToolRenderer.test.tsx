@@ -9,8 +9,8 @@ import { ToolCall, ToolResult } from '../../../../../../tools/types.js';
 import { Text } from 'ink';
 
 // Mock dependencies with simple text components
-vi.mock('../../../ui/TimelineEntryCollapsibleBox.js', () => ({
-  TimelineEntryCollapsibleBox: ({ children, summary, isExpanded, label }: any) => {
+vi.mock('../../../ui/TimelineEntry.js', () => ({
+  TimelineEntry: ({ children, summary, isExpanded, label }: any) => {
     const summaryText = typeof summary === 'object' ? '[ComplexSummary]' : summary;
     const contentText = isExpanded
       ? typeof children === 'object'
@@ -193,7 +193,7 @@ describe('GenericToolRenderer', () => {
 
       render(<GenericToolRenderer item={item}  />);
 
-      // onExpandedChange is passed to TimelineEntryCollapsibleBox
+      // onExpandedChange is passed to TimelineEntry
       expect(onExpandedChange).not.toHaveBeenCalled(); // Not called during render
     });
   });

@@ -1,16 +1,15 @@
-// ABOUTME: Generic tool renderer component using TimelineEntryCollapsibleBox
+// ABOUTME: Generic tool renderer component using TimelineEntry
 // ABOUTME: Provides consistent expansion behavior for any tool execution with input/output display
 
 import React, { forwardRef, useImperativeHandle } from 'react';
 import { Box, Text } from 'ink';
-import { TimelineEntryCollapsibleBox } from '../../ui/TimelineEntryCollapsibleBox.js';
+import { TimelineEntry, type TimelineStatus } from '../../ui/TimelineEntry.js';
 import { ToolCall, ToolResult } from '../../../../../tools/types.js';
 import { CompactOutput } from '../../ui/CompactOutput.js';
 import { CodeDisplay } from '../../ui/CodeDisplay.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
 import { useTimelineItemExpansion } from '../hooks/useTimelineExpansionToggle.js';
 import { TimelineItemRef } from '../../timeline-item-focus.js';
-import { type MarkerStatus } from '../../ui/SideMarkerRenderer.js';
 
 // Extract tool execution timeline item type
 type ToolExecutionItem = {
@@ -62,7 +61,7 @@ export const GenericToolRenderer = forwardRef<TimelineItemRef, GenericToolRender
     (expanded) => onToggle?.()
   );
 
-  // Create handler that works with TimelineEntryCollapsibleBox interface
+  // Create handler that works with TimelineEntry interface
   const handleExpandedChange = (expanded: boolean) => {
     if (expanded) {
       onExpand();
@@ -77,7 +76,7 @@ export const GenericToolRenderer = forwardRef<TimelineItemRef, GenericToolRender
   const success = result ? !result.isError : true;
   const output = result?.content?.[0]?.text;
   const error = result?.isError ? output : undefined;
-  const markerStatus: MarkerStatus = isStreaming ? 'pending' : success ? 'success' : result ? 'error' : 'none';
+  const markerStatus: TimelineStatus = isStreaming ? 'pending' : success ? 'success' : result ? 'error' : 'none';
 
   // Generate tool command summary for compact header
   const getToolCommand = (toolName: string, input: Record<string, unknown>): string => {
@@ -187,7 +186,7 @@ export const GenericToolRenderer = forwardRef<TimelineItemRef, GenericToolRender
 
 
   return (
-    <TimelineEntryCollapsibleBox
+    <TimelineEntry
       label={`${formatToolName(toolName)}${toolCommand ? ` ${toolCommand}` : ''}`}
       summary={toolSummary}
       isExpanded={isExpanded}
@@ -195,8 +194,9 @@ export const GenericToolRenderer = forwardRef<TimelineItemRef, GenericToolRender
       isSelected={isSelected}
       onToggle={onToggle}
       status={markerStatus}
+      isExpandable={true}
     >
       {expandedContent}
-    </TimelineEntryCollapsibleBox>
+    </TimelineEntry>
   );
 });
