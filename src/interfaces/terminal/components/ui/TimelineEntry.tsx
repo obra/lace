@@ -118,7 +118,9 @@ export function TimelineEntry({
         : `${UI_SYMBOLS.ARROW_RIGHT} to open`})`
     : ' ';
 
-  // Content area
+  // Content area - simplified to reduce empty space
+  const actualContent = isExpanded ? children : (summary && summary);
+  
   const contentArea = (
     <Box flexDirection="column">
       {label && (
@@ -130,12 +132,11 @@ export function TimelineEntry({
           )}
         </Box>
       )}
-
-      <Box flexDirection="column" marginLeft={label ? 2 : 0}>
-        <Box ref={contentRef}>
-          {isExpanded ? children : (summary && summary)}
+      {actualContent && (
+        <Box ref={contentRef} marginLeft={label ? 2 : 0}>
+          {actualContent}
         </Box>
-      </Box>
+      )}
     </Box>
   );
 
@@ -171,10 +172,8 @@ export function TimelineEntry({
         </Box>
         <Box flexDirection="column" flexGrow={1}>
           {contentArea}
+          <Text color="gray">{expandHint}</Text>
         </Box>
-      </Box>
-      <Box flexDirection="row" marginLeft={2}>
-        <Text color="gray">{expandHint}</Text>
       </Box>
     </Box>
   );

@@ -89,39 +89,41 @@ export function ThinkingAwareContent({
   
   const parts = parseContentParts(content);
   
+  const renderedParts = parts.map((part, index) => {
+    if (part.type === 'thinking') {
+      if (showThinking) {
+        // Show thinking content in italics (skip empty content)
+        const trimmedContent = part.content.trim();
+        return trimmedContent ? (
+          <Text key={index} italic dimColor={dimmed}>
+            {trimmedContent}
+          </Text>
+        ) : null;
+      } else {
+        // Show summary marker (skip empty thinking blocks)
+        const wordCount = countWords(part.content);
+        return wordCount > 0 ? (
+          <Text key={index} italic dimColor={dimmed}>
+            thought for {wordCount} word{wordCount === 1 ? '' : 's'}
+          </Text>
+        ) : null;
+      }
+    } else {
+      // Regular text content - render with markdown if it has content
+      return part.content.trim() ? (
+        <MarkdownDisplay 
+          key={index} 
+          content={part.content} 
+          showIcon={index === 0 ? showIcon : false} 
+          dimmed={dimmed} 
+        />
+      ) : null;
+    }
+  }).filter(Boolean); // Remove null elements
+
   return (
     <Box flexDirection="column">
-      {parts.map((part, index) => {
-        if (part.type === 'thinking') {
-          if (showThinking) {
-            // Show thinking content in italics (skip empty content)
-            const trimmedContent = part.content.trim();
-            return trimmedContent ? (
-              <Text key={index} italic dimColor={dimmed}>
-                {trimmedContent}
-              </Text>
-            ) : null;
-          } else {
-            // Show summary marker (skip empty thinking blocks)
-            const wordCount = countWords(part.content);
-            return wordCount > 0 ? (
-              <Text key={index} italic dimColor={dimmed}>
-                thought for {wordCount} word{wordCount === 1 ? '' : 's'}
-              </Text>
-            ) : null;
-          }
-        } else {
-          // Regular text content - render with markdown if it has content
-          return part.content.trim() ? (
-            <MarkdownDisplay 
-              key={index} 
-              content={part.content} 
-              showIcon={index === 0 ? showIcon : false} 
-              dimmed={dimmed} 
-            />
-          ) : null;
-        }
-      })}
+      {renderedParts}
     </Box>
   );
 }
