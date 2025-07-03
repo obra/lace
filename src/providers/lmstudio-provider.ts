@@ -4,7 +4,7 @@
 import { LMStudioClient } from '@lmstudio/sdk';
 import { AIProvider } from './base-provider.js';
 import { ProviderMessage, ProviderResponse, ProviderConfig } from './base-provider.js';
-import { Tool } from '../tools/types.js';
+import { Tool } from '../tools/tool.js';
 import { logger } from '../utils/logger.js';
 
 // Interface for LMStudio model objects

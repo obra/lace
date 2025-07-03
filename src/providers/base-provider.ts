@@ -2,7 +2,8 @@
 // ABOUTME: Defines the common interface and provides base functionality for providers
 
 import { EventEmitter } from 'events';
-import { Tool, ContentBlock } from '../tools/types.js';
+import { ContentBlock } from '../tools/types.js';
+import { Tool } from '../tools/tool.js';
 
 export interface ProviderConfig {
   model?: string;

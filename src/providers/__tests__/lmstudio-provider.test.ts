@@ -3,7 +3,9 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LMStudioProvider } from '../lmstudio-provider.js';
-import { Tool, ToolCall, ToolResult, ToolContext } from '../../tools/types.js';
+import { Tool } from '../../tools/tool.js';
+import { ToolResult, ToolContext } from '../../tools/types.js';
+import { z } from 'zod';
 
 // Mock the LMStudio SDK
 vi.mock('@lmstudio/sdk', () => {
@@ -72,24 +74,22 @@ describe('LMStudioProvider', () => {
   describe('native tool calling', () => {
     it('should handle tools correctly in configuration', () => {
       // Test inline tool conversion logic
-      const testTool: Tool = {
-        name: 'test_tool',
-        description: 'A test tool',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            input: { type: 'string' },
-          },
-          required: ['input'],
-        },
-        async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-          return {
-            id: call.id,
-            isError: false,
-            content: [{ type: 'text' as const, text: 'test result' }],
-          };
-        },
-      };
+      class TestTool extends Tool {
+        name = 'test_tool';
+        description = 'A test tool';
+        schema = z.object({
+          input: z.string(),
+        });
+
+        protected async executeValidated(
+          _args: { input: string },
+          _context?: ToolContext
+        ): Promise<ToolResult> {
+          return this.createResult('test result');
+        }
+      }
+
+      const testTool = new TestTool();
 
       // Test the conversion logic that's now inline in the provider
       const rawTools = {
@@ -118,6 +118,7 @@ describe('LMStudioProvider', () => {
                   input: { type: 'string' },
                 },
                 required: ['input'],
+                additionalProperties: false,
               },
             },
           },

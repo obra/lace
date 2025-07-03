@@ -2,8 +2,8 @@
 // ABOUTME: Validates Tool interface with annotations and ToolResult with MCP compatibility
 
 import { describe, it, expect } from 'vitest';
+import { Tool } from '../tool.js';
 import {
-  Tool,
   ToolResult,
   ToolAnnotations,
   createToolResult,

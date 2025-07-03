@@ -1,54 +1,43 @@
 // ABOUTME: Heavy integration tests for LMStudio provider conversation flows
 // ABOUTME: Tests tool calling, context preservation, and edge cases with real model
 
-import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { LMStudioProvider } from '../lmstudio-provider.js';
-import { Tool, ToolCall, ToolResult, ToolContext } from '../../tools/types.js';
-import { logger } from '../../utils/logger.js';
+import { Tool } from '../../tools/tool.js';
+import { ToolResult, ToolContext } from '../../tools/types.js';
 import { checkProviderAvailability } from '../../__tests__/utils/provider-test-helpers.js';
+import { z } from 'zod';
 
 // Mock tool for testing without side effects
-class MockTool implements Tool {
+class MockTool extends Tool {
   name = 'mock_tool';
   description = 'A mock tool for testing';
-  inputSchema = {
-    type: 'object' as const,
-    properties: {
-      action: { type: 'string', description: 'Action to perform' },
-      value: { type: 'string', description: 'Value to use' },
-    },
-    required: ['action'],
-  };
+  schema = z.object({
+    action: z.string().describe('Action to perform'),
+    value: z.string().describe('Value to use').optional(),
+  });
 
-  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-    return {
-      id: call.id,
-      isError: false,
-      content: [
-        { type: 'text' as const, text: `Mock executed: ${JSON.stringify(call.arguments)}` },
-      ],
-    };
+  protected async executeValidated(
+    _args: { action: string; value?: string },
+    _context?: ToolContext
+  ): Promise<ToolResult> {
+    return this.createResult(`Mock executed: ${JSON.stringify(_args)}`);
   }
 }
 
 // Test tool that always fails
-class FailingTool implements Tool {
+class FailingTool extends Tool {
   name = 'failing_tool';
   description = 'A tool that always fails';
-  inputSchema = {
-    type: 'object' as const,
-    properties: {
-      message: { type: 'string', description: 'Error message' },
-    },
-    required: ['message'],
-  };
+  schema = z.object({
+    message: z.string().describe('Error message'),
+  });
 
-  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-    return {
-      id: call.id,
-      isError: true,
-      content: [{ type: 'text' as const, text: 'Simulated failure' }],
-    };
+  protected async executeValidated(
+    _args: { message: string },
+    _context?: ToolContext
+  ): Promise<ToolResult> {
+    return this.createError('Simulated failure');
   }
 }
 
@@ -124,37 +113,24 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
   }, 30000);
 
   it('should handle complex tool instructions', async () => {
-    const complexTool: Tool = {
-      name: 'complex_tool',
-      description: 'A tool with complex parameters',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          operation: {
-            type: 'string',
-            description: 'Operation to perform (create, update, or delete)',
-          },
-          target: { type: 'string', description: 'Target resource' },
-          options: {
-            type: 'object',
-            description: 'Additional options',
-          },
-        },
-        required: ['operation', 'target'],
-      },
-      async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-        return {
-          id: call.id,
-          isError: false,
-          content: [
-            {
-              type: 'text' as const,
-              text: `Complex operation completed: ${JSON.stringify(call.arguments)}`,
-            },
-          ],
-        };
-      },
-    };
+    class ComplexTool extends Tool {
+      name = 'complex_tool';
+      description = 'A tool with complex parameters';
+      schema = z.object({
+        operation: z.string().describe('Operation to perform (create, update, or delete)'),
+        target: z.string().describe('Target resource'),
+        options: z.object({}).passthrough().describe('Additional options').optional(),
+      });
+
+      protected async executeValidated(
+        args: { operation: string; target: string; options?: any },
+        _context?: ToolContext
+      ): Promise<ToolResult> {
+        return this.createResult(`Complex operation completed: ${JSON.stringify(args)}`);
+      }
+    }
+
+    const complexTool = new ComplexTool();
 
     const messages = [
       {
@@ -243,29 +219,22 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
   }, 30000);
 
   it('should execute tools using native tool calling', async () => {
-    const simpleTool: Tool = {
-      name: 'get_weather',
-      description: 'Get weather information for a location',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          location: { type: 'string', description: 'Location name' },
-        },
-        required: ['location'],
-      },
-      async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-        return {
-          id: call.id,
-          isError: false,
-          content: [
-            {
-              type: 'text' as const,
-              text: `Weather in ${call.arguments.location}: Sunny, 72°F`,
-            },
-          ],
-        };
-      },
-    };
+    class SimpleTool extends Tool {
+      name = 'get_weather';
+      description = 'Get weather information for a location';
+      schema = z.object({
+        location: z.string().describe('Location name'),
+      });
+
+      protected async executeValidated(
+        args: { location: string },
+        _context?: ToolContext
+      ): Promise<ToolResult> {
+        return this.createResult(`Weather in ${args.location}: Sunny, 72°F`);
+      }
+    }
+
+    const simpleTool = new SimpleTool();
 
     const messages = [
       {

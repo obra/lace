@@ -9,7 +9,7 @@ import { ToolExecutor } from '../../../tools/executor.js';
 import { ThreadManager } from '../../../threads/thread-manager.js';
 import { AIProvider } from '../../../providers/base-provider.js';
 import { ProviderMessage, ProviderResponse } from '../../../providers/base-provider.js';
-import { Tool } from '../../../tools/types.js';
+import { Tool } from '../../../tools/tool.js';
 
 // Mock provider for testing
 class MockProvider extends AIProvider {

@@ -7,7 +7,9 @@ import { ToolExecutor } from '../../tools/executor.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 import { AIProvider } from '../../providers/base-provider.js';
 import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool, ToolCall } from '../../tools/types.js';
+import { Tool } from '../../tools/tool.js';
+import { ToolResult, ToolContext } from '../../tools/types.js';
+import { z } from 'zod';
 
 // Mock provider for controlled testing
 class MockIntegrationProvider extends AIProvider {
@@ -351,24 +353,22 @@ describe('Turn Tracking Provider Integration Tests', () => {
     it('should handle tool execution lifecycle correctly', async () => {
       // Arrange - This test validates turn tracking works with tool execution
       // without needing to test actual abort during tool execution
-      const mockTool: Tool = {
-        name: 'mock_tool',
-        description: 'A simple mock tool',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            text: { type: 'string' },
-          },
-          required: ['text'],
-        },
-        executeTool: async (call: ToolCall) => {
-          return {
-            id: call.id,
-            content: [{ type: 'text', text: `Processed: ${call.arguments.text}` }],
-            isError: false,
-          };
-        },
-      };
+      class MockTool extends Tool {
+        name = 'mock_tool';
+        description = 'A simple mock tool';
+        schema = z.object({
+          text: z.string(),
+        });
+
+        protected async executeValidated(
+          args: { text: string },
+          _context?: ToolContext
+        ): Promise<ToolResult> {
+          return this.createResult(`Processed: ${args.text}`);
+        }
+      }
+
+      const mockTool = new MockTool();
 
       toolExecutor.registerTool('mock_tool', mockTool);
 

@@ -3,7 +3,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OpenAIProvider } from '../openai-provider.js';
-import { Tool } from '../../tools/types.js';
+import { Tool } from '../../tools/tool.js';
+import { ToolResult, ToolContext } from '../../tools/types.js';
+import { z } from 'zod';
 
 // Mock the OpenAI SDK
 const mockCreate = vi.fn();
@@ -40,18 +42,22 @@ describe('OpenAIProvider', () => {
     });
     provider.setSystemPrompt('Test system prompt');
 
-    mockTool = {
-      name: 'test_tool',
-      description: 'A test tool',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          action: { type: 'string', description: 'Action to perform' },
-        },
-        required: ['action'],
-      },
-      executeTool: vi.fn(),
-    };
+    class TestTool extends Tool {
+      name = 'test_tool';
+      description = 'A test tool';
+      schema = z.object({
+        action: z.string().describe('Action to perform'),
+      });
+
+      protected async executeValidated(
+        args: { action: string },
+        _context?: ToolContext
+      ): Promise<ToolResult> {
+        return this.createResult(`Executed action: ${args.action}`);
+      }
+    }
+
+    mockTool = new TestTool();
   });
 
   afterEach(() => {
