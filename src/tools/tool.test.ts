@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import { Tool } from './tool.js';
-import { ToolContext } from './types.js';
+import { ToolContext, ToolResult } from './types.js';
 
 // Test implementation of new Tool class
 class TestTool extends Tool {
@@ -15,9 +15,12 @@ class TestTool extends Tool {
     optional: z.number().optional(),
   });
 
-  async executeValidated(args: z.infer<typeof this.schema>, _context?: ToolContext) {
+  async executeValidated(
+    args: z.infer<typeof this.schema>,
+    _context?: ToolContext
+  ): Promise<ToolResult> {
     return {
-      content: [{ type: 'text', text: `Got: ${args.required}` }],
+      content: [{ type: 'text' as const, text: `Got: ${args.required}` }],
       isError: false,
     };
   }
@@ -107,9 +110,9 @@ class ComplexTestTool extends Tool {
       }
     );
 
-  async executeValidated(_args: z.infer<typeof this.schema>) {
+  async executeValidated(_args: z.infer<typeof this.schema>): Promise<ToolResult> {
     return {
-      content: [{ type: 'text', text: 'validation passed' }],
+      content: [{ type: 'text' as const, text: 'validation passed' }],
       isError: false,
     };
   }

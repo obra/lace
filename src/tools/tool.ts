@@ -19,7 +19,7 @@ export abstract class Tool {
     });
 
     // Handle case where zodToJsonSchema returns a $ref structure
-    if ('$ref' in jsonSchema && jsonSchema.definitions) {
+    if ('$ref' in jsonSchema && jsonSchema.$ref && jsonSchema.definitions) {
       const refKey = jsonSchema.$ref.replace('#/definitions/', '');
       const actualSchema = jsonSchema.definitions[refKey];
       return actualSchema as ToolInputSchema;
@@ -47,18 +47,18 @@ export abstract class Tool {
   // Output helpers for consistent result construction
 
   // Public API for creating results
-  protected createResult(content: string | object, metadata?: Record<string, any>): ToolResult {
+  protected createResult(content: string | object, metadata?: Record<string, unknown>): ToolResult {
     return this._makeResult({ content, metadata, isError: false });
   }
 
-  protected createError(content: string | object, metadata?: Record<string, any>): ToolResult {
+  protected createError(content: string | object, metadata?: Record<string, unknown>): ToolResult {
     return this._makeResult({ content, metadata, isError: true });
   }
 
   // Private implementation
   private _makeResult(options: {
     content: string | object;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
     isError: boolean;
   }): ToolResult {
     const text =

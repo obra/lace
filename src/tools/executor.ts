@@ -1,8 +1,8 @@
 // ABOUTME: Simplified tool execution engine with configuration API and approval integration
 // ABOUTME: Handles tool registration, approval checks, and safe execution with simple configuration
 
-import { ToolResult, ToolContext, Tool, ToolCall, createErrorResult } from './types.js';
-import { Tool as NewTool } from './tool.js';
+import { ToolResult, ToolContext, ToolCall, createErrorResult } from './types.js';
+import { Tool } from './tool.js';
 import { ApprovalCallback, ApprovalDecision } from './approval-types.js';
 import { BashTool } from './implementations/bash.js';
 import { FileReadTool } from './implementations/file-read.js';
@@ -16,20 +16,15 @@ import { TaskAddTool, TaskListTool, TaskCompleteTool } from './implementations/t
 import { DelegateTool } from './implementations/delegate.js';
 import { UrlFetchTool } from './implementations/url-fetch.js';
 
-// Type guard to check if a tool is the new schema-based Tool class
-function isNewTool(tool: unknown): tool is NewTool {
-  return tool instanceof NewTool;
-}
-
 export class ToolExecutor {
-  private tools = new Map<string, Tool | NewTool>();
+  private tools = new Map<string, Tool>();
   private approvalCallback?: ApprovalCallback;
 
-  registerTool(name: string, tool: Tool | NewTool): void {
+  registerTool(name: string, tool: Tool): void {
     this.tools.set(name, tool);
   }
 
-  registerTools(tools: (Tool | NewTool)[]): void {
+  registerTools(tools: Tool[]): void {
     for (const tool of tools) {
       this.tools.set(tool.name, tool);
     }
@@ -39,7 +34,7 @@ export class ToolExecutor {
     this.approvalCallback = callback;
   }
 
-  getTool(toolName: string): Tool | NewTool | undefined {
+  getTool(toolName: string): Tool | undefined {
     return this.tools.get(toolName);
   }
 
@@ -47,7 +42,7 @@ export class ToolExecutor {
     return Array.from(this.tools.keys());
   }
 
-  getAllTools(): (Tool | NewTool)[] {
+  getAllTools(): Tool[] {
     return Array.from(this.tools.values());
   }
 
@@ -103,15 +98,7 @@ export class ToolExecutor {
 
     // 3. Execute the tool
     try {
-      let result: ToolResult;
-
-      if (isNewTool(tool)) {
-        // New schema-based tool
-        result = await tool.execute(call.arguments, context);
-      } else {
-        // Old tool interface
-        result = await tool.executeTool(call, context);
-      }
+      const result = await tool.execute(call.arguments, context);
 
       // Ensure the result has the call ID if it wasn't set by the tool
       if (!result.id && call.id) {
