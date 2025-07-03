@@ -139,7 +139,7 @@ export function TimelineEntry({
   const actualContent = isExpanded ? children : (summary && summary);
   
   const contentArea = (
-    <Box ref={contentAreaRef} flexDirection="column">
+    <Box ref={contentAreaRef} marginBottom={0} flexDirection="column">
       {label && (
         <Box marginBottom={0}>
           {typeof label === 'string' ? (
@@ -163,7 +163,7 @@ export function TimelineEntry({
   // Single line layout - but force multi-line for expandable items
   if (markers.single && !isExpandable) {
     return (
-      <Box marginBottom={0} flexDirection="column">
+      <Box marginBottom={1} flexDirection="column">
         <Box flexDirection="row">
           <Text color={color}>{markers.single} </Text>
           <Box flexDirection="column" flexGrow={1}>
@@ -181,7 +181,7 @@ export function TimelineEntry({
   const middleCount = Math.max(0, baseHeight - 2);
   
   return (
-    <Box marginBottom={0} flexDirection="column">
+    <Box marginBottom={1} flexDirection="column">
       <Box flexDirection="row">
         <Box flexDirection="column" marginRight={1}>
           <Text color={color}>{markers.top}</Text>
