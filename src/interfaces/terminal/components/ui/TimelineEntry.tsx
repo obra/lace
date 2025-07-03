@@ -18,6 +18,7 @@ interface TimelineEntryProps {
   onToggle?: () => void;
   status?: TimelineStatus;
   isExpandable?: boolean;
+  isStreaming?: boolean;
 }
 
 function getMarkerCharacters(height: number, isExpandable: boolean = false, isExpanded: boolean = false): {
@@ -63,6 +64,7 @@ export function TimelineEntry({
   onToggle,
   status = 'none',
   isExpandable = false,
+  isStreaming = false,
 }: TimelineEntryProps) {
   const contentAreaRef = useRef<DOMElement | null>(null);
   const [measuredHeight, setMeasuredHeight] = useState<number>(1);
@@ -114,14 +116,16 @@ export function TimelineEntry({
     if (measureTimeoutRef.current) {
       clearTimeout(measureTimeoutRef.current);
     }
-    measureTimeoutRef.current = setTimeout(measureHeight, 100);
+    // Use shorter delay for streaming content to make side indicators more responsive
+    const delay = isStreaming ? 10 : 100;
+    measureTimeoutRef.current = setTimeout(measureHeight, delay);
     
     return () => {
       if (measureTimeoutRef.current) {
         clearTimeout(measureTimeoutRef.current);
       }
     };
-  }, [children, measureHeight]);
+  }, [children, measureHeight, isStreaming]);
 
   // Calculate layout values - force minimum 2 lines for expandable items
   const baseHeight = isExpandable ? Math.max(2, measuredHeight) : measuredHeight;

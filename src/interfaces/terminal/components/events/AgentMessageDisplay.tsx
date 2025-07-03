@@ -69,7 +69,8 @@ export function AgentMessageDisplay({
       isSelected={isSelected}
       onToggle={onToggle}
       status={isStreaming ? 'pending' : 'success'}
-      isExpandable={true}
+      isExpandable={!isStreaming}
+      isStreaming={isStreaming}
     >
       <Box flexDirection="column">
         <ThinkingAwareContent 
