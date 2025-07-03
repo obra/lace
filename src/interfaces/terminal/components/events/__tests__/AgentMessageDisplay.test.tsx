@@ -118,7 +118,8 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       const frame = lastFrame();
       expect(frame).toContain('Some text');
       expect(frame).toContain('Final response');
-      expect(frame).toContain('thought for 6 words'); // Total: "First thought" + "Second longer thought process" = 2 + 4 = 6 words
+      expect(frame).toContain('thought for 2 words'); // "First thought" = 2 words
+      expect(frame).toContain('thought for 4 words'); // "Second longer thought process" = 4 words
     });
 
     it('should handle thinking-only messages in collapsed state', () => {

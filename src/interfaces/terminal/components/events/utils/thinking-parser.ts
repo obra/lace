@@ -157,22 +157,25 @@ export function parseThinkingBlocks(content: string): ParsedContent {
 }
 
 /**
- * Create summary content by hiding thinking blocks and showing italic summary (for collapsed state)
+ * Create summary content by replacing thinking blocks with inline markers (for collapsed state)
  */
 export function createSummaryContent(content: string): string {
-  const { contentWithoutThinking, totalThinkingWords, hasThinking } = parseThinkingBlocks(content);
+  const { hasThinking } = parseThinkingBlocks(content);
 
   if (!hasThinking) {
     return content;
   }
 
-  if (!contentWithoutThinking) {
-    // Only thinking blocks, no other content
-    return `*thought for ${totalThinkingWords} word${totalThinkingWords === 1 ? '' : 's'}*`;
-  }
+  // Replace thinking blocks with inline markers
+  let result = content;
+  const regex = /<think>([\s\S]*?)<\/think>/g;
 
-  // For content with thinking blocks, show the clean content with an italic summary marker
-  return `${contentWithoutThinking}\n\n*thought for ${totalThinkingWords} word${totalThinkingWords === 1 ? '' : 's'}*`;
+  result = result.replace(regex, (match, thinkingContent) => {
+    const wordCount = countWords(thinkingContent.trim());
+    return `*thought for ${wordCount} word${wordCount === 1 ? '' : 's'}*`;
+  });
+
+  return result;
 }
 
 /**
@@ -185,38 +188,22 @@ export function countWords(text: string): number {
 
 /**
  * Format thinking content for display in expanded state
- * Converts <think> tags to italic markdown
+ * Converts <think> tags to italic markdown, handles streaming cases
  */
 export function formatThinkingForDisplay(content: string): string {
-  const { thinkingBlocks } = parseThinkingBlocks(content);
+  // Handle complete thinking blocks first
+  let result = content.replace(/<think>([\s\S]*?)<\/think>/g, (match, thinkingContent) => {
+    const trimmed = thinkingContent.trim();
+    return trimmed ? `*${trimmed}*` : '';
+  });
 
-  if (thinkingBlocks.length === 0) {
-    return content;
+  // Handle unclosed thinking blocks (streaming case)
+  const openThinkMatch = result.match(/<think>([\s\S]*)$/);
+  if (openThinkMatch) {
+    const beforeThink = result.substring(0, openThinkMatch.index!);
+    const thinkingContent = openThinkMatch[1].trim();
+    result = beforeThink + (thinkingContent ? `*${thinkingContent}*` : '');
   }
-
-  // Reconstruct content with thinking blocks as italics
-  let result = '';
-  let lastIndex = 0;
-
-  // Find original positions of thinking blocks in the content
-  const regex = /<think>([\s\S]*?)<\/think>/g;
-  let match;
-
-  while ((match = regex.exec(content)) !== null) {
-    // Add content before this thinking block
-    result += content.substring(lastIndex, match.index);
-
-    // Add thinking block content in italics
-    const thinkingContent = match[1].trim();
-    if (thinkingContent) {
-      result += `\n\n*${thinkingContent}*\n\n`;
-    }
-
-    lastIndex = match.index + match[0].length;
-  }
-
-  // Add any remaining content after the last thinking block
-  result += content.substring(lastIndex);
 
   return result;
 }

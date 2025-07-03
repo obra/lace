@@ -45,16 +45,11 @@ export function AgentMessageDisplay({
     }
   };
 
-  // If no thinking blocks, render directly without collapsible wrapper
-  if (!parsed.hasThinking) {
+  // If no thinking blocks and not streaming, render directly without collapsible wrapper
+  if (!parsed.hasThinking && !isStreaming) {
     return (
       <Box flexDirection="column">
         <MarkdownDisplay content={message} showIcon={true} dimmed={!isFocused} />
-        {isStreaming && (
-          <Box marginTop={1}>
-            <Text color="gray"> (thinking...)</Text>
-          </Box>
-        )}
       </Box>
     );
   }
@@ -63,6 +58,18 @@ export function AgentMessageDisplay({
   const displayContent = isExpanded || isStreaming
     ? formatThinkingForDisplay(message)
     : createSummaryContent(message);
+
+  // If streaming but no thinking blocks yet, show direct content with thinking indicator
+  if (isStreaming && !parsed.hasThinking) {
+    return (
+      <Box flexDirection="column">
+        <MarkdownDisplay content={message} showIcon={true} dimmed={!isFocused} />
+        <Box marginTop={1}>
+          <Text color="gray"> (thinking...)</Text>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <TimelineEntryCollapsibleBox
