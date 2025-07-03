@@ -1,53 +1,41 @@
-// ABOUTME: Insert content to files at specific lines or at the end
-// ABOUTME: Supports both line-based insertion and end-of-file appending
+// ABOUTME: Schema-based file insertion tool with structured output
+// ABOUTME: Safe content insertion at specific lines or end-of-file with Zod validation
 
-import { writeFile } from 'fs/promises';
-import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
-import { BaseTool, ValidationError } from '../base-tool.js';
+import { z } from 'zod';
+import { writeFile, readFile, stat } from 'fs/promises';
+import { resolve } from 'path';
+import { Tool } from '../tool.js';
+import { NonEmptyString, LineNumber } from '../schemas/common.js';
+import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
 
-export class FileInsertTool extends BaseTool {
+const fileInsertSchema = z.object({
+  path: NonEmptyString.transform((path) => resolve(path)),
+  content: z.string(), // Allow empty content
+  line: LineNumber.optional(),
+});
+
+export class FileInsertTool extends Tool {
   name = 'file_insert';
   description = `Insert content into a file at a specific line or append to the end.
 Preserves all existing content. Use for adding new functions, imports, or sections.
 Line numbers are 1-based. If no line specified, appends to end of file.`;
-
-  annotations = {
+  schema = fileInsertSchema;
+  annotations: ToolAnnotations = {
     destructiveHint: true,
   };
 
-  inputSchema = {
-    type: 'object' as const,
-    properties: {
-      path: {
-        type: 'string',
-        description: 'File path to append to',
-      },
-      content: {
-        type: 'string',
-        description: 'Content to append (should include proper indentation)',
-      },
-      line: {
-        type: 'number',
-        description: 'Line number to insert after (1-based). If omitted, appends to end of file.',
-      },
-    },
-    required: ['path', 'content'],
-  };
-
-  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(
+    args: z.infer<typeof fileInsertSchema>,
+    _context?: ToolContext
+  ): Promise<ToolResult> {
     try {
-      const path = this.validateNonEmptyStringParam(call.arguments.path, 'path', call.id);
-      const content = this.validateStringParam(call.arguments.content, 'content', call.id);
-      const line = this.validateOptionalParam(
-        call.arguments.line,
-        'line',
-        (value) => this.validateNumberParam(value, 'line', call.id, { min: 1, integer: true }),
-        call.id
-      );
+      const { path, content, line } = args;
 
-      // Validate file exists and read content
-      await this.validateFileExists(path, call.id);
-      const currentContent = await this.readFileWithContext(path, call.id);
+      // Validate file exists
+      await stat(path);
+
+      // Read current content
+      const currentContent = await readFile(path, 'utf-8');
       const lines = currentContent.split('\n');
 
       let newContent: string;
@@ -61,7 +49,11 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
         operation = 'Appended to end of file';
       } else {
         // Validate line number against file content
-        this.validateLineNumber(line, currentContent, 'line', call.id);
+        if (line > lines.length) {
+          return this.createError(
+            `Line number ${line} is out of range. File has ${lines.length} lines. Use a line number between 1 and ${lines.length}, or omit line to append to end.`
+          );
+        }
 
         // Insert after the specified line
         lines.splice(line, 0, ...content.split('\n'));
@@ -74,46 +66,59 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
 
       const addedLines = content.split('\n').length;
 
-      return createSuccessResult(
-        [
-          {
-            type: 'text',
-            text: `${operation} in ${path} (+${addedLines} line${addedLines === 1 ? '' : 's'})`,
-          },
-        ],
-        call.id
+      return this.createResult(
+        `${operation} in ${path} (+${addedLines} line${addedLines === 1 ? '' : 's'})`
       );
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        return error.toolResult;
-      }
-
-      if (error instanceof Error) {
-        const nodeError = error as Error & { code?: string };
-        if (nodeError.code === 'EACCES') {
-          return this.createStructuredError(
-            `Permission denied writing to ${call.arguments.path}`,
-            'Check file permissions or choose a different location',
-            `File system error: ${error.message}`,
-            call.id
-          );
-        }
-        if (nodeError.code === 'ENOSPC') {
-          return this.createStructuredError(
-            'Insufficient disk space to modify file',
-            'Free up disk space and try again',
-            `File system error: ${error.message}`,
-            call.id
-          );
-        }
-      }
-
-      return this.createStructuredError(
-        'File insertion failed',
-        'Check the file path, permissions, and line number, then try again',
-        error instanceof Error ? error.message : 'Unknown error occurred',
-        call.id
-      );
+    } catch (error: unknown) {
+      return this.handleFileSystemError(error, args.path);
     }
+  }
+
+  private handleFileSystemError(error: unknown, filePath: string): ToolResult {
+    if (error instanceof Error) {
+      const nodeError = error as Error & { code?: string };
+
+      switch (nodeError.code) {
+        case 'ENOENT':
+          return this.createError(
+            `File not found: ${filePath}. Ensure the file exists before trying to insert content into it.`
+          );
+
+        case 'EACCES':
+          return this.createError(
+            `Permission denied writing to ${filePath}. Check file permissions or choose a different location. File system error: ${error.message}`
+          );
+
+        case 'ENOSPC':
+          return this.createError(
+            `Insufficient disk space to modify file. Free up disk space and try again. File system error: ${error.message}`
+          );
+
+        case 'EISDIR':
+          return this.createError(
+            `Path ${filePath} is a directory, not a file. Specify a file path instead of a directory path.`
+          );
+
+        case 'EMFILE':
+        case 'ENFILE':
+          return this.createError(
+            `Too many open files. Close some files and try again. File system error: ${error.message}`
+          );
+
+        default:
+          return this.createError(
+            `Failed to insert content: ${error.message}. Check the file path and permissions, then try again.`
+          );
+      }
+    }
+
+    return this.createError(
+      `Failed to insert content due to unknown error. Check the file path and permissions, then try again.`
+    );
+  }
+
+  // Public method for testing
+  validatePath(path: string): string {
+    return resolve(path);
   }
 }
