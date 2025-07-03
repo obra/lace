@@ -80,27 +80,31 @@ export function TimelineEntry({
     prevExpandedRef.current = currentExpanded;
   }, [isExpanded, onToggle]);
 
+  // Reset height when expansion state changes, then remeasure
+  useEffect(() => {
+    // Reset to 1 when expansion changes to force immediate layout update
+    setMeasuredHeight(1);
+  }, [isExpanded]);
+
   // Measure content height for marker sizing
   useEffect(() => {
-    if (isExpanded !== undefined) {
-      setMeasuredHeight(1);
-    }
-    
     const measureAfterDOMUpdate = () => {
       if (contentRef.current && typeof contentRef.current === 'object' && 'nodeName' in contentRef.current) {
         try {
           const { height } = measureElement(contentRef.current as DOMElement);
           const newHeight = Math.max(1, height);
-          setMeasuredHeight(newHeight);
+          // Only update if height actually changed to prevent unnecessary re-renders
+          setMeasuredHeight(prev => prev !== newHeight ? newHeight : prev);
         } catch (error) {
-          setMeasuredHeight(1);
+          setMeasuredHeight(prev => prev !== 1 ? 1 : prev);
         }
       }
     };
     
-    const timeoutId = setTimeout(measureAfterDOMUpdate, 1);
+    // Measure after DOM updates
+    const timeoutId = setTimeout(measureAfterDOMUpdate, 10);
     return () => clearTimeout(timeoutId);
-  }, [children, isExpanded]);
+  }, [isExpanded, children]);
 
   // Calculate layout values
   const baseHeight = measuredHeight;
