@@ -2,12 +2,7 @@
 // ABOUTME: Verifies extraction, word counting, and content transformation logic
 
 import { describe, it, expect } from 'vitest';
-import {
-  parseThinkingBlocks,
-  createSummaryContent,
-  countWords,
-  formatThinkingForDisplay,
-} from '../thinking-parser.js';
+import { parseThinkingBlocks, countWords } from '../thinking-parser.js';
 
 describe('thinking-parser utilities', () => {
   describe('countWords', () => {
@@ -86,100 +81,6 @@ describe('thinking-parser utilities', () => {
       expect(result.thinkingBlocks[0].startIndex).toBe(6); // After "Start "
       expect(result.thinkingBlocks[1].startIndex).toBe(14); // After "Start  middle "
       expect(result.contentWithoutThinking).toBe('Start  middle  end');
-    });
-  });
-
-  describe('createSummaryContent', () => {
-    it('should create summary with thinking word count markers', () => {
-      const content = '<think>Let me think about this</think>Here is my response';
-      const result = createSummaryContent(content);
-
-      expect(result).toContain('*thought for 5 words*');
-      expect(result).toContain('Here is my response');
-      expect(result).not.toContain('<think>');
-    });
-
-    it('should handle multiple thinking blocks with total word count', () => {
-      const content = '<think>First</think>Text<think>Second thought</think>More text';
-      const result = createSummaryContent(content);
-
-      expect(result).toBe('*thought for 1 word*Text*thought for 2 words*More text'); // Inline replacement
-      expect(result).toContain('Text');
-      expect(result).toContain('More text');
-    });
-
-    it('should handle single word thinking blocks', () => {
-      const content = '<think>Hmm</think>Response';
-      const result = createSummaryContent(content);
-
-      expect(result).toContain('*thought for 1 word*'); // Singular "word"
-      expect(result).toContain('Response');
-    });
-
-    it('should handle thinking-only content', () => {
-      const content = '<think>Only thinking content here</think>';
-      const result = createSummaryContent(content);
-
-      expect(result).toBe('*thought for 4 words*');
-    });
-
-    it('should return unchanged content when no thinking blocks', () => {
-      const content = 'Just regular content';
-      const result = createSummaryContent(content);
-
-      expect(result).toBe('Just regular content');
-    });
-
-    it('should handle empty thinking blocks', () => {
-      const content = '<think></think>Response';
-      const result = createSummaryContent(content);
-
-      expect(result).toContain('*thought for 0 words*');
-      expect(result).toContain('Response');
-    });
-
-    it('should handle complex mixed content', () => {
-      const content =
-        'Start <think>First thought process</think> middle text <think>Second</think> end';
-      const result = createSummaryContent(content);
-
-      expect(result).toBe('Start *thought for 3 words* middle text *thought for 1 word* end'); // Inline replacement
-    });
-  });
-
-  describe('formatThinkingForDisplay', () => {
-    it('should convert thinking blocks to italic markdown', () => {
-      const content = '<think>Some thinking</think>Response content';
-      const result = formatThinkingForDisplay(content);
-
-      expect(result).toBe('*Some thinking*Response content');
-    });
-
-    it('should handle empty content', () => {
-      const result = formatThinkingForDisplay('');
-      expect(result).toBe('');
-    });
-
-    it('should handle multiple thinking blocks', () => {
-      const content =
-        '<think>First thought</think>Middle content<think>Second thought</think>End content';
-      const result = formatThinkingForDisplay(content);
-
-      expect(result).toBe('*First thought*Middle content*Second thought*End content');
-    });
-
-    it('should handle content without thinking blocks', () => {
-      const content = 'Just regular content';
-      const result = formatThinkingForDisplay(content);
-
-      expect(result).toBe('Just regular content');
-    });
-
-    it('should handle unclosed thinking blocks (streaming case)', () => {
-      const content = 'Some response <think>partial thinking';
-      const result = formatThinkingForDisplay(content);
-
-      expect(result).toBe('Some response *partial thinking*');
     });
   });
 

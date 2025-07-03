@@ -7,6 +7,7 @@ import { marked } from 'marked';
 import TerminalRenderer from 'marked-terminal';
 import { UI_SYMBOLS } from '../../theme.js';
 
+
 interface MarkdownDisplayProps {
   content: string;
   showIcon?: boolean;
@@ -35,28 +36,20 @@ export function MarkdownDisplay({
 
     return (
       <Box flexDirection="column" marginBottom={1}>
-        <Box flexDirection="row">
-          <Box>
-            <Text color={dimmed ? 'dim' : 'green'}>{UI_SYMBOLS.AGENT} </Text>
-          </Box>
-          <Box>
-            <Text wrap="wrap" dimColor={dimmed}>
-              {cleanedContent}
-            </Text>
-          </Box>
-        </Box>
+        <Text wrap="wrap" dimColor={dimmed}>
+          {cleanedContent}
+        </Text>
       </Box>
     );
   } catch (error) {
     // Fallback to plain text if markdown parsing fails
+    const trimmedContent = content.trim();
+    
     return (
       <Box flexDirection="column" marginBottom={1}>
-        <Box flexDirection="row">
-          {showIcon && <Text color={dimmed ? 'dim' : 'green'}>{UI_SYMBOLS.AGENT}</Text>}
-          <Text color={dimmed ? 'dim' : 'white'} wrap="wrap">
-            {content.trim()}
-          </Text>
-        </Box>
+        <Text color={dimmed ? 'dim' : 'white'} wrap="wrap">
+          {trimmedContent}
+        </Text>
       </Box>
     );
   }

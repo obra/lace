@@ -18,7 +18,6 @@ describe('MessageDisplay', () => {
     const { lastFrame } = renderInkComponent(<MessageDisplay message={mockMessage} />);
 
     const frame = lastFrame();
-    expect(frame).toContain(UI_SYMBOLS.AGENT + ' '); // Assistant prefix
     expect(frame).toContain('Hello world');
   });
 
@@ -47,8 +46,7 @@ describe('MessageDisplay', () => {
 
     const frame = lastFrame();
     // With markdown rendering, the language label is handled by marked-terminal
-    // We should still see the code content and the assistant icon
-    expect(frame).toContain(UI_SYMBOLS.AGENT + ' '); // Assistant prefix
+    // We should still see the code content
     expect(frame).toContain("console.log('hello');");
   });
 
@@ -115,8 +113,7 @@ describe('MessageDisplay', () => {
 
     const frame = lastFrame();
     // With markdown rendering, language labels are handled by marked-terminal
-    // We should see the code content and assistant icon
-    expect(frame).toContain(UI_SYMBOLS.AGENT + ' '); // Assistant prefix
+    // We should see the code content
     expect(frame).toContain('ls -la');
     expect(frame).toContain("print('hello')");
   });

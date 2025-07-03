@@ -4,13 +4,9 @@
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
-import { MarkdownDisplay } from '../ui/MarkdownDisplay.js';
+import { ThinkingAwareContent } from '../ui/ThinkingAwareContent.js';
 import { TimelineEntryCollapsibleBox } from '../ui/TimelineEntryCollapsibleBox.js';
-import {
-  parseThinkingBlocks,
-  createSummaryContent,
-  formatThinkingForDisplay,
-} from './utils/thinking-parser.js';
+import { parseThinkingBlocks } from './utils/thinking-parser.js';
 import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
 
 interface AgentMessageDisplayProps {
@@ -45,38 +41,42 @@ export function AgentMessageDisplay({
     }
   };
 
-  // If no thinking blocks and not streaming, render directly without collapsible wrapper
-  if (!parsed.hasThinking && !isStreaming) {
+  // Check if content has any thinking blocks (completed or unclosed)
+  const hasAnyThinking = parsed.hasThinking || message.includes('<think>');
+  
+  // If no thinking blocks at all, render directly without collapsible wrapper
+  if (!hasAnyThinking) {
     return (
       <Box flexDirection="column">
-        <MarkdownDisplay content={message} showIcon={true} dimmed={!isFocused} />
+        <ThinkingAwareContent 
+          content={message} 
+          showThinking={true} 
+          showIcon={true} 
+          dimmed={!isFocused} 
+        />
+        {isStreaming && (
+          <Box marginTop={1}>
+            <Text color="gray"> (thinking...)</Text>
+          </Box>
+        )}
       </Box>
     );
   }
 
-  // Prepare content based on expansion state and streaming status
-  const displayContent = isExpanded || isStreaming
-    ? formatThinkingForDisplay(message)
-    : createSummaryContent(message);
-
-  // If streaming but no thinking blocks yet, show direct content with thinking indicator
-  if (isStreaming && !parsed.hasThinking) {
-    return (
-      <Box flexDirection="column">
-        <MarkdownDisplay content={message} showIcon={true} dimmed={!isFocused} />
-        <Box marginTop={1}>
-          <Text color="gray"> (thinking...)</Text>
-        </Box>
-      </Box>
-    );
-  }
+  // Determine whether to show thinking content or summary
+  const showThinking = isExpanded || (isStreaming ?? false);
 
   return (
     <TimelineEntryCollapsibleBox
       label="Agent Response"
       summary={
         isExpanded ? null : (
-          <MarkdownDisplay content={displayContent} showIcon={true} dimmed={!isFocused} />
+          <ThinkingAwareContent 
+            content={message} 
+            showThinking={false} 
+            showIcon={true} 
+            dimmed={!isFocused} 
+          />
         )
       }
       isExpanded={isExpanded}
@@ -87,7 +87,12 @@ export function AgentMessageDisplay({
       isExpandable={true}
     >
       <Box flexDirection="column">
-        <MarkdownDisplay content={displayContent} showIcon={true} dimmed={!isFocused} />
+        <ThinkingAwareContent 
+          content={message} 
+          showThinking={showThinking} 
+          showIcon={true} 
+          dimmed={!isFocused} 
+        />
         {isStreaming && (
           <Box marginTop={1}>
             <Text color="gray"> (thinking...)</Text>

@@ -43,7 +43,6 @@ describe('EventDisplay', () => {
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
-    expect(lastFrame()).toContain(UI_SYMBOLS.AGENT + ' ');
     expect(lastFrame()).toContain('Hello there!');
   });
 

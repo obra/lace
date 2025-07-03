@@ -146,6 +146,20 @@ export function parseThinkingBlocks(content: string): ParsedContent {
     }
 
     clean = content.replace(regex, '').trim();
+
+    // Also check for unclosed thinking blocks in regex fallback
+    const uncloseMatch = content.match(/<think>([\s\S]*)$/);
+    if (uncloseMatch) {
+      blocks.push({
+        content: uncloseMatch[1].trim(),
+        startIndex: uncloseMatch.index!,
+        endIndex: content.length,
+      });
+      totalThinkingWords += countWords(uncloseMatch[1].trim());
+      // Remove the unclosed thinking block from clean content
+      clean = content.substring(0, uncloseMatch.index!).trim();
+    }
+
     const result = {
       hasThinking: blocks.length > 0,
       thinkingBlocks: blocks,
@@ -157,53 +171,9 @@ export function parseThinkingBlocks(content: string): ParsedContent {
 }
 
 /**
- * Create summary content by replacing thinking blocks with inline markers (for collapsed state)
- */
-export function createSummaryContent(content: string): string {
-  const { hasThinking } = parseThinkingBlocks(content);
-
-  if (!hasThinking) {
-    return content;
-  }
-
-  // Replace thinking blocks with inline markers
-  let result = content;
-  const regex = /<think>([\s\S]*?)<\/think>/g;
-
-  result = result.replace(regex, (match, thinkingContent) => {
-    const wordCount = countWords(thinkingContent.trim());
-    return `*thought for ${wordCount} word${wordCount === 1 ? '' : 's'}*`;
-  });
-
-  return result;
-}
-
-/**
  * Count words in a text string
  */
 export function countWords(text: string): number {
   if (!text.trim()) return 0;
   return text.trim().split(/\s+/).length;
-}
-
-/**
- * Format thinking content for display in expanded state
- * Converts <think> tags to italic markdown, handles streaming cases
- */
-export function formatThinkingForDisplay(content: string): string {
-  // Handle complete thinking blocks first
-  let result = content.replace(/<think>([\s\S]*?)<\/think>/g, (match, thinkingContent) => {
-    const trimmed = thinkingContent.trim();
-    return trimmed ? `*${trimmed}*` : '';
-  });
-
-  // Handle unclosed thinking blocks (streaming case)
-  const openThinkMatch = result.match(/<think>([\s\S]*)$/);
-  if (openThinkMatch) {
-    const beforeThink = result.substring(0, openThinkMatch.index!);
-    const thinkingContent = openThinkMatch[1].trim();
-    result = beforeThink + (thinkingContent ? `*${thinkingContent}*` : '');
-  }
-
-  return result;
 }
