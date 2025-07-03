@@ -19,14 +19,8 @@ export interface ToolCall {
   arguments: Record<string, unknown>; // MCP uses "arguments"
 }
 
-export interface Tool {
-  name: string;
-  title?: string; // Optional title for UI display
-  description: string;
-  inputSchema: ToolInputSchema; // MCP alignment: camelCase
-  annotations?: ToolAnnotations;
-  executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult>;
-}
+// Note: Tool class is now defined in ./tool.ts
+// This ensures all tools use schema-based validation
 
 export interface ToolInputSchema {
   type: 'object';

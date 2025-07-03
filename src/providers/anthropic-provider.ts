@@ -9,7 +9,7 @@ import {
   ProviderConfig,
   ProviderToolCall,
 } from './base-provider.js';
-import { Tool } from '../tools/types.js';
+import { Tool } from '../tools/tool.js';
 import { logger } from '../utils/logger.js';
 import { convertToAnthropicFormat } from './format-converters.js';
 

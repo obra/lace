@@ -237,7 +237,7 @@ describe('Delegation Integration Tests', () => {
       name: 'delegate',
       arguments: delegateInput,
     };
-    const result = await delegateTool.executeTool(toolCall);
+    const result = await delegateTool.execute(toolCall.arguments);
 
     // Debug: Print the result to see what went wrong
     if (result.isError) {

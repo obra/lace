@@ -3,7 +3,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DelegateTool } from '../implementations/delegate.js';
-import { createTestToolCall } from './test-utils.js';
 import { Agent } from '../../agents/agent.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 import { ToolExecutor } from '../executor.js';
@@ -103,13 +102,11 @@ describe('DelegateTool', () => {
       return mockAgent;
     });
 
-    const result = await tool.executeTool(
-      createTestToolCall('delegate', {
-        title: 'Analyze test failures',
-        prompt: 'Review the test output and identify failing tests',
-        expected_response: 'List of failing tests',
-      })
-    );
+    const result = await tool.execute({
+      title: 'Analyze test failures',
+      prompt: 'Review the test output and identify failing tests',
+      expected_response: 'List of failing tests',
+    });
 
     expect(result.isError).toBe(false);
     expect(result.content[0]?.text).toContain('Analysis complete: 3 tests failed');
@@ -150,14 +147,12 @@ describe('DelegateTool', () => {
       return mockAgent;
     });
 
-    const result = await tool.executeTool(
-      createTestToolCall('delegate', {
-        title: 'Search logs',
-        prompt: 'Find errors in logs',
-        expected_response: 'Error list',
-        model: 'anthropic:claude-3.5-sonnet-latest',
-      })
-    );
+    const result = await tool.execute({
+      title: 'Search logs',
+      prompt: 'Find errors in logs',
+      expected_response: 'Error list',
+      model: 'anthropic:claude-3.5-sonnet-latest',
+    });
 
     expect(result.isError).toBe(false);
     expect(AnthropicProvider).toHaveBeenCalledWith(
@@ -183,13 +178,11 @@ describe('DelegateTool', () => {
       return mockAgent;
     });
 
-    const result = await tool.executeTool(
-      createTestToolCall('delegate', {
-        title: 'List files',
-        prompt: 'Show directory contents',
-        expected_response: 'File list',
-      })
-    );
+    const result = await tool.execute({
+      title: 'List files',
+      prompt: 'Show directory contents',
+      expected_response: 'File list',
+    });
 
     // Verify delegation succeeded
     expect(result.isError).toBe(false);
@@ -211,13 +204,11 @@ describe('DelegateTool', () => {
       return mockAgent;
     });
 
-    const result = await tool.executeTool(
-      createTestToolCall('delegate', {
-        title: 'Failing task',
-        prompt: 'This will fail',
-        expected_response: 'Should not get this',
-      })
-    );
+    const result = await tool.execute({
+      title: 'Failing task',
+      prompt: 'This will fail',
+      expected_response: 'Should not get this',
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Subagent error: Subagent failed');
@@ -231,13 +222,11 @@ describe('DelegateTool', () => {
     quickTimeoutTool.setDependencies(mockThreadManager, mockToolExecutor);
     (quickTimeoutTool as any).defaultTimeout = 100; // 100ms default timeout
 
-    const result = await quickTimeoutTool.executeTool(
-      createTestToolCall('delegate', {
-        title: 'Slow task',
-        prompt: 'This will timeout',
-        expected_response: 'Will not complete',
-      })
-    );
+    const result = await quickTimeoutTool.execute({
+      title: 'Slow task',
+      prompt: 'This will timeout',
+      expected_response: 'Will not complete',
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('timeout after 100ms');
@@ -258,13 +247,11 @@ describe('DelegateTool', () => {
       return mockAgent;
     });
 
-    await tool.executeTool(
-      createTestToolCall('delegate', {
-        title: 'Format test',
-        prompt: 'Test the prompt formatting',
-        expected_response: 'JSON object with {result: string}',
-      })
-    );
+    await tool.execute({
+      title: 'Format test',
+      prompt: 'Test the prompt formatting',
+      expected_response: 'JSON object with {result: string}',
+    });
 
     // Check the provider was created with correct system prompt
     expect(AnthropicProvider).toHaveBeenCalledWith(
@@ -277,14 +264,12 @@ describe('DelegateTool', () => {
   });
 
   it('should handle invalid provider format', async () => {
-    const result = await tool.executeTool(
-      createTestToolCall('delegate', {
-        title: 'Bad provider',
-        prompt: 'Test',
-        expected_response: 'Test',
-        model: 'invalid-format',
-      })
-    );
+    const result = await tool.execute({
+      title: 'Bad provider',
+      prompt: 'Test',
+      expected_response: 'Test',
+      model: 'invalid-format',
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Invalid model format');
@@ -307,13 +292,11 @@ describe('DelegateTool', () => {
       return mockAgent;
     });
 
-    const result = await tool.executeTool(
-      createTestToolCall('delegate', {
-        title: 'Multi-response task',
-        prompt: 'Generate multiple responses',
-        expected_response: 'Multiple outputs',
-      })
-    );
+    const result = await tool.execute({
+      title: 'Multi-response task',
+      prompt: 'Generate multiple responses',
+      expected_response: 'Multiple outputs',
+    });
 
     expect(result.isError).toBe(false);
     expect(result.content[0]?.text).toContain('First response');
@@ -335,13 +318,11 @@ describe('DelegateTool', () => {
       return mockAgent;
     });
 
-    const result = await tool.executeTool(
-      createTestToolCall('delegate', {
-        title: 'Test metadata',
-        prompt: 'Test thread ID in metadata',
-        expected_response: 'Success',
-      })
-    );
+    const result = await tool.execute({
+      title: 'Test metadata',
+      prompt: 'Test thread ID in metadata',
+      expected_response: 'Success',
+    });
 
     expect(result.isError).toBe(false);
     expect(result.metadata).toBeDefined();

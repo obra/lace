@@ -127,21 +127,52 @@ lace --provider openai       # Choose AI provider
 
 ## Tool Development
 
-### Adding New Tools
-1. Implement the `Tool` interface in `src/tools/implementations/`
-2. Register with `ToolRegistry` in main initialization
-3. Tools must provide:
-   - `name`, `description`, `input_schema`
-   - `executeTool()` method returning `ToolResult`
+### Schema-Based Tool Architecture
+All tools extend the `Tool` base class and use Zod schemas for validation. This provides automatic parameter validation, type safety, and JSON schema generation.
 
-### Tool Interface
+### Adding New Tools
+1. Create new class extending `Tool` in `src/tools/implementations/`
+2. Define Zod schema for parameters
+3. Implement `executeValidated()` method
+4. Export from `src/tools/implementations/index.ts`
+5. Register with `ToolExecutor` in main initialization
+
+### Tool Base Class
 ```typescript
-interface Tool {
-  name: string;
-  description: string;
-  input_schema: ToolInputSchema;  // JSON Schema format
-  executeTool(input: Record<string, unknown>): Promise<ToolResult>;
+import { z } from 'zod';
+import { Tool } from '../tool.js';
+
+class MyTool extends Tool {
+  name = 'my_tool';
+  description = 'What this tool does';
+  schema = z.object({
+    param: z.string().min(1, 'Cannot be empty'),
+    optional: z.number().optional(),
+  });
+  
+  protected async executeValidated(
+    args: z.infer<typeof this.schema>,
+    context?: ToolContext
+  ): Promise<ToolResult> {
+    // Validated args are fully typed
+    const result = doSomething(args.param);
+    
+    // Use helpers for consistent output
+    return this.createResult(result, { metadata: 'value' });
+  }
 }
+```
+
+### Common Schema Patterns
+```typescript
+import { NonEmptyString, FilePath, LineNumber } from '../schemas/common.js';
+
+const schema = z.object({
+  path: FilePath,              // Auto-resolves to absolute path
+  content: NonEmptyString,     // Rejects empty strings
+  line: LineNumber,            // Positive integers only
+  maxResults: z.number().int().min(1).max(1000).default(100),
+});
 ```
 
 Tools are model-agnostic - the Agent class handles conversion to provider-specific formats.

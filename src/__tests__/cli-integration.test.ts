@@ -163,7 +163,8 @@ describe('CLI Orchestration', () => {
         expect(tool.name).toBeDefined();
         expect(tool.description).toBeDefined();
         expect(tool.inputSchema).toBeDefined();
-        expect(typeof tool.executeTool).toBe('function');
+        // All tools now use the new schema-based interface
+        expect(typeof tool.execute).toBe('function');
       });
     });
   });

@@ -1,33 +1,27 @@
 // ABOUTME: Basic integration tests for Ollama provider conversation flows
 // ABOUTME: Tests basic functionality and tool calling with local Ollama server
 
-import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { OllamaProvider } from '../ollama-provider.js';
-import { Tool, ToolCall, ToolContext, ToolResult } from '../../tools/types.js';
-import { logger } from '../../utils/logger.js';
+import { Tool } from '../../tools/tool.js';
+import { ToolContext, ToolResult } from '../../tools/types.js';
 import { checkProviderAvailability } from '../../__tests__/utils/provider-test-helpers.js';
+import { z } from 'zod';
 
 // Mock tool for testing without side effects
-class MockTool implements Tool {
+class MockTool extends Tool {
   name = 'mock_tool';
   description = 'A mock tool for testing';
-  inputSchema = {
-    type: 'object' as const,
-    properties: {
-      action: { type: 'string', description: 'Action to perform' },
-      value: { type: 'string', description: 'Value to use' },
-    },
-    required: ['action'],
-  };
+  schema = z.object({
+    action: z.string().describe('Action to perform'),
+    value: z.string().describe('Value to use').optional(),
+  });
 
-  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-    return {
-      id: call.id,
-      isError: false,
-      content: [
-        { type: 'text' as const, text: `Mock executed: ${JSON.stringify(call.arguments)}` },
-      ],
-    };
+  protected async executeValidated(
+    args: { action: string; value?: string },
+    _context?: ToolContext
+  ): Promise<ToolResult> {
+    return this.createResult(`Mock executed: ${JSON.stringify(args)}`);
   }
 }
 

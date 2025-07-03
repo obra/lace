@@ -2,7 +2,7 @@
 // ABOUTME: Prevents broken tool calls from crashing the system when max_tokens is reached
 
 import { ProviderResponse, ProviderToolCall } from '../providers/base-provider.js';
-import { Tool } from '../tools/types.js';
+import { Tool } from '../tools/tool.js';
 import { logger } from '../utils/logger.js';
 
 export interface StopReasonHandlerConfig {

@@ -1,7 +1,8 @@
 // ABOUTME: Simplified tool execution engine with configuration API and approval integration
 // ABOUTME: Handles tool registration, approval checks, and safe execution with simple configuration
 
-import { ToolResult, ToolContext, Tool, ToolCall, createErrorResult } from './types.js';
+import { ToolResult, ToolContext, ToolCall, createErrorResult } from './types.js';
+import { Tool } from './tool.js';
 import { ApprovalCallback, ApprovalDecision } from './approval-types.js';
 import { BashTool } from './implementations/bash.js';
 import { FileReadTool } from './implementations/file-read.js';
@@ -52,7 +53,7 @@ export class ToolExecutor {
   registerAllAvailableTools(): void {
     const tools = [
       new BashTool(),
-      new FileReadTool(),
+      new FileReadTool(), // Schema-based file read tool
       new FileWriteTool(),
       new FileEditTool(),
       new FileInsertTool(),
@@ -97,7 +98,8 @@ export class ToolExecutor {
 
     // 3. Execute the tool
     try {
-      const result = await tool.executeTool(call, context);
+      const result = await tool.execute(call.arguments, context);
+
       // Ensure the result has the call ID if it wasn't set by the tool
       if (!result.id && call.id) {
         result.id = call.id;

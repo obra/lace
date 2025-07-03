@@ -1,102 +1,109 @@
-// ABOUTME: File writing tool for creating and modifying files
-// ABOUTME: Destructive operation that creates or overwrites files
+// ABOUTME: Schema-based file writing tool with structured output
+// ABOUTME: Safe file creation and modification with Zod validation and enhanced error handling
 
+import { z } from 'zod';
 import { writeFile, mkdir } from 'fs/promises';
-import { dirname } from 'path';
-import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
-import { BaseTool, ValidationError } from '../base-tool.js';
+import { dirname, resolve } from 'path';
+import { Tool } from '../tool.js';
+import { NonEmptyString } from '../schemas/common.js';
+import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
 
-export class FileWriteTool extends BaseTool {
+const fileWriteSchema = z.object({
+  path: NonEmptyString.transform((path) => resolve(path)),
+  content: z.string(), // Allow empty content
+  createDirs: z.boolean().default(true),
+});
+
+export class FileWriteTool extends Tool {
   name = 'file_write';
   description = 'Write content to a file, creating directories if needed';
-  annotations = {
+  schema = fileWriteSchema;
+  annotations: ToolAnnotations = {
     destructiveHint: true,
   };
-  inputSchema = {
-    type: 'object' as const,
-    properties: {
-      path: { type: 'string', description: 'File path to write to' },
-      content: { type: 'string', description: 'Content to write to the file' },
-      createDirs: {
-        type: 'boolean',
-        description: 'Create parent directories if they do not exist (default: true)',
-      },
-    },
-    required: ['path', 'content'],
-  };
 
-  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(
+    args: z.infer<typeof fileWriteSchema>,
+    _context?: ToolContext
+  ): Promise<ToolResult> {
     try {
-      const path = this.validateNonEmptyStringParam(call.arguments.path, 'path', call.id);
-      const content = this.validateStringParam(call.arguments.content, 'content', call.id);
-      const createDirs =
-        this.validateOptionalParam(
-          call.arguments.createDirs,
-          'createDirs',
-          (value) => {
-            if (typeof value !== 'boolean') {
-              throw new Error(`Expected boolean, received ${typeof value}`);
-            }
-            return value;
-          },
-          call.id
-        ) ?? true;
+      const { path, content, createDirs } = args;
 
+      // Create parent directories if requested
       if (createDirs) {
         const dir = dirname(path);
         await mkdir(dir, { recursive: true });
       }
 
+      // Write the file
       await writeFile(path, content, 'utf-8');
 
-      return createSuccessResult(
-        [
-          {
-            type: 'text',
-            text: `Successfully wrote ${this.formatFileSize(content.length)} to ${path}`,
-          },
-        ],
-        call.id
+      return this.createResult(
+        `Successfully wrote ${this.formatFileSize(content.length)} to ${path}`
       );
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        return error.toolResult;
-      }
-
-      if (error instanceof Error) {
-        const nodeError = error as Error & { code?: string };
-        if (nodeError.code === 'EACCES') {
-          return this.createStructuredError(
-            `Permission denied writing to ${call.arguments.path}`,
-            'Check file permissions or choose a different location',
-            `File system error: ${error.message}`,
-            call.id
-          );
-        }
-        if (nodeError.code === 'ENOENT') {
-          return this.createStructuredError(
-            `Directory does not exist for path ${call.arguments.path}`,
-            'Ensure parent directories exist or set createDirs to true',
-            `File system error: ${error.message}`,
-            call.id
-          );
-        }
-        if (nodeError.code === 'ENOSPC') {
-          return this.createStructuredError(
-            'Insufficient disk space to write file',
-            'Free up disk space and try again',
-            `File system error: ${error.message}`,
-            call.id
-          );
-        }
-      }
-
-      return this.createStructuredError(
-        'Failed to write file',
-        'Check the file path and permissions, then try again',
-        error instanceof Error ? error.message : 'Unknown error occurred',
-        call.id
-      );
+    } catch (error: unknown) {
+      return this.handleFileSystemError(error, args.path);
     }
+  }
+
+  private handleFileSystemError(error: unknown, filePath: string): ToolResult {
+    if (error instanceof Error) {
+      const nodeError = error as Error & { code?: string };
+
+      switch (nodeError.code) {
+        case 'EACCES':
+          return this.createError(
+            `Permission denied writing to ${filePath}. Check file permissions or choose a different location. File system error: ${error.message}`
+          );
+
+        case 'ENOENT':
+          return this.createError(
+            `Directory does not exist for path ${filePath}. Ensure parent directories exist or set createDirs to true. File system error: ${error.message}`
+          );
+
+        case 'ENOSPC':
+          return this.createError(
+            `Insufficient disk space to write file. Free up disk space and try again. File system error: ${error.message}`
+          );
+
+        case 'EISDIR':
+          return this.createError(
+            `Path ${filePath} is a directory, not a file. Specify a file path instead of a directory path.`
+          );
+
+        case 'EMFILE':
+        case 'ENFILE':
+          return this.createError(
+            `Too many open files. Close some files and try again. File system error: ${error.message}`
+          );
+
+        default:
+          return this.createError(
+            `Failed to write file: ${error.message}. Check the file path and permissions, then try again.`
+          );
+      }
+    }
+
+    return this.createError(
+      `Failed to write file due to unknown error. Check the file path and permissions, then try again.`
+    );
+  }
+
+  private formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 bytes';
+    if (bytes === 1) return '1 byte';
+    if (bytes < 1024) return `${bytes} bytes`;
+
+    const k = 1024;
+    const sizes = ['bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const size = parseFloat((bytes / Math.pow(k, i)).toFixed(1));
+
+    return `${size} ${sizes[i]}`;
+  }
+
+  // Public method for testing
+  validatePath(path: string): string {
+    return resolve(path);
   }
 }

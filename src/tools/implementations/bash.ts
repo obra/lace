@@ -1,16 +1,12 @@
-// ABOUTME: Bash command execution tool implementation
-// ABOUTME: Executes shell commands with proper error handling and structured output
+// ABOUTME: Schema-based bash command execution tool
+// ABOUTME: Executes shell commands with Zod validation and structured output
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import {
-  ToolCall,
-  ToolResult,
-  ToolContext,
-  createSuccessResult,
-  createErrorResult,
-} from '../types.js';
-import { BaseTool, ValidationError } from '../base-tool.js';
+import { z } from 'zod';
+import { Tool } from '../tool.js';
+import { NonEmptyString } from '../schemas/common.js';
+import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
 
 const execAsync = promisify(exec);
 
@@ -20,50 +16,29 @@ interface BashOutput {
   exitCode: number;
 }
 
-export class BashTool extends BaseTool {
+const bashSchema = z.object({
+  command: NonEmptyString,
+});
+
+export class BashTool extends Tool {
   name = 'bash';
   description =
     "Use bash to execute unix commands to achieve the user's goals. Be smart and careful.";
-  annotations = {
+  schema = bashSchema;
+  annotations: ToolAnnotations = {
     title: 'Run commands with bash',
     destructiveHint: true,
     openWorldHint: true,
   };
-  inputSchema = {
-    type: 'object' as const,
-    properties: {
-      command: { type: 'string', description: 'The bash command to execute' },
-    },
-    required: ['command'],
-  };
 
-  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-    try {
-      const command = this.validateNonEmptyStringParam(call.arguments.command, 'command', call.id);
-
-      return await this.executeCommand(command, call.id);
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        // Convert validation error to bash-style JSON output
-        const bashError: BashOutput = {
-          stdout: '',
-          stderr: 'Command must be a non-empty string',
-          exitCode: 1,
-        };
-        return createErrorResult(JSON.stringify(bashError), call.id);
-      }
-
-      // Unexpected error
-      const bashError: BashOutput = {
-        stdout: '',
-        stderr: error instanceof Error ? error.message : 'Unknown error occurred',
-        exitCode: 1,
-      };
-      return createErrorResult(JSON.stringify(bashError), call.id);
-    }
+  protected async executeValidated(
+    args: z.infer<typeof bashSchema>,
+    _context?: ToolContext
+  ): Promise<ToolResult> {
+    return await this.executeCommand(args.command);
   }
 
-  private async executeCommand(command: string, callId?: string): Promise<ToolResult> {
+  private async executeCommand(command: string): Promise<ToolResult> {
     try {
       const { stdout, stderr } = await execAsync(command, {
         cwd: process.cwd(),
@@ -77,15 +52,7 @@ export class BashTool extends BaseTool {
         exitCode: 0,
       };
 
-      return createSuccessResult(
-        [
-          {
-            type: 'text',
-            text: JSON.stringify(result),
-          },
-        ],
-        callId
-      );
+      return this.createResult(result);
     } catch (error: unknown) {
       const err = error as { message: string; stdout?: string; stderr?: string; code?: number };
 
@@ -108,7 +75,7 @@ export class BashTool extends BaseTool {
           exitCode: 127,
         };
 
-        return createErrorResult(JSON.stringify(result), callId);
+        return this.createError(result);
       }
 
       // If we have stdout or command executed in a sequence, treat as tool success
@@ -120,15 +87,7 @@ export class BashTool extends BaseTool {
           exitCode: err.code || 1, // Preserve actual exit code (non-zero)
         };
 
-        return createSuccessResult(
-          [
-            {
-              type: 'text',
-              text: JSON.stringify(result),
-            },
-          ],
-          callId
-        );
+        return this.createResult(result);
       }
 
       // True failure - command couldn't execute at all (rare cases)
@@ -138,7 +97,7 @@ export class BashTool extends BaseTool {
         exitCode: err.code || 1,
       };
 
-      return createErrorResult(JSON.stringify(result), callId);
+      return this.createError(result);
     }
   }
 }

@@ -5,7 +5,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, AgentConfig } from '../agent.js';
 import { AIProvider } from '../../providers/base-provider.js';
 import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool, ToolCall, ToolResult, ToolContext } from '../../tools/types.js';
+import { ToolCall, ToolResult, ToolContext } from '../../tools/types.js';
+import { Tool } from '../../tools/tool.js';
 import { ToolExecutor } from '../../tools/executor.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 
@@ -32,21 +33,24 @@ class MockProvider extends AIProvider {
 }
 
 // Mock tool for testing
-class MockTool implements Tool {
+import { z } from 'zod';
+
+class MockTool extends Tool {
   name = 'mock_tool';
   description = 'A mock tool for testing';
-  inputSchema = {
-    type: 'object' as const,
-    properties: {
-      action: { type: 'string', description: 'Action to perform' },
-    },
-    required: ['action'],
-  };
+  schema = z.object({
+    action: z.string(),
+  });
 
-  constructor(private result: ToolResult) {}
+  constructor(private result: ToolResult) {
+    super();
+  }
 
-  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
-    return { ...this.result, id: call.id };
+  async executeValidated(
+    _args: z.infer<typeof this.schema>,
+    _context?: ToolContext
+  ): Promise<ToolResult> {
+    return this.result;
   }
 }
 

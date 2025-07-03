@@ -2,7 +2,7 @@
 // ABOUTME: Converts generic tool call format to provider-specific native formats
 
 import { ProviderMessage, ProviderToolCall, ProviderToolResult } from './base-provider.js';
-import { Tool } from '../tools/types.js';
+import { Tool } from '../tools/tool.js';
 import Anthropic from '@anthropic-ai/sdk';
 
 /**

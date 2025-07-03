@@ -2,10 +2,12 @@
 // ABOUTME: Validates token accumulation, streaming updates, and estimation fallback
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { z } from 'zod';
 import { Agent, AgentConfig, CurrentTurnMetrics } from '../agent.js';
 import { AIProvider } from '../../providers/base-provider.js';
 import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool } from '../../tools/types.js';
+import { Tool } from '../../tools/tool.js';
+import { ToolResult } from '../../tools/types.js';
 import { ToolExecutor } from '../../tools/executor.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 
@@ -171,22 +173,22 @@ describe('Agent Token Tracking Integration', () => {
       };
 
       // Mock tool that returns a result
-      const mockTool: Tool = {
-        name: 'test_tool',
-        description: 'Test tool for token tracking',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            test: { type: 'string' },
-          },
-          required: [],
-        },
-        executeTool: vi.fn().mockResolvedValue({
-          success: true,
-          output: 'Tool executed successfully',
-          metadata: {},
-        }),
-      };
+      class MockTool extends Tool {
+        name = 'test_tool';
+        description = 'Test tool for token tracking';
+        schema = z.object({
+          test: z.string().optional(),
+        });
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return {
+            content: [{ type: 'text', text: 'Tool executed successfully' }],
+            isError: false,
+          };
+        }
+      }
+
+      const mockTool = new MockTool();
 
       // Create new agent with tool and multi-response provider
       const multiCallProvider = new MockTokenProvider(toolCallResponse);
@@ -268,16 +270,20 @@ describe('Agent Token Tracking Integration', () => {
         },
       };
 
-      const mockTool: Tool = {
-        name: 'test_tool',
-        description: 'Test tool',
-        inputSchema: { type: 'object', properties: {}, required: [] },
-        executeTool: vi.fn().mockResolvedValue({
-          success: true,
-          output: 'Tool result',
-          metadata: {},
-        }),
-      };
+      class MockTool2 extends Tool {
+        name = 'test_tool';
+        description = 'Test tool';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return {
+            content: [{ type: 'text', text: 'Tool result' }],
+            isError: false,
+          };
+        }
+      }
+
+      const mockTool = new MockTool2();
 
       const multiCallProvider = new MockTokenProvider(toolCallResponse);
       const multiCallAgent = new Agent({

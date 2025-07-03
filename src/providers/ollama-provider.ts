@@ -4,7 +4,7 @@
 import { Ollama, ChatResponse, Tool as OllamaTool } from 'ollama';
 import { AIProvider } from './base-provider.js';
 import { ProviderMessage, ProviderResponse, ProviderConfig } from './base-provider.js';
-import { Tool } from '../tools/types.js';
+import { Tool } from '../tools/tool.js';
 import { logger } from '../utils/logger.js';
 
 export interface OllamaProviderConfig extends ProviderConfig {

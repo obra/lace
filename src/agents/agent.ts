@@ -8,7 +8,8 @@ import {
   ProviderToolCall,
   ProviderToolResult,
 } from '../providers/base-provider.js';
-import { Tool, ToolCall, ToolResult } from '../tools/types.js';
+import { ToolCall, ToolResult } from '../tools/types.js';
+import { Tool } from '../tools/tool.js';
 import { ToolExecutor } from '../tools/executor.js';
 import { ApprovalDecision } from '../tools/approval-types.js';
 import { ThreadManager } from '../threads/thread-manager.js';

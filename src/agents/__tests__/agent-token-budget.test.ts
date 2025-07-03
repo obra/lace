@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { Agent, AgentConfig } from '../agent.js';
 import { AIProvider } from '../../providers/base-provider.js';
 import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool } from '../../tools/types.js';
+import { Tool } from '../../tools/tool.js';
 import { ToolExecutor } from '../../tools/executor.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 

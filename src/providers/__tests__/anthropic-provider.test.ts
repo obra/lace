@@ -1,9 +1,11 @@
-// ABOUTME: Unit tests for AnthropicProvider class  
+// ABOUTME: Unit tests for AnthropicProvider class
 // ABOUTME: Tests streaming vs non-streaming responses, configuration, and error handling
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AnthropicProvider } from '../anthropic-provider.js';
-import { Tool } from '../../tools/types.js';
+import { Tool } from '../../tools/tool.js';
+import { ToolResult, ToolContext } from '../../tools/types.js';
+import { z } from 'zod';
 
 // Mock the Anthropic SDK
 const mockCreateResponse = vi.fn();
@@ -34,24 +36,28 @@ describe('AnthropicProvider', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     provider = new AnthropicProvider({
       apiKey: 'test-key',
     });
     provider.setSystemPrompt('Test system prompt');
 
-    mockTool = {
-      name: 'test_tool',
-      description: 'A test tool',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          action: { type: 'string', description: 'Action to perform' },
-        },
-        required: ['action'],
-      },
-      executeTool: vi.fn(),
-    };
+    class TestTool extends Tool {
+      name = 'test_tool';
+      description = 'A test tool';
+      schema = z.object({
+        action: z.string().describe('Action to perform'),
+      });
+
+      protected async executeValidated(
+        args: { action: string },
+        _context?: ToolContext
+      ): Promise<ToolResult> {
+        return this.createResult(`Executed action: ${args.action}`);
+      }
+    }
+
+    mockTool = new TestTool();
   });
 
   afterEach(() => {
@@ -79,44 +85,45 @@ describe('AnthropicProvider', () => {
   describe('non-streaming responses', () => {
     beforeEach(() => {
       mockCreateResponse.mockResolvedValue({
-        content: [
-          { type: 'text', text: 'Test response' },
-        ],
+        content: [{ type: 'text', text: 'Test response' }],
         usage: { input_tokens: 10, output_tokens: 5 },
       });
     });
 
     it('should create non-streaming response correctly', async () => {
-      const messages = [
-        { role: 'user' as const, content: 'Hello' },
-      ];
+      const messages = [{ role: 'user' as const, content: 'Hello' }];
 
       const response = await provider.createResponse(messages, [mockTool]);
 
       expect(response.content).toBe('Test response');
       expect(response.toolCalls).toEqual([]);
-      expect(mockCreateResponse).toHaveBeenCalledWith({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: 'Hello' }],
-        system: 'Test system prompt',
-        tools: [{
-          name: 'test_tool',
-          description: 'A test tool',
-          input_schema: mockTool.inputSchema,
-        }],
-      }, { signal: undefined });
+      expect(mockCreateResponse).toHaveBeenCalledWith(
+        {
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 4000,
+          messages: [{ role: 'user', content: 'Hello' }],
+          system: 'Test system prompt',
+          tools: [
+            {
+              name: 'test_tool',
+              description: 'A test tool',
+              input_schema: mockTool.inputSchema,
+            },
+          ],
+        },
+        { signal: undefined }
+      );
     });
 
     it('should handle tool calls in response', async () => {
       mockCreateResponse.mockResolvedValue({
         content: [
           { type: 'text', text: 'Using tool' },
-          { 
-            type: 'tool_use', 
-            id: 'call_123', 
-            name: 'test_tool', 
-            input: { action: 'test' }
+          {
+            type: 'tool_use',
+            id: 'call_123',
+            name: 'test_tool',
+            input: { action: 'test' },
           },
         ],
         usage: { input_tokens: 10, output_tokens: 5 },
@@ -126,11 +133,13 @@ describe('AnthropicProvider', () => {
       const response = await provider.createResponse(messages, [mockTool]);
 
       expect(response.content).toBe('Using tool');
-      expect(response.toolCalls).toEqual([{
-        id: 'call_123',
-        name: 'test_tool',
-        input: { action: 'test' },
-      }]);
+      expect(response.toolCalls).toEqual([
+        {
+          id: 'call_123',
+          name: 'test_tool',
+          input: { action: 'test' },
+        },
+      ]);
     });
 
     it('should filter out system messages correctly', async () => {
@@ -164,15 +173,13 @@ describe('AnthropicProvider', () => {
 
     it('should create streaming response correctly', async () => {
       const finalMessage = {
-        content: [
-          { type: 'text', text: 'Streaming complete' },
-        ],
+        content: [{ type: 'text', text: 'Streaming complete' }],
         usage: { input_tokens: 15, output_tokens: 8 },
       };
       mockStream.finalMessage.mockResolvedValue(finalMessage);
 
       const messages = [{ role: 'user' as const, content: 'Stream this' }];
-      
+
       // Start the streaming response (don't await yet)
       const responsePromise = provider.createStreamingResponse(messages, [mockTool]);
 
@@ -186,17 +193,22 @@ describe('AnthropicProvider', () => {
 
       expect(response.content).toBe('Streaming complete');
       expect(response.toolCalls).toEqual([]);
-      expect(mockStreamResponse).toHaveBeenCalledWith({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: 'Stream this' }],
-        system: 'Test system prompt',
-        tools: [{
-          name: 'test_tool',
-          description: 'A test tool',
-          input_schema: mockTool.inputSchema,
-        }],
-      }, { signal: undefined });
+      expect(mockStreamResponse).toHaveBeenCalledWith(
+        {
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 4000,
+          messages: [{ role: 'user', content: 'Stream this' }],
+          system: 'Test system prompt',
+          tools: [
+            {
+              name: 'test_tool',
+              description: 'A test tool',
+              input_schema: mockTool.inputSchema,
+            },
+          ],
+        },
+        { signal: undefined }
+      );
     });
 
     it('should emit token events during streaming', async () => {
@@ -211,7 +223,7 @@ describe('AnthropicProvider', () => {
       });
 
       const messages = [{ role: 'user' as const, content: 'Stream tokens' }];
-      
+
       // Start streaming
       const responsePromise = provider.createStreamingResponse(messages, []);
 
@@ -256,8 +268,7 @@ describe('AnthropicProvider', () => {
 
       const messages = [{ role: 'user' as const, content: 'Error test' }];
 
-      await expect(provider.createStreamingResponse(messages, []))
-        .rejects.toThrow('Stream failed');
+      await expect(provider.createStreamingResponse(messages, [])).rejects.toThrow('Stream failed');
 
       expect(errorEvents).toHaveLength(1);
       expect(errorEvents[0].message).toBe('Stream failed');
@@ -282,11 +293,13 @@ describe('AnthropicProvider', () => {
       const response = await provider.createStreamingResponse(messages, [mockTool]);
 
       expect(response.content).toBe('Using tool via stream');
-      expect(response.toolCalls).toEqual([{
-        id: 'stream_call_456',
-        name: 'test_tool',
-        input: { action: 'stream_action' },
-      }]);
+      expect(response.toolCalls).toEqual([
+        {
+          id: 'stream_call_456',
+          name: 'test_tool',
+          input: { action: 'stream_action' },
+        },
+      ]);
     });
   });
 
@@ -349,8 +362,7 @@ describe('AnthropicProvider', () => {
 
       const messages = [{ role: 'user' as const, content: 'Error test' }];
 
-      await expect(provider.createResponse(messages, []))
-        .rejects.toThrow('API Error');
+      await expect(provider.createResponse(messages, [])).rejects.toThrow('API Error');
     });
 
     it('should handle streaming setup errors', async () => {
@@ -361,8 +373,9 @@ describe('AnthropicProvider', () => {
 
       const messages = [{ role: 'user' as const, content: 'Stream error test' }];
 
-      await expect(provider.createStreamingResponse(messages, []))
-        .rejects.toThrow('Stream setup failed');
+      await expect(provider.createStreamingResponse(messages, [])).rejects.toThrow(
+        'Stream setup failed'
+      );
     });
   });
 });
