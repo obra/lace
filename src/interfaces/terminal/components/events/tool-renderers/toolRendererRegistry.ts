@@ -1,5 +1,5 @@
-// ABOUTME: Central registry for tool renderers, eliminating dynamic import complexity
-// ABOUTME: Maps tool names to specific renderer components with type safety and clear fallback patterns
+// ABOUTME: Tool renderer factory function using direct imports and switch pattern
+// ABOUTME: Matches existing codebase patterns like ToolExecutor.registerAllAvailableTools() for consistent architecture
 
 import React from 'react';
 import { BashToolRenderer } from './BashToolRenderer.js';
@@ -13,36 +13,42 @@ import { GenericToolRenderer } from './GenericToolRenderer.js';
 export type ToolRendererComponent = React.ComponentType<any>;
 
 /**
- * Registry mapping tool names to their specific renderer components
- * 
- * Add new tool renderers here instead of relying on naming conventions
- * and dynamic imports. This eliminates the brittle string manipulation
- * and provides type safety.
- */
-export const TOOL_RENDERER_REGISTRY: Record<string, ToolRendererComponent> = {
-  'bash': BashToolRenderer,
-  'delegate': DelegateToolRenderer,
-  'file-edit': FileEditToolRenderer,
-  'file-list': FileListToolRenderer,
-  'file-read': GenericToolRenderer, // Use generic for simple tools
-  'file-search': FileSearchToolRenderer,
-  'file-write': FileWriteToolRenderer,
-  'ripgrep-search': GenericToolRenderer, // Use generic for simple tools
-  'task-manager': GenericToolRenderer, // Use generic for simple tools
-  'url-fetch': GenericToolRenderer, // Use generic for simple tools
-  'file-find': GenericToolRenderer, // Use generic for simple tools
-  'file-insert': GenericToolRenderer, // Use generic for simple tools
-} as const;
-
-/**
  * Get the appropriate renderer for a tool, with fallback to GenericToolRenderer
+ * 
+ * This follows the same pattern as ToolExecutor.registerAllAvailableTools() - 
+ * using explicit switch statements rather than registry objects for better
+ * type safety and maintainability.
  * 
  * @param toolName - The name of the tool (e.g., 'bash', 'file-read', 'delegate')
  * @returns The renderer component for the tool
  */
 export function getToolRenderer(toolName: string): ToolRendererComponent {
-  const renderer = TOOL_RENDERER_REGISTRY[toolName];
-  return renderer || GenericToolRenderer;
+  switch (toolName) {
+    case 'bash':
+      return BashToolRenderer;
+    case 'delegate':
+      return DelegateToolRenderer;
+    case 'file-edit':
+      return FileEditToolRenderer;
+    case 'file-list':
+      return FileListToolRenderer;
+    case 'file-search':
+      return FileSearchToolRenderer;
+    case 'file-write':
+      return FileWriteToolRenderer;
+    
+    // Tools using generic renderer
+    case 'file-read':
+    case 'ripgrep-search':
+    case 'task-manager':
+    case 'url-fetch':
+    case 'file-find':
+    case 'file-insert':
+      return GenericToolRenderer;
+    
+    default:
+      return GenericToolRenderer;
+  }
 }
 
 /**
@@ -52,8 +58,17 @@ export function getToolRenderer(toolName: string): ToolRendererComponent {
  * @returns true if the tool has a specialized renderer
  */
 export function hasSpecializedRenderer(toolName: string): boolean {
-  const renderer = TOOL_RENDERER_REGISTRY[toolName];
-  return renderer !== undefined && renderer !== GenericToolRenderer;
+  switch (toolName) {
+    case 'bash':
+    case 'delegate':
+    case 'file-edit':
+    case 'file-list':
+    case 'file-search':
+    case 'file-write':
+      return true;
+    default:
+      return false;
+  }
 }
 
 /**
@@ -62,7 +77,12 @@ export function hasSpecializedRenderer(toolName: string): boolean {
  * @returns Array of tool names with specialized renderers
  */
 export function getSpecializedToolNames(): string[] {
-  return Object.entries(TOOL_RENDERER_REGISTRY)
-    .filter(([_, renderer]) => renderer !== GenericToolRenderer)
-    .map(([toolName, _]) => toolName);
+  return [
+    'bash',
+    'delegate',
+    'file-edit',
+    'file-list',
+    'file-search',
+    'file-write',
+  ];
 }

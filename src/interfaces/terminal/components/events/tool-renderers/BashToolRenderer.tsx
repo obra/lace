@@ -4,7 +4,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { ToolResult } from '../../../../../tools/types.js';
-import { useToolData, ToolExecutionItem } from '../hooks/useToolData.js';
+import { useToolData, ToolExecutionItem, ToolData } from '../hooks/useToolData.js';
 import { useToolState } from '../hooks/useToolState.js';
 import { ToolDisplay } from '../components/ToolDisplay.js';
 import { UI_COLORS } from '../../../theme.js';
@@ -44,15 +44,16 @@ export function BashToolRenderer({
   const toolState = useToolState(toolData, isSelected, onToggle);
   
   // Layer 3: Display with bash-specific components
+  // Pass computed data to avoid recomputation in child components
   return (
     <ToolDisplay
       toolData={toolData}
       toolState={toolState}
       isSelected={isSelected}
       components={{
-        header: BashHeader,
-        preview: BashPreview,
-        content: BashContent,
+        header: (props) => <BashHeader {...props} bashData={bashData} />,
+        preview: (props) => <BashPreview {...props} bashData={bashData} />,
+        content: (props) => <BashContent {...props} bashData={bashData} />,
       }}
     />
   );
@@ -85,7 +86,7 @@ function useBashData(result: ToolResult | undefined): BashOutput | null {
  * Bash-specific header component
  * Shows command with terminal prompt styling
  */
-function BashHeader({ toolData }: { toolData: any }) {
+function BashHeader({ toolData, bashData }: { toolData: ToolData; bashData: BashOutput | null }) {
   const command = toolData.input.command as string || '';
   
   return (
@@ -106,8 +107,7 @@ function BashHeader({ toolData }: { toolData: any }) {
  * Bash-specific preview component
  * Shows stdout preview for success, stderr for errors
  */
-function BashPreview({ toolData }: { toolData: any }) {
-  const bashData = useBashData(toolData.result);
+function BashPreview({ toolData, bashData }: { toolData: ToolData; bashData: BashOutput | null }) {
   if (!bashData) return null;
   
   const { stdout, stderr, exitCode } = bashData;
@@ -148,8 +148,7 @@ function BashPreview({ toolData }: { toolData: any }) {
  * Bash-specific content component
  * Shows full command output with proper formatting
  */
-function BashContent({ toolData }: { toolData: any }) {
-  const bashData = useBashData(toolData.result);
+function BashContent({ toolData, bashData }: { toolData: ToolData; bashData: BashOutput | null }) {
   const command = toolData.input.command as string || '';
   
   if (!bashData) {
