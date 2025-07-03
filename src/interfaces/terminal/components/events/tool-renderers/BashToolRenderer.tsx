@@ -122,14 +122,14 @@ export function BashToolRenderer({
               <Box flexDirection="column">
                 {/* stdout */}
                 {stdout && (
-                  <Box marginBottom={1}>
+                  <Box>
                     <Text>{stdout}</Text>
                   </Box>
                 )}
 
                 {/* stderr */}
                 {stderr && (
-                  <Box flexDirection="column" marginBottom={1}>
+                  <Box flexDirection="column" marginTop={stdout ? 1 : 0 }>
                     <Text color="red">stderr:</Text>
                     <Text color="red">{stderr}</Text>
                   </Box>
