@@ -1,7 +1,7 @@
 // ABOUTME: Clean, unified timeline entry component with integrated markers and hint system
 // ABOUTME: Handles all timeline rendering with consistent expand/collapse behavior
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Box, Text, measureElement, DOMElement } from 'ink';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
 
@@ -64,9 +64,23 @@ export function TimelineEntry({
   status = 'none',
   isExpandable = false,
 }: TimelineEntryProps) {
-  const contentRef = useRef<any>(null);
+  const contentRef = useRef<DOMElement | null>(null);
   const [measuredHeight, setMeasuredHeight] = useState<number>(1);
   const prevExpandedRef = useRef<boolean | undefined>(undefined);
+  const measureTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced height measurement function
+  const measureHeight = useCallback(() => {
+    if (contentRef.current) {
+      try {
+        const { height } = measureElement(contentRef.current);
+        const newHeight = Math.max(1, height);
+        setMeasuredHeight(prev => prev !== newHeight ? newHeight : prev);
+      } catch (error) {
+        setMeasuredHeight(prev => prev !== 1 ? 1 : prev);
+      }
+    }
+  }, []);
 
   // Detect expansion state changes and trigger remeasurement
   useEffect(() => {
@@ -75,36 +89,29 @@ export function TimelineEntry({
 
     if (prevExpanded !== undefined && prevExpanded !== currentExpanded) {
       onToggle?.();
+      // Schedule measurement after expansion change
+      if (measureTimeoutRef.current) {
+        clearTimeout(measureTimeoutRef.current);
+      }
+      measureTimeoutRef.current = setTimeout(measureHeight, 50);
     }
 
     prevExpandedRef.current = currentExpanded;
-  }, [isExpanded, onToggle]);
+  }, [isExpanded, onToggle, measureHeight]);
 
-  // Reset height when expansion state changes, then remeasure
+  // Measure content height when children change (debounced)
   useEffect(() => {
-    // Reset to 1 when expansion changes to force immediate layout update
-    setMeasuredHeight(1);
-  }, [isExpanded]);
-
-  // Measure content height for marker sizing
-  useEffect(() => {
-    const measureAfterDOMUpdate = () => {
-      if (contentRef.current && typeof contentRef.current === 'object' && 'nodeName' in contentRef.current) {
-        try {
-          const { height } = measureElement(contentRef.current as DOMElement);
-          const newHeight = Math.max(1, height);
-          // Only update if height actually changed to prevent unnecessary re-renders
-          setMeasuredHeight(prev => prev !== newHeight ? newHeight : prev);
-        } catch (error) {
-          setMeasuredHeight(prev => prev !== 1 ? 1 : prev);
-        }
+    if (measureTimeoutRef.current) {
+      clearTimeout(measureTimeoutRef.current);
+    }
+    measureTimeoutRef.current = setTimeout(measureHeight, 100);
+    
+    return () => {
+      if (measureTimeoutRef.current) {
+        clearTimeout(measureTimeoutRef.current);
       }
     };
-    
-    // Measure after DOM updates
-    const timeoutId = setTimeout(measureAfterDOMUpdate, 10);
-    return () => clearTimeout(timeoutId);
-  }, [isExpanded, children]);
+  }, [children, measureHeight]);
 
   // Calculate layout values - force minimum 2 lines for expandable items
   const baseHeight = isExpandable ? Math.max(2, measuredHeight) : measuredHeight;

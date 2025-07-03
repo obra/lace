@@ -1,10 +1,11 @@
 // ABOUTME: Display component for USER_MESSAGE events with collapsible formatting
 // ABOUTME: Shows user input in expandable boxes with auto-collapse for long messages
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
 import { TimelineEntry } from '../ui/TimelineEntry.js';
+import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
 import { UI_SYMBOLS } from '../../theme.js';
 
 interface UserMessageDisplayProps {
@@ -79,10 +80,25 @@ export function UserMessageDisplay({
   const lines = trimmedMessage.split('\n');
   const shouldAutoCollapse = lines.length > 8;
   
-  const [isExpanded, setIsExpanded] = useState(!shouldAutoCollapse);
+  // Use shared expansion state management
+  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
+    isSelected || false, 
+    (expanded) => onToggle?.()
+  );
+  
+  // For short messages, auto-expand on mount
+  React.useEffect(() => {
+    if (!shouldAutoCollapse && !isExpanded) {
+      onExpand();
+    }
+  }, [shouldAutoCollapse, isExpanded, onExpand]);
   
   const handleExpandedChange = (expanded: boolean) => {
-    setIsExpanded(expanded);
+    if (expanded) {
+      onExpand();
+    } else {
+      onCollapse();
+    }
   };
   
   // For collapsed state (> 8 lines), show truncated with ellipsis

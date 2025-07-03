@@ -43,131 +43,97 @@ export function parseThinkingBlocks(content: string): ParsedContent {
   if (parseCache.has(content)) {
     return parseCache.get(content)!;
   }
+
   const thinkingBlocks: ThinkingBlock[] = [];
   let cleanContent = '';
   let totalThinkingWords = 0;
 
-  try {
-    // Use SAX parser for consistent thinking block extraction (handles streaming)
-    const parser = sax.parser(false, { lowercase: true });
-    let insideThinkTag = false;
-    let thinkContent = '';
-    let textBuffer = '';
+  // Use SAX parser for consistent thinking block extraction (handles streaming)
+  const parser = sax.parser(false, { lowercase: true });
+  let insideThinkTag = false;
+  let thinkContent = '';
+  let textBuffer = '';
 
-    parser.onopentag = (tag) => {
-      if (tag.name === 'think') {
-        // Add any accumulated text before think tag
-        cleanContent += textBuffer;
-        textBuffer = '';
-        insideThinkTag = true;
-        thinkContent = '';
-      }
-      // Ignore root tag - it's just our wrapper
-    };
-
-    parser.ontext = (text) => {
-      if (insideThinkTag) {
-        thinkContent += text;
-      } else {
-        textBuffer += text;
-      }
-    };
-
-    parser.oncdata = (text) => {
-      if (insideThinkTag) {
-        thinkContent += text;
-      } else {
-        textBuffer += text;
-      }
-    };
-
-    parser.onclosetag = (tagName) => {
-      if (tagName === 'think' && insideThinkTag) {
-        // Extract completed thinking block (even if empty)
-        thinkingBlocks.push({
-          content: thinkContent.trim(),
-          startIndex: cleanContent.length,
-          endIndex: cleanContent.length + thinkContent.length,
-        });
-        totalThinkingWords += countWords(thinkContent.trim());
-        insideThinkTag = false;
-        thinkContent = '';
-      }
-      // Ignore root tag - it's just our wrapper
-    };
-
-    parser.onerror = () => {
-      // Parser error, fall back to regex
-      throw new Error('SAX parser failed');
-    };
-
-    parser.onend = () => {
-      // Add any remaining text
+  parser.onopentag = (tag) => {
+    if (tag.name === 'think') {
+      // Add any accumulated text before think tag
       cleanContent += textBuffer;
+      textBuffer = '';
+      insideThinkTag = true;
+      thinkContent = '';
+    }
+    // Ignore root tag - it's just our wrapper
+  };
 
-      // Handle incomplete thinking block (streaming edge case)
-      if (insideThinkTag && thinkContent.trim()) {
-        // For streaming case where we have partial thinking
-        const incompleteContent = `${thinkContent.trim()} [incomplete]`;
-        thinkingBlocks.push({
-          content: incompleteContent,
-          startIndex: cleanContent.length,
-          endIndex: cleanContent.length + thinkContent.length,
-        });
-        totalThinkingWords += countWords(thinkContent.trim());
-      }
-    };
+  parser.ontext = (text) => {
+    if (insideThinkTag) {
+      thinkContent += text;
+    } else {
+      textBuffer += text;
+    }
+  };
 
+  parser.oncdata = (text) => {
+    if (insideThinkTag) {
+      thinkContent += text;
+    } else {
+      textBuffer += text;
+    }
+  };
+
+  parser.onclosetag = (tagName) => {
+    if (tagName === 'think' && insideThinkTag) {
+      // Extract completed thinking block (even if empty)
+      thinkingBlocks.push({
+        content: thinkContent.trim(),
+        startIndex: cleanContent.length,
+        endIndex: cleanContent.length + thinkContent.length,
+      });
+      totalThinkingWords += countWords(thinkContent.trim());
+      insideThinkTag = false;
+      thinkContent = '';
+    }
+    // Ignore root tag - it's just our wrapper
+  };
+
+  parser.onerror = (error) => {
+    // Log error but continue - SAX can handle malformed XML gracefully
+    logger.warn('SAX parser encountered error, continuing:', error);
+  };
+
+  parser.onend = () => {
+    // Add any remaining text
+    cleanContent += textBuffer;
+
+    // Handle incomplete thinking block (streaming edge case)
+    if (insideThinkTag && thinkContent.trim()) {
+      // For streaming case where we have partial thinking
+      const incompleteContent = `${thinkContent.trim()} [incomplete]`;
+      thinkingBlocks.push({
+        content: incompleteContent,
+        startIndex: cleanContent.length,
+        endIndex: cleanContent.length + thinkContent.length,
+      });
+      totalThinkingWords += countWords(thinkContent.trim());
+    }
+  };
+
+  try {
     // Parse the content - wrap in root element for well-formed XML
     parser.write(`<root>${content}</root>`).close();
-
-    const result = {
-      hasThinking: thinkingBlocks.length > 0,
-      thinkingBlocks,
-      contentWithoutThinking: cleanContent.trim(),
-      totalThinkingWords,
-    };
-    return cacheResult(content, result);
   } catch (error) {
-    // If SAX parser fails, fall back to regex for robustness
-    logger.warn('SAX parser failed, falling back to regex:', error);
-    const regex = /<think>([\s\S]*?)<\/think>/g;
-    const blocks: ThinkingBlock[] = [];
-    let match;
-    let clean = content;
-
-    while ((match = regex.exec(content)) !== null) {
-      blocks.push({
-        content: match[1].trim(),
-        startIndex: match.index,
-        endIndex: match.index + match[0].length,
-      });
-      totalThinkingWords += countWords(match[1].trim());
-    }
-
-    clean = content.replace(regex, '').trim();
-
-    // Also check for unclosed thinking blocks in regex fallback
-    const uncloseMatch = content.match(/<think>([\s\S]*)$/);
-    if (uncloseMatch) {
-      blocks.push({
-        content: uncloseMatch[1].trim(),
-        startIndex: uncloseMatch.index!,
-        endIndex: content.length,
-      });
-      totalThinkingWords += countWords(uncloseMatch[1].trim());
-      // Remove the unclosed thinking block from clean content
-      clean = content.substring(0, uncloseMatch.index!).trim();
-    }
-
-    const result = {
-      hasThinking: blocks.length > 0,
-      thinkingBlocks: blocks,
-      contentWithoutThinking: clean,
-      totalThinkingWords,
-    };
-    return cacheResult(content, result);
+    // Continue processing even if parser fails
+    logger.warn('SAX parser write/close failed:', error);
   }
+
+  const result = {
+    hasThinking: thinkingBlocks.length > 0,
+    thinkingBlocks,
+    contentWithoutThinking: cleanContent.trim(),
+    totalThinkingWords,
+  };
+
+  return cacheResult(content, result);
 }
 
 /**
