@@ -108,8 +108,8 @@ describe('TimelineDisplay Viewport Behavior', () => {
     const timeline = createMockTimeline(3);
     const { lastFrame } = renderWithFocus(<TimelineDisplay timeline={timeline} />);
 
-    // Should contain cursor indicator
-    expect(lastFrame()).toContain('>');
+    // Should contain user message content (cursor overlay doesn't show `>` anymore)
+    expect(lastFrame()).toContain('Message');
   });
 
   it('should handle focus management', () => {

@@ -157,7 +157,7 @@ export function parseThinkingBlocks(content: string): ParsedContent {
 }
 
 /**
- * Create summary content by replacing thinking blocks with word count markers
+ * Create summary content by hiding thinking blocks and showing italic summary (for collapsed state)
  */
 export function createSummaryContent(content: string): string {
   const { contentWithoutThinking, totalThinkingWords, hasThinking } = parseThinkingBlocks(content);
@@ -168,12 +168,11 @@ export function createSummaryContent(content: string): string {
 
   if (!contentWithoutThinking) {
     // Only thinking blocks, no other content
-    return `/thought for ${totalThinkingWords} word${totalThinkingWords === 1 ? '' : 's'}/`;
+    return `*thought for ${totalThinkingWords} word${totalThinkingWords === 1 ? '' : 's'}*`;
   }
 
-  // For content with thinking blocks, show the clean content with a single summary marker
-  // This is simpler and more readable than trying to preserve exact positioning
-  return `${contentWithoutThinking} /thought for ${totalThinkingWords} word${totalThinkingWords === 1 ? '' : 's'}/`;
+  // For content with thinking blocks, show the clean content with an italic summary marker
+  return `${contentWithoutThinking}\n\n*thought for ${totalThinkingWords} word${totalThinkingWords === 1 ? '' : 's'}*`;
 }
 
 /**
@@ -186,10 +185,38 @@ export function countWords(text: string): number {
 
 /**
  * Format thinking content for display in expanded state
- * Adds special styling or formatting as needed
+ * Converts <think> tags to italic markdown
  */
 export function formatThinkingForDisplay(content: string): string {
-  // For now, just include thinking blocks as-is in the markdown
-  // Could be enhanced with special formatting later
-  return content;
+  const { thinkingBlocks } = parseThinkingBlocks(content);
+
+  if (thinkingBlocks.length === 0) {
+    return content;
+  }
+
+  // Reconstruct content with thinking blocks as italics
+  let result = '';
+  let lastIndex = 0;
+
+  // Find original positions of thinking blocks in the content
+  const regex = /<think>([\s\S]*?)<\/think>/g;
+  let match;
+
+  while ((match = regex.exec(content)) !== null) {
+    // Add content before this thinking block
+    result += content.substring(lastIndex, match.index);
+
+    // Add thinking block content in italics
+    const thinkingContent = match[1].trim();
+    if (thinkingContent) {
+      result += `\n\n*${thinkingContent}*\n\n`;
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add any remaining content after the last thinking block
+  result += content.substring(lastIndex);
+
+  return result;
 }

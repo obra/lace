@@ -74,7 +74,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
 
       // Should show collapsed state with Agent Response label
       expect(lastFrame()).toContain('Agent Response');
-      expect(lastFrame()).toContain('/thought for 2 words/');
+      expect(lastFrame()).toContain('thought for 2 words');
       expect(lastFrame()).toContain(UI_SYMBOLS.TOOLBOX_SINGLE_EXPANDABLE);
     });
 
@@ -103,7 +103,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
 
       const frame = lastFrame();
       expect(frame).toContain('Here is the response');
-      expect(frame).toContain('/thought for 6 words/'); // "This is some thinking content here" = 6 words
+      expect(frame).toContain('thought for 6 words'); // "This is some thinking content here" = 6 words
     });
 
     it('should handle multiple thinking blocks in summary', () => {
@@ -118,7 +118,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       const frame = lastFrame();
       expect(frame).toContain('Some text');
       expect(frame).toContain('Final response');
-      expect(frame).toContain('/thought for 6 words/'); // Total: "First thought" + "Second longer thought process" = 2 + 4 = 6 words
+      expect(frame).toContain('thought for 6 words'); // Total: "First thought" + "Second longer thought process" = 2 + 4 = 6 words
     });
 
     it('should handle thinking-only messages in collapsed state', () => {
@@ -129,7 +129,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       );
 
       const frame = lastFrame();
-      expect(frame).toContain('/thought for 4 words/'); // "Only thinking content here" = 4 words
+      expect(frame).toContain('thought for 4 words'); // "Only thinking content here" = 4 words
       expect(frame).not.toContain('MD:'); // No regular content to show
     });
   });
@@ -146,7 +146,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE_EXPANDABLE);
       expect(frame).toContain('Agent Response');
       // Should show summary content with thinking marker
-      expect(frame).toContain('/thought for 2 words/');
+      expect(frame).toContain('thought for 2 words');
       expect(frame).toContain('Here is the response');
     });
   });

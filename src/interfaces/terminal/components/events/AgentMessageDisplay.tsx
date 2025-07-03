@@ -59,8 +59,8 @@ export function AgentMessageDisplay({
     );
   }
 
-  // Prepare content based on expansion state
-  const displayContent = isExpanded
+  // Prepare content based on expansion state and streaming status
+  const displayContent = isExpanded || isStreaming
     ? formatThinkingForDisplay(message)
     : createSummaryContent(message);
 

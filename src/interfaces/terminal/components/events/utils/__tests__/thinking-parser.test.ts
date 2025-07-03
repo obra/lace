@@ -94,7 +94,7 @@ describe('thinking-parser utilities', () => {
       const content = '<think>Let me think about this</think>Here is my response';
       const result = createSummaryContent(content);
 
-      expect(result).toContain('/thought for 5 words/');
+      expect(result).toContain('*thought for 5 words*');
       expect(result).toContain('Here is my response');
       expect(result).not.toContain('<think>');
     });
@@ -103,7 +103,7 @@ describe('thinking-parser utilities', () => {
       const content = '<think>First</think>Text<think>Second thought</think>More text';
       const result = createSummaryContent(content);
 
-      expect(result).toBe('TextMore text /thought for 3 words/'); // Total: "First" + "Second thought" = 1 + 2 = 3 words
+      expect(result).toBe('TextMore text\n\n*thought for 3 words*'); // Total: "First" + "Second thought" = 1 + 2 = 3 words
       expect(result).toContain('Text');
       expect(result).toContain('More text');
     });
@@ -112,7 +112,7 @@ describe('thinking-parser utilities', () => {
       const content = '<think>Hmm</think>Response';
       const result = createSummaryContent(content);
 
-      expect(result).toContain('/thought for 1 word/'); // Singular "word"
+      expect(result).toContain('*thought for 1 word*'); // Singular "word"
       expect(result).toContain('Response');
     });
 
@@ -120,7 +120,7 @@ describe('thinking-parser utilities', () => {
       const content = '<think>Only thinking content here</think>';
       const result = createSummaryContent(content);
 
-      expect(result).toBe('/thought for 4 words/');
+      expect(result).toBe('*thought for 4 words*');
     });
 
     it('should return unchanged content when no thinking blocks', () => {
@@ -134,7 +134,7 @@ describe('thinking-parser utilities', () => {
       const content = '<think></think>Response';
       const result = createSummaryContent(content);
 
-      expect(result).toContain('/thought for 0 words/');
+      expect(result).toContain('*thought for 0 words*');
       expect(result).toContain('Response');
     });
 
@@ -143,21 +143,38 @@ describe('thinking-parser utilities', () => {
         'Start <think>First thought process</think> middle text <think>Second</think> end';
       const result = createSummaryContent(content);
 
-      expect(result).toBe('Start  middle text  end /thought for 4 words/'); // Total: "First thought process" + "Second" = 3 + 1 = 4 words
+      expect(result).toBe('Start  middle text  end\n\n*thought for 4 words*'); // Total: "First thought process" + "Second" = 3 + 1 = 4 words
     });
   });
 
   describe('formatThinkingForDisplay', () => {
-    it('should return content as-is for now', () => {
+    it('should convert thinking blocks to italic markdown', () => {
       const content = '<think>Some thinking</think>Response content';
       const result = formatThinkingForDisplay(content);
 
-      expect(result).toBe(content);
+      expect(result).toBe('\n\n*Some thinking*\n\nResponse content');
     });
 
     it('should handle empty content', () => {
       const result = formatThinkingForDisplay('');
       expect(result).toBe('');
+    });
+
+    it('should handle multiple thinking blocks', () => {
+      const content =
+        '<think>First thought</think>Middle content<think>Second thought</think>End content';
+      const result = formatThinkingForDisplay(content);
+
+      expect(result).toBe(
+        '\n\n*First thought*\n\nMiddle content\n\n*Second thought*\n\nEnd content'
+      );
+    });
+
+    it('should handle content without thinking blocks', () => {
+      const content = 'Just regular content';
+      const result = formatThinkingForDisplay(content);
+
+      expect(result).toBe('Just regular content');
     });
   });
 

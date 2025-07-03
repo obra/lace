@@ -29,8 +29,8 @@ describe('EventDisplay', () => {
     };
 
     const { lastFrame } = render(<EventDisplay event={event} />);
-    expect(lastFrame()).toContain('> ');
-    expect(lastFrame()).toContain('Hello, world!');
+    expect(lastFrame()).toContain(UI_SYMBOLS.TOOLBOX_SINGLE);
+    expect(lastFrame()).toContain('"Hello, world!"');
   });
 
   it('should render AGENT_MESSAGE events', () => {
