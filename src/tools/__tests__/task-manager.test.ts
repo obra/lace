@@ -47,6 +47,8 @@ describe('Task Management Tools with schema validation', () => {
         const result = await addTool.execute({});
 
         expect(result.isError).toBe(true);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toContain('Validation failed');
         expect(result.content[0].text).toContain('tasks');
       });
@@ -55,6 +57,8 @@ describe('Task Management Tools with schema validation', () => {
         const result = await addTool.execute({ tasks: '' });
 
         expect(result.isError).toBe(true);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toContain('Validation failed');
         expect(result.content[0].text).toContain('Cannot be empty');
       });
@@ -81,6 +85,8 @@ describe('Task Management Tools with schema validation', () => {
         );
 
         expect(result.isError).toBe(true);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toContain('Invalid JSON array format');
       });
 
@@ -88,6 +94,8 @@ describe('Task Management Tools with schema validation', () => {
         const result = await addTool.execute({ tasks: '[]' }, { threadId: testThreadId });
 
         expect(result.isError).toBe(true);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toContain('Tasks array cannot be empty');
       });
     });
@@ -97,6 +105,8 @@ describe('Task Management Tools with schema validation', () => {
         const result = await addTool.execute({ tasks: 'Test task' }, { threadId: testThreadId });
 
         expect(result.isError).toBe(false);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toMatch(/Added task #\d+: Test task/);
       });
 
@@ -107,8 +117,12 @@ describe('Task Management Tools with schema validation', () => {
         expect(result1.isError).toBe(false);
         expect(result2.isError).toBe(false);
 
-        const id1 = result1.content[0].text.match(/#(\d+):/)?.[1];
-        const id2 = result2.content[0].text.match(/#(\d+):/)?.[1];
+        expect(result1.content[0]).toBeDefined();
+        expect(result1.content[0].text).toBeDefined();
+        const id1 = result1.content[0].text!.match(/#(\d+):/)?.[1];
+        expect(result2.content[0]).toBeDefined();
+        expect(result2.content[0].text).toBeDefined();
+        const id2 = result2.content[0].text!.match(/#(\d+):/)?.[1];
 
         expect(parseInt(id2!)).toBeGreaterThan(parseInt(id1!));
       });
@@ -120,6 +134,8 @@ describe('Task Management Tools with schema validation', () => {
         );
 
         expect(result.isError).toBe(false);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toContain('Whitespace task');
         expect(result.content[0].text).not.toContain('  Whitespace task  ');
       });
@@ -131,6 +147,8 @@ describe('Task Management Tools with schema validation', () => {
         );
 
         expect(result.isError).toBe(false);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         const output = result.content[0].text;
         expect(output).toContain('Added 3 tasks');
         expect(output).toContain('First task');
@@ -145,6 +163,8 @@ describe('Task Management Tools with schema validation', () => {
         );
 
         expect(result.isError).toBe(true);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toContain('Invalid JSON array format');
       });
     });
@@ -154,6 +174,8 @@ describe('Task Management Tools with schema validation', () => {
         const result = await addTool.execute({ tasks: 'Test task' }, { threadId: testThreadId });
 
         expect(result.isError).toBe(false);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toContain('Added task');
       });
 
@@ -161,6 +183,8 @@ describe('Task Management Tools with schema validation', () => {
         const result = await addTool.execute({ tasks: '' });
 
         expect(result.isError).toBe(true);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toContain('Validation failed');
       });
     });
@@ -209,6 +233,8 @@ describe('Task Management Tools with schema validation', () => {
         );
 
         expect(result.isError).toBe(true);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toContain('Validation failed');
       });
 
@@ -218,12 +244,16 @@ describe('Task Management Tools with schema validation', () => {
           { tasks: 'Completed task' },
           { threadId: testThreadId }
         );
-        const taskId = addResult.content[0].text.match(/#(\d+):/)?.[1];
+        expect(addResult.content[0]).toBeDefined();
+        expect(addResult.content[0].text).toBeDefined();
+        const taskId = addResult.content[0].text!.match(/#(\d+):/)?.[1];
         await completeTool.execute({ id: taskId! }, { threadId: testThreadId });
 
         const result = await listTool.execute({}, { threadId: testThreadId });
 
         expect(result.isError).toBe(false);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toBe('No pending tasks');
       });
     });
@@ -233,6 +263,8 @@ describe('Task Management Tools with schema validation', () => {
         const result = await listTool.execute({}, { threadId: testThreadId });
 
         expect(result.isError).toBe(false);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toBe('No pending tasks');
       });
 
@@ -242,6 +274,8 @@ describe('Task Management Tools with schema validation', () => {
         const result = await listTool.execute({}, { threadId: testThreadId });
 
         expect(result.isError).toBe(false);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         const output = result.content[0].text;
         expect(output).toContain('Pending tasks (1):');
         expect(output).toContain('○ #');
@@ -253,12 +287,16 @@ describe('Task Management Tools with schema validation', () => {
           { tasks: 'Task to complete' },
           { threadId: testThreadId }
         );
-        const taskId = addResult.content[0].text.match(/#(\d+):/)?.[1];
+        expect(addResult.content[0]).toBeDefined();
+        expect(addResult.content[0].text).toBeDefined();
+        const taskId = addResult.content[0].text!.match(/#(\d+):/)?.[1];
         await completeTool.execute({ id: taskId! }, { threadId: testThreadId });
 
         const result = await listTool.execute({}, { threadId: testThreadId });
 
         expect(result.isError).toBe(false);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toBe('No pending tasks');
       });
 
@@ -267,7 +305,9 @@ describe('Task Management Tools with schema validation', () => {
           { tasks: 'Completed task' },
           { threadId: testThreadId }
         );
-        const taskId = addResult.content[0].text.match(/#(\d+):/)?.[1];
+        expect(addResult.content[0]).toBeDefined();
+        expect(addResult.content[0].text).toBeDefined();
+        const taskId = addResult.content[0].text!.match(/#(\d+):/)?.[1];
         await completeTool.execute({ id: taskId! }, { threadId: testThreadId });
 
         const result = await listTool.execute(
@@ -276,6 +316,8 @@ describe('Task Management Tools with schema validation', () => {
         );
 
         expect(result.isError).toBe(false);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         const output = result.content[0].text;
         expect(output).toContain('Tasks (0 pending, 1 completed):');
         expect(output).toContain('✓ #');
@@ -289,7 +331,9 @@ describe('Task Management Tools with schema validation', () => {
           { tasks: 'Completed task' },
           { threadId: testThreadId }
         );
-        const taskId = addResult.content[0].text.match(/#(\d+):/)?.[1];
+        expect(addResult.content[0]).toBeDefined();
+        expect(addResult.content[0].text).toBeDefined();
+        const taskId = addResult.content[0].text!.match(/#(\d+):/)?.[1];
         await completeTool.execute({ id: taskId! }, { threadId: testThreadId });
 
         const result = await listTool.execute(
@@ -298,6 +342,8 @@ describe('Task Management Tools with schema validation', () => {
         );
 
         expect(result.isError).toBe(false);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         const output = result.content[0].text;
         expect(output).toContain('Tasks (1 pending, 1 completed):');
         expect(output).toContain('○ #');
@@ -330,6 +376,8 @@ describe('Task Management Tools with schema validation', () => {
         const result = await completeTool.execute({});
 
         expect(result.isError).toBe(true);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toContain('Validation failed');
         expect(result.content[0].text).toContain('id');
       });
@@ -338,6 +386,8 @@ describe('Task Management Tools with schema validation', () => {
         const result = await completeTool.execute({ id: '' });
 
         expect(result.isError).toBe(true);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toContain('Validation failed');
         expect(result.content[0].text).toContain('Cannot be empty');
       });
@@ -348,7 +398,9 @@ describe('Task Management Tools with schema validation', () => {
           { tasks: 'Task to complete' },
           { threadId: testThreadId }
         );
-        const taskId = addResult.content[0].text.match(/#(\d+):/)?.[1];
+        expect(addResult.content[0]).toBeDefined();
+        expect(addResult.content[0].text).toBeDefined();
+        const taskId = addResult.content[0].text!.match(/#(\d+):/)?.[1];
 
         const result = await completeTool.execute({ id: taskId! }, { threadId: testThreadId });
 
@@ -362,11 +414,15 @@ describe('Task Management Tools with schema validation', () => {
           { tasks: 'Task to complete' },
           { threadId: testThreadId }
         );
-        const taskId = addResult.content[0].text.match(/#(\d+):/)?.[1];
+        expect(addResult.content[0]).toBeDefined();
+        expect(addResult.content[0].text).toBeDefined();
+        const taskId = addResult.content[0].text!.match(/#(\d+):/)?.[1];
 
         const result = await completeTool.execute({ id: taskId! }, { threadId: testThreadId });
 
         expect(result.isError).toBe(false);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toMatch(/Completed task #\d+: Task to complete/);
       });
 
@@ -375,11 +431,15 @@ describe('Task Management Tools with schema validation', () => {
           { tasks: 'Task to complete' },
           { threadId: testThreadId }
         );
-        const taskId = addResult.content[0].text.match(/#(\d+):/)?.[1];
+        expect(addResult.content[0]).toBeDefined();
+        expect(addResult.content[0].text).toBeDefined();
+        const taskId = addResult.content[0].text!.match(/#(\d+):/)?.[1];
 
         await completeTool.execute({ id: taskId! }, { threadId: testThreadId });
         const listResult = await listTool.execute({}, { threadId: testThreadId });
 
+        expect(listResult.content[0]).toBeDefined();
+        expect(listResult.content[0].text).toBeDefined();
         expect(listResult.content[0].text).toBe('No pending tasks');
       });
 
@@ -387,6 +447,8 @@ describe('Task Management Tools with schema validation', () => {
         const result = await completeTool.execute({ id: '999' }, { threadId: testThreadId });
 
         expect(result.isError).toBe(true);
+        expect(result.content[0]).toBeDefined();
+        expect(result.content[0].text).toBeDefined();
         expect(result.content[0].text).toContain('Task #999 not found');
         expect(result.content[0].text).toContain('Check the task ID and ensure the task exists');
       });
@@ -402,14 +464,20 @@ describe('Task Management Tools with schema validation', () => {
 
       // List tasks
       let listResult = await listTool.execute({}, { threadId: testThreadId });
+      expect(listResult.content[0]).toBeDefined();
+      expect(listResult.content[0].text).toBeDefined();
       expect(listResult.content[0].text).toContain('Pending tasks (3):');
 
       // Complete one task
-      const taskId = listResult.content[0].text.match(/#(\d+):/)?.[1];
+      expect(listResult.content[0]).toBeDefined();
+      expect(listResult.content[0].text).toBeDefined();
+      const taskId = listResult.content[0].text!.match(/#(\d+):/)?.[1];
       await completeTool.execute({ id: taskId! }, { threadId: testThreadId });
 
       // Verify updated list
       listResult = await listTool.execute({}, { threadId: testThreadId });
+      expect(listResult.content[0]).toBeDefined();
+      expect(listResult.content[0].text).toBeDefined();
       expect(listResult.content[0].text).toContain('Pending tasks (2):');
 
       // Verify completed task appears in full list
@@ -417,6 +485,8 @@ describe('Task Management Tools with schema validation', () => {
         { includeCompleted: true },
         { threadId: testThreadId }
       );
+      expect(fullListResult.content[0]).toBeDefined();
+      expect(fullListResult.content[0].text).toBeDefined();
       expect(fullListResult.content[0].text).toContain('Tasks (2 pending, 1 completed):');
     });
 
@@ -427,9 +497,13 @@ describe('Task Management Tools with schema validation', () => {
       );
 
       expect(result.isError).toBe(false);
+      expect(result.content[0]).toBeDefined();
+      expect(result.content[0].text).toBeDefined();
       expect(result.content[0].text).toContain('Added 4 tasks');
 
       const listResult = await listTool.execute({}, { threadId: testThreadId });
+      expect(listResult.content[0]).toBeDefined();
+      expect(listResult.content[0].text).toBeDefined();
       expect(listResult.content[0].text).toContain('Pending tasks (4):');
       expect(listResult.content[0].text).toContain('Design API');
       expect(listResult.content[0].text).toContain('Deploy to staging');
@@ -449,9 +523,13 @@ describe('Task Management Tools with schema validation', () => {
       const list1 = await listTool.execute({}, { threadId: thread1 });
       const list2 = await listTool.execute({}, { threadId: thread2 });
 
+      expect(list1.content[0]).toBeDefined();
+      expect(list1.content[0].text).toBeDefined();
       expect(list1.content[0].text).toContain('Thread 1 task');
       expect(list1.content[0].text).not.toContain('Thread 2 task');
 
+      expect(list2.content[0]).toBeDefined();
+      expect(list2.content[0].text).toBeDefined();
       expect(list2.content[0].text).toContain('Thread 2 task');
       expect(list2.content[0].text).not.toContain('Thread 1 task');
     });
@@ -465,10 +543,12 @@ describe('Task Management Tools with schema validation', () => {
 
       // Get initial list
       let listResult = await listTool.execute({}, { threadId: testThreadId });
+      expect(listResult.content[0]).toBeDefined();
+      expect(listResult.content[0].text).toBeDefined();
       expect(listResult.content[0].text).toContain('Pending tasks (4):');
 
       // Complete first and third tasks
-      const allTasks = listResult.content[0].text.match(/#(\d+):/g);
+      const allTasks = listResult.content[0].text!.match(/#(\d+):/g);
       const firstTaskId = allTasks?.[0].match(/#(\d+):/)?.[1];
       const thirdTaskId = allTasks?.[2].match(/#(\d+):/)?.[1];
 
@@ -477,6 +557,8 @@ describe('Task Management Tools with schema validation', () => {
 
       // Check pending tasks
       listResult = await listTool.execute({}, { threadId: testThreadId });
+      expect(listResult.content[0]).toBeDefined();
+      expect(listResult.content[0].text).toBeDefined();
       expect(listResult.content[0].text).toContain('Pending tasks (2):');
 
       // Check full list
@@ -484,6 +566,8 @@ describe('Task Management Tools with schema validation', () => {
         { includeCompleted: true },
         { threadId: testThreadId }
       );
+      expect(fullListResult.content[0]).toBeDefined();
+      expect(fullListResult.content[0].text).toBeDefined();
       expect(fullListResult.content[0].text).toContain('Tasks (2 pending, 2 completed):');
     });
   });
@@ -492,7 +576,9 @@ describe('Task Management Tools with schema validation', () => {
     it('should use createResult for successful operations', async () => {
       const addResult = await addTool.execute({ tasks: 'Test task' }, { threadId: testThreadId });
       const listResult = await listTool.execute({}, { threadId: testThreadId });
-      const taskId = addResult.content[0].text.match(/#(\d+):/)?.[1];
+      expect(addResult.content[0]).toBeDefined();
+      expect(addResult.content[0].text).toBeDefined();
+      const taskId = addResult.content[0].text!.match(/#(\d+):/)?.[1];
       const completeResult = await completeTool.execute(
         { id: taskId! },
         { threadId: testThreadId }
@@ -512,8 +598,14 @@ describe('Task Management Tools with schema validation', () => {
       expect(listResult.isError).toBe(true);
       expect(completeResult.isError).toBe(true);
 
+      expect(addResult.content[0]).toBeDefined();
+      expect(addResult.content[0].text).toBeDefined();
       expect(addResult.content[0].text).toContain('Validation failed');
+      expect(listResult.content[0]).toBeDefined();
+      expect(listResult.content[0].text).toBeDefined();
       expect(listResult.content[0].text).toContain('Validation failed');
+      expect(completeResult.content[0]).toBeDefined();
+      expect(completeResult.content[0].text).toBeDefined();
       expect(completeResult.content[0].text).toContain('Validation failed');
     });
   });
@@ -524,6 +616,8 @@ describe('Task Management Tools with schema validation', () => {
       const result = await addTool.execute({ tasks: longDescription }, { threadId: testThreadId });
 
       expect(result.isError).toBe(false);
+      expect(result.content[0]).toBeDefined();
+      expect(result.content[0].text).toBeDefined();
       expect(result.content[0].text).toContain('Added task');
     });
 
@@ -532,6 +626,8 @@ describe('Task Management Tools with schema validation', () => {
       const result = await addTool.execute({ tasks: specialTask }, { threadId: testThreadId });
 
       expect(result.isError).toBe(false);
+      expect(result.content[0]).toBeDefined();
+      expect(result.content[0].text).toBeDefined();
       expect(result.content[0].text).toContain(specialTask);
     });
 
@@ -540,6 +636,8 @@ describe('Task Management Tools with schema validation', () => {
       const result = await addTool.execute({ tasks: unicodeTask }, { threadId: testThreadId });
 
       expect(result.isError).toBe(false);
+      expect(result.content[0]).toBeDefined();
+      expect(result.content[0].text).toBeDefined();
       expect(result.content[0].text).toContain(unicodeTask);
     });
 
@@ -548,7 +646,9 @@ describe('Task Management Tools with schema validation', () => {
         { tasks: 'Task to complete twice' },
         { threadId: testThreadId }
       );
-      const taskId = addResult.content[0].text.match(/#(\d+):/)?.[1];
+      expect(addResult.content[0]).toBeDefined();
+      expect(addResult.content[0].text).toBeDefined();
+      const taskId = addResult.content[0].text!.match(/#(\d+):/)?.[1];
 
       // Complete once
       const firstComplete = await completeTool.execute({ id: taskId! }, { threadId: testThreadId });

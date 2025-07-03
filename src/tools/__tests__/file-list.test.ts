@@ -377,7 +377,9 @@ describe('FileListTool with schema validation', () => {
       });
 
       expect(result.isError).toBe(false);
-      const output = result.content[0].text;
+      expect(result.content[0]).toBeDefined();
+      expect(result.content[0].text).toBeDefined();
+      const output = result.content[0].text!;
       const lines = output.split('\n');
 
       // Find directory and file lines
@@ -399,7 +401,7 @@ describe('FileListTool with schema validation', () => {
     it('should provide actionable error for file system issues', async () => {
       // This test would need a way to simulate file system errors
       // For now, just verify the tool handles errors gracefully
-      expect(typeof tool.executeValidated).toBe('function');
+      expect(tool.name).toBe('file_list');
     });
   });
 });

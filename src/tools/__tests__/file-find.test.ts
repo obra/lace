@@ -178,7 +178,9 @@ describe('FileFindTool with schema validation', () => {
       expect(result.content[0].text).toContain('README.md');
       expect(result.content[0].text).toContain('package.json');
       // Check that no standalone directory names appear (without file extensions or paths)
-      const lines = result.content[0].text.split('\n');
+      expect(result.content[0]).toBeDefined();
+      expect(result.content[0].text).toBeDefined();
+      const lines = result.content[0].text!.split('\n');
       const standaloneDirectories = lines.filter(
         (line) => line.trim() === join(testDir, 'src') || line.trim() === join(testDir, 'tests')
       );
@@ -275,7 +277,9 @@ describe('FileFindTool with schema validation', () => {
       });
 
       expect(result.isError).toBe(false);
-      const lines = result.content[0].text.split('\n').filter((line) => line.trim());
+      expect(result.content[0]).toBeDefined();
+      expect(result.content[0].text).toBeDefined();
+      const lines = result.content[0].text!.split('\n').filter((line) => line.trim());
       expect(lines.length).toBeLessThanOrEqual(3); // 2 results + possible truncation message
       if (lines.length === 3) {
         expect(lines[2]).toContain('Results limited to 2');
@@ -396,7 +400,7 @@ describe('FileFindTool with schema validation', () => {
     it('should provide actionable error for file system issues', async () => {
       // This test would need a way to simulate file system errors
       // For now, just verify the tool handles errors gracefully
-      expect(typeof tool.executeValidated).toBe('function');
+      expect(tool.name).toBe('file_find');
     });
   });
 });

@@ -291,7 +291,9 @@ describe('RipgrepSearchTool with schema validation', () => {
       });
 
       expect(result.isError).toBe(false);
-      const output = result.content[0].text;
+      expect(result.content[0]).toBeDefined();
+      expect(result.content[0].text).toBeDefined();
+      const output = result.content[0].text!;
 
       // Count actual matches in output
       const matchLines = output
@@ -443,7 +445,7 @@ describe('RipgrepSearchTool with schema validation', () => {
     it('should provide helpful error for ripgrep not found', async () => {
       // This would need to mock exec to simulate ripgrep not being installed
       // For now, just verify the tool structure exists
-      expect(typeof tool.executeValidated).toBe('function');
+      expect(tool.name).toBe('ripgrep_search');
     });
   });
 

@@ -166,8 +166,8 @@ export class UrlFetchTool extends Tool {
     if (UrlFetchTool.cleanupRegistered) return;
 
     // Double-check locking pattern for thread safety
-    if ((globalThis as Record<string, unknown>)[UrlFetchTool.cleanupLock]) return;
-    (globalThis as Record<string, unknown>)[UrlFetchTool.cleanupLock] = true;
+    if ((globalThis as any)[UrlFetchTool.cleanupLock]) return;
+    (globalThis as any)[UrlFetchTool.cleanupLock] = true;
 
     UrlFetchTool.cleanupRegistered = true;
 

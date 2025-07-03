@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { Tool } from '../tool.js';
 import { NonEmptyString } from '../schemas/common.js';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
+import { ApprovalDecision } from '../approval-types.js';
 import { Agent } from '../../agents/agent.js';
 import { ThreadManager } from '../../threads/thread-manager.js';
 import { ToolExecutor } from '../executor.js';
@@ -292,7 +293,7 @@ IMPORTANT: Once you have gathered enough information to provide the expected res
       // SAFE DEFAULT: If no approval callback, deny all tools
       childExecutor.setApprovalCallback({
         async requestApproval() {
-          return 'deny' as const;
+          return ApprovalDecision.DENY;
         },
       });
     }

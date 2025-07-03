@@ -352,7 +352,7 @@ describe('FileInsertTool with schema validation', () => {
     it('should provide actionable error for disk space issues', async () => {
       // This test would need a way to simulate disk space errors
       // For now, just verify the tool handles errors gracefully
-      expect(typeof tool.executeValidated).toBe('function');
+      expect(tool.name).toBe('file_insert');
     });
   });
 });
