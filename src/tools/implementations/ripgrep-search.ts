@@ -1,10 +1,13 @@
-// ABOUTME: Fast text search tool using ripgrep for codebase analysis
-// ABOUTME: Wraps ripgrep command with structured output and error handling
+// ABOUTME: Schema-based fast text search tool using ripgrep for codebase analysis
+// ABOUTME: Wraps ripgrep command with Zod validation and structured output
 
+import { z } from 'zod';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { ToolCall, ToolResult, ToolContext, createSuccessResult } from '../types.js';
-import { BaseTool, ValidationError } from '../base-tool.js';
+import { resolve } from 'path';
+import { Tool } from '../tool.js';
+import { NonEmptyString } from '../schemas/common.js';
+import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
 import { TOOL_LIMITS } from '../constants.js';
 
 const execAsync = promisify(exec);
@@ -15,103 +18,58 @@ interface SearchMatch {
   content: string;
 }
 
-export class RipgrepSearchTool extends BaseTool {
+const ripgrepSearchSchema = z.object({
+  pattern: NonEmptyString,
+  path: z
+    .string()
+    .min(1, 'Path cannot be empty')
+    .transform((path) => resolve(path))
+    .default('.'),
+  caseSensitive: z.boolean().default(false),
+  wholeWord: z.boolean().default(false),
+  includePattern: z.string().optional(),
+  excludePattern: z.string().optional(),
+  maxResults: z
+    .number()
+    .int('Must be an integer')
+    .min(TOOL_LIMITS.MIN_SEARCH_RESULTS, `Must be at least ${TOOL_LIMITS.MIN_SEARCH_RESULTS}`)
+    .max(TOOL_LIMITS.MAX_SEARCH_RESULTS, `Must be at most ${TOOL_LIMITS.MAX_SEARCH_RESULTS}`)
+    .default(TOOL_LIMITS.DEFAULT_SEARCH_RESULTS),
+  contextLines: z
+    .number()
+    .int('Must be an integer')
+    .min(0, 'Cannot be negative')
+    .max(10, 'Cannot exceed 10 lines of context')
+    .default(0),
+});
+
+export class RipgrepSearchTool extends Tool {
   name = 'ripgrep_search';
   description = 'Fast text search across files using ripgrep';
-  annotations = {
+  schema = ripgrepSearchSchema;
+  annotations: ToolAnnotations = {
     readOnlyHint: true,
     idempotentHint: true,
     openWorldHint: true,
   };
-  inputSchema = {
-    type: 'object' as const,
-    properties: {
-      pattern: { type: 'string', description: 'Text pattern to search for' },
-      path: {
-        type: 'string',
-        description: 'Directory or file path to search (default: current directory)',
-      },
-      caseSensitive: { type: 'boolean', description: 'Case sensitive search (default: false)' },
-      wholeWord: { type: 'boolean', description: 'Match whole words only (default: false)' },
-      includePattern: { type: 'string', description: 'File pattern to include (e.g., "*.ts")' },
-      excludePattern: {
-        type: 'string',
-        description: 'File pattern to exclude (e.g., "*.test.ts")',
-      },
-      maxResults: { type: 'number', description: 'Maximum number of results (default: 50)' },
-      contextLines: { type: 'number', description: 'Lines of context around matches (default: 0)' },
-    },
-    required: ['pattern'],
-  };
 
-  async executeTool(call: ToolCall, _context?: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(
+    args: z.infer<typeof ripgrepSearchSchema>,
+    _context?: ToolContext
+  ): Promise<ToolResult> {
     try {
-      const pattern = this.validateNonEmptyStringParam(call.arguments.pattern, 'pattern', call.id);
-      const path =
-        this.validateOptionalParam(
-          call.arguments.path,
-          'path',
-          (value) => this.validateNonEmptyStringParam(value, 'path'),
-          call.id
-        ) ?? '.';
+      const {
+        pattern,
+        path,
+        caseSensitive,
+        wholeWord,
+        includePattern,
+        excludePattern,
+        maxResults,
+        contextLines,
+      } = args;
 
-      const caseSensitive =
-        this.validateOptionalParam(
-          call.arguments.caseSensitive,
-          'caseSensitive',
-          (value) => this.validateBooleanParam(value, 'caseSensitive'),
-          call.id
-        ) ?? false;
-
-      const wholeWord =
-        this.validateOptionalParam(
-          call.arguments.wholeWord,
-          'wholeWord',
-          (value) => this.validateBooleanParam(value, 'wholeWord'),
-          call.id
-        ) ?? false;
-
-      const includePattern = this.validateOptionalParam(
-        call.arguments.includePattern,
-        'includePattern',
-        (value) => this.validateStringParam(value, 'includePattern'),
-        call.id
-      );
-
-      const excludePattern = this.validateOptionalParam(
-        call.arguments.excludePattern,
-        'excludePattern',
-        (value) => this.validateStringParam(value, 'excludePattern'),
-        call.id
-      );
-
-      const maxResults =
-        this.validateOptionalParam(
-          call.arguments.maxResults,
-          'maxResults',
-          (value) =>
-            this.validateNumberParam(value, 'maxResults', call.id, {
-              min: TOOL_LIMITS.MIN_SEARCH_RESULTS,
-              max: TOOL_LIMITS.MAX_SEARCH_RESULTS,
-              integer: true,
-            }),
-          call.id
-        ) ?? TOOL_LIMITS.DEFAULT_SEARCH_RESULTS;
-
-      const contextLines =
-        this.validateOptionalParam(
-          call.arguments.contextLines,
-          'contextLines',
-          (value) =>
-            this.validateNumberParam(value, 'contextLines', call.id, {
-              min: 0,
-              max: 10,
-              integer: true,
-            }),
-          call.id
-        ) ?? 0;
-
-      const args = this.buildRipgrepArgs({
+      const ripgrepArgs = this.buildRipgrepArgs({
         pattern,
         path,
         caseSensitive,
@@ -122,7 +80,7 @@ export class RipgrepSearchTool extends BaseTool {
         contextLines,
       });
 
-      const command = `rg ${args.join(' ')}`;
+      const command = `rg ${ripgrepArgs.join(' ')}`;
 
       try {
         const { stdout } = await execAsync(command, {
@@ -133,58 +91,32 @@ export class RipgrepSearchTool extends BaseTool {
         const matches = this.parseRipgrepOutput(stdout, maxResults);
         const resultText = this.formatResults(matches, pattern, maxResults);
 
-        return createSuccessResult(
-          [
-            {
-              type: 'text',
-              text: resultText,
-            },
-          ],
-          call.id
-        );
+        return this.createResult(resultText);
       } catch (execError: unknown) {
         // ripgrep exits with code 1 when no matches found
         const err = execError as { code?: number; message?: string };
         if (err.code === 1) {
-          return createSuccessResult(
-            [
-              {
-                type: 'text',
-                text: `No matches found for pattern: ${pattern}`,
-              },
-            ],
-            call.id
-          );
+          return this.createResult(`No matches found for pattern: ${pattern}`);
         }
 
         // Other errors (e.g., invalid regex, file not found)
         throw execError;
       }
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        return error.toolResult;
-      }
-
+    } catch (error: unknown) {
       if (error instanceof Error) {
         // Check if ripgrep is not installed
         if (
           error.message.includes('command not found') ||
           error.message.includes('not recognized')
         ) {
-          return this.createStructuredError(
-            'ripgrep (rg) command not found',
-            'Install ripgrep to use this tool: brew install ripgrep (macOS) or apt-get install ripgrep (Linux)',
-            'Search tool dependency missing',
-            call.id
+          return this.createError(
+            'ripgrep (rg) command not found. Install ripgrep to use this tool: brew install ripgrep (macOS) or apt-get install ripgrep (Linux). Search tool dependency missing.'
           );
         }
       }
 
-      return this.createStructuredError(
-        'Search operation failed',
-        'Check the search pattern and directory path, then try again',
-        error instanceof Error ? error.message : 'Unknown error occurred',
-        call.id
+      return this.createError(
+        `Search operation failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}. Check the search pattern and directory path, then try again.`
       );
     }
   }
