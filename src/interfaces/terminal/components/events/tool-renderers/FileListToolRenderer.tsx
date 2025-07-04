@@ -1,19 +1,9 @@
-// ABOUTME: Specialized renderer for file-list tool executions using three-layer architecture
+// ABOUTME: Renderer for file-list tool executions with direct component composition
 // ABOUTME: Shows directory trees with proper indentation, file sizes, and type indicators
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ToolDisplay } from './components/ToolDisplay.js';
-import { useToolData, type ToolExecutionItem } from './hooks/useToolData.js';
-import { useToolState } from './hooks/useToolState.js';
-import { limitLines } from './useToolRenderer.js';
-
-interface FileListToolRendererProps {
-  item: ToolExecutionItem;
-  isStreaming?: boolean;
-  isSelected?: boolean;
-  onToggle?: () => void;
-}
+import { ToolHeader, ToolPreview, ToolContent, useToolExpansion, limitLines, type ToolRendererProps } from './components/shared.js';
 
 // Helper function to count tree elements
 function countTreeElements(text: string): { files: number; dirs: number } {
@@ -32,68 +22,71 @@ function countTreeElements(text: string): { files: number; dirs: number } {
   return { files, dirs };
 }
 
-// Custom preview component for file lists
-function FileListPreview({ output }: { output: string }) {
-  if (output === 'No files found') {
-    return <Text color="gray">No files found</Text>;
-  }
+export function FileListToolRenderer({ item, isSelected = false, onToggle }: ToolRendererProps) {
+  const { isExpanded } = useToolExpansion(isSelected, onToggle);
   
-  const { lines, truncated, remaining } = limitLines(output, 3);
+  // Extract data directly
+  const { path, recursive } = item.call.arguments as { path: string; recursive?: boolean };
+  const output = item.result?.content?.[0]?.text || '';
+  const hasError = item.result?.isError;
+  const isRunning = !item.result;
+  
+  // Determine status
+  const status = isRunning ? 'pending' : hasError ? 'error' : 'success';
+  
+  // Calculate stats
+  const isEmpty = output === 'No files found';
+  let stats = '';
+  if (item.result && !hasError && !isEmpty && output) {
+    const counts = countTreeElements(output);
+    stats = `${counts.files} files, ${counts.dirs} directories`;
+  }
   
   return (
     <Box flexDirection="column">
-      {lines.map((line, index) => (
-        <Text key={index} color="gray">{line}</Text>
-      ))}
-      {truncated && (
-        <Text color="gray">... and {remaining} more lines</Text>
+      <ToolHeader icon="📁" status={status}>
+        <Text bold>file-list</Text>
+        <Text> {path || 'current directory'}</Text>
+        {recursive && <Text color="gray"> (recursive)</Text>}
+        {stats && (
+          <>
+            <Text color="gray"> - </Text>
+            <Text color="cyan">{stats}</Text>
+          </>
+        )}
+      </ToolHeader>
+      
+      {!isExpanded && output && item.result && !isRunning && (
+        <ToolPreview>
+          {isEmpty ? (
+            <Text color="gray">No files found</Text>
+          ) : (
+            (() => {
+              const { lines, truncated, remaining } = limitLines(output, 3);
+              return (
+                <Box flexDirection="column">
+                  {lines.map((line, index) => (
+                    <Text key={index} color="gray">{line}</Text>
+                  ))}
+                  {truncated && (
+                    <Text color="gray">... and {remaining} more lines</Text>
+                  )}
+                </Box>
+              );
+            })()
+          )}
+        </ToolPreview>
+      )}
+      
+      {isExpanded && (
+        <ToolContent>
+          {isEmpty ? (
+            <Text color="gray">No files found</Text>
+          ) : (
+            <Text>{output}</Text>
+          )}
+        </ToolContent>
       )}
     </Box>
-  );
-}
-
-// Custom content component for file lists
-function FileListContent({ output, isEmpty }: { output: string; isEmpty?: boolean }) {
-  if (isEmpty) {
-    return <Text color="gray">No files found</Text>;
-  }
-  
-  return <Text>{output}</Text>;
-}
-
-export function FileListToolRenderer({
-  item,
-  isStreaming = false,
-  isSelected = false,
-  onToggle,
-}: FileListToolRendererProps) {
-  // Layer 1: Data processing
-  const toolData = useToolData(item);
-  
-  // Layer 2: State management
-  const toolState = useToolState(isSelected, onToggle);
-  
-  // Add file-specific stats to toolData
-  if (toolData.result && toolData.success && !toolData.stats) {
-    const isEmpty = toolData.output === 'No files found';
-    if (!isEmpty) {
-      const stats = countTreeElements(toolData.output);
-      toolData.stats = `${stats.files} files, ${stats.dirs} directories`;
-    }
-    toolData.isEmpty = isEmpty;
-  }
-  
-  // Layer 3: Display with custom components
-  return (
-    <ToolDisplay
-      toolData={toolData}
-      toolState={toolState}
-      isSelected={isSelected}
-      onToggle={onToggle}
-      components={{
-        preview: <FileListPreview output={toolData.output} />,
-        content: <FileListContent output={toolData.output} isEmpty={toolData.isEmpty} />
-      }}
-    />
   );
 }
