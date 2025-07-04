@@ -297,69 +297,9 @@ export class ThreadManager extends EventEmitter {
     return threadId;
   }
 
+  // Legacy method - use createCompactedVersion() instead
   async createShadowThread(reason: string, provider?: AIProvider): Promise<string> {
-    if (!this._currentThread) {
-      throw new Error('No current thread to create shadow for');
-    }
-
-    const currentThreadId = this._currentThread.id;
-    const canonicalId = this.getCanonicalId(currentThreadId);
-    
-    // Generate new shadow thread ID
-    const shadowThreadId = this.generateThreadId();
-    
-    try {
-      // Compact the events using provider-aware strategy if available
-      const strategy = provider ? new SummarizeStrategy(undefined, provider) : this._compactionStrategy;
-      const compactedEvents = strategy.compact(this._currentThread.events);
-      
-      // Update thread IDs in compacted events
-      const updatedEvents = compactedEvents.map(event => ({
-        ...event,
-        threadId: shadowThreadId,
-      }));
-      
-      // Create shadow thread with compacted events
-      const shadowThread: Thread = {
-        id: shadowThreadId,
-        createdAt: this._currentThread.createdAt,
-        updatedAt: new Date(),
-        events: updatedEvents,
-      };
-
-      // Execute all shadow thread operations atomically
-      this._persistence.createShadowThreadTransaction(
-        shadowThread,
-        updatedEvents,
-        canonicalId,
-        reason
-      );
-      
-      // Only switch to shadow thread after successful database operations
-      this._currentThread = shadowThread;
-      
-      logger.info('Shadow thread created with compaction', {
-        originalThreadId: currentThreadId,
-        shadowThreadId,
-        canonicalId,
-        originalEventCount: compactedEvents.length,
-        compactedEventCount: updatedEvents.length,
-        reason,
-      });
-      
-      return shadowThreadId;
-    } catch (error) {
-      logger.error('Failed to create shadow thread', {
-        originalThreadId: currentThreadId,
-        shadowThreadId,
-        canonicalId,
-        error: error instanceof Error ? error.message : String(error),
-        reason,
-      });
-      
-      // Don't change current thread on failure
-      throw new Error(`Shadow thread creation failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    return this.createCompactedVersion(reason, provider);
   }
 
   needsCompaction(provider?: AIProvider): boolean {
@@ -398,21 +338,9 @@ export class ThreadManager extends EventEmitter {
   }
 
   getCanonicalId(threadId: string): string {
-    // First check if this threadId is a canonical ID with a current version
-    const currentVersion = this._persistence.getCurrentVersion(threadId);
-    if (currentVersion) {
-      // This thread is already a canonical ID
-      return threadId;
-    }
-    
-    // Check if this thread is itself a version of something else
+    // Simple version mapping lookup
     const canonicalId = this._persistence.findCanonicalIdForVersion(threadId);
-    if (canonicalId) {
-      return canonicalId;
-    }
-    
-    // If no version mapping exists, this thread IS the canonical ID
-    return threadId;
+    return canonicalId || threadId; // If no mapping, this IS the canonical ID
   }
 
   cleanupOldShadows(canonicalId?: string, keepLast: number = 3): void {
@@ -424,6 +352,69 @@ export class ThreadManager extends EventEmitter {
       const currentCanonicalId = this.getCanonicalId(this._currentThread.id);
       this._persistence.cleanupOldShadows(currentCanonicalId, keepLast);
     }
+  }
+
+  // Simplified compaction approach - creates a new thread with compacted events
+  async createCompactedVersion(reason: string, provider?: AIProvider): Promise<string> {
+    if (!this._currentThread) {
+      throw new Error('No current thread to compact');
+    }
+
+    const originalThreadId = this._currentThread.id;
+    const canonicalId = this.getCanonicalId(originalThreadId);
+    
+    try {
+      // Get compacted events using provider-aware strategy if available
+      const strategy = provider ? new SummarizeStrategy(undefined, provider) : this._compactionStrategy;
+      const compactedEvents = strategy.compact(this._currentThread.events);
+      
+      // Create new thread (using existing method)
+      const newThreadId = this.generateThreadId();
+      this.createThread(newThreadId);
+      
+      // Add compacted events (using existing method)
+      for (const event of compactedEvents) {
+        this.addEvent(newThreadId, event.type, event.data);
+      }
+      
+      // Update version mapping
+      this._persistence.createVersion(canonicalId, newThreadId, reason);
+      
+      // Switch to new thread (using existing method)
+      await this.setCurrentThread(newThreadId);
+      
+      logger.info('Compacted thread created successfully', {
+        originalThreadId,
+        newThreadId,
+        canonicalId,
+        originalEventCount: this._currentThread.events.length,
+        compactedEventCount: compactedEvents.length,
+        reason,
+      });
+      
+      return newThreadId;
+    } catch (error) {
+      logger.error('Failed to create compacted thread', {
+        originalThreadId,
+        canonicalId,
+        error: error instanceof Error ? error.message : String(error),
+        reason,
+      });
+      
+      throw new Error(`Compacted thread creation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  // Simplified compaction check and execution
+  async compactIfNeededSimplified(provider?: AIProvider): Promise<boolean> {
+    const needsCompaction = provider 
+      ? await this.needsCompactionAsync(provider)
+      : this.needsCompaction();
+      
+    if (!needsCompaction) return false;
+    
+    await this.createCompactedVersion('Automatic compaction due to size', provider);
+    return true;
   }
 
   // Cleanup

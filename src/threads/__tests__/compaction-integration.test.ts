@@ -118,9 +118,10 @@ describe('Compaction Integration', () => {
       });
     }
 
-    // Trigger compaction manually since we want to test the compaction itself
-    const compacted = await threadManager.compactIfNeeded();
-    expect(compacted).toBe(true);
+    // Trigger compaction manually using simplified approach
+    expect(threadManager.needsCompaction()).toBe(true);
+    const newThreadId = await threadManager.createCompactedVersion('Test compaction');
+    expect(newThreadId).toBeDefined();
 
     // Check if compaction occurred - Agent threadId should remain stable (canonical ID)
     const finalThreadId = agent.getThreadId();
@@ -174,8 +175,10 @@ describe('Compaction Integration', () => {
       });
     }
     
-    // Trigger compaction
-    await threadManager.compactIfNeeded();
+    // Trigger compaction using simplified approach
+    if (threadManager.needsCompaction()) {
+      await threadManager.createCompactedVersion('Test compaction for conversation');
+    }
 
     // Verify compaction occurred - Agent threadId should remain stable
     const compactedThreadId = agent.getThreadId();

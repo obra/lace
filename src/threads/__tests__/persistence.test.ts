@@ -642,7 +642,7 @@ describe('Enhanced ThreadManager', () => {
 
     it('should throw error when no current thread', async () => {
       await expect(threadManager.createShadowThread('Test')).rejects.toThrow(
-        'No current thread to create shadow for'
+        'No current thread to compact'
       );
     });
 

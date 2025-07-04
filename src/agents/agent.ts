@@ -282,20 +282,16 @@ export class Agent extends EventEmitter {
     this._abortController = new AbortController();
 
     try {
-      // Check if compaction is needed before building conversation
+      // Check if compaction is needed before building conversation (simplified approach)
       if (this._threadManager.needsCompaction(this._provider)) {
         logger.info('Thread compaction triggered', { threadId: this._threadId });
-        const wasCompacted = await this._threadManager.compactIfNeeded(this._provider);
-        if (wasCompacted) {
-          // ThreadManager handles the internal thread switching
-          // Agent's threadId remains stable (canonical ID)
-          const currentThreadId = this._threadManager.getCurrentThreadId();
-          logger.info('Thread compacted successfully', { 
-            canonicalThreadId: this._threadId, // Stable external ID
-            currentShadowId: currentThreadId,   // Internal shadow thread ID
-            canonicalId: this._threadManager.getCanonicalId(this._threadId),
-          });
-        }
+        const newThreadId = await this._threadManager.createCompactedVersion('Auto-compaction', this._provider);
+        // ThreadManager already switched to the new compacted thread
+        logger.info('Thread compacted successfully', { 
+          canonicalThreadId: this._threadId, // Stable external ID
+          newCompactedThreadId: newThreadId, // New compacted thread ID
+          canonicalId: this._threadManager.getCanonicalId(this._threadId),
+        });
       }
 
       // Rebuild conversation from thread events
