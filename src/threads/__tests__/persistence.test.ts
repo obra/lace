@@ -69,6 +69,25 @@ describe('ThreadPersistence', () => {
 
       db.close();
     });
+
+    it('should create version management tables', () => {
+      const db = new Database(tempDbPath);
+
+      const tables = db
+        .prepare(
+          `
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name IN ('thread_versions', 'version_history')
+      `
+        )
+        .all() as Array<{ name: string }>;
+
+      expect(tables).toHaveLength(2);
+      expect(tables.map((t) => t.name)).toContain('thread_versions');
+      expect(tables.map((t) => t.name)).toContain('version_history');
+
+      db.close();
+    });
   });
 
   describe('thread operations', () => {
@@ -307,6 +326,130 @@ describe('ThreadPersistence', () => {
 
       // Should throw when trying to load events with invalid JSON
       expect(() => persistence.loadEvents('test_thread')).toThrow();
+    });
+  });
+
+  describe('version management', () => {
+    it('should return null for non-versioned threads', async () => {
+      const currentVersion = await persistence.getCurrentVersion('non_existent');
+      expect(currentVersion).toBeNull();
+    });
+
+    it('should create and retrieve thread versions', async () => {
+      const canonicalId = 'thread_canonical_123';
+      const versionId = 'thread_version_456';
+      const reason = 'Created shadow for compaction';
+
+      // Create the version thread first to satisfy foreign key constraint
+      const versionThread: Thread = {
+        id: versionId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        events: [],
+      };
+      await persistence.saveThread(versionThread);
+
+      await persistence.createVersion(canonicalId, versionId, reason);
+      const currentVersion = await persistence.getCurrentVersion(canonicalId);
+
+      expect(currentVersion).toBe(versionId);
+    });
+
+    it('should update existing version', async () => {
+      const canonicalId = 'thread_canonical_123';
+      const firstVersionId = 'thread_version_456';
+      const secondVersionId = 'thread_version_789';
+
+      // Create both version threads
+      const firstThread: Thread = {
+        id: firstVersionId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        events: [],
+      };
+      const secondThread: Thread = {
+        id: secondVersionId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        events: [],
+      };
+      await persistence.saveThread(firstThread);
+      await persistence.saveThread(secondThread);
+
+      await persistence.createVersion(canonicalId, firstVersionId, 'First version');
+      await persistence.createVersion(canonicalId, secondVersionId, 'Second version');
+
+      const currentVersion = await persistence.getCurrentVersion(canonicalId);
+      expect(currentVersion).toBe(secondVersionId);
+    });
+
+    it('should track version history', async () => {
+      const canonicalId = 'thread_canonical_123';
+      const firstVersionId = 'thread_version_456';
+      const secondVersionId = 'thread_version_789';
+
+      // Create both version threads
+      const firstThread: Thread = {
+        id: firstVersionId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        events: [],
+      };
+      const secondThread: Thread = {
+        id: secondVersionId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        events: [],
+      };
+      await persistence.saveThread(firstThread);
+      await persistence.saveThread(secondThread);
+
+      await persistence.createVersion(canonicalId, firstVersionId, 'First version');
+      // Small delay to ensure different timestamps
+      await new Promise(resolve => setTimeout(resolve, 10));
+      await persistence.createVersion(canonicalId, secondVersionId, 'Second version');
+
+      const history = await persistence.getVersionHistory(canonicalId);
+      expect(history).toHaveLength(2);
+      expect(history[0].versionId).toBe(secondVersionId); // Most recent first
+      expect(history[0].reason).toBe('Second version');
+      expect(history[1].versionId).toBe(firstVersionId);
+      expect(history[1].reason).toBe('First version');
+    });
+
+    it('should load current version when accessing canonical ID', async () => {
+      // Create a thread
+      const originalThread: Thread = {
+        id: 'thread_version_456',
+        createdAt: new Date('2025-01-01T10:00:00Z'),
+        updatedAt: new Date('2025-01-01T10:30:00Z'),
+        events: [],
+      };
+      await persistence.saveThread(originalThread);
+
+      // Create version mapping
+      const canonicalId = 'thread_canonical_123';
+      await persistence.createVersion(canonicalId, 'thread_version_456', 'Shadow creation');
+
+      // Load using canonical ID should return the version
+      const loaded = await persistence.loadThread(canonicalId);
+      expect(loaded).not.toBeNull();
+      expect(loaded!.id).toBe('thread_version_456');
+      expect(loaded!.createdAt).toEqual(originalThread.createdAt);
+    });
+
+    it('should load normally for non-versioned threads', async () => {
+      const thread: Thread = {
+        id: 'normal_thread_123',
+        createdAt: new Date('2025-01-01T10:00:00Z'),
+        updatedAt: new Date('2025-01-01T10:30:00Z'),
+        events: [],
+      };
+      await persistence.saveThread(thread);
+
+      const loaded = await persistence.loadThread('normal_thread_123');
+      expect(loaded).not.toBeNull();
+      expect(loaded!.id).toBe('normal_thread_123');
     });
   });
 });

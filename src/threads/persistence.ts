@@ -2,7 +2,7 @@
 // ABOUTME: Handles database schema, CRUD operations, and data serialization
 
 import Database from 'better-sqlite3';
-import { Thread, ThreadEvent, EventType } from './types.js';
+import { Thread, ThreadEvent, EventType, VersionHistoryEntry } from './types.js';
 
 export class ThreadPersistence {
   private db: Database.Database | null = null;
@@ -41,6 +41,22 @@ export class ThreadPersistence {
         FOREIGN KEY (thread_id) REFERENCES threads(id)
       );
 
+      CREATE TABLE IF NOT EXISTS thread_versions (
+        canonical_id TEXT PRIMARY KEY,
+        current_version_id TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (current_version_id) REFERENCES threads(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS version_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        canonical_id TEXT NOT NULL,
+        version_id TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        reason TEXT,
+        FOREIGN KEY (canonical_id) REFERENCES thread_versions(canonical_id)
+      );
+
       CREATE INDEX IF NOT EXISTS idx_events_thread_timestamp 
       ON events(thread_id, timestamp);
       
@@ -63,16 +79,20 @@ export class ThreadPersistence {
   loadThread(threadId: string): Thread | null {
     if (this._disabled || !this.db) return null;
 
+    // Check if this is a canonical ID with a current version
+    const currentVersionId = this.getCurrentVersion(threadId);
+    const actualThreadId = currentVersionId || threadId;
+
     const threadStmt = this.db.prepare(`
       SELECT * FROM threads WHERE id = ?
     `);
 
-    const threadRow = threadStmt.get(threadId) as
+    const threadRow = threadStmt.get(actualThreadId) as
       | { id: string; created_at: string; updated_at: string }
       | undefined;
     if (!threadRow) return null;
 
-    const events = this.loadEvents(threadId);
+    const events = this.loadEvents(actualThreadId);
 
     return {
       id: threadRow.id,
@@ -164,6 +184,65 @@ export class ThreadPersistence {
     const pattern = `${parentThreadId}.%`;
     const rows = stmt.all(pattern) as Array<{ thread_id: string }>;
     return rows.map((row) => row.thread_id);
+  }
+
+  getCurrentVersion(canonicalId: string): string | null {
+    if (this._disabled || !this.db) return null;
+
+    const stmt = this.db.prepare(`
+      SELECT current_version_id FROM thread_versions WHERE canonical_id = ?
+    `);
+
+    const row = stmt.get(canonicalId) as { current_version_id: string } | undefined;
+    return row ? row.current_version_id : null;
+  }
+
+  createVersion(canonicalId: string, newVersionId: string, reason: string): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const transaction = this.db.transaction(() => {
+      // Insert or update the current version
+      const upsertStmt = this.db!.prepare(`
+        INSERT OR REPLACE INTO thread_versions (canonical_id, current_version_id, created_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+      `);
+      upsertStmt.run(canonicalId, newVersionId);
+
+      // Add to version history
+      const historyStmt = this.db!.prepare(`
+        INSERT INTO version_history (canonical_id, version_id, created_at, reason)
+        VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+      `);
+      historyStmt.run(canonicalId, newVersionId, reason);
+    });
+
+    transaction();
+  }
+
+  getVersionHistory(canonicalId: string): VersionHistoryEntry[] {
+    if (this._disabled || !this.db) return [];
+
+    const stmt = this.db.prepare(`
+      SELECT * FROM version_history 
+      WHERE canonical_id = ? 
+      ORDER BY id DESC
+    `);
+
+    const rows = stmt.all(canonicalId) as Array<{
+      id: number;
+      canonical_id: string;
+      version_id: string;
+      created_at: string;
+      reason: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      canonicalId: row.canonical_id,
+      versionId: row.version_id,
+      createdAt: new Date(row.created_at),
+      reason: row.reason,
+    }));
   }
 
   close(): void {

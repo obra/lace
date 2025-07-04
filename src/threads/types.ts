@@ -26,3 +26,11 @@ export interface Thread {
   updatedAt: Date;
   events: ThreadEvent[];
 }
+
+export interface VersionHistoryEntry {
+  id: number;
+  canonicalId: string;
+  versionId: string;
+  createdAt: Date;
+  reason: string;
+}
