@@ -40,13 +40,13 @@ export class ThreadPersistence {
 
   private runMigrations(): void {
     if (!this.db) return;
-    
+
     const currentVersion = this.getSchemaVersion();
-    
+
     if (currentVersion < 1) {
       this.migrateToV1();
     }
-    
+
     if (currentVersion < 2) {
       this.migrateToV2();
     }
@@ -54,9 +54,11 @@ export class ThreadPersistence {
 
   private getSchemaVersion(): number {
     if (!this.db) return 0;
-    
+
     try {
-      const result = this.db.prepare('SELECT MAX(version) as version FROM schema_version').get() as { version: number | null };
+      const result = this.db
+        .prepare('SELECT MAX(version) as version FROM schema_version')
+        .get() as { version: number | null };
       return result.version || 0;
     } catch {
       return 0;
@@ -65,14 +67,16 @@ export class ThreadPersistence {
 
   private setSchemaVersion(version: number): void {
     if (!this.db) return;
-    this.db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)').run(version, new Date().toISOString());
+    this.db
+      .prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)')
+      .run(version, new Date().toISOString());
   }
 
   private migrateToV1(): void {
     if (!this.db) return;
-    
+
     console.log('Migrating database to version 1 (basic schema)...');
-    
+
     // Create basic threads and events tables
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS threads (
@@ -103,9 +107,9 @@ export class ThreadPersistence {
 
   private migrateToV2(): void {
     if (!this.db) return;
-    
+
     console.log('Migrating database to version 2 (thread versioning)...');
-    
+
     // Create thread versioning tables
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS thread_versions (
@@ -328,7 +332,7 @@ export class ThreadPersistence {
     return row ? row.canonical_id : null;
   }
 
-  // Execute multiple operations in a single transaction for atomic shadow thread creation
+  // Execute multiple operations in a single transaction for atomic compacted thread creation
   createShadowThreadTransaction(
     shadowThread: Thread,
     events: ThreadEvent[],
@@ -338,7 +342,7 @@ export class ThreadPersistence {
     if (this._closed || this._disabled || !this.db) return;
 
     const transaction = this.db.transaction(() => {
-      // 1. Save the shadow thread
+      // 1. Save the compacted thread
       const threadStmt = this.db!.prepare(`
         INSERT OR REPLACE INTO threads (id, created_at, updated_at)
         VALUES (?, ?, ?)
@@ -384,7 +388,7 @@ export class ThreadPersistence {
     transaction();
   }
 
-  // Clean up old shadow threads to prevent unbounded growth
+  // Clean up old compacted threads to prevent unbounded growth
   cleanupOldShadows(canonicalId: string, keepLast: number = 3): void {
     if (this._closed || this._disabled || !this.db) return;
 
@@ -395,28 +399,28 @@ export class ThreadPersistence {
         WHERE canonical_id = ? 
         ORDER BY id DESC
       `);
-      
+
       const versions = versionsStmt.all(canonicalId) as Array<{ version_id: string }>;
-      
+
       if (versions.length <= keepLast) {
         return; // Nothing to clean up
       }
 
       // Keep the most recent N versions, delete the rest
-      const versionsToDelete = versions.slice(keepLast).map(v => v.version_id);
-      
+      const versionsToDelete = versions.slice(keepLast).map((v) => v.version_id);
+
       if (versionsToDelete.length === 0) return;
 
-      // Delete events for old shadow threads
+      // Delete events for old compacted threads
       const deleteEventsStmt = this.db!.prepare(`
         DELETE FROM events WHERE thread_id = ?
       `);
-      
-      // Delete old shadow threads
+
+      // Delete old compacted threads
       const deleteThreadStmt = this.db!.prepare(`
         DELETE FROM threads WHERE id = ?
       `);
-      
+
       // Delete old version history entries (but keep the current version mapping)
       const deleteHistoryStmt = this.db!.prepare(`
         DELETE FROM version_history WHERE version_id = ?
@@ -428,7 +432,9 @@ export class ThreadPersistence {
         deleteHistoryStmt.run(versionId);
       }
 
-      console.log(`Cleaned up ${versionsToDelete.length} old shadow threads for canonical ID ${canonicalId}`);
+      console.log(
+        `Cleaned up ${versionsToDelete.length} old compacted threads for canonical ID ${canonicalId}`
+      );
     });
 
     transaction();

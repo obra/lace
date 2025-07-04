@@ -406,7 +406,7 @@ describe('ThreadPersistence', () => {
 
       await persistence.createVersion(canonicalId, firstVersionId, 'First version');
       // Small delay to ensure different timestamps
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       await persistence.createVersion(canonicalId, secondVersionId, 'Second version');
 
       const history = await persistence.getVersionHistory(canonicalId);
@@ -607,37 +607,37 @@ describe('Enhanced ThreadManager', () => {
     });
   });
 
-  describe('shadow thread creation', () => {
-    it('should create shadow thread and update version mapping', async () => {
+  describe('thread compaction', () => {
+    it('should create compacted thread and update version mapping', async () => {
       const originalThreadId = 'lace_20250101_abc123';
       threadManager.createThread(originalThreadId);
       threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'Original message');
 
-      const shadowThreadId = await threadManager.createShadowThread('Compaction needed');
+      const compactedThreadId = await threadManager.createShadowThread('Compaction needed');
 
-      expect(shadowThreadId).not.toBe(originalThreadId);
-      expect(shadowThreadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
-      expect(threadManager.getCurrentThreadId()).toBe(shadowThreadId);
+      expect(compactedThreadId).not.toBe(originalThreadId);
+      expect(compactedThreadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
+      expect(threadManager.getCurrentThreadId()).toBe(compactedThreadId);
 
-      // Verify shadow thread has the events (may be compacted)
-      const shadowEvents = threadManager.getEvents(shadowThreadId);
-      expect(shadowEvents.length).toBeGreaterThan(0);
+      // Verify compacted thread has the events (may be compacted)
+      const compactedEvents = threadManager.getEvents(compactedThreadId);
+      expect(compactedEvents.length).toBeGreaterThan(0);
       // With default compaction strategy, 1 event should be preserved
-      expect(shadowEvents).toHaveLength(1);
-      expect(shadowEvents[0].data).toBe('Original message');
+      expect(compactedEvents).toHaveLength(1);
+      expect(compactedEvents[0].data).toBe('Original message');
     });
 
     it('should maintain canonical ID mapping', async () => {
       const originalThreadId = 'lace_20250101_abc123';
       threadManager.createThread(originalThreadId);
 
-      const shadowThreadId = await threadManager.createShadowThread('First shadow');
-      const secondShadowThreadId = await threadManager.createShadowThread('Second shadow');
+      const compactedThreadId = await threadManager.createShadowThread('First compaction');
+      const secondCompactedThreadId = await threadManager.createShadowThread('Second compaction');
 
       // All should resolve to the same canonical ID
       expect(threadManager.getCanonicalId(originalThreadId)).toBe(originalThreadId);
-      expect(threadManager.getCanonicalId(shadowThreadId)).toBe(originalThreadId);
-      expect(threadManager.getCanonicalId(secondShadowThreadId)).toBe(originalThreadId);
+      expect(threadManager.getCanonicalId(compactedThreadId)).toBe(originalThreadId);
+      expect(threadManager.getCanonicalId(secondCompactedThreadId)).toBe(originalThreadId);
     });
 
     it('should throw error when no current thread', async () => {
@@ -646,30 +646,30 @@ describe('Enhanced ThreadManager', () => {
       );
     });
 
-    it('should compact events when creating shadow thread', async () => {
+    it('should compact events when creating compacted thread', async () => {
       const originalThreadId = 'lace_20250101_abc123';
       threadManager.createThread(originalThreadId);
-      
+
       // Add enough events to trigger compaction
       for (let i = 0; i < 15; i++) {
         threadManager.addEvent(originalThreadId, 'USER_MESSAGE', `Message ${i}`);
       }
 
-      const shadowThreadId = await threadManager.createShadowThread('Test compaction');
-      const shadowEvents = threadManager.getEvents(shadowThreadId);
+      const compactedThreadId = await threadManager.createShadowThread('Test compaction');
+      const compactedEvents = threadManager.getEvents(compactedThreadId);
 
       // Should have all user messages preserved since we now preserve all user/agent messages
       // With 15 USER_MESSAGE events, all should be preserved (no summary needed)
-      expect(shadowEvents.length).toBe(15); // All user messages preserved
-      
+      expect(compactedEvents.length).toBe(15); // All user messages preserved
+
       // All events should be user messages (no summary created since all events are preserved)
-      expect(shadowEvents.every(e => e.type === 'USER_MESSAGE')).toBe(true);
+      expect(compactedEvents.every((e) => e.type === 'USER_MESSAGE')).toBe(true);
     });
 
     it('should detect when compaction is needed', () => {
       const originalThreadId = 'lace_20250101_abc123';
       threadManager.createThread(originalThreadId);
-      
+
       // Small thread shouldn't need compaction
       threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'Short message');
       expect(threadManager.needsCompaction()).toBe(false);
@@ -685,7 +685,7 @@ describe('Enhanced ThreadManager', () => {
     it('should compact automatically when needed', async () => {
       const originalThreadId = 'lace_20250101_abc123';
       threadManager.createThread(originalThreadId);
-      
+
       // Add content that doesn't need compaction
       threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'Short message');
       const compacted1 = await threadManager.compactIfNeeded();

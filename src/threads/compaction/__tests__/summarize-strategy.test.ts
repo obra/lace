@@ -13,7 +13,12 @@ describe('SummarizeStrategy', () => {
     events,
   });
 
-  const createEvent = (id: string, type: string, data: string, timestamp = new Date()): ThreadEvent => ({
+  const createEvent = (
+    id: string,
+    type: string,
+    data: string,
+    timestamp = new Date()
+  ): ThreadEvent => ({
     id,
     threadId: 'test_thread',
     type: type as any,
@@ -35,7 +40,10 @@ describe('SummarizeStrategy', () => {
 
     it('should return true for threads over token limit', () => {
       const strategy = new SummarizeStrategy({ maxTokens: 50 });
-      const longMessage = 'This is a very long message that should exceed the token limit when repeated multiple times. '.repeat(10);
+      const longMessage =
+        'This is a very long message that should exceed the token limit when repeated multiple times. '.repeat(
+          10
+        );
       const events = [
         createEvent('1', 'USER_MESSAGE', longMessage),
         createEvent('2', 'AGENT_MESSAGE', longMessage),
@@ -74,15 +82,17 @@ describe('SummarizeStrategy', () => {
       // Recent events: 4, 5, 6 (last 3)
       // Result: [summary] + [1, 2] + [4, 5, 6] = 6 events
       expect(compacted).toHaveLength(6);
-      
+
       // First event should be summary
       expect(compacted[0].type).toBe('LOCAL_SYSTEM_MESSAGE');
       expect(compacted[0].data).toContain('**Compaction Summary**');
-      
+
       // All user and agent messages should be preserved
-      const userAgentEvents = compacted.filter(e => e.type === 'USER_MESSAGE' || e.type === 'AGENT_MESSAGE');
+      const userAgentEvents = compacted.filter(
+        (e) => e.type === 'USER_MESSAGE' || e.type === 'AGENT_MESSAGE'
+      );
       expect(userAgentEvents).toHaveLength(4);
-      expect(userAgentEvents.map(e => e.id)).toEqual(['1', '2', '5', '6']);
+      expect(userAgentEvents.map((e) => e.id)).toEqual(['1', '2', '5', '6']);
     });
 
     it('should return original events if count is below preserve threshold', () => {
@@ -130,7 +140,7 @@ describe('SummarizeStrategy', () => {
   describe('configuration', () => {
     it('should preserve all user messages regardless of count', () => {
       const strategy = new SummarizeStrategy({ preserveRecentEvents: 3 });
-      const events = Array.from({ length: 15 }, (_, i) => 
+      const events = Array.from({ length: 15 }, (_, i) =>
         createEvent(`${i}`, 'USER_MESSAGE', 'Test message')
       );
 
@@ -139,7 +149,7 @@ describe('SummarizeStrategy', () => {
       // All 15 user messages should be preserved (no summarization needed)
       // Since all events are important (USER_MESSAGE), no summary is created
       expect(compacted).toHaveLength(15);
-      expect(compacted.every(e => e.type === 'USER_MESSAGE')).toBe(true);
+      expect(compacted.every((e) => e.type === 'USER_MESSAGE')).toBe(true);
     });
 
     it('should create summary only for non-conversational events', () => {

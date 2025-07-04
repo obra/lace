@@ -26,7 +26,7 @@ export class SummarizeStrategy implements CompactionStrategy {
     const estimatedTokens = this.fallbackTokenEstimation(thread.events);
     return estimatedTokens > this.config.maxTokens!;
   }
-  
+
   async shouldCompactAsync(thread: Thread): Promise<boolean> {
     const estimatedTokens = await this.estimateThreadTokens(thread.events);
     return estimatedTokens > this.config.maxTokens!;
@@ -35,7 +35,7 @@ export class SummarizeStrategy implements CompactionStrategy {
   compact(events: ThreadEvent[]): ThreadEvent[] {
     const totalEvents = events.length;
     const preserveCount = this.config.preserveRecentEvents!;
-    
+
     // If we don't have enough events to warrant compaction, return as-is
     if (totalEvents <= preserveCount) {
       return [...events];
@@ -87,11 +87,21 @@ export class SummarizeStrategy implements CompactionStrategy {
     // Preserve messages with task-related keywords (for other event types)
     if (typeof event.data === 'string') {
       const taskKeywords = [
-        'TODO', 'TASK', 'FIXME', 'BUG', 'ERROR', 'IMPORTANT', 'CRITICAL',
-        'ACTION ITEM', 'DECISION', 'REQUIREMENT', 'SPEC', 'ISSUE'
+        'TODO',
+        'TASK',
+        'FIXME',
+        'BUG',
+        'ERROR',
+        'IMPORTANT',
+        'CRITICAL',
+        'ACTION ITEM',
+        'DECISION',
+        'REQUIREMENT',
+        'SPEC',
+        'ISSUE',
       ];
       const content = event.data.toUpperCase();
-      return taskKeywords.some(keyword => content.includes(keyword));
+      return taskKeywords.some((keyword) => content.includes(keyword));
     }
 
     // Preserve tool call data structures with errors
@@ -109,10 +119,10 @@ export class SummarizeStrategy implements CompactionStrategy {
     const firstEvent = events[0];
     const lastEvent = events[events.length - 1];
     const originalTokens = this.fallbackTokenEstimation(events);
-    
+
     // Create detailed summary with metrics
     const summaryContent = this.createDetailedSummary(events, originalTokens);
-    
+
     const summaryEvent: ThreadEvent = {
       id: `summary_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       threadId: firstEvent.threadId,
@@ -124,7 +134,7 @@ export class SummarizeStrategy implements CompactionStrategy {
     // Log compaction metrics
     const summaryTokens = this.fallbackTokenEstimation([summaryEvent]);
     const compressionRatio = (originalTokens / summaryTokens).toFixed(2);
-    
+
     logger.info('Thread compaction summary created', {
       originalEvents: events.length,
       originalTokens,
@@ -137,24 +147,27 @@ export class SummarizeStrategy implements CompactionStrategy {
   }
 
   private createDetailedSummary(events: ThreadEvent[], originalTokens: number): string {
-    const toolCalls = events.filter(e => e.type === 'TOOL_CALL');
-    const toolResults = events.filter(e => e.type === 'TOOL_RESULT');
-    const otherEvents = events.filter(e => e.type !== 'TOOL_CALL' && e.type !== 'TOOL_RESULT');
+    const toolCalls = events.filter((e) => e.type === 'TOOL_CALL');
+    const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
+    const otherEvents = events.filter((e) => e.type !== 'TOOL_CALL' && e.type !== 'TOOL_RESULT');
 
     let summary = `🗜️ **Compaction Summary** (${events.length} events, ~${originalTokens} tokens compressed)\n\n`;
 
     // Add time range
     if (events.length > 0) {
-      const timeRange = this.formatTimeRange(events[0].timestamp, events[events.length - 1].timestamp);
+      const timeRange = this.formatTimeRange(
+        events[0].timestamp,
+        events[events.length - 1].timestamp
+      );
       summary += `⏱️ **Period**: ${timeRange}\n`;
     }
 
     if (toolCalls.length > 0) {
       summary += `🔧 **Tool Operations**: ${toolCalls.length} calls with ${toolResults.length} results compressed\n`;
-      
+
       // List unique tools used
       const toolNames = new Set(
-        toolCalls.map(e => {
+        toolCalls.map((e) => {
           if (typeof e.data === 'object' && e.data && 'name' in e.data) {
             return (e.data as { name: string }).name;
           }
@@ -167,7 +180,7 @@ export class SummarizeStrategy implements CompactionStrategy {
     }
 
     if (otherEvents.length > 0) {
-      const eventTypes = new Set(otherEvents.map(e => e.type));
+      const eventTypes = new Set(otherEvents.map((e) => e.type));
       summary += `📊 **Other Events**: ${otherEvents.length} events (${Array.from(eventTypes).join(', ')})\n`;
     }
 
@@ -183,7 +196,7 @@ export class SummarizeStrategy implements CompactionStrategy {
         // Build conversation from events to get accurate provider token count
         const conversation = this.buildConversationFromEvents(events);
         const providerCount = await this.provider.countTokens(conversation, []);
-        
+
         if (providerCount !== null) {
           return providerCount;
         }
@@ -194,7 +207,7 @@ export class SummarizeStrategy implements CompactionStrategy {
         });
       }
     }
-    
+
     return this.fallbackTokenEstimation(events);
   }
 
@@ -213,7 +226,7 @@ export class SummarizeStrategy implements CompactionStrategy {
   private formatTimeRange(start: Date, end: Date): string {
     const diffMs = end.getTime() - start.getTime();
     const diffMins = Math.round(diffMs / 60000);
-    
+
     if (diffMins < 1) {
       return 'less than a minute';
     } else if (diffMins < 60) {
@@ -235,7 +248,7 @@ export class SummarizeStrategy implements CompactionStrategy {
   // Build conversation from events (simplified version of Agent's method)
   private buildConversationFromEvents(events: ThreadEvent[]): ProviderMessage[] {
     const messages: ProviderMessage[] = [];
-    
+
     for (const event of events) {
       if (event.type === 'USER_MESSAGE') {
         messages.push({
@@ -250,8 +263,7 @@ export class SummarizeStrategy implements CompactionStrategy {
       }
       // Skip other event types for token estimation purposes
     }
-    
+
     return messages;
   }
-
 }

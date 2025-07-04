@@ -304,35 +304,35 @@ export class ThreadManager extends EventEmitter {
 
   needsCompaction(provider?: AIProvider): boolean {
     if (!this._currentThread) return false;
-    
+
     if (provider) {
       // Use provider-aware strategy for accurate token counting
       const providerStrategy = new SummarizeStrategy(undefined, provider);
       return providerStrategy.shouldCompact(this._currentThread);
     }
-    
+
     return this._compactionStrategy.shouldCompact(this._currentThread);
   }
-  
+
   async needsCompactionAsync(provider?: AIProvider): Promise<boolean> {
     if (!this._currentThread) return false;
-    
+
     if (provider) {
       // Use provider-aware strategy for accurate async token counting
       const providerStrategy = new SummarizeStrategy(undefined, provider);
       return await providerStrategy.shouldCompactAsync(this._currentThread);
     }
-    
+
     return this._compactionStrategy.shouldCompact(this._currentThread);
   }
 
   async compactIfNeeded(provider?: AIProvider): Promise<boolean> {
-    const needsCompaction = provider 
+    const needsCompaction = provider
       ? await this.needsCompactionAsync(provider)
       : this.needsCompaction();
-      
+
     if (!needsCompaction) return false;
-    
+
     await this.createShadowThread('Automatic compaction due to size', provider);
     return true;
   }
@@ -362,27 +362,29 @@ export class ThreadManager extends EventEmitter {
 
     const originalThreadId = this._currentThread.id;
     const canonicalId = this.getCanonicalId(originalThreadId);
-    
+
     try {
       // Get compacted events using provider-aware strategy if available
-      const strategy = provider ? new SummarizeStrategy(undefined, provider) : this._compactionStrategy;
+      const strategy = provider
+        ? new SummarizeStrategy(undefined, provider)
+        : this._compactionStrategy;
       const compactedEvents = strategy.compact(this._currentThread.events);
-      
+
       // Create new thread (using existing method)
       const newThreadId = this.generateThreadId();
       this.createThread(newThreadId);
-      
+
       // Add compacted events (using existing method)
       for (const event of compactedEvents) {
         this.addEvent(newThreadId, event.type, event.data);
       }
-      
+
       // Update version mapping
       this._persistence.createVersion(canonicalId, newThreadId, reason);
-      
+
       // Switch to new thread (using existing method)
       await this.setCurrentThread(newThreadId);
-      
+
       logger.info('Compacted thread created successfully', {
         originalThreadId,
         newThreadId,
@@ -391,7 +393,7 @@ export class ThreadManager extends EventEmitter {
         compactedEventCount: compactedEvents.length,
         reason,
       });
-      
+
       return newThreadId;
     } catch (error) {
       logger.error('Failed to create compacted thread', {
@@ -400,19 +402,21 @@ export class ThreadManager extends EventEmitter {
         error: error instanceof Error ? error.message : String(error),
         reason,
       });
-      
-      throw new Error(`Compacted thread creation failed: ${error instanceof Error ? error.message : String(error)}`);
+
+      throw new Error(
+        `Compacted thread creation failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
   // Simplified compaction check and execution
   async compactIfNeededSimplified(provider?: AIProvider): Promise<boolean> {
-    const needsCompaction = provider 
+    const needsCompaction = provider
       ? await this.needsCompactionAsync(provider)
       : this.needsCompaction();
-      
+
     if (!needsCompaction) return false;
-    
+
     await this.createCompactedVersion('Automatic compaction due to size', provider);
     return true;
   }

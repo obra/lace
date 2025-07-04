@@ -136,7 +136,7 @@ export class Agent extends EventEmitter {
     this._addTokensToCurrentTurn('in', this._estimateTokens(content));
 
     if (content.trim()) {
-      // Add user message to active thread (could be shadow thread after compaction)
+      // Add user message to active thread (could be compacted thread after compaction)
       this._threadManager.addEvent(this._getActiveThreadId(), 'USER_MESSAGE', content);
     }
 
@@ -240,7 +240,7 @@ export class Agent extends EventEmitter {
     return this._threadId;
   }
 
-  // Get the current active thread ID (canonical ID for external use, but shadow thread for internal operations)
+  // Get the current active thread ID (canonical ID for external use, but compacted thread for internal operations)
   private _getActiveThreadId(): string {
     return this._threadManager.getCurrentThreadId() || this._threadId;
   }
@@ -272,7 +272,7 @@ export class Agent extends EventEmitter {
 
   // Thread message processing for agent-facing conversation
   buildThreadMessages(): ProviderMessage[] {
-    // Use the current active thread (which might be a shadow thread after compaction)
+    // Use the current active thread (which might be a compacted thread after compaction)
     const events = this._threadManager.getEvents(this._getActiveThreadId());
     return this._buildConversationFromEvents(events);
   }
@@ -285,9 +285,12 @@ export class Agent extends EventEmitter {
       // Check if compaction is needed before building conversation (simplified approach)
       if (this._threadManager.needsCompaction(this._provider)) {
         logger.info('Thread compaction triggered', { threadId: this._threadId });
-        const newThreadId = await this._threadManager.createCompactedVersion('Auto-compaction', this._provider);
+        const newThreadId = await this._threadManager.createCompactedVersion(
+          'Auto-compaction',
+          this._provider
+        );
         // ThreadManager already switched to the new compacted thread
-        logger.info('Thread compacted successfully', { 
+        logger.info('Thread compacted successfully', {
           canonicalThreadId: this._threadId, // Stable external ID
           newCompactedThreadId: newThreadId, // New compacted thread ID
           canonicalId: this._threadManager.getCanonicalId(this._threadId),

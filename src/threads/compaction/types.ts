@@ -6,7 +6,7 @@ import { Thread, ThreadEvent } from '../types.js';
 export interface CompactionStrategy {
   // Analyze thread and determine if compaction needed
   shouldCompact(thread: Thread): boolean;
-  
+
   // Create compacted version of events
   compact(events: ThreadEvent[]): ThreadEvent[];
 }
