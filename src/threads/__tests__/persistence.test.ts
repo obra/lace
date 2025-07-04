@@ -619,8 +619,10 @@ describe('Enhanced ThreadManager', () => {
       expect(shadowThreadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
       expect(threadManager.getCurrentThreadId()).toBe(shadowThreadId);
 
-      // Verify shadow thread has the events
+      // Verify shadow thread has the events (may be compacted)
       const shadowEvents = threadManager.getEvents(shadowThreadId);
+      expect(shadowEvents.length).toBeGreaterThan(0);
+      // With default compaction strategy, 1 event should be preserved
       expect(shadowEvents).toHaveLength(1);
       expect(shadowEvents[0].data).toBe('Original message');
     });
@@ -642,6 +644,63 @@ describe('Enhanced ThreadManager', () => {
       await expect(threadManager.createShadowThread('Test')).rejects.toThrow(
         'No current thread to create shadow for'
       );
+    });
+
+    it('should compact events when creating shadow thread', async () => {
+      const originalThreadId = 'lace_20250101_abc123';
+      threadManager.createThread(originalThreadId);
+      
+      // Add enough events to trigger compaction
+      for (let i = 0; i < 15; i++) {
+        threadManager.addEvent(originalThreadId, 'USER_MESSAGE', `Message ${i}`);
+      }
+
+      const shadowThreadId = await threadManager.createShadowThread('Test compaction');
+      const shadowEvents = threadManager.getEvents(shadowThreadId);
+
+      // Should have fewer events due to compaction (default preserves 10 recent + 1 summary)
+      expect(shadowEvents.length).toBeLessThan(15);
+      expect(shadowEvents.length).toBe(11); // 10 preserved + 1 summary
+      
+      // First event should be summary
+      expect(shadowEvents[0].type).toBe('LOCAL_SYSTEM_MESSAGE');
+      expect(shadowEvents[0].data).toContain('Summarized');
+    });
+
+    it('should detect when compaction is needed', () => {
+      const originalThreadId = 'lace_20250101_abc123';
+      threadManager.createThread(originalThreadId);
+      
+      // Small thread shouldn't need compaction
+      threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'Short message');
+      expect(threadManager.needsCompaction()).toBe(false);
+
+      // Large thread should need compaction
+      const longMessage = 'Very long message. '.repeat(1000);
+      for (let i = 0; i < 10; i++) {
+        threadManager.addEvent(originalThreadId, 'USER_MESSAGE', longMessage);
+      }
+      expect(threadManager.needsCompaction()).toBe(true);
+    });
+
+    it('should compact automatically when needed', async () => {
+      const originalThreadId = 'lace_20250101_abc123';
+      threadManager.createThread(originalThreadId);
+      
+      // Add content that doesn't need compaction
+      threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'Short message');
+      const compacted1 = await threadManager.compactIfNeeded();
+      expect(compacted1).toBe(false);
+      expect(threadManager.getCurrentThreadId()).toBe(originalThreadId);
+
+      // Add content that needs compaction
+      const longMessage = 'Very long message. '.repeat(1000);
+      for (let i = 0; i < 10; i++) {
+        threadManager.addEvent(originalThreadId, 'USER_MESSAGE', longMessage);
+      }
+      const compacted2 = await threadManager.compactIfNeeded();
+      expect(compacted2).toBe(true);
+      expect(threadManager.getCurrentThreadId()).not.toBe(originalThreadId);
     });
   });
 });

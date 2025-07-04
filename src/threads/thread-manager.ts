@@ -6,6 +6,7 @@ import { ThreadPersistence } from './persistence.js';
 import { Thread, ThreadEvent, EventType } from './types.js';
 import { ToolCall, ToolResult } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
+import { SummarizeStrategy } from './compaction/index.js';
 
 export interface ThreadSessionInfo {
   threadId: string;
@@ -16,10 +17,12 @@ export interface ThreadSessionInfo {
 export class ThreadManager extends EventEmitter {
   private _currentThread: Thread | null = null;
   private _persistence: ThreadPersistence;
+  private _compactionStrategy: SummarizeStrategy;
 
   constructor(dbPath: string) {
     super();
     this._persistence = new ThreadPersistence(dbPath);
+    this._compactionStrategy = new SummarizeStrategy();
   }
 
   generateThreadId(): string {
@@ -305,16 +308,30 @@ export class ThreadManager extends EventEmitter {
     // Generate new shadow thread ID
     const shadowThreadId = this.generateThreadId();
     
+    // Compact the events using the compaction strategy
+    const compactedEvents = this._compactionStrategy.compact(this._currentThread.events);
+    
+    // Update thread IDs in compacted events
+    const updatedEvents = compactedEvents.map(event => ({
+      ...event,
+      threadId: shadowThreadId,
+    }));
+    
     // Create shadow thread with compacted events
     const shadowThread: Thread = {
       id: shadowThreadId,
       createdAt: this._currentThread.createdAt,
       updatedAt: new Date(),
-      events: [...this._currentThread.events], // Copy events for now
+      events: updatedEvents,
     };
 
     // Save shadow thread
     this._persistence.saveThread(shadowThread);
+    
+    // Save each compacted event
+    for (const event of updatedEvents) {
+      this._persistence.saveEvent(event);
+    }
     
     // Create version mapping
     this._persistence.createVersion(canonicalId, shadowThreadId, reason);
@@ -322,7 +339,28 @@ export class ThreadManager extends EventEmitter {
     // Switch to shadow thread
     this._currentThread = shadowThread;
     
+    logger.info('Shadow thread created with compaction', {
+      originalThreadId: currentThreadId,
+      shadowThreadId,
+      canonicalId,
+      originalEventCount: this._currentThread.events.length,
+      compactedEventCount: updatedEvents.length,
+      reason,
+    });
+    
     return shadowThreadId;
+  }
+
+  needsCompaction(): boolean {
+    if (!this._currentThread) return false;
+    return this._compactionStrategy.shouldCompact(this._currentThread);
+  }
+
+  async compactIfNeeded(): Promise<boolean> {
+    if (!this.needsCompaction()) return false;
+    
+    await this.createShadowThread('Automatic compaction due to size');
+    return true;
   }
 
   getCanonicalId(threadId: string): string {
