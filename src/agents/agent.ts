@@ -13,7 +13,7 @@ import { Tool } from '../tools/tool.js';
 import { ToolExecutor } from '../tools/executor.js';
 import { ApprovalDecision } from '../tools/approval-types.js';
 import { ThreadManager } from '../threads/thread-manager.js';
-import { ThreadEvent } from '../threads/types.js';
+import { ThreadEvent, asThreadId } from '../threads/types.js';
 import { logger } from '../utils/logger.js';
 import { StopReasonHandler } from '../token-management/stop-reason-handler.js';
 import { TokenBudgetManager } from '../token-management/token-budget-manager.js';
@@ -684,7 +684,8 @@ export class Agent extends EventEmitter {
       try {
         // Execute tool
         const result = await this._toolExecutor.executeTool(toolCall, {
-          threadId: this._threadId,
+          threadId: asThreadId(this._threadId),
+          parentThreadId: asThreadId(this._getParentThreadId()),
         });
 
         const outputText = result.content[0]?.text || '';
@@ -962,6 +963,13 @@ export class Agent extends EventEmitter {
 
       this._currentTurnMetrics = null;
     }
+  }
+
+  // Helper to extract parent thread ID
+  private _getParentThreadId(): string {
+    // Extract parent thread ID by removing hierarchical suffix
+    const dotIndex = this._threadId.indexOf('.');
+    return dotIndex > 0 ? this._threadId.substring(0, dotIndex) : this._threadId;
   }
 
   // Token tracking helper methods
