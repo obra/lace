@@ -4,3 +4,4 @@
 export * from './types.js';
 export * from './persistence.js';
 export * from './tools.js';
+export * from './formatter.js';
