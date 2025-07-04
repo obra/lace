@@ -20,6 +20,7 @@ export class ThreadManager extends EventEmitter {
   private _currentThread: Thread | null = null;
   private _persistence: ThreadPersistence;
   private _compactionStrategy: SummarizeStrategy;
+  private _providerStrategyCache = new Map<string, SummarizeStrategy>();
 
   constructor(dbPath: string) {
     super();
@@ -306,8 +307,8 @@ export class ThreadManager extends EventEmitter {
     if (!this._currentThread) return false;
 
     if (provider) {
-      // Use provider-aware strategy for accurate token counting
-      const providerStrategy = new SummarizeStrategy(undefined, provider);
+      // Use cached provider-aware strategy for accurate token counting
+      const providerStrategy = this._getProviderStrategy(provider);
       return providerStrategy.shouldCompact(this._currentThread);
     }
 
@@ -318,8 +319,8 @@ export class ThreadManager extends EventEmitter {
     if (!this._currentThread) return false;
 
     if (provider) {
-      // Use provider-aware strategy for accurate async token counting
-      const providerStrategy = new SummarizeStrategy(undefined, provider);
+      // Use cached provider-aware strategy for accurate async token counting
+      const providerStrategy = this._getProviderStrategy(provider);
       return await providerStrategy.shouldCompactAsync(this._currentThread);
     }
 
@@ -365,10 +366,21 @@ export class ThreadManager extends EventEmitter {
 
     try {
       // Get compacted events using provider-aware strategy if available
-      const strategy = provider
-        ? new SummarizeStrategy(undefined, provider)
-        : this._compactionStrategy;
-      const compactedEvents = strategy.compact(this._currentThread.events);
+      const strategy = provider ? this._getProviderStrategy(provider) : this._compactionStrategy;
+
+      let compactedEvents: ThreadEvent[];
+      try {
+        compactedEvents = strategy.compact(this._currentThread.events);
+      } catch (compactionError) {
+        logger.error('Compaction strategy failed, using original events', {
+          error:
+            compactionError instanceof Error ? compactionError.message : String(compactionError),
+          threadId: originalThreadId,
+          eventCount: this._currentThread.events.length,
+        });
+        // Fallback: use original events if compaction fails
+        compactedEvents = [...this._currentThread.events];
+      }
 
       // Create new thread (using existing method)
       const newThreadId = this.generateThreadId();
@@ -428,7 +440,21 @@ export class ThreadManager extends EventEmitter {
     } catch {
       // Ignore save errors on close
     }
+    // Clear provider strategy cache
+    this._providerStrategyCache.clear();
     await this._persistence.close();
+  }
+
+  private _getProviderStrategy(provider: AIProvider): SummarizeStrategy {
+    const cacheKey = `${provider.providerName}-${provider.defaultModel}`;
+    let strategy = this._providerStrategyCache.get(cacheKey);
+    
+    if (!strategy) {
+      strategy = new SummarizeStrategy(undefined, provider);
+      this._providerStrategyCache.set(cacheKey, strategy);
+    }
+    
+    return strategy;
   }
 }
 

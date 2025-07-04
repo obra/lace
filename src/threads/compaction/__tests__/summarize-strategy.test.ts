@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { SummarizeStrategy } from '../summarize-strategy.js';
-import { Thread, ThreadEvent } from '../../types.js';
+import { Thread, ThreadEvent, EventType } from '../../types.js';
 
 describe('SummarizeStrategy', () => {
   const createThread = (events: ThreadEvent[]): Thread => ({
@@ -15,13 +15,13 @@ describe('SummarizeStrategy', () => {
 
   const createEvent = (
     id: string,
-    type: string,
+    type: EventType,
     data: string,
     timestamp = new Date()
   ): ThreadEvent => ({
     id,
     threadId: 'test_thread',
-    type: type as any,
+    type,
     timestamp,
     data,
   });
