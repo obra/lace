@@ -45,10 +45,10 @@ export function FileSearchToolRenderer({ item, isSelected = false, onToggle }: T
         <Text> "{pattern}"</Text>
         <Text color="gray"> in {path}</Text>
         {matchStats && (
-          <>
+          <React.Fragment>
             <Text color="gray"> - </Text>
             <Text color="cyan">{matchStats}</Text>
-          </>
+          </React.Fragment>
         )}
       </ToolHeader>
       

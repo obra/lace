@@ -52,12 +52,12 @@ export function BashToolRenderer({ item, isSelected = false, onToggle }: ToolRen
       <ToolHeader icon="🔨" status={status}>
         <Text bold>bash</Text>
         <Text> $ {command}</Text>
-        {description && <Text dim> - {description}</Text>}
+        {description && <Text dimColor> - {description}</Text>}
         {bashOutput && bashOutput.exitCode !== 0 && (
-          <>
+          <React.Fragment>
             <Text color="gray"> - </Text>
             <Text color="cyan">exit {bashOutput.exitCode}</Text>
-          </>
+          </React.Fragment>
         )}
       </ToolHeader>
       

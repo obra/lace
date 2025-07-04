@@ -12,6 +12,7 @@ describe('FileSearchToolRenderer', () => {
   const createMockItem = (overrides?: Partial<ToolRendererProps['item']>): ToolRendererProps['item'] => ({
     type: 'tool_execution',
     call: {
+      id: 'call-123',
       name: 'ripgrep-search',
       arguments: {
         pattern: 'TODO',
@@ -62,6 +63,7 @@ src/file2.js
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: searchOutput,
         }],
         isError: false,
@@ -76,6 +78,7 @@ src/file2.js
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: 'No matches found',
         }],
         isError: false,
@@ -91,6 +94,7 @@ src/file2.js
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: 'Error: Directory not found',
         }],
         isError: true,
@@ -118,6 +122,7 @@ src/utils.js
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: searchOutput,
         }],
         isError: false,
@@ -141,6 +146,7 @@ src/config.js
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: searchOutput,
         }],
         isError: false,
@@ -159,6 +165,7 @@ src/config.js
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: searchOutput,
         }],
         isError: false,

@@ -48,21 +48,21 @@ export function FileWriteToolRenderer({ item, isSelected = false, onToggle }: To
         <ToolContent>
           <Box flexDirection="column">
             {content && (
-              <>
+              <React.Fragment>
                 {(() => {
                   const { lines, truncated, remaining } = limitLines(content, 5);
                   return (
-                    <>
+                    <React.Fragment>
                       {lines.map((line, index) => (
                         <Text key={index}>{line}</Text>
                       ))}
                       {truncated && (
                         <Text color="gray">... ({remaining} more lines)</Text>
                       )}
-                    </>
+                    </React.Fragment>
                   );
                 })()}
-              </>
+              </React.Fragment>
             )}
           </Box>
         </ToolContent>

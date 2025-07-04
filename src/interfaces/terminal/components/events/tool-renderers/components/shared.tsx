@@ -4,7 +4,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { useTimelineItemExpansion } from '../../hooks/useTimelineExpansionToggle.js';
-import { ToolCall, ToolResult } from '../../../../../tools/types.js';
+import { ToolCall, ToolResult } from '../../../../../../tools/types.js';
 
 // Standard props interface for all tool renderers
 export interface ToolRendererProps {
@@ -40,10 +40,10 @@ export function ToolHeader({
       <Text color="yellow">{icon} </Text>
       {children}
       {status && (
-        <>
+        <React.Fragment>
           <Text color="gray"> </Text>
           <Text color={statusColor}>{statusIcon}</Text>
-        </>
+        </React.Fragment>
       )}
     </Box>
   );

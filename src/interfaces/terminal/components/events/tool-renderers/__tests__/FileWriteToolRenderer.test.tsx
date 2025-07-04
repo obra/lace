@@ -12,6 +12,7 @@ describe('FileWriteToolRenderer', () => {
   const createMockItem = (overrides?: Partial<ToolRendererProps['item']>): ToolRendererProps['item'] => ({
     type: 'tool_execution',
     call: {
+      id: 'call-123',
       name: 'file-write',
       arguments: {
         file_path: '/path/to/file.txt',
@@ -53,6 +54,7 @@ describe('FileWriteToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: 'File written successfully',
         }],
         isError: false,
@@ -67,6 +69,7 @@ describe('FileWriteToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: 'Permission denied',
         }],
         isError: true,
@@ -81,6 +84,7 @@ describe('FileWriteToolRenderer', () => {
     const content = 'Line 1\nLine 2\nLine 3';
     const item = createMockItem({
       call: {
+      id: 'call-123',
         name: 'file-write',
         arguments: {
           file_path: '/path/to/file.txt',
@@ -89,6 +93,7 @@ describe('FileWriteToolRenderer', () => {
       },
       result: {
         content: [{
+          type: 'text',
           text: 'File written successfully',
         }],
         isError: false,
@@ -104,6 +109,7 @@ describe('FileWriteToolRenderer', () => {
   it('should handle empty content', () => {
     const item = createMockItem({
       call: {
+      id: 'call-123',
         name: 'file-write',
         arguments: {
           file_path: '/path/to/file.txt',
@@ -120,6 +126,7 @@ describe('FileWriteToolRenderer', () => {
     const content = 'First line\nSecond line\nThird line\nFourth line';
     const item = createMockItem({
       call: {
+      id: 'call-123',
         name: 'file-write',
         arguments: {
           file_path: '/path/to/file.txt',
@@ -128,6 +135,7 @@ describe('FileWriteToolRenderer', () => {
       },
       result: {
         content: [{
+          type: 'text',
           text: 'File written successfully',
         }],
         isError: false,

@@ -22,6 +22,7 @@ describe('DelegateToolRenderer', () => {
   const createMockItem = (overrides?: Partial<ToolRendererProps['item']>): ToolRendererProps['item'] => ({
     type: 'tool_execution',
     call: {
+      id: 'call-123',
       name: 'delegate',
       arguments: {
         task: 'Analyze the codebase structure',
@@ -64,6 +65,7 @@ describe('DelegateToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: JSON.stringify({
             threadId: 'delegate-thread-123',
             status: 'active',
@@ -81,6 +83,7 @@ describe('DelegateToolRenderer', () => {
   it('should handle prompt field instead of task', () => {
     const item = createMockItem({
       call: {
+      id: 'call-123',
         name: 'delegate',
         arguments: {
           prompt: 'Explain this function',
@@ -96,6 +99,7 @@ describe('DelegateToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: 'Delegation failed: timeout',
         }],
         isError: true,
@@ -110,6 +114,7 @@ describe('DelegateToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: JSON.stringify({
             threadId: 'delegate-thread-456',
             status: 'completed',
@@ -129,6 +134,7 @@ describe('DelegateToolRenderer', () => {
   it('should handle unknown task gracefully', () => {
     const item = createMockItem({
       call: {
+      id: 'call-123',
         name: 'delegate',
         arguments: {},
       },
@@ -142,6 +148,7 @@ describe('DelegateToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: JSON.stringify({
             threadId: 'delegate-thread-789',
             status: 'active',

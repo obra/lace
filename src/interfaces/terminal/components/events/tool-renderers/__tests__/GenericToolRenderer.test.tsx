@@ -12,6 +12,7 @@ describe('GenericToolRenderer', () => {
   const createMockItem = (overrides?: Partial<ToolRendererProps['item']>): ToolRendererProps['item'] => ({
     type: 'tool_execution',
     call: {
+      id: 'call-123',
       name: 'unknown-tool',
       arguments: {
         param1: 'value1',
@@ -52,6 +53,7 @@ describe('GenericToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: 'Tool executed successfully',
         }],
         isError: false,
@@ -66,6 +68,7 @@ describe('GenericToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: 'Tool execution failed',
         }],
         isError: true,
@@ -79,6 +82,7 @@ describe('GenericToolRenderer', () => {
   it('should handle various tool names', () => {
     const item = createMockItem({
       call: {
+      id: 'call-123',
         name: 'custom-analyzer',
         arguments: {},
       },
@@ -92,6 +96,7 @@ describe('GenericToolRenderer', () => {
   it('should show primary info from first argument', () => {
     const item = createMockItem({
       call: {
+      id: 'call-123',
         name: 'test-tool',
         arguments: {
           filename: '/path/to/file.txt',
@@ -107,6 +112,7 @@ describe('GenericToolRenderer', () => {
   it('should handle empty arguments', () => {
     const item = createMockItem({
       call: {
+      id: 'call-123',
         name: 'no-args-tool',
         arguments: {},
       },
@@ -121,6 +127,7 @@ describe('GenericToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5',
         }],
         isError: false,

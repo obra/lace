@@ -12,6 +12,7 @@ describe('FileListToolRenderer', () => {
   const createMockItem = (overrides?: Partial<ToolRendererProps['item']>): ToolRendererProps['item'] => ({
     type: 'tool_execution',
     call: {
+      id: 'call-123',
       name: 'file-list',
       arguments: {
         path: '/path/to/dir',
@@ -44,6 +45,7 @@ describe('FileListToolRenderer', () => {
   it('should show recursive indicator when recursive is true', () => {
     const item = createMockItem({
       call: {
+      id: 'call-123',
         name: 'file-list',
         arguments: {
           path: '/path/to/dir',
@@ -73,6 +75,7 @@ dir2/
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: treeOutput,
         }],
         isError: false,
@@ -87,6 +90,7 @@ dir2/
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: 'No files found',
         }],
         isError: false,
@@ -102,6 +106,7 @@ dir2/
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: 'Directory not found',
         }],
         isError: true,
@@ -122,6 +127,7 @@ file5.txt (500 bytes)`;
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: treeOutput,
         }],
         isError: false,
@@ -147,6 +153,7 @@ test/
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: treeOutput,
         }],
         isError: false,

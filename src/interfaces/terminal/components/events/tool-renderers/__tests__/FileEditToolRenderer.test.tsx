@@ -12,6 +12,7 @@ describe('FileEditToolRenderer', () => {
   const createMockItem = (overrides?: Partial<ToolRendererProps['item']>): ToolRendererProps['item'] => ({
     type: 'tool_execution',
     call: {
+      id: 'call-123',
       name: 'file-edit',
       arguments: {
         file_path: '/path/to/file.txt',
@@ -53,6 +54,7 @@ describe('FileEditToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: 'File edited successfully',
         }],
         isError: false,
@@ -67,6 +69,7 @@ describe('FileEditToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: 'Text not found in file',
         }],
         isError: true,
@@ -80,6 +83,7 @@ describe('FileEditToolRenderer', () => {
   it('should show old text preview when collapsed and complete', () => {
     const item = createMockItem({
       call: {
+      id: 'call-123',
         name: 'file-edit',
         arguments: {
           file_path: '/path/to/file.txt',
@@ -89,6 +93,7 @@ describe('FileEditToolRenderer', () => {
       },
       result: {
         content: [{
+          type: 'text',
           text: 'File edited successfully',
         }],
         isError: false,
@@ -104,6 +109,7 @@ describe('FileEditToolRenderer', () => {
   it('should show line count changes in header', () => {
     const item = createMockItem({
       call: {
+      id: 'call-123',
         name: 'file-edit',
         arguments: {
           file_path: '/path/to/file.txt',
@@ -113,6 +119,7 @@ describe('FileEditToolRenderer', () => {
       },
       result: {
         content: [{
+          type: 'text',
           text: 'File edited successfully',
         }],
         isError: false,
@@ -126,6 +133,7 @@ describe('FileEditToolRenderer', () => {
   it('should handle single line edits', () => {
     const item = createMockItem({
       call: {
+      id: 'call-123',
         name: 'file-edit',
         arguments: {
           file_path: '/path/to/file.txt',
@@ -135,6 +143,7 @@ describe('FileEditToolRenderer', () => {
       },
       result: {
         content: [{
+          type: 'text',
           text: 'File edited successfully',
         }],
         isError: false,
@@ -148,6 +157,7 @@ describe('FileEditToolRenderer', () => {
   it('should handle empty text replacements', () => {
     const item = createMockItem({
       call: {
+      id: 'call-123',
         name: 'file-edit',
         arguments: {
           file_path: '/path/to/file.txt',
@@ -157,6 +167,7 @@ describe('FileEditToolRenderer', () => {
       },
       result: {
         content: [{
+          type: 'text',
           text: 'File edited successfully',
         }],
         isError: false,

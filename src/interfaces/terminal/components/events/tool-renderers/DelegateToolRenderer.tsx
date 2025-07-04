@@ -152,14 +152,14 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, ToolRendererProp
           {item.result && (
             <Box flexDirection="column">
               {delegateResult?.error ? (
-                <>
+                <React.Fragment>
                   <Text color="red">Error:</Text>
                   <Box marginLeft={2}>
                     <Text color="red">{delegateResult.error}</Text>
                   </Box>
-                </>
+                </React.Fragment>
               ) : (
-                <>
+                <React.Fragment>
                   <Text color="green">Delegation Status:</Text>
                   <Box marginLeft={2} flexDirection="column">
                     {delegateThreadId && (
@@ -175,7 +175,7 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, ToolRendererProp
                       <Text>Tokens: {formatTokenCount(delegateResult.totalTokens)}</Text>
                     )}
                   </Box>
-                </>
+                </React.Fragment>
               )}
             </Box>
           )}

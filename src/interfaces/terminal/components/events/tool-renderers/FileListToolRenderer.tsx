@@ -49,10 +49,10 @@ export function FileListToolRenderer({ item, isSelected = false, onToggle }: Too
         <Text> {path || 'current directory'}</Text>
         {recursive && <Text color="gray"> (recursive)</Text>}
         {stats && (
-          <>
+          <React.Fragment>
             <Text color="gray"> - </Text>
             <Text color="cyan">{stats}</Text>
-          </>
+          </React.Fragment>
         )}
       </ToolHeader>
       

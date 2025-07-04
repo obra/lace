@@ -12,6 +12,7 @@ describe('BashToolRenderer', () => {
   const createMockItem = (overrides?: Partial<ToolRendererProps['item']>): ToolRendererProps['item'] => ({
     type: 'tool_execution',
     call: {
+      id: 'call-123',
       name: 'bash',
       arguments: {
         command: 'ls -la',
@@ -52,6 +53,7 @@ describe('BashToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: JSON.stringify({
             stdout: 'file1.txt\nfile2.txt',
             stderr: '',
@@ -71,6 +73,7 @@ describe('BashToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: JSON.stringify({
             stdout: '',
             stderr: 'Command not found',
@@ -90,6 +93,7 @@ describe('BashToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: JSON.stringify({
             stdout: 'line1\nline2\nline3\nline4\nline5',
             stderr: '',
@@ -111,6 +115,7 @@ describe('BashToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: JSON.stringify({
             stdout: '',
             stderr: 'Error message',
@@ -130,6 +135,7 @@ describe('BashToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: 'not valid json',
         }],
         isError: false,
@@ -144,6 +150,7 @@ describe('BashToolRenderer', () => {
     const item = createMockItem({
       result: {
         content: [{
+          type: 'text',
           text: JSON.stringify({
             stdout: '',
             stderr: '',
