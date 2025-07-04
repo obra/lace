@@ -1,46 +1,37 @@
-// ABOUTME: Generic tool renderer using three-layer architecture for unknown/unsupported tools
+// ABOUTME: Generic tool renderer with direct composition for unknown/unsupported tools
 // ABOUTME: Provides fallback display for any tool execution with input/output visualization
 
 import React, { forwardRef, useImperativeHandle } from 'react';
 import { Box, Text } from 'ink';
-import { ToolDisplay } from './components/ToolDisplay.js';
-import { useToolData, type ToolExecutionItem } from './hooks/useToolData.js';
-import { useToolState } from './hooks/useToolState.js';
+import { ToolHeader, ToolPreview, ToolContent, useToolExpansion, limitLines, type ToolRendererProps } from './components/shared.js';
 import { TimelineItemRef } from '../../timeline-item-focus.js';
 
-interface GenericToolRendererProps {
-  item: ToolExecutionItem;
-  isStreaming?: boolean;
-  isSelected?: boolean;
-  onToggle?: () => void;
+// Extract primary info from tool arguments
+function getPrimaryInfo(toolName: string, args: Record<string, unknown>): string {
+  // Special handling for known tools
+  switch (toolName) {
+    case 'bash':
+      return `$ ${args.command || ''}`;
+    case 'file-write':
+    case 'file-read':
+    case 'file-edit':
+      return (args.path || args.file_path || '') as string;
+    case 'ripgrep-search':
+      return `"${args.pattern || ''}" in ${args.path || 'current directory'}`;
+    case 'delegate':
+      return `"${args.task || args.prompt || 'Unknown task'}"`;
+    default:
+      // For unknown tools, use the first argument value if it's short
+      const firstValue = Object.values(args)[0];
+      if (firstValue && typeof firstValue === 'string' && firstValue.length <= 50) {
+        return firstValue;
+      }
+      return 'unknown';
+  }
 }
 
-// Custom header component that adds [GENERIC] tag
-function GenericHeader({ toolData }: { toolData: any }) {
-  return (
-    <Box>
-      <Text color="magenta">🔧 </Text>
-      <Text color="magenta" bold>
-        {toolData.toolName}
-      </Text>
-      <Text color="gray">: </Text>
-      <Text color="white">{toolData.primaryInfo || 'unknown'}</Text>
-      {toolData.secondaryInfo && (
-        <Text color="gray">{toolData.secondaryInfo}</Text>
-      )}
-      <Text color="gray"> </Text>
-      <Text color={toolData.success ? 'green' : 'red'}>
-        {toolData.statusIcon}
-      </Text>
-      {toolData.isStreaming && <Text color="gray"> (running...)</Text>}
-      <Text color="magenta"> [GENERIC]</Text>
-    </Box>
-  );
-}
-
-export const GenericToolRenderer = forwardRef<TimelineItemRef, GenericToolRendererProps>(({
+export const GenericToolRenderer = forwardRef<TimelineItemRef, ToolRendererProps>(({
   item,
-  isStreaming = false,
   isSelected = false,
   onToggle,
 }, ref) => {
@@ -51,22 +42,71 @@ export const GenericToolRenderer = forwardRef<TimelineItemRef, GenericToolRender
     },
   }), []);
   
-  // Layer 1: Data processing
-  const toolData = useToolData(item);
+  const { isExpanded } = useToolExpansion(isSelected, onToggle);
   
-  // Layer 2: State management
-  const toolState = useToolState(isSelected, onToggle);
+  // Extract data directly
+  const toolName = item.call.name;
+  const args = item.call.arguments;
+  const output = item.result?.content?.[0]?.text || '';
+  const hasError = item.result?.isError;
+  const isRunning = !item.result;
   
-  // Layer 3: Display with custom header
+  // Determine status
+  const status = isRunning ? 'pending' : hasError ? 'error' : 'success';
+  
+  // Get primary info
+  const primaryInfo = getPrimaryInfo(toolName, args);
+  
   return (
-    <ToolDisplay
-      toolData={toolData}
-      toolState={toolState}
-      isSelected={isSelected}
-      onToggle={onToggle}
-      components={{
-        header: <GenericHeader toolData={toolData} />
-      }}
-    />
+    <Box flexDirection="column">
+      <ToolHeader icon="🔧" status={status}>
+        <Text color="magenta" bold>{toolName}</Text>
+        <Text color="gray">: </Text>
+        <Text color="white">{primaryInfo}</Text>
+        <Text color="magenta"> [GENERIC]</Text>
+      </ToolHeader>
+      
+      {!isExpanded && output && item.result && !isRunning && (
+        <ToolPreview>
+          {(() => {
+            const { lines, truncated, remaining } = limitLines(output, 3);
+            return (
+              <Box flexDirection="column">
+                {lines.map((line, index) => (
+                  <Text key={index} dimColor>{line}</Text>
+                ))}
+                {truncated && <Text color="gray">(+ {remaining} lines)</Text>}
+              </Box>
+            );
+          })()}
+        </ToolPreview>
+      )}
+      
+      {isExpanded && (
+        <ToolContent>
+          {/* Input parameters */}
+          <Box flexDirection="column" marginBottom={1}>
+            <Text color="yellow">Input:</Text>
+            <Box marginLeft={2}>
+              <Text>{JSON.stringify(args, null, 2)}</Text>
+            </Box>
+          </Box>
+
+          {/* Output or Error */}
+          {item.result && (
+            <Box flexDirection="column">
+              <Text color={hasError ? 'red' : 'green'}>
+                {hasError ? 'Error:' : 'Output:'}
+              </Text>
+              <Box marginLeft={2}>
+                <Text color={hasError ? 'red' : undefined}>
+                  {output || 'No output'}
+                </Text>
+              </Box>
+            </Box>
+          )}
+        </ToolContent>
+      )}
+    </Box>
   );
 });
