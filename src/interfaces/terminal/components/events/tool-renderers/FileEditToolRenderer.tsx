@@ -1,121 +1,90 @@
-// ABOUTME: Specialized renderer for file-edit tool executions using three-layer architecture
+// ABOUTME: Renderer for file-edit tool executions with direct component composition
 // ABOUTME: Shows file edit operations with before/after line counts and replacement context
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ToolDisplay } from './components/ToolDisplay.js';
-import { useToolData, type ToolExecutionItem } from './hooks/useToolData.js';
-import { useToolState } from './hooks/useToolState.js';
-import { limitLines } from './useToolRenderer.js';
+import { ToolHeader, ToolPreview, ToolContent, useToolExpansion, limitLines, type ToolRendererProps } from './components/shared.js';
 
-interface FileEditToolRendererProps {
-  item: ToolExecutionItem;
-  isStreaming?: boolean;
-  isSelected?: boolean;
-  onToggle?: () => void;
-}
-
-// Custom preview component for edit operations
-function EditPreview({ oldText }: { oldText: string }) {
-  const { lines, truncated } = limitLines(oldText, 2);
+export function FileEditToolRenderer({ item, isSelected = false, onToggle }: ToolRendererProps) {
+  const { isExpanded } = useToolExpansion(isSelected, onToggle);
+  
+  // Extract data directly
+  const { file_path, old_text, new_text } = item.call.arguments as { 
+    file_path: string; 
+    old_text: string; 
+    new_text: string; 
+  };
+  const hasError = item.result?.isError;
+  const isRunning = !item.result;
+  
+  // Determine status
+  const status = isRunning ? 'pending' : hasError ? 'error' : 'success';
+  
+  // Calculate line counts
+  const oldLineCount = old_text ? old_text.split('\n').length : 0;
+  const newLineCount = new_text ? new_text.split('\n').length : 0;
   
   return (
     <Box flexDirection="column">
-      {lines.map((line, index) => (
-        <Text key={index} color="red">
-          - {line}
-        </Text>
-      ))}
-      {truncated && <Text color="gray">... and more</Text>}
-    </Box>
-  );
-}
-
-// Custom content component for edit operations
-function EditContent({ 
-  input, 
-  output, 
-  success 
-}: { 
-  input: Record<string, unknown>; 
-  output: string; 
-  success: boolean;
-}) {
-  const oldText = (input.old_text as string) || '';
-  const newText = (input.new_text as string) || '';
-  
-  if (!success) {
-    return (
-      <Box flexDirection="column">
-        <Text color="red">Error:</Text>
-        <Box marginLeft={2}>
-          <Text color="red">{output || 'Unknown error'}</Text>
-        </Box>
-      </Box>
-    );
-  }
-  
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text color="red">- Removed:</Text>
-      {(() => {
-        const { lines } = limitLines(oldText, 10);
-        return lines.map((line, index) => (
-          <Text key={`old-${index}`} color="red">
-            - {line}
-          </Text>
-        ));
-      })()}
+      <ToolHeader icon="✏️" status={status}>
+        <Text bold>file-edit</Text>
+        <Text> {file_path}</Text>
+        <Text color="gray"> - </Text>
+        <Text color="cyan">-{oldLineCount} +{newLineCount} lines</Text>
+      </ToolHeader>
       
-      <Box marginTop={1}>
-        <Text color="green">+ Added:</Text>
-      </Box>
-      {(() => {
-        const { lines } = limitLines(newText, 10);
-        return lines.map((line, index) => (
-          <Text key={`new-${index}`} color="green">
-            + {line}
-          </Text>
-        ));
-      })()}
+      {!isExpanded && old_text && item.result && !isRunning && (
+        <ToolPreview>
+          {(() => {
+            const { lines, truncated } = limitLines(old_text, 2);
+            return (
+              <Box flexDirection="column">
+                {lines.map((line, index) => (
+                  <Text key={index} color="red">- {line}</Text>
+                ))}
+                {truncated && <Text color="gray">... and more</Text>}
+              </Box>
+            );
+          })()}
+        </ToolPreview>
+      )}
+      
+      {isExpanded && (
+        <ToolContent>
+          {hasError && item.result ? (
+            <Box flexDirection="column">
+              <Text color="red">Error:</Text>
+              <Box marginLeft={2}>
+                <Text color="red">{item.result.content?.[0]?.text || 'Unknown error'}</Text>
+              </Box>
+            </Box>
+          ) : (
+            <Box flexDirection="column">
+              <Text color="red">- Removed:</Text>
+              {(() => {
+                const { lines } = limitLines(old_text, 10);
+                return lines.map((line, index) => (
+                  <Text key={`old-${index}`} color="red">
+                    - {line}
+                  </Text>
+                ));
+              })()}
+              
+              <Box marginTop={1}>
+                <Text color="green">+ Added:</Text>
+              </Box>
+              {(() => {
+                const { lines } = limitLines(new_text, 10);
+                return lines.map((line, index) => (
+                  <Text key={`new-${index}`} color="green">
+                    + {line}
+                  </Text>
+                ));
+              })()}
+            </Box>
+          )}
+        </ToolContent>
+      )}
     </Box>
-  );
-}
-
-export function FileEditToolRenderer({
-  item,
-  isStreaming = false,
-  isSelected = false,
-  onToggle,
-}: FileEditToolRendererProps) {
-  // Layer 1: Data processing
-  const toolData = useToolData(item);
-  
-  // Layer 2: State management
-  const toolState = useToolState(isSelected, onToggle);
-  
-  // Get old text for preview
-  const oldText = (toolData.input.old_text as string) || '';
-  
-  // Layer 3: Display with custom components
-  return (
-    <ToolDisplay
-      toolData={toolData}
-      toolState={toolState}
-      isSelected={isSelected}
-      onToggle={onToggle}
-      components={{
-        preview: toolData.result && !toolData.isStreaming ? (
-          <EditPreview oldText={oldText} />
-        ) : undefined,
-        content: (
-          <EditContent 
-            input={toolData.input} 
-            output={toolData.output} 
-            success={toolData.success} 
-          />
-        )
-      }}
-    />
   );
 }

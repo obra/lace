@@ -1,80 +1,72 @@
-// ABOUTME: Specialized renderer for file-write tool executions using three-layer architecture
+// ABOUTME: Renderer for file-write tool executions with direct component composition
 // ABOUTME: Shows file write operations with character counts and content preview
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ToolDisplay } from './components/ToolDisplay.js';
-import { useToolData, type ToolExecutionItem } from './hooks/useToolData.js';
-import { useToolState } from './hooks/useToolState.js';
-import { limitLines } from './useToolRenderer.js';
+import { ToolHeader, ToolPreview, ToolContent, useToolExpansion, limitLines, type ToolRendererProps } from './components/shared.js';
 
-interface FileWriteToolRendererProps {
-  item: ToolExecutionItem;
-  isStreaming?: boolean;
-  isSelected?: boolean;
-  onToggle?: () => void;
-}
-
-// Custom preview component for file write
-function WritePreview({ content }: { content: string }) {
-  const { lines, truncated } = limitLines(content, 2);
+export function FileWriteToolRenderer({ item, isSelected = false, onToggle }: ToolRendererProps) {
+  const { isExpanded } = useToolExpansion(isSelected, onToggle);
+  
+  // Extract data directly
+  const { file_path, content } = item.call.arguments as { file_path: string; content: string };
+  const hasError = item.result?.isError;
+  const isRunning = !item.result;
+  
+  // Determine status
+  const status = isRunning ? 'pending' : hasError ? 'error' : 'success';
+  
+  // Calculate character count
+  const charCount = content ? content.length : 0;
   
   return (
     <Box flexDirection="column">
-      {lines.map((line, index) => (
-        <Text key={index} color="gray">
-          {line}
-        </Text>
-      ))}
-      {truncated && <Text color="gray">... and more</Text>}
-    </Box>
-  );
-}
-
-// Custom content component for file write
-function WriteContent({ content }: { content: string }) {
-  const { lines, truncated, remaining } = limitLines(content, 5);
-  
-  return (
-    <Box flexDirection="column">
-      {lines.map((line, index) => (
-        <Text key={index}>{line}</Text>
-      ))}
-      {truncated && (
-        <Text color="gray">... ({remaining} more lines)</Text>
+      <ToolHeader icon="📝" status={status}>
+        <Text bold>file-write</Text>
+        <Text> {file_path}</Text>
+        <Text color="gray"> - </Text>
+        <Text color="cyan">{charCount} chars</Text>
+      </ToolHeader>
+      
+      {!isExpanded && content && item.result && !isRunning && (
+        <ToolPreview>
+          {(() => {
+            const { lines, truncated } = limitLines(content, 2);
+            return (
+              <Box flexDirection="column">
+                {lines.map((line, index) => (
+                  <Text key={index}>{line}</Text>
+                ))}
+                {truncated && <Text color="gray">... and more</Text>}
+              </Box>
+            );
+          })()}
+        </ToolPreview>
+      )}
+      
+      {isExpanded && (
+        <ToolContent>
+          <Box flexDirection="column">
+            {content && (
+              <>
+                {(() => {
+                  const { lines, truncated, remaining } = limitLines(content, 5);
+                  return (
+                    <>
+                      {lines.map((line, index) => (
+                        <Text key={index}>{line}</Text>
+                      ))}
+                      {truncated && (
+                        <Text color="gray">... ({remaining} more lines)</Text>
+                      )}
+                    </>
+                  );
+                })()}
+              </>
+            )}
+          </Box>
+        </ToolContent>
       )}
     </Box>
-  );
-}
-
-export function FileWriteToolRenderer({
-  item,
-  isStreaming = false,
-  isSelected = false,
-  onToggle,
-}: FileWriteToolRendererProps) {
-  // Layer 1: Data processing
-  const toolData = useToolData(item);
-  
-  // Layer 2: State management
-  const toolState = useToolState(isSelected, onToggle);
-  
-  // Get content from input
-  const content = (toolData.input.content as string) || '';
-  
-  // Layer 3: Display with custom components
-  return (
-    <ToolDisplay
-      toolData={toolData}
-      toolState={toolState}
-      isSelected={isSelected}
-      onToggle={onToggle}
-      components={{
-        preview: toolData.result && !toolData.isStreaming ? (
-          <WritePreview content={content} />
-        ) : undefined,
-        content: <WriteContent content={content} />
-      }}
-    />
   );
 }

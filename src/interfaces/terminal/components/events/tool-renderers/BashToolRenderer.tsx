@@ -1,20 +1,10 @@
-// ABOUTME: Specialized renderer for bash tool executions using three-layer architecture
+// ABOUTME: Renderer for bash tool executions with direct component composition
 // ABOUTME: Shows commands as terminal prompts and processes stdout/stderr with proper formatting
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ToolDisplay } from './components/ToolDisplay.js';
-import { useToolData, type ToolExecutionItem } from './hooks/useToolData.js';
-import { useToolState } from './hooks/useToolState.js';
+import { ToolHeader, ToolPreview, ToolContent, useToolExpansion, limitLines, type ToolRendererProps } from './components/shared.js';
 import { ToolResult } from '../../../../../tools/types.js';
-import { limitLines } from './useToolRenderer.js';
-
-interface BashToolRendererProps {
-  item: ToolExecutionItem;
-  isStreaming?: boolean;
-  isSelected?: boolean;
-  onToggle?: () => void;
-}
 
 // Bash tool output structure
 interface BashOutput {
@@ -42,112 +32,86 @@ function parseBashResult(result: ToolResult): BashOutput | null {
   }
 }
 
-// Custom preview component for bash output
-function BashPreview({ toolData }: { toolData: any }) {
-  if (!toolData.result || toolData.isStreaming) return null;
+export function BashToolRenderer({ item, isSelected = false, onToggle }: ToolRendererProps) {
+  const { isExpanded } = useToolExpansion(isSelected, onToggle);
   
-  const bashOutput = parseBashResult(toolData.result);
-  if (!bashOutput) return null;
+  // Extract data directly - no abstraction needed
+  const { command, description } = item.call.arguments as { command: string; description?: string };
+  const bashOutput = item.result ? parseBashResult(item.result) : null;
+  const hasError = item.result?.isError || (bashOutput && bashOutput.exitCode !== 0);
+  const isRunning = !item.result;
   
-  const { stdout, stderr, exitCode } = bashOutput;
-  const commandSuccess = exitCode === 0;
+  // Determine status
+  const status = isRunning ? 'pending' : hasError ? 'error' : 'success';
   
-  if (commandSuccess && stdout) {
-    const { lines, truncated, remaining } = limitLines(stdout, 3);
-    return (
-      <Box flexDirection="column">
-        <Text>{lines.join('\n')}</Text>
-        {truncated && <Text color="gray">(+ {remaining} lines)</Text>}
-      </Box>
-    );
-  } else if (!commandSuccess && stderr) {
-    const { lines, truncated, remaining } = limitLines(stderr, 3);
-    return (
-      <Box flexDirection="column">
-        <Text color="red">{lines.join('\n')}</Text>
-        {truncated && <Text color="gray">(+ {remaining} lines)</Text>}
-      </Box>
-    );
-  }
-  
-  return null;
-}
-
-// Custom content component for bash output
-function BashContent({ toolData }: { toolData: any }) {
-  const bashOutput = toolData.result ? parseBashResult(toolData.result) : null;
-  const { stdout = '', stderr = '', exitCode = null } = bashOutput || {};
+  // Get output for preview
+  const output = bashOutput ? (bashOutput.stdout || bashOutput.stderr) : '';
   
   return (
     <Box flexDirection="column">
-      {/* Command line */}
-      <Box marginBottom={1}>
-        <Text color="cyan">$ </Text>
-        <Text color="white">{toolData.input.command as string}</Text>
-      </Box>
+      <ToolHeader icon="🔨" status={status}>
+        <Text bold>bash</Text>
+        <Text> $ {command}</Text>
+        {description && <Text dim> - {description}</Text>}
+        {bashOutput && bashOutput.exitCode !== 0 && (
+          <>
+            <Text color="gray"> - </Text>
+            <Text color="cyan">exit {bashOutput.exitCode}</Text>
+          </>
+        )}
+      </ToolHeader>
+      
+      {!isExpanded && output && (
+        <ToolPreview>
+          {(() => {
+            const { lines, truncated, remaining } = limitLines(output, 3);
+            const isError = bashOutput && !bashOutput.stdout && bashOutput.stderr;
+            return (
+              <Box flexDirection="column">
+                <Text color={isError ? 'red' : undefined}>{lines.join('\n')}</Text>
+                {truncated && <Text color="gray">(+ {remaining} lines)</Text>}
+              </Box>
+            );
+          })()}
+        </ToolPreview>
+      )}
+      
+      {isExpanded && (
+        <ToolContent>
+          {/* Command line */}
+          <Box marginBottom={1}>
+            <Text color="cyan">$ </Text>
+            <Text color="white">{command}</Text>
+          </Box>
 
-      {/* Output sections */}
-      {bashOutput && (
-        <Box flexDirection="column">
-          {/* stdout */}
-          {stdout && (
-            <Box>
-              <Text>{stdout}</Text>
+          {/* Output sections */}
+          {bashOutput && (
+            <Box flexDirection="column">
+              {/* stdout */}
+              {bashOutput.stdout && (
+                <Box>
+                  <Text>{bashOutput.stdout}</Text>
+                </Box>
+              )}
+
+              {/* stderr */}
+              {bashOutput.stderr && (
+                <Box flexDirection="column" marginTop={bashOutput.stdout ? 1 : 0 }>
+                  <Text color="red">stderr:</Text>
+                  <Text color="red">{bashOutput.stderr}</Text>
+                </Box>
+              )}
+
+              {/* Show empty indicators when no output */}
+              {!bashOutput.stdout && !bashOutput.stderr && bashOutput.exitCode !== null && (
+                <Box>
+                  <Text color="gray">(no output)</Text>
+                </Box>
+              )}
             </Box>
           )}
-
-          {/* stderr */}
-          {stderr && (
-            <Box flexDirection="column" marginTop={stdout ? 1 : 0 }>
-              <Text color="red">stderr:</Text>
-              <Text color="red">{stderr}</Text>
-            </Box>
-          )}
-
-          {/* Show empty indicators when no output */}
-          {!stdout && !stderr && exitCode !== null && (
-            <Box>
-              <Text color="gray">(no output)</Text>
-            </Box>
-          )}
-        </Box>
+        </ToolContent>
       )}
     </Box>
-  );
-}
-
-export function BashToolRenderer({
-  item,
-  isStreaming = false,
-  isSelected = false,
-  onToggle,
-}: BashToolRendererProps) {
-  // Layer 1: Data processing
-  const toolData = useToolData(item);
-  
-  // Layer 2: State management
-  const toolState = useToolState(isSelected, onToggle);
-  
-  // Add bash-specific stats
-  if (toolData.result && toolData.success) {
-    const bashOutput = parseBashResult(toolData.result);
-    if (bashOutput && bashOutput.exitCode !== 0) {
-      toolData.stats = `exit ${bashOutput.exitCode}`;
-      toolData.success = false; // Override success based on exit code
-    }
-  }
-  
-  // Layer 3: Display with custom components
-  return (
-    <ToolDisplay
-      toolData={toolData}
-      toolState={toolState}
-      isSelected={isSelected}
-      onToggle={onToggle}
-      components={{
-        preview: <BashPreview toolData={toolData} />,
-        content: <BashContent toolData={toolData} />
-      }}
-    />
   );
 }
