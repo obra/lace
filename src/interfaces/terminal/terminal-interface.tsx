@@ -10,7 +10,7 @@ import React, {
   useContext,
   useRef,
 } from 'react';
-import { Box, Text, render, useFocusManager, useInput, measureElement } from 'ink';
+import { Box, Text, render, useApp, useFocusManager, useInput, measureElement } from 'ink';
 import { Alert } from '@inkjs/ui';
 import useStdoutDimensions from '../../utils/use-stdout-dimensions.js';
 import ShellInput from './components/shell-input.js';
@@ -91,6 +91,7 @@ const SigintHandler: React.FC<{ agent: Agent; showAlert: (alert: any) => void }>
 }) => {
   const [ctrlCCount, setCtrlCCount] = useState(0);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const app = useApp();
 
   // Handle Ctrl+C through Ink's input system
   useInput(
@@ -136,14 +137,14 @@ const SigintHandler: React.FC<{ agent: Agent; showAlert: (alert: any) => void }>
                 ctrlCTimerRef.current = null;
               }
               // Exit after a brief delay to show the message
-              setTimeout(() => process.exit(0), 500);
+              setTimeout(() => app.exit(), 500);
             }
 
             return newCount;
           });
         }
       },
-      [agent, showAlert, ctrlCCount]
+      [agent, app, showAlert, ctrlCCount]
     )
   );
 
@@ -663,6 +664,9 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
   }, [agent.threadManager, syncEvents]);
 
+  // Get Ink app instance for proper exit handling
+  const app = useApp();
+
   // Create UserInterface implementation
   const userInterface: UserInterface = React.useMemo(
     () => ({
@@ -691,7 +695,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       },
 
       exit(): void {
-        process.exit(0);
+        app.exit();
       },
 
       toggleFocusDebugPanel(): boolean {
@@ -704,7 +708,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         return !isTimelineLayoutDebugVisible;
       },
     }),
-    [agent, addMessage, isFocusDebugVisible, isTimelineLayoutDebugVisible]
+    [agent, app, addMessage, isFocusDebugVisible, isTimelineLayoutDebugVisible]
   );
 
   // Handle slash commands using new command system
@@ -950,6 +954,7 @@ export class TerminalInterface implements ApprovalCallback {
   private agent: Agent;
   private isRunning = false;
   private pendingApprovalRequests = new Map<string, (decision: ApprovalDecision) => void>();
+  private inkInstance?: ReturnType<typeof withFullScreen>;
 
   constructor(agent: Agent) {
     this.agent = agent;
@@ -963,14 +968,12 @@ export class TerminalInterface implements ApprovalCallback {
     this.isRunning = true;
 
     // Render the Ink app with custom Ctrl+C handling
-    withFullScreen(<TerminalInterfaceComponent agent={this.agent} approvalCallback={this} />, {
+    this.inkInstance = withFullScreen(<TerminalInterfaceComponent agent={this.agent} approvalCallback={this} />, {
       exitOnCtrlC: false, // Disable Ink's default Ctrl+C exit behavior
-    }).start();
-
-    // Keep the process running
-    await new Promise<void>((resolve) => {
-      // The interface will exit via process.exit() or SIGINT
     });
+    
+    await this.inkInstance.start();
+    await this.inkInstance.waitUntilExit();
   }
 
   async stop(): Promise<void> {
@@ -980,6 +983,11 @@ export class TerminalInterface implements ApprovalCallback {
 
     this.isRunning = false;
     await this.agent?.stop();
+    
+    // Properly unmount the Ink app
+    if (this.inkInstance) {
+      this.inkInstance.instance.unmount();
+    }
   }
 
   async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
