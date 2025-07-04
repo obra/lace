@@ -448,12 +448,12 @@ export class ThreadManager extends EventEmitter {
   private _getProviderStrategy(provider: AIProvider): SummarizeStrategy {
     const cacheKey = `${provider.providerName}-${provider.defaultModel}`;
     let strategy = this._providerStrategyCache.get(cacheKey);
-    
+
     if (!strategy) {
       strategy = new SummarizeStrategy(undefined, provider);
       this._providerStrategyCache.set(cacheKey, strategy);
     }
-    
+
     return strategy;
   }
 }

@@ -133,7 +133,8 @@ export class SummarizeStrategy implements CompactionStrategy {
 
     // Log compaction metrics - estimate summary tokens only once
     const summaryTokens = this.fallbackTokenEstimation([summaryEvent]);
-    const compressionRatio = summaryTokens > 0 ? (originalTokens / summaryTokens).toFixed(2) : 'N/A';
+    const compressionRatio =
+      summaryTokens > 0 ? (originalTokens / summaryTokens).toFixed(2) : 'N/A';
 
     logger.info('Thread compaction summary created', {
       originalEvents: events.length,
