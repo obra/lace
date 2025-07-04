@@ -294,6 +294,55 @@ export class ThreadManager extends EventEmitter {
     return threadId;
   }
 
+  async createShadowThread(reason: string): Promise<string> {
+    if (!this._currentThread) {
+      throw new Error('No current thread to create shadow for');
+    }
+
+    const currentThreadId = this._currentThread.id;
+    const canonicalId = this.getCanonicalId(currentThreadId);
+    
+    // Generate new shadow thread ID
+    const shadowThreadId = this.generateThreadId();
+    
+    // Create shadow thread with compacted events
+    const shadowThread: Thread = {
+      id: shadowThreadId,
+      createdAt: this._currentThread.createdAt,
+      updatedAt: new Date(),
+      events: [...this._currentThread.events], // Copy events for now
+    };
+
+    // Save shadow thread
+    this._persistence.saveThread(shadowThread);
+    
+    // Create version mapping
+    this._persistence.createVersion(canonicalId, shadowThreadId, reason);
+    
+    // Switch to shadow thread
+    this._currentThread = shadowThread;
+    
+    return shadowThreadId;
+  }
+
+  getCanonicalId(threadId: string): string {
+    // First check if this threadId is a canonical ID with a current version
+    const currentVersion = this._persistence.getCurrentVersion(threadId);
+    if (currentVersion) {
+      // This thread is already a canonical ID
+      return threadId;
+    }
+    
+    // Check if this thread is itself a version of something else
+    const canonicalId = this._persistence.findCanonicalIdForVersion(threadId);
+    if (canonicalId) {
+      return canonicalId;
+    }
+    
+    // If no version mapping exists, this thread IS the canonical ID
+    return threadId;
+  }
+
   // Cleanup
   async close(): Promise<void> {
     try {

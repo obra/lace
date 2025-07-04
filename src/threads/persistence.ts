@@ -245,6 +245,19 @@ export class ThreadPersistence {
     }));
   }
 
+  findCanonicalIdForVersion(versionId: string): string | null {
+    if (this._disabled || !this.db) return null;
+
+    const stmt = this.db.prepare(`
+      SELECT canonical_id FROM version_history 
+      WHERE version_id = ? 
+      LIMIT 1
+    `);
+
+    const row = stmt.get(versionId) as { canonical_id: string } | undefined;
+    return row ? row.canonical_id : null;
+  }
+
   close(): void {
     if (!this._closed) {
       this._closed = true;

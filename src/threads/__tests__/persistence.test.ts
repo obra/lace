@@ -606,6 +606,44 @@ describe('Enhanced ThreadManager', () => {
       expect(event.data).toBe('Hello');
     });
   });
+
+  describe('shadow thread creation', () => {
+    it('should create shadow thread and update version mapping', async () => {
+      const originalThreadId = 'lace_20250101_abc123';
+      threadManager.createThread(originalThreadId);
+      threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'Original message');
+
+      const shadowThreadId = await threadManager.createShadowThread('Compaction needed');
+
+      expect(shadowThreadId).not.toBe(originalThreadId);
+      expect(shadowThreadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
+      expect(threadManager.getCurrentThreadId()).toBe(shadowThreadId);
+
+      // Verify shadow thread has the events
+      const shadowEvents = threadManager.getEvents(shadowThreadId);
+      expect(shadowEvents).toHaveLength(1);
+      expect(shadowEvents[0].data).toBe('Original message');
+    });
+
+    it('should maintain canonical ID mapping', async () => {
+      const originalThreadId = 'lace_20250101_abc123';
+      threadManager.createThread(originalThreadId);
+
+      const shadowThreadId = await threadManager.createShadowThread('First shadow');
+      const secondShadowThreadId = await threadManager.createShadowThread('Second shadow');
+
+      // All should resolve to the same canonical ID
+      expect(threadManager.getCanonicalId(originalThreadId)).toBe(originalThreadId);
+      expect(threadManager.getCanonicalId(shadowThreadId)).toBe(originalThreadId);
+      expect(threadManager.getCanonicalId(secondShadowThreadId)).toBe(originalThreadId);
+    });
+
+    it('should throw error when no current thread', async () => {
+      await expect(threadManager.createShadowThread('Test')).rejects.toThrow(
+        'No current thread to create shadow for'
+      );
+    });
+  });
 });
 
 describe('Session Management', () => {
