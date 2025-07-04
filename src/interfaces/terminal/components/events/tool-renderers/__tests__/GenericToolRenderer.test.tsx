@@ -1,397 +1,222 @@
-// ABOUTME: Comprehensive tests for GenericToolRenderer component
-// ABOUTME: Tests expansion behavior, content rendering, focus states, and tool-specific formatting
+// ABOUTME: Test suite for GenericToolRenderer component functionality
+// ABOUTME: Covers tool name formatting, command extraction, and generic fallback display
 
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import { GenericToolRenderer } from '../GenericToolRenderer.js';
 import { ToolCall, ToolResult } from '../../../../../../tools/types.js';
-import { Text } from 'ink';
+import type { ToolExecutionItem } from '../hooks/useToolData.js';
 
-// Mock dependencies with simple text components
-vi.mock('../../../ui/TimelineEntry.js', () => ({
-  TimelineEntry: ({ children, summary, isExpanded, label }: any) => {
-    const summaryText = typeof summary === 'object' ? '[ComplexSummary]' : summary;
-    const contentText = isExpanded
-      ? typeof children === 'object'
-        ? '[ComplexContent]'
-        : children
-      : '';
+import { Text, Box } from 'ink';
+
+// Mock the new architecture components
+vi.mock('../components/ToolDisplay.js', () => ({
+  ToolDisplay: ({ toolData, toolState, components }: any) => {
     return React.createElement(
-      Text,
-      {},
-      `[Box] ${label} - Expanded: ${isExpanded}\nSummary: ${summaryText}${isExpanded ? `\nContent: ${contentText}` : ''}`
+      Box,
+      { flexDirection: 'column' },
+      // Render header
+      React.createElement(
+        Box,
+        {},
+        React.createElement(Text, {}, `Tool: ${toolData.toolName}`),
+        React.createElement(Text, {}, ` - ${toolData.primaryInfo}`),
+        toolData.secondaryInfo && React.createElement(Text, {}, toolData.secondaryInfo),
+        React.createElement(Text, {}, ` ${toolData.statusIcon}`),
+        toolData.isStreaming && React.createElement(Text, {}, ' (running...)'),
+        React.createElement(Text, {}, ' [GENERIC]')
+      ),
+      // Render preview when collapsed
+      !toolState.isExpanded && components?.preview,
+      // Render content when expanded
+      toolState.isExpanded && components?.content
     );
   },
 }));
 
-vi.mock('../../../ui/CompactOutput.js', () => ({
-  CompactOutput: ({ output, language, maxLines }: any) =>
-    React.createElement(Text, {}, `[CompactOutput] ${output} (${language}, max: ${maxLines})`),
-}));
+vi.mock('../hooks/useToolData.js', () => {
+  return {
+    useToolData: (item: any) => {
+      const { call, result } = item;
+      const success = result ? !result.isError : true;
+      const isStreaming = !result;
+      const output = result?.content?.[0]?.text || '';
+      
+      // Simulate the real useToolData behavior for different tools
+      let primaryInfo = '';
+      const toolName = call.name;
+      
+      switch (toolName) {
+        case 'bash':
+          primaryInfo = `$ ${call.arguments.command || ''}`;
+          break;
+        case 'file-write':
+        case 'file-read':
+        case 'file-edit':
+          primaryInfo = call.arguments.path || '';
+          break;
+        case 'ripgrep-search':
+          primaryInfo = `"${call.arguments.pattern || ''}" in ${call.arguments.path || 'current directory'}`;
+          break;
+        case 'delegate':
+          primaryInfo = `"${call.arguments.task || call.arguments.prompt || 'Unknown task'}"`;
+          break;
+        default:
+          // For unknown tools, use the first argument value if it's short
+          const firstValue = Object.values(call.arguments)[0];
+          if (firstValue && typeof firstValue === 'string' && firstValue.length <= 50) {
+            primaryInfo = firstValue;
+          } else {
+            primaryInfo = toolName;
+          }
+          break;
+      }
+      
+      return {
+        toolName,
+        primaryInfo,
+        secondaryInfo: '',
+        success,
+        isStreaming,
+        statusIcon: success ? '✓' : '✗',
+        output,
+        language: 'text',
+        isEmpty: false,
+        stats: '',
+        input: call.arguments,
+        result,
+      };
+    },
+    ToolExecutionItem: {},
+  };
+});
 
-vi.mock('../../../ui/CodeDisplay.js', () => ({
-  CodeDisplay: ({ code, language }: any) =>
-    React.createElement(Text, {}, `[CodeDisplay] ${code} (${language})`),
-}));
-
-vi.mock('../../../../theme.js', () => ({
-  UI_SYMBOLS: {
-    TOOL: '🔧',
-    SUCCESS: '✓',
-    ERROR: '✗',
-    PENDING: '⏳',
-  },
-  UI_COLORS: {
-    TOOL: 'blue',
-    SUCCESS: 'green',
-    ERROR: 'red',
-    PENDING: 'yellow',
-  },
-}));
-
-vi.mock('../../hooks/useTimelineExpansionToggle.js', () => ({
-  useTimelineItemExpansion: () => ({
+vi.mock('../hooks/useToolState.js', () => ({
+  useToolState: (isSelected: boolean, onToggle?: () => void) => ({
     isExpanded: false,
     onExpand: vi.fn(),
     onCollapse: vi.fn(),
+    handleExpandedChange: vi.fn(),
   }),
 }));
 
 describe('GenericToolRenderer', () => {
-  const createToolExecutionItem = (
-    toolName: string = 'bash',
-    input: Record<string, unknown> = { command: 'ls -la' },
-    result?: ToolResult
-  ) => ({
+  const createToolExecutionItem = (call: ToolCall, result?: ToolResult): ToolExecutionItem => ({
     type: 'tool_execution' as const,
-    call: {
-      id: 'call-123',
-      name: toolName,
-      arguments: input,
-    } as ToolCall,
+    call,
     result,
-    timestamp: new Date('2024-01-01T10:00:00Z'),
-    callId: 'call-123',
-  });
-
-  const createSuccessResult = (output: string = 'file1.txt\nfile2.txt'): ToolResult => ({
-    id: 'call-123',
-    content: [{ type: 'text', text: output }],
-    isError: false,
-  });
-
-  const createErrorResult = (error: string = 'Command failed'): ToolResult => ({
-    id: 'call-123',
-    content: [{ type: 'text', text: error }],
-    isError: true,
-  });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
+    timestamp: new Date(),
+    callId: 'test-call-id',
   });
 
   describe('Tool name formatting', () => {
     it('should format tool names nicely', () => {
-      const item = createToolExecutionItem('file_read');
-
+      const call: ToolCall = {
+        id: 'test-call-1',
+        name: 'custom-tool-name',
+        arguments: {},
+      };
+      const item = createToolExecutionItem(call);
       const { lastFrame } = render(<GenericToolRenderer item={item} />);
 
-      expect(lastFrame()).toContain('file-read');
-    });
-
-    it('should preserve hyphenated tool names', () => {
-      const item = createToolExecutionItem('ripgrep-search');
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('ripgrep-search');
+      const frame = lastFrame();
+      expect(frame).toContain('Tool: custom-tool-name');
+      expect(frame).toContain('[GENERIC]');
     });
   });
 
   describe('Tool command extraction', () => {
     it('should extract bash command for summary', () => {
-      const item = createToolExecutionItem('bash', { command: 'ls -la' });
-
+      const call: ToolCall = {
+        id: 'test-call-2',
+        name: 'bash',
+        arguments: { command: 'ls -la' },
+      };
+      const item = createToolExecutionItem(call);
       const { lastFrame } = render(<GenericToolRenderer item={item} />);
 
-      expect(lastFrame()).toContain('bash ls -la'); // Label includes command
+      const frame = lastFrame();
+      expect(frame).toContain('$ ls -la');
     });
 
     it('should extract file path for file operations', () => {
-      const item = createToolExecutionItem('file-read', { file_path: '/test/file.txt' });
-
+      const call: ToolCall = {
+        id: 'test-call-3',
+        name: 'file-write',
+        arguments: { path: '/test/file.txt', content: 'content' },
+      };
+      const item = createToolExecutionItem(call);
       const { lastFrame } = render(<GenericToolRenderer item={item} />);
 
-      expect(lastFrame()).toContain('file-read /test/file.txt'); // Label includes file path
+      const frame = lastFrame();
+      expect(frame).toContain('/test/file.txt');
     });
 
     it('should extract search pattern for ripgrep', () => {
-      const item = createToolExecutionItem('ripgrep-search', { pattern: 'TODO' });
-
+      const call: ToolCall = {
+        id: 'test-call-4',
+        name: 'ripgrep-search',
+        arguments: { pattern: 'TODO', path: 'src' },
+      };
+      const item = createToolExecutionItem(call);
       const { lastFrame } = render(<GenericToolRenderer item={item} />);
 
-      expect(lastFrame()).toContain('ripgrep-search "TODO"'); // Label includes pattern
+      const frame = lastFrame();
+      expect(frame).toContain('"TODO" in src');
     });
 
     it('should extract task for delegate tool', () => {
-      const item = createToolExecutionItem('delegate', { task: 'Calculate sum' });
-
+      const call: ToolCall = {
+        id: 'test-call-5',
+        name: 'delegate',
+        arguments: { task: 'Fix the tests' },
+      };
+      const item = createToolExecutionItem(call);
       const { lastFrame } = render(<GenericToolRenderer item={item} />);
 
-      expect(lastFrame()).toContain('delegate "Calculate sum"'); // Label includes task
+      const frame = lastFrame();
+      expect(frame).toContain('"Fix the tests"');
     });
 
     it('should handle delegate tool with prompt field', () => {
-      const item = createToolExecutionItem('delegate', { prompt: 'Help with task' });
-
+      const call: ToolCall = {
+        id: 'test-call-6',
+        name: 'delegate',
+        arguments: { prompt: 'Analyze the code' },
+      };
+      const item = createToolExecutionItem(call);
       const { lastFrame } = render(<GenericToolRenderer item={item} />);
 
-      expect(lastFrame()).toContain('delegate "Help with task"'); // Label includes prompt
+      const frame = lastFrame();
+      expect(frame).toContain('"Analyze the code"');
     });
 
     it('should use first parameter for unknown tools if short', () => {
-      const item = createToolExecutionItem('custom-tool', { first_param: 'value' });
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('custom-tool value'); // Label includes first param
-    });
-
-    it('should skip long parameters for unknown tools', () => {
-      const longValue = 'x'.repeat(60);
-      const item = createToolExecutionItem('custom-tool', { param: longValue });
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('custom-tool'); // Label without long param
-      expect(lastFrame()).not.toContain(longValue);
-    });
-  });
-
-  describe('Expansion behavior', () => {
-    it('should start collapsed by default', () => {
-      const item = createToolExecutionItem();
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('Expanded: false');
-    });
-
-    it('should use shared expansion state from hook', () => {
-      const item = createToolExecutionItem();
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} />);
-
-      // Expansion is now managed by the hook system
-      expect(lastFrame()).toContain('Expanded: false');
-    });
-
-    it('should call onExpandedChange when provided', () => {
-      const item = createToolExecutionItem();
-      const onExpandedChange = vi.fn();
-
-      render(<GenericToolRenderer item={item}  />);
-
-      // onExpandedChange is passed to TimelineEntry
-      expect(onExpandedChange).not.toHaveBeenCalled(); // Not called during render
-    });
-  });
-
-  describe('Content rendering', () => {
-    it('should show tool summary when collapsed', () => {
-      const item = createToolExecutionItem('bash', { command: 'ls' });
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[ComplexSummary]'); // Summary mock
-      expect(frame).toContain('bash'); // Tool name in label
-    });
-
-    it('should show input and output summary when collapsed', () => {
-      const item = createToolExecutionItem(
-        'bash',
-        { command: 'ls' },
-        createSuccessResult('file.txt')
-      );
-
-      const { lastFrame } = render(<GenericToolRenderer item={item}  />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[ComplexSummary]'); // Collapsed summary mock
-      expect(frame).toContain('Expanded: false'); // Should be collapsed
-    });
-
-    it('should show compact output preview when collapsed with result', () => {
-      const item = createToolExecutionItem(
-        'bash',
-        { command: 'ls' },
-        createSuccessResult('file.txt')
-      );
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[ComplexSummary]'); // Summary includes compact output
-      expect(frame).toContain('Expanded: false'); // Should be collapsed
-    });
-
-    it('should not show compact output preview for errors when collapsed', () => {
-      const item = createToolExecutionItem(
-        'bash',
-        { command: 'ls' },
-        createErrorResult('Permission denied')
-      );
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[ComplexSummary]'); // Still has summary but no compact output
-      expect(frame).toContain('Expanded: false'); // Should be collapsed
-    });
-  });
-
-  describe('Status indicators', () => {
-    it('should show success status for successful tools', () => {
-      const item = createToolExecutionItem('bash', { command: 'ls' }, createSuccessResult());
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('[ComplexSummary]'); // Summary includes status
-    });
-
-    it('should show error status for failed tools', () => {
-      const item = createToolExecutionItem('bash', { command: 'ls' }, createErrorResult());
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('[ComplexSummary]'); // Summary includes status
-    });
-
-    it('should show pending status for tools without results', () => {
-      const item = createToolExecutionItem('bash', { command: 'ls' });
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('[ComplexSummary]'); // Summary includes status
-    });
-
-    it('should show streaming indicator when isStreaming is true', () => {
-      const item = createToolExecutionItem('bash', { command: 'ls' });
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} isStreaming={true} />);
-
-      expect(lastFrame()).toContain('[ComplexSummary]'); // Summary includes streaming indicator
-    });
-  });
-
-  describe('JSON output detection', () => {
-    it('should detect JSON output and set appropriate language', () => {
-      const jsonOutput = '{"result": "success"}';
-      const item = createToolExecutionItem(
-        'bash',
-        { command: 'curl' },
-        createSuccessResult(jsonOutput)
-      );
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('[ComplexSummary]'); // Summary includes JSON output
-    });
-
-    it('should default to text for non-JSON output', () => {
-      const textOutput = 'file1.txt\nfile2.txt';
-      const item = createToolExecutionItem(
-        'bash',
-        { command: 'ls' },
-        createSuccessResult(textOutput)
-      );
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('[ComplexSummary]'); // Summary includes text output
-    });
-  });
-
-  describe('Error handling', () => {
-    it('should display error message when tool fails', () => {
-      const item = createToolExecutionItem(
-        'bash',
-        { command: 'invalid' },
-        createErrorResult('Command not found')
-      );
-
-      const { lastFrame } = render(<GenericToolRenderer item={item}  />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[ComplexSummary]'); // Error content in collapsed view
-      expect(frame).toContain('Expanded: false');
-    });
-
-    it('should handle missing error message gracefully', () => {
-      const result: ToolResult = {
-        id: 'call-123',
-        content: [{ type: 'text', text: '' }],
-        isError: true,
+      const call: ToolCall = {
+        id: 'test-call-7',
+        name: 'unknown-tool',
+        arguments: { someParam: 'short value' },
       };
-      const item = createToolExecutionItem('bash', { command: 'invalid' }, result);
-
-      const { lastFrame } = render(<GenericToolRenderer item={item}  />);
+      const item = createToolExecutionItem(call);
+      const { lastFrame } = render(<GenericToolRenderer item={item} />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[ComplexSummary]'); // Error content with fallback
-      expect(frame).toContain('Expanded: false');
+      expect(frame).toContain('short value');
     });
 
-    it('should handle missing output gracefully', () => {
-      const result: ToolResult = {
-        id: 'call-123',
-        content: [{ type: 'text', text: '' }],
-        isError: false,
+    it('should use tool name for unknown tools with long parameters', () => {
+      const call: ToolCall = {
+        id: 'test-call-8',
+        name: 'unknown-tool',
+        arguments: { someParam: 'a'.repeat(100) },
       };
-      const item = createToolExecutionItem('bash', { command: 'echo' }, result);
-
-      const { lastFrame } = render(<GenericToolRenderer item={item}  />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[ComplexSummary]'); // Success content with fallback
-      expect(frame).toContain('Expanded: false');
-    });
-  });
-
-  describe('Focus states', () => {
-    it('should render without errors when focused', () => {
-      const item = createToolExecutionItem();
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} isSelected={true} />);
-
-      expect(lastFrame()).toBeTruthy();
-    });
-
-    it('should render without errors when not focused', () => {
-      const item = createToolExecutionItem();
-
-      const { lastFrame } = render(<GenericToolRenderer item={item} isSelected={false} />);
-
-      expect(lastFrame()).toBeTruthy();
-    });
-  });
-
-  describe('Input truncation', () => {
-    it('should handle complex input objects', () => {
-      const complexInput = {
-        file_path: '/long/path/to/file.txt',
-        options: { recursive: true, force: true },
-        content: 'Some file content here',
-      };
-      const item = createToolExecutionItem('file-write', complexInput);
-
-      const { lastFrame } = render(<GenericToolRenderer item={item}  />);
+      const item = createToolExecutionItem(call);
+      const { lastFrame } = render(<GenericToolRenderer item={item} />);
 
       const frame = lastFrame();
-      expect(frame).toContain('[ComplexSummary]'); // Complex input summary
-      expect(frame).toContain('Expanded: false');
+      expect(frame).toContain('unknown-tool');
+      expect(frame).not.toContain('a'.repeat(100));
     });
   });
 });

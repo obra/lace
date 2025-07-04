@@ -1,30 +1,85 @@
-// ABOUTME: Specialized renderer for file-edit tool executions with replacement details and line counts
+// ABOUTME: Specialized renderer for file-edit tool executions using three-layer architecture
 // ABOUTME: Shows file edit operations with before/after line counts and replacement context
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { 
-  useToolRenderer, 
-  ToolRendererProps,
-  limitLines,
-  parseBasicToolResult 
-} from './useToolRenderer.js';
+import { ToolDisplay } from './components/ToolDisplay.js';
+import { useToolData, type ToolExecutionItem } from './hooks/useToolData.js';
+import { useToolState } from './hooks/useToolState.js';
+import { limitLines } from './useToolRenderer.js';
 
-// Helper function to parse edit result
-function parseEditResult(output: string): { filePath: string; fromLines: number; toLines: number } | null {
-  // Parse "Successfully replaced text in path (X lines → Y lines)"
-  const pattern = /Successfully replaced text in (.+) \((\d+) lines → (\d+) lines\)/;
-  const match = output.match(pattern);
+interface FileEditToolRendererProps {
+  item: ToolExecutionItem;
+  isStreaming?: boolean;
+  isSelected?: boolean;
+  onToggle?: () => void;
+}
+
+// Custom preview component for edit operations
+function EditPreview({ oldText }: { oldText: string }) {
+  const { lines, truncated } = limitLines(oldText, 2);
   
-  if (match) {
-    return {
-      filePath: match[1],
-      fromLines: parseInt(match[2], 10),
-      toLines: parseInt(match[3], 10)
-    };
+  return (
+    <Box flexDirection="column">
+      {lines.map((line, index) => (
+        <Text key={index} color="red">
+          - {line}
+        </Text>
+      ))}
+      {truncated && <Text color="gray">... and more</Text>}
+    </Box>
+  );
+}
+
+// Custom content component for edit operations
+function EditContent({ 
+  input, 
+  output, 
+  success 
+}: { 
+  input: Record<string, unknown>; 
+  output: string; 
+  success: boolean;
+}) {
+  const oldText = (input.old_text as string) || '';
+  const newText = (input.new_text as string) || '';
+  
+  if (!success) {
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Error:</Text>
+        <Box marginLeft={2}>
+          <Text color="red">{output || 'Unknown error'}</Text>
+        </Box>
+      </Box>
+    );
   }
   
-  return null;
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Text color="red">- Removed:</Text>
+      {(() => {
+        const { lines } = limitLines(oldText, 10);
+        return lines.map((line, index) => (
+          <Text key={`old-${index}`} color="red">
+            - {line}
+          </Text>
+        ));
+      })()}
+      
+      <Box marginTop={1}>
+        <Text color="green">+ Added:</Text>
+      </Box>
+      {(() => {
+        const { lines } = limitLines(newText, 10);
+        return lines.map((line, index) => (
+          <Text key={`new-${index}`} color="green">
+            + {line}
+          </Text>
+        ));
+      })()}
+    </Box>
+  );
 }
 
 export function FileEditToolRenderer({
@@ -32,96 +87,35 @@ export function FileEditToolRenderer({
   isStreaming = false,
   isSelected = false,
   onToggle,
-}: ToolRendererProps) {
+}: FileEditToolRendererProps) {
+  // Layer 1: Data processing
+  const toolData = useToolData(item);
   
-  const { timelineEntry } = useToolRenderer(
-    item,
-    {
-      toolName: 'Edit',
-      streamingAction: 'editing...',
-      
-      getPrimaryInfo: (input) => (input.path as string) || '',
-      
-      parseOutput: (result, input) => {
-        const { success, output } = parseBasicToolResult(result);
-        
-        if (!success) {
-          return {
-            success: false,
-            errorMessage: output || 'Unknown error'
-          };
-        }
-
-        const editResult = parseEditResult(output);
-        const oldText = (input.old_text as string) || '';
-        const newText = (input.new_text as string) || '';
-        
-        if (!editResult) {
-          return {
-            success: false,
-            errorMessage: 'Could not parse edit result'
-          };
-        }
-
-        // Create stats summary
-        const statsText = `1 replacement (${editResult.fromLines} → ${editResult.toLines} lines)`;
-
-        // Create preview content for collapsed view
-        const previewContent = (
-          <Box flexDirection="column">
-            {(() => {
-              const { lines, truncated } = limitLines(oldText, 2);
-              return (
-                <Box flexDirection="column">
-                  {lines.map((line, index) => (
-                    <Text key={index} color="red">
-                      - {line}
-                    </Text>
-                  ))}
-                  {truncated && <Text color="gray">... and more</Text>}
-                </Box>
-              );
-            })()}
-          </Box>
-        );
-
-        // Create main content for expanded view
-        const mainContent = (
-          <Box flexDirection="column" marginTop={1}>
-            <Text color="red">- Removed:</Text>
-            {(() => {
-              const { lines } = limitLines(oldText, 10);
-              return lines.map((line, index) => (
-                <Text key={`old-${index}`} color="red">
-                  - {line}
-                </Text>
-              ));
-            })()}
-            
-            <Text color="green">+ Added:</Text>
-            {(() => {
-              const { lines } = limitLines(newText, 10);
-              return lines.map((line, index) => (
-                <Text key={`new-${index}`} color="green">
-                  + {line}
-                </Text>
-              ));
-            })()}
-          </Box>
-        );
-
-        return {
-          success,
-          stats: statsText,
-          previewContent,
-          mainContent
-        };
-      }
-    },
-    isStreaming,
-    isSelected,
-    onToggle
+  // Layer 2: State management
+  const toolState = useToolState(isSelected, onToggle);
+  
+  // Get old text for preview
+  const oldText = (toolData.input.old_text as string) || '';
+  
+  // Layer 3: Display with custom components
+  return (
+    <ToolDisplay
+      toolData={toolData}
+      toolState={toolState}
+      isSelected={isSelected}
+      onToggle={onToggle}
+      components={{
+        preview: toolData.result && !toolData.isStreaming ? (
+          <EditPreview oldText={oldText} />
+        ) : undefined,
+        content: (
+          <EditContent 
+            input={toolData.input} 
+            output={toolData.output} 
+            success={toolData.success} 
+          />
+        )
+      }}
+    />
   );
-
-  return timelineEntry;
 }

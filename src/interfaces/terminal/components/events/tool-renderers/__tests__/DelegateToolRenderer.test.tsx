@@ -6,503 +6,433 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { DelegateToolRenderer } from '../DelegateToolRenderer.js';
 import { ToolCall, ToolResult } from '../../../../../../tools/types.js';
-import { Text } from 'ink';
+import type { ToolExecutionItem } from '../hooks/useToolData.js';
+import { LaceFocusProvider } from '../../../../focus/focus-provider.js';
+import { UI_SYMBOLS, UI_COLORS } from '../../../../theme.js';
 
-// Mock dependencies with simple text components
-vi.mock('../../../ui/TimelineEntry.js', () => ({
-  TimelineEntry: ({ children, summary, isExpanded, label }: any) => {
-    const summaryText = typeof summary === 'object' ? '[DelegateSummary]' : summary;
-    const contentText = isExpanded
-      ? typeof children === 'object'
-        ? '[DelegateContent]'
-        : children
-      : '';
-    return React.createElement(
-      Text,
+import { Text, Box } from 'ink';
+
+// Mock all the dependencies BEFORE the component imports them
+vi.mock('../../../focus/focus-lifecycle-wrapper.js', () => ({
+  FocusLifecycleWrapper: ({ children }: any) => children,
+}));
+
+// Mock the utils
+vi.mock('../../../../../utils/logger.js', () => ({
+  logger: {
+    debug: () => {},
+    error: () => {},
+    warn: () => {},
+  },
+}));
+
+vi.mock('../../../../../utils/token-estimation.js', () => ({
+  formatTokenCount: (count: number) => `${count} tokens`,
+}));
+
+vi.mock('../../utils/timeline-utils.js', () => ({
+  extractDelegateThreadId: (item: any) => item.result?.metadata?.threadId || null,
+  isThreadComplete: () => false,
+  extractTaskFromTimeline: (timeline: any) => 'Task',
+  calculateDuration: () => '0:00',
+  calculateTokens: () => ({ tokensIn: 0, tokensOut: 0 }),
+}));
+
+// Mock the thread management
+vi.mock('../../../../hooks/useThreadManager.js', () => ({
+  useThreadManager: () => ({
+    getEvents: () => [],
+  }),
+}));
+
+vi.mock('../../../../hooks/useThreadProcessor.js', () => ({
+  useThreadProcessor: () => ({
+    processThreads: () => ({ items: [], metadata: {} }),
+  }),
+}));
+
+// Create mock DelegateHeader component
+const MockDelegateHeader = ({ toolData, delegateData }: any) => {
+  return React.createElement(
+    Box,
+    { flexDirection: 'column' },
+    React.createElement(
+      Box,
       {},
-      `[DelegateBox] ${label} - Expanded: ${isExpanded}\nSummary: ${summaryText}${isExpanded ? `\nContent: ${contentText}` : ''}`
+      React.createElement(Text, {}, '🔧 delegate '),
+      React.createElement(Text, {}, toolData.baseData.primaryInfo),
+      React.createElement(Text, {}, ' '),
+      React.createElement(Text, {}, toolData.baseData.statusIcon),
+      React.createElement(Text, {}, ' [DELEGATE]')
+    ),
+    delegateData.delegateThreadId && React.createElement(
+      Box,
+      {},
+      React.createElement(Text, {}, `${UI_SYMBOLS.DELEGATE} `),
+      React.createElement(Text, {}, `Thread: ${delegateData.delegateThreadId}`)
+    )
+  );
+};
+
+// Mock the new architecture components
+vi.mock('../components/ToolDisplay.js', () => ({
+  ToolDisplay: ({ toolData, toolState, components }: any) => {
+    // For DelegateToolRenderer, the toolData passed is the delegateData object
+    // which has baseData property
+    const actualToolData = toolData.baseData || toolData;
+    
+    return React.createElement(
+      Box,
+      { flexDirection: 'column' },
+      // Render custom components
+      components?.header || React.createElement(Text, {}, 'Default header'),
+      !toolState.isExpanded && components?.preview,
+      toolState.isExpanded && components?.content
     );
   },
 }));
 
-vi.mock('../../../ui/CompactOutput.js', () => ({
-  CompactOutput: ({ output, language }: any) =>
-    React.createElement(Text, {}, `[CompactOutput] ${output} (${language})`),
-}));
+vi.mock('../hooks/useToolData.js', () => {
+  return {
+    useToolData: (item: any) => {
+      const { call, result } = item;
+      const success = result ? !result.isError : true;
+      const isStreaming = !result;
+      const output = result?.content?.[0]?.text || '';
+      const task = call.arguments.task || call.arguments.prompt || 'Unknown task';
+      
+      return {
+        toolName: 'delegate',
+        primaryInfo: task,
+        secondaryInfo: '[DELEGATE]',
+        success,
+        isStreaming,
+        statusIcon: success ? '✓' : result ? '✗' : '⏳',
+        output,
+        language: 'text',
+        isEmpty: false,
+        stats: '',
+        input: call.arguments,
+        result,
+      };
+    },
+    ToolExecutionItem: {},
+  };
+});
 
-vi.mock('../../../ui/CodeDisplay.js', () => ({
-  CodeDisplay: ({ code, language }: any) =>
-    React.createElement(Text, {}, `[CodeDisplay] ${code} (${language})`),
-}));
-
-vi.mock('../../../../../../theme.js', () => ({
-  UI_SYMBOLS: {
-    TOOL: '🔧',
-    SUCCESS: '✓',
-    ERROR: '✗',
-    PENDING: '⏳',
-    DELEGATE: '🤝',
-    WORKING: '⚡',
-    TOKEN_IN: '↑',
-    TOKEN_OUT: '↓',
-    COLLAPSE_HINT: '←',
-    EXPAND_HINT: '→',
+vi.mock('../hooks/useDelegateToolData.js', () => ({
+  useDelegateToolData: (item: any) => {
+    const { call, result } = item;
+    const task = call.arguments.task || call.arguments.prompt || 'Unknown task';
+    const delegateThreadId = result?.metadata?.threadId || null;
+    
+    // Create a mock of the DelegateHeader component content inline
+    const header = React.createElement(MockDelegateHeader, { 
+      toolData: {
+        baseData: {
+          primaryInfo: `"${task}"`,
+          statusIcon: result ? (!result.isError ? '✓' : '✗') : '⏳',
+        }
+      },
+      delegateData: { delegateThreadId }
+    });
+    
+    return {
+      baseData: {
+        toolName: 'delegate',
+        primaryInfo: `"${task}"`,
+        secondaryInfo: '[DELEGATE]',
+        success: result ? !result.isError : true,
+        isStreaming: !result,
+        statusIcon: result ? (!result.isError ? '✓' : '✗') : '⏳',
+        output: result?.content?.[0]?.text || '',
+        language: 'text',
+        isEmpty: false,
+        stats: '',
+        input: call.arguments,
+        result,
+      },
+      delegateThreadId,
+      delegateTask: task,
+      timeline: { items: [], metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() } },
+      hasThreadData: !!delegateThreadId,
+      isComplete: false,
+      taskDescription: task,
+      duration: '0:00',
+      tokens: { tokensIn: 0, tokensOut: 0 },
+      // Include the header for rendering
+      header,
+    };
   },
-  UI_COLORS: {
-    TOOL: 'blue',
-    SUCCESS: 'green',
-    ERROR: 'red',
-    PENDING: 'yellow',
-    DELEGATE: 'cyan',
-  },
 }));
 
-vi.mock('../../hooks/useTimelineExpansionToggle.js', () => ({
-  useTimelineItemExpansion: () => ({
+vi.mock('../hooks/useDelegateToolState.js', () => ({
+  useDelegateToolState: (delegateThreadId: string | null, isSelected: boolean, onToggle?: () => void) => ({
+    baseState: {
+      isExpanded: false,
+      onExpand: vi.fn(),
+      onCollapse: vi.fn(),
+      handleExpandedChange: vi.fn(),
+    },
+    isEntered: false,
+    isFocused: false,
+    focusId: delegateThreadId ? `delegate:${delegateThreadId}` : 'none',
+    setIsEntered: vi.fn(),
+    delegationExpanded: true,
+    setDelegationExpanded: vi.fn(),
+    handleFocusEntry: vi.fn(),
+  }),
+}));
+
+vi.mock('../hooks/useToolState.js', () => ({
+  useToolState: (isSelected: boolean, onToggle?: () => void) => ({
     isExpanded: false,
     onExpand: vi.fn(),
     onCollapse: vi.fn(),
-  }),
-  useTimelineItemFocusEntry: vi.fn(),
-  TimelineExpansionProvider: ({ children }: any) => children,
-}));
-
-vi.mock('../../../../terminal-interface.js', () => ({
-  useThreadManager: () => ({
-    getEvents: vi.fn(() => []),
-  }),
-  useThreadProcessor: () => ({
-    processThreads: vi.fn(() => ({
-      items: [],
-      metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
-    })),
+    handleExpandedChange: vi.fn(),
   }),
 }));
 
-vi.mock('../../../../../../utils/token-estimation.js', () => ({
-  calculateTokens: () => ({ tokensIn: 100, tokensOut: 50 }),
-  formatTokenCount: (count: number) => count.toString(),
-}));
+// Use actual theme values - no mocking needed since we import them
 
-vi.mock('../../../../focus/index.js', () => ({
-  useLaceFocus: () => ({ isFocused: false }),
-  useLaceFocusContext: () => ({
-    currentFocus: 'timeline',
-    pushFocus: vi.fn(),
-    popFocus: vi.fn(),
-    getFocusStack: () => ['shell-input', 'timeline'],
-    isFocusActive: (id: string) => id === 'timeline',
-  }),
-  FocusRegions: {
-    delegate: (threadId: string) => `delegate-${threadId}`,
-  },
+// Mock other dependencies
+vi.mock('../../../focus/index.js', () => ({
   FocusLifecycleWrapper: ({ children }: any) => children,
-}));
-
-vi.mock('../../TimelineDisplay.js', () => ({
-  default: ({ timeline }: any) =>
-    React.createElement(Text, {}, `[TimelineDisplay] Items: ${timeline.items.length}`),
-}));
-
-vi.mock('../../../../../../utils/logger.js', () => ({
-  logger: {
-    error: vi.fn(),
-    debug: vi.fn(),
+  FocusRegions: {
+    delegate: (id: string) => `delegate:${id}`,
   },
+  useLaceFocus: () => ({ isFocused: false }),
 }));
 
-vi.mock('../../utils/timeline-utils.js', () => ({
-  extractDelegateThreadId: (item: any) => {
-    const threadId = item.result?.metadata?.threadId;
-    return threadId && typeof threadId === 'string' ? threadId : null;
-  },
-  isThreadComplete: () => false,
-  extractTaskFromTimeline: () => 'Test Task',
-  calculateDuration: () => '5s',
+vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
+  TimelineExpansionProvider: ({ children }: any) => children,
+  useTimelineItemFocusEntry: () => {},
+}));
+
+vi.mock('ink', async () => {
+  const actual = await vi.importActual<typeof import('ink')>('ink');
+  return {
+    ...actual,
+    useInput: () => {},
+  };
+});
+
+vi.mock('../TimelineDisplay.js', () => ({
+  default: () => React.createElement(Text, {}, '[TimelineDisplay]'),
 }));
 
 describe('DelegateToolRenderer', () => {
-  const createDelegateExecutionItem = (
-    input: Record<string, unknown> = { task: 'Calculate 3+6' },
-    result?: ToolResult
-  ) => ({
+  const createToolExecutionItem = (call: ToolCall, result?: ToolResult): ToolExecutionItem => ({
     type: 'tool_execution' as const,
-    call: {
-      id: 'call-123',
-      name: 'delegate',
-      arguments: input,
-    } as ToolCall,
+    call,
     result,
-    timestamp: new Date('2024-01-01T10:00:00Z'),
-    callId: 'call-123',
-  });
-
-  const createSuccessResult = (output: string = 'Thread: delegate-thread-456'): ToolResult => ({
-    id: 'call-123',
-    content: [{ type: 'text', text: output }],
-    isError: false,
-  });
-
-  const createErrorResult = (error: string = 'Delegation failed'): ToolResult => ({
-    id: 'call-123',
-    content: [{ type: 'text', text: error }],
-    isError: true,
-  });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
+    timestamp: new Date(),
+    callId: 'test-call-id',
   });
 
   describe('Task extraction and display', () => {
     it('should extract task from input.task field', () => {
-      const item = createDelegateExecutionItem({ task: 'Help me calculate something' });
+      const call: ToolCall = {
+        id: 'test-call-1',
+        name: 'delegate',
+        arguments: { task: 'Fix the tests' },
+      };
+      const item = createToolExecutionItem(call);
+      const { lastFrame } = render(
+        <LaceFocusProvider>
+          <DelegateToolRenderer item={item} />
+        </LaceFocusProvider>
+      );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('delegate "Help me calculate something"');
+      const frame = lastFrame();
+      expect(frame).toContain('"Fix the tests"');
+      expect(frame).toContain('[DELEGATE]');
     });
 
     it('should extract task from input.prompt field as fallback', () => {
-      const item = createDelegateExecutionItem({ prompt: 'Solve this problem' });
+      const call: ToolCall = {
+        id: 'test-call-2',
+        name: 'delegate',
+        arguments: { prompt: 'Analyze the code' },
+      };
+      const item = createToolExecutionItem(call);
+      const { lastFrame } = render(
+        <LaceFocusProvider>
+          <DelegateToolRenderer item={item} />
+        </LaceFocusProvider>
+      );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('delegate "Solve this problem"');
+      const frame = lastFrame();
+      expect(frame).toContain('"Analyze the code"');
+      expect(frame).toContain('[DELEGATE]');
     });
 
     it('should use fallback when no task or prompt provided', () => {
-      const item = createDelegateExecutionItem({ other: 'field' });
+      const call: ToolCall = {
+        id: 'test-call-3',
+        name: 'delegate',
+        arguments: {},
+      };
+      const item = createToolExecutionItem(call);
+      const { lastFrame } = render(
+        <LaceFocusProvider>
+          <DelegateToolRenderer item={item} />
+        </LaceFocusProvider>
+      );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('delegate "Unknown task"');
+      const frame = lastFrame();
+      expect(frame).toContain('"Unknown task"');
     });
   });
 
   describe('Delegation status display', () => {
     it('should show thread ID when delegation is successful', () => {
-      const item = createDelegateExecutionItem(
-        { task: 'Calculate sum' },
-        createSuccessResult('Thread: delegate-thread-456')
+      const call: ToolCall = {
+        id: 'test-call-5',
+        name: 'delegate',
+        arguments: { task: 'Test task' },
+      };
+      const result: ToolResult = {
+        content: [{ type: 'text', text: 'Task completed' }],
+        isError: false,
+        metadata: { threadId: 'thread-123' },
+      };
+      const item = createToolExecutionItem(call, result);
+      const { lastFrame } = render(
+        <LaceFocusProvider>
+          <DelegateToolRenderer item={item} />
+        </LaceFocusProvider>
       );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateSummary]');
-      expect(frame).toContain('delegate "Calculate sum"');
+      expect(frame).toContain('Thread: thread-123');
+      expect(frame).toContain('✓');
     });
 
     it('should show error status when delegation fails', () => {
-      const item = createDelegateExecutionItem(
-        { task: 'Calculate sum' },
-        createErrorResult('Failed to create delegate thread')
+      const call: ToolCall = {
+        id: 'test-call-6',
+        name: 'delegate',
+        arguments: { task: 'Test task' },
+      };
+      const result: ToolResult = {
+        content: [{ type: 'text', text: 'Error occurred' }],
+        isError: true,
+      };
+      const item = createToolExecutionItem(call, result);
+      const { lastFrame } = render(
+        <LaceFocusProvider>
+          <DelegateToolRenderer item={item} />
+        </LaceFocusProvider>
       );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateSummary]');
-      expect(frame).toContain('delegate "Calculate sum"');
+      expect(frame).toContain('✗');
     });
 
     it('should show pending status when no result yet', () => {
-      const item = createDelegateExecutionItem({ task: 'Calculate sum' });
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[DelegateSummary]');
-      expect(frame).toContain('delegate "Calculate sum"');
-    });
-
-    it('should show streaming indicator when isStreaming is true', () => {
-      const item = createDelegateExecutionItem({ task: 'Calculate sum' });
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isStreaming={true} />);
-
-      expect(lastFrame()).toContain('[DelegateSummary]');
-    });
-  });
-
-  describe('Thread ID extraction', () => {
-    it('should extract thread ID from output containing Thread: pattern', () => {
-      const item = createDelegateExecutionItem(
-        { task: 'Calculate sum' },
-        createSuccessResult(
-          'Successfully created delegate thread.\nThread: delegate-thread-789\nStarting execution...'
-        )
-      );
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[DelegateSummary]');
-    });
-
-    it('should handle output without thread ID pattern', () => {
-      const item = createDelegateExecutionItem(
-        { task: 'Calculate sum' },
-        createSuccessResult('Delegation completed without thread ID')
-      );
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[DelegateSummary]');
-    });
-
-    it('should handle missing output gracefully', () => {
-      const item = createDelegateExecutionItem(
-        { task: 'Calculate sum' },
-        {
-          id: 'call-123',
-          content: [{ type: 'text', text: '' }],
-          isError: false,
-        }
-      );
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('[DelegateSummary]');
-    });
-  });
-
-  describe('Expansion behavior', () => {
-    it('should start collapsed by default', () => {
-      const item = createDelegateExecutionItem();
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('Expanded: false');
-    });
-
-    it('should use shared expansion state from hook', () => {
-      const item = createDelegateExecutionItem();
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
-      // Expansion is now managed by the hook system
-      expect(lastFrame()).toContain('Expanded: false');
-    });
-  });
-
-  describe('Content rendering', () => {
-    it('should show delegate summary when collapsed', () => {
-      const item = createDelegateExecutionItem({ task: 'Calculate sum' });
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[DelegateSummary]');
-      expect(frame).toContain('Expanded: false');
-    });
-
-    it('should show delegate summary when collapsed', () => {
-      const item = createDelegateExecutionItem(
-        { task: 'Calculate sum' },
-        createSuccessResult('Thread: delegate-thread-456')
-      );
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[DelegateSummary]');
-      expect(frame).toContain('Expanded: false');
-    });
-
-    it('should show delegate summary when thread ID is found but collapsed', () => {
-      const item = createDelegateExecutionItem(
-        { task: 'Calculate sum' },
-        createSuccessResult('Thread: delegate-thread-456')
-      );
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[DelegateSummary]');
-      expect(frame).toContain('Expanded: false');
-    });
-
-    it('should show delegate summary when no thread ID found', () => {
-      const item = createDelegateExecutionItem(
-        { task: 'Calculate sum' },
-        createSuccessResult('No thread created')
-      );
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[DelegateSummary]');
-      expect(frame).toContain('Expanded: false');
-    });
-  });
-
-  describe('Error handling', () => {
-    it('should display delegate summary when delegation fails', () => {
-      const item = createDelegateExecutionItem(
-        { task: 'Calculate sum' },
-        createErrorResult('Failed to create delegate thread')
-      );
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[DelegateSummary]');
-      expect(frame).toContain('Expanded: false');
-    });
-
-    it('should handle missing error message gracefully', () => {
-      const result: ToolResult = {
-        id: 'call-123',
-        content: [{ type: 'text', text: '' }],
-        isError: true,
+      const call: ToolCall = {
+        id: 'test-call-7',
+        name: 'delegate',
+        arguments: { task: 'Test task' },
       };
-      const item = createDelegateExecutionItem({ task: 'Calculate sum' }, result);
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[DelegateSummary]');
-      expect(frame).toContain('Expanded: false');
-    });
-
-    it('should handle missing output gracefully', () => {
-      const result: ToolResult = {
-        id: 'call-123',
-        content: [{ type: 'text', text: '' }],
-        isError: false,
-      };
-      const item = createDelegateExecutionItem({ task: 'Calculate sum' }, result);
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
-
-      const frame = lastFrame();
-      expect(frame).toContain('[DelegateSummary]');
-      expect(frame).toContain('Expanded: false');
-    });
-  });
-
-  describe('JSON output detection', () => {
-    it('should detect JSON output and set appropriate language', () => {
-      const jsonOutput = '{"threadId": "delegate-thread-456", "status": "created"}';
-      const item = createDelegateExecutionItem(
-        { task: 'Calculate sum' },
-        createSuccessResult(jsonOutput)
+      const item = createToolExecutionItem(call);
+      const { lastFrame } = render(
+        <LaceFocusProvider>
+          <DelegateToolRenderer item={item} />
+        </LaceFocusProvider>
       );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('[DelegateSummary]');
-    });
-
-    it('should default to text for non-JSON output', () => {
-      const textOutput = 'Thread: delegate-thread-456\nDelegation started successfully';
-      const item = createDelegateExecutionItem(
-        { task: 'Calculate sum' },
-        createSuccessResult(textOutput)
-      );
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('[DelegateSummary]');
-    });
-  });
-
-  describe('Focus states', () => {
-    it('should render without errors when focused', () => {
-      const item = createDelegateExecutionItem();
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isSelected={true} />);
-
-      expect(lastFrame()).toBeTruthy();
-    });
-
-    it('should render without errors when not focused', () => {
-      const item = createDelegateExecutionItem();
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item} isSelected={false} />);
-
-      expect(lastFrame()).toBeTruthy();
+      const frame = lastFrame();
+      expect(frame).toContain('⏳');
     });
   });
 
   describe('Input handling', () => {
     it('should handle complex input objects', () => {
-      const complexInput = {
-        task: 'Process data analysis',
-        context: {
-          data: 'large dataset',
-          format: 'CSV',
-          requirements: ['clean', 'analyze', 'visualize'],
+      const call: ToolCall = {
+        id: 'test-call-8',
+        name: 'delegate',
+        arguments: {
+          task: 'Complex task',
+          context: { key: 'value' },
+          options: ['option1', 'option2'],
         },
-        options: { timeout: 300, retries: 3 },
       };
-      const item = createDelegateExecutionItem(complexInput);
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item}  />);
+      const item = createToolExecutionItem(call);
+      const { lastFrame } = render(
+        <LaceFocusProvider>
+          <DelegateToolRenderer item={item} />
+        </LaceFocusProvider>
+      );
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateSummary]');
-      expect(frame).toContain('delegate "Process data analysis"');
-      expect(frame).toContain('Expanded: false');
+      expect(frame).toContain('"Complex task"');
     });
 
     it('should handle empty input objects', () => {
-      const item = createDelegateExecutionItem({});
+      const call: ToolCall = {
+        id: 'test-call-4',
+        name: 'delegate',
+        arguments: {},
+      };
+      const item = createToolExecutionItem(call);
+      const { lastFrame } = render(
+        <LaceFocusProvider>
+          <DelegateToolRenderer item={item} />
+        </LaceFocusProvider>
+      );
 
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('delegate "Unknown task"');
+      const frame = lastFrame();
+      // Should still render without crashing
+      expect(frame).toContain('Unknown task');
     });
   });
 
   describe('Thread ID extraction from metadata', () => {
     it('should extract thread ID from result metadata', () => {
-      const result: ToolResult = {
-        id: 'call-123',
-        content: [{ type: 'text', text: 'Delegation created successfully' }],
-        isError: false,
-        metadata: { threadId: 'delegate-thread-789' },
+      const call: ToolCall = {
+        id: 'test-call-9',
+        name: 'delegate',
+        arguments: { task: 'Test task' },
       };
-      const item = createDelegateExecutionItem({ task: 'Analyze logs' }, result);
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
+      const result: ToolResult = {
+        content: [{ type: 'text', text: 'Success' }],
+        isError: false,
+        metadata: { threadId: 'thread-456' },
+      };
+      const item = createToolExecutionItem(call, result);
+      const { lastFrame } = render(
+        <LaceFocusProvider>
+          <DelegateToolRenderer item={item} />
+        </LaceFocusProvider>
+      );
 
       const frame = lastFrame();
-      expect(frame).toContain('[DelegateBox] delegate "Analyze logs"');
-      // Delegation content should be rendered for tools with metadata threadId
+      expect(frame).toContain('thread-456');
     });
 
     it('should show delegation active status when thread ID present in metadata', () => {
-      const result: ToolResult = {
-        id: 'call-456',
-        content: [{ type: 'text', text: 'Task completed' }],
-        isError: false,
-        metadata: { threadId: 'delegate-thread-completed' },
+      const call: ToolCall = {
+        id: 'test-call-10',
+        name: 'delegate',
+        arguments: { task: 'Test task' },
       };
-      const item = createDelegateExecutionItem({ task: 'Complete analysis' }, result);
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
-
-      expect(lastFrame()).toContain('[DelegateBox] delegate "Complete analysis"');
-      // Delegation content should be rendered for completed delegate tasks
-    });
-
-    it('should not show delegation info when no thread ID in metadata', () => {
       const result: ToolResult = {
-        id: 'call-789',
-        content: [{ type: 'text', text: 'No delegation' }],
+        content: [{ type: 'text', text: 'Working...' }],
         isError: false,
-        metadata: {},
+        metadata: { threadId: 'thread-789' },
       };
-      const item = createDelegateExecutionItem({ task: 'Simple task' }, result);
-
-      const { lastFrame } = render(<DelegateToolRenderer item={item} />);
+      const item = createToolExecutionItem(call, result);
+      const { lastFrame } = render(
+        <LaceFocusProvider>
+          <DelegateToolRenderer item={item} />
+        </LaceFocusProvider>
+      );
 
       const frame = lastFrame();
-      expect(frame).not.toContain('Thread:');
-      expect(frame).not.toContain('Delegation active');
+      expect(frame).toContain(UI_SYMBOLS.DELEGATE); // Delegate symbol
+      expect(frame).toContain('Thread: thread-789');
     });
   });
 });

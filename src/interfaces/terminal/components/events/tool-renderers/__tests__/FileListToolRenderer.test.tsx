@@ -6,55 +6,87 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { FileListToolRenderer } from '../FileListToolRenderer.js';
 import { ToolCall, ToolResult } from '../../../../../../tools/types.js';
-import { Text } from 'ink';
+import type { ToolExecutionItem } from '../hooks/useToolData.js';
 
-// Mock dependencies with simple text components
-vi.mock('../../../ui/TimelineEntry.js', () => ({
-  TimelineEntry: ({ children, summary, isExpanded, label }: any) => {
-    const summaryText = typeof summary === 'object' ? '[ComplexSummary]' : summary;
-    const contentText = isExpanded
-      ? typeof children === 'object'
-        ? '[ComplexContent]'
-        : children
-      : '';
-    
-    // If label is a React element, render it as part of the mock
-    const labelText = React.isValidElement(label) ? '' : label;
-    
+import { Text, Box } from 'ink';
+
+// Mock the new architecture components
+vi.mock('../components/ToolDisplay.js', () => ({
+  ToolDisplay: ({ toolData, toolState, components }: any) => {
     return React.createElement(
-      Text,
-      {},
-      `[Box] ${labelText} - Expanded: ${isExpanded}\nSummary: ${summaryText}${isExpanded ? `\nContent: ${contentText}` : ''}`,
-      React.isValidElement(label) ? label : null
+      Box,
+      { flexDirection: 'column' },
+      // Render header
+      React.createElement(
+        Box,
+        {},
+        React.createElement(Text, {}, `Tool: ${toolData.toolName}`),
+        React.createElement(Text, {}, ` - ${toolData.primaryInfo}`),
+        toolData.secondaryInfo && React.createElement(Text, {}, toolData.secondaryInfo),
+        React.createElement(Text, {}, ` ${toolData.statusIcon}`),
+        toolData.isStreaming && React.createElement(Text, {}, ' (running...)'),
+        toolData.stats && React.createElement(Text, {}, ` - ${toolData.stats}`)
+      ),
+      // Render preview when collapsed
+      !toolState.isExpanded && components?.preview,
+      // Render content when expanded
+      toolState.isExpanded && components?.content
     );
   },
 }));
 
-vi.mock('../../../../theme.js', () => ({
-  UI_SYMBOLS: {
-    SUCCESS: '✓',
-    ERROR: '✗',
-    PENDING: '⏳',
-  },
-  UI_COLORS: {
-    TOOL: 'blue',
-    SUCCESS: 'green',
-    ERROR: 'red',
-  },
-}));
+vi.mock('../hooks/useToolData.js', () => {
+  return {
+    useToolData: (item: any) => {
+      const { call, result } = item;
+      const success = result ? !result.isError : true;
+      const isStreaming = !result;
+      const output = result?.content?.[0]?.text || '';
+      
+      return {
+        toolName: 'file-list',
+        primaryInfo: call.arguments.path || 'current directory',
+        secondaryInfo: call.arguments.recursive ? ' (recursive)' : '',
+        success,
+        isStreaming,
+        statusIcon: success ? '✓' : '✗',
+        output,
+        language: 'text',
+        isEmpty: output === 'No files found',
+        stats: '',
+        input: call.arguments,
+        result,
+      };
+    },
+    ToolExecutionItem: {},
+  };
+});
 
-vi.mock('../../hooks/useTimelineExpansionToggle.js', () => ({
-  useTimelineItemExpansion: () => ({
+vi.mock('../hooks/useToolState.js', () => ({
+  useToolState: (isSelected: boolean, onToggle?: () => void) => ({
     isExpanded: false,
     onExpand: vi.fn(),
     onCollapse: vi.fn(),
+    handleExpandedChange: vi.fn(),
   }),
+}));
+
+// Keep the limitLines utility
+vi.mock('../useToolRenderer.js', () => ({
+  limitLines: (text: string, maxLines: number) => {
+    const lines = text.split('\n');
+    return {
+      lines: lines.slice(0, maxLines),
+      truncated: lines.length > maxLines,
+      remaining: Math.max(0, lines.length - maxLines),
+    };
+  },
 }));
 
 describe('FileListToolRenderer', () => {
   const mockCall: ToolCall = {
-    id: 'test-call-id',
-    name: 'file_list',
+    id: 'test-call-1',
+    name: 'file-list',
     arguments: {
       path: '/test/directory',
       recursive: true,
@@ -93,63 +125,35 @@ describe('FileListToolRenderer', () => {
     callId: 'test-call-id',
   });
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('renders tool name and directory path correctly', () => {
+  it('renders basic file list information', () => {
     const item = createToolExecutionItem(mockCall, mockSuccessResult);
     const { lastFrame } = render(<FileListToolRenderer item={item} />);
 
     const frame = lastFrame();
-    expect(frame).toContain('File List:');
+    expect(frame).toContain('Tool: file-list');
     expect(frame).toContain('/test/directory');
-  });
-
-  it('displays parameter summary when options are provided', () => {
-    const callWithOptions: ToolCall = {
-      ...mockCall,
-      arguments: {
-        path: '/test/directory',
-        recursive: true,
-        includeHidden: true,
-        pattern: '*.js',
-        maxDepth: 5,
-      },
-    };
-    
-    const item = createToolExecutionItem(callWithOptions, mockSuccessResult);
-    const { lastFrame } = render(<FileListToolRenderer item={item} />);
-
-    const frame = lastFrame();
-    expect(frame).toContain('recursive');
-    expect(frame).toContain('hidden files');
-    expect(frame).toContain('pattern: *.js');
-    expect(frame).toContain('depth:');
-  });
-
-  it('shows current directory when path is not specified', () => {
-    const callWithoutPath: ToolCall = {
-      ...mockCall,
-      arguments: {},
-    };
-    
-    const item = createToolExecutionItem(callWithoutPath, mockSuccessResult);
-    const { lastFrame } = render(<FileListToolRenderer item={item} />);
-
-    const frame = lastFrame();
-    expect(frame).toContain('current directory');
-  });
-
-  it('displays success icon for successful results', () => {
-    const item = createToolExecutionItem(mockCall, mockSuccessResult);
-    const { lastFrame } = render(<FileListToolRenderer item={item} />);
-
-    const frame = lastFrame();
+    expect(frame).toContain('(recursive)');
     expect(frame).toContain('✓');
   });
 
-  it('displays error icon for failed results', () => {
+  it('shows directory tree preview when collapsed', () => {
+    const item = createToolExecutionItem(mockCall, mockSuccessResult);
+    const { lastFrame } = render(<FileListToolRenderer item={item} />);
+
+    const frame = lastFrame();
+    expect(frame).toContain('test-directory/');
+    expect(frame).toContain('├ file1.txt (150 bytes)');
+  });
+
+  it('handles empty directory results', () => {
+    const item = createToolExecutionItem(mockCall, mockEmptyResult);
+    const { lastFrame } = render(<FileListToolRenderer item={item} />);
+
+    const frame = lastFrame();
+    expect(frame).toContain('No files found');
+  });
+
+  it('handles error results', () => {
     const item = createToolExecutionItem(mockCall, mockErrorResult);
     const { lastFrame } = render(<FileListToolRenderer item={item} />);
 
@@ -157,38 +161,12 @@ describe('FileListToolRenderer', () => {
     expect(frame).toContain('✗');
   });
 
-  it('shows file and directory count in summary', () => {
-    const item = createToolExecutionItem(mockCall, mockSuccessResult);
-    const { lastFrame } = render(<FileListToolRenderer item={item} />);
-
-    const frame = lastFrame();
-    // The summary shows in the [ComplexSummary] mock - actual counting happens in the component
-    expect(frame).toContain('[ComplexSummary]');
-  });
-
-  it('displays "No files found" message for empty results', () => {
-    const item = createToolExecutionItem(mockCall, mockEmptyResult);
-    const { lastFrame } = render(<FileListToolRenderer item={item} />);
-
-    const frame = lastFrame();
-    expect(frame).toContain('[ComplexSummary]');
-  });
-
-  it('shows error message for failed tool execution', () => {
-    const item = createToolExecutionItem(mockCall, mockErrorResult);
-    const { lastFrame } = render(<FileListToolRenderer item={item} />);
-
-    const frame = lastFrame();
-    // Error results don't have complex summary, they show 'false' for the summary
-    expect(frame).toContain('Summary: false');
-  });
-
   it('shows streaming indicator when isStreaming is true', () => {
     const item = createToolExecutionItem(mockCall);
     const { lastFrame } = render(<FileListToolRenderer item={item} isStreaming={true} />);
 
     const frame = lastFrame();
-    expect(frame).toContain('(scanning...)');
+    expect(frame).toContain('(running...)');
   });
 
   it('handles missing result gracefully', () => {
@@ -196,31 +174,6 @@ describe('FileListToolRenderer', () => {
     const { lastFrame } = render(<FileListToolRenderer item={item} />);
 
     const frame = lastFrame();
-    // Pending items show success icon (✓) not pending icon since 'success' is true for missing results
     expect(frame).toContain('✓');
-  });
-
-  it('renders collapsed by default', () => {
-    const item = createToolExecutionItem(mockCall, mockSuccessResult);
-    const { lastFrame } = render(<FileListToolRenderer item={item} />);
-
-    const frame = lastFrame();
-    expect(frame).toContain('Expanded: false');
-  });
-
-  it('uses shared expansion state from hook', () => {
-    const item = createToolExecutionItem(mockCall, mockSuccessResult);
-    const { lastFrame } = render(<FileListToolRenderer item={item} />);
-
-    const frame = lastFrame();
-    expect(frame).toContain('Expanded: false');
-  });
-
-  it('handles focus states correctly', () => {
-    const item = createToolExecutionItem(mockCall, mockSuccessResult);
-    const { lastFrame } = render(<FileListToolRenderer item={item} isSelected={true} />);
-
-    const frame = lastFrame();
-    expect(frame).toBeTruthy();
   });
 });

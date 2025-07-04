@@ -22,12 +22,12 @@
 - **file_insert**: Add content at specific line numbers
 
 ### System Operations
-- **bash**: Run shell commands (warn before destructive ops)
+- **bash**: Use this tool to run commands locally that you don't have special tools for.
 - **url_fetch**: Fetch and analyze web content
 - **delegate**: Create sub-agents for complex tasks
 
 ### Workflow Tools (MANDATORY USE)
-- **task_add**: Add tasks to track progress - MUST use to track all work
+- **task_add**: Add tasks to track progress - YOU MUST use this to track all work
 - **task_list**: View current tasks regularly
 - **task_complete**: Mark tasks as done when finished
 
