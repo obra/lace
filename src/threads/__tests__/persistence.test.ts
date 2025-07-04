@@ -69,6 +69,25 @@ describe('ThreadPersistence', () => {
 
       db.close();
     });
+
+    it('should create version management tables', () => {
+      const db = new Database(tempDbPath);
+
+      const tables = db
+        .prepare(
+          `
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name IN ('thread_versions', 'version_history')
+      `
+        )
+        .all() as Array<{ name: string }>;
+
+      expect(tables).toHaveLength(2);
+      expect(tables.map((t) => t.name)).toContain('thread_versions');
+      expect(tables.map((t) => t.name)).toContain('version_history');
+
+      db.close();
+    });
   });
 
   describe('thread operations', () => {
@@ -309,6 +328,130 @@ describe('ThreadPersistence', () => {
       expect(() => persistence.loadEvents('test_thread')).toThrow();
     });
   });
+
+  describe('version management', () => {
+    it('should return null for non-versioned threads', async () => {
+      const currentVersion = await persistence.getCurrentVersion('non_existent');
+      expect(currentVersion).toBeNull();
+    });
+
+    it('should create and retrieve thread versions', async () => {
+      const canonicalId = 'thread_canonical_123';
+      const versionId = 'thread_version_456';
+      const reason = 'Created shadow for compaction';
+
+      // Create the version thread first to satisfy foreign key constraint
+      const versionThread: Thread = {
+        id: versionId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        events: [],
+      };
+      await persistence.saveThread(versionThread);
+
+      await persistence.createVersion(canonicalId, versionId, reason);
+      const currentVersion = await persistence.getCurrentVersion(canonicalId);
+
+      expect(currentVersion).toBe(versionId);
+    });
+
+    it('should update existing version', async () => {
+      const canonicalId = 'thread_canonical_123';
+      const firstVersionId = 'thread_version_456';
+      const secondVersionId = 'thread_version_789';
+
+      // Create both version threads
+      const firstThread: Thread = {
+        id: firstVersionId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        events: [],
+      };
+      const secondThread: Thread = {
+        id: secondVersionId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        events: [],
+      };
+      await persistence.saveThread(firstThread);
+      await persistence.saveThread(secondThread);
+
+      await persistence.createVersion(canonicalId, firstVersionId, 'First version');
+      await persistence.createVersion(canonicalId, secondVersionId, 'Second version');
+
+      const currentVersion = await persistence.getCurrentVersion(canonicalId);
+      expect(currentVersion).toBe(secondVersionId);
+    });
+
+    it('should track version history', async () => {
+      const canonicalId = 'thread_canonical_123';
+      const firstVersionId = 'thread_version_456';
+      const secondVersionId = 'thread_version_789';
+
+      // Create both version threads
+      const firstThread: Thread = {
+        id: firstVersionId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        events: [],
+      };
+      const secondThread: Thread = {
+        id: secondVersionId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        events: [],
+      };
+      await persistence.saveThread(firstThread);
+      await persistence.saveThread(secondThread);
+
+      await persistence.createVersion(canonicalId, firstVersionId, 'First version');
+      // Small delay to ensure different timestamps
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      await persistence.createVersion(canonicalId, secondVersionId, 'Second version');
+
+      const history = await persistence.getVersionHistory(canonicalId);
+      expect(history).toHaveLength(2);
+      expect(history[0].versionId).toBe(secondVersionId); // Most recent first
+      expect(history[0].reason).toBe('Second version');
+      expect(history[1].versionId).toBe(firstVersionId);
+      expect(history[1].reason).toBe('First version');
+    });
+
+    it('should load current version when accessing canonical ID', async () => {
+      // Create a thread
+      const originalThread: Thread = {
+        id: 'thread_version_456',
+        createdAt: new Date('2025-01-01T10:00:00Z'),
+        updatedAt: new Date('2025-01-01T10:30:00Z'),
+        events: [],
+      };
+      await persistence.saveThread(originalThread);
+
+      // Create version mapping
+      const canonicalId = 'thread_canonical_123';
+      await persistence.createVersion(canonicalId, 'thread_version_456', 'Shadow creation');
+
+      // Load using canonical ID should return the version
+      const loaded = await persistence.loadThread(canonicalId);
+      expect(loaded).not.toBeNull();
+      expect(loaded!.id).toBe('thread_version_456');
+      expect(loaded!.createdAt).toEqual(originalThread.createdAt);
+    });
+
+    it('should load normally for non-versioned threads', async () => {
+      const thread: Thread = {
+        id: 'normal_thread_123',
+        createdAt: new Date('2025-01-01T10:00:00Z'),
+        updatedAt: new Date('2025-01-01T10:30:00Z'),
+        events: [],
+      };
+      await persistence.saveThread(thread);
+
+      const loaded = await persistence.loadThread('normal_thread_123');
+      expect(loaded).not.toBeNull();
+      expect(loaded!.id).toBe('normal_thread_123');
+    });
+  });
 });
 
 describe('Enhanced ThreadManager', () => {
@@ -461,6 +604,102 @@ describe('Enhanced ThreadManager', () => {
       threadManager.createThread('test_123');
       const event = threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
       expect(event.data).toBe('Hello');
+    });
+  });
+
+  describe('thread compaction', () => {
+    it('should create compacted thread and update version mapping', async () => {
+      const originalThreadId = 'lace_20250101_abc123';
+      threadManager.createThread(originalThreadId);
+      threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'Original message');
+
+      const compactedThreadId = await threadManager.createShadowThread('Compaction needed');
+
+      expect(compactedThreadId).not.toBe(originalThreadId);
+      expect(compactedThreadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
+      expect(threadManager.getCurrentThreadId()).toBe(compactedThreadId);
+
+      // Verify compacted thread has the events (may be compacted)
+      const compactedEvents = threadManager.getEvents(compactedThreadId);
+      expect(compactedEvents.length).toBeGreaterThan(0);
+      // With default compaction strategy, 1 event should be preserved
+      expect(compactedEvents).toHaveLength(1);
+      expect(compactedEvents[0].data).toBe('Original message');
+    });
+
+    it('should maintain canonical ID mapping', async () => {
+      const originalThreadId = 'lace_20250101_abc123';
+      threadManager.createThread(originalThreadId);
+
+      const compactedThreadId = await threadManager.createShadowThread('First compaction');
+      const secondCompactedThreadId = await threadManager.createShadowThread('Second compaction');
+
+      // All should resolve to the same canonical ID
+      expect(threadManager.getCanonicalId(originalThreadId)).toBe(originalThreadId);
+      expect(threadManager.getCanonicalId(compactedThreadId)).toBe(originalThreadId);
+      expect(threadManager.getCanonicalId(secondCompactedThreadId)).toBe(originalThreadId);
+    });
+
+    it('should throw error when no current thread', async () => {
+      await expect(threadManager.createShadowThread('Test')).rejects.toThrow(
+        'No current thread to compact'
+      );
+    });
+
+    it('should compact events when creating compacted thread', async () => {
+      const originalThreadId = 'lace_20250101_abc123';
+      threadManager.createThread(originalThreadId);
+
+      // Add enough events to trigger compaction
+      for (let i = 0; i < 15; i++) {
+        threadManager.addEvent(originalThreadId, 'USER_MESSAGE', `Message ${i}`);
+      }
+
+      const compactedThreadId = await threadManager.createShadowThread('Test compaction');
+      const compactedEvents = threadManager.getEvents(compactedThreadId);
+
+      // Should have all user messages preserved since we now preserve all user/agent messages
+      // With 15 USER_MESSAGE events, all should be preserved (no summary needed)
+      expect(compactedEvents.length).toBe(15); // All user messages preserved
+
+      // All events should be user messages (no summary created since all events are preserved)
+      expect(compactedEvents.every((e) => e.type === 'USER_MESSAGE')).toBe(true);
+    });
+
+    it('should detect when compaction is needed', async () => {
+      const originalThreadId = 'lace_20250101_abc123';
+      threadManager.createThread(originalThreadId);
+
+      // Small thread shouldn't need compaction
+      threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'Short message');
+      expect(await threadManager.needsCompaction()).toBe(false);
+
+      // Large thread should need compaction
+      const longMessage = 'Very long message. '.repeat(1000);
+      for (let i = 0; i < 10; i++) {
+        threadManager.addEvent(originalThreadId, 'USER_MESSAGE', longMessage);
+      }
+      expect(await threadManager.needsCompaction()).toBe(true);
+    });
+
+    it('should compact automatically when needed', async () => {
+      const originalThreadId = 'lace_20250101_abc123';
+      threadManager.createThread(originalThreadId);
+
+      // Add content that doesn't need compaction
+      threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'Short message');
+      const compacted1 = await threadManager.compactIfNeeded();
+      expect(compacted1).toBe(false);
+      expect(threadManager.getCurrentThreadId()).toBe(originalThreadId);
+
+      // Add content that needs compaction
+      const longMessage = 'Very long message. '.repeat(1000);
+      for (let i = 0; i < 10; i++) {
+        threadManager.addEvent(originalThreadId, 'USER_MESSAGE', longMessage);
+      }
+      const compacted2 = await threadManager.compactIfNeeded();
+      expect(compacted2).toBe(true);
+      expect(threadManager.getCurrentThreadId()).not.toBe(originalThreadId);
     });
   });
 });
