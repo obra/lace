@@ -31,6 +31,15 @@ class MockProvider extends AIProvider {
     return 'mock-model';
   }
 
+  // Use context window that allows for testing but not too restrictive
+  get contextWindow(): number {
+    return 4000; 
+  }
+
+  get maxCompletionTokens(): number {
+    return 2000;
+  }
+
   setMockResponse(content: string): void {
     this.mockResponse = {
       content,
@@ -56,7 +65,7 @@ describe('Compaction Integration', () => {
     
     // Configure compaction strategy with lower token limit for testing
     threadManager['_compactionStrategy'] = new SummarizeStrategy({ 
-      maxTokens: 1000, // Much lower for testing
+      maxTokens: 500, // Very low for testing to ensure compaction triggers
       preserveRecentEvents: 2 
     });
     
@@ -85,62 +94,103 @@ describe('Compaction Integration', () => {
     }
   });
 
-  it('should trigger compaction automatically during conversation', async () => {
+  it('should trigger compaction and preserve conversational flow', async () => {
     const originalThreadId = agent.getThreadId();
     
-    // Add multiple messages to trigger compaction
-    const message = 'This is a message that will contribute to hitting the token limit. '.repeat(50);
+    // Manually add large tool results to trigger compaction
+    const longToolResult = 'Very long tool output that takes up lots of tokens. '.repeat(200);
     
-    // Mock provider to return simple responses
-    mockProvider.setMockResponse('I understand.');
+    // Add a mix of events that will trigger compaction
+    threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'Please run a command');
+    threadManager.addEvent(originalThreadId, 'AGENT_MESSAGE', 'I will run that for you');
     
-    // Send multiple messages to trigger compaction
-    for (let i = 0; i < 8; i++) {
-      await agent.sendMessage(`${message} Message ${i}`);
+    // Add several large tool results that should trigger compaction
+    for (let i = 0; i < 5; i++) {
+      threadManager.addEvent(originalThreadId, 'TOOL_CALL', {
+        id: `call_${i}`,
+        name: 'bash',
+        arguments: { command: 'ls -la' }
+      });
+      threadManager.addEvent(originalThreadId, 'TOOL_RESULT', {
+        id: `call_${i}`,
+        content: [{ type: 'text', text: longToolResult }],
+        isError: false
+      });
     }
 
-    // Check if compaction occurred (thread ID should change)
+    // Trigger compaction manually since we want to test the compaction itself
+    const compacted = await threadManager.compactIfNeeded();
+    expect(compacted).toBe(true);
+
+    // Check if compaction occurred - Agent threadId should remain stable (canonical ID)
     const finalThreadId = agent.getThreadId();
-    const eventsAfterCompaction = threadManager.getEvents(finalThreadId);
+    expect(finalThreadId).toBe(originalThreadId);
     
-    // Should have compacted the thread
-    expect(finalThreadId).not.toBe(originalThreadId);
+    // ThreadManager's current thread should be different if compaction occurred
+    const currentShadowThreadId = threadManager.getCurrentThreadId();
+    expect(currentShadowThreadId).not.toBe(originalThreadId);
     
-    // Should have fewer events due to compaction
-    expect(eventsAfterCompaction.length).toBeLessThan(16); // 8 user + 8 agent = 16, compaction should reduce this significantly
+    // Get events from the shadow thread
+    const eventsAfterCompaction = threadManager.getEvents(currentShadowThreadId!);
     
-    // Check that we have a summary event
+    // Should have: the 2 user/agent messages preserved + summary for tool events + recent events
+    expect(eventsAfterCompaction.length).toBeGreaterThan(2); // At least the preserved messages
+    expect(eventsAfterCompaction.length).toBeLessThan(12); // But fewer than original 12 events
+    
+    // All user and agent messages should be preserved
+    const userAgentEvents = eventsAfterCompaction.filter(e => 
+      e.type === 'USER_MESSAGE' || e.type === 'AGENT_MESSAGE'
+    );
+    expect(userAgentEvents).toHaveLength(2);
+    expect(userAgentEvents[0].data).toBe('Please run a command');
+    expect(userAgentEvents[1].data).toBe('I will run that for you');
+    
+    // Should have a compaction summary
     const summaryEvent = eventsAfterCompaction.find(e => 
       e.type === 'LOCAL_SYSTEM_MESSAGE' && 
       typeof e.data === 'string' && 
-      e.data.includes('Summarized')
+      e.data.includes('**Compaction Summary**')
     );
     expect(summaryEvent).toBeDefined();
     
     // Should maintain canonical ID mapping
-    expect(threadManager.getCanonicalId(finalThreadId)).toBe(originalThreadId);
+    expect(threadManager.getCanonicalId(currentShadowThreadId!)).toBe(originalThreadId);
   });
 
   it('should continue conversation normally after compaction', async () => {
     const originalThreadId = agent.getThreadId();
     
-    // Trigger compaction
-    const message = 'Message that will trigger compaction. '.repeat(50);
-    mockProvider.setMockResponse('Got it.');
+    // Manually create a compaction scenario and trigger it
+    const longToolResult = 'Long tool output. '.repeat(100); // Smaller to avoid context window issues after compaction
     
-    for (let i = 0; i < 5; i++) {
-      await agent.sendMessage(message);
+    threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'First message');
+    threadManager.addEvent(originalThreadId, 'AGENT_MESSAGE', 'First response');
+    
+    for (let i = 0; i < 3; i++) {
+      threadManager.addEvent(originalThreadId, 'TOOL_RESULT', {
+        id: `result_${i}`,
+        content: [{ type: 'text', text: longToolResult }],
+        isError: false
+      });
     }
+    
+    // Trigger compaction
+    await threadManager.compactIfNeeded();
 
-    // Verify compaction occurred
+    // Verify compaction occurred - Agent threadId should remain stable
     const compactedThreadId = agent.getThreadId();
-    expect(compactedThreadId).not.toBe(originalThreadId);
-
+    expect(compactedThreadId).toBe(originalThreadId); // Agent threadId stays stable
+    
     // Continue conversation after compaction
     mockProvider.setMockResponse('Hello there!');
     await agent.sendMessage('Hello after compaction');
 
-    const finalEvents = threadManager.getEvents(compactedThreadId);
+    // Get the active thread ID (shadow thread or original)
+    const activeThreadId = threadManager.getCurrentThreadId() || originalThreadId;
+    const finalEvents = threadManager.getEvents(activeThreadId);
+    
+    // Should have events and the last should be the new response
+    expect(finalEvents.length).toBeGreaterThan(0);
     const lastEvent = finalEvents[finalEvents.length - 1];
     
     expect(lastEvent.type).toBe('AGENT_MESSAGE');

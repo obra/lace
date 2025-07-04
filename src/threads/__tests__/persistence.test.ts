@@ -658,13 +658,12 @@ describe('Enhanced ThreadManager', () => {
       const shadowThreadId = await threadManager.createShadowThread('Test compaction');
       const shadowEvents = threadManager.getEvents(shadowThreadId);
 
-      // Should have fewer events due to compaction (default preserves 10 recent + 1 summary)
-      expect(shadowEvents.length).toBeLessThan(15);
-      expect(shadowEvents.length).toBe(11); // 10 preserved + 1 summary
+      // Should have all user messages preserved since we now preserve all user/agent messages
+      // With 15 USER_MESSAGE events, all should be preserved (no summary needed)
+      expect(shadowEvents.length).toBe(15); // All user messages preserved
       
-      // First event should be summary
-      expect(shadowEvents[0].type).toBe('LOCAL_SYSTEM_MESSAGE');
-      expect(shadowEvents[0].data).toContain('Summarized');
+      // All events should be user messages (no summary created since all events are preserved)
+      expect(shadowEvents.every(e => e.type === 'USER_MESSAGE')).toBe(true);
     });
 
     it('should detect when compaction is needed', () => {

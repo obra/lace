@@ -7,6 +7,8 @@ import { Thread, ThreadEvent, EventType } from './types.js';
 import { ToolCall, ToolResult } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
 import { SummarizeStrategy } from './compaction/index.js';
+import { estimateTokens } from '../utils/token-estimation.js';
+import { AIProvider } from '../providers/base-provider.js';
 
 export interface ThreadSessionInfo {
   threadId: string;
@@ -253,9 +255,7 @@ export class ThreadManager extends EventEmitter {
   }
 
   private _estimateTokens(text: string): number {
-    // Rough approximation: 1 token ≈ 4 characters for English text
-    // This is a commonly used heuristic, though actual tokenization varies by model
-    return Math.ceil(text.length / 4);
+    return estimateTokens(text);
   }
 
   clearEvents(threadId: string): void {
@@ -297,7 +297,7 @@ export class ThreadManager extends EventEmitter {
     return threadId;
   }
 
-  async createShadowThread(reason: string): Promise<string> {
+  async createShadowThread(reason: string, provider?: AIProvider): Promise<string> {
     if (!this._currentThread) {
       throw new Error('No current thread to create shadow for');
     }
@@ -308,58 +308,92 @@ export class ThreadManager extends EventEmitter {
     // Generate new shadow thread ID
     const shadowThreadId = this.generateThreadId();
     
-    // Compact the events using the compaction strategy
-    const compactedEvents = this._compactionStrategy.compact(this._currentThread.events);
-    
-    // Update thread IDs in compacted events
-    const updatedEvents = compactedEvents.map(event => ({
-      ...event,
-      threadId: shadowThreadId,
-    }));
-    
-    // Create shadow thread with compacted events
-    const shadowThread: Thread = {
-      id: shadowThreadId,
-      createdAt: this._currentThread.createdAt,
-      updatedAt: new Date(),
-      events: updatedEvents,
-    };
+    try {
+      // Compact the events using provider-aware strategy if available
+      const strategy = provider ? new SummarizeStrategy(undefined, provider) : this._compactionStrategy;
+      const compactedEvents = strategy.compact(this._currentThread.events);
+      
+      // Update thread IDs in compacted events
+      const updatedEvents = compactedEvents.map(event => ({
+        ...event,
+        threadId: shadowThreadId,
+      }));
+      
+      // Create shadow thread with compacted events
+      const shadowThread: Thread = {
+        id: shadowThreadId,
+        createdAt: this._currentThread.createdAt,
+        updatedAt: new Date(),
+        events: updatedEvents,
+      };
 
-    // Save shadow thread
-    this._persistence.saveThread(shadowThread);
-    
-    // Save each compacted event
-    for (const event of updatedEvents) {
-      this._persistence.saveEvent(event);
+      // Execute all shadow thread operations atomically
+      this._persistence.createShadowThreadTransaction(
+        shadowThread,
+        updatedEvents,
+        canonicalId,
+        reason
+      );
+      
+      // Only switch to shadow thread after successful database operations
+      this._currentThread = shadowThread;
+      
+      logger.info('Shadow thread created with compaction', {
+        originalThreadId: currentThreadId,
+        shadowThreadId,
+        canonicalId,
+        originalEventCount: compactedEvents.length,
+        compactedEventCount: updatedEvents.length,
+        reason,
+      });
+      
+      return shadowThreadId;
+    } catch (error) {
+      logger.error('Failed to create shadow thread', {
+        originalThreadId: currentThreadId,
+        shadowThreadId,
+        canonicalId,
+        error: error instanceof Error ? error.message : String(error),
+        reason,
+      });
+      
+      // Don't change current thread on failure
+      throw new Error(`Shadow thread creation failed: ${error instanceof Error ? error.message : String(error)}`);
     }
-    
-    // Create version mapping
-    this._persistence.createVersion(canonicalId, shadowThreadId, reason);
-    
-    // Switch to shadow thread
-    this._currentThread = shadowThread;
-    
-    logger.info('Shadow thread created with compaction', {
-      originalThreadId: currentThreadId,
-      shadowThreadId,
-      canonicalId,
-      originalEventCount: this._currentThread.events.length,
-      compactedEventCount: updatedEvents.length,
-      reason,
-    });
-    
-    return shadowThreadId;
   }
 
-  needsCompaction(): boolean {
+  needsCompaction(provider?: AIProvider): boolean {
     if (!this._currentThread) return false;
+    
+    if (provider) {
+      // Use provider-aware strategy for accurate token counting
+      const providerStrategy = new SummarizeStrategy(undefined, provider);
+      return providerStrategy.shouldCompact(this._currentThread);
+    }
+    
+    return this._compactionStrategy.shouldCompact(this._currentThread);
+  }
+  
+  async needsCompactionAsync(provider?: AIProvider): Promise<boolean> {
+    if (!this._currentThread) return false;
+    
+    if (provider) {
+      // Use provider-aware strategy for accurate async token counting
+      const providerStrategy = new SummarizeStrategy(undefined, provider);
+      return await providerStrategy.shouldCompactAsync(this._currentThread);
+    }
+    
     return this._compactionStrategy.shouldCompact(this._currentThread);
   }
 
-  async compactIfNeeded(): Promise<boolean> {
-    if (!this.needsCompaction()) return false;
+  async compactIfNeeded(provider?: AIProvider): Promise<boolean> {
+    const needsCompaction = provider 
+      ? await this.needsCompactionAsync(provider)
+      : this.needsCompaction();
+      
+    if (!needsCompaction) return false;
     
-    await this.createShadowThread('Automatic compaction due to size');
+    await this.createShadowThread('Automatic compaction due to size', provider);
     return true;
   }
 
@@ -379,6 +413,17 @@ export class ThreadManager extends EventEmitter {
     
     // If no version mapping exists, this thread IS the canonical ID
     return threadId;
+  }
+
+  cleanupOldShadows(canonicalId?: string, keepLast: number = 3): void {
+    if (canonicalId) {
+      // Clean up specific canonical thread
+      this._persistence.cleanupOldShadows(canonicalId, keepLast);
+    } else if (this._currentThread) {
+      // Clean up current thread's shadows
+      const currentCanonicalId = this.getCanonicalId(this._currentThread.id);
+      this._persistence.cleanupOldShadows(currentCanonicalId, keepLast);
+    }
   }
 
   // Cleanup

@@ -95,6 +95,12 @@ TOOL_RESULT events → Agent continues or responds
 - **ThreadProcessor**: Cached processing of persisted events + real-time streaming content processing
 - **NonInteractiveInterface**: Single-prompt execution mode
 
+**Compaction System (`src/threads/compaction/`)**
+- **CompactionStrategy**: Pluggable interface for different compaction approaches
+- **SummarizeStrategy**: Default implementation that summarizes old conversation segments
+- **Thread Versioning**: Canonical ID mapping enables shadow thread creation while maintaining thread ID stability
+- Automatic triggering when token limits are approached during conversation processing
+
 ## Event Model
 
 Events include: USER_MESSAGE, AGENT_MESSAGE, TOOL_CALL, TOOL_RESULT, THINKING, SYSTEM_PROMPT, USER_SYSTEM_PROMPT.
@@ -194,7 +200,11 @@ Generic `ProviderMessage[]` format converts to provider-specific APIs. Each prov
 - SQLite persistence with graceful degradation to memory-only
 - Resumable conversations with `--continue` flag
 - Delegate thread management for sub-conversations
-- Thread compaction for token optimization
+- **Thread Shadowing**: Automatic compaction with versioning for token optimization
+  - Creates "shadow" threads when conversations exceed token limits
+  - Maintains stable thread IDs through canonical ID mapping
+  - Summarizes old conversation segments while preserving recent context
+  - Transparent operation - conversations continue normally after compaction
 
 
 ## Testing Strategy

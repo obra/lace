@@ -19,6 +19,7 @@ import { StopReasonHandler } from '../token-management/stop-reason-handler.js';
 import { TokenBudgetManager } from '../token-management/token-budget-manager.js';
 import { TokenBudgetConfig } from '../token-management/types.js';
 import { loadPromptConfig } from '../config/prompts.js';
+import { estimateTokens } from '../utils/token-estimation.js';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -135,8 +136,8 @@ export class Agent extends EventEmitter {
     this._addTokensToCurrentTurn('in', this._estimateTokens(content));
 
     if (content.trim()) {
-      // Add user message to thread
-      this._threadManager.addEvent(this._threadId, 'USER_MESSAGE', content);
+      // Add user message to active thread (could be shadow thread after compaction)
+      this._threadManager.addEvent(this._getActiveThreadId(), 'USER_MESSAGE', content);
     }
 
     await this._processConversation();
@@ -239,6 +240,11 @@ export class Agent extends EventEmitter {
     return this._threadId;
   }
 
+  // Get the current active thread ID (canonical ID for external use, but shadow thread for internal operations)
+  private _getActiveThreadId(): string {
+    return this._threadManager.getCurrentThreadId() || this._threadId;
+  }
+
   getAvailableTools(): Tool[] {
     return [...this._tools]; // Return copy to prevent mutation
   }
@@ -266,7 +272,8 @@ export class Agent extends EventEmitter {
 
   // Thread message processing for agent-facing conversation
   buildThreadMessages(): ProviderMessage[] {
-    const events = this._threadManager.getEvents(this._threadId);
+    // Use the current active thread (which might be a shadow thread after compaction)
+    const events = this._threadManager.getEvents(this._getActiveThreadId());
     return this._buildConversationFromEvents(events);
   }
 
@@ -276,14 +283,16 @@ export class Agent extends EventEmitter {
 
     try {
       // Check if compaction is needed before building conversation
-      if (this._threadManager.needsCompaction()) {
+      if (this._threadManager.needsCompaction(this._provider)) {
         logger.info('Thread compaction triggered', { threadId: this._threadId });
-        const wasCompacted = await this._threadManager.compactIfNeeded();
+        const wasCompacted = await this._threadManager.compactIfNeeded(this._provider);
         if (wasCompacted) {
-          // Update threadId if it changed due to compaction
-          this._threadId = this._threadManager.getCurrentThreadId() || this._threadId;
+          // ThreadManager handles the internal thread switching
+          // Agent's threadId remains stable (canonical ID)
+          const currentThreadId = this._threadManager.getCurrentThreadId();
           logger.info('Thread compacted successfully', { 
-            newThreadId: this._threadId,
+            canonicalThreadId: this._threadId, // Stable external ID
+            currentShadowId: currentThreadId,   // Internal shadow thread ID
             canonicalId: this._threadManager.getCanonicalId(this._threadId),
           });
         }
@@ -433,7 +442,7 @@ export class Agent extends EventEmitter {
       // Process agent response
       if (response.content) {
         // Store raw content (with thinking blocks) for model context
-        this._threadManager.addEvent(this._threadId, 'AGENT_MESSAGE', response.content);
+        this._threadManager.addEvent(this._getActiveThreadId(), 'AGENT_MESSAGE', response.content);
 
         // Extract clean content for UI display and events
         const cleanedContent = response.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
@@ -644,7 +653,7 @@ export class Agent extends EventEmitter {
       };
 
       // Add tool call to thread
-      this._threadManager.addEvent(this._threadId, 'TOOL_CALL', toolCall);
+      this._threadManager.addEvent(this._getActiveThreadId(), 'TOOL_CALL', toolCall);
 
       // Emit tool call start event
       this.emit('tool_call_start', {
@@ -678,7 +687,7 @@ export class Agent extends EventEmitter {
         });
 
         // Add tool result to thread
-        this._threadManager.addEvent(this._threadId, 'TOOL_RESULT', result);
+        this._threadManager.addEvent(this._getActiveThreadId(), 'TOOL_RESULT', result);
 
         // Add tool output tokens to current turn metrics (estimated)
         this._addTokensToCurrentTurn('in', this._estimateTokens(outputText));
@@ -704,7 +713,7 @@ export class Agent extends EventEmitter {
         });
 
         // Add failed tool result to thread
-        this._threadManager.addEvent(this._threadId, 'TOOL_RESULT', failedResult);
+        this._threadManager.addEvent(this._getActiveThreadId(), 'TOOL_RESULT', failedResult);
       }
     }
   }
@@ -938,8 +947,7 @@ export class Agent extends EventEmitter {
 
   // Token tracking helper methods
   private _estimateTokens(text: string): number {
-    // Rough approximation: 1 token ≈ 4 characters for most models
-    return Math.ceil(text.length / 4);
+    return estimateTokens(text);
   }
 
   private _estimateConversationTokens(messages: ProviderMessage[]): number {

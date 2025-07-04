@@ -25,6 +25,55 @@ export class ThreadPersistence {
 
   private initializeSchema(): void {
     if (!this.db) return;
+
+    // Create schema version table first
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS schema_version (
+        version INTEGER PRIMARY KEY,
+        applied_at TEXT NOT NULL
+      )
+    `);
+
+    // Run migrations
+    this.runMigrations();
+  }
+
+  private runMigrations(): void {
+    if (!this.db) return;
+    
+    const currentVersion = this.getSchemaVersion();
+    
+    if (currentVersion < 1) {
+      this.migrateToV1();
+    }
+    
+    if (currentVersion < 2) {
+      this.migrateToV2();
+    }
+  }
+
+  private getSchemaVersion(): number {
+    if (!this.db) return 0;
+    
+    try {
+      const result = this.db.prepare('SELECT MAX(version) as version FROM schema_version').get() as { version: number | null };
+      return result.version || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private setSchemaVersion(version: number): void {
+    if (!this.db) return;
+    this.db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)').run(version, new Date().toISOString());
+  }
+
+  private migrateToV1(): void {
+    if (!this.db) return;
+    
+    console.log('Migrating database to version 1 (basic schema)...');
+    
+    // Create basic threads and events tables
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS threads (
         id TEXT PRIMARY KEY,
@@ -41,6 +90,24 @@ export class ThreadPersistence {
         FOREIGN KEY (thread_id) REFERENCES threads(id)
       );
 
+      CREATE INDEX IF NOT EXISTS idx_events_thread_timestamp 
+      ON events(thread_id, timestamp);
+      
+      CREATE INDEX IF NOT EXISTS idx_threads_updated 
+      ON threads(updated_at DESC);
+    `);
+
+    this.setSchemaVersion(1);
+    console.log('Database migrated to version 1');
+  }
+
+  private migrateToV2(): void {
+    if (!this.db) return;
+    
+    console.log('Migrating database to version 2 (thread versioning)...');
+    
+    // Create thread versioning tables
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS thread_versions (
         canonical_id TEXT PRIMARY KEY,
         current_version_id TEXT NOT NULL,
@@ -57,12 +124,15 @@ export class ThreadPersistence {
         FOREIGN KEY (canonical_id) REFERENCES thread_versions(canonical_id)
       );
 
-      CREATE INDEX IF NOT EXISTS idx_events_thread_timestamp 
-      ON events(thread_id, timestamp);
+      CREATE INDEX IF NOT EXISTS idx_version_history_canonical 
+      ON version_history(canonical_id, created_at DESC);
       
-      CREATE INDEX IF NOT EXISTS idx_threads_updated 
-      ON threads(updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_version_history_version 
+      ON version_history(version_id);
     `);
+
+    this.setSchemaVersion(2);
+    console.log('Database migrated to version 2');
   }
 
   saveThread(thread: Thread): void {
@@ -256,6 +326,112 @@ export class ThreadPersistence {
 
     const row = stmt.get(versionId) as { canonical_id: string } | undefined;
     return row ? row.canonical_id : null;
+  }
+
+  // Execute multiple operations in a single transaction for atomic shadow thread creation
+  createShadowThreadTransaction(
+    shadowThread: Thread,
+    events: ThreadEvent[],
+    canonicalId: string,
+    reason: string
+  ): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const transaction = this.db.transaction(() => {
+      // 1. Save the shadow thread
+      const threadStmt = this.db!.prepare(`
+        INSERT OR REPLACE INTO threads (id, created_at, updated_at)
+        VALUES (?, ?, ?)
+      `);
+      threadStmt.run(
+        shadowThread.id,
+        shadowThread.createdAt.toISOString(),
+        shadowThread.updatedAt.toISOString()
+      );
+
+      // 2. Save all events
+      const eventStmt = this.db!.prepare(`
+        INSERT OR REPLACE INTO events (id, thread_id, type, timestamp, data)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+
+      for (const event of events) {
+        eventStmt.run(
+          event.id,
+          event.threadId,
+          event.type,
+          event.timestamp.toISOString(),
+          JSON.stringify(event.data)
+        );
+      }
+
+      // 3. Update version mapping
+      const versionStmt = this.db!.prepare(`
+        INSERT OR REPLACE INTO thread_versions (canonical_id, current_version_id, created_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+      `);
+      versionStmt.run(canonicalId, shadowThread.id);
+
+      // 4. Add to version history
+      const historyStmt = this.db!.prepare(`
+        INSERT INTO version_history (canonical_id, version_id, created_at, reason)
+        VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+      `);
+      historyStmt.run(canonicalId, shadowThread.id, reason);
+    });
+
+    // Execute all operations atomically
+    transaction();
+  }
+
+  // Clean up old shadow threads to prevent unbounded growth
+  cleanupOldShadows(canonicalId: string, keepLast: number = 3): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const transaction = this.db.transaction(() => {
+      // Get all version IDs for this canonical thread, ordered by creation date (newest first)
+      const versionsStmt = this.db!.prepare(`
+        SELECT version_id FROM version_history 
+        WHERE canonical_id = ? 
+        ORDER BY id DESC
+      `);
+      
+      const versions = versionsStmt.all(canonicalId) as Array<{ version_id: string }>;
+      
+      if (versions.length <= keepLast) {
+        return; // Nothing to clean up
+      }
+
+      // Keep the most recent N versions, delete the rest
+      const versionsToDelete = versions.slice(keepLast).map(v => v.version_id);
+      
+      if (versionsToDelete.length === 0) return;
+
+      // Delete events for old shadow threads
+      const deleteEventsStmt = this.db!.prepare(`
+        DELETE FROM events WHERE thread_id = ?
+      `);
+      
+      // Delete old shadow threads
+      const deleteThreadStmt = this.db!.prepare(`
+        DELETE FROM threads WHERE id = ?
+      `);
+      
+      // Delete old version history entries (but keep the current version mapping)
+      const deleteHistoryStmt = this.db!.prepare(`
+        DELETE FROM version_history WHERE version_id = ?
+      `);
+
+      for (const versionId of versionsToDelete) {
+        deleteEventsStmt.run(versionId);
+        deleteThreadStmt.run(versionId);
+        deleteHistoryStmt.run(versionId);
+      }
+
+      console.log(`Cleaned up ${versionsToDelete.length} old shadow threads for canonical ID ${canonicalId}`);
+    });
+
+    transaction();
   }
 
   close(): void {
