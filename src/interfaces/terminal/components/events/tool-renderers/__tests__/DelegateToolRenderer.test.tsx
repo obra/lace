@@ -3,10 +3,20 @@
 
 import React from 'react';
 import { render } from 'ink-testing-library';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { DelegateToolRenderer } from '../DelegateToolRenderer.js';
 import type { ToolRendererProps } from '../components/shared.js';
 import { TimelineExpansionProvider } from '../../hooks/useTimelineExpansionToggle.js';
+import { LaceFocusProvider } from '../../../../focus/focus-provider.js';
+
+// Mock the logger to avoid console output
+vi.mock('../../../../../utils/logger.js', () => ({
+  logger: {
+    debug: () => {},
+    error: () => {},
+    warn: () => {},
+  },
+}));
 
 describe('DelegateToolRenderer', () => {
   const createMockItem = (overrides?: Partial<ToolRendererProps['item']>): ToolRendererProps['item'] => ({
@@ -26,9 +36,11 @@ describe('DelegateToolRenderer', () => {
   // Helper to render with required providers
   const renderWithProviders = (component: React.ReactElement) => {
     return render(
-      <TimelineExpansionProvider>
-        {component}
-      </TimelineExpansionProvider>
+      <LaceFocusProvider>
+        <TimelineExpansionProvider>
+          {component}
+        </TimelineExpansionProvider>
+      </LaceFocusProvider>
     );
   };
 
@@ -111,7 +123,7 @@ describe('DelegateToolRenderer', () => {
     
     const { lastFrame } = renderWithProviders(<DelegateToolRenderer item={item} />);
     expect(lastFrame()).toContain('Analysis complete. Found 10 components.');
-    expect(lastFrame()).toContain('5,432 tokens');
+    expect(lastFrame()).toContain('5.4k');
   });
 
   it('should handle unknown task gracefully', () => {
