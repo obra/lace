@@ -27,77 +27,34 @@ interface TimelineItemProps {
 
 interface DynamicToolRendererProps {
   item: Extract<TimelineItemType, { type: 'tool_execution' }>;
-  isSelected: boolean; // Whether timeline cursor is on this item
+  isSelected: boolean;
   onToggle?: () => void;
-  onExpansionToggle?: () => void;
 }
 
 function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRendererProps) {
   const [ToolRenderer, setToolRenderer] = React.useState<React.ComponentType<unknown> | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [debugInfo, setDebugInfo] = React.useState<string>('');
 
   React.useEffect(() => {
-    const abortController = new AbortController();
-    setDebugInfo(`Looking for ${item.call.name}ToolRenderer...`);
-
-    logger.debug('DynamicToolRenderer: Starting renderer discovery', {
-      toolName: item.call.name,
-      callId: item.callId
-    });
-
     getToolRenderer(item.call.name)
       .then((renderer) => {
-        if (!abortController.signal.aborted) {
-          setToolRenderer(() => renderer);
-          setIsLoading(false);
-          const debugMsg = renderer ? `Found: ${renderer.name}` : 'Not found, using Generic';
-          setDebugInfo(debugMsg);
-          
-          logger.info('DynamicToolRenderer: Renderer resolution complete', {
-            toolName: item.call.name,
-            callId: item.callId,
-            found: !!renderer,
-            rendererName: renderer?.name,
-            willUseGeneric: !renderer
-          });
-        }
+        setToolRenderer(() => renderer);
+        setIsLoading(false);
       })
       .catch((error) => {
-        if (!abortController.signal.aborted) {
-          setIsLoading(false);
-          const errorMsg = `Error: ${error.message}`;
-          setDebugInfo(errorMsg);
-          
-          logger.error('DynamicToolRenderer: Renderer discovery error', {
-            toolName: item.call.name,
-            callId: item.callId,
-            error: error.message,
-            willUseGeneric: true
-          });
-        }
+        logger.error('DynamicToolRenderer: Failed to load renderer', {
+          toolName: item.call.name,
+          error: error.message,
+        });
+        setIsLoading(false);
       });
-
-    return () => {
-      abortController.abort();
-    };
   }, [item.call.name]);
 
+  // For cached renderers, this will only show briefly on first render
   if (isLoading) {
-    // Add debug info to loading state
-    const debugItem = {
-      ...item,
-      call: {
-        ...item.call,
-        arguments: {
-          ...item.call.arguments,
-          _debug: debugInfo,
-        },
-      },
-    };
     return (
       <GenericToolRenderer
-        item={debugItem}
+        item={item}
         isSelected={isSelected}
         onToggle={onToggle}
       />
@@ -105,22 +62,9 @@ function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRenderer
   }
 
   const RendererComponent = ToolRenderer || GenericToolRenderer;
-
-  // Add debug info to final render
-  const debugItem = {
-    ...item,
-    call: {
-      ...item.call,
-      arguments: {
-        ...item.call.arguments,
-        _debug: debugInfo,
-      },
-    },
-  };
-
   return (
     <RendererComponent
-      item={debugItem}
+      item={item}
       isSelected={isSelected}
       onToggle={onToggle}
     />

@@ -4,8 +4,11 @@
 import React from 'react';
 import { logger } from '../../../../../utils/logger.js';
 
+// Module-level cache to avoid repeated dynamic imports
+const rendererCache = new Map<string, React.ComponentType<unknown> | null>();
+
 /**
- * Dynamic tool renderer discovery function
+ * Dynamic tool renderer discovery function with caching
  *
  * @param toolName - The name of the tool (e.g., 'bash', 'file-read', 'delegate')
  * @returns Promise<React.ComponentType> or null if no specific renderer found
@@ -18,6 +21,15 @@ import { logger } from '../../../../../utils/logger.js';
 export async function getToolRenderer(
   toolName: string
 ): Promise<React.ComponentType<unknown> | null> {
+  // Check cache first
+  if (rendererCache.has(toolName)) {
+    const cached = rendererCache.get(toolName)!;
+    logger.debug('Tool renderer cache hit', {
+      toolName,
+      found: !!cached,
+    });
+    return cached;
+  }
   try {
     // Convert tool name to component name (bash → BashToolRenderer)
     const componentName = toolNameToComponentName(toolName);
@@ -44,6 +56,9 @@ export async function getToolRenderer(
     // Return the default export or named export matching component name
     const renderer = module.default || module[componentName] || null;
 
+    // Cache the result (including null for not found)
+    rendererCache.set(toolName, renderer);
+
     logger.info('Tool renderer discovery result', {
       toolName,
       found: !!renderer,
@@ -58,6 +73,8 @@ export async function getToolRenderer(
       error: error?.message,
       fallback: 'GenericToolRenderer',
     });
+    // Cache the null result to avoid repeated failed imports
+    rendererCache.set(toolName, null);
     // Return null if component not found - caller should use GenericToolRenderer
     return null;
   }
@@ -79,34 +96,4 @@ function toolNameToComponentName(toolName: string): string {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join('') + 'ToolRenderer'
   );
-}
-
-/**
- * Synchronous version that returns React.lazy component
- * Use this when you need a component that can be used with Suspense
- */
-export function getToolRendererLazy(
-  toolName: string
-): React.LazyExoticComponent<React.ComponentType<unknown>> | null {
-  if (!toolName || toolName.trim() === '') {
-    return null;
-  }
-
-  try {
-    const componentName = toolNameToComponentName(toolName);
-    const fileName = `./${componentName}.js`;
-
-    return React.lazy(() =>
-      import(fileName)
-        .then((module) => ({
-          default: module.default || module[componentName],
-        }))
-        .catch(() => {
-          // Return a component that throws to trigger Suspense fallback
-          throw new Error(`Tool renderer not found: ${toolName}`);
-        })
-    );
-  } catch {
-    return null;
-  }
 }

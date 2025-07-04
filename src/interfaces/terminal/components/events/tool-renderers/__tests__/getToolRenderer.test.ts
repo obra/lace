@@ -2,23 +2,7 @@
 // ABOUTME: Verifies naming convention mapping, import handling, and error cases
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getToolRenderer, getToolRendererLazy } from '../getToolRenderer.js';
-
-// Mock React.lazy for testing
-vi.mock('react', async () => {
-  const actual = await vi.importActual('react');
-  const mockLazy = vi.fn((_importFn) => {
-    // Return a mock lazy component
-    const LazyComponent = () => null;
-    LazyComponent.displayName = 'LazyComponent';
-    return LazyComponent;
-  });
-
-  return {
-    ...actual,
-    lazy: mockLazy,
-  };
-});
+import { getToolRenderer } from '../getToolRenderer.js';
 
 describe('getToolRenderer', () => {
   beforeEach(() => {
@@ -122,32 +106,6 @@ describe('getToolRenderer', () => {
       const result = await getToolRenderer('file--read__write');
       expect(result).toBeNull();
     });
-  });
-});
-
-describe('getToolRendererLazy', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should return a lazy component for existing tools', () => {
-    const result = getToolRendererLazy('bash');
-    expect(result).toBeTruthy();
-    expect(typeof result).toBe('object'); // Lazy component is an object
-  });
-
-  it('should return null for error cases', () => {
-    // Test error case by passing invalid input
-    const result = getToolRendererLazy('');
-    expect(result).toBeNull();
-  });
-
-  it('should create lazy component with correct import path', () => {
-    const result = getToolRendererLazy('file-read');
-
-    // Verify a lazy component was created
-    expect(result).toBeTruthy();
-    expect(typeof result).toBe('object');
   });
 });
 
