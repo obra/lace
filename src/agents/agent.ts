@@ -275,6 +275,20 @@ export class Agent extends EventEmitter {
     this._abortController = new AbortController();
 
     try {
+      // Check if compaction is needed before building conversation
+      if (this._threadManager.needsCompaction()) {
+        logger.info('Thread compaction triggered', { threadId: this._threadId });
+        const wasCompacted = await this._threadManager.compactIfNeeded();
+        if (wasCompacted) {
+          // Update threadId if it changed due to compaction
+          this._threadId = this._threadManager.getCurrentThreadId() || this._threadId;
+          logger.info('Thread compacted successfully', { 
+            newThreadId: this._threadId,
+            canonicalId: this._threadManager.getCanonicalId(this._threadId),
+          });
+        }
+      }
+
       // Rebuild conversation from thread events
       const conversation = this.buildThreadMessages();
 
