@@ -128,7 +128,7 @@ function SearchContent({
   );
 }
 
-export const FileSearchToolRenderer = forwardRef<TimelineItemRef, FileSearchToolRendererProps>({
+export const FileSearchToolRenderer = forwardRef<TimelineItemRef, FileSearchToolRendererProps>(({
   item,
   isStreaming = false,
   isSelected = false,

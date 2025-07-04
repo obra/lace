@@ -106,7 +106,7 @@ function EditContent({
   );
 }
 
-export const FileEditToolRenderer = forwardRef<TimelineItemRef, FileEditToolRendererProps>({
+export const FileEditToolRenderer = forwardRef<TimelineItemRef, FileEditToolRendererProps>(({
   item,
   isStreaming = false,
   isSelected = false,
