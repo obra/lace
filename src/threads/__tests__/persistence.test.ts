@@ -666,20 +666,20 @@ describe('Enhanced ThreadManager', () => {
       expect(compactedEvents.every((e) => e.type === 'USER_MESSAGE')).toBe(true);
     });
 
-    it('should detect when compaction is needed', () => {
+    it('should detect when compaction is needed', async () => {
       const originalThreadId = 'lace_20250101_abc123';
       threadManager.createThread(originalThreadId);
 
       // Small thread shouldn't need compaction
       threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'Short message');
-      expect(threadManager.needsCompaction()).toBe(false);
+      expect(await threadManager.needsCompaction()).toBe(false);
 
       // Large thread should need compaction
       const longMessage = 'Very long message. '.repeat(1000);
       for (let i = 0; i < 10; i++) {
         threadManager.addEvent(originalThreadId, 'USER_MESSAGE', longMessage);
       }
-      expect(threadManager.needsCompaction()).toBe(true);
+      expect(await threadManager.needsCompaction()).toBe(true);
     });
 
     it('should compact automatically when needed', async () => {

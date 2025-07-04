@@ -92,6 +92,9 @@ export class Agent extends EventEmitter {
   }
 
   // Public access to thread ID for delegation
+  // IMPORTANT: This returns the CANONICAL thread ID, which remains stable across compactions
+  // The canonical ID is the external identifier that clients see and should never change
+  // Internally, we may switch to compacted threads, but this API maintains the stable contract
   get threadId(): string {
     return this._threadId;
   }
@@ -240,7 +243,24 @@ export class Agent extends EventEmitter {
     return this._threadId;
   }
 
-  // Get the current active thread ID (canonical ID for external use, but compacted thread for internal operations)
+  // Get the current active thread ID for INTERNAL operations
+  // DESIGN EXPLANATION: This is the heart of the canonical ID mapping system
+  // 
+  // EXTERNAL CONTRACT: agent.getThreadId() always returns the stable canonical ID
+  // INTERNAL OPERATIONS: We use the current working thread (may be compacted)
+  //
+  // Why this works:
+  // 1. External clients see stable thread IDs that never change
+  // 2. Internal operations automatically use the latest compacted version
+  // 3. ThreadManager maintains the mapping between canonical and working threads
+  // 4. This enables seamless compaction without breaking external thread ID contracts
+  //
+  // Example flow:
+  // - User creates thread "abc123" 
+  // - agent.getThreadId() returns "abc123" (canonical ID)
+  // - After compaction, internal operations use "abc123_v2" (compacted thread)
+  // - agent.getThreadId() STILL returns "abc123" (stable external contract)
+  // - ThreadManager.getCanonicalId("abc123_v2") resolves back to "abc123"
   private _getActiveThreadId(): string {
     return this._threadManager.getCurrentThreadId() || this._threadId;
   }
@@ -283,7 +303,7 @@ export class Agent extends EventEmitter {
 
     try {
       // Check if compaction is needed before building conversation (simplified approach)
-      if (this._threadManager.needsCompaction(this._provider)) {
+      if (await this._threadManager.needsCompaction(this._provider)) {
         logger.info('Thread compaction triggered', { threadId: this._threadId });
         const newThreadId = await this._threadManager.createCompactedVersion(
           'Auto-compaction',

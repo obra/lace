@@ -27,7 +27,7 @@ describe('SummarizeStrategy', () => {
   });
 
   describe('shouldCompact', () => {
-    it('should return false for threads under token limit', () => {
+    it('should return false for threads under token limit', async () => {
       const strategy = new SummarizeStrategy({ maxTokens: 1000 });
       const events = [
         createEvent('1', 'USER_MESSAGE', 'Short message'),
@@ -35,10 +35,10 @@ describe('SummarizeStrategy', () => {
       ];
       const thread = createThread(events);
 
-      expect(strategy.shouldCompact(thread)).toBe(false);
+      expect(await strategy.shouldCompact(thread)).toBe(false);
     });
 
-    it('should return true for threads over token limit', () => {
+    it('should return true for threads over token limit', async () => {
       const strategy = new SummarizeStrategy({ maxTokens: 50 });
       const longMessage =
         'This is a very long message that should exceed the token limit when repeated multiple times. '.repeat(
@@ -50,15 +50,15 @@ describe('SummarizeStrategy', () => {
       ];
       const thread = createThread(events);
 
-      expect(strategy.shouldCompact(thread)).toBe(true);
+      expect(await strategy.shouldCompact(thread)).toBe(true);
     });
 
-    it('should use default token limit when not specified', () => {
+    it('should use default token limit when not specified', async () => {
       const strategy = new SummarizeStrategy();
       const events = [createEvent('1', 'USER_MESSAGE', 'Short message')];
       const thread = createThread(events);
 
-      expect(strategy.shouldCompact(thread)).toBe(false);
+      expect(await strategy.shouldCompact(thread)).toBe(false);
     });
   });
 

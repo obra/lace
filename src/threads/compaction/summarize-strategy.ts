@@ -20,14 +20,8 @@ export class SummarizeStrategy implements CompactionStrategy {
     this.provider = provider;
   }
 
-  shouldCompact(thread: Thread): boolean {
-    // For synchronous shouldCompact, use fallback estimation
-    // The async version with provider counting is used in needsCompaction
-    const estimatedTokens = this.fallbackTokenEstimation(thread.events);
-    return estimatedTokens > this.config.maxTokens!;
-  }
-
-  async shouldCompactAsync(thread: Thread): Promise<boolean> {
+  async shouldCompact(thread: Thread): Promise<boolean> {
+    // Use provider-aware token counting when available, fallback to estimation
     const estimatedTokens = await this.estimateThreadTokens(thread.events);
     return estimatedTokens > this.config.maxTokens!;
   }

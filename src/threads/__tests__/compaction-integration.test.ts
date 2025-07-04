@@ -119,7 +119,7 @@ describe('Compaction Integration', () => {
     }
 
     // Trigger compaction manually using simplified approach
-    expect(threadManager.needsCompaction()).toBe(true);
+    expect(await threadManager.needsCompaction()).toBe(true);
     const newThreadId = await threadManager.createCompactedVersion('Test compaction');
     expect(newThreadId).toBeDefined();
 
@@ -177,7 +177,7 @@ describe('Compaction Integration', () => {
     }
 
     // Trigger compaction using simplified approach
-    if (threadManager.needsCompaction()) {
+    if (await threadManager.needsCompaction()) {
       await threadManager.createCompactedVersion('Test compaction for conversation');
     }
 
