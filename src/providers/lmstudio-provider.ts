@@ -32,6 +32,11 @@ export class LMStudioProvider extends AIProvider {
   public _cachedModel: LMStudioModel | null = null;
   private _cachedModelId: string | null = null;
 
+  // Expose RETRY_CONFIG for testing
+  get RETRY_CONFIG() {
+    return super['RETRY_CONFIG'];
+  }
+
   constructor(config: LMStudioProviderConfig = {}) {
     super(config);
     this._baseUrl = config.baseUrl || 'ws://localhost:1234';
@@ -86,17 +91,22 @@ export class LMStudioProvider extends AIProvider {
     tools: Tool[] = [],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    await this._ensureModelLoaded(this.modelName);
+    return this.withRetry(
+      async () => {
+        await this._ensureModelLoaded(this.modelName);
 
-    logger.debug('Creating LMStudio response with native tool calling', {
-      provider: 'lmstudio',
-      model: this.modelName,
-      messageCount: messages.length,
-      toolCount: tools.length,
-      toolNames: tools.map((t) => t.name),
-    });
+        logger.debug('Creating LMStudio response with native tool calling', {
+          provider: 'lmstudio',
+          model: this.modelName,
+          messageCount: messages.length,
+          toolCount: tools.length,
+          toolNames: tools.map((t) => t.name),
+        });
 
-    return this._createResponseWithNativeToolCalling(messages, tools, this.modelName, signal);
+        return this._createResponseWithNativeToolCalling(messages, tools, this.modelName, signal);
+      },
+      { signal }
+    );
   }
 
   private async _ensureModelLoaded(modelId: string): Promise<void> {
@@ -227,7 +237,8 @@ export class LMStudioProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[],
     modelId: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    streamingStartedCallback?: () => void
   ): Promise<ProviderResponse> {
     // Convert tools to LMStudio format
     let rawTools;
@@ -453,6 +464,10 @@ export class LMStudioProvider extends AIProvider {
 
                 if (fragment?.content) {
                   allContent += fragment.content;
+                  // Mark that streaming has started
+                  if (streamingStartedCallback) {
+                    streamingStartedCallback();
+                  }
                   // Emit token events for streaming
                   this.emit('token', { token: fragment.content });
 
@@ -595,19 +610,36 @@ export class LMStudioProvider extends AIProvider {
     tools: Tool[] = [],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    const modelId = this.modelName;
-    await this._ensureModelLoaded(modelId);
+    let streamingStarted = false;
 
-    logger.debug('Creating streaming LMStudio response with native tool calling', {
-      provider: 'lmstudio',
-      model: modelId,
-      messageCount: messages.length,
-      toolCount: tools.length,
-      toolNames: tools.map((t) => t.name),
-    });
+    return this.withRetry(
+      async () => {
+        const modelId = this.modelName;
+        await this._ensureModelLoaded(modelId);
 
-    // Use the same native tool calling method
-    return this._createResponseWithNativeToolCalling(messages, tools, modelId, signal);
+        logger.debug('Creating streaming LMStudio response with native tool calling', {
+          provider: 'lmstudio',
+          model: modelId,
+          messageCount: messages.length,
+          toolCount: tools.length,
+          toolNames: tools.map((t) => t.name),
+        });
+
+        // Use the same native tool calling method with streaming callback
+        return this._createResponseWithNativeToolCalling(
+          messages, 
+          tools, 
+          modelId, 
+          signal,
+          () => { streamingStarted = true; }
+        );
+      },
+      { 
+        signal,
+        isStreaming: true,
+        canRetry: () => !streamingStarted
+      }
+    );
   }
 
   private _estimateUsage(
