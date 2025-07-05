@@ -20,6 +20,12 @@ const providerInitializers: Record<
   (config: { apiKey?: string; model?: string }) => Promise<AIProvider>
 > = {
   anthropic: async ({ apiKey, model }) => {
+    // Check for test mode to use mock provider
+    if (getEnvVar('LACE_TEST_MODE') === 'true') {
+      const { createMockProvider } = await import('./__tests__/utils/mock-provider.js');
+      return createMockProvider();
+    }
+
     const { AnthropicProvider } = await import('./providers/anthropic-provider.js');
     if (!apiKey) {
       throw new Error('Anthropic API key is required');

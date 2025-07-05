@@ -141,21 +141,16 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
     ];
 
     // Try multiple times as AI models can be unpredictable under load
-    let response;
+    let response = await provider.createResponse(messages, [complexTool]);
     let attempts = 0;
     const maxAttempts = 3;
 
-    while (attempts < maxAttempts) {
-      response = await provider.createResponse(messages, [complexTool]);
-
-      if (response.toolCalls.length > 0) {
-        break;
-      }
-
+    while (attempts < maxAttempts && response.toolCalls.length === 0) {
       attempts++;
       if (attempts < maxAttempts) {
         // Wait a bit before retrying
         await new Promise((resolve) => setTimeout(resolve, 1000));
+        response = await provider.createResponse(messages, [complexTool]);
       }
     }
 
