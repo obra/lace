@@ -14,7 +14,12 @@ export async function checkProviderAvailability(
   provider: { diagnose(): Promise<{ connected: boolean; models: string[]; error?: string }> }
 ): Promise<boolean> {
   try {
-    const diagnostics = await provider.diagnose();
+    // Add timeout to prevent hanging (give extra time for provider's own timeout)
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Provider check timeout')), 4000);
+    });
+
+    const diagnostics = await Promise.race([provider.diagnose(), timeoutPromise]);
     if (!diagnostics.connected || diagnostics.models.length === 0) {
       console.log(`Skipping ${providerName} tests - ${diagnostics.error || 'not available'}`);
       return false;

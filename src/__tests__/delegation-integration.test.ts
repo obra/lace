@@ -1,15 +1,14 @@
 // ABOUTME: Comprehensive integration test for delegation functionality
 // ABOUTME: Tests end-to-end delegation workflow including UI component rendering
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ThreadManager } from '../threads/thread-manager.js';
 import { ThreadProcessor } from '../interfaces/thread-processor.js';
 import { Agent } from '../agents/agent.js';
 import { ToolExecutor } from '../tools/executor.js';
 import { DelegateTool } from '../tools/implementations/delegate.js';
 import { BashTool } from '../tools/implementations/bash.js';
-import { LMStudioProvider } from '../providers/lmstudio-provider.js';
-import { checkProviderAvailability } from './utils/provider-test-helpers.js';
+import { TestProvider } from './utils/test-provider.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -194,22 +193,28 @@ describe('Delegation Integration Tests', () => {
   });
 
   it('should integrate delegation with DelegateTool', async () => {
-    // Create LMStudio provider for real integration testing
-    const provider = new LMStudioProvider({
-      baseUrl: 'ws://localhost:1234',
-      model: 'qwen/qwen3-1.7b',
+    // Create mock provider for predictable testing
+    const mockProvider = new TestProvider({
+      mockResponse: JSON.stringify({
+        threadId: 'delegate-thread-123',
+        status: 'completed',
+        summary: 'Successfully analyzed the project structure and found key patterns',
+        totalTokens: 150,
+      }),
     });
 
-    // Skip this test if LMStudio is not available
-    const isAvailable = await checkProviderAvailability('LMStudio', provider);
-    if (!isAvailable) return;
+    // Mock the DelegateTool's createProvider method to return our test provider
+    const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
+    const createProviderSpy = vi
+      .spyOn(delegateTool as any, 'createProvider')
+      .mockResolvedValue(mockProvider);
 
-    // Create main agent with real provider
+    // Create main agent with any provider (won't be used for delegation due to mock)
     const mainThreadId = threadManager.generateThreadId();
     threadManager.createThread(mainThreadId);
 
     const agent = new Agent({
-      provider,
+      provider: mockProvider, // Use mock provider for main agent too
       toolExecutor,
       threadManager,
       threadId: mainThreadId,
@@ -226,12 +231,10 @@ describe('Delegation Integration Tests', () => {
       title: 'Code Analysis',
       prompt: 'Analyze the project structure and identify key patterns',
       expected_response: 'Brief summary of project structure',
-      model: 'lmstudio:qwen/qwen3-1.7b',
+      model: 'anthropic:claude-3-5-haiku-latest', // Use real provider format, will be mocked
     };
 
-    const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
-
-    // Execute delegation (this will create a sub-thread and run a real subagent)
+    // Execute delegation (this will create a sub-thread and run a mock subagent)
     const toolCall = {
       id: 'test-delegation-call',
       name: 'delegate',
@@ -258,7 +261,17 @@ describe('Delegation Integration Tests', () => {
     // Check that we have events from delegate thread
     const delegateEvents = allEvents.filter((e) => e.threadId.includes('.'));
     expect(delegateEvents.length).toBeGreaterThan(0);
-  }, 60000); // 60 second timeout for real delegation
+
+    // Verify that our mock was called
+    expect(createProviderSpy).toHaveBeenCalledWith(
+      'anthropic',
+      'claude-3-5-haiku-latest',
+      expect.any(String)
+    );
+
+    // Cleanup
+    createProviderSpy.mockRestore();
+  }); // Should complete quickly with mock provider
 
   it('should process main thread only for UI timeline', () => {
     const mainThreadId = threadManager.generateThreadId();

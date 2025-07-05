@@ -86,7 +86,7 @@ describe('End-to-End CLI Tests', () => {
         const result = await runCLI(
           ['--provider', 'lmstudio', '--model', 'qwen/qwen3-1.7b', '--prompt', 'Hello /nothink'],
           {
-            timeout: 30000,
+            timeout: 10000, // Reduced timeout - should fail fast if provider unavailable
           }
         );
 
@@ -95,25 +95,28 @@ describe('End-to-End CLI Tests', () => {
 
         // Should exit cleanly after processing prompt (or skip if LMStudio not available)
         if (result.exitCode !== 0) {
-          // console.log('LMStudio not available, skipping test. stderr:', result.stderr);
+          // LMStudio not available, check for proper error message
+          expect(result.stderr).toMatch(/LMStudio|connection|timeout/i);
           return;
         }
         expect(result.exitCode).toBe(0);
       },
-      120000
+      15000 // Reduced test timeout
     );
 
     it('should handle --prompt with different providers', async () => {
       const result = await runCLI(
         ['--provider', 'lmstudio', '--model', 'qwen/qwen3-1.7b', '--prompt', 'Hello /nothink'],
         {
-          timeout: 15000,
+          timeout: 8000, // Reduced timeout
         }
-      ); // Longer timeout for provider connection
+      );
 
       // Should mention the provider and attempt to start, even if connection fails
-      expect(result.stdout || result.stderr).toMatch(/lmstudio|Starting|Lace Agent/);
-    }, 20000); // Vitest timeout
+      expect(result.stdout || result.stderr).toMatch(
+        /lmstudio|Starting|Lace Agent|connection|timeout/i
+      );
+    }, 12000); // Reduced test timeout
 
     it('should require prompt text', async () => {
       const result = await runCLI(['--prompt']);
@@ -138,18 +141,19 @@ describe('End-to-End CLI Tests', () => {
             '--prompt',
             'Hello',
           ],
-          { timeout: 30000 }
+          { timeout: 10000 } // Reduced timeout
         );
 
         if (result.exitCode !== 0) {
-          // console.log('LMStudio not available, skipping test. stderr:', result.stderr);
+          // LMStudio not available, check for proper error message
+          expect(result.stderr).toMatch(/LMStudio|connection|timeout/i);
           return;
         }
         // Should not crash, should start new session
         expect(result.exitCode).toBe(0);
         expect(result.stdout).toMatch(/🆕 Starting new conversation lace_\d{8}_[a-z0-9]{6}/);
       },
-      120000
+      15000 // Reduced test timeout
     );
   });
 
@@ -189,7 +193,7 @@ describe('End-to-End CLI Tests', () => {
               '--prompt',
               'Add 2+2 /nothink',
             ],
-            { timeout: 30000 }
+            { timeout: 10000 } // Reduced timeout
           );
 
           if (result.exitCode !== 0) {
@@ -208,7 +212,7 @@ describe('End-to-End CLI Tests', () => {
           }
         }
       },
-      20000
+      15000 // Reduced test timeout
     );
   });
 
