@@ -90,8 +90,6 @@ export class DatabasePersistence {
   private migrateToV1(): void {
     if (!this.db) return;
 
-    console.log('Migrating database to version 1 (basic schema)...');
-
     // Create basic threads and events tables
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS threads (
@@ -117,13 +115,10 @@ export class DatabasePersistence {
     `);
 
     this.setSchemaVersion(1);
-    console.log('Database migrated to version 1');
   }
 
   private migrateToV2(): void {
     if (!this.db) return;
-
-    console.log('Migrating database to version 2 (thread versioning)...');
 
     // Create thread versioning tables
     this.db.exec(`
@@ -151,13 +146,10 @@ export class DatabasePersistence {
     `);
 
     this.setSchemaVersion(2);
-    console.log('Database migrated to version 2');
   }
 
   private migrateToV3(): void {
     if (!this.db) return;
-
-    console.log('Migrating database to version 3 (task management)...');
 
     // Create task management tables
     this.db.exec(`
@@ -191,7 +183,6 @@ export class DatabasePersistence {
     `);
 
     this.setSchemaVersion(3);
-    console.log('Database migrated to version 3');
   }
 
   // ===============================

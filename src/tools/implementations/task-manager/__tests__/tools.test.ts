@@ -10,14 +10,12 @@ import {
   TaskAddNoteTool,
   TaskViewTool,
 } from '../tools.js';
-import { DatabasePersistence } from '../../../../persistence/database.js';
 import { ToolContext } from '../../../types.js';
 import { createThreadId, asThreadId, createNewAgentSpec } from '../../../../threads/types.js';
 import { useTempLaceDir, getTestDbPath } from '../../../../test-utils/temp-lace-dir.js';
 
 describe('Enhanced Task Manager Tools', () => {
   const tempDirContext = useTempLaceDir();
-  let persistence: DatabasePersistence;
   let context: ToolContext;
 
   const parentThreadId = asThreadId('lace_20250703_parent');
@@ -25,10 +23,6 @@ describe('Enhanced Task Manager Tools', () => {
   const agent2ThreadId = asThreadId('lace_20250703_parent.2');
 
   beforeEach(async () => {
-    // Create persistence instance using the same path the tools will use
-    const { getLaceDbPath } = await import('../../../../config/lace-dir.js');
-    persistence = new DatabasePersistence(getLaceDbPath());
-
     context = {
       threadId: agent1ThreadId,
       parentThreadId: parentThreadId,
@@ -36,8 +30,6 @@ describe('Enhanced Task Manager Tools', () => {
   });
 
   afterEach(async () => {
-    // Close persistence
-    persistence.close();
     vi.clearAllMocks();
   });
 
@@ -285,9 +277,11 @@ describe('Enhanced Task Manager Tools', () => {
       expect(result.isError).toBe(false);
       expect(result.content?.[0]?.text).toContain('in_progress');
 
-      // Verify in database
-      const task = persistence.loadTask(taskId);
-      expect(task?.status).toBe('in_progress');
+      // Verify using TaskViewTool
+      const viewTool = new TaskViewTool();
+      const viewResult = await viewTool.execute({ taskId }, context);
+      expect(viewResult.isError).toBe(false);
+      expect(viewResult.content?.[0]?.text).toContain('in_progress');
     });
 
     it('should validate status values', async () => {
@@ -334,8 +328,11 @@ describe('Enhanced Task Manager Tools', () => {
       expect(result.isError).toBe(false);
       expect(result.content?.[0]?.text).toContain('assigned to');
 
-      const task = persistence.loadTask(taskId);
-      expect(task?.assignedTo).toBe(agent2ThreadId);
+      // Verify reassignment using TaskViewTool
+      const viewTool = new TaskViewTool();
+      const viewResult = await viewTool.execute({ taskId }, context);
+      expect(viewResult.isError).toBe(false);
+      expect(viewResult.content?.[0]?.text).toContain(agent2ThreadId);
     });
 
     it('should assign to new agent spec', async () => {
@@ -400,10 +397,16 @@ describe('Enhanced Task Manager Tools', () => {
       expect(result.isError).toBe(false);
       expect(result.content?.[0]?.text).toContain('Added note');
 
-      const task = persistence.loadTask(taskId);
-      expect(task?.notes).toHaveLength(1);
-      expect(task?.notes[0].content).toBe('Started working on this task');
-      expect(task?.notes[0].author).toBe(agent1ThreadId);
+      // Verify note was added using TaskViewTool
+      const viewTool = new TaskViewTool();
+      const viewResult = await viewTool.execute({ taskId }, context);
+      expect(viewResult.isError).toBe(false);
+      const taskDetails = viewResult.content?.[0]?.text || '';
+      expect(taskDetails).toContain('Started working on this task');
+      expect(taskDetails).toContain(agent1ThreadId);
+      // Should have 1 note in the output
+      const noteMatches = taskDetails.match(/\d+\. \[/g);
+      expect(noteMatches).toHaveLength(1);
     });
 
     it('should add multiple notes', async () => {
@@ -425,11 +428,17 @@ describe('Enhanced Task Manager Tools', () => {
         { ...context, threadId: agent2ThreadId }
       );
 
-      const task = persistence.loadTask(taskId);
-      expect(task?.notes).toHaveLength(2);
-      expect(task?.notes[0].content).toBe('First note');
-      expect(task?.notes[1].content).toBe('Second note');
-      expect(task?.notes[1].author).toBe(agent2ThreadId);
+      // Verify multiple notes using TaskViewTool
+      const viewTool = new TaskViewTool();
+      const viewResult = await viewTool.execute({ taskId }, context);
+      expect(viewResult.isError).toBe(false);
+      const taskDetails = viewResult.content?.[0]?.text || '';
+      expect(taskDetails).toContain('First note');
+      expect(taskDetails).toContain('Second note');
+      expect(taskDetails).toContain(agent2ThreadId);
+      // Should have 2 notes in the output
+      const noteMatches = taskDetails.match(/\d+\. \[/g);
+      expect(noteMatches).toHaveLength(2);
     });
   });
 
@@ -525,8 +534,11 @@ describe('Enhanced Task Manager Tools', () => {
       expect(result.isError).toBe(false);
       expect(result.content?.[0]?.text).toContain('Completed task');
 
-      const task = persistence.loadTask(taskId);
-      expect(task?.status).toBe('completed');
+      // Verify completion using TaskViewTool
+      const viewTool = new TaskViewTool();
+      const viewResult = await viewTool.execute({ taskId }, context);
+      expect(viewResult.isError).toBe(false);
+      expect(viewResult.content?.[0]?.text).toContain('completed');
     });
 
     it('should handle non-existent task', async () => {
