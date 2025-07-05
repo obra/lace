@@ -211,6 +211,19 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   const [currentTurnId, setCurrentTurnId] = useState<string | null>(null);
   const [currentTurnMetrics, setCurrentTurnMetrics] = useState<CurrentTurnMetrics | null>(null);
 
+  // Retry status state
+  const [retryStatus, setRetryStatus] = useState<{
+    isRetrying: boolean;
+    attempt: number;
+    maxAttempts: number;
+    delayMs: number;
+    errorType: string;
+    retryStartTime: number;
+  } | null>(null);
+
+  // Retry countdown timer for real-time updates
+  const retryCountdownRef = useRef<NodeJS.Timeout | null>(null);
+
   // Alert state for SIGINT and other system messages
   const [alert, setAlert] = useState<{
     variant: 'info' | 'warning' | 'error' | 'success';
@@ -364,6 +377,14 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       // Clear streaming content - the final response will be in ThreadEvents
       setStreamingContent('');
       setIsProcessing(false);
+      
+      // Clear retry status and countdown timer on successful response
+      if (retryCountdownRef.current) {
+        clearInterval(retryCountdownRef.current);
+        retryCountdownRef.current = null;
+      }
+      setRetryStatus(null);
+      
       syncEvents();
     };
 
@@ -602,6 +623,84 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       });
     };
 
+    // Handle retry events
+    const handleRetryAttempt = ({ attempt, delay, error }: { attempt: number; delay: number; error: Error }) => {
+      // Extract error type for display
+      let errorType = 'network error';
+      if (error.message.includes('timeout') || error.message.includes('ETIMEDOUT')) {
+        errorType = 'timeout';
+      } else if (error.message.includes('rate limit') || error.message.includes('429')) {
+        errorType = 'rate limit';
+      } else if (error.message.includes('server') || error.message.includes('5')) {
+        errorType = 'server error';
+      } else if (error.message.includes('auth') || error.message.includes('401')) {
+        errorType = 'auth error';
+      } else if (error.message.includes('connection') || error.message.includes('ECONNREFUSED')) {
+        errorType = 'connection error';
+      }
+
+      const newRetryStatus = {
+        isRetrying: true,
+        attempt,
+        maxAttempts: 10, // Default from base provider config
+        delayMs: delay,
+        errorType,
+        retryStartTime: Date.now(),
+      };
+
+      setRetryStatus(newRetryStatus);
+
+      // Clear any existing countdown timer
+      if (retryCountdownRef.current) {
+        clearInterval(retryCountdownRef.current);
+      }
+
+      // Start countdown timer for real-time updates (only if delay > 1s)
+      if (delay > 1000) {
+        retryCountdownRef.current = setInterval(() => {
+          setRetryStatus(prev => {
+            if (!prev || !prev.isRetrying) {
+              if (retryCountdownRef.current) {
+                clearInterval(retryCountdownRef.current);
+                retryCountdownRef.current = null;
+              }
+              return prev;
+            }
+
+            const elapsed = Date.now() - prev.retryStartTime;
+            if (elapsed >= prev.delayMs) {
+              // Countdown finished, clear timer
+              if (retryCountdownRef.current) {
+                clearInterval(retryCountdownRef.current);
+                retryCountdownRef.current = null;
+              }
+              return { ...prev }; // Force re-render with updated state
+            }
+
+            return { ...prev }; // Force re-render for countdown update
+          });
+        }, 500); // Update every 500ms for smooth countdown
+      }
+    };
+
+    const handleRetryExhausted = ({ attempts, lastError }: { attempts: number; lastError: Error }) => {
+      // Clear countdown timer
+      if (retryCountdownRef.current) {
+        clearInterval(retryCountdownRef.current);
+        retryCountdownRef.current = null;
+      }
+      
+      // Clear retry status when exhausted
+      setRetryStatus(null);
+      
+      // Add system message about retry exhaustion
+      addMessage({
+        type: 'system',
+        content: `❌ All ${attempts} retries exhausted: ${lastError.message}`,
+        timestamp: new Date(),
+      });
+    };
+
     // Register event listeners
     agent.on('agent_token', handleToken);
     agent.on('agent_thinking_complete', handleThinkingComplete);
@@ -617,6 +716,9 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     agent.on('turn_progress', handleTurnProgress);
     agent.on('turn_complete', handleTurnComplete);
     agent.on('turn_aborted', handleTurnAborted);
+    // Retry events
+    agent.on('retry_attempt', handleRetryAttempt);
+    agent.on('retry_exhausted', handleRetryExhausted);
 
     // Cleanup function
     return () => {
@@ -634,11 +736,20 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       agent.off('turn_progress', handleTurnProgress);
       agent.off('turn_complete', handleTurnComplete);
       agent.off('turn_aborted', handleTurnAborted);
+      // Retry events cleanup
+      agent.off('retry_attempt', handleRetryAttempt);
+      agent.off('retry_exhausted', handleRetryExhausted);
       
       // Clear any pending debounced updates
       if (tokenUpdateDebounceRef.current) {
         clearTimeout(tokenUpdateDebounceRef.current);
         tokenUpdateDebounceRef.current = null;
+      }
+      
+      // Clear retry countdown timer
+      if (retryCountdownRef.current) {
+        clearInterval(retryCountdownRef.current);
+        retryCountdownRef.current = null;
       }
     };
   }, [agent, addMessage, syncEvents, streamingContent]);
@@ -902,6 +1013,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               turnMetrics={currentTurnMetrics}
               projectContext={projectContext}
               contextWindow={agent.provider?.contextWindow}
+              retryStatus={retryStatus}
             />
 
             {/* Input area or modal - takes natural height */}
