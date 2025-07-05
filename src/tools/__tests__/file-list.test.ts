@@ -2,16 +2,19 @@
 // ABOUTME: Validates directory listing, tree formatting, and recursive traversal
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { writeFile, mkdir, rm } from 'fs/promises';
+import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { FileListTool } from '../implementations/file-list.js';
+import { createTestTempDir } from './temp-utils.js';
 
 describe('FileListTool with schema validation', () => {
   let tool: FileListTool;
-  const testDir = join(process.cwd(), 'test-temp-file-list-schema');
+  const tempDir = createTestTempDir('file-list-test-');
+  let testDir: string;
 
   beforeEach(async () => {
     tool = new FileListTool();
+    testDir = await tempDir.getPath();
     await mkdir(testDir, { recursive: true });
 
     // Create test file structure
@@ -33,7 +36,7 @@ describe('FileListTool with schema validation', () => {
   });
 
   afterEach(async () => {
-    await rm(testDir, { recursive: true, force: true });
+    await tempDir.cleanup();
   });
 
   describe('Tool metadata', () => {

@@ -11,7 +11,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { runCLI, isLMStudioAvailable } from './helpers/cli-runner.js';
 
-describe.skip('End-to-End CLI Conversation Tests', () => {
+describe('End-to-End CLI Conversation Tests', () => {
   let tempDbPath: string;
   let originalEnv: string | undefined;
 
@@ -53,16 +53,9 @@ describe.skip('End-to-End CLI Conversation Tests', () => {
 
         // First, create a session with a prompt
         const session1 = await runCLI(
-          [
-            '--provider',
-            'lmstudio',
-            '--model',
-            'mistralai/devstral-small-2505',
-            '--prompt',
-            'Add 2+2',
-          ],
+          ['--provider', 'lmstudio', '--model', 'mistralai/devstral-small-2505', '--prompt', 'Hi'],
           {
-            timeout: 30000,
+            timeout: 60000,
           }
         );
 
@@ -90,9 +83,9 @@ describe.skip('End-to-End CLI Conversation Tests', () => {
             '--continue',
             sessionId,
             '--prompt',
-            'Add 3+3',
+            'Hello',
           ],
-          { timeout: 15000 }
+          { timeout: 60000 }
         );
 
         expect(session2.exitCode).toBe(0);
@@ -112,16 +105,9 @@ describe.skip('End-to-End CLI Conversation Tests', () => {
 
         // Create first session
         const session1 = await runCLI(
-          [
-            '--provider',
-            'lmstudio',
-            '--model',
-            'mistralai/devstral-small-2505',
-            '--prompt',
-            'Hello',
-          ],
+          ['--provider', 'lmstudio', '--model', 'mistralai/devstral-small-2505', '--prompt', 'Hi'],
           {
-            timeout: 30000,
+            timeout: 60000,
           }
         );
 
@@ -139,10 +125,10 @@ describe.skip('End-to-End CLI Conversation Tests', () => {
             '--model',
             'mistralai/devstral-small-2505',
             '--prompt',
-            'Add 2+2',
+            'Hello',
           ],
           {
-            timeout: 30000,
+            timeout: 60000,
           }
         );
 
@@ -164,7 +150,7 @@ describe.skip('End-to-End CLI Conversation Tests', () => {
             'Hello',
           ],
           {
-            timeout: 30000,
+            timeout: 60000,
           }
         );
 
@@ -188,16 +174,9 @@ describe.skip('End-to-End CLI Conversation Tests', () => {
 
         // Turn 1: Ask initial question
         const turn1 = await runCLI(
-          [
-            '--provider',
-            'lmstudio',
-            '--model',
-            'mistralai/devstral-small-2505',
-            '--prompt',
-            'Add 2+2',
-          ],
+          ['--provider', 'lmstudio', '--model', 'mistralai/devstral-small-2505', '--prompt', 'Hi'],
           {
-            timeout: 30000,
+            timeout: 60000,
           }
         );
 
@@ -219,10 +198,10 @@ describe.skip('End-to-End CLI Conversation Tests', () => {
             '--continue',
             sessionId,
             '--prompt',
-            'Add 3+3',
+            'Hello',
           ],
           {
-            timeout: 30000,
+            timeout: 60000,
           }
         );
 
@@ -261,16 +240,9 @@ describe.skip('End-to-End CLI Conversation Tests', () => {
 
         // Turn 1: Ask "Add 2+2" with LMStudio
         const turn1 = await runCLI(
-          [
-            '--provider',
-            'lmstudio',
-            '--model',
-            'mistralai/devstral-small-2505',
-            '--prompt',
-            'Add 2+2',
-          ],
+          ['--provider', 'lmstudio', '--model', 'mistralai/devstral-small-2505', '--prompt', 'Hi'],
           {
-            timeout: 30000,
+            timeout: 60000,
           }
         );
 
@@ -302,7 +274,7 @@ describe.skip('End-to-End CLI Conversation Tests', () => {
             'Hello',
           ],
           {
-            timeout: 30000,
+            timeout: 60000,
           }
         );
 
