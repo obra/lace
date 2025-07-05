@@ -90,13 +90,15 @@ async function initializeServices(options: CLIOptions) {
   });
 }
 
-async function setupAgent(options: CLIOptions, threadId: string): Promise<Agent> {
+async function setupAgent(
+  options: CLIOptions,
+  threadId: string,
+  threadManager: ThreadManager
+): Promise<Agent> {
   const toolExecutor = new ToolExecutor();
   toolExecutor.registerAllAvailableTools();
 
   const provider = await createProvider(options.provider, options.model);
-  const threadManager = new ThreadManager(getLaceDbPath());
-
   const agent = new Agent({
     provider,
     toolExecutor,
@@ -149,7 +151,7 @@ export async function run(options: CLIOptions): Promise<void> {
   const threadManager = new ThreadManager(getLaceDbPath());
   const threadId = await handleSession(threadManager, options.continue);
 
-  const agent = await setupAgent(options, threadId);
+  const agent = await setupAgent(options, threadId, threadManager);
 
   if (options.prompt) {
     const nonInteractive = new NonInteractiveInterface(agent);
