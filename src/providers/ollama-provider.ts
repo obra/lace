@@ -297,7 +297,7 @@ export class OllamaProvider extends AIProvider {
 
         // Make the streaming request
         const response = await this._ollama.chat(requestPayload);
-        
+
         // Mark that stream is created to prevent retries after this point
         streamCreated = true;
 
