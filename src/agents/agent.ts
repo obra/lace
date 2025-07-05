@@ -936,44 +936,90 @@ export class Agent extends EventEmitter {
       } else if (event.type === 'TOOL_RESULT') {
         const toolResult = event.data as ToolResult;
 
-        // Look ahead to see if there are more tool results to group together
-        const toolResultsForThisMessage: ProviderToolResult[] = [];
-
-        // Convert from ToolResult to ProviderToolResult format
-        toolResultsForThisMessage.push({
-          id: toolResult.id || '',
-          content: toolResult.content,
-          isError: toolResult.isError,
-        });
-
-        // Look for consecutive tool results
-        let nextIndex = i + 1;
-        while (nextIndex < events.length) {
-          const nextEvent = events[nextIndex];
-
-          // If we hit a non-TOOL_RESULT event, stop looking
-          if (nextEvent.type !== 'TOOL_RESULT') {
+        // Find the most recent assistant message with tool calls that contains this tool result ID
+        let targetAssistantMessage: ProviderMessage | undefined;
+        let targetAssistantIndex = -1;
+        
+        for (let j = messages.length - 1; j >= 0; j--) {
+          const msg = messages[j];
+          if (msg.role === 'assistant' && msg.toolCalls && 
+              msg.toolCalls.some(tc => tc.id === toolResult.id)) {
+            targetAssistantMessage = msg;
+            targetAssistantIndex = j;
             break;
           }
-
-          const nextToolResult = nextEvent.data as ToolResult;
-          // Convert from ToolResult to ProviderToolResult format
-          toolResultsForThisMessage.push({
-            id: nextToolResult.id || '',
-            content: nextToolResult.content,
-            isError: nextToolResult.isError,
-          });
-
-          processedEventIndices.add(nextIndex); // Mark as processed
-          nextIndex++;
         }
 
-        // Create user message with tool results
-        messages.push({
-          role: 'user',
-          content: '', // No text content for pure tool results
-          toolResults: toolResultsForThisMessage,
-        });
+        if (targetAssistantMessage) {
+          // Find if there's already a user message with tool results after this assistant message
+          let existingUserMessage: ProviderMessage | undefined;
+          for (let j = targetAssistantIndex + 1; j < messages.length; j++) {
+            const msg = messages[j];
+            if (msg.role === 'user' && msg.toolResults && msg.toolResults.length > 0) {
+              existingUserMessage = msg;
+              break;
+            }
+          }
+
+          if (existingUserMessage) {
+            // Add this tool result to the existing user message
+            existingUserMessage.toolResults!.push({
+              id: toolResult.id || '',
+              content: toolResult.content,
+              isError: toolResult.isError,
+            });
+          } else {
+            // Create a new user message with this tool result
+            messages.push({
+              role: 'user',
+              content: '',
+              toolResults: [{
+                id: toolResult.id || '',
+                content: toolResult.content,
+                isError: toolResult.isError,
+              }],
+            });
+          }
+        } else {
+          // This tool result doesn't correspond to any assistant message with tool calls
+          // Try to find the corresponding TOOL_CALL event to create a synthetic assistant message
+          const correspondingToolCallEvent = events.find(e => 
+            e.type === 'TOOL_CALL' && 
+            (e.data as ToolCall).id === toolResult.id
+          );
+
+          if (correspondingToolCallEvent) {
+            // Create a synthetic assistant message with the missing tool call
+            const toolCallData = correspondingToolCallEvent.data as ToolCall;
+            const syntheticAssistantMessage: ProviderMessage = {
+              role: 'assistant',
+              content: '', // No text content for synthetic message
+              toolCalls: [{
+                id: toolCallData.id,
+                name: toolCallData.name,
+                input: toolCallData.arguments,
+              }],
+            };
+            
+            messages.push(syntheticAssistantMessage);
+
+            // Now create the user message with the tool result
+            messages.push({
+              role: 'user',
+              content: '',
+              toolResults: [{
+                id: toolResult.id || '',
+                content: toolResult.content,
+                isError: toolResult.isError,
+              }],
+            });
+          } else {
+            // Truly orphaned tool result - no corresponding tool call found
+            // Skip this tool result to prevent API errors - it represents corrupted data
+            // This is a graceful degradation that maintains conversation flow
+            continue;
+          }
+        }
       } else if (
         event.type === 'LOCAL_SYSTEM_MESSAGE' ||
         event.type === 'SYSTEM_PROMPT' ||
