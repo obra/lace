@@ -6,7 +6,7 @@ import { Tool } from '../../tool.js';
 import { NonEmptyString } from '../../schemas/common.js';
 import type { ToolResult, ToolContext } from '../../types.js';
 import { DatabasePersistence } from '../../../persistence/database.js';
-import { Task, TaskNote } from './types.js';
+import { Task, TaskNote, TaskStatus, TaskPriority } from './types.js';
 import { isAssigneeId, AssigneeId, ThreadId } from '../../../threads/types.js';
 
 // Helper to generate task IDs
@@ -21,7 +21,7 @@ const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(1000).optional(),
   prompt: z.string().min(1),
-  priority: z.enum(['high', 'medium', 'low']).default('medium'),
+  priority: z.enum(['high', 'medium', 'low'] as const).default('medium'),
   assignedTo: z.string().optional().describe('Thread ID or "new:provider/model"'),
 });
 
@@ -239,9 +239,9 @@ export class TaskCompleteTool extends Tool {
 const updateTaskSchema = z
   .object({
     taskId: NonEmptyString,
-    status: z.enum(['pending', 'in_progress', 'completed', 'blocked']).optional(),
+    status: z.enum(['pending', 'in_progress', 'completed', 'blocked'] as const).optional(),
     assignTo: z.string().describe('Thread ID or "new:provider/model"').optional(),
-    priority: z.enum(['high', 'medium', 'low']).optional(),
+    priority: z.enum(['high', 'medium', 'low'] as const).optional(),
     title: z.string().max(200).optional(),
     description: z.string().max(1000).optional(),
     prompt: z.string().optional(),

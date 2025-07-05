@@ -3,13 +3,16 @@
 
 import { ThreadId, AssigneeId } from '../../../threads/types.js';
 
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked';
+export type TaskPriority = 'high' | 'medium' | 'low';
+
 export interface Task {
   id: string;
   title: string; // Brief summary
   description: string; // Human-readable details
   prompt: string; // Detailed instructions for assigned agent
-  status: 'pending' | 'in_progress' | 'completed' | 'blocked';
-  priority: 'high' | 'medium' | 'low';
+  status: TaskStatus;
+  priority: TaskPriority;
   assignedTo?: AssigneeId; // ThreadId or NewAgentSpec
   createdBy: ThreadId; // Full hierarchical thread ID of creating agent
   threadId: ThreadId; // Parent thread ID only (e.g., "lace_20250703_abc123")

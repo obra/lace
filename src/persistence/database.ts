@@ -10,7 +10,8 @@ import {
   ThreadId,
   AssigneeId,
 } from '../threads/types.js';
-import { Task, TaskNote } from '../tools/implementations/task-manager/types.js';
+import { Task, TaskNote, TaskStatus, TaskPriority } from '../tools/implementations/task-manager/types.js';
+import { logger } from '../utils/logger.js';
 
 export class DatabasePersistence {
   private db: Database.Database | null = null;
@@ -25,11 +26,11 @@ export class DatabasePersistence {
       this.db.pragma('busy_timeout = 5000');
       this.initializeSchema();
     } catch (error) {
-      console.error(
-        `Failed to initialize database at ${dbPath}:`,
-        error instanceof Error ? error.message : String(error)
-      );
-      console.error('Database persistence disabled - data will only be stored in memory');
+      logger.error('Failed to initialize database', {
+        dbPath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      logger.warn('Database persistence disabled - data will only be stored in memory');
       this._disabled = true;
     }
   }
@@ -482,9 +483,10 @@ export class DatabasePersistence {
         deleteHistoryStmt.run(versionId);
       }
 
-      console.log(
-        `Cleaned up ${versionsToDelete.length} old compacted threads for canonical ID ${canonicalId}`
-      );
+      logger.info('Cleaned up old compacted threads', {
+        versionsDeleted: versionsToDelete.length,
+        canonicalId,
+      });
     });
 
     transaction();
@@ -570,8 +572,8 @@ export class DatabasePersistence {
       title: row.title,
       description: row.description || '',
       prompt: row.prompt,
-      status: row.status,
-      priority: row.priority,
+      status: row.status as TaskStatus,
+      priority: row.priority as TaskPriority,
       assignedTo: row.assigned_to as AssigneeId | undefined,
       createdBy: row.created_by as ThreadId,
       threadId: row.thread_id as ThreadId,
@@ -590,8 +592,38 @@ export class DatabasePersistence {
       ORDER BY created_at DESC
     `);
 
-    const rows = stmt.all(threadId) as Array<{ id: string }>;
-    return rows.map((row) => this.loadTask(row.id)!).filter((task) => task !== null);
+    const rows = stmt.all(threadId) as Array<{
+      id: string;
+      title: string;
+      description: string;
+      prompt: string;
+      status: string;
+      priority: string;
+      assigned_to: string | null;
+      created_by: string;
+      thread_id: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+
+    // Load notes for all tasks in batch
+    const taskIds = rows.map(row => row.id);
+    const notesMap = this.loadNotesBatch(taskIds);
+
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      description: row.description || '',
+      prompt: row.prompt,
+      status: row.status as TaskStatus,
+      priority: row.priority as TaskPriority,
+      assignedTo: row.assigned_to as AssigneeId | undefined,
+      createdBy: row.created_by as ThreadId,
+      threadId: row.thread_id as ThreadId,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      notes: notesMap.get(row.id) || [],
+    }));
   }
 
   loadTasksByAssignee(assignee: AssigneeId): Task[] {
@@ -603,8 +635,38 @@ export class DatabasePersistence {
       ORDER BY created_at DESC
     `);
 
-    const rows = stmt.all(assignee) as Array<{ id: string }>;
-    return rows.map((row) => this.loadTask(row.id)!).filter((task) => task !== null);
+    const rows = stmt.all(assignee) as Array<{
+      id: string;
+      title: string;
+      description: string;
+      prompt: string;
+      status: string;
+      priority: string;
+      assigned_to: string | null;
+      created_by: string;
+      thread_id: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+
+    // Load notes for all tasks in batch
+    const taskIds = rows.map(row => row.id);
+    const notesMap = this.loadNotesBatch(taskIds);
+
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      description: row.description || '',
+      prompt: row.prompt,
+      status: row.status as TaskStatus,
+      priority: row.priority as TaskPriority,
+      assignedTo: row.assigned_to as AssigneeId | undefined,
+      createdBy: row.created_by as ThreadId,
+      threadId: row.thread_id as ThreadId,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      notes: notesMap.get(row.id) || [],
+    }));
   }
 
   async updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
@@ -688,8 +750,46 @@ export class DatabasePersistence {
     });
   }
 
+  // Batch load notes for multiple tasks to avoid N+1 queries
+  private loadNotesBatch(taskIds: string[]): Map<string, TaskNote[]> {
+    if (this._disabled || !this.db || taskIds.length === 0) return new Map();
+
+    const placeholders = taskIds.map(() => '?').join(',');
+    const stmt = this.db.prepare(`
+      SELECT * FROM task_notes 
+      WHERE task_id IN (${placeholders})
+      ORDER BY task_id, timestamp ASC
+    `);
+
+    const noteRows = stmt.all(...taskIds) as Array<{
+      id: number;
+      task_id: string;
+      author: string;
+      content: string;
+      timestamp: string;
+    }>;
+
+    const notesMap = new Map<string, TaskNote[]>();
+    
+    for (const noteRow of noteRows) {
+      const taskId = noteRow.task_id;
+      if (!notesMap.has(taskId)) {
+        notesMap.set(taskId, []);
+      }
+      
+      notesMap.get(taskId)!.push({
+        id: String(noteRow.id),
+        author: noteRow.author as ThreadId,
+        content: noteRow.content,
+        timestamp: new Date(noteRow.timestamp),
+      });
+    }
+
+    return notesMap;
+  }
+
   // Retry wrapper for write operations to handle SQLITE_BUSY
-  private withRetry<T>(operation: () => T, maxRetries = 3): T {
+  private async withRetry<T>(operation: () => T, maxRetries = 3): Promise<T> {
     let lastError: unknown;
     for (let i = 0; i < maxRetries; i++) {
       try {
@@ -697,10 +797,9 @@ export class DatabasePersistence {
       } catch (error: unknown) {
         if ((error as { code?: string }).code === 'SQLITE_BUSY' && i < maxRetries - 1) {
           lastError = error;
-          // Exponential backoff
+          // Exponential backoff with proper async delay
           const delay = Math.min(100 * Math.pow(2, i), 1000);
-          const end = Date.now() + delay;
-          while (Date.now() < end); // Simple sleep
+          await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
         throw error;
