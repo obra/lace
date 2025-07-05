@@ -249,7 +249,7 @@ export class OpenAIProvider extends AIProvider {
           const stream = (await this._openai.chat.completions.create(requestPayload, {
             signal,
           })) as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
-          
+
           // Mark that stream is created to prevent retries after this point
           streamCreated = true;
 

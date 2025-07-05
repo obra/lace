@@ -2,15 +2,19 @@
 // ABOUTME: Validates file pattern matching, glob support, and directory traversal
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { writeFile, mkdir, rm } from 'fs/promises';
+import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { FileFindTool } from '../implementations/file-find.js';
+import { createTestTempDir } from './temp-utils.js';
 
 describe('FileFindTool with schema validation', () => {
   let tool: FileFindTool;
+  const tempDir = createTestTempDir('file-find-test-');
+  let testDir: string;
 
   beforeEach(async () => {
     tool = new FileFindTool();
+    testDir = await tempDir.getPath();
     await mkdir(testDir, { recursive: true });
 
     // Create test file structure
@@ -30,10 +34,8 @@ describe('FileFindTool with schema validation', () => {
     await writeFile(join(testDir, '.gitignore'), 'git ignore');
   });
 
-  const testDir = join(process.cwd(), 'test-temp-file-find-schema');
-
   afterEach(async () => {
-    await rm(testDir, { recursive: true, force: true });
+    await tempDir.cleanup();
   });
 
   describe('Tool metadata', () => {

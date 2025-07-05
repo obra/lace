@@ -153,20 +153,20 @@ describe('AnthropicProvider retry functionality', () => {
     it('should retry streaming requests before first token', async () => {
       const messages: ProviderMessage[] = [{ role: 'user', content: 'Hello' }];
 
-      // Create a mock stream that fails first time
-      const failingStream = {
-        on: vi.fn(),
-        finalMessage: vi.fn().mockRejectedValue({ code: 'ECONNRESET' }),
-      };
+      // First call throws with network error, second call succeeds with stream
+      const networkError = new Error('Connection failed');
+      (networkError as any).code = 'ECONNRESET';
 
-      // Create a successful stream
-      const successStream = {
+      // Create a proper stream mock for the successful retry
+      const successfulStream = {
         on: vi.fn((event, handler) => {
           if (event === 'text') {
-            // Simulate some text events
-            setTimeout(() => handler('Hello '), 10);
-            setTimeout(() => handler('world!'), 20);
+            // Simulate some text events synchronously for testing
+            handler('Hello ');
+            handler('world!');
           }
+          // Return the mock function to allow chaining
+          return successfulStream;
         }),
         finalMessage: vi.fn().mockResolvedValue({
           content: [{ type: 'text', text: 'Hello world!' }],
@@ -175,12 +175,19 @@ describe('AnthropicProvider retry functionality', () => {
         }),
       };
 
-      mockStream.mockReturnValueOnce(failingStream).mockReturnValueOnce(successStream);
+      // Mock the stream method: first call throws, second call returns working stream
+      mockStream
+        .mockImplementationOnce(() => {
+          throw networkError;
+        })
+        .mockImplementationOnce(() => successfulStream);
 
       const promise = provider.createStreamingResponse(messages, []);
+      promise.catch(() => {}); // Prevent unhandled rejection during retry
 
       // Wait for first attempt to fail
       await vi.advanceTimersByTimeAsync(0);
+      expect(mockStream).toHaveBeenCalledTimes(1);
 
       // Advance past retry delay
       await vi.advanceTimersByTimeAsync(1100);

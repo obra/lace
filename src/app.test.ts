@@ -100,11 +100,33 @@ describe('App Initialization (run function)', () => {
     vi.mocked(Agent).mockImplementation(() => {
       const mockAgentInstance = {
         start: vi.fn(),
-        toolExecutor: vi.mocked(new ToolExecutor()), // Ensure this is a mocked instance
+        toolExecutor: vi.mocked(new ToolExecutor()),
+        // Add all required Agent properties/methods
+        _provider: {},
+        _toolExecutor: {},
+        _threadManager: {},
+        _threadId: 'test-thread',
+        sendMessage: vi.fn(),
+        abort: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        emit: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        removeAllListeners: vi.fn(),
+        setMaxListeners: vi.fn(),
+        getMaxListeners: vi.fn(),
+        listeners: vi.fn(),
+        rawListeners: vi.fn(),
+        listenerCount: vi.fn(),
+        prependListener: vi.fn(),
+        prependOnceListener: vi.fn(),
+        eventNames: vi.fn(),
+        once: vi.fn(),
       };
       // Mock the prototype methods that are accessed
       Object.setPrototypeOf(mockAgentInstance, Agent.prototype);
-      return mockAgentInstance;
+      return mockAgentInstance as any;
     });
 
     // Mock console.log and console.warn to prevent test output pollution
@@ -116,7 +138,9 @@ describe('App Initialization (run function)', () => {
     vi.mocked(TerminalInterface.prototype.startInteractive).mockResolvedValue(undefined);
 
     // Mock createGlobalPolicyCallback
-    vi.mocked(createGlobalPolicyCallback).mockReturnValue(vi.fn()); // Mock the function itself
+    vi.mocked(createGlobalPolicyCallback).mockReturnValue({
+      requestApproval: vi.fn(),
+    });
   });
 
   afterEach(() => {
@@ -167,7 +191,7 @@ describe('App Initialization (run function)', () => {
   });
 
   it('should exit if Anthropic API key is missing', async () => {
-    (getEnvVar as vi.Mock).mockImplementation((key) => {
+    vi.mocked(getEnvVar).mockImplementation((key: string) => {
       if (key === 'ANTHROPIC_KEY') return undefined;
       return undefined;
     });
@@ -176,7 +200,7 @@ describe('App Initialization (run function)', () => {
   });
 
   it('should exit if OpenAI API key is missing', async () => {
-    (getEnvVar as vi.Mock).mockImplementation((key) => {
+    vi.mocked(getEnvVar).mockImplementation((key: string) => {
       if (key === 'OPENAI_API_KEY' || key === 'OPENAI_KEY') return undefined;
       return undefined;
     });
@@ -253,9 +277,17 @@ describe('App Initialization (run function)', () => {
 
   it('should set delegate tool dependencies if delegate tool exists', async () => {
     const mockDelegateTool = {
+      name: 'delegate',
+      description: 'Mock delegate tool',
+      schema: {},
+      inputSchema: {},
+      execute: vi.fn(),
+      executeValidated: vi.fn(),
+      createResult: vi.fn(),
+      createErrorResult: vi.fn(),
       setDependencies: vi.fn(),
     };
-    vi.mocked(ToolExecutor.prototype.getTool).mockReturnValue(mockDelegateTool);
+    vi.mocked(ToolExecutor.prototype.getTool).mockReturnValue(mockDelegateTool as any);
     await run(mockCliOptions);
     expect(mockDelegateTool.setDependencies).toHaveBeenCalledWith(
       expect.any(ThreadManager),
@@ -281,7 +313,7 @@ describe('App Initialization (run function)', () => {
   });
 
   it('should set global policy callback on tool executor', async () => {
-    const mockPolicyCallback = vi.fn();
+    const mockPolicyCallback = { requestApproval: vi.fn() };
     vi.mocked(createGlobalPolicyCallback).mockReturnValue(mockPolicyCallback);
     await run(mockCliOptions);
     expect(vi.mocked(createGlobalPolicyCallback)).toHaveBeenCalledWith(

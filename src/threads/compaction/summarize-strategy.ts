@@ -260,65 +260,65 @@ export class SummarizeStrategy implements CompactionStrategy {
 
   private truncateToolResult(event: ThreadEvent): ThreadEvent {
     if (event.type !== 'TOOL_RESULT') return event;
-    
+
     // Handle string data directly
     if (typeof event.data === 'string') {
       const lines = event.data.split('\n');
       if (lines.length <= 3) {
         return event; // No need to truncate
       }
-      
+
       const truncatedLines = lines.slice(0, 3);
       truncatedLines.push('[results truncated to save space.]');
       const truncatedContent = truncatedLines.join('\n');
-      
+
       return {
         ...event,
-        data: truncatedContent
+        data: truncatedContent,
       };
     }
-    
+
     // Handle ToolResult data with ContentBlock[]
     if (typeof event.data === 'object' && event.data && 'content' in event.data) {
       const toolResult = event.data as ToolResult;
       const contentBlocks = toolResult.content;
-      
+
       if (!Array.isArray(contentBlocks) || contentBlocks.length === 0) {
         return event; // Return as-is if no content blocks
       }
-      
+
       // Concatenate all text content from content blocks
       const fullText = contentBlocks
-        .filter(block => block.type === 'text' && block.text)
-        .map(block => block.text)
+        .filter((block) => block.type === 'text' && block.text)
+        .map((block) => block.text)
         .join('\n');
-      
+
       const lines = fullText.split('\n');
       if (lines.length <= 3) {
         return event; // No need to truncate
       }
-      
+
       const truncatedLines = lines.slice(0, 3);
       truncatedLines.push('[results truncated to save space.]');
       const truncatedContent = truncatedLines.join('\n');
-      
+
       // Create new ToolResult with truncated content
       const truncatedToolResult: ToolResult = {
         ...toolResult,
         content: [
           {
             type: 'text',
-            text: truncatedContent
-          }
-        ]
+            text: truncatedContent,
+          },
+        ],
       };
-      
+
       return {
         ...event,
-        data: truncatedToolResult
+        data: truncatedToolResult,
       };
     }
-    
+
     return event; // Return as-is if we can't handle the data format
   }
 
@@ -351,11 +351,11 @@ export class SummarizeStrategy implements CompactionStrategy {
           const toolResult = event.data as ToolResult;
           // Extract text from ContentBlock[]
           content = toolResult.content
-            .filter(block => block.type === 'text' && block.text)
-            .map(block => block.text)
+            .filter((block) => block.type === 'text' && block.text)
+            .map((block) => block.text)
             .join('\n');
         }
-        
+
         if (content) {
           messages.push({
             role: 'user',

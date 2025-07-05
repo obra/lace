@@ -524,11 +524,11 @@ describe('Enhanced Agent', () => {
         isError: false,
       });
 
-      // Should not throw error
+      // Should not throw error - orphaned tool results are now skipped
       const history = agent.buildThreadMessages();
-      expect(history).toHaveLength(2); // user message + tool result as user message
-      expect(history[1].role).toBe('user');
-      expect(history[1].toolResults).toBeDefined();
+      expect(history).toHaveLength(1); // only user message, orphaned tool result skipped
+      expect(history[0].role).toBe('user');
+      expect(history[0].content).toBe('Test');
     });
 
     it('should handle orphaned tool calls gracefully', () => {

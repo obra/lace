@@ -63,20 +63,19 @@ describe('LMStudioProvider retry functionality', () => {
       const mockModel = {
         port: {
           createChannel: vi.fn((type, config, onMessage) => {
-            setTimeout(() => {
-              onMessage({
-                type: 'fragment',
-                fragment: { content: 'Hello there!' },
-              });
-              onMessage({
-                type: 'success',
-                stats: {
-                  stopReason: 'stop',
-                  promptTokensCount: 10,
-                  predictedTokensCount: 5,
-                },
-              });
-            }, 10);
+            // Execute immediately with fake timers to avoid timeout
+            onMessage({
+              type: 'fragment',
+              fragment: { content: 'Hello there!' },
+            });
+            onMessage({
+              type: 'success',
+              stats: {
+                stopReason: 'stop',
+                promptTokensCount: 10,
+                predictedTokensCount: 5,
+              },
+            });
           }),
         },
         specifier: 'test-model',
@@ -114,16 +113,15 @@ describe('LMStudioProvider retry functionality', () => {
       const mockModel = {
         port: {
           createChannel: vi.fn((type, config, onMessage) => {
-            setTimeout(() => {
-              onMessage({
-                type: 'fragment',
-                fragment: { content: 'Hello!' },
-              });
-              onMessage({
-                type: 'success',
-                stats: { stopReason: 'stop' },
-              });
-            }, 10);
+            // Execute immediately with fake timers to avoid timeout
+            onMessage({
+              type: 'fragment',
+              fragment: { content: 'Hello!' },
+            });
+            onMessage({
+              type: 'success',
+              stats: { stopReason: 'stop' },
+            });
           }),
         },
         specifier: 'test-model',
@@ -139,9 +137,11 @@ describe('LMStudioProvider retry functionality', () => {
       provider.on('retry_attempt', retryAttemptSpy);
 
       const promise = provider.createResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection
 
+      // Wait for first attempt
       await vi.advanceTimersByTimeAsync(0);
+
+      // Advance past retry delay
       await vi.advanceTimersByTimeAsync(1100);
 
       await promise;
@@ -207,16 +207,15 @@ describe('LMStudioProvider retry functionality', () => {
       const mockModel = {
         port: {
           createChannel: vi.fn((type, config, onMessage) => {
-            setTimeout(() => {
-              onMessage({
-                type: 'fragment',
-                fragment: { content: 'Hello world!' },
-              });
-              onMessage({
-                type: 'success',
-                stats: { stopReason: 'stop' },
-              });
-            }, 10);
+            // Execute immediately with fake timers to avoid timeout
+            onMessage({
+              type: 'fragment',
+              fragment: { content: 'Hello world!' },
+            });
+            onMessage({
+              type: 'success',
+              stats: { stopReason: 'stop' },
+            });
           }),
         },
         specifier: 'test-model',
@@ -229,6 +228,7 @@ describe('LMStudioProvider retry functionality', () => {
       mockLoad.mockResolvedValue(mockModel);
 
       const promise = provider.createStreamingResponse(messages, []);
+      promise.catch(() => {}); // Prevent unhandled rejection during retry
 
       // Wait for first attempt to fail
       await vi.advanceTimersByTimeAsync(0);
