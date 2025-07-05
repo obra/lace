@@ -8,6 +8,7 @@ import { FileListTool } from '../implementations/file-list.js';
 
 describe('FileListTool with schema validation', () => {
   let tool: FileListTool;
+  const testDir = join(process.cwd(), 'test-temp-file-list-schema');
 
   beforeEach(async () => {
     tool = new FileListTool();
@@ -30,8 +31,6 @@ describe('FileListTool with schema validation', () => {
     await writeFile(join(testDir, '.hidden', 'secret.txt'), 'hidden content');
     await writeFile(join(testDir, 'node_modules', 'package.json'), 'node module');
   });
-
-  const testDir = join(process.cwd(), 'test-temp-file-list-schema');
 
   afterEach(async () => {
     await rm(testDir, { recursive: true, force: true });

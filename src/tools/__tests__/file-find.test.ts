@@ -8,6 +8,7 @@ import { FileFindTool } from '../implementations/file-find.js';
 
 describe('FileFindTool with schema validation', () => {
   let tool: FileFindTool;
+  const testDir = join(process.cwd(), 'test-temp-file-find-schema');
 
   beforeEach(async () => {
     tool = new FileFindTool();
@@ -29,8 +30,6 @@ describe('FileFindTool with schema validation', () => {
     await writeFile(join(testDir, '.hidden', 'secret.txt'), 'hidden content');
     await writeFile(join(testDir, '.gitignore'), 'git ignore');
   });
-
-  const testDir = join(process.cwd(), 'test-temp-file-find-schema');
 
   afterEach(async () => {
     await rm(testDir, { recursive: true, force: true });
