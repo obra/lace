@@ -626,18 +626,14 @@ export class LMStudioProvider extends AIProvider {
         });
 
         // Use the same native tool calling method with streaming callback
-        return this._createResponseWithNativeToolCalling(
-          messages, 
-          tools, 
-          modelId, 
-          signal,
-          () => { streamingStarted = true; }
-        );
+        return this._createResponseWithNativeToolCalling(messages, tools, modelId, signal, () => {
+          streamingStarted = true;
+        });
       },
-      { 
+      {
         signal,
         isStreaming: true,
-        canRetry: () => !streamingStarted
+        canRetry: () => !streamingStarted,
       }
     );
   }

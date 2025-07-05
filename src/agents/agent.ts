@@ -43,6 +43,12 @@ export interface CurrentTurnMetrics {
   tokensIn: number; // User input + tool results + model context
   tokensOut: number; // Model responses + tool calls
   turnId: string; // Unique ID for this user turn
+  retryMetrics?: {
+    totalAttempts: number; // Total retry attempts made (0 if no retries)
+    totalDelayMs: number; // Total time spent waiting for retries
+    lastError?: string; // Last error that caused retry, if any
+    successful: boolean; // Whether the operation ultimately succeeded
+  };
 }
 
 // Event type definitions for TypeScript
@@ -146,7 +152,16 @@ export class Agent extends EventEmitter {
       this._threadManager.addEvent(this._getActiveThreadId(), 'USER_MESSAGE', content);
     }
 
-    await this._processConversation();
+    try {
+      await this._processConversation();
+    } catch (error) {
+      // Ensure turn is completed even if _processConversation throws
+      // (this handles the case where error occurs before _processConversation's catch block)
+      if (this._currentTurnMetrics) {
+        this._completeTurn();
+      }
+      throw error; // Re-throw to maintain API contract
+    }
   }
 
   async continueConversation(): Promise<void> {
@@ -499,6 +514,9 @@ export class Agent extends EventEmitter {
         context: { phase: 'conversation_processing', threadId: this._threadId },
       });
 
+      // Complete turn tracking even when error occurs
+      this._completeTurn();
+
       // Clean up provider resources on error to prevent hanging connections
       try {
         await this._provider.cleanup();
@@ -566,11 +584,37 @@ export class Agent extends EventEmitter {
       });
     };
 
-    const retryAttemptListener = ({ attempt, delay, error }: { attempt: number; delay: number; error: Error }) => {
+    const retryAttemptListener = ({
+      attempt,
+      delay,
+      error,
+    }: {
+      attempt: number;
+      delay: number;
+      error: Error;
+    }) => {
+      // Track retry metrics for the current turn
+      if (this._currentTurnMetrics?.retryMetrics) {
+        this._currentTurnMetrics.retryMetrics.totalAttempts = attempt;
+        this._currentTurnMetrics.retryMetrics.totalDelayMs += delay;
+        this._currentTurnMetrics.retryMetrics.lastError = error.message;
+      }
       this.emit('retry_attempt', { attempt, delay, error });
     };
 
-    const retryExhaustedListener = ({ attempts, lastError }: { attempts: number; lastError: Error }) => {
+    const retryExhaustedListener = ({
+      attempts,
+      lastError,
+    }: {
+      attempts: number;
+      lastError: Error;
+    }) => {
+      // Mark retry as failed when exhausted
+      if (this._currentTurnMetrics?.retryMetrics) {
+        this._currentTurnMetrics.retryMetrics.totalAttempts = attempts;
+        this._currentTurnMetrics.retryMetrics.successful = false;
+        this._currentTurnMetrics.retryMetrics.lastError = lastError.message;
+      }
       this.emit('retry_exhausted', { attempts, lastError });
     };
 
@@ -630,11 +674,37 @@ export class Agent extends EventEmitter {
     signal?: AbortSignal
   ): Promise<AgentResponse> {
     // Set up retry event listeners for non-streaming requests
-    const retryAttemptListener = ({ attempt, delay, error }: { attempt: number; delay: number; error: Error }) => {
+    const retryAttemptListener = ({
+      attempt,
+      delay,
+      error,
+    }: {
+      attempt: number;
+      delay: number;
+      error: Error;
+    }) => {
+      // Track retry metrics for the current turn
+      if (this._currentTurnMetrics?.retryMetrics) {
+        this._currentTurnMetrics.retryMetrics.totalAttempts = attempt;
+        this._currentTurnMetrics.retryMetrics.totalDelayMs += delay;
+        this._currentTurnMetrics.retryMetrics.lastError = error.message;
+      }
       this.emit('retry_attempt', { attempt, delay, error });
     };
 
-    const retryExhaustedListener = ({ attempts, lastError }: { attempts: number; lastError: Error }) => {
+    const retryExhaustedListener = ({
+      attempts,
+      lastError,
+    }: {
+      attempts: number;
+      lastError: Error;
+    }) => {
+      // Mark retry as failed when exhausted
+      if (this._currentTurnMetrics?.retryMetrics) {
+        this._currentTurnMetrics.retryMetrics.totalAttempts = attempts;
+        this._currentTurnMetrics.retryMetrics.successful = false;
+        this._currentTurnMetrics.retryMetrics.lastError = lastError.message;
+      }
       this.emit('retry_exhausted', { attempts, lastError });
     };
 
@@ -939,6 +1009,11 @@ export class Agent extends EventEmitter {
       tokensIn: 0,
       tokensOut: 0,
       turnId,
+      retryMetrics: {
+        totalAttempts: 0,
+        totalDelayMs: 0,
+        successful: true, // Assume success until proven otherwise
+      },
     };
 
     // Reset streaming token count for new turn

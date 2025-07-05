@@ -399,10 +399,10 @@ export class OllamaProvider extends AIProvider {
           throw error;
         }
       },
-      { 
+      {
         signal,
         isStreaming: true,
-        canRetry: () => !streamingStarted
+        canRetry: () => !streamingStarted,
       }
     );
   }
