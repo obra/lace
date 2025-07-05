@@ -8,6 +8,8 @@ import { ProviderRegistry } from './providers/registry.js';
 import { run } from './app.js';
 
 async function main() {
+  console.log(`[CLI] ${new Date().toISOString()} Starting main CLI execution...`);
+
   // Load environment variables from .env file before anything else
   loadEnvFile();
 
@@ -21,8 +23,13 @@ async function main() {
   validateProvider(options.provider, registry);
 
   // Run the application
+  console.log(`[CLI] ${new Date().toISOString()} About to run application...`);
   await run(options);
+  console.log(`[CLI] ${new Date().toISOString()} Application run completed successfully`);
 }
 
 // Start the application
-main().catch(console.error);
+main().catch((error) => {
+  console.error(`[CLI] ${new Date().toISOString()} Application exited with error:`, error);
+  process.exit(1);
+});

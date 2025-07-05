@@ -10,7 +10,8 @@ const execAsync = promisify(exec);
 describe('Help Integration', () => {
   it('should show dynamic provider list in --help output', async () => {
     try {
-      const { stdout } = await execAsync('npm run build && node dist/cli.js --help');
+      // Use pre-built CLI instead of rebuilding each time
+      const { stdout } = await execAsync('node dist/cli.js --help');
 
       // Help should contain all auto-discovered providers
       expect(stdout).toContain('anthropic');
