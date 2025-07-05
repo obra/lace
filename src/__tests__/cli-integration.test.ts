@@ -142,7 +142,7 @@ describe('CLI Orchestration', () => {
       const { FileListTool } = await import('../tools/implementations/file-list.js');
       const { RipgrepSearchTool } = await import('../tools/implementations/ripgrep-search.js');
       const { FileFindTool } = await import('../tools/implementations/file-find.js');
-      const { TaskAddTool, TaskListTool, TaskCompleteTool } = await import(
+      const { TaskCreateTool, TaskListTool, TaskCompleteTool } = await import(
         '../tools/implementations/task-manager/index.js'
       );
 
@@ -153,7 +153,7 @@ describe('CLI Orchestration', () => {
         new FileListTool(),
         new RipgrepSearchTool(),
         new FileFindTool(),
-        new TaskAddTool(),
+        new TaskCreateTool(),
         new TaskListTool(),
         new TaskCompleteTool(),
       ];

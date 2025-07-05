@@ -10,14 +10,14 @@ import {
   TaskAddNoteTool,
   TaskViewTool,
 } from '../tools.js';
-import { TaskPersistence } from '../persistence.js';
+import { DatabasePersistence } from '../../../../persistence/database.js';
 import { ToolContext } from '../../../types.js';
 import { createThreadId, asThreadId, createNewAgentSpec } from '../../../../threads/types.js';
 import { useTempLaceDir, getTestDbPath } from '../../../../test-utils/temp-lace-dir.js';
 
 describe('Enhanced Task Manager Tools', () => {
   const tempDirContext = useTempLaceDir();
-  let persistence: TaskPersistence;
+  let persistence: DatabasePersistence;
   let context: ToolContext;
 
   const parentThreadId = asThreadId('lace_20250703_parent');
@@ -27,7 +27,7 @@ describe('Enhanced Task Manager Tools', () => {
   beforeEach(async () => {
     // Create persistence instance using the same path the tools will use
     const { getLaceDbPath } = await import('../../../../config/lace-dir.js');
-    persistence = new TaskPersistence(getLaceDbPath());
+    persistence = new DatabasePersistence(getLaceDbPath());
 
     context = {
       threadId: agent1ThreadId,

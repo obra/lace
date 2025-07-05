@@ -2,7 +2,7 @@
 // ABOUTME: Tests end-to-end scenarios including task creation, assignment, and collaboration
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { TaskPersistence } from '../persistence.js';
+import { DatabasePersistence } from '../../../../persistence/database.js';
 import { TaskCreateTool, TaskListTool, TaskUpdateTool, TaskAddNoteTool } from '../tools.js';
 import { ToolContext } from '../../../types.js';
 import { asThreadId, createNewAgentSpec } from '../../../../threads/types.js';
@@ -10,7 +10,7 @@ import { useTempLaceDir, getTestDbPath } from '../../../../test-utils/temp-lace-
 
 describe('Multi-Agent Task Manager Integration', () => {
   const tempDirContext = useTempLaceDir();
-  let persistence: TaskPersistence;
+  let persistence: DatabasePersistence;
 
   // Simulate three agents in a parent thread
   const parentThreadId = asThreadId('lace_20250703_parent');
@@ -141,7 +141,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       // Step 9: Verify task has all notes
       // Create persistence instance to read the database the tools wrote to
       const { getLaceDbPath } = await import('../../../../config/lace-dir.js');
-      persistence = new TaskPersistence(getLaceDbPath());
+      persistence = new DatabasePersistence(getLaceDbPath());
       const task = persistence.loadTask(taskId);
       expect(task?.notes).toHaveLength(2);
       expect(task?.notes[0].content).toContain('JWT token generation');
@@ -174,7 +174,7 @@ describe('Multi-Agent Task Manager Integration', () => {
 
       // Verify task shows new agent assignment
       const { getLaceDbPath } = await import('../../../../config/lace-dir.js');
-      persistence = new TaskPersistence(getLaceDbPath());
+      persistence = new DatabasePersistence(getLaceDbPath());
       const task = persistence.loadTask(taskId);
       expect(task?.assignedTo).toBe('new:anthropic/claude-3-haiku');
       expect(task?.status).toBe('pending'); // Should remain pending until real agent created
@@ -193,7 +193,7 @@ describe('Multi-Agent Task Manager Integration', () => {
 
       // Verify reassignment
       const { getLaceDbPath: getLaceDbPath2 } = await import('../../../../config/lace-dir.js');
-      persistence = new TaskPersistence(getLaceDbPath2());
+      persistence = new DatabasePersistence(getLaceDbPath2());
       const updatedTask = persistence.loadTask(taskId);
       expect(updatedTask?.assignedTo).toBe(agent3Context.threadId);
       persistence.close();
@@ -289,7 +289,7 @@ describe('Multi-Agent Task Manager Integration', () => {
 
       // Verify all notes were added
       const { getLaceDbPath: getLaceDbPath3 } = await import('../../../../config/lace-dir.js');
-      persistence = new TaskPersistence(getLaceDbPath3());
+      persistence = new DatabasePersistence(getLaceDbPath3());
       const task = persistence.loadTask(taskId);
       expect(task?.notes).toHaveLength(3);
 

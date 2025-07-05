@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Tool } from '../../tool.js';
 import { NonEmptyString } from '../../schemas/common.js';
 import type { ToolResult, ToolContext } from '../../types.js';
-import { TaskPersistence } from './persistence.js';
+import { DatabasePersistence } from '../../../persistence/database.js';
 import { Task, TaskNote } from './types.js';
 import { isAssigneeId, AssigneeId, ThreadId } from '../../../threads/types.js';
 
@@ -26,12 +26,12 @@ const createTaskSchema = z.object({
 });
 
 // Singleton persistence instance
-let persistenceInstance: TaskPersistence | null = null;
+let persistenceInstance: DatabasePersistence | null = null;
 
-async function getPersistence(): Promise<TaskPersistence> {
+async function getPersistence(): Promise<DatabasePersistence> {
   if (!persistenceInstance) {
     const { getLaceDbPath } = await import('../../../config/lace-dir.js');
-    persistenceInstance = new TaskPersistence(getLaceDbPath());
+    persistenceInstance = new DatabasePersistence(getLaceDbPath());
   }
   return persistenceInstance;
 }
@@ -41,7 +41,7 @@ export class TaskCreateTool extends Tool {
   description = 'Create a new task with detailed instructions for execution';
   schema = createTaskSchema;
 
-  private async getPersistence(): Promise<TaskPersistence> {
+  private async getPersistence(): Promise<DatabasePersistence> {
     return getPersistence();
   }
 
@@ -102,7 +102,7 @@ export class TaskListTool extends Tool {
   description = 'List tasks filtered by assignment, creation, or thread';
   schema = listTasksSchema;
 
-  private async getPersistence(): Promise<TaskPersistence> {
+  private async getPersistence(): Promise<DatabasePersistence> {
     return getPersistence();
   }
 
@@ -209,7 +209,7 @@ export class TaskCompleteTool extends Tool {
   description = 'Mark a task as completed';
   schema = completeTaskSchema;
 
-  private async getPersistence(): Promise<TaskPersistence> {
+  private async getPersistence(): Promise<DatabasePersistence> {
     return getPersistence();
   }
 
@@ -256,7 +256,7 @@ export class TaskUpdateTool extends Tool {
   description = 'Update task properties (status, assignment, priority, etc.)';
   schema = updateTaskSchema;
 
-  private async getPersistence(): Promise<TaskPersistence> {
+  private async getPersistence(): Promise<DatabasePersistence> {
     return getPersistence();
   }
 
@@ -314,7 +314,7 @@ export class TaskAddNoteTool extends Tool {
   description = 'Add a note to a task for communication between agents';
   schema = addNoteSchema;
 
-  private async getPersistence(): Promise<TaskPersistence> {
+  private async getPersistence(): Promise<DatabasePersistence> {
     return getPersistence();
   }
 
@@ -355,7 +355,7 @@ export class TaskViewTool extends Tool {
   description = 'View detailed information about a specific task';
   schema = viewTaskSchema;
 
-  private async getPersistence(): Promise<TaskPersistence> {
+  private async getPersistence(): Promise<DatabasePersistence> {
     return getPersistence();
   }
 

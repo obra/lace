@@ -6,18 +6,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import Database from 'better-sqlite3';
-import { ThreadPersistence } from '../persistence.js';
+import { DatabasePersistence } from '../../persistence/database.js';
 import { ThreadManager } from '../thread-manager.js';
 import { Thread, ThreadEvent, EventType } from '../types.js';
 
-describe('ThreadPersistence', () => {
+describe('DatabasePersistence (Thread Features)', () => {
   let tempDbPath: string;
-  let persistence: ThreadPersistence;
+  let persistence: DatabasePersistence;
 
   beforeEach(() => {
     // Create temporary database file
     tempDbPath = path.join(os.tmpdir(), `lace-test-${Date.now()}.db`);
-    persistence = new ThreadPersistence(tempDbPath);
+    persistence = new DatabasePersistence(tempDbPath);
   });
 
   afterEach(() => {
@@ -39,14 +39,16 @@ describe('ThreadPersistence', () => {
         .prepare(
           `
         SELECT name FROM sqlite_master 
-        WHERE type='table' AND name IN ('threads', 'events')
+        WHERE type='table' AND name IN ('threads', 'events', 'tasks', 'task_notes')
       `
         )
         .all() as Array<{ name: string }>;
 
-      expect(tables).toHaveLength(2);
+      expect(tables).toHaveLength(4);
       expect(tables.map((t) => t.name)).toContain('threads');
       expect(tables.map((t) => t.name)).toContain('events');
+      expect(tables.map((t) => t.name)).toContain('tasks');
+      expect(tables.map((t) => t.name)).toContain('task_notes');
 
       db.close();
     });
