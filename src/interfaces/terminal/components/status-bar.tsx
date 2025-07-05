@@ -16,6 +16,15 @@ interface CumulativeTokens {
   lastPromptTokens?: number;  // For delta calculation
 }
 
+interface RetryStatus {
+  isRetrying: boolean;
+  attempt: number;
+  maxAttempts: number;
+  delayMs: number;
+  errorType: string;
+  retryStartTime: number;
+}
+
 interface StatusBarProps {
   providerName: string;
   modelName?: string;
@@ -27,6 +36,7 @@ interface StatusBarProps {
   turnMetrics?: CurrentTurnMetrics | null;
   projectContext?: ProjectContext;
   contextWindow?: number;  // Provider's context window limit
+  retryStatus?: RetryStatus | null;
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({
@@ -40,6 +50,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   turnMetrics = null,
   projectContext,
   contextWindow,
+  retryStatus = null,
 }) => {
   // Format cumulative session tokens for display with context awareness
   const formatCumulativeTokens = (tokens?: CumulativeTokens, contextLimit?: number) => {
@@ -101,6 +112,27 @@ const StatusBar: React.FC<StatusBarProps> = ({
     return id;
   };
 
+  // Format retry status for display: 🔄 Retry 2/10 in 3s... (network error)
+  const formatRetryStatus = (retry?: RetryStatus | null) => {
+    if (!retry || !retry.isRetrying) return null;
+
+    const elapsed = Date.now() - retry.retryStartTime;
+    const remainingMs = Math.max(0, retry.delayMs - elapsed);
+    const remainingSeconds = Math.ceil(remainingMs / 1000);
+
+    let statusText = `${UI_SYMBOLS.RETRY} Retry ${retry.attempt}/${retry.maxAttempts}`;
+    
+    if (remainingSeconds > 0) {
+      statusText += ` in ${remainingSeconds}s...`;
+    } else {
+      statusText += '...';
+    }
+    
+    statusText += ` (${retry.errorType})`;
+    
+    return statusText;
+  };
+
   // Format project context for display
   const formatProjectContext = (context?: ProjectContext) => {
     if (!context) return null;
@@ -148,7 +180,16 @@ const StatusBar: React.FC<StatusBarProps> = ({
 
   // Right content shows turn progress when active, otherwise session info with cumulative tokens
   let rightContent: string;
-  if (isTurnActive && turnMetrics) {
+  const retryStatusText = formatRetryStatus(retryStatus);
+  
+  if (retryStatusText) {
+    // When retrying, show retry status prominently
+    if (isTurnActive && turnMetrics) {
+      rightContent = `${formatTurnMetrics(turnMetrics)} • ${retryStatusText}`;
+    } else {
+      rightContent = `${UI_SYMBOLS.MESSAGE} ${messageCount} • ${formatCumulativeTokens(cumulativeTokens, contextWindow)} • ${retryStatusText}`;
+    }
+  } else if (isTurnActive && turnMetrics) {
     rightContent = `${formatTurnMetrics(turnMetrics)} • ${UI_SYMBOLS.LIGHTNING} Processing`;
   } else {
     rightContent = `${UI_SYMBOLS.MESSAGE} ${messageCount} • ${formatCumulativeTokens(cumulativeTokens, contextWindow)} • ${isProcessing ? UI_SYMBOLS.LIGHTNING + ' Processing' : UI_SYMBOLS.READY + ' Ready'}`;

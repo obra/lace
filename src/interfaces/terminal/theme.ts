@@ -60,6 +60,7 @@ export const UI_SYMBOLS = {
   MESSAGE: '◈', // Message count indicator
   LIGHTNING: '.', // Processing indicator
   READY: '✓', // Ready status indicator
+  RETRY: '🔄', // Retry indicator
 
   // Project context symbols (for double status bar)
   GIT_BRANCH: '⎇', // Git branch indicator

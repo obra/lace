@@ -75,130 +75,135 @@ export class OllamaProvider extends AIProvider {
     tools: Tool[] = [],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    // First check if we can connect and if the model exists
-    const diagnostics = await this.diagnose();
+    return this.withRetry(
+      async () => {
+        // First check if we can connect and if the model exists
+        const diagnostics = await this.diagnose();
 
-    if (!diagnostics.connected) {
-      throw new Error(
-        `Cannot connect to Ollama server at ${this._host}.\n` +
-          `Make sure Ollama is running and accessible.\n\n` +
-          `To fix this:\n` +
-          `  - Start Ollama service: 'ollama serve'\n` +
-          `  - Ensure the server is running on ${this._host}\n` +
-          `  - Check firewall settings if using a remote server\n\n` +
-          `Connection error: ${diagnostics.error}`
-      );
-    }
+        if (!diagnostics.connected) {
+          throw new Error(
+            `Cannot connect to Ollama server at ${this._host}.\n` +
+              `Make sure Ollama is running and accessible.\n\n` +
+              `To fix this:\n` +
+              `  - Start Ollama service: 'ollama serve'\n` +
+              `  - Ensure the server is running on ${this._host}\n` +
+              `  - Check firewall settings if using a remote server\n\n` +
+              `Connection error: ${diagnostics.error}`
+          );
+        }
 
-    // Check if our target model is available
-    if (!diagnostics.models.includes(this.modelName)) {
-      throw new Error(
-        `Model "${this.modelName}" is not available in Ollama.\n\n` +
-          `Available models: ${diagnostics.models.join(', ')}\n\n` +
-          `To fix this:\n` +
-          `  - Pull the model: 'ollama pull ${this.modelName}'\n` +
-          `  - Choose an available model from the list above\n` +
-          `  - Use --provider anthropic as fallback`
-      );
-    }
+        // Check if our target model is available
+        if (!diagnostics.models.includes(this.modelName)) {
+          throw new Error(
+            `Model "${this.modelName}" is not available in Ollama.\n\n` +
+              `Available models: ${diagnostics.models.join(', ')}\n\n` +
+              `To fix this:\n` +
+              `  - Pull the model: 'ollama pull ${this.modelName}'\n` +
+              `  - Choose an available model from the list above\n` +
+              `  - Use --provider anthropic as fallback`
+          );
+        }
 
-    // Convert messages to Ollama format
-    const ollamaMessages = [];
+        // Convert messages to Ollama format
+        const ollamaMessages = [];
 
-    // Add system prompt if configured
-    if (this._systemPrompt) {
-      ollamaMessages.push({
-        role: 'system',
-        content: this._systemPrompt,
-      });
-    }
+        // Add system prompt if configured
+        if (this._systemPrompt) {
+          ollamaMessages.push({
+            role: 'system',
+            content: this._systemPrompt,
+          });
+        }
 
-    // Add conversation messages
-    ollamaMessages.push(
-      ...messages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }))
+        // Add conversation messages
+        ollamaMessages.push(
+          ...messages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          }))
+        );
+
+        logger.debug('Sending request to Ollama', {
+          provider: 'ollama',
+          model: this.modelName,
+          messageCount: ollamaMessages.length,
+          toolCount: tools.length,
+          toolNames: tools.map((t) => t.name),
+        });
+
+        // Prepare the request payload
+        const requestPayload = {
+          model: this.modelName,
+          messages: ollamaMessages,
+          stream: false as const,
+          tools:
+            tools.length > 0
+              ? tools.map(
+                  (tool): OllamaTool => ({
+                    type: 'function',
+                    function: {
+                      name: tool.name,
+                      description: tool.description,
+                      parameters: tool.inputSchema,
+                    },
+                  })
+                )
+              : undefined,
+        };
+
+        // Make the request
+        // Handle abort signal
+        if (signal?.aborted) {
+          throw new Error('Request aborted');
+        }
+
+        const response: ChatResponse = await this._ollama.chat(requestPayload);
+
+        // If the response is an AbortableAsyncIterator and signal is provided, set up abort handling
+        if (
+          signal &&
+          'abort' in response &&
+          typeof (response as unknown as { abort?: () => void }).abort === 'function'
+        ) {
+          signal.addEventListener('abort', () => {
+            (response as unknown as { abort: () => void }).abort();
+          });
+        }
+
+        logger.debug('Received response from Ollama', {
+          provider: 'ollama',
+          model: this.modelName,
+          messageContent: response.message?.content,
+          hasToolCalls: !!response.message?.tool_calls,
+          toolCallCount: response.message?.tool_calls?.length || 0,
+        });
+
+        // Extract content and tool calls
+        const content = response.message?.content || '';
+        const toolCalls = (response.message?.tool_calls || []).map((tc, index: number) => ({
+          id: `call_${index + 1}`,
+          name: tc.function.name,
+          input: tc.function.arguments,
+        }));
+
+        logger.debug('Parsed Ollama response', {
+          provider: 'ollama',
+          model: this.modelName,
+          contentLength: content.length,
+          toolCallCount: toolCalls.length,
+          toolCallNames: toolCalls.map((tc) => tc.name),
+        });
+
+        return {
+          content,
+          toolCalls,
+          stopReason: response.done ? 'stop' : undefined,
+          usage: this._extractUsage(response),
+          performance: this._extractPerformance(response),
+        };
+      },
+      { signal }
     );
-
-    logger.debug('Sending request to Ollama', {
-      provider: 'ollama',
-      model: this.modelName,
-      messageCount: ollamaMessages.length,
-      toolCount: tools.length,
-      toolNames: tools.map((t) => t.name),
-    });
-
-    // Prepare the request payload
-    const requestPayload = {
-      model: this.modelName,
-      messages: ollamaMessages,
-      stream: false as const,
-      tools:
-        tools.length > 0
-          ? tools.map(
-              (tool): OllamaTool => ({
-                type: 'function',
-                function: {
-                  name: tool.name,
-                  description: tool.description,
-                  parameters: tool.inputSchema,
-                },
-              })
-            )
-          : undefined,
-    };
-
-    // Make the request
-    // Handle abort signal
-    if (signal?.aborted) {
-      throw new Error('Request aborted');
-    }
-
-    const response: ChatResponse = await this._ollama.chat(requestPayload);
-
-    // If the response is an AbortableAsyncIterator and signal is provided, set up abort handling
-    if (
-      signal &&
-      'abort' in response &&
-      typeof (response as unknown as { abort?: () => void }).abort === 'function'
-    ) {
-      signal.addEventListener('abort', () => {
-        (response as unknown as { abort: () => void }).abort();
-      });
-    }
-
-    logger.debug('Received response from Ollama', {
-      provider: 'ollama',
-      model: this.modelName,
-      messageContent: response.message?.content,
-      hasToolCalls: !!response.message?.tool_calls,
-      toolCallCount: response.message?.tool_calls?.length || 0,
-    });
-
-    // Extract content and tool calls
-    const content = response.message?.content || '';
-    const toolCalls = (response.message?.tool_calls || []).map((tc, index: number) => ({
-      id: `call_${index + 1}`,
-      name: tc.function.name,
-      input: tc.function.arguments,
-    }));
-
-    logger.debug('Parsed Ollama response', {
-      provider: 'ollama',
-      model: this.modelName,
-      contentLength: content.length,
-      toolCallCount: toolCalls.length,
-      toolCallNames: toolCalls.map((tc) => tc.name),
-    });
-
-    return {
-      content,
-      toolCalls,
-      stopReason: response.done ? 'stop' : undefined,
-      usage: this._extractUsage(response),
-      performance: this._extractPerformance(response),
-    };
   }
 
   async createStreamingResponse(
@@ -206,182 +211,199 @@ export class OllamaProvider extends AIProvider {
     tools: Tool[] = [],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    // First check if we can connect and if the model exists
-    const diagnostics = await this.diagnose();
+    let streamingStarted = false;
+    let streamCreated = false;
 
-    if (!diagnostics.connected) {
-      throw new Error(
-        `Cannot connect to Ollama server at ${this._host}.\n` +
-          `Make sure Ollama is running and accessible.\n\n` +
-          `To fix this:\n` +
-          `  - Start Ollama service: 'ollama serve'\n` +
-          `  - Ensure the server is running on ${this._host}\n` +
-          `  - Check firewall settings if using a remote server\n\n` +
-          `Connection error: ${diagnostics.error}`
-      );
-    }
+    return this.withRetry(
+      async () => {
+        // First check if we can connect and if the model exists
+        const diagnostics = await this.diagnose();
 
-    // Check if our target model is available
-    if (!diagnostics.models.includes(this.modelName)) {
-      throw new Error(
-        `Model "${this.modelName}" is not available in Ollama.\n\n` +
-          `Available models: ${diagnostics.models.join(', ')}\n\n` +
-          `To fix this:\n` +
-          `  - Pull the model: 'ollama pull ${this.modelName}'\n` +
-          `  - Choose an available model from the list above\n` +
-          `  - Use --provider anthropic as fallback`
-      );
-    }
-
-    // Convert messages to Ollama format
-    const ollamaMessages = [];
-
-    // Add system prompt if configured
-    if (this._systemPrompt) {
-      ollamaMessages.push({
-        role: 'system',
-        content: this._systemPrompt,
-      });
-    }
-
-    // Add conversation messages
-    ollamaMessages.push(
-      ...messages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }))
-    );
-
-    logger.debug('Sending streaming request to Ollama', {
-      provider: 'ollama',
-      model: this.modelName,
-      messageCount: ollamaMessages.length,
-      toolCount: tools.length,
-      toolNames: tools.map((t) => t.name),
-    });
-
-    // Prepare the request payload for streaming
-    const requestPayload = {
-      model: this.modelName,
-      messages: ollamaMessages,
-      stream: true as const,
-      tools:
-        tools.length > 0
-          ? tools.map(
-              (tool): OllamaTool => ({
-                type: 'function',
-                function: {
-                  name: tool.name,
-                  description: tool.description,
-                  parameters: tool.inputSchema,
-                },
-              })
-            )
-          : undefined,
-    };
-
-    // Handle abort signal
-    if (signal?.aborted) {
-      throw new Error('Request aborted');
-    }
-
-    // Make the streaming request
-    const response = await this._ollama.chat(requestPayload);
-
-    // If the response is an AbortableAsyncIterator and signal is provided, set up abort handling
-    if (
-      signal &&
-      'abort' in response &&
-      typeof (response as unknown as { abort?: () => void }).abort === 'function'
-    ) {
-      signal.addEventListener('abort', () => {
-        (response as unknown as { abort: () => void }).abort();
-      });
-    }
-
-    let content = '';
-    let toolCalls: { id: string; name: string; input: Record<string, unknown> }[] = [];
-    let finalMessage: OllamaMessage | null = null;
-    let estimatedOutputTokens = 0;
-
-    try {
-      // Process streaming response
-      for await (const part of response) {
-        if (part.message?.content) {
-          // Emit token events for real-time display
-          this.emit('token', { token: part.message.content });
-          content += part.message.content;
-
-          // If no token counts available yet, estimate progressively
-          if (part.prompt_eval_count === undefined && part.eval_count === undefined) {
-            const newTokens = Math.ceil(part.message.content.length / 4);
-            estimatedOutputTokens += newTokens;
-
-            this.emit('token_usage_update', {
-              usage: {
-                promptTokens: 0, // Unknown during streaming
-                completionTokens: estimatedOutputTokens,
-                totalTokens: estimatedOutputTokens,
-              },
-            });
-          }
+        if (!diagnostics.connected) {
+          throw new Error(
+            `Cannot connect to Ollama server at ${this._host}.\n` +
+              `Make sure Ollama is running and accessible.\n\n` +
+              `To fix this:\n` +
+              `  - Start Ollama service: 'ollama serve'\n` +
+              `  - Ensure the server is running on ${this._host}\n` +
+              `  - Check firewall settings if using a remote server\n\n` +
+              `Connection error: ${diagnostics.error}`
+          );
         }
 
-        // Emit token usage updates if available (usually in final response)
-        if (part.prompt_eval_count !== undefined || part.eval_count !== undefined) {
-          const promptTokens = part.prompt_eval_count || 0;
-          const completionTokens = part.eval_count || 0;
+        // Check if our target model is available
+        if (!diagnostics.models.includes(this.modelName)) {
+          throw new Error(
+            `Model "${this.modelName}" is not available in Ollama.\n\n` +
+              `Available models: ${diagnostics.models.join(', ')}\n\n` +
+              `To fix this:\n` +
+              `  - Pull the model: 'ollama pull ${this.modelName}'\n` +
+              `  - Choose an available model from the list above\n` +
+              `  - Use --provider anthropic as fallback`
+          );
+        }
 
-          this.emit('token_usage_update', {
-            usage: {
-              promptTokens,
-              completionTokens,
-              totalTokens: promptTokens + completionTokens,
-            },
+        // Convert messages to Ollama format
+        const ollamaMessages = [];
+
+        // Add system prompt if configured
+        if (this._systemPrompt) {
+          ollamaMessages.push({
+            role: 'system',
+            content: this._systemPrompt,
           });
         }
 
-        // Store the final message for tool calls
-        if (part.done) {
-          finalMessage = part.message;
+        // Add conversation messages
+        ollamaMessages.push(
+          ...messages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          }))
+        );
+
+        logger.debug('Sending streaming request to Ollama', {
+          provider: 'ollama',
+          model: this.modelName,
+          messageCount: ollamaMessages.length,
+          toolCount: tools.length,
+          toolNames: tools.map((t) => t.name),
+        });
+
+        // Prepare the request payload for streaming
+        const requestPayload = {
+          model: this.modelName,
+          messages: ollamaMessages,
+          stream: true as const,
+          tools:
+            tools.length > 0
+              ? tools.map(
+                  (tool): OllamaTool => ({
+                    type: 'function',
+                    function: {
+                      name: tool.name,
+                      description: tool.description,
+                      parameters: tool.inputSchema,
+                    },
+                  })
+                )
+              : undefined,
+        };
+
+        // Handle abort signal
+        if (signal?.aborted) {
+          throw new Error('Request aborted');
         }
+
+        // Make the streaming request
+        const response = await this._ollama.chat(requestPayload);
+        
+        // Mark that stream is created to prevent retries after this point
+        streamCreated = true;
+
+        // If the response is an AbortableAsyncIterator and signal is provided, set up abort handling
+        if (
+          signal &&
+          'abort' in response &&
+          typeof (response as unknown as { abort?: () => void }).abort === 'function'
+        ) {
+          signal.addEventListener('abort', () => {
+            (response as unknown as { abort: () => void }).abort();
+          });
+        }
+
+        let content = '';
+        let toolCalls: { id: string; name: string; input: Record<string, unknown> }[] = [];
+        let finalMessage: OllamaMessage | null = null;
+        let estimatedOutputTokens = 0;
+
+        try {
+          // Process streaming response
+          for await (const part of response) {
+            if (part.message?.content) {
+              streamingStarted = true; // Mark that streaming has begun
+              // Emit token events for real-time display
+              this.emit('token', { token: part.message.content });
+              content += part.message.content;
+
+              // If no token counts available yet, estimate progressively
+              if (part.prompt_eval_count === undefined && part.eval_count === undefined) {
+                const newTokens = Math.ceil(part.message.content.length / 4);
+                estimatedOutputTokens += newTokens;
+
+                this.emit('token_usage_update', {
+                  usage: {
+                    promptTokens: 0, // Unknown during streaming
+                    completionTokens: estimatedOutputTokens,
+                    totalTokens: estimatedOutputTokens,
+                  },
+                });
+              }
+            }
+
+            // Emit token usage updates if available (usually in final response)
+            if (part.prompt_eval_count !== undefined || part.eval_count !== undefined) {
+              const promptTokens = part.prompt_eval_count || 0;
+              const completionTokens = part.eval_count || 0;
+
+              this.emit('token_usage_update', {
+                usage: {
+                  promptTokens,
+                  completionTokens,
+                  totalTokens: promptTokens + completionTokens,
+                },
+              });
+            }
+
+            // Store the final message for tool calls
+            if (part.done) {
+              finalMessage = part.message;
+            }
+          }
+
+          // Extract tool calls from final message
+          if (finalMessage?.tool_calls) {
+            toolCalls = finalMessage.tool_calls.map((tc: OllamaToolCall, index: number) => ({
+              id: `call_${index + 1}`,
+              name: tc.function.name,
+              input: tc.function.arguments,
+            }));
+          }
+
+          logger.debug('Received streaming response from Ollama', {
+            provider: 'ollama',
+            model: this.modelName,
+            contentLength: content.length,
+            toolCallCount: toolCalls.length,
+            toolCallNames: toolCalls.map((tc) => tc.name),
+          });
+
+          const result = {
+            content,
+            toolCalls,
+            stopReason: 'stop', // Streaming always completes normally
+            usage: finalMessage ? this._extractUsageFromMessage(finalMessage) : undefined,
+            performance: this._extractPerformanceFromStream(finalMessage),
+          };
+
+          // Emit completion event
+          this.emit('complete', { response: result });
+
+          return result;
+        } catch (error) {
+          const errorObj = error as Error;
+          logger.error('Streaming error from Ollama', { error: errorObj.message });
+          // Emit error event for compatibility with existing tests
+          this.emit('error', { error: errorObj });
+          throw error;
+        }
+      },
+      {
+        signal,
+        isStreaming: true,
+        canRetry: () => !streamCreated && !streamingStarted,
       }
-
-      // Extract tool calls from final message
-      if (finalMessage?.tool_calls) {
-        toolCalls = finalMessage.tool_calls.map((tc: OllamaToolCall, index: number) => ({
-          id: `call_${index + 1}`,
-          name: tc.function.name,
-          input: tc.function.arguments,
-        }));
-      }
-
-      logger.debug('Received streaming response from Ollama', {
-        provider: 'ollama',
-        model: this.modelName,
-        contentLength: content.length,
-        toolCallCount: toolCalls.length,
-        toolCallNames: toolCalls.map((tc) => tc.name),
-      });
-
-      const result = {
-        content,
-        toolCalls,
-        stopReason: 'stop', // Streaming always completes normally
-        usage: finalMessage ? this._extractUsageFromMessage(finalMessage) : undefined,
-        performance: this._extractPerformanceFromStream(finalMessage),
-      };
-
-      // Emit completion event
-      this.emit('complete', { response: result });
-
-      return result;
-    } catch (error) {
-      const errorObj = error as Error;
-      logger.error('Streaming error from Ollama', { error: errorObj.message });
-      this.emit('error', { error: errorObj });
-      throw error;
-    }
+    );
   }
 
   private _extractUsage(

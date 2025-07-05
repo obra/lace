@@ -149,67 +149,72 @@ export class OpenAIProvider extends AIProvider {
     tools: Tool[] = [],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    const requestPayload = this._createRequestPayload(messages, tools, false);
+    return this.withRetry(
+      async () => {
+        const requestPayload = this._createRequestPayload(messages, tools, false);
 
-    logger.debug('Sending request to OpenAI', {
-      provider: 'openai',
-      model: requestPayload.model,
-      messageCount: requestPayload.messages.length,
-      systemPromptLength: requestPayload.messages[0].content?.length,
-      toolCount: requestPayload.tools?.length,
-      toolNames: requestPayload.tools?.map((t) => t.function.name),
-    });
+        logger.debug('Sending request to OpenAI', {
+          provider: 'openai',
+          model: requestPayload.model,
+          messageCount: requestPayload.messages.length,
+          systemPromptLength: requestPayload.messages[0].content?.length,
+          toolCount: requestPayload.tools?.length,
+          toolNames: requestPayload.tools?.map((t) => t.function.name),
+        });
 
-    // Log full request payload for debugging
-    logger.debug('OpenAI request payload', {
-      provider: 'openai',
-      payload: JSON.stringify(requestPayload, null, 2),
-    });
+        // Log full request payload for debugging
+        logger.debug('OpenAI request payload', {
+          provider: 'openai',
+          payload: JSON.stringify(requestPayload, null, 2),
+        });
 
-    const response = (await this._openai.chat.completions.create(requestPayload, {
-      signal,
-    })) as OpenAI.Chat.ChatCompletion;
+        const response = (await this._openai.chat.completions.create(requestPayload, {
+          signal,
+        })) as OpenAI.Chat.ChatCompletion;
 
-    // Log full response for debugging
-    logger.debug('OpenAI response payload', {
-      provider: 'openai',
-      response: JSON.stringify(response, null, 2),
-    });
+        // Log full response for debugging
+        logger.debug('OpenAI response payload', {
+          provider: 'openai',
+          response: JSON.stringify(response, null, 2),
+        });
 
-    const choice = response.choices[0];
-    if (!choice.message) {
-      throw new Error('No message in OpenAI response');
-    }
+        const choice = response.choices[0];
+        if (!choice.message) {
+          throw new Error('No message in OpenAI response');
+        }
 
-    const textContent = choice.message.content || '';
+        const textContent = choice.message.content || '';
 
-    const toolCalls: ProviderToolCall[] =
-      choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) => ({
-        id: toolCall.id,
-        name: toolCall.function.name,
-        input: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
-      })) || [];
+        const toolCalls: ProviderToolCall[] =
+          choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) => ({
+            id: toolCall.id,
+            name: toolCall.function.name,
+            input: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
+          })) || [];
 
-    logger.debug('Received response from OpenAI', {
-      provider: 'openai',
-      contentLength: textContent.length,
-      toolCallCount: toolCalls.length,
-      toolCallNames: toolCalls.map((tc) => tc.name),
-      usage: response.usage,
-    });
+        logger.debug('Received response from OpenAI', {
+          provider: 'openai',
+          contentLength: textContent.length,
+          toolCallCount: toolCalls.length,
+          toolCallNames: toolCalls.map((tc) => tc.name),
+          usage: response.usage,
+        });
 
-    return {
-      content: textContent,
-      toolCalls,
-      stopReason: this.normalizeStopReason(choice.finish_reason),
-      usage: response.usage
-        ? {
-            promptTokens: response.usage.prompt_tokens,
-            completionTokens: response.usage.completion_tokens,
-            totalTokens: response.usage.total_tokens,
-          }
-        : undefined,
-    };
+        return {
+          content: textContent,
+          toolCalls,
+          stopReason: this.normalizeStopReason(choice.finish_reason),
+          usage: response.usage
+            ? {
+                promptTokens: response.usage.prompt_tokens,
+                completionTokens: response.usage.completion_tokens,
+                totalTokens: response.usage.total_tokens,
+              }
+            : undefined,
+        };
+      },
+      { signal }
+    );
   }
 
   async createStreamingResponse(
@@ -217,148 +222,165 @@ export class OpenAIProvider extends AIProvider {
     tools: Tool[] = [],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    const requestPayload = this._createRequestPayload(messages, tools, true);
+    let streamingStarted = false;
+    let streamCreated = false;
 
-    logger.debug('Sending streaming request to OpenAI', {
-      provider: 'openai',
-      model: requestPayload.model,
-      messageCount: requestPayload.messages.length,
-      systemPromptLength: requestPayload.messages[0].content?.length,
-      toolCount: requestPayload.tools?.length,
-      toolNames: requestPayload.tools?.map((t) => t.function.name),
-    });
+    return this.withRetry(
+      async () => {
+        const requestPayload = this._createRequestPayload(messages, tools, true);
 
-    // Log full request payload for debugging
-    logger.debug('OpenAI streaming request payload', {
-      provider: 'openai',
-      payload: JSON.stringify(requestPayload, null, 2),
-    });
+        logger.debug('Sending streaming request to OpenAI', {
+          provider: 'openai',
+          model: requestPayload.model,
+          messageCount: requestPayload.messages.length,
+          systemPromptLength: requestPayload.messages[0].content?.length,
+          toolCount: requestPayload.tools?.length,
+          toolNames: requestPayload.tools?.map((t) => t.function.name),
+        });
 
-    try {
-      // Use the streaming API
-      const stream = (await this._openai.chat.completions.create(requestPayload, {
-        signal,
-      })) as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
+        // Log full request payload for debugging
+        logger.debug('OpenAI streaming request payload', {
+          provider: 'openai',
+          payload: JSON.stringify(requestPayload, null, 2),
+        });
 
-      let content = '';
-      let toolCalls: ProviderToolCall[] = [];
-      let stopReason: string | undefined;
-      let usage: OpenAI.CompletionUsage | undefined;
+        try {
+          // Use the streaming API
+          const stream = (await this._openai.chat.completions.create(requestPayload, {
+            signal,
+          })) as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
+          
+          // Mark that stream is created to prevent retries after this point
+          streamCreated = true;
 
-      // Accumulate tool calls during streaming
-      const partialToolCalls: Map<
-        number,
-        {
-          id: string;
-          name: string;
-          arguments: string;
-        }
-      > = new Map();
+          let content = '';
+          let toolCalls: ProviderToolCall[] = [];
+          let stopReason: string | undefined;
+          let usage: OpenAI.CompletionUsage | undefined;
 
-      // Track progressive token estimation
-      let estimatedOutputTokens = 0;
+          // Accumulate tool calls during streaming
+          const partialToolCalls: Map<
+            number,
+            {
+              id: string;
+              name: string;
+              arguments: string;
+            }
+          > = new Map();
 
-      // Process stream chunks
-      for await (const chunk of stream) {
-        const delta = chunk.choices[0]?.delta;
+          // Track progressive token estimation
+          let estimatedOutputTokens = 0;
 
-        if (delta?.content) {
-          content += delta.content;
-          // Emit token events for real-time display
-          this.emit('token', { token: delta.content });
+          // Process stream chunks
+          for await (const chunk of stream) {
+            const delta = chunk.choices[0]?.delta;
 
-          // Estimate progressive tokens from text chunks
-          const newTokens = this.estimateTokens(delta.content);
-          estimatedOutputTokens += newTokens;
+            if (delta?.content) {
+              streamingStarted = true; // Mark that streaming has begun
+              content += delta.content;
+              // Emit token events for real-time display
+              this.emit('token', { token: delta.content });
 
-          // Emit progressive token estimate
-          this.emit('token_usage_update', {
-            usage: {
-              promptTokens: 0, // Unknown during streaming
-              completionTokens: estimatedOutputTokens,
-              totalTokens: estimatedOutputTokens,
-            },
-          });
-        }
+              // Estimate progressive tokens from text chunks
+              const newTokens = this.estimateTokens(delta.content);
+              estimatedOutputTokens += newTokens;
 
-        // Handle tool calls
-        if (delta?.tool_calls) {
-          for (const toolCall of delta.tool_calls) {
-            const index = toolCall.index!;
-
-            if (!partialToolCalls.has(index)) {
-              partialToolCalls.set(index, {
-                id: toolCall.id!,
-                name: toolCall.function!.name!,
-                arguments: '',
+              // Emit progressive token estimate
+              this.emit('token_usage_update', {
+                usage: {
+                  promptTokens: 0, // Unknown during streaming
+                  completionTokens: estimatedOutputTokens,
+                  totalTokens: estimatedOutputTokens,
+                },
               });
             }
 
-            const partial = partialToolCalls.get(index)!;
-            if (toolCall.function?.arguments) {
-              partial.arguments += toolCall.function.arguments;
+            // Handle tool calls
+            if (delta?.tool_calls) {
+              for (const toolCall of delta.tool_calls) {
+                const index = toolCall.index!;
+
+                if (!partialToolCalls.has(index)) {
+                  partialToolCalls.set(index, {
+                    id: toolCall.id!,
+                    name: toolCall.function!.name!,
+                    arguments: '',
+                  });
+                }
+
+                const partial = partialToolCalls.get(index)!;
+                if (toolCall.function?.arguments) {
+                  partial.arguments += toolCall.function.arguments;
+                }
+              }
+            }
+
+            // Get finish reason from the last chunk
+            if (chunk.choices[0]?.finish_reason) {
+              stopReason = chunk.choices[0].finish_reason;
+            }
+
+            // Some providers include usage in streaming responses
+            if (chunk.usage) {
+              usage = chunk.usage;
+
+              // Emit token usage updates during streaming
+              this.emit('token_usage_update', {
+                usage: {
+                  promptTokens: usage.prompt_tokens,
+                  completionTokens: usage.completion_tokens,
+                  totalTokens: usage.total_tokens,
+                },
+              });
             }
           }
-        }
 
-        // Get finish reason from the last chunk
-        if (chunk.choices[0]?.finish_reason) {
-          stopReason = chunk.choices[0].finish_reason;
-        }
+          // Convert partial tool calls to final format
+          toolCalls = Array.from(partialToolCalls.values()).map((partial) => ({
+            id: partial.id,
+            name: partial.name,
+            input: JSON.parse(partial.arguments) as Record<string, unknown>,
+          }));
 
-        // Some providers include usage in streaming responses
-        if (chunk.usage) {
-          usage = chunk.usage;
-
-          // Emit token usage updates during streaming
-          this.emit('token_usage_update', {
-            usage: {
-              promptTokens: usage.prompt_tokens,
-              completionTokens: usage.completion_tokens,
-              totalTokens: usage.total_tokens,
-            },
+          logger.debug('Received streaming response from OpenAI', {
+            provider: 'openai',
+            contentLength: content.length,
+            toolCallCount: toolCalls.length,
+            toolCallNames: toolCalls.map((tc) => tc.name),
+            usage,
           });
+
+          const response = {
+            content,
+            toolCalls,
+            stopReason: this.normalizeStopReason(stopReason),
+            usage: usage
+              ? {
+                  promptTokens: usage.prompt_tokens,
+                  completionTokens: usage.completion_tokens,
+                  totalTokens: usage.total_tokens,
+                }
+              : undefined,
+          };
+
+          // Emit completion event
+          this.emit('complete', { response });
+
+          return response;
+        } catch (error) {
+          const errorObj = error as Error;
+          logger.error('Streaming error from OpenAI', { error: errorObj.message });
+          // Emit error event for compatibility with existing tests
+          this.emit('error', { error: errorObj });
+          throw error;
         }
+      },
+      {
+        signal,
+        isStreaming: true,
+        canRetry: () => !streamCreated && !streamingStarted,
       }
-
-      // Convert partial tool calls to final format
-      toolCalls = Array.from(partialToolCalls.values()).map((partial) => ({
-        id: partial.id,
-        name: partial.name,
-        input: JSON.parse(partial.arguments) as Record<string, unknown>,
-      }));
-
-      logger.debug('Received streaming response from OpenAI', {
-        provider: 'openai',
-        contentLength: content.length,
-        toolCallCount: toolCalls.length,
-        toolCallNames: toolCalls.map((tc) => tc.name),
-        usage,
-      });
-
-      const response = {
-        content,
-        toolCalls,
-        stopReason: this.normalizeStopReason(stopReason),
-        usage: usage
-          ? {
-              promptTokens: usage.prompt_tokens,
-              completionTokens: usage.completion_tokens,
-              totalTokens: usage.total_tokens,
-            }
-          : undefined,
-      };
-
-      // Emit completion event
-      this.emit('complete', { response });
-
-      return response;
-    } catch (error) {
-      const errorObj = error as Error;
-      logger.error('Streaming error from OpenAI', { error: errorObj.message });
-      this.emit('error', { error: errorObj });
-      throw error;
-    }
+    );
   }
 
   protected normalizeStopReason(stopReason: string | null | undefined): string | undefined {
