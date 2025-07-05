@@ -18,7 +18,7 @@ const rawThreadEventsData = JSON.parse(readFileSync(threadDataPath, 'utf8'));
 // Convert timestamp strings to Date objects for TypeScript compatibility
 const threadEventsData = rawThreadEventsData.map((event: any) => ({
   ...event,
-  timestamp: new Date(event.timestamp)
+  timestamp: new Date(event.timestamp),
 }));
 
 describe('Compaction Regression Tests', () => {
@@ -45,7 +45,9 @@ describe('Compaction Regression Tests', () => {
     });
 
     it('should preserve TOOL_RESULT events with truncation', () => {
-      const toolResultEvents = threadEventsData.filter((e: ThreadEvent) => e.type === 'TOOL_RESULT');
+      const toolResultEvents = threadEventsData.filter(
+        (e: ThreadEvent) => e.type === 'TOOL_RESULT'
+      );
       expect(toolResultEvents.length).toBeGreaterThan(0);
 
       for (const event of toolResultEvents) {
@@ -57,58 +59,70 @@ describe('Compaction Regression Tests', () => {
 
     it('should maintain tool call/result atomic pairing after compaction', () => {
       const compactedEvents = strategy.compact(threadEventsData);
-      
-      const toolCalls = compactedEvents.filter(e => e.type === 'TOOL_CALL');
-      const toolResults = compactedEvents.filter(e => e.type === 'TOOL_RESULT');
-      
+
+      const toolCalls = compactedEvents.filter((e) => e.type === 'TOOL_CALL');
+      const toolResults = compactedEvents.filter((e) => e.type === 'TOOL_RESULT');
+
       // Should have same number of tool calls and results
       expect(toolCalls.length).toBe(toolResults.length);
-      
+
       // Each tool call should have a corresponding result
-      const toolCallIds = new Set(toolCalls.map(tc => {
-        if (typeof tc.data === 'object' && tc.data && 'id' in tc.data) {
-          return (tc.data as { id: string }).id;
-        }
-        return null;
-      }).filter(Boolean));
-      
-      const toolResultIds = new Set(toolResults.map(tr => {
-        if (typeof tr.data === 'object' && tr.data && 'id' in tr.data) {
-          return (tr.data as { id: string }).id;
-        }
-        return null;
-      }).filter(Boolean));
-      
+      const toolCallIds = new Set(
+        toolCalls
+          .map((tc) => {
+            if (typeof tc.data === 'object' && tc.data && 'id' in tc.data) {
+              return (tc.data as { id: string }).id;
+            }
+            return null;
+          })
+          .filter(Boolean)
+      );
+
+      const toolResultIds = new Set(
+        toolResults
+          .map((tr) => {
+            if (typeof tr.data === 'object' && tr.data && 'id' in tr.data) {
+              return (tr.data as { id: string }).id;
+            }
+            return null;
+          })
+          .filter(Boolean)
+      );
+
       expect(toolCallIds.size).toBe(toolResultIds.size);
       expect(toolCallIds).toEqual(toolResultIds);
     });
 
     it('should truncate long TOOL_RESULT content to save space', () => {
       const compactedEvents = strategy.compact(threadEventsData);
-      const toolResults = compactedEvents.filter(e => e.type === 'TOOL_RESULT');
-      
+      const toolResults = compactedEvents.filter((e) => e.type === 'TOOL_RESULT');
+
       for (const result of toolResults) {
         if (typeof result.data === 'string') {
           // If content was long, it should be truncated
           if (result.data.includes('[results truncated to save space.]')) {
             const lines = result.data.split('\n');
-            const truncationIndex = lines.findIndex(line => line.includes('[results truncated to save space.]'));
-            
+            const truncationIndex = lines.findIndex((line) =>
+              line.includes('[results truncated to save space.]')
+            );
+
             // Should preserve first 3 lines plus truncation marker
             expect(truncationIndex).toBeLessThanOrEqual(3);
           }
         } else if (typeof result.data === 'object' && result.data && 'content' in result.data) {
           const toolResult = result.data as { content: Array<{ type: string; text?: string }> };
           const textContent = toolResult.content
-            .filter(block => block.type === 'text' && block.text)
-            .map(block => block.text)
+            .filter((block) => block.type === 'text' && block.text)
+            .map((block) => block.text)
             .join('\n');
-          
+
           // If content was long, it should be truncated
           if (textContent.includes('[results truncated to save space.]')) {
             const lines = textContent.split('\n');
-            const truncationIndex = lines.findIndex(line => line.includes('[results truncated to save space.]'));
-            
+            const truncationIndex = lines.findIndex((line) =>
+              line.includes('[results truncated to save space.]')
+            );
+
             // Should preserve first 3 lines plus truncation marker
             expect(truncationIndex).toBeLessThanOrEqual(3);
           }
@@ -118,10 +132,10 @@ describe('Compaction Regression Tests', () => {
 
     it('should preserve USER_MESSAGE and AGENT_MESSAGE events', () => {
       const compactedEvents = strategy.compact(threadEventsData);
-      
-      const userMessages = compactedEvents.filter(e => e.type === 'USER_MESSAGE');
-      const agentMessages = compactedEvents.filter(e => e.type === 'AGENT_MESSAGE');
-      
+
+      const userMessages = compactedEvents.filter((e) => e.type === 'USER_MESSAGE');
+      const agentMessages = compactedEvents.filter((e) => e.type === 'AGENT_MESSAGE');
+
       // Should preserve most recent user and agent messages
       expect(userMessages.length).toBeGreaterThan(0);
       expect(agentMessages.length).toBeGreaterThan(0);
@@ -129,31 +143,30 @@ describe('Compaction Regression Tests', () => {
 
     it('should handle tool events in buildConversationFromEvents', () => {
       const compactedEvents = strategy.compact(threadEventsData);
-      
+
       // Access private method for testing
       const conversation = (strategy as any).buildConversationFromEvents(compactedEvents);
-      
+
       // Should not crash when processing tool events
       expect(conversation).toBeDefined();
       expect(Array.isArray(conversation)).toBe(true);
     });
 
     it('should preserve tool structure while compacting other content', () => {
-      const originalTokens = (strategy as any).fallbackTokenEstimation(threadEventsData);
       const compactedEvents = strategy.compact(threadEventsData);
       const compactedTokens = (strategy as any).fallbackTokenEstimation(compactedEvents);
-      
+
       // With tool preservation, tokens may not reduce significantly (this is expected behavior)
       // The key is that we preserve critical structure for API compatibility
       expect(compactedTokens).toBeGreaterThan(0);
-      
+
       // Should preserve critical structure for API compatibility
-      const toolCalls = compactedEvents.filter(e => e.type === 'TOOL_CALL');
-      const toolResults = compactedEvents.filter(e => e.type === 'TOOL_RESULT');
-      
+      const toolCalls = compactedEvents.filter((e) => e.type === 'TOOL_CALL');
+      const toolResults = compactedEvents.filter((e) => e.type === 'TOOL_RESULT');
+
       expect(toolCalls.length).toBeGreaterThan(0);
       expect(toolResults.length).toBeGreaterThan(0);
-      
+
       // Should have atomic pairing preserved
       expect(toolCalls.length).toBe(toolResults.length);
     });
@@ -169,7 +182,7 @@ describe('Compaction Regression Tests', () => {
       const nonToolEvents = threadEventsData.filter(
         (e: ThreadEvent) => e.type !== 'TOOL_CALL' && e.type !== 'TOOL_RESULT'
       );
-      
+
       const result = strategy.compact(nonToolEvents);
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
@@ -183,10 +196,10 @@ describe('Compaction Regression Tests', () => {
         timestamp: new Date(),
         data: 'malformed', // malformed data
       };
-      
+
       const eventsWithMalformed = [...threadEventsData, malformedEvent];
       const result = strategy.compact(eventsWithMalformed);
-      
+
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
     });
