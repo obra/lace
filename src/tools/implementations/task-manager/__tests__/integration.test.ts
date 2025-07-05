@@ -2,7 +2,13 @@
 // ABOUTME: Tests end-to-end scenarios including task creation, assignment, and collaboration
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { TaskCreateTool, TaskListTool, TaskUpdateTool, TaskAddNoteTool, TaskViewTool } from '../tools.js';
+import {
+  TaskCreateTool,
+  TaskListTool,
+  TaskUpdateTool,
+  TaskAddNoteTool,
+  TaskViewTool,
+} from '../tools.js';
 import { ToolContext } from '../../../types.js';
 import { asThreadId, createNewAgentSpec } from '../../../../threads/types.js';
 import { useTempLaceDir, getTestDbPath } from '../../../../test-utils/temp-lace-dir.js';
@@ -137,12 +143,12 @@ describe('Multi-Agent Task Manager Integration', () => {
       const viewTool = new TaskViewTool();
       const finalViewResult = await viewTool.execute({ taskId }, mainAgentContext);
       expect(finalViewResult.isError).toBe(false);
-      
+
       const taskDetails = finalViewResult.content?.[0]?.text || '';
       expect(taskDetails).toContain('JWT token generation');
       expect(taskDetails).toContain('refresh token support');
       expect(taskDetails).toContain('in_progress');
-      
+
       // Should have 2 notes in the output
       const noteMatches = taskDetails.match(/\d+\. \[lace_20250703_parent\.\d+\]/g);
       expect(noteMatches).toHaveLength(2);
@@ -287,12 +293,12 @@ describe('Multi-Agent Task Manager Integration', () => {
       const viewTool = new TaskViewTool();
       const viewResult = await viewTool.execute({ taskId }, mainAgentContext);
       expect(viewResult.isError).toBe(false);
-      
+
       const taskDetails = viewResult.content?.[0]?.text || '';
       expect(taskDetails).toContain('Note from agent 1');
       expect(taskDetails).toContain('Note from agent 2');
       expect(taskDetails).toContain('Note from agent 3');
-      
+
       // Should have 3 notes in the output (each note shows as "N. [author] timestamp")
       const noteMatches = taskDetails.match(/\d+\. \[lace_20250703_parent\.\d+\]/g);
       expect(noteMatches).toHaveLength(3);

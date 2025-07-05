@@ -10,7 +10,12 @@ import {
   ThreadId,
   AssigneeId,
 } from '../threads/types.js';
-import { Task, TaskNote, TaskStatus, TaskPriority } from '../tools/implementations/task-manager/types.js';
+import {
+  Task,
+  TaskNote,
+  TaskStatus,
+  TaskPriority,
+} from '../tools/implementations/task-manager/types.js';
 import { logger } from '../utils/logger.js';
 
 export class DatabasePersistence {
@@ -607,7 +612,7 @@ export class DatabasePersistence {
     }>;
 
     // Load notes for all tasks in batch
-    const taskIds = rows.map(row => row.id);
+    const taskIds = rows.map((row) => row.id);
     const notesMap = this.loadNotesBatch(taskIds);
 
     return rows.map((row) => ({
@@ -650,7 +655,7 @@ export class DatabasePersistence {
     }>;
 
     // Load notes for all tasks in batch
-    const taskIds = rows.map(row => row.id);
+    const taskIds = rows.map((row) => row.id);
     const notesMap = this.loadNotesBatch(taskIds);
 
     return rows.map((row) => ({
@@ -770,13 +775,13 @@ export class DatabasePersistence {
     }>;
 
     const notesMap = new Map<string, TaskNote[]>();
-    
+
     for (const noteRow of noteRows) {
       const taskId = noteRow.task_id;
       if (!notesMap.has(taskId)) {
         notesMap.set(taskId, []);
       }
-      
+
       notesMap.get(taskId)!.push({
         id: String(noteRow.id),
         author: noteRow.author as ThreadId,
@@ -799,7 +804,7 @@ export class DatabasePersistence {
           lastError = error;
           // Exponential backoff with proper async delay
           const delay = Math.min(100 * Math.pow(2, i), 1000);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
         }
         throw error;
