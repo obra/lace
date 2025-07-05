@@ -72,9 +72,10 @@ export class TestProvider extends AIProvider {
 
     return {
       content: this.mockResponse,
+      toolCalls: [],
       usage: {
         promptTokens: 10,
-        outputTokens: 20,
+        completionTokens: 20,
         totalTokens: 30,
       },
       stopReason: 'end_turn',
