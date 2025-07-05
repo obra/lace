@@ -606,11 +606,13 @@ export class LMStudioProvider extends AIProvider {
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
+    let modelLoaded = false;
 
     return this.withRetry(
       async () => {
         const modelId = this.modelName;
         await this._ensureModelLoaded(modelId);
+        modelLoaded = true; // Mark model as loaded to prevent retries after this point
 
         logger.debug('Creating streaming LMStudio response with native tool calling', {
           provider: 'lmstudio',
@@ -628,7 +630,7 @@ export class LMStudioProvider extends AIProvider {
       {
         signal,
         isStreaming: true,
-        canRetry: () => !streamingStarted,
+        canRetry: () => !modelLoaded && !streamingStarted,
       }
     );
   }

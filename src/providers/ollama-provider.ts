@@ -212,6 +212,7 @@ export class OllamaProvider extends AIProvider {
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
+    let streamCreated = false;
 
     return this.withRetry(
       async () => {
@@ -296,6 +297,9 @@ export class OllamaProvider extends AIProvider {
 
         // Make the streaming request
         const response = await this._ollama.chat(requestPayload);
+        
+        // Mark that stream is created to prevent retries after this point
+        streamCreated = true;
 
         // If the response is an AbortableAsyncIterator and signal is provided, set up abort handling
         if (
@@ -397,7 +401,7 @@ export class OllamaProvider extends AIProvider {
       {
         signal,
         isStreaming: true,
-        canRetry: () => !streamingStarted,
+        canRetry: () => !streamCreated && !streamingStarted,
       }
     );
   }

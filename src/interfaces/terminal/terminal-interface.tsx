@@ -623,21 +623,68 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       });
     };
 
+    // Robust error classification for retry display
+    const classifyRetryError = (error: Error): string => {
+      // Check error codes first (most reliable)
+      if ('code' in error) {
+        const code = (error as any).code;
+        switch (code) {
+          case 'ECONNREFUSED':
+          case 'ENOTFOUND':
+          case 'EHOSTUNREACH':
+          case 'ECONNRESET':
+            return 'connection error';
+          case 'ETIMEDOUT':
+            return 'timeout';
+          default:
+            break;
+        }
+      }
+
+      // Check status codes
+      if ('status' in error || 'statusCode' in error) {
+        const status = (error as any).status || (error as any).statusCode;
+        if (typeof status === 'number') {
+          if (status === 429) return 'rate limit';
+          if (status === 401 || status === 403) return 'auth error';
+          if (status >= 500 && status < 600) return 'server error';
+          if (status === 408) return 'timeout';
+        }
+      }
+
+      // Check error name
+      if (error.name) {
+        switch (error.name.toLowerCase()) {
+          case 'timeouterror':
+          case 'aborterror':
+            return 'timeout';
+          case 'networkerror':
+            return 'connection error';
+          default:
+            break;
+        }
+      }
+
+      // Fall back to message checking (least reliable)
+      const message = error.message.toLowerCase();
+      if (message.includes('timeout') || message.includes('timed out')) {
+        return 'timeout';
+      } else if (message.includes('rate limit') || message.includes('too many requests')) {
+        return 'rate limit';
+      } else if (message.includes('server error') || message.includes('internal server') || message.includes('service unavailable')) {
+        return 'server error';
+      } else if (message.includes('unauthorized') || message.includes('forbidden') || message.includes('authentication')) {
+        return 'auth error';
+      } else if (message.includes('connection') || message.includes('network') || message.includes('connect')) {
+        return 'connection error';
+      }
+
+      return 'network error'; // Default fallback
+    };
+
     // Handle retry events
     const handleRetryAttempt = ({ attempt, delay, error }: { attempt: number; delay: number; error: Error }) => {
-      // Extract error type for display
-      let errorType = 'network error';
-      if (error.message.includes('timeout') || error.message.includes('ETIMEDOUT')) {
-        errorType = 'timeout';
-      } else if (error.message.includes('rate limit') || error.message.includes('429')) {
-        errorType = 'rate limit';
-      } else if (error.message.includes('server') || error.message.includes('5')) {
-        errorType = 'server error';
-      } else if (error.message.includes('auth') || error.message.includes('401')) {
-        errorType = 'auth error';
-      } else if (error.message.includes('connection') || error.message.includes('ECONNREFUSED')) {
-        errorType = 'connection error';
-      }
+      const errorType = classifyRetryError(error);
 
       const newRetryStatus = {
         isRetrying: true,

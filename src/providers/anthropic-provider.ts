@@ -213,6 +213,7 @@ export class AnthropicProvider extends AIProvider {
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
+    let streamCreated = false;
 
     return this.withRetry(
       async () => {
@@ -237,6 +238,9 @@ export class AnthropicProvider extends AIProvider {
         const stream = this._anthropic.messages.stream(requestPayload, {
           signal,
         });
+        
+        // Mark that stream is created to prevent retries after this point
+        streamCreated = true;
 
         let toolCalls: ProviderToolCall[] = [];
 
@@ -355,7 +359,7 @@ export class AnthropicProvider extends AIProvider {
       {
         signal,
         isStreaming: true,
-        canRetry: () => !streamingStarted,
+        canRetry: () => !streamCreated && !streamingStarted,
       }
     );
   }

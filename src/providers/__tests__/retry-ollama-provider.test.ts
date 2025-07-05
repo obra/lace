@@ -137,8 +137,10 @@ describe('OllamaProvider retry functionality', () => {
       vi.useRealTimers();
 
       // Reduce delays for faster testing
-      provider.RETRY_CONFIG.initialDelayMs = 1;
-      provider.RETRY_CONFIG.maxDelayMs = 2;
+      provider.RETRY_CONFIG = {
+        initialDelayMs: 1,
+        maxDelayMs: 2,
+      };
 
       await expect(provider.createResponse(messages, [])).rejects.toMatchObject({
         code: 'ETIMEDOUT',

@@ -223,6 +223,7 @@ export class OpenAIProvider extends AIProvider {
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
+    let streamCreated = false;
 
     return this.withRetry(
       async () => {
@@ -248,6 +249,9 @@ export class OpenAIProvider extends AIProvider {
           const stream = (await this._openai.chat.completions.create(requestPayload, {
             signal,
           })) as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
+          
+          // Mark that stream is created to prevent retries after this point
+          streamCreated = true;
 
           let content = '';
           let toolCalls: ProviderToolCall[] = [];
@@ -374,7 +378,7 @@ export class OpenAIProvider extends AIProvider {
       {
         signal,
         isStreaming: true,
-        canRetry: () => !streamingStarted,
+        canRetry: () => !streamCreated && !streamingStarted,
       }
     );
   }

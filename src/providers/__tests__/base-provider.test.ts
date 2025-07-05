@@ -262,8 +262,10 @@ describe('AIProvider retry functionality', () => {
       provider.on('retry_attempt', retrySpy);
 
       // Use very short retry delays for testing
-      provider.RETRY_CONFIG.initialDelayMs = 1;
-      provider.RETRY_CONFIG.maxDelayMs = 2;
+      provider.RETRY_CONFIG = {
+        initialDelayMs: 1,
+        maxDelayMs: 2,
+      };
 
       await expect(provider.withRetry(operation, { maxAttempts: 2 })).rejects.toMatchObject({
         code: 'ECONNREFUSED',

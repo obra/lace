@@ -34,14 +34,81 @@ export abstract class AIProvider extends EventEmitter {
   protected readonly _config: ProviderConfig;
   protected _systemPrompt: string = '';
 
-  // Retry configuration - can be modified in tests
-  public RETRY_CONFIG = {
+  // Retry configuration - can be modified in tests but must be validated
+  private _retryConfig = {
     maxRetries: 10,
     initialDelayMs: 1000,
     maxDelayMs: 30000,
     backoffFactor: 2,
     jitterFactor: 0.1,
   };
+
+  public get RETRY_CONFIG(): {
+    maxRetries: number;
+    initialDelayMs: number;
+    maxDelayMs: number;
+    backoffFactor: number;
+    jitterFactor: number;
+  } {
+    return this._retryConfig;
+  }
+
+  public set RETRY_CONFIG(config: Partial<typeof this._retryConfig>) {
+    this.validateRetryConfig(config);
+    this._retryConfig = { ...this._retryConfig, ...config };
+  }
+
+  private validateRetryConfig(config: Partial<typeof this._retryConfig>): void {
+    if (config.maxRetries !== undefined) {
+      if (!Number.isInteger(config.maxRetries) || config.maxRetries < 0) {
+        throw new Error('maxRetries must be a non-negative integer');
+      }
+      if (config.maxRetries > 50) {
+        throw new Error('maxRetries cannot exceed 50 to prevent excessive retry loops');
+      }
+    }
+
+    if (config.initialDelayMs !== undefined) {
+      if (!Number.isInteger(config.initialDelayMs) || config.initialDelayMs < 0) {
+        throw new Error('initialDelayMs must be a non-negative integer');
+      }
+      if (config.initialDelayMs > 60000) {
+        throw new Error('initialDelayMs cannot exceed 60000ms (1 minute)');
+      }
+    }
+
+    if (config.maxDelayMs !== undefined) {
+      if (!Number.isInteger(config.maxDelayMs) || config.maxDelayMs < 0) {
+        throw new Error('maxDelayMs must be a non-negative integer');
+      }
+      if (config.maxDelayMs > 300000) {
+        throw new Error('maxDelayMs cannot exceed 300000ms (5 minutes)');
+      }
+    }
+
+    if (config.backoffFactor !== undefined) {
+      if (typeof config.backoffFactor !== 'number' || config.backoffFactor < 1) {
+        throw new Error('backoffFactor must be a number >= 1');
+      }
+      if (config.backoffFactor > 10) {
+        throw new Error('backoffFactor cannot exceed 10 to prevent excessive delays');
+      }
+    }
+
+    if (config.jitterFactor !== undefined) {
+      if (typeof config.jitterFactor !== 'number' || config.jitterFactor < 0 || config.jitterFactor >= 1) {
+        throw new Error('jitterFactor must be a number between 0 (inclusive) and 1 (exclusive)');
+      }
+    }
+
+    // Cross-validation
+    const newInitialDelay = config.initialDelayMs ?? this._retryConfig.initialDelayMs;
+    const newMaxDelay = config.maxDelayMs ?? this._retryConfig.maxDelayMs;
+    
+    if (newInitialDelay > newMaxDelay) {
+      throw new Error('initialDelayMs cannot be greater than maxDelayMs');
+    }
+  }
 
   constructor(config: ProviderConfig) {
     super();
@@ -186,14 +253,15 @@ export abstract class AIProvider extends EventEmitter {
    * Calculates exponential backoff delay with jitter
    */
   protected calculateBackoffDelay(attempt: number): number {
+    const config = this.RETRY_CONFIG;
     // Calculate base delay with exponential backoff
     const baseDelay = Math.min(
-      this.RETRY_CONFIG.initialDelayMs * Math.pow(this.RETRY_CONFIG.backoffFactor, attempt - 1),
-      this.RETRY_CONFIG.maxDelayMs
+      config.initialDelayMs * Math.pow(config.backoffFactor, attempt - 1),
+      config.maxDelayMs
     );
 
     // Apply jitter to prevent thundering herd
-    const jitter = baseDelay * this.RETRY_CONFIG.jitterFactor;
+    const jitter = baseDelay * config.jitterFactor;
     const minDelay = baseDelay - jitter;
     const maxDelay = baseDelay + jitter;
 
@@ -212,7 +280,8 @@ export abstract class AIProvider extends EventEmitter {
       signal?: AbortSignal;
     }
   ): Promise<T> {
-    const maxAttempts = options?.maxAttempts ?? this.RETRY_CONFIG.maxRetries;
+    const config = this.RETRY_CONFIG;
+    const maxAttempts = options?.maxAttempts ?? config.maxRetries;
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -257,23 +326,42 @@ export abstract class AIProvider extends EventEmitter {
 
         // Wait before retrying
         await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(() => resolve(), delay);
+          let timer: ReturnType<typeof setTimeout> | null = null;
+          let abortListener: (() => void) | null = null;
+
+          const cleanup = () => {
+            if (timer) {
+              clearTimeout(timer);
+              timer = null;
+            }
+            if (abortListener && options?.signal) {
+              options.signal.removeEventListener('abort', abortListener);
+              abortListener = null;
+            }
+          };
 
           // Handle abort during delay
           if (options?.signal) {
-            const abortHandler = () => {
-              clearTimeout(timer);
+            abortListener = () => {
+              cleanup();
               const abortError = new Error('Aborted');
               abortError.name = 'AbortError';
               reject(abortError);
             };
 
             if (options.signal.aborted) {
-              abortHandler();
+              abortListener();
+              return;
             } else {
-              options.signal.addEventListener('abort', abortHandler, { once: true });
+              options.signal.addEventListener('abort', abortListener, { once: true });
             }
           }
+
+          // Set timer with cleanup
+          timer = setTimeout(() => {
+            cleanup();
+            resolve();
+          }, delay);
         });
       }
     }
