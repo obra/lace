@@ -527,7 +527,21 @@ export class DatabasePersistence {
       SELECT * FROM tasks WHERE id = ?
     `);
 
-    const row = stmt.get(taskId) as any;
+    const row = stmt.get(taskId) as
+      | {
+          id: string;
+          title: string;
+          description: string;
+          prompt: string;
+          status: string;
+          priority: string;
+          assigned_to: string | null;
+          created_by: string;
+          thread_id: string;
+          created_at: string;
+          updated_at: string;
+        }
+      | undefined;
     if (!row) return null;
 
     // Load notes for this task
@@ -537,7 +551,13 @@ export class DatabasePersistence {
       ORDER BY timestamp ASC
     `);
 
-    const noteRows = notesStmt.all(taskId) as any[];
+    const noteRows = notesStmt.all(taskId) as Array<{
+      id: number;
+      task_id: string;
+      author: string;
+      content: string;
+      timestamp: string;
+    }>;
     const notes: TaskNote[] = noteRows.map((noteRow) => ({
       id: String(noteRow.id),
       author: noteRow.author as ThreadId,
@@ -570,7 +590,7 @@ export class DatabasePersistence {
       ORDER BY created_at DESC
     `);
 
-    const rows = stmt.all(threadId) as any[];
+    const rows = stmt.all(threadId) as Array<{ id: string }>;
     return rows.map((row) => this.loadTask(row.id)!).filter((task) => task !== null);
   }
 
@@ -583,7 +603,7 @@ export class DatabasePersistence {
       ORDER BY created_at DESC
     `);
 
-    const rows = stmt.all(assignee) as any[];
+    const rows = stmt.all(assignee) as Array<{ id: string }>;
     return rows.map((row) => this.loadTask(row.id)!).filter((task) => task !== null);
   }
 
@@ -593,7 +613,7 @@ export class DatabasePersistence {
 
       // Build dynamic update query
       const updateFields: string[] = [];
-      const values: any[] = [];
+      const values: (string | number | null)[] = [];
 
       if (updates.title !== undefined) {
         updateFields.push('title = ?');
@@ -670,12 +690,12 @@ export class DatabasePersistence {
 
   // Retry wrapper for write operations to handle SQLITE_BUSY
   private withRetry<T>(operation: () => T, maxRetries = 3): T {
-    let lastError: any;
+    let lastError: unknown;
     for (let i = 0; i < maxRetries; i++) {
       try {
         return operation();
-      } catch (error: any) {
-        if (error.code === 'SQLITE_BUSY' && i < maxRetries - 1) {
+      } catch (error: unknown) {
+        if ((error as { code?: string }).code === 'SQLITE_BUSY' && i < maxRetries - 1) {
           lastError = error;
           // Exponential backoff
           const delay = Math.min(100 * Math.pow(2, i), 1000);
