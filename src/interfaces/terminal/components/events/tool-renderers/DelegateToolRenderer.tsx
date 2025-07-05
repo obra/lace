@@ -1,9 +1,11 @@
-// ABOUTME: Renderer for delegate tool executions with direct component composition
+// ABOUTME: Renderer for delegate tool executions using TimelineEntry
 // ABOUTME: Displays delegation with thread information and completion status
 
 import React, { forwardRef, useImperativeHandle, useState, useCallback } from 'react';
 import { Box, Text } from 'ink';
-import { ToolHeader, ToolPreview, ToolContent, useToolExpansion, type ToolRendererProps } from './components/shared.js';
+import { TimelineEntry, TimelineStatus } from '../../ui/TimelineEntry.js';
+import { useTimelineItem } from '../contexts/TimelineItemContext.js';
+import { type ToolRendererProps } from './components/shared.js';
 import { TimelineItemRef } from '../../timeline-item-focus.js';
 import { formatTokenCount } from '../../../../../utils/token-estimation.js';
 import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
@@ -39,10 +41,8 @@ function parseDelegateResult(result: any): DelegateResult | null {
 
 export const DelegateToolRenderer = forwardRef<TimelineItemRef, ToolRendererProps>(({
   item,
-  isSelected = false,
-  onToggle,
 }, ref) => {
-  const { isExpanded } = useToolExpansion(isSelected, onToggle);
+  const { isExpanded, isSelected } = useTimelineItem();
   
   // Extract data directly
   const task = (item.call.arguments.task || item.call.arguments.prompt || 'Unknown task') as string;
@@ -51,7 +51,7 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, ToolRendererProp
   const isRunning = !item.result;
   
   // Determine status
-  const status = isRunning ? 'pending' : hasError ? 'error' : 'success';
+  const status: TimelineStatus = isRunning ? 'pending' : hasError ? 'error' : 'success';
   
   // Delegation-specific state
   const [isEntered, setIsEntered] = useState(false);
@@ -100,18 +100,22 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, ToolRendererProp
     },
   }), [delegateThreadId, isEntered]);
   
-  return (
-    <Box flexDirection="column">
+  // Build header with task and delegation indicator
+  const header = (
+    <Box>
+      <Text color={UI_COLORS.TOOL} bold>delegate</Text>
+      <Text>: "{task}"</Text>
+      <Text color="cyan"> [DELEGATE]</Text>
+    </Box>
+  );
+  
+  // Build preview content 
+  const preview = delegateResult && item.result && !isRunning ? (() => {
+    return (
       <Box flexDirection="column">
-        <ToolHeader icon="🔧" status={status}>
-          <Text color={UI_COLORS.TOOL} bold>delegate</Text>
-          <Text> "{task}"</Text>
-          <Text color="cyan"> [DELEGATE]</Text>
-        </ToolHeader>
-        
-        {/* Show delegation status when collapsed */}
+        {/* Show delegation status info */}
         {delegateThreadId && (
-          <Box marginLeft={2} marginTop={1}>
+          <Box>
             <Text color={UI_COLORS.DELEGATE}>{UI_SYMBOLS.DELEGATE} </Text>
             <Text color="gray">Thread: {delegateThreadId}</Text>
             {delegateResult?.status === 'active' && (
@@ -119,91 +123,100 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, ToolRendererProp
             )}
           </Box>
         )}
+        
+        {/* Show result or error */}
+        {delegateResult.error ? (
+          <Text color="red">{delegateResult.error}</Text>
+        ) : delegateResult.summary ? (
+          <Box flexDirection="column">
+            <Text>{delegateResult.summary}</Text>
+            {delegateResult.totalTokens && (
+              <Text color="gray">{formatTokenCount(delegateResult.totalTokens)}</Text>
+            )}
+          </Box>
+        ) : (
+          <Text color="gray">Delegation in progress...</Text>
+        )}
       </Box>
-      
-      {!isExpanded && delegateResult && item.result && !isRunning && (
-        <ToolPreview>
-          {delegateResult.error ? (
-            <Text color="red">{delegateResult.error}</Text>
-          ) : delegateResult.summary ? (
-            <Box flexDirection="column">
-              <Text>{delegateResult.summary}</Text>
-              {delegateResult.totalTokens && (
-                <Text color="gray">{formatTokenCount(delegateResult.totalTokens)}</Text>
-              )}
-            </Box>
+    );
+  })() : null;
+  
+  // Build expanded content
+  const expandedContent = (
+    <Box flexDirection="column">
+      {/* Input parameters */}
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color="yellow">Input:</Text>
+        <Box marginLeft={2}>
+          <Text>{JSON.stringify(item.call.arguments, null, 2)}</Text>
+        </Box>
+      </Box>
+
+      {/* Delegation result or status */}
+      {item.result && (
+        <Box flexDirection="column">
+          {delegateResult?.error ? (
+            <React.Fragment>
+              <Text color="red">Error:</Text>
+              <Box marginLeft={2}>
+                <Text color="red">{delegateResult.error}</Text>
+              </Box>
+            </React.Fragment>
           ) : (
-            <Text color="gray">Delegation in progress...</Text>
+            <React.Fragment>
+              <Text color="green">Delegation Status:</Text>
+              <Box marginLeft={2} flexDirection="column">
+                {delegateThreadId && (
+                  <Text>Thread ID: {delegateThreadId}</Text>
+                )}
+                {delegateResult?.status && (
+                  <Text>Status: {delegateResult.status}</Text>
+                )}
+                {delegateResult?.summary && (
+                  <Text>Summary: {delegateResult.summary}</Text>
+                )}
+                {delegateResult?.totalTokens && (
+                  <Text>Tokens: {formatTokenCount(delegateResult.totalTokens)}</Text>
+                )}
+              </Box>
+            </React.Fragment>
           )}
-        </ToolPreview>
+        </Box>
       )}
       
-      {isExpanded && (
-        <ToolContent>
-          {/* Input parameters */}
-          <Box flexDirection="column" marginBottom={1}>
-            <Text color="yellow">Input:</Text>
-            <Box marginLeft={2}>
-              <Text>{JSON.stringify(item.call.arguments, null, 2)}</Text>
-            </Box>
+      {/* Delegation instructions */}
+      {delegateThreadId && delegateResult?.status === 'active' && (
+        <Box marginTop={1} flexDirection="column">
+          <Box>
+            <Text color={UI_COLORS.DELEGATE}>{UI_SYMBOLS.DELEGATE} </Text>
+            <Text color="gray">Delegation Thread - </Text>
+            <Text color={isEntered ? 'green' : 'gray'}>
+              {isEntered
+                ? '[ESC to exit]'
+                : `[${UI_SYMBOLS.EXPAND_HINT} to enter]`}
+            </Text>
           </Box>
-
-          {/* Delegation result or status */}
-          {item.result && (
-            <Box flexDirection="column">
-              {delegateResult?.error ? (
-                <React.Fragment>
-                  <Text color="red">Error:</Text>
-                  <Box marginLeft={2}>
-                    <Text color="red">{delegateResult.error}</Text>
-                  </Box>
-                </React.Fragment>
-              ) : (
-                <React.Fragment>
-                  <Text color="green">Delegation Status:</Text>
-                  <Box marginLeft={2} flexDirection="column">
-                    {delegateThreadId && (
-                      <Text>Thread ID: {delegateThreadId}</Text>
-                    )}
-                    {delegateResult?.status && (
-                      <Text>Status: {delegateResult.status}</Text>
-                    )}
-                    {delegateResult?.summary && (
-                      <Text>Summary: {delegateResult.summary}</Text>
-                    )}
-                    {delegateResult?.totalTokens && (
-                      <Text>Tokens: {formatTokenCount(delegateResult.totalTokens)}</Text>
-                    )}
-                  </Box>
-                </React.Fragment>
-              )}
-            </Box>
-          )}
           
-          {/* Delegation instructions */}
-          {delegateThreadId && delegateResult?.status === 'active' && (
-            <Box marginTop={1} flexDirection="column">
-              <Box>
-                <Text color={UI_COLORS.DELEGATE}>{UI_SYMBOLS.DELEGATE} </Text>
-                <Text color="gray">Delegation Thread - </Text>
-                <Text color={isEntered ? 'green' : 'gray'}>
-                  {isEntered
-                    ? '[ESC to exit]'
-                    : `[${UI_SYMBOLS.EXPAND_HINT} to enter]`}
-                </Text>
-              </Box>
-              
-              {delegationExpanded && (
-                <Box marginTop={1}>
-                  <Text color="gray" italic>
-                    Note: Full delegation timeline display requires additional context providers.
-                  </Text>
-                </Box>
-              )}
+          {delegationExpanded && (
+            <Box marginTop={1}>
+              <Text color="gray" italic>
+                Note: Full delegation timeline display requires additional context providers.
+              </Text>
             </Box>
           )}
-        </ToolContent>
+        </Box>
       )}
     </Box>
+  );
+
+  return (
+    <TimelineEntry
+      label={header}
+      summary={preview}
+      status={status}
+      isExpandable={true}
+    >
+      {expandedContent}
+    </TimelineEntry>
   );
 });
