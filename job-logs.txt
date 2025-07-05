@@ -1,0 +1,1206 @@
+﻿2025-07-05T20:59:14.8089138Z Current runner version: '2.325.0'
+2025-07-05T20:59:14.8115526Z ##[group]Operating System
+2025-07-05T20:59:14.8116389Z Ubuntu
+2025-07-05T20:59:14.8116880Z 24.04.2
+2025-07-05T20:59:14.8117319Z LTS
+2025-07-05T20:59:14.8117849Z ##[endgroup]
+2025-07-05T20:59:14.8118328Z ##[group]Runner Image
+2025-07-05T20:59:14.8119114Z Image: ubuntu-24.04
+2025-07-05T20:59:14.8119713Z Version: 20250629.1.0
+2025-07-05T20:59:14.8120699Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20250629.1/images/ubuntu/Ubuntu2404-Readme.md
+2025-07-05T20:59:14.8122063Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20250629.1
+2025-07-05T20:59:14.8122948Z ##[endgroup]
+2025-07-05T20:59:14.8123473Z ##[group]Runner Image Provisioner
+2025-07-05T20:59:14.8124044Z 2.0.449.1
+2025-07-05T20:59:14.8124533Z ##[endgroup]
+2025-07-05T20:59:14.8125573Z ##[group]GITHUB_TOKEN Permissions
+2025-07-05T20:59:14.8127547Z Contents: read
+2025-07-05T20:59:14.8128149Z Metadata: read
+2025-07-05T20:59:14.8129027Z Packages: read
+2025-07-05T20:59:14.8129682Z ##[endgroup]
+2025-07-05T20:59:14.8131689Z Secret source: Actions
+2025-07-05T20:59:14.8132412Z Prepare workflow directory
+2025-07-05T20:59:14.8517138Z Prepare all required actions
+2025-07-05T20:59:14.8574365Z Getting action download info
+2025-07-05T20:59:15.2969489Z ##[group]Download immutable action package 'actions/checkout@v4'
+2025-07-05T20:59:15.2971039Z Version: 4.2.2
+2025-07-05T20:59:15.2972162Z Digest: sha256:ccb2698953eaebd21c7bf6268a94f9c26518a7e38e27e0b83c1fe1ad049819b1
+2025-07-05T20:59:15.2973468Z Source commit SHA: 11bd71901bbe5b1630ceea73d27597364c9af683
+2025-07-05T20:59:15.2974173Z ##[endgroup]
+2025-07-05T20:59:15.3848179Z ##[group]Download immutable action package 'actions/setup-node@v4'
+2025-07-05T20:59:15.3849315Z Version: 4.4.0
+2025-07-05T20:59:15.3850087Z Digest: sha256:9427cefe82346e992fb5b949e3569b39d537ae41aa3086483b14eceebfc16bc1
+2025-07-05T20:59:15.3851040Z Source commit SHA: 49933ea5288caeca8642d1e84afbd3f7d6820020
+2025-07-05T20:59:15.3851824Z ##[endgroup]
+2025-07-05T20:59:15.5492953Z Complete job name: Cross-Platform Tests (ubuntu-latest)
+2025-07-05T20:59:15.6146688Z ##[group]Run actions/checkout@v4
+2025-07-05T20:59:15.6147487Z with:
+2025-07-05T20:59:15.6147973Z   repository: obra/lace
+2025-07-05T20:59:15.6148603Z   token: ***
+2025-07-05T20:59:15.6149182Z   ssh-strict: true
+2025-07-05T20:59:15.6149577Z   ssh-user: git
+2025-07-05T20:59:15.6149967Z   persist-credentials: true
+2025-07-05T20:59:15.6150405Z   clean: true
+2025-07-05T20:59:15.6150791Z   sparse-checkout-cone-mode: true
+2025-07-05T20:59:15.6151260Z   fetch-depth: 1
+2025-07-05T20:59:15.6151630Z   fetch-tags: false
+2025-07-05T20:59:15.6152021Z   show-progress: true
+2025-07-05T20:59:15.6152406Z   lfs: false
+2025-07-05T20:59:15.6152765Z   submodules: false
+2025-07-05T20:59:15.6153175Z   set-safe-directory: true
+2025-07-05T20:59:15.6153898Z env:
+2025-07-05T20:59:15.6154247Z   NODE_VERSION: 20
+2025-07-05T20:59:15.6154656Z ##[endgroup]
+2025-07-05T20:59:15.8646730Z Syncing repository: obra/lace
+2025-07-05T20:59:15.8648407Z ##[group]Getting Git version info
+2025-07-05T20:59:15.8649411Z Working directory is '/home/runner/work/lace/lace'
+2025-07-05T20:59:15.8650404Z [command]/usr/bin/git version
+2025-07-05T20:59:15.8725091Z git version 2.49.0
+2025-07-05T20:59:15.8754609Z ##[endgroup]
+2025-07-05T20:59:15.8769973Z Temporarily overriding HOME='/home/runner/work/_temp/e12bd4a2-9462-431a-8d2e-fcd1dd97dd2f' before making global git config changes
+2025-07-05T20:59:15.8772412Z Adding repository directory to the temporary git global config as a safe directory
+2025-07-05T20:59:15.8774688Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/lace/lace
+2025-07-05T20:59:15.8811378Z Deleting the contents of '/home/runner/work/lace/lace'
+2025-07-05T20:59:15.8815563Z ##[group]Initializing the repository
+2025-07-05T20:59:15.8819836Z [command]/usr/bin/git init /home/runner/work/lace/lace
+2025-07-05T20:59:15.8912964Z hint: Using 'master' as the name for the initial branch. This default branch name
+2025-07-05T20:59:15.8915070Z hint: is subject to change. To configure the initial branch name to use in all
+2025-07-05T20:59:15.8916903Z hint: of your new repositories, which will suppress this warning, call:
+2025-07-05T20:59:15.8918139Z hint:
+2025-07-05T20:59:15.8919335Z hint: 	git config --global init.defaultBranch <name>
+2025-07-05T20:59:15.8920407Z hint:
+2025-07-05T20:59:15.8921371Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2025-07-05T20:59:15.8923174Z hint: 'development'. The just-created branch can be renamed via this command:
+2025-07-05T20:59:15.8924424Z hint:
+2025-07-05T20:59:15.8925101Z hint: 	git branch -m <name>
+2025-07-05T20:59:15.8926299Z Initialized empty Git repository in /home/runner/work/lace/lace/.git/
+2025-07-05T20:59:15.8930896Z [command]/usr/bin/git remote add origin https://github.com/obra/lace
+2025-07-05T20:59:15.8966434Z ##[endgroup]
+2025-07-05T20:59:15.8967632Z ##[group]Disabling automatic garbage collection
+2025-07-05T20:59:15.8970512Z [command]/usr/bin/git config --local gc.auto 0
+2025-07-05T20:59:15.9003945Z ##[endgroup]
+2025-07-05T20:59:15.9004682Z ##[group]Setting up auth
+2025-07-05T20:59:15.9014260Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2025-07-05T20:59:15.9048509Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2025-07-05T20:59:15.9462359Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2025-07-05T20:59:15.9492504Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2025-07-05T20:59:15.9715997Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2025-07-05T20:59:15.9753526Z ##[endgroup]
+2025-07-05T20:59:15.9754789Z ##[group]Fetching the repository
+2025-07-05T20:59:15.9764367Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +eadeb6b6edb9632edd3bc7d2cce69f39ed8076a7:refs/remotes/pull/63/merge
+2025-07-05T20:59:16.7270803Z From https://github.com/obra/lace
+2025-07-05T20:59:16.7272577Z  * [new ref]         eadeb6b6edb9632edd3bc7d2cce69f39ed8076a7 -> pull/63/merge
+2025-07-05T20:59:16.7299967Z ##[endgroup]
+2025-07-05T20:59:16.7301473Z ##[group]Determining the checkout info
+2025-07-05T20:59:16.7303366Z ##[endgroup]
+2025-07-05T20:59:16.7308075Z [command]/usr/bin/git sparse-checkout disable
+2025-07-05T20:59:16.7351404Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2025-07-05T20:59:16.7382979Z ##[group]Checking out the ref
+2025-07-05T20:59:16.7386910Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/63/merge
+2025-07-05T20:59:16.7779728Z Note: switching to 'refs/remotes/pull/63/merge'.
+2025-07-05T20:59:16.7782664Z 
+2025-07-05T20:59:16.7783670Z You are in 'detached HEAD' state. You can look around, make experimental
+2025-07-05T20:59:16.7785911Z changes and commit them, and you can discard any commits you make in this
+2025-07-05T20:59:16.7788124Z state without impacting any branches by switching back to a branch.
+2025-07-05T20:59:16.7789616Z 
+2025-07-05T20:59:16.7790488Z If you want to create a new branch to retain commits you create, you may
+2025-07-05T20:59:16.7792459Z do so (now or later) by using -c with the switch command. Example:
+2025-07-05T20:59:16.7793618Z 
+2025-07-05T20:59:16.7794132Z   git switch -c <new-branch-name>
+2025-07-05T20:59:16.7794937Z 
+2025-07-05T20:59:16.7795421Z Or undo this operation with:
+2025-07-05T20:59:16.7796200Z 
+2025-07-05T20:59:16.7796647Z   git switch -
+2025-07-05T20:59:16.7797286Z 
+2025-07-05T20:59:16.7798294Z Turn off this advice by setting config variable advice.detachedHead to false
+2025-07-05T20:59:16.7799988Z 
+2025-07-05T20:59:16.7801645Z HEAD is now at eadeb6b Merge ca8aab9c8d36514184f9ab04cc6d5be22e00a670 into 0a8eecf0fa0511b32aa93d9c151b7ea45c882e72
+2025-07-05T20:59:16.7807470Z ##[endgroup]
+2025-07-05T20:59:16.7831516Z [command]/usr/bin/git log -1 --format=%H
+2025-07-05T20:59:16.7854832Z eadeb6b6edb9632edd3bc7d2cce69f39ed8076a7
+2025-07-05T20:59:16.8153929Z ##[group]Run actions/setup-node@v4
+2025-07-05T20:59:16.8155004Z with:
+2025-07-05T20:59:16.8155799Z   node-version: 20
+2025-07-05T20:59:16.8156638Z   cache: npm
+2025-07-05T20:59:16.8157457Z   always-auth: false
+2025-07-05T20:59:16.8158349Z   check-latest: false
+2025-07-05T20:59:16.8159647Z   token: ***
+2025-07-05T20:59:16.8160456Z env:
+2025-07-05T20:59:16.8161223Z   NODE_VERSION: 20
+2025-07-05T20:59:16.8162060Z ##[endgroup]
+2025-07-05T20:59:16.9896957Z Found in cache @ /opt/hostedtoolcache/node/20.19.3/x64
+2025-07-05T20:59:16.9902772Z ##[group]Environment details
+2025-07-05T20:59:17.3546684Z node: v20.19.3
+2025-07-05T20:59:17.3547242Z npm: 10.8.2
+2025-07-05T20:59:17.3547477Z yarn: 1.22.22
+2025-07-05T20:59:17.3548088Z ##[endgroup]
+2025-07-05T20:59:17.3568231Z [command]/opt/hostedtoolcache/node/20.19.3/x64/bin/npm config get cache
+2025-07-05T20:59:17.4742849Z /home/runner/.npm
+2025-07-05T20:59:17.7815315Z Cache hit for: node-cache-Linux-x64-npm-6f643ec53f6ecc152dad70741436db0c7fb2f915ac4f3ac3850f2c1f98edf88f
+2025-07-05T20:59:19.1080369Z Received 0 of 43805840 (0.0%), 0.0 MBs/sec
+2025-07-05T20:59:19.5150464Z Received 43805840 of 43805840 (100.0%), 29.7 MBs/sec
+2025-07-05T20:59:19.5151340Z Cache Size: ~42 MB (43805840 B)
+2025-07-05T20:59:19.5205018Z [command]/usr/bin/tar -xf /home/runner/work/_temp/40e2ffdd-bb52-489c-aac1-53e7e38c5193/cache.tzst -P -C /home/runner/work/lace/lace --use-compress-program unzstd
+2025-07-05T20:59:19.6717610Z Cache restored successfully
+2025-07-05T20:59:19.6810497Z Cache restored from key: node-cache-Linux-x64-npm-6f643ec53f6ecc152dad70741436db0c7fb2f915ac4f3ac3850f2c1f98edf88f
+2025-07-05T20:59:19.6967037Z ##[group]Run if [[ "$RUNNER_OS" == "Linux" ]]; then
+2025-07-05T20:59:19.6967484Z [36;1mif [[ "$RUNNER_OS" == "Linux" ]]; then[0m
+2025-07-05T20:59:19.6967908Z [36;1m  sudo apt-get update && sudo apt-get install -y ripgrep[0m
+2025-07-05T20:59:19.6968263Z [36;1melif [[ "$RUNNER_OS" == "macOS" ]]; then[0m
+2025-07-05T20:59:19.6968543Z [36;1m  brew install ripgrep[0m
+2025-07-05T20:59:19.6968756Z [36;1mfi[0m
+2025-07-05T20:59:19.7075634Z shell: /usr/bin/bash -e {0}
+2025-07-05T20:59:19.7075893Z env:
+2025-07-05T20:59:19.7076069Z   NODE_VERSION: 20
+2025-07-05T20:59:19.7076257Z ##[endgroup]
+2025-07-05T20:59:19.7928203Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2025-07-05T20:59:19.8205077Z Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
+2025-07-05T20:59:19.8208541Z Hit:6 https://packages.microsoft.com/repos/azure-cli noble InRelease
+2025-07-05T20:59:19.8219206Z Get:3 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+2025-07-05T20:59:19.8249407Z Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
+2025-07-05T20:59:19.8277189Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
+2025-07-05T20:59:19.8309562Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+2025-07-05T20:59:19.9787888Z Get:8 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [25.1 kB]
+2025-07-05T20:59:19.9921452Z Get:9 https://packages.microsoft.com/ubuntu/24.04/prod noble/main armhf Packages [9168 B]
+2025-07-05T20:59:19.9973660Z Get:10 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [38.5 kB]
+2025-07-05T20:59:20.0253875Z Get:11 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1221 kB]
+2025-07-05T20:59:20.0330647Z Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [251 kB]
+2025-07-05T20:59:20.0368578Z Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [162 kB]
+2025-07-05T20:59:20.0392470Z Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1103 kB]
+2025-07-05T20:59:20.0458756Z Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [281 kB]
+2025-07-05T20:59:20.0485953Z Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [377 kB]
+2025-07-05T20:59:20.0530752Z Get:17 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1391 kB]
+2025-07-05T20:59:20.0626145Z Get:18 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [298 kB]
+2025-07-05T20:59:20.0702563Z Get:19 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Components [212 B]
+2025-07-05T20:59:20.0703921Z Get:20 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Packages [22.8 kB]
+2025-07-05T20:59:20.1133144Z Get:21 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse Translation-en [5456 B]
+2025-07-05T20:59:20.1144483Z Get:22 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
+2025-07-05T20:59:20.1161115Z Get:23 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [7052 B]
+2025-07-05T20:59:20.1175501Z Get:24 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [16.3 kB]
+2025-07-05T20:59:20.1190337Z Get:25 http://azure.archive.ubuntu.com/ubuntu noble-backports/restricted amd64 Components [216 B]
+2025-07-05T20:59:20.1202023Z Get:26 http://azure.archive.ubuntu.com/ubuntu noble-backports/multiverse amd64 Components [212 B]
+2025-07-05T20:59:20.1330000Z Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [970 kB]
+2025-07-05T20:59:20.1386415Z Get:28 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [173 kB]
+2025-07-05T20:59:20.1406841Z Get:29 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [21.6 kB]
+2025-07-05T20:59:20.1420071Z Get:30 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [869 kB]
+2025-07-05T20:59:20.1473896Z Get:31 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [191 kB]
+2025-07-05T20:59:20.1497328Z Get:32 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [52.2 kB]
+2025-07-05T20:59:20.1511856Z Get:33 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1347 kB]
+2025-07-05T20:59:20.1580431Z Get:34 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [290 kB]
+2025-07-05T20:59:20.2058297Z Get:35 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Components [212 B]
+2025-07-05T20:59:20.2072437Z Get:36 http://azure.archive.ubuntu.com/ubuntu noble-security/multiverse amd64 Packages [18.5 kB]
+2025-07-05T20:59:20.2086760Z Get:37 http://azure.archive.ubuntu.com/ubuntu noble-security/multiverse Translation-en [4288 B]
+2025-07-05T20:59:20.2126165Z Get:38 http://azure.archive.ubuntu.com/ubuntu noble-security/multiverse amd64 Components [212 B]
+2025-07-05T20:59:26.9603717Z Fetched 9529 kB in 1s (7940 kB/s)
+2025-07-05T20:59:27.6178516Z Reading package lists...
+2025-07-05T20:59:27.6487142Z Reading package lists...
+2025-07-05T20:59:27.8149837Z Building dependency tree...
+2025-07-05T20:59:27.8157808Z Reading state information...
+2025-07-05T20:59:27.9754883Z The following NEW packages will be installed:
+2025-07-05T20:59:27.9755407Z   ripgrep
+2025-07-05T20:59:27.9919883Z 0 upgraded, 1 newly installed, 0 to remove and 40 not upgraded.
+2025-07-05T20:59:27.9920319Z Need to get 1551 kB of archives.
+2025-07-05T20:59:27.9920914Z After this operation, 5335 kB of additional disk space will be used.
+2025-07-05T20:59:27.9921704Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2025-07-05T20:59:28.0939497Z Get:2 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 ripgrep amd64 14.1.0-1 [1551 kB]
+2025-07-05T20:59:28.5131355Z Fetched 1551 kB in 0s (5564 kB/s)
+2025-07-05T20:59:28.5364775Z Selecting previously unselected package ripgrep.
+2025-07-05T20:59:28.5612659Z (Reading database ... 
+2025-07-05T20:59:28.5613075Z (Reading database ... 5%
+2025-07-05T20:59:28.5613749Z (Reading database ... 10%
+2025-07-05T20:59:28.5614115Z (Reading database ... 15%
+2025-07-05T20:59:28.5614460Z (Reading database ... 20%
+2025-07-05T20:59:28.5616202Z (Reading database ... 25%
+2025-07-05T20:59:28.5616641Z (Reading database ... 30%
+2025-07-05T20:59:28.5617035Z (Reading database ... 35%
+2025-07-05T20:59:28.5617410Z (Reading database ... 40%
+2025-07-05T20:59:28.5617773Z (Reading database ... 45%
+2025-07-05T20:59:28.5618149Z (Reading database ... 50%
+2025-07-05T20:59:28.5811957Z (Reading database ... 55%
+2025-07-05T20:59:28.6571062Z (Reading database ... 60%
+2025-07-05T20:59:28.7082893Z (Reading database ... 65%
+2025-07-05T20:59:28.7449403Z (Reading database ... 70%
+2025-07-05T20:59:28.7959997Z (Reading database ... 75%
+2025-07-05T20:59:28.8592401Z (Reading database ... 80%
+2025-07-05T20:59:28.9147277Z (Reading database ... 85%
+2025-07-05T20:59:28.9822426Z (Reading database ... 90%
+2025-07-05T20:59:29.0379431Z (Reading database ... 95%
+2025-07-05T20:59:29.0379769Z (Reading database ... 100%
+2025-07-05T20:59:29.0380227Z (Reading database ... 219395 files and directories currently installed.)
+2025-07-05T20:59:29.0423303Z Preparing to unpack .../ripgrep_14.1.0-1_amd64.deb ...
+2025-07-05T20:59:29.0465833Z Unpacking ripgrep (14.1.0-1) ...
+2025-07-05T20:59:29.1157510Z Setting up ripgrep (14.1.0-1) ...
+2025-07-05T20:59:29.1228342Z Processing triggers for man-db (2.12.0-4build2) ...
+2025-07-05T20:59:38.0468284Z 
+2025-07-05T20:59:38.0469453Z Running kernel seems to be up-to-date.
+2025-07-05T20:59:38.0469844Z 
+2025-07-05T20:59:38.0470094Z No services need to be restarted.
+2025-07-05T20:59:38.0470375Z 
+2025-07-05T20:59:38.0470612Z No containers need to be restarted.
+2025-07-05T20:59:38.0470889Z 
+2025-07-05T20:59:38.0471175Z No user sessions are running outdated binaries.
+2025-07-05T20:59:38.0471504Z 
+2025-07-05T20:59:38.0472300Z No VM guests are running outdated hypervisor (qemu) binaries on this host.
+2025-07-05T20:59:38.9200284Z ##[group]Run npm ci
+2025-07-05T20:59:38.9200531Z [36;1mnpm ci[0m
+2025-07-05T20:59:38.9260585Z shell: /usr/bin/bash -e {0}
+2025-07-05T20:59:38.9260815Z env:
+2025-07-05T20:59:38.9260985Z   NODE_VERSION: 20
+2025-07-05T20:59:38.9261171Z ##[endgroup]
+2025-07-05T20:59:41.4069621Z npm warn deprecated lodash.isequal@4.5.0: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
+2025-07-05T20:59:41.7693322Z npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+2025-07-05T20:59:43.4315004Z 
+2025-07-05T20:59:43.4315800Z > LACE - A lightweight agentic coding environment@0.0.1 prepare
+2025-07-05T20:59:43.4316396Z > husky
+2025-07-05T20:59:43.4317264Z 
+2025-07-05T20:59:43.4904604Z 
+2025-07-05T20:59:43.4905755Z added 640 packages, and audited 641 packages in 4s
+2025-07-05T20:59:43.4906708Z 
+2025-07-05T20:59:43.4907185Z 171 packages are looking for funding
+2025-07-05T20:59:43.4907884Z   run `npm fund` for details
+2025-07-05T20:59:43.4917761Z 
+2025-07-05T20:59:43.4918016Z found 0 vulnerabilities
+2025-07-05T20:59:43.5331998Z ##[group]Run npm run test:run -- --exclude "**/*lmstudio-integration*" --exclude "**/*ollama-integration*" --exclude "**/e2e-cli*" --exclude "**/*sigint-integration*"
+2025-07-05T20:59:43.5333082Z [36;1mnpm run test:run -- --exclude "**/*lmstudio-integration*" --exclude "**/*ollama-integration*" --exclude "**/e2e-cli*" --exclude "**/*sigint-integration*"[0m
+2025-07-05T20:59:43.5391124Z shell: /usr/bin/bash -e {0}
+2025-07-05T20:59:43.5391348Z env:
+2025-07-05T20:59:43.5391513Z   NODE_VERSION: 20
+2025-07-05T20:59:43.5391695Z ##[endgroup]
+2025-07-05T20:59:43.6561611Z 
+2025-07-05T20:59:43.6562377Z > LACE - A lightweight agentic coding environment@0.0.1 test:run
+2025-07-05T20:59:43.6563772Z > vitest run --exclude **/*lmstudio-integration* --exclude **/*ollama-integration* --exclude **/e2e-cli* --exclude **/*sigint-integration*
+2025-07-05T20:59:43.6564553Z 
+2025-07-05T20:59:43.9951911Z 
+2025-07-05T20:59:43.9954593Z [1m[46m RUN [49m[22m [36mv3.2.3 [39m[90m/home/runner/work/lace/lace[39m
+2025-07-05T20:59:43.9955400Z 
+2025-07-05T20:59:45.4687509Z  [32m✓[39m src/interfaces/__tests__/thread-processor.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+2025-07-05T20:59:46.3856672Z  [32m✓[39m src/threads/__tests__/persistence.test.ts [2m([22m[2m45 tests[22m[2m)[22m[33m 872[2mms[22m[39m
+2025-07-05T20:59:46.5207322Z  [32m✓[39m src/agents/__tests__/agent.test.ts [2m([22m[2m42 tests[22m[2m)[22m[33m 451[2mms[22m[39m
+2025-07-05T20:59:47.1599483Z  [32m✓[39m src/agents/__tests__/conversation-building-regression.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2025-07-05T20:59:48.0057378Z  [32m✓[39m src/providers/__tests__/openai-provider.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+2025-07-05T20:59:48.1195087Z  [32m✓[39m src/agents/__tests__/turn-tracking-integration.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 1453[2mms[22m[39m
+2025-07-05T20:59:48.1199947Z    [33m[2m✓[22m[39m Turn Tracking Provider Integration Tests[2m > [22mComplete turn lifecycle tests[2m > [22mshould complete turn with Ollama-style provider [33m 331[2mms[22m[39m
+2025-07-05T20:59:48.3309868Z  [32m✓[39m src/agents/__tests__/agent-token-tracking.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 219[2mms[22m[39m
+2025-07-05T20:59:49.0821356Z  [32m✓[39m src/tools/__tests__/file-edit.test.ts [2m([22m[2m37 tests[22m[2m)[22m[32m 112[2mms[22m[39m
+2025-07-05T20:59:49.2472114Z  [32m✓[39m src/tools/implementations/task-manager/__tests__/tools.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 88[2mms[22m[39m
+2025-07-05T20:59:49.7259204Z  [32m✓[39m src/tools/__tests__/ripgrep-search.test.ts [2m([22m[2m36 tests[22m[2m)[22m[33m 429[2mms[22m[39m
+2025-07-05T20:59:50.2753095Z  [32m✓[39m src/__tests__/cli.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 194[2mms[22m[39m
+2025-07-05T20:59:50.8576181Z  [32m✓[39m src/config/__tests__/prompt-manager.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 93[2mms[22m[39m
+2025-07-05T20:59:51.2116143Z  [32m✓[39m src/config/__tests__/variable-providers.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+2025-07-05T20:59:52.1936678Z  [32m✓[39m src/interfaces/terminal/components/events/hooks/__tests__/timeline-expansion-integration.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 82[2mms[22m[39m
+2025-07-05T20:59:52.5261567Z  [32m✓[39m src/interfaces/terminal/focus/focus-lifecycle-wrapper.test.tsx [2m([22m[2m17 tests[22m[2m | [22m[33m5 skipped[39m[2m)[22m[32m 63[2mms[22m[39m
+2025-07-05T20:59:52.9974458Z  [32m✓[39m src/interfaces/terminal/components/__tests__/shell-input-autocomplete.test.tsx [2m([22m[2m17 tests[22m[2m)[22m[33m 2182[2mms[22m[39m
+2025-07-05T20:59:53.2773590Z  [32m✓[39m src/tools/__tests__/file-find.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 211[2mms[22m[39m
+2025-07-05T20:59:53.6949471Z  [32m✓[39m src/tools/__tests__/file-list.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 234[2mms[22m[39m
+2025-07-05T20:59:54.2294765Z  [32m✓[39m src/__tests__/tool-approval-integration.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 59[2mms[22m[39m
+2025-07-05T20:59:54.7406096Z  [32m✓[39m src/interfaces/terminal/__tests__/use-text-buffer.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 76[2mms[22m[39m
+2025-07-05T20:59:54.7907240Z  [32m✓[39m src/__tests__/har-integration.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 147[2mms[22m[39m
+2025-07-05T20:59:55.9891233Z  [32m✓[39m src/interfaces/terminal/__tests__/shell-input-paste.test.tsx [2m([22m[2m17 tests[22m[2m)[22m[32m 78[2mms[22m[39m
+2025-07-05T20:59:57.6714033Z [90mstderr[2m | src/app.test.ts[2m > [22m[2mApp Initialization (run function)[2m > [22m[2mshould exit if Anthropic API key is missing
+2025-07-05T20:59:57.6720411Z [22m[39mError: ANTHROPIC_KEY environment variable required for Anthropic provider
+2025-07-05T20:59:57.6721002Z 
+2025-07-05T20:59:57.6754939Z [90mstderr[2m | src/app.test.ts[2m > [22m[2mApp Initialization (run function)[2m > [22m[2mshould exit if OpenAI API key is missing
+2025-07-05T20:59:57.6757249Z [22m[39mError: OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider
+2025-07-05T20:59:57.6760156Z 
+2025-07-05T20:59:57.7355030Z  [32m✓[39m src/app.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 87[2mms[22m[39m
+2025-07-05T20:59:57.8550065Z  [32m✓[39m src/interfaces/terminal/__tests__/tool-approval-modal.test.tsx [2m([22m[2m19 tests[22m[2m)[22m[33m 2325[2mms[22m[39m
+2025-07-05T20:59:57.8562796Z    [33m[2m✓[22m[39m ToolApprovalModal[2m > [22mnavigation behavior[2m > [22mclamps navigation at max option [33m 304[2mms[22m[39m
+2025-07-05T20:59:58.6187681Z  [32m✓[39m src/tools/implementations/task-manager/__tests__/integration.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+2025-07-05T20:59:58.7176257Z  [32m✓[39m src/tools/__tests__/file-insert.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+2025-07-05T20:59:59.8865772Z  [32m✓[39m src/agents/__tests__/agent-retry-metrics.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 268[2mms[22m[39m
+2025-07-05T20:59:59.8929108Z  [32m✓[39m src/interfaces/terminal/__tests__/progress-display-integration.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[33m 2251[2mms[22m[39m
+2025-07-05T20:59:59.8931721Z    [33m[2m✓[22m[39m Progress Display Integration Tests[2m > [22mReal-time progress display[2m > [22mshould show progress updates with elapsed time and token counts [33m 507[2mms[22m[39m
+2025-07-05T20:59:59.8935069Z    [33m[2m✓[22m[39m Progress Display Integration Tests[2m > [22mReal-time progress display[2m > [22mshould display real-time token counts in status bar [33m 366[2mms[22m[39m
+2025-07-05T20:59:59.8937172Z    [33m[2m✓[22m[39m Progress Display Integration Tests[2m > [22mToken and timing display[2m > [22mshould show token counts updating in real-time [33m 359[2mms[22m[39m
+2025-07-05T21:00:00.0438684Z  [32m✓[39m src/interfaces/terminal/__tests__/shell-input.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[32m 91[2mms[22m[39m
+2025-07-05T21:00:00.8791362Z  [32m✓[39m src/providers/__tests__/base-provider.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+2025-07-05T21:00:01.4620587Z  [32m✓[39m src/__tests__/delegation-integration.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 137[2mms[22m[39m
+2025-07-05T21:00:01.9555037Z  [32m✓[39m src/interfaces/terminal/components/events/__tests__/timeline-focus-integration.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[32m 243[2mms[22m[39m
+2025-07-05T21:00:01.9604251Z  [32m✓[39m src/providers/__tests__/anthropic-provider.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+2025-07-05T21:00:02.7381250Z  [32m✓[39m src/tools/__tests__/bash.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 158[2mms[22m[39m
+2025-07-05T21:00:03.0366784Z  [32m✓[39m src/config/__tests__/template-engine.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+2025-07-05T21:00:03.4783734Z  [32m✓[39m src/tools/__tests__/delegate.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 249[2mms[22m[39m
+2025-07-05T21:00:03.9786747Z  [32m✓[39m src/cli/__tests__/args.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 156[2mms[22m[39m
+2025-07-05T21:00:04.3137025Z  [32m✓[39m src/interfaces/terminal/__tests__/text-renderer.test.tsx [2m([22m[2m22 tests[22m[2m)[22m[32m 65[2mms[22m[39m
+2025-07-05T21:00:05.3365547Z  [32m✓[39m src/interfaces/terminal/__tests__/use-text-buffer-wrapping.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 67[2mms[22m[39m
+2025-07-05T21:00:05.9311074Z  [32m✓[39m src/interfaces/terminal/components/events/__tests__/TimelineItem.test.tsx [2m([22m[2m15 tests[22m[2m)[22m[32m 66[2mms[22m[39m
+2025-07-05T21:00:05.9821442Z  [32m✓[39m src/interfaces/terminal/components/events/__tests__/TimelineContent.test.tsx [2m([22m[2m16 tests[22m[2m)[22m[32m 91[2mms[22m[39m
+2025-07-05T21:00:06.6321595Z  [32m✓[39m src/tools/__tests__/policy-wrapper.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+2025-07-05T21:00:07.3097346Z  [32m✓[39m src/__tests__/conversation-state.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 101[2mms[22m[39m
+2025-07-05T21:00:07.4638087Z  [32m✓[39m src/interfaces/terminal/components/timeline-item-focus.test.ts [2m([22m[2m31 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+2025-07-05T21:00:08.3013574Z  [32m✓[39m src/interfaces/terminal/components/ui/__tests__/TimelineEntry.test.tsx [2m([22m[2m14 tests[22m[2m)[22m[32m 133[2mms[22m[39m
+2025-07-05T21:00:08.5092125Z  [32m✓[39m src/interfaces/terminal/utils/__tests__/file-scanner.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+2025-07-05T21:00:09.2984300Z  [32m✓[39m src/interfaces/terminal/hooks/__tests__/use-project-context.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+2025-07-05T21:00:09.3586879Z  [32m✓[39m src/providers/__tests__/enhanced-provider-conversion.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2025-07-05T21:00:10.0634121Z  [32m✓[39m src/utils/__tests__/har-recorder.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2025-07-05T21:00:10.1693863Z  [32m✓[39m src/tools/__tests__/file-write.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+2025-07-05T21:00:10.2403103Z  [32m✓[39m src/tools/__tests__/url-fetch.test.ts [2m([22m[2m25 tests[22m[2m)[22m[33m 1700[2mms[22m[39m
+2025-07-05T21:00:10.2406738Z    [33m[2m✓[22m[39m UrlFetchTool with schema validation[2m > [22mInput validation[2m > [22mshould accept valid HTTP/HTTPS URLs [33m 334[2mms[22m[39m
+2025-07-05T21:00:10.2411325Z    [33m[2m✓[22m[39m UrlFetchTool with schema validation[2m > [22mInput validation[2m > [22mshould accept valid parameters [33m 307[2mms[22m[39m
+2025-07-05T21:00:10.2413528Z    [33m[2m✓[22m[39m UrlFetchTool with schema validation[2m > [22mNetwork error scenarios[2m > [22mshould handle timeout errors gracefully [33m 1010[2mms[22m[39m
+2025-07-05T21:00:10.9437044Z  [32m✓[39m src/providers/__tests__/retry-lmstudio-provider.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+2025-07-05T21:00:11.2996077Z  [32m✓[39m src/agents/__tests__/agent-abort.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 197[2mms[22m[39m
+2025-07-05T21:00:11.8904404Z  [32m✓[39m src/token-management/__tests__/token-budget-manager.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+2025-07-05T21:00:12.3874307Z  [32m✓[39m src/config/__tests__/prompts.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 144[2mms[22m[39m
+2025-07-05T21:00:12.7713085Z  [32m✓[39m src/__tests__/retry-integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 615[2mms[22m[39m
+2025-07-05T21:00:12.7719084Z    [33m[2m✓[22m[39m Retry System Integration Tests[2m > [22mComponent integration validation[2m > [22mshould verify StatusBar component accepts retry status [33m 526[2mms[22m[39m
+2025-07-05T21:00:12.8850439Z  [32m✓[39m src/interfaces/terminal/components/events/__tests__/DelegationBox.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2025-07-05T21:00:13.9779074Z  [32m✓[39m src/interfaces/terminal/__tests__/status-bar.test.tsx [2m([22m[2m18 tests[22m[2m)[22m[32m 117[2mms[22m[39m
+2025-07-05T21:00:14.0437861Z  [32m✓[39m src/tools/implementations/task-manager/__tests__/formatter.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 108[2mms[22m[39m
+2025-07-05T21:00:14.8881755Z  [32m✓[39m src/interfaces/terminal/components/events/__tests__/timeline-focus-isolation.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 160[2mms[22m[39m
+2025-07-05T21:00:15.0897520Z  [32m✓[39m src/config/__tests__/lace-dir.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+2025-07-05T21:00:15.7270484Z [90mstdout[2m | src/interfaces/terminal/__tests__/status-bar-wrapping.test.tsx[2m > [22m[2mStatusBar Layout and Truncation[2m > [22m[2mTwo-row status bar wrapping[2m > [22m[2mshould handle project context row wrapping in narrow terminal
+2025-07-05T21:00:15.7279544Z [22m[39mTwo-row status bar wrapped to 2 lines in 50-column terminal
+2025-07-05T21:00:15.7280047Z 
+2025-07-05T21:00:15.7296801Z [90mstdout[2m | src/interfaces/terminal/__tests__/status-bar-wrapping.test.tsx[2m > [22m[2mStatusBar Layout and Truncation[2m > [22m[2mTwo-row status bar wrapping[2m > [22m[2mshould handle both rows wrapping when both exceed terminal width
+2025-07-05T21:00:15.7311075Z [22m[39mBoth status bar rows in 35-column terminal resulted in 2 lines:
+2025-07-05T21:00:15.7311978Z   Line 1: " ◉ anthropic:clau......Processing"
+2025-07-05T21:00:15.7312520Z   Line 2: " ~/Documents/Project......45- 89?"
+2025-07-05T21:00:15.7312843Z 
+2025-07-05T21:00:15.7317077Z  [32m✓[39m src/interfaces/terminal/__tests__/status-bar-wrapping.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+2025-07-05T21:00:16.1612595Z  [32m✓[39m src/commands/system/__tests__/commands.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+2025-07-05T21:00:17.2792805Z  [32m✓[39m src/agents/__tests__/agent-retry-events.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 62[2mms[22m[39m
+2025-07-05T21:00:17.3701597Z  [32m✓[39m src/interfaces/terminal/components/__tests__/file-autocomplete.test.tsx [2m([22m[2m14 tests[22m[2m)[22m[32m 82[2mms[22m[39m
+2025-07-05T21:00:17.4232169Z  [32m✓[39m src/interfaces/terminal/__tests__/turn-state-integration.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[32m 299[2mms[22m[39m
+2025-07-05T21:00:18.2189284Z  [32m✓[39m src/threads/compaction/__tests__/compaction-regression.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2025-07-05T21:00:18.4787817Z  [32m✓[39m src/utils/__tests__/fetch-interceptor.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 41[2mms[22m[39m
+2025-07-05T21:00:19.1216785Z  [32m✓[39m src/interfaces/terminal/__tests__/text-renderer-edge-cases.test.tsx [2m([22m[2m19 tests[22m[2m)[22m[33m 358[2mms[22m[39m
+2025-07-05T21:00:20.0251293Z  [32m✓[39m src/interfaces/terminal/components/events/__tests__/AgentMessageDisplay.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[32m 133[2mms[22m[39m
+2025-07-05T21:00:20.2322109Z  [32m✓[39m src/providers/__tests__/retry-anthropic-provider.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+2025-07-05T21:00:20.8343488Z  [32m✓[39m src/interfaces/terminal/__tests__/retry-status-ui.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[32m 163[2mms[22m[39m
+2025-07-05T21:00:21.4579069Z  [32m✓[39m src/agents/__tests__/agent-token-budget.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 112[2mms[22m[39m
+2025-07-05T21:00:21.7616000Z  [32m✓[39m src/interfaces/terminal/components/events/__tests__/UserMessageDisplay.test.tsx [2m([22m[2m13 tests[22m[2m)[22m[32m 113[2mms[22m[39m
+2025-07-05T21:00:22.1123923Z  [32m✓[39m src/agents/__tests__/agent-turn-tracking.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 138[2mms[22m[39m
+2025-07-05T21:00:23.1362146Z  [32m✓[39m src/providers/__tests__/retry-ollama-provider.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+2025-07-05T21:00:23.1371781Z  [32m✓[39m src/threads/__tests__/compaction-integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 86[2mms[22m[39m
+2025-07-05T21:00:23.3845452Z  [32m✓[39m src/interfaces/terminal/components/events/contexts/TimelineItemContext.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[32m 146[2mms[22m[39m
+2025-07-05T21:00:24.1293505Z  [32m✓[39m src/threads/compaction/__tests__/summarize-strategy.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+2025-07-05T21:00:24.1645618Z  [32m✓[39m src/providers/__tests__/retry-openai-provider.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+2025-07-05T21:00:24.4222845Z  [32m✓[39m src/tools/__tests__/file-read.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+2025-07-05T21:00:25.0754079Z  [32m✓[39m src/utils/__tests__/logger.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+2025-07-05T21:00:25.5540145Z  [32m✓[39m src/tools/utils/file-suggestions.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 109[2mms[22m[39m
+2025-07-05T21:00:26.1773792Z  [32m✓[39m src/interfaces/terminal/components/events/__tests__/TimelineDisplay.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 308[2mms[22m[39m
+2025-07-05T21:00:26.8805285Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould discover and register all existing provider files
+2025-07-05T21:00:26.8807645Z [22m[39m[Registry] 2025-07-05T21:00:26.866Z Starting auto-discovery...
+2025-07-05T21:00:26.8812485Z [Registry] 2025-07-05T21:00:26.867Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:26.8813492Z [Registry] 2025-07-05T21:00:26.867Z Globbing for JS files...
+2025-07-05T21:00:26.8813920Z 
+2025-07-05T21:00:26.8830723Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould discover and register all existing provider files
+2025-07-05T21:00:26.8832659Z [22m[39m[Registry] 2025-07-05T21:00:26.881Z JS glob took 14ms, found: 
+2025-07-05T21:00:26.8833494Z [Registry] 2025-07-05T21:00:26.881Z Globbing for TS files...
+2025-07-05T21:00:26.8833919Z 
+2025-07-05T21:00:26.8928124Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould discover and register all existing provider files
+2025-07-05T21:00:26.8930796Z [22m[39m[Registry] 2025-07-05T21:00:26.892Z TS glob took 11ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:26.8932518Z [Registry] 2025-07-05T21:00:26.892Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:26.8932984Z 
+2025-07-05T21:00:26.8947567Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould discover and register all existing provider files
+2025-07-05T21:00:26.8949398Z [22m[39m[Registry] 2025-07-05T21:00:26.892Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:26.8952791Z [Registry] 2025-07-05T21:00:26.894Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:26.8968494Z 
+2025-07-05T21:00:26.8970533Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould discover and register all existing provider files
+2025-07-05T21:00:26.8973335Z [22m[39m[Registry] 2025-07-05T21:00:26.894Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:26.8974942Z [Registry] 2025-07-05T21:00:26.895Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:26.8975673Z 
+2025-07-05T21:00:26.8977442Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould discover and register all existing provider files
+2025-07-05T21:00:26.8979937Z [22m[39m[Registry] 2025-07-05T21:00:26.895Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:26.8981522Z [Registry] 2025-07-05T21:00:26.895Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:26.8982254Z 
+2025-07-05T21:00:26.8984010Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould discover and register all existing provider files
+2025-07-05T21:00:26.8989326Z [22m[39m[Registry] 2025-07-05T21:00:26.895Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:26.8991427Z [Registry] 2025-07-05T21:00:26.895Z Auto-discovery completed in 28ms
+2025-07-05T21:00:26.8992260Z 
+2025-07-05T21:00:26.8994892Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould register providers with correct instances
+2025-07-05T21:00:26.8998492Z [22m[39m[Registry] 2025-07-05T21:00:26.896Z Starting auto-discovery...
+2025-07-05T21:00:26.9000531Z [Registry] 2025-07-05T21:00:26.897Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:26.9001798Z [Registry] 2025-07-05T21:00:26.897Z Globbing for JS files...
+2025-07-05T21:00:26.9003302Z 
+2025-07-05T21:00:26.9004952Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould register providers with correct instances
+2025-07-05T21:00:26.9006678Z [22m[39m[Registry] 2025-07-05T21:00:26.898Z JS glob took 1ms, found: 
+2025-07-05T21:00:26.9007491Z [Registry] 2025-07-05T21:00:26.898Z Globbing for TS files...
+2025-07-05T21:00:26.9007915Z 
+2025-07-05T21:00:26.9012556Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould register providers with correct instances
+2025-07-05T21:00:26.9016924Z [22m[39m[Registry] 2025-07-05T21:00:26.900Z TS glob took 2ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:26.9024561Z [Registry] 2025-07-05T21:00:26.900Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:26.9025291Z 
+2025-07-05T21:00:26.9026971Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould register providers with correct instances
+2025-07-05T21:00:26.9029473Z [22m[39m[Registry] 2025-07-05T21:00:26.900Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:26.9030954Z [Registry] 2025-07-05T21:00:26.900Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:26.9031657Z 
+2025-07-05T21:00:26.9033356Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould register providers with correct instances
+2025-07-05T21:00:26.9035827Z [22m[39m[Registry] 2025-07-05T21:00:26.900Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:26.9037304Z [Registry] 2025-07-05T21:00:26.901Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:26.9037992Z 
+2025-07-05T21:00:26.9039799Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould register providers with correct instances
+2025-07-05T21:00:26.9041758Z [22m[39m[Registry] 2025-07-05T21:00:26.901Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:26.9043096Z [Registry] 2025-07-05T21:00:26.901Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:26.9043719Z 
+2025-07-05T21:00:26.9045172Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould register providers with correct instances
+2025-07-05T21:00:26.9047127Z [22m[39m[Registry] 2025-07-05T21:00:26.901Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:26.9048447Z [Registry] 2025-07-05T21:00:26.901Z Auto-discovery completed in 4ms
+2025-07-05T21:00:26.9049995Z 
+2025-07-05T21:00:26.9069458Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould only discover files matching *-provider.ts pattern
+2025-07-05T21:00:26.9099324Z [22m[39m[Registry] 2025-07-05T21:00:26.902Z Starting auto-discovery...
+2025-07-05T21:00:26.9100387Z [Registry] 2025-07-05T21:00:26.902Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:26.9101296Z [Registry] 2025-07-05T21:00:26.902Z Globbing for JS files...
+2025-07-05T21:00:26.9101682Z 
+2025-07-05T21:00:26.9103388Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould only discover files matching *-provider.ts pattern
+2025-07-05T21:00:26.9105117Z [22m[39m[Registry] 2025-07-05T21:00:26.906Z JS glob took 4ms, found: 
+2025-07-05T21:00:26.9105900Z [Registry] 2025-07-05T21:00:26.906Z Globbing for TS files...
+2025-07-05T21:00:26.9106289Z 
+2025-07-05T21:00:26.9107954Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould only discover files matching *-provider.ts pattern
+2025-07-05T21:00:26.9112343Z [22m[39m[Registry] 2025-07-05T21:00:26.908Z TS glob took 2ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:26.9115116Z [Registry] 2025-07-05T21:00:26.908Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:26.9115809Z 
+2025-07-05T21:00:26.9117482Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould only discover files matching *-provider.ts pattern
+2025-07-05T21:00:26.9119841Z [22m[39m[Registry] 2025-07-05T21:00:26.908Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:26.9121302Z [Registry] 2025-07-05T21:00:26.908Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:26.9121964Z 
+2025-07-05T21:00:26.9127733Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould only discover files matching *-provider.ts pattern
+2025-07-05T21:00:26.9130210Z [22m[39m[Registry] 2025-07-05T21:00:26.908Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:26.9134766Z [Registry] 2025-07-05T21:00:26.909Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:26.9135539Z 
+2025-07-05T21:00:26.9137269Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould only discover files matching *-provider.ts pattern
+2025-07-05T21:00:26.9139650Z [22m[39m[Registry] 2025-07-05T21:00:26.909Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:26.9141129Z [Registry] 2025-07-05T21:00:26.909Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:26.9141803Z 
+2025-07-05T21:00:26.9143436Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould only discover files matching *-provider.ts pattern
+2025-07-05T21:00:26.9145567Z [22m[39m[Registry] 2025-07-05T21:00:26.909Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:26.9146933Z [Registry] 2025-07-05T21:00:26.909Z Auto-discovery completed in 7ms
+2025-07-05T21:00:26.9147432Z 
+2025-07-05T21:00:26.9149250Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould handle provider files with missing exports gracefully
+2025-07-05T21:00:26.9150920Z [22m[39m[Registry] 2025-07-05T21:00:26.910Z Starting auto-discovery...
+2025-07-05T21:00:26.9151872Z [Registry] 2025-07-05T21:00:26.910Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:26.9152737Z [Registry] 2025-07-05T21:00:26.910Z Globbing for JS files...
+2025-07-05T21:00:26.9153118Z 
+2025-07-05T21:00:26.9154716Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould handle provider files with missing exports gracefully
+2025-07-05T21:00:26.9156352Z [22m[39m[Registry] 2025-07-05T21:00:26.911Z JS glob took 1ms, found: 
+2025-07-05T21:00:26.9157119Z [Registry] 2025-07-05T21:00:26.911Z Globbing for TS files...
+2025-07-05T21:00:26.9157510Z 
+2025-07-05T21:00:26.9162068Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould handle provider files with missing exports gracefully
+2025-07-05T21:00:26.9166294Z [22m[39m[Registry] 2025-07-05T21:00:26.912Z TS glob took 1ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:26.9169321Z [Registry] 2025-07-05T21:00:26.913Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:26.9170027Z 
+2025-07-05T21:00:26.9174204Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould handle provider files with missing exports gracefully
+2025-07-05T21:00:26.9177749Z [22m[39m[Registry] 2025-07-05T21:00:26.913Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:26.9179546Z [Registry] 2025-07-05T21:00:26.913Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:26.9180255Z 
+2025-07-05T21:00:26.9182023Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould handle provider files with missing exports gracefully
+2025-07-05T21:00:26.9184208Z [22m[39m[Registry] 2025-07-05T21:00:26.913Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:26.9185953Z [Registry] 2025-07-05T21:00:26.914Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:26.9186418Z 
+2025-07-05T21:00:26.9187404Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould handle provider files with missing exports gracefully
+2025-07-05T21:00:26.9188644Z [22m[39m[Registry] 2025-07-05T21:00:26.914Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:26.9189743Z [Registry] 2025-07-05T21:00:26.914Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:26.9190139Z 
+2025-07-05T21:00:26.9191059Z [90mstdout[2m | src/providers/__tests__/provider-registry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcreateWithAutoDiscovery[2m > [22m[2mshould handle provider files with missing exports gracefully
+2025-07-05T21:00:26.9192264Z [22m[39m[Registry] 2025-07-05T21:00:26.914Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:26.9193073Z [Registry] 2025-07-05T21:00:26.914Z Auto-discovery completed in 4ms
+2025-07-05T21:00:26.9193320Z 
+2025-07-05T21:00:26.9199674Z  [32m✓[39m src/providers/__tests__/provider-registry.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 62[2mms[22m[39m
+2025-07-05T21:00:27.3371697Z  [32m✓[39m src/__tests__/cli-integration.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 922[2mms[22m[39m
+2025-07-05T21:00:27.3373576Z    [33m[2m✓[22m[39m CLI Orchestration[2m > [22mcomponent integration[2m > [22mshould integrate Agent with TerminalInterface correctly [33m 898[2mms[22m[39m
+2025-07-05T21:00:27.4245408Z  [32m✓[39m src/commands/__tests__/executor.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+2025-07-05T21:00:27.9669981Z  [32m✓[39m src/providers/__tests__/lmstudio-provider.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+2025-07-05T21:00:28.4543933Z  [32m✓[39m src/interfaces/terminal/components/events/hooks/useTimelineViewport.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+2025-07-05T21:00:28.9219568Z  [32m✓[39m src/interfaces/terminal/__tests__/token-tracking.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+2025-07-05T21:00:29.4805165Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould create providers using auto-discovered registry
+2025-07-05T21:00:29.4809498Z [22m[39m[Registry] 2025-07-05T21:00:29.474Z Starting auto-discovery...
+2025-07-05T21:00:29.4810590Z [Registry] 2025-07-05T21:00:29.475Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:29.4811570Z [Registry] 2025-07-05T21:00:29.475Z Globbing for JS files...
+2025-07-05T21:00:29.4812003Z 
+2025-07-05T21:00:29.4828043Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould create providers using auto-discovered registry
+2025-07-05T21:00:29.4830318Z [22m[39m[Registry] 2025-07-05T21:00:29.481Z JS glob took 6ms, found: 
+2025-07-05T21:00:29.4831188Z [Registry] 2025-07-05T21:00:29.481Z Globbing for TS files...
+2025-07-05T21:00:29.4832665Z 
+2025-07-05T21:00:29.4858030Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould create providers using auto-discovered registry
+2025-07-05T21:00:29.4862653Z [22m[39m[Registry] 2025-07-05T21:00:29.484Z TS glob took 3ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:29.4865892Z [Registry] 2025-07-05T21:00:29.484Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:29.4866559Z 
+2025-07-05T21:00:29.5866067Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould create providers using auto-discovered registry
+2025-07-05T21:00:29.5872719Z [22m[39m[Registry] 2025-07-05T21:00:29.583Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 98ms
+2025-07-05T21:00:29.5878060Z [Registry] 2025-07-05T21:00:29.585Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:29.5882919Z 
+2025-07-05T21:00:29.5962152Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould create providers using auto-discovered registry
+2025-07-05T21:00:29.5971117Z [22m[39m[Registry] 2025-07-05T21:00:29.594Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 9ms
+2025-07-05T21:00:29.5973155Z [Registry] 2025-07-05T21:00:29.595Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:29.5973900Z 
+2025-07-05T21:00:29.6829187Z  [32m✓[39m src/interfaces/terminal/components/events/__tests__/TimelineViewport.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 96[2mms[22m[39m
+2025-07-05T21:00:29.7050563Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould create providers using auto-discovered registry
+2025-07-05T21:00:29.7057679Z [22m[39m[Registry] 2025-07-05T21:00:29.704Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 109ms
+2025-07-05T21:00:29.7059305Z [Registry] 2025-07-05T21:00:29.704Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:29.7060013Z 
+2025-07-05T21:00:29.7627939Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould create providers using auto-discovered registry
+2025-07-05T21:00:29.7630735Z [22m[39m[Registry] 2025-07-05T21:00:29.760Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 56ms
+2025-07-05T21:00:29.7632029Z [Registry] 2025-07-05T21:00:29.761Z Auto-discovery completed in 286ms
+2025-07-05T21:00:29.7632509Z 
+2025-07-05T21:00:29.7686586Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould handle provider creation with proper configuration
+2025-07-05T21:00:29.7688466Z [22m[39m[Registry] 2025-07-05T21:00:29.764Z Starting auto-discovery...
+2025-07-05T21:00:29.7689668Z [Registry] 2025-07-05T21:00:29.764Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:29.7690590Z [Registry] 2025-07-05T21:00:29.764Z Globbing for JS files...
+2025-07-05T21:00:29.7690977Z 
+2025-07-05T21:00:29.7692907Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould handle provider creation with proper configuration
+2025-07-05T21:00:29.7694737Z [22m[39m[Registry] 2025-07-05T21:00:29.766Z JS glob took 2ms, found: 
+2025-07-05T21:00:29.7695531Z [Registry] 2025-07-05T21:00:29.766Z Globbing for TS files...
+2025-07-05T21:00:29.7695930Z 
+2025-07-05T21:00:29.7700113Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould handle provider creation with proper configuration
+2025-07-05T21:00:29.7705723Z [22m[39m[Registry] 2025-07-05T21:00:29.769Z TS glob took 3ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:29.7710191Z [Registry] 2025-07-05T21:00:29.769Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:29.7710870Z 
+2025-07-05T21:00:29.7712784Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould handle provider creation with proper configuration
+2025-07-05T21:00:29.7715597Z [22m[39m[Registry] 2025-07-05T21:00:29.769Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:29.7717016Z [Registry] 2025-07-05T21:00:29.769Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:29.7717654Z 
+2025-07-05T21:00:29.7723260Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould handle provider creation with proper configuration
+2025-07-05T21:00:29.7725939Z [22m[39m[Registry] 2025-07-05T21:00:29.770Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:29.7727467Z [Registry] 2025-07-05T21:00:29.771Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:29.7728179Z 
+2025-07-05T21:00:29.7734642Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould handle provider creation with proper configuration
+2025-07-05T21:00:29.7737156Z [22m[39m[Registry] 2025-07-05T21:00:29.771Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:29.7738761Z [Registry] 2025-07-05T21:00:29.771Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:29.7739753Z 
+2025-07-05T21:00:29.7741784Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould handle provider creation with proper configuration
+2025-07-05T21:00:29.7744218Z [22m[39m[Registry] 2025-07-05T21:00:29.772Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 1ms
+2025-07-05T21:00:29.7745408Z [Registry] 2025-07-05T21:00:29.772Z Auto-discovery completed in 8ms
+2025-07-05T21:00:29.7749141Z 
+2025-07-05T21:00:29.7750985Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould provide list of available provider names
+2025-07-05T21:00:29.7752892Z [22m[39m[Registry] 2025-07-05T21:00:29.773Z Starting auto-discovery...
+2025-07-05T21:00:29.7753953Z [Registry] 2025-07-05T21:00:29.773Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:29.7755408Z [Registry] 2025-07-05T21:00:29.773Z Globbing for JS files...
+2025-07-05T21:00:29.7755822Z 
+2025-07-05T21:00:29.7758283Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould provide list of available provider names
+2025-07-05T21:00:29.7760368Z [22m[39m[Registry] 2025-07-05T21:00:29.774Z JS glob took 1ms, found: 
+2025-07-05T21:00:29.7761205Z [Registry] 2025-07-05T21:00:29.774Z Globbing for TS files...
+2025-07-05T21:00:29.7761607Z 
+2025-07-05T21:00:29.7766191Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould provide list of available provider names
+2025-07-05T21:00:29.7771983Z [22m[39m[Registry] 2025-07-05T21:00:29.775Z TS glob took 1ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:29.7774934Z [Registry] 2025-07-05T21:00:29.776Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:29.7775804Z 
+2025-07-05T21:00:29.7777654Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould provide list of available provider names
+2025-07-05T21:00:29.7780526Z [22m[39m[Registry] 2025-07-05T21:00:29.776Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:29.7781945Z [Registry] 2025-07-05T21:00:29.776Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:29.7782803Z 
+2025-07-05T21:00:29.7784626Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould provide list of available provider names
+2025-07-05T21:00:29.7786879Z [22m[39m[Registry] 2025-07-05T21:00:29.776Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:29.7788369Z [Registry] 2025-07-05T21:00:29.777Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:29.7789278Z 
+2025-07-05T21:00:29.7791110Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould provide list of available provider names
+2025-07-05T21:00:29.7793360Z [22m[39m[Registry] 2025-07-05T21:00:29.777Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:29.7794844Z [Registry] 2025-07-05T21:00:29.777Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:29.7795515Z 
+2025-07-05T21:00:29.7797368Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould provide list of available provider names
+2025-07-05T21:00:29.7799837Z [22m[39m[Registry] 2025-07-05T21:00:29.777Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:29.7801005Z [Registry] 2025-07-05T21:00:29.777Z Auto-discovery completed in 4ms
+2025-07-05T21:00:29.7801427Z 
+2025-07-05T21:00:29.7812440Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould handle unknown provider names gracefully
+2025-07-05T21:00:29.7820084Z [22m[39m[Registry] 2025-07-05T21:00:29.780Z Starting auto-discovery...
+2025-07-05T21:00:29.7821075Z [Registry] 2025-07-05T21:00:29.780Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:29.7821936Z [Registry] 2025-07-05T21:00:29.780Z Globbing for JS files...
+2025-07-05T21:00:29.7822312Z 
+2025-07-05T21:00:29.7826736Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould handle unknown provider names gracefully
+2025-07-05T21:00:29.7828490Z [22m[39m[Registry] 2025-07-05T21:00:29.781Z JS glob took 1ms, found: 
+2025-07-05T21:00:29.7829480Z [Registry] 2025-07-05T21:00:29.781Z Globbing for TS files...
+2025-07-05T21:00:29.7829877Z 
+2025-07-05T21:00:29.7841232Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould handle unknown provider names gracefully
+2025-07-05T21:00:29.7863948Z [22m[39m[Registry] 2025-07-05T21:00:29.783Z TS glob took 2ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:29.7866877Z [Registry] 2025-07-05T21:00:29.783Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:29.7867594Z 
+2025-07-05T21:00:29.7869700Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould handle unknown provider names gracefully
+2025-07-05T21:00:29.7872119Z [22m[39m[Registry] 2025-07-05T21:00:29.783Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:29.7873818Z [Registry] 2025-07-05T21:00:29.783Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:29.7874482Z 
+2025-07-05T21:00:29.7876764Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould handle unknown provider names gracefully
+2025-07-05T21:00:29.7920838Z [22m[39m[Registry] 2025-07-05T21:00:29.783Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:29.7922632Z [Registry] 2025-07-05T21:00:29.784Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:29.7923484Z 
+2025-07-05T21:00:29.7925597Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould handle unknown provider names gracefully
+2025-07-05T21:00:29.7927897Z [22m[39m[Registry] 2025-07-05T21:00:29.784Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:29.7929600Z [Registry] 2025-07-05T21:00:29.784Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:29.7930332Z 
+2025-07-05T21:00:29.7932211Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Creation with Auto-Discovery[2m > [22m[2mshould handle unknown provider names gracefully
+2025-07-05T21:00:29.7934513Z [22m[39m[Registry] 2025-07-05T21:00:29.784Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:29.7935701Z [Registry] 2025-07-05T21:00:29.784Z Auto-discovery completed in 4ms
+2025-07-05T21:00:29.7936140Z 
+2025-07-05T21:00:29.7938222Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould validate provider names against auto-discovered providers
+2025-07-05T21:00:29.7940415Z [22m[39m[Registry] 2025-07-05T21:00:29.785Z Starting auto-discovery...
+2025-07-05T21:00:29.7941456Z [Registry] 2025-07-05T21:00:29.785Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:29.7942375Z [Registry] 2025-07-05T21:00:29.785Z Globbing for JS files...
+2025-07-05T21:00:29.7942761Z 
+2025-07-05T21:00:29.7944823Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould validate provider names against auto-discovered providers
+2025-07-05T21:00:29.7962953Z [22m[39m[Registry] 2025-07-05T21:00:29.788Z JS glob took 3ms, found: 
+2025-07-05T21:00:29.7963777Z [Registry] 2025-07-05T21:00:29.789Z Globbing for TS files...
+2025-07-05T21:00:29.7964174Z 
+2025-07-05T21:00:29.7966523Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould validate provider names against auto-discovered providers
+2025-07-05T21:00:29.7971156Z [22m[39m[Registry] 2025-07-05T21:00:29.790Z TS glob took 1ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:29.7973888Z [Registry] 2025-07-05T21:00:29.790Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:29.7974558Z 
+2025-07-05T21:00:29.7976721Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould validate provider names against auto-discovered providers
+2025-07-05T21:00:29.7979601Z [22m[39m[Registry] 2025-07-05T21:00:29.790Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:29.7981098Z [Registry] 2025-07-05T21:00:29.790Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:29.7981804Z 
+2025-07-05T21:00:29.7983931Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould validate provider names against auto-discovered providers
+2025-07-05T21:00:29.7986275Z [22m[39m[Registry] 2025-07-05T21:00:29.791Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 1ms
+2025-07-05T21:00:29.7987715Z [Registry] 2025-07-05T21:00:29.791Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:29.7988291Z 
+2025-07-05T21:00:29.8020824Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould validate provider names against auto-discovered providers
+2025-07-05T21:00:29.8023269Z [22m[39m[Registry] 2025-07-05T21:00:29.792Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 1ms
+2025-07-05T21:00:29.8024810Z [Registry] 2025-07-05T21:00:29.792Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:29.8025549Z 
+2025-07-05T21:00:29.8027679Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould validate provider names against auto-discovered providers
+2025-07-05T21:00:29.8030446Z [22m[39m[Registry] 2025-07-05T21:00:29.792Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:29.8031724Z [Registry] 2025-07-05T21:00:29.792Z Auto-discovery completed in 7ms
+2025-07-05T21:00:29.8032201Z 
+2025-07-05T21:00:29.8034325Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould generate dynamic help text from available providers
+2025-07-05T21:00:29.8036296Z [22m[39m[Registry] 2025-07-05T21:00:29.793Z Starting auto-discovery...
+2025-07-05T21:00:29.8037352Z [Registry] 2025-07-05T21:00:29.793Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:29.8038294Z [Registry] 2025-07-05T21:00:29.793Z Globbing for JS files...
+2025-07-05T21:00:29.8038697Z 
+2025-07-05T21:00:29.8040823Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould generate dynamic help text from available providers
+2025-07-05T21:00:29.8043003Z [22m[39m[Registry] 2025-07-05T21:00:29.794Z JS glob took 1ms, found: 
+2025-07-05T21:00:29.8043795Z [Registry] 2025-07-05T21:00:29.794Z Globbing for TS files...
+2025-07-05T21:00:29.8044165Z 
+2025-07-05T21:00:29.8046068Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould generate dynamic help text from available providers
+2025-07-05T21:00:29.8110390Z [22m[39m[Registry] 2025-07-05T21:00:29.801Z TS glob took 7ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:29.8113098Z [Registry] 2025-07-05T21:00:29.801Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:29.8113739Z 
+2025-07-05T21:00:29.8115730Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould generate dynamic help text from available providers
+2025-07-05T21:00:29.8118221Z [22m[39m[Registry] 2025-07-05T21:00:29.801Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:29.8119788Z [Registry] 2025-07-05T21:00:29.801Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:29.8120438Z 
+2025-07-05T21:00:29.8122355Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould generate dynamic help text from available providers
+2025-07-05T21:00:29.8124603Z [22m[39m[Registry] 2025-07-05T21:00:29.801Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:29.8126021Z [Registry] 2025-07-05T21:00:29.802Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:29.8126698Z 
+2025-07-05T21:00:29.8128687Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould generate dynamic help text from available providers
+2025-07-05T21:00:29.8131359Z [22m[39m[Registry] 2025-07-05T21:00:29.802Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:29.8132911Z [Registry] 2025-07-05T21:00:29.802Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:29.8139632Z 
+2025-07-05T21:00:29.8161869Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould generate dynamic help text from available providers
+2025-07-05T21:00:29.8164459Z [22m[39m[Registry] 2025-07-05T21:00:29.802Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:29.8165698Z [Registry] 2025-07-05T21:00:29.803Z Auto-discovery completed in 10ms
+2025-07-05T21:00:29.8166155Z 
+2025-07-05T21:00:29.8168291Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould handle provider validation errors with helpful messages
+2025-07-05T21:00:29.8170513Z [22m[39m[Registry] 2025-07-05T21:00:29.803Z Starting auto-discovery...
+2025-07-05T21:00:29.8171543Z [Registry] 2025-07-05T21:00:29.803Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:29.8172478Z [Registry] 2025-07-05T21:00:29.803Z Globbing for JS files...
+2025-07-05T21:00:29.8172887Z 
+2025-07-05T21:00:29.8175178Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould handle provider validation errors with helpful messages
+2025-07-05T21:00:29.8177221Z [22m[39m[Registry] 2025-07-05T21:00:29.805Z JS glob took 2ms, found: 
+2025-07-05T21:00:29.8178061Z [Registry] 2025-07-05T21:00:29.805Z Globbing for TS files...
+2025-07-05T21:00:29.8178471Z 
+2025-07-05T21:00:29.8180723Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould handle provider validation errors with helpful messages
+2025-07-05T21:00:29.8185129Z [22m[39m[Registry] 2025-07-05T21:00:29.806Z TS glob took 1ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:29.8188166Z [Registry] 2025-07-05T21:00:29.806Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:29.8219135Z 
+2025-07-05T21:00:29.8221318Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould handle provider validation errors with helpful messages
+2025-07-05T21:00:29.8223809Z [22m[39m[Registry] 2025-07-05T21:00:29.806Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:29.8225347Z [Registry] 2025-07-05T21:00:29.806Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:29.8226057Z 
+2025-07-05T21:00:29.8228150Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould handle provider validation errors with helpful messages
+2025-07-05T21:00:29.8230779Z [22m[39m[Registry] 2025-07-05T21:00:29.806Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:29.8232314Z [Registry] 2025-07-05T21:00:29.807Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:29.8233036Z 
+2025-07-05T21:00:29.8235094Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould handle provider validation errors with helpful messages
+2025-07-05T21:00:29.8237563Z [22m[39m[Registry] 2025-07-05T21:00:29.807Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:29.8239272Z [Registry] 2025-07-05T21:00:29.807Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:29.8240008Z 
+2025-07-05T21:00:29.8242093Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mCLI Argument Validation with Auto-Discovery[2m > [22m[2mshould handle provider validation errors with helpful messages
+2025-07-05T21:00:29.8244579Z [22m[39m[Registry] 2025-07-05T21:00:29.807Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:29.8245783Z [Registry] 2025-07-05T21:00:29.807Z Auto-discovery completed in 4ms
+2025-07-05T21:00:29.8246235Z 
+2025-07-05T21:00:29.8248168Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould support adding new providers without CLI changes
+2025-07-05T21:00:29.8280339Z [22m[39m[Registry] 2025-07-05T21:00:29.808Z Starting auto-discovery...
+2025-07-05T21:00:29.8281577Z [Registry] 2025-07-05T21:00:29.808Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:29.8282486Z [Registry] 2025-07-05T21:00:29.808Z Globbing for JS files...
+2025-07-05T21:00:29.8282865Z 
+2025-07-05T21:00:29.8284617Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould support adding new providers without CLI changes
+2025-07-05T21:00:29.8286422Z [22m[39m[Registry] 2025-07-05T21:00:29.809Z JS glob took 1ms, found: 
+2025-07-05T21:00:29.8287196Z [Registry] 2025-07-05T21:00:29.809Z Globbing for TS files...
+2025-07-05T21:00:29.8287584Z 
+2025-07-05T21:00:29.8289671Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould support adding new providers without CLI changes
+2025-07-05T21:00:29.8294140Z [22m[39m[Registry] 2025-07-05T21:00:29.810Z TS glob took 1ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:29.8328321Z [Registry] 2025-07-05T21:00:29.810Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:29.8329232Z 
+2025-07-05T21:00:29.8331207Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould support adding new providers without CLI changes
+2025-07-05T21:00:29.8333644Z [22m[39m[Registry] 2025-07-05T21:00:29.811Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 1ms
+2025-07-05T21:00:29.8335159Z [Registry] 2025-07-05T21:00:29.811Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:29.8335863Z 
+2025-07-05T21:00:29.8337805Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould support adding new providers without CLI changes
+2025-07-05T21:00:29.8340409Z [22m[39m[Registry] 2025-07-05T21:00:29.812Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 1ms
+2025-07-05T21:00:29.8341947Z [Registry] 2025-07-05T21:00:29.812Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:29.8342669Z 
+2025-07-05T21:00:29.8344597Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould support adding new providers without CLI changes
+2025-07-05T21:00:29.8347067Z [22m[39m[Registry] 2025-07-05T21:00:29.813Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 1ms
+2025-07-05T21:00:29.8348675Z [Registry] 2025-07-05T21:00:29.813Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:29.8349597Z 
+2025-07-05T21:00:29.8351443Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould support adding new providers without CLI changes
+2025-07-05T21:00:29.8353506Z [22m[39m[Registry] 2025-07-05T21:00:29.813Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:29.8354639Z [Registry] 2025-07-05T21:00:29.813Z Auto-discovery completed in 5ms
+2025-07-05T21:00:29.8355055Z 
+2025-07-05T21:00:29.8357051Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould maintain provider consistency across registry operations
+2025-07-05T21:00:29.8359314Z [22m[39m[Registry] 2025-07-05T21:00:29.814Z Starting auto-discovery...
+2025-07-05T21:00:29.8360316Z [Registry] 2025-07-05T21:00:29.814Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:29.8361208Z [Registry] 2025-07-05T21:00:29.814Z Globbing for JS files...
+2025-07-05T21:00:29.8361564Z 
+2025-07-05T21:00:29.8365036Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould maintain provider consistency across registry operations
+2025-07-05T21:00:29.8366945Z [22m[39m[Registry] 2025-07-05T21:00:29.816Z JS glob took 2ms, found: 
+2025-07-05T21:00:29.8367722Z [Registry] 2025-07-05T21:00:29.816Z Globbing for TS files...
+2025-07-05T21:00:29.8368108Z 
+2025-07-05T21:00:29.8370217Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould maintain provider consistency across registry operations
+2025-07-05T21:00:29.8374556Z [22m[39m[Registry] 2025-07-05T21:00:29.817Z TS glob took 1ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:29.8377594Z [Registry] 2025-07-05T21:00:29.817Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:29.8378257Z 
+2025-07-05T21:00:29.8400606Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould maintain provider consistency across registry operations
+2025-07-05T21:00:29.8402927Z [22m[39m[Registry] 2025-07-05T21:00:29.817Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:29.8404314Z [Registry] 2025-07-05T21:00:29.818Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:29.8404961Z 
+2025-07-05T21:00:29.8406796Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould maintain provider consistency across registry operations
+2025-07-05T21:00:29.8409368Z [22m[39m[Registry] 2025-07-05T21:00:29.818Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:29.8410764Z [Registry] 2025-07-05T21:00:29.818Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:29.8411377Z 
+2025-07-05T21:00:29.8413115Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould maintain provider consistency across registry operations
+2025-07-05T21:00:29.8415196Z [22m[39m[Registry] 2025-07-05T21:00:29.818Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:29.8416519Z [Registry] 2025-07-05T21:00:29.818Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:29.8417122Z 
+2025-07-05T21:00:29.8418998Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould maintain provider consistency across registry operations
+2025-07-05T21:00:29.8421303Z [22m[39m[Registry] 2025-07-05T21:00:29.818Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:29.8422333Z [Registry] 2025-07-05T21:00:29.819Z Auto-discovery completed in 5ms
+2025-07-05T21:00:29.8422714Z 
+2025-07-05T21:00:29.8424627Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould maintain provider consistency across registry operations
+2025-07-05T21:00:29.8426300Z [22m[39m[Registry] 2025-07-05T21:00:29.819Z Starting auto-discovery...
+2025-07-05T21:00:29.8427179Z [Registry] 2025-07-05T21:00:29.819Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:29.8427974Z [Registry] 2025-07-05T21:00:29.819Z Globbing for JS files...
+2025-07-05T21:00:29.8428320Z 
+2025-07-05T21:00:29.8430247Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould maintain provider consistency across registry operations
+2025-07-05T21:00:29.8431880Z [22m[39m[Registry] 2025-07-05T21:00:29.821Z JS glob took 2ms, found: 
+2025-07-05T21:00:29.8432573Z [Registry] 2025-07-05T21:00:29.821Z Globbing for TS files...
+2025-07-05T21:00:29.8432943Z 
+2025-07-05T21:00:29.8434809Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould maintain provider consistency across registry operations
+2025-07-05T21:00:29.8439688Z [22m[39m[Registry] 2025-07-05T21:00:29.823Z TS glob took 2ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:29.8442363Z [Registry] 2025-07-05T21:00:29.823Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:29.8443008Z 
+2025-07-05T21:00:29.8444907Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould maintain provider consistency across registry operations
+2025-07-05T21:00:29.8447148Z [22m[39m[Registry] 2025-07-05T21:00:29.823Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:29.8448546Z [Registry] 2025-07-05T21:00:29.824Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:29.8449332Z 
+2025-07-05T21:00:29.8451228Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould maintain provider consistency across registry operations
+2025-07-05T21:00:29.8453502Z [22m[39m[Registry] 2025-07-05T21:00:29.824Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:29.8454893Z [Registry] 2025-07-05T21:00:29.824Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:29.8455600Z 
+2025-07-05T21:00:29.8457599Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould maintain provider consistency across registry operations
+2025-07-05T21:00:29.8460193Z [22m[39m[Registry] 2025-07-05T21:00:29.824Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:29.8461718Z [Registry] 2025-07-05T21:00:29.825Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:29.8462410Z 
+2025-07-05T21:00:29.8464332Z [90mstdout[2m | src/cli/__tests__/auto-discovery-integration.test.ts[2m > [22m[2mCLI Auto-Discovery Integration[2m > [22m[2mProvider Registration Flexibility[2m > [22m[2mshould maintain provider consistency across registry operations
+2025-07-05T21:00:29.8466605Z [22m[39m[Registry] 2025-07-05T21:00:29.825Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:29.8469913Z [Registry] 2025-07-05T21:00:29.825Z Auto-discovery completed in 6ms
+2025-07-05T21:00:29.8470315Z 
+2025-07-05T21:00:29.8471326Z  [32m✓[39m src/cli/__tests__/auto-discovery-integration.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 355[2mms[22m[39m
+2025-07-05T21:00:30.0399749Z  [32m✓[39m src/commands/__tests__/integration.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 60[2mms[22m[39m
+2025-07-05T21:00:31.0041168Z  [32m✓[39m src/providers/__tests__/abort-signal-integration.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+2025-07-05T21:00:31.5165416Z  [32m✓[39m src/interfaces/terminal/components/events/tool-renderers/DelegateToolRenderer.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 88[2mms[22m[39m
+2025-07-05T21:00:32.0127684Z  [32m✓[39m src/interfaces/terminal/components/events/__tests__/EventDisplay.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 106[2mms[22m[39m
+2025-07-05T21:00:32.0436228Z  [32m✓[39m src/commands/__tests__/registry.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+2025-07-05T21:00:32.5534415Z  [32m✓[39m src/interfaces/terminal/components/events/utils/__tests__/thinking-parser.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+2025-07-05T21:00:33.0252646Z  [32m✓[39m src/threads/__tests__/thread-compaction.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+2025-07-05T21:00:33.0513573Z  [32m✓[39m src/tools/tool.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2025-07-05T21:00:33.4867314Z  [32m✓[39m src/tools/implementations/__tests__/task-note-management.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+2025-07-05T21:00:34.0413290Z  [32m✓[39m src/tools/__tests__/types.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+2025-07-05T21:00:34.0619209Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould generate help text with all auto-discovered providers
+2025-07-05T21:00:34.0620916Z [22m[39m[Registry] 2025-07-05T21:00:34.052Z Starting auto-discovery...
+2025-07-05T21:00:34.0622358Z [Registry] 2025-07-05T21:00:34.054Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:34.0623400Z [Registry] 2025-07-05T21:00:34.054Z Globbing for JS files...
+2025-07-05T21:00:34.0623955Z 
+2025-07-05T21:00:34.0649112Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould generate help text with all auto-discovered providers
+2025-07-05T21:00:34.0650587Z [22m[39m[Registry] 2025-07-05T21:00:34.063Z JS glob took 9ms, found: 
+2025-07-05T21:00:34.0651363Z [Registry] 2025-07-05T21:00:34.063Z Globbing for TS files...
+2025-07-05T21:00:34.0651754Z 
+2025-07-05T21:00:34.0692749Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould generate help text with all auto-discovered providers
+2025-07-05T21:00:34.0696485Z [22m[39m[Registry] 2025-07-05T21:00:34.068Z TS glob took 5ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:34.0699496Z [Registry] 2025-07-05T21:00:34.068Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:34.0700198Z 
+2025-07-05T21:00:34.1649511Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould generate help text with all auto-discovered providers
+2025-07-05T21:00:34.1651512Z [22m[39m[Registry] 2025-07-05T21:00:34.160Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 92ms
+2025-07-05T21:00:34.1652995Z [Registry] 2025-07-05T21:00:34.162Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:34.1653672Z 
+2025-07-05T21:00:34.1736990Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould generate help text with all auto-discovered providers
+2025-07-05T21:00:34.1748603Z [22m[39m[Registry] 2025-07-05T21:00:34.172Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 10ms
+2025-07-05T21:00:34.1750301Z [Registry] 2025-07-05T21:00:34.172Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:34.1750990Z 
+2025-07-05T21:00:34.2485879Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould generate help text with all auto-discovered providers
+2025-07-05T21:00:34.2488112Z [22m[39m[Registry] 2025-07-05T21:00:34.246Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 74ms
+2025-07-05T21:00:34.2489929Z [Registry] 2025-07-05T21:00:34.246Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:34.2490675Z 
+2025-07-05T21:00:34.3161236Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould generate help text with all auto-discovered providers
+2025-07-05T21:00:34.3164156Z [22m[39m[Registry] 2025-07-05T21:00:34.310Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 64ms
+2025-07-05T21:00:34.3165635Z [Registry] 2025-07-05T21:00:34.311Z Auto-discovery completed in 257ms
+2025-07-05T21:00:34.3166351Z 
+2025-07-05T21:00:34.3167931Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould handle dynamic provider lists in help generation
+2025-07-05T21:00:34.3169837Z [22m[39m[Registry] 2025-07-05T21:00:34.314Z Starting auto-discovery...
+2025-07-05T21:00:34.3171051Z [Registry] 2025-07-05T21:00:34.314Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:34.3172138Z [Registry] 2025-07-05T21:00:34.314Z Globbing for JS files...
+2025-07-05T21:00:34.3172693Z 
+2025-07-05T21:00:34.3205728Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould handle dynamic provider lists in help generation
+2025-07-05T21:00:34.3207191Z [22m[39m[Registry] 2025-07-05T21:00:34.319Z JS glob took 5ms, found: 
+2025-07-05T21:00:34.3208718Z [Registry] 2025-07-05T21:00:34.319Z Globbing for TS files...
+2025-07-05T21:00:34.3209283Z 
+2025-07-05T21:00:34.3290953Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould handle dynamic provider lists in help generation
+2025-07-05T21:00:34.3295144Z [22m[39m[Registry] 2025-07-05T21:00:34.321Z TS glob took 2ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:34.3298254Z [Registry] 2025-07-05T21:00:34.321Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:34.3299356Z 
+2025-07-05T21:00:34.3300830Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould handle dynamic provider lists in help generation
+2025-07-05T21:00:34.3302716Z [22m[39m[Registry] 2025-07-05T21:00:34.322Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 1ms
+2025-07-05T21:00:34.3304286Z [Registry] 2025-07-05T21:00:34.322Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:34.3305013Z 
+2025-07-05T21:00:34.3306436Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould handle dynamic provider lists in help generation
+2025-07-05T21:00:34.3310089Z [22m[39m[Registry] 2025-07-05T21:00:34.322Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:34.3311874Z [Registry] 2025-07-05T21:00:34.323Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:34.3312637Z 
+2025-07-05T21:00:34.3314002Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould handle dynamic provider lists in help generation
+2025-07-05T21:00:34.3315992Z [22m[39m[Registry] 2025-07-05T21:00:34.323Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:34.3317536Z [Registry] 2025-07-05T21:00:34.323Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:34.3318251Z 
+2025-07-05T21:00:34.3319893Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould handle dynamic provider lists in help generation
+2025-07-05T21:00:34.3321941Z [22m[39m[Registry] 2025-07-05T21:00:34.323Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:34.3323168Z [Registry] 2025-07-05T21:00:34.326Z Auto-discovery completed in 12ms
+2025-07-05T21:00:34.3323843Z 
+2025-07-05T21:00:34.3325070Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould format provider list consistently
+2025-07-05T21:00:34.3326490Z [22m[39m[Registry] 2025-07-05T21:00:34.327Z Starting auto-discovery...
+2025-07-05T21:00:34.3327523Z [Registry] 2025-07-05T21:00:34.327Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:34.3328461Z [Registry] 2025-07-05T21:00:34.327Z Globbing for JS files...
+2025-07-05T21:00:34.3329047Z 
+2025-07-05T21:00:34.3330283Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould format provider list consistently
+2025-07-05T21:00:34.3331681Z [22m[39m[Registry] 2025-07-05T21:00:34.328Z JS glob took 1ms, found: 
+2025-07-05T21:00:34.3332486Z [Registry] 2025-07-05T21:00:34.328Z Globbing for TS files...
+2025-07-05T21:00:34.3332892Z 
+2025-07-05T21:00:34.3394243Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould format provider list consistently
+2025-07-05T21:00:34.3399502Z [22m[39m[Registry] 2025-07-05T21:00:34.336Z TS glob took 8ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:34.3418228Z [Registry] 2025-07-05T21:00:34.336Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:34.3419158Z 
+2025-07-05T21:00:34.3420370Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould format provider list consistently
+2025-07-05T21:00:34.3422212Z [22m[39m[Registry] 2025-07-05T21:00:34.336Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:34.3423806Z [Registry] 2025-07-05T21:00:34.336Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:34.3424508Z 
+2025-07-05T21:00:34.3425749Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould format provider list consistently
+2025-07-05T21:00:34.3427646Z [22m[39m[Registry] 2025-07-05T21:00:34.336Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:34.3429372Z [Registry] 2025-07-05T21:00:34.337Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:34.3430074Z 
+2025-07-05T21:00:34.3431273Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould format provider list consistently
+2025-07-05T21:00:34.3433109Z [22m[39m[Registry] 2025-07-05T21:00:34.337Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:34.3434858Z [Registry] 2025-07-05T21:00:34.337Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:34.3435624Z 
+2025-07-05T21:00:34.3436884Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould format provider list consistently
+2025-07-05T21:00:34.3439065Z [22m[39m[Registry] 2025-07-05T21:00:34.337Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:34.3440314Z [Registry] 2025-07-05T21:00:34.337Z Auto-discovery completed in 10ms
+2025-07-05T21:00:34.3440772Z 
+2025-07-05T21:00:34.3442131Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould generate dynamic help text in showHelp function
+2025-07-05T21:00:34.3443670Z [22m[39m[Registry] 2025-07-05T21:00:34.338Z Starting auto-discovery...
+2025-07-05T21:00:34.3444713Z [Registry] 2025-07-05T21:00:34.338Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:34.3445908Z [Registry] 2025-07-05T21:00:34.338Z Globbing for JS files...
+2025-07-05T21:00:34.3446309Z 
+2025-07-05T21:00:34.3447661Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould generate dynamic help text in showHelp function
+2025-07-05T21:00:34.3493803Z [22m[39m[Registry] 2025-07-05T21:00:34.340Z JS glob took 1ms, found: 
+2025-07-05T21:00:34.3494617Z [Registry] 2025-07-05T21:00:34.340Z Globbing for TS files...
+2025-07-05T21:00:34.3495009Z 
+2025-07-05T21:00:34.3496381Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould generate dynamic help text in showHelp function
+2025-07-05T21:00:34.3500504Z [22m[39m[Registry] 2025-07-05T21:00:34.345Z TS glob took 5ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:34.3503409Z [Registry] 2025-07-05T21:00:34.345Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:34.3504181Z 
+2025-07-05T21:00:34.3505603Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould generate dynamic help text in showHelp function
+2025-07-05T21:00:34.3507626Z [22m[39m[Registry] 2025-07-05T21:00:34.345Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:34.3509383Z [Registry] 2025-07-05T21:00:34.345Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:34.3510104Z 
+2025-07-05T21:00:34.3511492Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould generate dynamic help text in showHelp function
+2025-07-05T21:00:34.3513494Z [22m[39m[Registry] 2025-07-05T21:00:34.345Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:34.3515025Z [Registry] 2025-07-05T21:00:34.346Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:34.3515750Z 
+2025-07-05T21:00:34.3517136Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould generate dynamic help text in showHelp function
+2025-07-05T21:00:34.3522206Z [22m[39m[Registry] 2025-07-05T21:00:34.346Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:34.3523798Z [Registry] 2025-07-05T21:00:34.346Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:34.3524493Z 
+2025-07-05T21:00:34.3525834Z [90mstdout[2m | src/cli/__tests__/dynamic-help.test.ts[2m > [22m[2mDynamic Help Text Generation[2m > [22m[2mshould generate dynamic help text in showHelp function
+2025-07-05T21:00:34.3528007Z [22m[39m[Registry] 2025-07-05T21:00:34.346Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:34.3529394Z [Registry] 2025-07-05T21:00:34.346Z Auto-discovery completed in 8ms
+2025-07-05T21:00:34.3529845Z 
+2025-07-05T21:00:34.3530635Z  [32m✓[39m src/cli/__tests__/dynamic-help.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 297[2mms[22m[39m
+2025-07-05T21:00:34.4666538Z  [32m✓[39m src/interfaces/__tests__/agent-message-processing-new.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2025-07-05T21:00:35.0387284Z  [32m✓[39m src/tools/implementations/__tests__/task-manager-enhanced.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+2025-07-05T21:00:35.3391530Z  [32m✓[39m src/threads/__tests__/thread-id-types.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+2025-07-05T21:00:36.0695544Z  [32m✓[39m src/tools/schemas/common.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+2025-07-05T21:00:36.1755635Z  [32m✓[39m src/interfaces/terminal/__tests__/message-display.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 78[2mms[22m[39m
+2025-07-05T21:00:36.9704737Z  [32m✓[39m src/interfaces/terminal/components/events/tool-renderers/GenericToolRenderer.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 66[2mms[22m[39m
+2025-07-05T21:00:37.6389113Z  [32m✓[39m src/interfaces/terminal/components/events/TimelineContent.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+2025-07-05T21:00:37.8252224Z  [32m✓[39m src/interfaces/terminal/components/events/tool-renderers/BashToolRenderer.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 65[2mms[22m[39m
+2025-07-05T21:00:38.8268300Z  [32m✓[39m src/interfaces/terminal/components/ui/__tests__/ThinkingAwareContent.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 89[2mms[22m[39m
+2025-07-05T21:00:38.8270545Z  [32m✓[39m src/interfaces/__tests__/agent-message-processing-baseline.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+2025-07-05T21:00:39.2284354Z  [32m✓[39m src/interfaces/terminal/components/events/tool-renderers/FileSearchToolRenderer.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 70[2mms[22m[39m
+2025-07-05T21:00:39.8097308Z Test responseTest responseTest response [32m✓[39m src/interfaces/__tests__/non-interactive-interface.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+2025-07-05T21:00:40.4322070Z  [32m✓[39m src/interfaces/terminal/components/events/tool-renderers/FileListToolRenderer.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+2025-07-05T21:00:40.4943063Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould accept valid providers from auto-discovery
+2025-07-05T21:00:40.4944764Z [22m[39m[Registry] 2025-07-05T21:00:40.485Z Starting auto-discovery...
+2025-07-05T21:00:40.4945911Z [Registry] 2025-07-05T21:00:40.487Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:40.4946917Z [Registry] 2025-07-05T21:00:40.487Z Globbing for JS files...
+2025-07-05T21:00:40.4947569Z 
+2025-07-05T21:00:40.4968539Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould accept valid providers from auto-discovery
+2025-07-05T21:00:40.4975771Z [22m[39m[Registry] 2025-07-05T21:00:40.495Z JS glob took 8ms, found: 
+2025-07-05T21:00:40.4976639Z [Registry] 2025-07-05T21:00:40.495Z Globbing for TS files...
+2025-07-05T21:00:40.4977051Z 
+2025-07-05T21:00:40.5017085Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould accept valid providers from auto-discovery
+2025-07-05T21:00:40.5022353Z [22m[39m[Registry] 2025-07-05T21:00:40.500Z TS glob took 5ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:40.5025336Z [Registry] 2025-07-05T21:00:40.500Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:40.5026086Z 
+2025-07-05T21:00:40.6109797Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould accept valid providers from auto-discovery
+2025-07-05T21:00:40.6112238Z [22m[39m[Registry] 2025-07-05T21:00:40.606Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 107ms
+2025-07-05T21:00:40.6114012Z [Registry] 2025-07-05T21:00:40.609Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:40.6114900Z 
+2025-07-05T21:00:40.6140822Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould accept valid providers from auto-discovery
+2025-07-05T21:00:40.6143292Z [22m[39m[Registry] 2025-07-05T21:00:40.610Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 1ms
+2025-07-05T21:00:40.6145626Z [Registry] 2025-07-05T21:00:40.610Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:40.6146548Z 
+2025-07-05T21:00:40.6148138Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould accept valid providers from auto-discovery
+2025-07-05T21:00:40.6150500Z [22m[39m[Registry] 2025-07-05T21:00:40.611Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 1ms
+2025-07-05T21:00:40.6152309Z [Registry] 2025-07-05T21:00:40.611Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:40.6153187Z 
+2025-07-05T21:00:40.6154777Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould accept valid providers from auto-discovery
+2025-07-05T21:00:40.6157070Z [22m[39m[Registry] 2025-07-05T21:00:40.611Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:40.6158707Z [Registry] 2025-07-05T21:00:40.612Z Auto-discovery completed in 125ms
+2025-07-05T21:00:40.6159515Z 
+2025-07-05T21:00:40.6175010Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould reject invalid providers with helpful error message
+2025-07-05T21:00:40.6176717Z [22m[39m[Registry] 2025-07-05T21:00:40.615Z Starting auto-discovery...
+2025-07-05T21:00:40.6177821Z [Registry] 2025-07-05T21:00:40.615Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:40.6179002Z [Registry] 2025-07-05T21:00:40.615Z Globbing for JS files...
+2025-07-05T21:00:40.6179432Z 
+2025-07-05T21:00:40.6190804Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould reject invalid providers with helpful error message
+2025-07-05T21:00:40.6192676Z [22m[39m[Registry] 2025-07-05T21:00:40.616Z JS glob took 1ms, found: 
+2025-07-05T21:00:40.6193742Z [Registry] 2025-07-05T21:00:40.616Z Globbing for TS files...
+2025-07-05T21:00:40.6194305Z 
+2025-07-05T21:00:40.6195979Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould reject invalid providers with helpful error message
+2025-07-05T21:00:40.6200145Z [22m[39m[Registry] 2025-07-05T21:00:40.618Z TS glob took 2ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:40.6203061Z [Registry] 2025-07-05T21:00:40.618Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:40.6203771Z 
+2025-07-05T21:00:40.6205797Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould reject invalid providers with helpful error message
+2025-07-05T21:00:40.6208178Z [22m[39m[Registry] 2025-07-05T21:00:40.619Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 1ms
+2025-07-05T21:00:40.6210144Z [Registry] 2025-07-05T21:00:40.619Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:40.6211066Z 
+2025-07-05T21:00:40.6212727Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould reject invalid providers with helpful error message
+2025-07-05T21:00:40.6214814Z [22m[39m[Registry] 2025-07-05T21:00:40.619Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:40.6216364Z [Registry] 2025-07-05T21:00:40.619Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:40.6217105Z 
+2025-07-05T21:00:40.6218784Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould reject invalid providers with helpful error message
+2025-07-05T21:00:40.6221583Z [22m[39m[Registry] 2025-07-05T21:00:40.619Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:40.6223348Z [Registry] 2025-07-05T21:00:40.620Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:40.6224252Z 
+2025-07-05T21:00:40.6225884Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould reject invalid providers with helpful error message
+2025-07-05T21:00:40.6228228Z [22m[39m[Registry] 2025-07-05T21:00:40.620Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:40.6229892Z [Registry] 2025-07-05T21:00:40.620Z Auto-discovery completed in 5ms
+2025-07-05T21:00:40.6230525Z 
+2025-07-05T21:00:40.6269174Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould list all available providers in error message
+2025-07-05T21:00:40.6272088Z [22m[39m[Registry] 2025-07-05T21:00:40.624Z Starting auto-discovery...
+2025-07-05T21:00:40.6274590Z [Registry] 2025-07-05T21:00:40.624Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:40.6275541Z [Registry] 2025-07-05T21:00:40.624Z Globbing for JS files...
+2025-07-05T21:00:40.6275939Z 
+2025-07-05T21:00:40.6282930Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould list all available providers in error message
+2025-07-05T21:00:40.6284492Z [22m[39m[Registry] 2025-07-05T21:00:40.625Z JS glob took 1ms, found: 
+2025-07-05T21:00:40.6285178Z [Registry] 2025-07-05T21:00:40.625Z Globbing for TS files...
+2025-07-05T21:00:40.6285524Z 
+2025-07-05T21:00:40.6286771Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould list all available providers in error message
+2025-07-05T21:00:40.6290902Z [22m[39m[Registry] 2025-07-05T21:00:40.626Z TS glob took 1ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:40.6293826Z [Registry] 2025-07-05T21:00:40.626Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:40.6294528Z 
+2025-07-05T21:00:40.6295983Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould list all available providers in error message
+2025-07-05T21:00:40.6297954Z [22m[39m[Registry] 2025-07-05T21:00:40.626Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:40.6299947Z [Registry] 2025-07-05T21:00:40.626Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:40.6300688Z 
+2025-07-05T21:00:40.6302083Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould list all available providers in error message
+2025-07-05T21:00:40.6304083Z [22m[39m[Registry] 2025-07-05T21:00:40.627Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:40.6305563Z [Registry] 2025-07-05T21:00:40.627Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:40.6306243Z 
+2025-07-05T21:00:40.6307606Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould list all available providers in error message
+2025-07-05T21:00:40.6323793Z [22m[39m[Registry] 2025-07-05T21:00:40.627Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:40.6325444Z [Registry] 2025-07-05T21:00:40.627Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:40.6326477Z 
+2025-07-05T21:00:40.6327944Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould list all available providers in error message
+2025-07-05T21:00:40.6330263Z [22m[39m[Registry] 2025-07-05T21:00:40.627Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:40.6331525Z [Registry] 2025-07-05T21:00:40.627Z Auto-discovery completed in 3ms
+2025-07-05T21:00:40.6332005Z 
+2025-07-05T21:00:40.6333383Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould validate against dynamic provider list
+2025-07-05T21:00:40.6337383Z [22m[39m[Registry] 2025-07-05T21:00:40.629Z Starting auto-discovery...
+2025-07-05T21:00:40.6347220Z [Registry] 2025-07-05T21:00:40.629Z Provider dir: /home/runner/work/lace/lace/src/providers
+2025-07-05T21:00:40.6348134Z [Registry] 2025-07-05T21:00:40.629Z Globbing for JS files...
+2025-07-05T21:00:40.6348510Z 
+2025-07-05T21:00:40.6349969Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould validate against dynamic provider list
+2025-07-05T21:00:40.6351371Z [22m[39m[Registry] 2025-07-05T21:00:40.629Z JS glob took 0ms, found: 
+2025-07-05T21:00:40.6352133Z [Registry] 2025-07-05T21:00:40.629Z Globbing for TS files...
+2025-07-05T21:00:40.6352503Z 
+2025-07-05T21:00:40.6353721Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould validate against dynamic provider list
+2025-07-05T21:00:40.6357327Z [22m[39m[Registry] 2025-07-05T21:00:40.631Z TS glob took 2ms, found: /home/runner/work/lace/lace/src/providers/openai-provider.ts,/home/runner/work/lace/lace/src/providers/ollama-provider.ts,/home/runner/work/lace/lace/src/providers/lmstudio-provider.ts,/home/runner/work/lace/lace/src/providers/anthropic-provider.ts
+2025-07-05T21:00:40.6360101Z [Registry] 2025-07-05T21:00:40.631Z Importing /home/runner/work/lace/lace/src/providers/openai-provider.ts...
+2025-07-05T21:00:40.6360756Z 
+2025-07-05T21:00:40.6362004Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould validate against dynamic provider list
+2025-07-05T21:00:40.6363837Z [22m[39m[Registry] 2025-07-05T21:00:40.631Z Import of /home/runner/work/lace/lace/src/providers/openai-provider.ts took 0ms
+2025-07-05T21:00:40.6365221Z [Registry] 2025-07-05T21:00:40.631Z Importing /home/runner/work/lace/lace/src/providers/ollama-provider.ts...
+2025-07-05T21:00:40.6365865Z 
+2025-07-05T21:00:40.6367123Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould validate against dynamic provider list
+2025-07-05T21:00:40.6369591Z [22m[39m[Registry] 2025-07-05T21:00:40.631Z Import of /home/runner/work/lace/lace/src/providers/ollama-provider.ts took 0ms
+2025-07-05T21:00:40.6371178Z [Registry] 2025-07-05T21:00:40.632Z Importing /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts...
+2025-07-05T21:00:40.6371659Z 
+2025-07-05T21:00:40.6372406Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould validate against dynamic provider list
+2025-07-05T21:00:40.6373489Z [22m[39m[Registry] 2025-07-05T21:00:40.632Z Import of /home/runner/work/lace/lace/src/providers/lmstudio-provider.ts took 0ms
+2025-07-05T21:00:40.6374523Z [Registry] 2025-07-05T21:00:40.632Z Importing /home/runner/work/lace/lace/src/providers/anthropic-provider.ts...
+2025-07-05T21:00:40.6375240Z 
+2025-07-05T21:00:40.6376604Z [90mstdout[2m | src/cli/__tests__/provider-validation.test.ts[2m > [22m[2mCLI Provider Validation[2m > [22m[2mshould validate against dynamic provider list
+2025-07-05T21:00:40.6378587Z [22m[39m[Registry] 2025-07-05T21:00:40.632Z Import of /home/runner/work/lace/lace/src/providers/anthropic-provider.ts took 0ms
+2025-07-05T21:00:40.6379823Z [Registry] 2025-07-05T21:00:40.632Z Auto-discovery completed in 3ms
+2025-07-05T21:00:40.6380076Z 
+2025-07-05T21:00:40.6380584Z  [32m✓[39m src/cli/__tests__/provider-validation.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 151[2mms[22m[39m
+2025-07-05T21:00:41.0853006Z  [32m✓[39m src/tools/executor.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+2025-07-05T21:00:41.4231111Z  [32m✓[39m src/utils/__tests__/traffic-logger.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+2025-07-05T21:00:42.0349243Z [90mstdout[2m | src/cli/__tests__/help-integration.test.ts[2m > [22m[2mHelp Integration[2m > [22m[2mshould show dynamic provider list in --help output
+2025-07-05T21:00:42.0350686Z [22m[39m[TEST] 2025-07-05T21:00:42.028Z Starting help integration test...
+2025-07-05T21:00:42.0351471Z [TEST] 2025-07-05T21:00:42.029Z Running npm run build...
+2025-07-05T21:00:42.0351851Z 
+2025-07-05T21:00:42.2611835Z  [32m✓[39m src/interfaces/terminal/components/ui/__tests__/CodeDisplay.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+2025-07-05T21:00:42.3932081Z [90mstdout[2m | src/interfaces/__tests__/non-interactive-race-condition.test.ts[2m > [22m[2mNonInteractiveInterface Race Condition[2m > [22m[2mshould handle errors from sendMessage without hanging
+2025-07-05T21:00:42.3934029Z [22m[39m🤖 Lace Agent using test-provider provider.
+2025-07-05T21:00:42.3934529Z 
+2025-07-05T21:00:42.3934627Z 
+2025-07-05T21:00:42.3965221Z  [32m✓[39m src/interfaces/__tests__/non-interactive-race-condition.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 9[2mms[22m[39m
+2025-07-05T21:00:43.6743219Z [?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[90mstderr[2m | src/providers/__tests__/lmstudio-timeout.test.ts[2m > [22m[2mLMStudio Provider Timeout Handling[2m > [22m[2mshould timeout quickly when LMStudio server is unavailable
+2025-07-05T21:00:43.6745775Z [22m[39m[LMStudioClient][LLM][ClientPort][WsClientTransport:AuthenticatedWsClientTransport] WebSocket error: AggregateError: 
+2025-07-05T21:00:43.6747213Z [90m    at internalConnectMultiple (node:net:1122:18)[39m
+2025-07-05T21:00:43.6748211Z [90m    at afterConnectMultiple (node:net:1689:7)[39m {
+2025-07-05T21:00:43.6749148Z   code: [32m'ECONNREFUSED'[39m,
+2025-07-05T21:00:43.6749596Z   [errors]: [
+2025-07-05T21:00:43.6750071Z     Error: connect ECONNREFUSED ::1:9999
+2025-07-05T21:00:43.6750837Z     [90m    at createConnectionError (node:net:1652:14)[39m
+2025-07-05T21:00:43.6751667Z     [90m    at afterConnectMultiple (node:net:1682:16)[39m {
+2025-07-05T21:00:43.6752331Z       errno: [33m-111[39m,
+2025-07-05T21:00:43.6752891Z       code: [32m'ECONNREFUSED'[39m,
+2025-07-05T21:00:43.6753481Z       syscall: [32m'connect'[39m,
+2025-07-05T21:00:43.6754257Z       address: [32m'::1'[39m,
+2025-07-05T21:00:43.6754754Z       port: [33m9999[39m
+2025-07-05T21:00:43.6755480Z     },
+2025-07-05T21:00:43.6755953Z     Error: connect ECONNREFUSED 127.0.0.1:9999
+2025-07-05T21:00:43.6756745Z     [90m    at createConnectionError (node:net:1652:14)[39m
+2025-07-05T21:00:43.6757572Z     [90m    at afterConnectMultiple (node:net:1682:16)[39m {
+2025-07-05T21:00:43.6758208Z       errno: [33m-111[39m,
+2025-07-05T21:00:43.6758773Z       code: [32m'ECONNREFUSED'[39m,
+2025-07-05T21:00:43.6759593Z       syscall: [32m'connect'[39m,
+2025-07-05T21:00:43.6760178Z       address: [32m'127.0.0.1'[39m,
+2025-07-05T21:00:43.6760696Z       port: [33m9999[39m
+2025-07-05T21:00:43.6761071Z     }
+2025-07-05T21:00:43.6761336Z   ]
+2025-07-05T21:00:43.6761586Z }
+2025-07-05T21:00:43.6763936Z [LMStudioClient][LLM][ClientPort][WsClientTransport:AuthenticatedWsClientTransport] WebSocket connection refused. This can happen if the server is not running or the client is trying to connect to the wrong path. The server path that this client is attempting to connect to is: ws://localhost:9999/llm.
+2025-07-05T21:00:43.6765795Z 
+2025-07-05T21:00:43.6766370Z Please make sure the following:
+2025-07-05T21:00:43.6766671Z 
+2025-07-05T21:00:43.6766837Z   1. LM Studio is running
+2025-07-05T21:00:43.6767086Z 
+2025-07-05T21:00:43.6767328Z   2. The API server in LM Studio has started
+2025-07-05T21:00:43.6767706Z 
+2025-07-05T21:00:43.6768057Z   3. The client is attempting to connect to the correct path
+2025-07-05T21:00:43.6768457Z 
+2025-07-05T21:00:43.6802120Z  [32m✓[39m src/providers/__tests__/lmstudio-timeout.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 78[2mms[22m[39m
+2025-07-05T21:00:44.8111869Z  [32m✓[39m src/providers/__tests__/ollama-provider.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+2025-07-05T21:00:45.9474644Z  [32m✓[39m src/__tests__/example.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 5[2mms[22m[39m
+2025-07-05T21:00:49.4440097Z [90mstderr[2m | src/__tests__/cli-flow.test.ts[2m > [22m[2mCLI Flow Tests[2m > [22m[2mprovider initialization[2m > [22m[2mshould throw error for missing Anthropic API key
+2025-07-05T21:00:49.4445933Z [22m[39mError: ANTHROPIC_KEY environment variable required for Anthropic provider
+2025-07-05T21:00:49.4450412Z 
+2025-07-05T21:00:49.4562305Z [90mstderr[2m | src/__tests__/cli-flow.test.ts[2m > [22m[2mCLI Flow Tests[2m > [22m[2mprovider initialization[2m > [22m[2mshould throw error for missing OpenAI API key
+2025-07-05T21:00:49.4567546Z [22m[39mError: OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider
+2025-07-05T21:00:49.4571951Z 
+2025-07-05T21:00:49.6144886Z  [32m✓[39m src/__tests__/cli-flow.test.ts [2m([22m[2m19 tests[22m[2m)[22m[33m 2159[2mms[22m[39m
+2025-07-05T21:00:49.6151394Z    [33m[2m✓[22m[39m CLI Flow Tests[2m > [22mprovider initialization[2m > [22mshould initialize Anthropic provider with API key [33m 1928[2mms[22m[39m
+2025-07-05T21:00:54.8649369Z [90mstdout[2m | src/cli/__tests__/help-integration.test.ts[2m > [22m[2mHelp Integration[2m > [22m[2mshould show dynamic provider list in --help output
+2025-07-05T21:00:54.8653153Z [22m[39m[TEST] 2025-07-05T21:00:54.860Z Build completed, running CLI help...
+2025-07-05T21:00:54.8657960Z 
+2025-07-05T21:00:55.2311277Z [90mstdout[2m | src/cli/__tests__/help-integration.test.ts[2m > [22m[2mHelp Integration[2m > [22m[2mshould show dynamic provider list in --help output
+2025-07-05T21:00:55.2312593Z [22m[39m[TEST] 2025-07-05T21:00:55.230Z Help test completed successfully
+2025-07-05T21:00:55.2312891Z 
+2025-07-05T21:00:55.2334313Z  [32m✓[39m src/cli/__tests__/help-integration.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 13205[2mms[22m[39m
+2025-07-05T21:00:55.2337241Z    [33m[2m✓[22m[39m Help Integration[2m > [22mshould show dynamic provider list in --help output [33m 13204[2mms[22m[39m
+2025-07-05T21:01:02.6191173Z  [32m✓[39m src/__tests__/typescript-compilation.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 19241[2mms[22m[39m
+2025-07-05T21:01:02.6193448Z    [33m[2m✓[22m[39m TypeScript Compilation[2m > [22mshould compile without any TypeScript errors [33m 11559[2mms[22m[39m
+2025-07-05T21:01:02.6195831Z    [33m[2m✓[22m[39m TypeScript Compilation[2m > [22mshould have clean TypeScript output for build [33m 7680[2mms[22m[39m
+2025-07-05T21:01:02.6375132Z 
+2025-07-05T21:01:02.6393852Z [2m Test Files [22m [1m[32m127 passed[39m[22m[90m (127)[39m
+2025-07-05T21:01:02.6399710Z [2m      Tests [22m [1m[32m1610 passed[39m[22m[2m | [22m[33m5 skipped[39m[90m (1615)[39m
+2025-07-05T21:01:02.6409686Z [2m   Start at [22m 20:59:43
+2025-07-05T21:01:02.6411523Z [2m   Duration [22m 78.64s[2m (transform 3.79s, setup 18.55s, collect 34.36s, tests 57.21s, environment 68.81s, prepare 11.50s)[22m
+2025-07-05T21:01:02.6412429Z 
+2025-07-05T21:01:02.7471097Z ##[group]Run npm run build
+2025-07-05T21:01:02.7471375Z [36;1mnpm run build[0m
+2025-07-05T21:01:02.7471601Z [36;1mnode dist/cli.js --help[0m
+2025-07-05T21:01:02.7530604Z shell: /usr/bin/bash -e {0}
+2025-07-05T21:01:02.7530844Z env:
+2025-07-05T21:01:02.7531010Z   NODE_VERSION: 20
+2025-07-05T21:01:02.7531384Z ##[endgroup]
+2025-07-05T21:01:02.8638448Z 
+2025-07-05T21:01:02.8639385Z > LACE - A lightweight agentic coding environment@0.0.1 build
+2025-07-05T21:01:02.8640316Z > tsc && cp -r src/config/prompts dist/config/ 2>/dev/null || true
+2025-07-05T21:01:02.8640762Z 
+2025-07-05T21:01:10.6516374Z [CLI] 2025-07-05T21:01:10.650Z Starting main CLI execution...
+2025-07-05T21:01:10.6551199Z [CLI] 2025-07-05T21:01:10.655Z Starting showHelp()...
+2025-07-05T21:01:10.6553827Z [Registry] 2025-07-05T21:01:10.655Z Starting auto-discovery...
+2025-07-05T21:01:10.6556833Z [Registry] 2025-07-05T21:01:10.655Z Provider dir: /home/runner/work/lace/lace/dist/providers
+2025-07-05T21:01:10.6557518Z [Registry] 2025-07-05T21:01:10.655Z Globbing for JS files...
+2025-07-05T21:01:10.6650591Z [Registry] 2025-07-05T21:01:10.664Z JS glob took 9ms, found: /home/runner/work/lace/lace/dist/providers/openai-provider.js,/home/runner/work/lace/lace/dist/providers/ollama-provider.js,/home/runner/work/lace/lace/dist/providers/lmstudio-provider.js,/home/runner/work/lace/lace/dist/providers/anthropic-provider.js
+2025-07-05T21:01:10.6653285Z [Registry] 2025-07-05T21:01:10.664Z Globbing for TS files...
+2025-07-05T21:01:10.6660691Z [Registry] 2025-07-05T21:01:10.665Z TS glob took 1ms, found: 
+2025-07-05T21:01:10.6661966Z [Registry] 2025-07-05T21:01:10.665Z Importing /home/runner/work/lace/lace/dist/providers/openai-provider.js...
+2025-07-05T21:01:10.7339188Z [Registry] 2025-07-05T21:01:10.733Z Import of /home/runner/work/lace/lace/dist/providers/openai-provider.js took 67ms
+2025-07-05T21:01:10.7354192Z [Registry] 2025-07-05T21:01:10.735Z Importing /home/runner/work/lace/lace/dist/providers/ollama-provider.js...
+2025-07-05T21:01:10.7357090Z [Registry] 2025-07-05T21:01:10.735Z Import of /home/runner/work/lace/lace/dist/providers/ollama-provider.js took 0ms
+2025-07-05T21:01:10.7359097Z [Registry] 2025-07-05T21:01:10.735Z Importing /home/runner/work/lace/lace/dist/providers/lmstudio-provider.js...
+2025-07-05T21:01:10.7360911Z [Registry] 2025-07-05T21:01:10.735Z Import of /home/runner/work/lace/lace/dist/providers/lmstudio-provider.js took 0ms
+2025-07-05T21:01:10.7362525Z [Registry] 2025-07-05T21:01:10.736Z Importing /home/runner/work/lace/lace/dist/providers/anthropic-provider.js...
+2025-07-05T21:01:10.7364071Z [Registry] 2025-07-05T21:01:10.736Z Import of /home/runner/work/lace/lace/dist/providers/anthropic-provider.js took 0ms
+2025-07-05T21:01:10.7371780Z [Registry] 2025-07-05T21:01:10.737Z Auto-discovery completed in 82ms
+2025-07-05T21:01:10.7372742Z [CLI] 2025-07-05T21:01:10.737Z Got provider help text, showing help...
+2025-07-05T21:01:10.7401112Z Usage: lace [options]
+2025-07-05T21:01:10.7401337Z 
+2025-07-05T21:01:10.7401534Z Lace AI Coding Assistant
+2025-07-05T21:01:10.7401765Z 
+2025-07-05T21:01:10.7401884Z Options:
+2025-07-05T21:01:10.7402435Z   -p, --provider <name>            Choose AI provider: anthropic, lmstudio,
+2025-07-05T21:01:10.7403131Z                                    ollama, openai (default: "anthropic")
+2025-07-05T21:01:10.7403802Z   -m, --model <name>               Override the default model for the selected
+2025-07-05T21:01:10.7404391Z                                    provider
+2025-07-05T21:01:10.7405015Z   --log-level <level>              Set log level: "error", "warn", "info"
+2025-07-05T21:01:10.7405684Z                                    (default), or "debug" (default: "info")
+2025-07-05T21:01:10.7406329Z   --log-file <path>                Write logs to file (no file = no logging)
+2025-07-05T21:01:10.7407082Z   --har <path>                     Record HTTP traffic to HAR file for debugging
+2025-07-05T21:01:10.7407571Z                                    (includes all provider requests)
+2025-07-05T21:01:10.7408392Z   --prompt <text>                  Send a single prompt and exit
+2025-07-05T21:01:10.7408776Z                                    (non-interactive mode)
+2025-07-05T21:01:10.7409455Z   --continue [session_id]          Continue previous conversation (latest if no
+2025-07-05T21:01:10.7409859Z                                    ID provided)
+2025-07-05T21:01:10.7410416Z   --ui <type>                      Choose UI type (choices: "terminal", default:
+2025-07-05T21:01:10.7410768Z                                    "terminal")
+2025-07-05T21:01:10.7411183Z   --allow-non-destructive-tools    Automatically approve tools marked as
+2025-07-05T21:01:10.7411572Z                                    read-only
+2025-07-05T21:01:10.7411960Z   --auto-approve-tools <tools...>  Automatically approve specific tools
+2025-07-05T21:01:10.7412361Z                                    (comma-separated, additive)
+2025-07-05T21:01:10.7412734Z   --disable-tools <tools...>       Disable specific tools entirely
+2025-07-05T21:01:10.7413115Z                                    (comma-separated, additive)
+2025-07-05T21:01:10.7413461Z   --disable-all-tools              Disable all tool calling
+2025-07-05T21:01:10.7413913Z   --disable-tool-guardrails        Auto-approve all tools (DANGEROUS: tools may
+2025-07-05T21:01:10.7414305Z                                    erase data)
+2025-07-05T21:01:10.7414688Z   --list-tools                     Show available tools and their descriptions
+2025-07-05T21:01:10.7415068Z   -h, --help                       display help for command
+2025-07-05T21:01:10.7415467Z [CLI] 2025-07-05T21:01:10.740Z Help output complete
+2025-07-05T21:01:10.7569662Z Post job cleanup.
+2025-07-05T21:01:10.9079689Z Cache hit occurred on the primary key node-cache-Linux-x64-npm-6f643ec53f6ecc152dad70741436db0c7fb2f915ac4f3ac3850f2c1f98edf88f, not saving cache.
+2025-07-05T21:01:10.9201438Z Post job cleanup.
+2025-07-05T21:01:11.0197537Z [command]/usr/bin/git version
+2025-07-05T21:01:11.0235655Z git version 2.49.0
+2025-07-05T21:01:11.0287354Z Temporarily overriding HOME='/home/runner/work/_temp/28f9f204-0e86-43ff-ade5-13c33eb61712' before making global git config changes
+2025-07-05T21:01:11.0288801Z Adding repository directory to the temporary git global config as a safe directory
+2025-07-05T21:01:11.0294006Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/lace/lace
+2025-07-05T21:01:11.0329913Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2025-07-05T21:01:11.0363457Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2025-07-05T21:01:11.0598295Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2025-07-05T21:01:11.0623984Z http.https://github.com/.extraheader
+2025-07-05T21:01:11.0642274Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2025-07-05T21:01:11.0679768Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2025-07-05T21:01:11.1042059Z Cleaning up orphan processes

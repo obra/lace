@@ -54,9 +54,38 @@ jobs:
       - name: Build project
         run: npm run build
 
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            dist/
+            !dist/**/*.map
+          retention-days: 7
+
   test:
     name: Test Suite
     runs-on: ubuntu-latest
+    needs: [build]
     strategy:
       matrix:
         test-group: [unit, integration]
@@ -81,6 +110,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: .
+
       - name: Run unit tests
         if: matrix.test-group == 'unit'
         run: npm run test:unit
@@ -92,6 +127,7 @@ jobs:
   test-coverage:
     name: Test Coverage
     runs-on: ubuntu-latest
+    needs: [build]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -113,6 +149,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: .
+
       - name: Run tests with coverage
         run: npm run test:coverage -- --exclude "**/*lmstudio-integration*" --exclude "**/*ollama-integration*" --exclude "**/e2e-cli*"
 
@@ -123,10 +165,10 @@ jobs:
           fail_ci_if_error: false
 
 
-  build-and-package:
-    name: Build and Package
+  package:
+    name: Package
     runs-on: ubuntu-latest
-    needs: [lint-and-format, type-check, test]
+    needs: [lint-and-format, type-check, test, build]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -140,26 +182,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build project
-        run: npm run build
-
-      - name: Test built CLI
-        run: |
-          chmod +x dist/cli.js
-          node dist/cli.js --help
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
         with:
           name: build-artifacts
-          path: |
-            dist/
-            !dist/**/*.map
-          retention-days: 7
+          path: .
 
   matrix-test:
     name: Cross-Platform Tests
     runs-on: ${{ matrix.os }}
+    needs: [build]
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -184,10 +216,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: .
+
       - name: Run core tests
         run: npm run test:run -- --exclude "**/*lmstudio-integration*" --exclude "**/*ollama-integration*" --exclude "**/e2e-cli*" --exclude "**/*sigint-integration*"
-
-      - name: Build and test CLI
-        run: |
-          npm run build
-          node dist/cli.js --help

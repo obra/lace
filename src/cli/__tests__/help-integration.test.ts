@@ -12,11 +12,22 @@ describe('Help Integration', () => {
     try {
       console.log(`[TEST] ${new Date().toISOString()} Starting help integration test...`);
 
-      // Build first, then run help with separate commands for better debugging
-      console.log(`[TEST] ${new Date().toISOString()} Running npm run build...`);
-      await execAsync('npm run build');
+      // In CI, artifacts should be pre-built. Locally, build if needed.
+      if (!process.env.CI) {
+        try {
+          await execAsync('test -f dist/cli.js');
+          console.log(`[TEST] ${new Date().toISOString()} CLI already built, running help...`);
+        } catch {
+          console.log(`[TEST] ${new Date().toISOString()} CLI not built, running npm run build...`);
+          await execAsync('npm run build');
+          console.log(`[TEST] ${new Date().toISOString()} Build completed`);
+        }
+      } else {
+        console.log(
+          `[TEST] ${new Date().toISOString()} Running in CI, expecting pre-built artifacts...`
+        );
+      }
 
-      console.log(`[TEST] ${new Date().toISOString()} Build completed, running CLI help...`);
       const { stdout } = await execAsync('node dist/cli.js --help');
 
       // Help should contain all auto-discovered providers
