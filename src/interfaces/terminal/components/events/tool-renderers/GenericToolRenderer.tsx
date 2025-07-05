@@ -1,9 +1,11 @@
-// ABOUTME: Generic tool renderer with direct composition for unknown/unsupported tools
+// ABOUTME: Generic tool renderer using TimelineEntry for unknown/unsupported tools
 // ABOUTME: Provides fallback display for any tool execution with input/output visualization
 
 import React, { forwardRef, useImperativeHandle } from 'react';
 import { Box, Text } from 'ink';
-import { ToolHeader, ToolPreview, ToolContent, useToolExpansion, limitLines, type ToolRendererProps } from './components/shared.js';
+import { TimelineEntry, TimelineStatus } from '../../ui/TimelineEntry.js';
+import { useTimelineItem } from '../contexts/TimelineItemContext.js';
+import { limitLines, type ToolRendererProps } from './components/shared.js';
 import { TimelineItemRef } from '../../timeline-item-focus.js';
 
 // Extract primary info from tool arguments
@@ -32,8 +34,6 @@ function getPrimaryInfo(toolName: string, args: Record<string, unknown>): string
 
 export const GenericToolRenderer = forwardRef<TimelineItemRef, ToolRendererProps>(({
   item,
-  isSelected = false,
-  onToggle,
 }, ref) => {
   // Generic tool renderer doesn't support focus entry
   useImperativeHandle(ref, () => ({
@@ -42,7 +42,7 @@ export const GenericToolRenderer = forwardRef<TimelineItemRef, ToolRendererProps
     },
   }), []);
   
-  const { isExpanded } = useToolExpansion(isSelected, onToggle);
+  const { isExpanded } = useTimelineItem();
   
   // Extract data directly
   const toolName = item.call.name;
@@ -52,61 +52,69 @@ export const GenericToolRenderer = forwardRef<TimelineItemRef, ToolRendererProps
   const isRunning = !item.result;
   
   // Determine status
-  const status = isRunning ? 'pending' : hasError ? 'error' : 'success';
+  const status: TimelineStatus = isRunning ? 'pending' : hasError ? 'error' : 'success';
   
   // Get primary info
   const primaryInfo = getPrimaryInfo(toolName, args);
   
-  return (
+  // Build header with tool name and generic indicator
+  const header = (
+    <Box>
+      <Text color="magenta" bold>{toolName}</Text>
+      <Text color="gray">: </Text>
+      <Text color="white">{primaryInfo}</Text>
+      <Text color="magenta"> [GENERIC]</Text>
+    </Box>
+  );
+  
+  // Build preview content
+  const preview = output && item.result && !isRunning ? (() => {
+    const { lines, truncated, remaining } = limitLines(output, 3);
+    return (
+      <Box flexDirection="column">
+        {lines.map((line, index) => (
+          <Text key={index} dimColor>{line}</Text>
+        ))}
+        {truncated && <Text color="gray">(+ {remaining} lines)</Text>}
+      </Box>
+    );
+  })() : null;
+  
+  // Build expanded content
+  const expandedContent = (
     <Box flexDirection="column">
-      <ToolHeader icon="🔧" status={status}>
-        <Text color="magenta" bold>{toolName}</Text>
-        <Text color="gray">: </Text>
-        <Text color="white">{primaryInfo}</Text>
-        <Text color="magenta"> [GENERIC]</Text>
-      </ToolHeader>
-      
-      {!isExpanded && output && item.result && !isRunning && (
-        <ToolPreview>
-          {(() => {
-            const { lines, truncated, remaining } = limitLines(output, 3);
-            return (
-              <Box flexDirection="column">
-                {lines.map((line, index) => (
-                  <Text key={index} dimColor>{line}</Text>
-                ))}
-                {truncated && <Text color="gray">(+ {remaining} lines)</Text>}
-              </Box>
-            );
-          })()}
-        </ToolPreview>
-      )}
-      
-      {isExpanded && (
-        <ToolContent>
-          {/* Input parameters */}
-          <Box flexDirection="column" marginBottom={1}>
-            <Text color="yellow">Input:</Text>
-            <Box marginLeft={2}>
-              <Text>{JSON.stringify(args, null, 2)}</Text>
-            </Box>
-          </Box>
+      {/* Input parameters */}
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color="yellow">Input:</Text>
+        <Box marginLeft={2}>
+          <Text>{JSON.stringify(args, null, 2)}</Text>
+        </Box>
+      </Box>
 
-          {/* Output or Error */}
-          {item.result && (
-            <Box flexDirection="column">
-              <Text color={hasError ? 'red' : 'green'}>
-                {hasError ? 'Error:' : 'Output:'}
-              </Text>
-              <Box marginLeft={2}>
-                <Text color={hasError ? 'red' : undefined}>
-                  {output || 'No output'}
-                </Text>
-              </Box>
-            </Box>
-          )}
-        </ToolContent>
+      {/* Output or Error */}
+      {item.result && (
+        <Box flexDirection="column">
+          <Text color={hasError ? 'red' : 'green'}>
+            {hasError ? 'Error:' : 'Output:'}
+          </Text>
+          <Box marginLeft={2}>
+            <Text color={hasError ? 'red' : undefined}>
+              {output || 'No output'}
+            </Text>
+          </Box>
+        </Box>
       )}
     </Box>
+  );
+
+  return (
+    <TimelineEntry
+      label={header}
+      summary={preview}
+      status={status}
+      isExpandable={true}
+    >
+      {expandedContent}
+    </TimelineEntry>
   );
 });
