@@ -155,13 +155,11 @@ describe('OpenAIProvider retry functionality', () => {
     it('should retry streaming requests before first token', async () => {
       const messages: ProviderMessage[] = [{ role: 'user', content: 'Hello' }];
 
-      // Create a mock stream that fails first time
-      const failingStream = (async function* () {
-        yield* []; // Empty generator to satisfy eslint
-        throw { code: 'ECONNRESET' };
-      })();
+      // Mock the first call to create() to throw immediately (before stream is created)
+      const networkError = new Error('Connection failed');
+      (networkError as any).code = 'ECONNRESET';
 
-      // Create a successful stream
+      // Create a successful stream for the retry
       const successStream = (async function* () {
         yield {
           choices: [
@@ -182,7 +180,7 @@ describe('OpenAIProvider retry functionality', () => {
         };
       })();
 
-      mockCreate.mockReturnValueOnce(failingStream).mockReturnValueOnce(successStream);
+      mockCreate.mockRejectedValueOnce(networkError).mockReturnValueOnce(successStream);
 
       const promise = provider.createStreamingResponse(messages, []);
 
