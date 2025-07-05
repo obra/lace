@@ -54,6 +54,26 @@ function getMarkerColor(status: TimelineStatus, isSelected: boolean): string {
   return colorMap[status];
 }
 
+function getStatusSymbol(status: TimelineStatus): string | null {
+  const symbolMap = {
+    none: null,
+    pending: UI_SYMBOLS.PENDING,
+    success: UI_SYMBOLS.SUCCESS,
+    error: UI_SYMBOLS.ERROR,
+  };
+  return symbolMap[status];
+}
+
+function getStatusColor(status: TimelineStatus): string {
+  const colorMap = {
+    none: 'gray',
+    pending: 'yellow',
+    success: 'green', 
+    error: 'red',
+  };
+  return colorMap[status];
+}
+
 export function TimelineEntry({
   children,
   label,
@@ -156,13 +176,22 @@ export function TimelineEntry({
         : `${UI_SYMBOLS.ARROW_RIGHT} to open`})`
     : ' ';
 
+  // Get status symbol and color
+  const statusSymbol = getStatusSymbol(status);
+  const statusColor = getStatusColor(status);
+
   // Content area - simplified to reduce empty space
   const actualContent = isExpanded ? children : (summary && summary);
   
   const contentArea = (
     <Box ref={contentAreaRef} marginBottom={0} flexDirection="column">
       {label && (
-        <Box marginBottom={0}>
+        <Box marginBottom={0} flexDirection="row">
+          {statusSymbol && (
+            <React.Fragment>
+              <Text color={statusColor}>{statusSymbol} </Text>
+            </React.Fragment>
+          )}
           {typeof label === 'string' ? (
             <Text color="gray">{label}</Text>
           ) : (
