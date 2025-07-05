@@ -1,9 +1,11 @@
-// ABOUTME: Renderer for ripgrep-search tool executions with direct component composition
+// ABOUTME: Renderer for ripgrep-search tool executions using TimelineEntry
 // ABOUTME: Shows search results grouped by file with line numbers and highlighted matches
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ToolHeader, ToolPreview, ToolContent, useToolExpansion, limitLines, type ToolRendererProps } from './components/shared.js';
+import { TimelineEntry, TimelineStatus } from '../../ui/TimelineEntry.js';
+import { useTimelineItem } from '../contexts/TimelineItemContext.js';
+import { limitLines, type ToolRendererProps } from './components/shared.js';
 
 // Extract match count from search results
 function extractMatchCount(output: string): string | null {
@@ -20,8 +22,8 @@ function extractMatchCount(output: string): string | null {
   return null;
 }
 
-export function FileSearchToolRenderer({ item, isSelected = false, onToggle }: ToolRendererProps) {
-  const { isExpanded } = useToolExpansion(isSelected, onToggle);
+export function FileSearchToolRenderer({ item }: ToolRendererProps) {
+  const { isExpanded } = useTimelineItem();
   
   // Extract data directly
   const { pattern, path } = item.call.arguments as { pattern: string; path: string };
@@ -30,7 +32,7 @@ export function FileSearchToolRenderer({ item, isSelected = false, onToggle }: T
   const isRunning = !item.result;
   
   // Determine status
-  const status = isRunning ? 'pending' : hasError ? 'error' : 'success';
+  const status: TimelineStatus = isRunning ? 'pending' : hasError ? 'error' : 'success';
   
   // Check for empty results
   const isEmpty = output === 'No matches found';
@@ -38,57 +40,67 @@ export function FileSearchToolRenderer({ item, isSelected = false, onToggle }: T
   // Extract match stats
   const matchStats = !isEmpty && output ? extractMatchCount(output) : null;
   
-  return (
-    <Box flexDirection="column">
-      <ToolHeader icon="🔍" status={status}>
-        <Text bold>ripgrep-search</Text>
-        <Text> "{pattern}"</Text>
-        <Text color="gray"> in {path}</Text>
-        {matchStats && (
-          <React.Fragment>
-            <Text color="gray"> - </Text>
-            <Text color="cyan">{matchStats}</Text>
-          </React.Fragment>
-        )}
-      </ToolHeader>
-      
-      {!isExpanded && output && item.result && !isRunning && (
-        <ToolPreview>
-          {isEmpty ? (
-            <Text color="gray">No matches found</Text>
-          ) : (
-            (() => {
-              const { lines, truncated } = limitLines(output, 4);
-              // Skip the "Found X matches" header line
-              const previewLines = lines.filter(line => !line.startsWith('Found'));
-              const displayLines = previewLines.slice(0, 3);
-              
-              return (
-                <Box flexDirection="column">
-                  {displayLines.map((line, index) => (
-                    <Text key={index} color="gray">
-                      {line}
-                    </Text>
-                  ))}
-                  {(truncated || previewLines.length > 3) && (
-                    <Text color="gray">... and more</Text>
-                  )}
-                </Box>
-              );
-            })()
-          )}
-        </ToolPreview>
-      )}
-      
-      {isExpanded && (
-        <ToolContent>
-          {isEmpty ? (
-            <Text color="gray">No matches found</Text>
-          ) : (
-            <Text>{output}</Text>
-          )}
-        </ToolContent>
+  // Build header with pattern, path, and match counts
+  const header = (
+    <Box>
+      <Text bold>ripgrep-search: </Text>
+      <Text>"{pattern}"</Text>
+      <Text color="gray"> in {path}</Text>
+      {matchStats && (
+        <React.Fragment>
+          <Text color="gray"> - </Text>
+          <Text color="cyan">{matchStats}</Text>
+        </React.Fragment>
       )}
     </Box>
+  );
+  
+  // Build preview content
+  const preview = output && item.result && !isRunning ? (() => {
+    if (isEmpty) {
+      return <Text color="gray">No matches found</Text>;
+    }
+    const { lines, truncated } = limitLines(output, 4);
+    // Skip the "Found X matches" header line
+    const previewLines = lines.filter(line => !line.startsWith('Found'));
+    const displayLines = previewLines.slice(0, 3);
+    
+    return (
+      <Box flexDirection="column">
+        {displayLines.map((line, index) => (
+          <Text key={index} color="gray">
+            {line}
+          </Text>
+        ))}
+        {(truncated || previewLines.length > 3) && (
+          <Text color="gray">... and more</Text>
+        )}
+      </Box>
+    );
+  })() : null;
+  
+  // Build expanded content
+  const expandedContent = hasError && item.result ? (
+    <Box flexDirection="column">
+      <Text color="red">Error:</Text>
+      <Box marginLeft={2}>
+        <Text color="red">{item.result.content?.[0]?.text || 'Unknown error'}</Text>
+      </Box>
+    </Box>
+  ) : isEmpty ? (
+    <Text color="gray">No matches found</Text>
+  ) : (
+    <Text>{output}</Text>
+  );
+
+  return (
+    <TimelineEntry
+      label={header}
+      summary={preview}
+      status={status}
+      isExpandable={true}
+    >
+      {expandedContent}
+    </TimelineEntry>
   );
 }
