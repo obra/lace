@@ -4,6 +4,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Box, Text, measureElement, DOMElement } from 'ink';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
+import { useTimelineItemOptional } from '../events/contexts/TimelineItemContext.js';
 
 export type TimelineStatus = 'none' | 'pending' | 'success' | 'error';
 
@@ -11,11 +12,11 @@ interface TimelineEntryProps {
   children: React.ReactNode;
   label?: string | React.ReactNode;
   summary?: React.ReactNode;
-  isExpanded: boolean;
-  onExpandedChange: (expanded: boolean) => void;
-  isSelected?: boolean;
+  isExpanded?: boolean;  // Optional - uses context if available
+  onExpandedChange?: (expanded: boolean) => void;  // Optional - uses context if available
+  isSelected?: boolean;  // Optional - uses context if available
   isFocused?: boolean;
-  onToggle?: () => void;
+  onToggle?: () => void;  // Optional - uses context if available
   status?: TimelineStatus;
   isExpandable?: boolean;
   isStreaming?: boolean;
@@ -57,11 +58,11 @@ export function TimelineEntry({
   children,
   label,
   summary,
-  isExpanded,
-  onExpandedChange,
-  isSelected = false,
+  isExpanded: isExpandedProp,
+  onExpandedChange: onExpandedChangeProp,
+  isSelected: isSelectedProp,
   isFocused = false,
-  onToggle,
+  onToggle: onToggleProp,
   status = 'none',
   isExpandable = false,
   isStreaming = false,
@@ -70,6 +71,22 @@ export function TimelineEntry({
   const [measuredHeight, setMeasuredHeight] = useState<number>(1);
   const prevExpandedRef = useRef<boolean | undefined>(undefined);
   const measureTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Get context values if available
+  const context = useTimelineItemOptional();
+  
+  // Use context values if available, otherwise fall back to props
+  const isSelected = isSelectedProp ?? context?.isSelected ?? false;
+  const isExpanded = isExpandedProp ?? context?.isExpanded ?? false;
+  const onToggle = onToggleProp ?? context?.onToggle;
+  const onExpandedChange = onExpandedChangeProp ?? 
+    (context ? (expanded: boolean) => {
+      if (expanded) {
+        context.onExpand();
+      } else {
+        context.onCollapse();
+      }
+    } : undefined);
 
   // Debounced height measurement function
   const measureHeight = useCallback(() => {

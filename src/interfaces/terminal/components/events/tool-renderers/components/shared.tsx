@@ -20,6 +20,14 @@ export interface ToolRendererProps {
   onToggle?: () => void;
 }
 
+// Data structure that tool renderers should return
+export interface ToolRendererOutput {
+  header: React.ReactNode;  // What shows in the timeline entry label
+  preview?: React.ReactNode; // What shows when collapsed (optional)
+  content: React.ReactNode;  // What shows when expanded
+  status: 'pending' | 'success' | 'error';
+}
+
 interface ToolHeaderProps {
   icon?: string;
   status?: 'pending' | 'success' | 'error';

@@ -13,8 +13,11 @@ import { EventDisplay } from './EventDisplay.js';
 import { GenericToolRenderer } from './tool-renderers/GenericToolRenderer.js';
 import { getToolRenderer } from './tool-renderers/getToolRenderer.js';
 import { ToolRendererErrorBoundary } from './ToolRendererErrorBoundary.js';
+import { ToolExecutionTimelineEntry } from './ToolExecutionTimelineEntry.js';
 import MessageDisplay from '../message-display.js';
 import { logger } from '../../../../utils/logger.js';
+import { ToolRendererProps } from './tool-renderers/components/shared.js';
+import { TimelineItemProvider } from './contexts/TimelineItemContext.js';
 
 interface TimelineItemProps {
   item: TimelineItemType;
@@ -32,13 +35,13 @@ interface DynamicToolRendererProps {
 }
 
 function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRendererProps) {
-  const [ToolRenderer, setToolRenderer] = React.useState<React.ComponentType<unknown> | null>(null);
+  const [ToolRenderer, setToolRenderer] = React.useState<React.ComponentType<ToolRendererProps> | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
     getToolRenderer(item.call.name)
       .then((renderer) => {
-        setToolRenderer(() => renderer);
+        setToolRenderer(() => renderer as React.ComponentType<ToolRendererProps>);
         setIsLoading(false);
       })
       .catch((error) => {
@@ -53,8 +56,9 @@ function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRenderer
   // For cached renderers, this will only show briefly on first render
   if (isLoading) {
     return (
-      <GenericToolRenderer
+      <ToolExecutionTimelineEntry
         item={item}
+        ToolRenderer={GenericToolRenderer}
         isSelected={isSelected}
         onToggle={onToggle}
       />
@@ -63,8 +67,9 @@ function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRenderer
 
   const RendererComponent = ToolRenderer || GenericToolRenderer;
   return (
-    <RendererComponent
+    <ToolExecutionTimelineEntry
       item={item}
+      ToolRenderer={RendererComponent}
       isSelected={isSelected}
       onToggle={onToggle}
     />
@@ -78,7 +83,8 @@ export function TimelineItem({
   itemStartLine,
   onToggle,
 }: TimelineItemProps) {
-  switch (item.type) {
+  const content = (() => {
+    switch (item.type) {
     case 'user_message':
       return (
         <EventDisplay
@@ -184,5 +190,17 @@ export function TimelineItem({
           <Text>Unknown timeline item type</Text>
         </Box>
       );
-  }
+    }
+  })();
+
+  return (
+    <TimelineItemProvider
+      isSelected={isSelected}
+      onToggle={onToggle}
+      focusedLine={selectedLine}
+      itemStartLine={itemStartLine}
+    >
+      {content}
+    </TimelineItemProvider>
+  );
 }
