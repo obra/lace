@@ -33,7 +33,12 @@ let fullThreadEvents: ThreadEvent[] = [];
 
 try {
   const data = readFileSync(FULL_THREAD_DATA_PATH, 'utf8');
-  fullThreadEvents = JSON.parse(data);
+  const rawEvents = JSON.parse(data);
+  // Convert timestamp strings to Date objects for TypeScript compatibility
+  fullThreadEvents = rawEvents.map((event: any) => ({
+    ...event,
+    timestamp: new Date(event.timestamp)
+  }));
 } catch (error) {
   console.warn('Could not load full thread data, using sample data instead');
   // Fallback to sample data if full data not available
@@ -46,49 +51,49 @@ describe('Conversation Building Regression Tests', () => {
       id: 'evt_1751729643019_tka8scjv6',
       threadId: 'lace_20250705_2opxkw',
       type: 'SYSTEM_PROMPT',
-      timestamp: '2025-07-05T15:34:03.019Z',
+      timestamp: new Date('2025-07-05T15:34:03.019Z'),
       data: 'System prompt content...'
     },
     {
       id: 'evt_1751729643021_nirgfm08p',
       threadId: 'lace_20250705_2opxkw',
       type: 'USER_SYSTEM_PROMPT',
-      timestamp: '2025-07-05T15:34:03.021Z',
+      timestamp: new Date('2025-07-05T15:34:03.021Z'),
       data: 'User system prompt content...'
     },
     {
       id: 'evt_1751729670935_vhy84p2kk',
       threadId: 'lace_20250705_2opxkw',
       type: 'USER_MESSAGE',
-      timestamp: '2025-07-05T15:34:30.935Z',
+      timestamp: new Date('2025-07-05T15:34:30.935Z'),
       data: "How's it going?"
     },
     {
       id: 'evt_1751729677673_fyjr751ho',
       threadId: 'lace_20250705_2opxkw',
       type: 'AGENT_MESSAGE',
-      timestamp: '2025-07-05T15:34:37.673Z',
+      timestamp: new Date('2025-07-05T15:34:37.673Z'),
       data: "Hey there! Things are going well - I'm ready to help you with whatever you're working on in your lace project.\n\nI can see you're in a TypeScript/Node.js project with a solid structure - looks like you've got CLI tools, agents, persistence, and a comprehensive test setup. The architecture docs suggest this is a pretty sophisticated system.\n\nWhat would you like to work on today? Whether it's debugging, adding features, refactoring, or just exploring the codebase, I'm here to help!"
     },
     {
       id: 'evt_1751731558773_ow2tmw2nv',
       threadId: 'lace_20250705_2opxkw',
       type: 'USER_MESSAGE',
-      timestamp: '2025-07-05T16:05:58.773Z',
+      timestamp: new Date('2025-07-05T16:05:58.773Z'),
       data: "Hi. We recently upgraded your task management tool. I'd like you to test out the various tools that are part of the task management suite and report back."
     },
     {
       id: 'evt_1751731563862_x3do345xk',
       threadId: 'lace_20250705_2opxkw',
       type: 'AGENT_MESSAGE',
-      timestamp: '2025-07-05T16:06:03.862Z',
+      timestamp: new Date('2025-07-05T16:06:03.862Z'),
       data: "I'll test out the task management tools to see how they work. Let me start by exploring what's currently available and then test each function."
     },
     {
       id: 'evt_1751731563870_danpj5hth',
       threadId: 'lace_20250705_2opxkw',
       type: 'TOOL_CALL',
-      timestamp: '2025-07-05T16:06:03.870Z',
+      timestamp: new Date('2025-07-05T16:06:03.870Z'),
       data: {
         id: 'toolu_012RDexnDVgu6QthBGZZ45RH',
         name: 'task_list',
@@ -99,7 +104,7 @@ describe('Conversation Building Regression Tests', () => {
       id: 'evt_1751731579685_xkymz4vzm',
       threadId: 'lace_20250705_2opxkw',
       type: 'TOOL_RESULT',
-      timestamp: '2025-07-05T16:06:19.685Z',
+      timestamp: new Date('2025-07-05T16:06:19.685Z'),
       data: {
         content: [{ type: 'text', text: 'No tasks found' }],
         isError: false,
@@ -110,7 +115,7 @@ describe('Conversation Building Regression Tests', () => {
       id: 'evt_1751731585752_3zq9ap1uc',
       threadId: 'lace_20250705_2opxkw',
       type: 'AGENT_MESSAGE',
-      timestamp: '2025-07-05T16:06:25.752Z',
+      timestamp: new Date('2025-07-05T16:06:25.752Z'),
       data: "Good - starting with a clean slate. Let me test the task management suite systematically:"
     }
   ];
@@ -467,9 +472,11 @@ describe('Conversation Building Regression Tests', () => {
                 break;
               }
               
-              const hasMatchingToolUse = prevMessage.content?.some((c: any) => 
-                c.type === 'tool_use' && c.id === content.tool_use_id
-              );
+              const hasMatchingToolUse = Array.isArray(prevMessage.content) 
+                ? prevMessage.content.some((c: any) => 
+                    c.type === 'tool_use' && c.id === content.tool_use_id
+                  )
+                : false;
               
               if (!hasMatchingToolUse) {
                 hasOrphanedToolResults = true;

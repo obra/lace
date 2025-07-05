@@ -6,6 +6,7 @@ import { CompactionStrategy, CompactionConfig } from './types.js';
 import { logger } from '../../utils/logger.js';
 import { AIProvider, ProviderMessage } from '../../providers/base-provider.js';
 import { estimateTokens } from '../../utils/token-estimation.js';
+import { ToolResult } from '../../tools/types.js';
 
 export class SummarizeStrategy implements CompactionStrategy {
   private config: CompactionConfig;
@@ -58,7 +59,12 @@ export class SummarizeStrategy implements CompactionStrategy {
 
     for (const event of events) {
       if (this.config.preserveTaskEvents && this.isImportantEvent(event)) {
-        importantEvents.push(event);
+        // Truncate tool results to save space while preserving structure
+        if (event.type === 'TOOL_RESULT') {
+          importantEvents.push(this.truncateToolResult(event));
+        } else {
+          importantEvents.push(event);
+        }
       } else {
         summarizableEvents.push(event);
       }
@@ -75,6 +81,16 @@ export class SummarizeStrategy implements CompactionStrategy {
 
     // ALWAYS preserve user and agent messages - these form the core conversation
     if (event.type === 'USER_MESSAGE' || event.type === 'AGENT_MESSAGE') {
+      return true;
+    }
+
+    // ALWAYS preserve tool calls - they're small and needed for atomic pairing
+    if (event.type === 'TOOL_CALL') {
+      return true;
+    }
+
+    // ALWAYS preserve tool results - we'll truncate them to save space
+    if (event.type === 'TOOL_RESULT') {
       return true;
     }
 
@@ -219,7 +235,9 @@ export class SummarizeStrategy implements CompactionStrategy {
   }
 
   private formatTimeRange(start: Date, end: Date): string {
-    const diffMs = end.getTime() - start.getTime();
+    const startTime = start instanceof Date ? start : new Date(start);
+    const endTime = end instanceof Date ? end : new Date(end);
+    const diffMs = endTime.getTime() - startTime.getTime();
     const diffMins = Math.round(diffMs / 60000);
 
     if (diffMins < 1) {
@@ -240,6 +258,70 @@ export class SummarizeStrategy implements CompactionStrategy {
     return text.substring(0, maxLength - 3) + '...';
   }
 
+  private truncateToolResult(event: ThreadEvent): ThreadEvent {
+    if (event.type !== 'TOOL_RESULT') return event;
+    
+    // Handle string data directly
+    if (typeof event.data === 'string') {
+      const lines = event.data.split('\n');
+      if (lines.length <= 3) {
+        return event; // No need to truncate
+      }
+      
+      const truncatedLines = lines.slice(0, 3);
+      truncatedLines.push('[results truncated to save space.]');
+      const truncatedContent = truncatedLines.join('\n');
+      
+      return {
+        ...event,
+        data: truncatedContent
+      };
+    }
+    
+    // Handle ToolResult data with ContentBlock[]
+    if (typeof event.data === 'object' && event.data && 'content' in event.data) {
+      const toolResult = event.data as ToolResult;
+      const contentBlocks = toolResult.content;
+      
+      if (!Array.isArray(contentBlocks) || contentBlocks.length === 0) {
+        return event; // Return as-is if no content blocks
+      }
+      
+      // Concatenate all text content from content blocks
+      const fullText = contentBlocks
+        .filter(block => block.type === 'text' && block.text)
+        .map(block => block.text)
+        .join('\n');
+      
+      const lines = fullText.split('\n');
+      if (lines.length <= 3) {
+        return event; // No need to truncate
+      }
+      
+      const truncatedLines = lines.slice(0, 3);
+      truncatedLines.push('[results truncated to save space.]');
+      const truncatedContent = truncatedLines.join('\n');
+      
+      // Create new ToolResult with truncated content
+      const truncatedToolResult: ToolResult = {
+        ...toolResult,
+        content: [
+          {
+            type: 'text',
+            text: truncatedContent
+          }
+        ]
+      };
+      
+      return {
+        ...event,
+        data: truncatedToolResult
+      };
+    }
+    
+    return event; // Return as-is if we can't handle the data format
+  }
+
   // Build conversation from events (simplified version of Agent's method)
   private buildConversationFromEvents(events: ThreadEvent[]): ProviderMessage[] {
     const messages: ProviderMessage[] = [];
@@ -255,6 +337,31 @@ export class SummarizeStrategy implements CompactionStrategy {
           role: 'assistant',
           content: event.data as string,
         });
+      } else if (event.type === 'TOOL_CALL') {
+        // Tool calls are handled as part of assistant messages in the full implementation
+        // For token estimation purposes, we can skip them as they're typically included in the assistant message
+        continue;
+      } else if (event.type === 'TOOL_RESULT') {
+        // Tool results are handled as user messages in the full implementation
+        // For token estimation purposes, we can skip them or include them as user messages
+        let content = '';
+        if (typeof event.data === 'string') {
+          content = event.data;
+        } else if (typeof event.data === 'object' && event.data && 'content' in event.data) {
+          const toolResult = event.data as ToolResult;
+          // Extract text from ContentBlock[]
+          content = toolResult.content
+            .filter(block => block.type === 'text' && block.text)
+            .map(block => block.text)
+            .join('\n');
+        }
+        
+        if (content) {
+          messages.push({
+            role: 'user',
+            content,
+          });
+        }
       }
       // Skip other event types for token estimation purposes
     }
