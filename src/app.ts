@@ -46,7 +46,9 @@ const providerInitializers: Record<
 async function createProvider(providerType: string, model?: string): Promise<AIProvider> {
   const initializer = providerInitializers[providerType];
   if (!initializer) {
-    throw new Error(`Unknown provider: ${providerType}`);
+    throw new Error(
+      `Unknown provider: ${providerType}. Available providers are: ${Object.keys(providerInitializers).join(', ')}`
+    );
   }
 
   let apiKey: string | undefined;
@@ -57,7 +59,7 @@ async function createProvider(providerType: string, model?: string): Promise<AIP
       process.exit(1);
     }
   } else if (providerType === 'openai') {
-    apiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_KEY;
+    apiKey = getEnvVar('OPENAI_API_KEY') || getEnvVar('OPENAI_KEY');
     if (!apiKey) {
       console.error(
         'Error: OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider'
