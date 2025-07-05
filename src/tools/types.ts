@@ -1,8 +1,12 @@
 // ABOUTME: Tool system type definitions and interfaces
 // ABOUTME: Model-agnostic tool definitions compatible with multiple AI SDKs and MCP
 
+import { ThreadId } from '../threads/types.js';
+
 export interface ToolContext {
-  threadId?: string;
+  threadId?: ThreadId;
+  // Add for multi-agent support:
+  parentThreadId?: ThreadId; // Parent thread (session)
 }
 
 export interface ToolAnnotations {

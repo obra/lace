@@ -45,5 +45,5 @@ export function getLaceFilePath(filename: string): string {
  * Get the path to the threads database file
  */
 export function getLaceDbPath(): string {
-  return getLaceFilePath('threads.db');
+  return getLaceFilePath('lace.db');
 }

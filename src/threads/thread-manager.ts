@@ -2,7 +2,7 @@
 // ABOUTME: Maintains backward compatibility with immediate event persistence
 
 import { EventEmitter } from 'events';
-import { ThreadPersistence } from './persistence.js';
+import { DatabasePersistence } from '../persistence/database.js';
 import { Thread, ThreadEvent, EventType } from './types.js';
 import { ToolCall, ToolResult } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
@@ -18,13 +18,13 @@ export interface ThreadSessionInfo {
 
 export class ThreadManager extends EventEmitter {
   private _currentThread: Thread | null = null;
-  private _persistence: ThreadPersistence;
+  private _persistence: DatabasePersistence;
   private _compactionStrategy: SummarizeStrategy;
   private _providerStrategyCache = new Map<string, SummarizeStrategy>();
 
   constructor(dbPath: string) {
     super();
-    this._persistence = new ThreadPersistence(dbPath);
+    this._persistence = new DatabasePersistence(dbPath);
     this._compactionStrategy = new SummarizeStrategy();
   }
 

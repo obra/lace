@@ -172,9 +172,9 @@ describe('Lace Directory Management', () => {
   });
 
   describe('getLaceDbPath', () => {
-    it('should return threads.db in the lace directory', () => {
+    it('should return lace.db in the lace directory', () => {
       const result = getLaceDbPath();
-      const expected = path.join(tempDir, 'threads.db');
+      const expected = path.join(tempDir, 'lace.db');
 
       expect(result).toBe(expected);
     });
@@ -184,7 +184,7 @@ describe('Lace Directory Management', () => {
       process.env.LACE_DIR = customDir;
 
       const result = getLaceDbPath();
-      const expected = path.join(customDir, 'threads.db');
+      const expected = path.join(customDir, 'lace.db');
 
       expect(result).toBe(expected);
     });
@@ -193,7 +193,7 @@ describe('Lace Directory Management', () => {
       delete process.env.LACE_DIR;
 
       const result = getLaceDbPath();
-      const expected = path.join(os.homedir(), '.lace', 'threads.db');
+      const expected = path.join(os.homedir(), '.lace', 'lace.db');
 
       expect(result).toBe(expected);
     });
@@ -221,7 +221,7 @@ describe('Lace Directory Management', () => {
       expect(configPath).toBe(path.join(customDir, 'config.json'));
 
       const dbPath = getLaceDbPath();
-      expect(dbPath).toBe(path.join(customDir, 'threads.db'));
+      expect(dbPath).toBe(path.join(customDir, 'lace.db'));
     });
 
     it('should handle multiple calls consistently', () => {

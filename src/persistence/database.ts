@@ -1,10 +1,24 @@
-// ABOUTME: SQLite persistence layer for thread and event storage
-// ABOUTME: Handles database schema, CRUD operations, and data serialization
+// ABOUTME: Consolidated SQLite persistence layer for threads, events, and tasks
+// ABOUTME: Handles database schema, CRUD operations, and data serialization for all entities
 
 import Database from 'better-sqlite3';
-import { Thread, ThreadEvent, EventType, VersionHistoryEntry } from './types.js';
+import {
+  Thread,
+  ThreadEvent,
+  EventType,
+  VersionHistoryEntry,
+  ThreadId,
+  AssigneeId,
+} from '../threads/types.js';
+import {
+  Task,
+  TaskNote,
+  TaskStatus,
+  TaskPriority,
+} from '../tools/implementations/task-manager/types.js';
+import { logger } from '../utils/logger.js';
 
-export class ThreadPersistence {
+export class DatabasePersistence {
   private db: Database.Database | null = null;
   private _closed: boolean = false;
   private _disabled: boolean = false;
@@ -12,13 +26,16 @@ export class ThreadPersistence {
   constructor(dbPath: string) {
     try {
       this.db = new Database(dbPath);
+      // Enable WAL mode for better concurrency
+      this.db.pragma('journal_mode = WAL');
+      this.db.pragma('busy_timeout = 5000');
       this.initializeSchema();
     } catch (error) {
-      console.error(
-        `Failed to initialize database at ${dbPath}:`,
-        error instanceof Error ? error.message : String(error)
-      );
-      console.error('Thread persistence disabled - data will only be stored in memory');
+      logger.error('Failed to initialize database', {
+        dbPath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      logger.warn('Database persistence disabled - data will only be stored in memory');
       this._disabled = true;
     }
   }
@@ -50,6 +67,10 @@ export class ThreadPersistence {
     if (currentVersion < 2) {
       this.migrateToV2();
     }
+
+    if (currentVersion < 3) {
+      this.migrateToV3();
+    }
   }
 
   private getSchemaVersion(): number {
@@ -74,8 +95,6 @@ export class ThreadPersistence {
 
   private migrateToV1(): void {
     if (!this.db) return;
-
-    console.log('Migrating database to version 1 (basic schema)...');
 
     // Create basic threads and events tables
     this.db.exec(`
@@ -102,13 +121,10 @@ export class ThreadPersistence {
     `);
 
     this.setSchemaVersion(1);
-    console.log('Database migrated to version 1');
   }
 
   private migrateToV2(): void {
     if (!this.db) return;
-
-    console.log('Migrating database to version 2 (thread versioning)...');
 
     // Create thread versioning tables
     this.db.exec(`
@@ -136,8 +152,48 @@ export class ThreadPersistence {
     `);
 
     this.setSchemaVersion(2);
-    console.log('Database migrated to version 2');
   }
+
+  private migrateToV3(): void {
+    if (!this.db) return;
+
+    // Create task management tables
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        prompt TEXT NOT NULL,
+        status TEXT CHECK(status IN ('pending', 'in_progress', 'completed', 'blocked')) DEFAULT 'pending',
+        priority TEXT CHECK(priority IN ('high', 'medium', 'low')) DEFAULT 'medium',
+        assigned_to TEXT,
+        created_by TEXT NOT NULL,
+        thread_id TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS task_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id TEXT NOT NULL,
+        author TEXT NOT NULL,
+        content TEXT NOT NULL,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_tasks_thread_id ON tasks(thread_id);
+      CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to);
+      CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+      CREATE INDEX IF NOT EXISTS idx_task_notes_task_id ON task_notes(task_id);
+    `);
+
+    this.setSchemaVersion(3);
+  }
+
+  // ===============================
+  // Thread-related methods
+  // ===============================
 
   saveThread(thread: Thread): void {
     if (this._closed || this._disabled || !this.db) return;
@@ -432,12 +488,329 @@ export class ThreadPersistence {
         deleteHistoryStmt.run(versionId);
       }
 
-      console.log(
-        `Cleaned up ${versionsToDelete.length} old compacted threads for canonical ID ${canonicalId}`
-      );
+      logger.info('Cleaned up old compacted threads', {
+        versionsDeleted: versionsToDelete.length,
+        canonicalId,
+      });
     });
 
     transaction();
+  }
+
+  // ===============================
+  // Task-related methods
+  // ===============================
+
+  async saveTask(task: Task): Promise<void> {
+    return this.withRetry(() => {
+      if (this._closed || this._disabled || !this.db) return;
+
+      const stmt = this.db.prepare(`
+        INSERT INTO tasks (id, title, description, prompt, status, priority, 
+                          assigned_to, created_by, thread_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      stmt.run(
+        task.id,
+        task.title,
+        task.description,
+        task.prompt,
+        task.status,
+        task.priority,
+        task.assignedTo || null,
+        task.createdBy,
+        task.threadId,
+        task.createdAt.toISOString(),
+        task.updatedAt.toISOString()
+      );
+    });
+  }
+
+  loadTask(taskId: string): Task | null {
+    if (this._disabled || !this.db) return null;
+
+    const stmt = this.db.prepare(`
+      SELECT * FROM tasks WHERE id = ?
+    `);
+
+    const row = stmt.get(taskId) as
+      | {
+          id: string;
+          title: string;
+          description: string;
+          prompt: string;
+          status: string;
+          priority: string;
+          assigned_to: string | null;
+          created_by: string;
+          thread_id: string;
+          created_at: string;
+          updated_at: string;
+        }
+      | undefined;
+    if (!row) return null;
+
+    // Load notes for this task
+    const notesStmt = this.db.prepare(`
+      SELECT * FROM task_notes 
+      WHERE task_id = ? 
+      ORDER BY timestamp ASC
+    `);
+
+    const noteRows = notesStmt.all(taskId) as Array<{
+      id: number;
+      task_id: string;
+      author: string;
+      content: string;
+      timestamp: string;
+    }>;
+    const notes: TaskNote[] = noteRows.map((noteRow) => ({
+      id: String(noteRow.id),
+      author: noteRow.author as ThreadId,
+      content: noteRow.content,
+      timestamp: new Date(noteRow.timestamp),
+    }));
+
+    return {
+      id: row.id,
+      title: row.title,
+      description: row.description || '',
+      prompt: row.prompt,
+      status: row.status as TaskStatus,
+      priority: row.priority as TaskPriority,
+      assignedTo: row.assigned_to as AssigneeId | undefined,
+      createdBy: row.created_by as ThreadId,
+      threadId: row.thread_id as ThreadId,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      notes,
+    };
+  }
+
+  loadTasksByThread(threadId: ThreadId): Task[] {
+    if (this._disabled || !this.db) return [];
+
+    const stmt = this.db.prepare(`
+      SELECT * FROM tasks 
+      WHERE thread_id = ? 
+      ORDER BY created_at DESC
+    `);
+
+    const rows = stmt.all(threadId) as Array<{
+      id: string;
+      title: string;
+      description: string;
+      prompt: string;
+      status: string;
+      priority: string;
+      assigned_to: string | null;
+      created_by: string;
+      thread_id: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+
+    // Load notes for all tasks in batch
+    const taskIds = rows.map((row) => row.id);
+    const notesMap = this.loadNotesBatch(taskIds);
+
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      description: row.description || '',
+      prompt: row.prompt,
+      status: row.status as TaskStatus,
+      priority: row.priority as TaskPriority,
+      assignedTo: row.assigned_to as AssigneeId | undefined,
+      createdBy: row.created_by as ThreadId,
+      threadId: row.thread_id as ThreadId,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      notes: notesMap.get(row.id) || [],
+    }));
+  }
+
+  loadTasksByAssignee(assignee: AssigneeId): Task[] {
+    if (this._disabled || !this.db) return [];
+
+    const stmt = this.db.prepare(`
+      SELECT * FROM tasks 
+      WHERE assigned_to = ? 
+      ORDER BY created_at DESC
+    `);
+
+    const rows = stmt.all(assignee) as Array<{
+      id: string;
+      title: string;
+      description: string;
+      prompt: string;
+      status: string;
+      priority: string;
+      assigned_to: string | null;
+      created_by: string;
+      thread_id: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+
+    // Load notes for all tasks in batch
+    const taskIds = rows.map((row) => row.id);
+    const notesMap = this.loadNotesBatch(taskIds);
+
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      description: row.description || '',
+      prompt: row.prompt,
+      status: row.status as TaskStatus,
+      priority: row.priority as TaskPriority,
+      assignedTo: row.assigned_to as AssigneeId | undefined,
+      createdBy: row.created_by as ThreadId,
+      threadId: row.thread_id as ThreadId,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      notes: notesMap.get(row.id) || [],
+    }));
+  }
+
+  async updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
+    return this.withRetry(() => {
+      if (this._closed || this._disabled || !this.db) return;
+
+      // Build dynamic update query
+      const updateFields: string[] = [];
+      const values: (string | number | null)[] = [];
+
+      if (updates.title !== undefined) {
+        updateFields.push('title = ?');
+        values.push(updates.title);
+      }
+      if (updates.description !== undefined) {
+        updateFields.push('description = ?');
+        values.push(updates.description);
+      }
+      if (updates.prompt !== undefined) {
+        updateFields.push('prompt = ?');
+        values.push(updates.prompt);
+      }
+      if (updates.status !== undefined) {
+        updateFields.push('status = ?');
+        values.push(updates.status);
+      }
+      if (updates.priority !== undefined) {
+        updateFields.push('priority = ?');
+        values.push(updates.priority);
+      }
+      if (updates.assignedTo !== undefined) {
+        updateFields.push('assigned_to = ?');
+        values.push(updates.assignedTo);
+      }
+
+      // Always update timestamp
+      updateFields.push('updated_at = ?');
+      values.push(new Date().toISOString());
+
+      // Add task ID at the end
+      values.push(taskId);
+
+      const query = `
+        UPDATE tasks 
+        SET ${updateFields.join(', ')}
+        WHERE id = ?
+      `;
+
+      const stmt = this.db.prepare(query);
+      const result = stmt.run(...values);
+
+      if (result.changes === 0) {
+        throw new Error(`Task ${taskId} not found`);
+      }
+    });
+  }
+
+  async addNote(taskId: string, note: Omit<TaskNote, 'id'>): Promise<void> {
+    return this.withRetry(() => {
+      if (this._closed || this._disabled || !this.db) return;
+
+      // First check if task exists
+      const taskCheck = this.db.prepare('SELECT id FROM tasks WHERE id = ?');
+      const task = taskCheck.get(taskId);
+      if (!task) {
+        throw new Error(`Task ${taskId} not found`);
+      }
+
+      const stmt = this.db.prepare(`
+        INSERT INTO task_notes (task_id, author, content, timestamp)
+        VALUES (?, ?, ?, ?)
+      `);
+
+      stmt.run(taskId, note.author, note.content, note.timestamp.toISOString());
+
+      // Update task's updated_at timestamp
+      const updateStmt = this.db.prepare(`
+        UPDATE tasks SET updated_at = ? WHERE id = ?
+      `);
+      updateStmt.run(new Date().toISOString(), taskId);
+    });
+  }
+
+  // Batch load notes for multiple tasks to avoid N+1 queries
+  private loadNotesBatch(taskIds: string[]): Map<string, TaskNote[]> {
+    if (this._disabled || !this.db || taskIds.length === 0) return new Map();
+
+    const placeholders = taskIds.map(() => '?').join(',');
+    const stmt = this.db.prepare(`
+      SELECT * FROM task_notes 
+      WHERE task_id IN (${placeholders})
+      ORDER BY task_id, timestamp ASC
+    `);
+
+    const noteRows = stmt.all(...taskIds) as Array<{
+      id: number;
+      task_id: string;
+      author: string;
+      content: string;
+      timestamp: string;
+    }>;
+
+    const notesMap = new Map<string, TaskNote[]>();
+
+    for (const noteRow of noteRows) {
+      const taskId = noteRow.task_id;
+      if (!notesMap.has(taskId)) {
+        notesMap.set(taskId, []);
+      }
+
+      notesMap.get(taskId)!.push({
+        id: String(noteRow.id),
+        author: noteRow.author as ThreadId,
+        content: noteRow.content,
+        timestamp: new Date(noteRow.timestamp),
+      });
+    }
+
+    return notesMap;
+  }
+
+  // Retry wrapper for write operations to handle SQLITE_BUSY
+  private async withRetry<T>(operation: () => T, maxRetries = 3): Promise<T> {
+    let lastError: unknown;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return operation();
+      } catch (error: unknown) {
+        if ((error as { code?: string }).code === 'SQLITE_BUSY' && i < maxRetries - 1) {
+          lastError = error;
+          // Exponential backoff with proper async delay
+          const delay = Math.min(100 * Math.pow(2, i), 1000);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw lastError;
   }
 
   close(): void {
