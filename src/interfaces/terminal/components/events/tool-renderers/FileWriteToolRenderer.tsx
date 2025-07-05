@@ -6,12 +6,32 @@ import { Box, Text } from 'ink';
 import { TimelineEntry, TimelineStatus } from '../../ui/TimelineEntry.js';
 import { useTimelineItem } from '../contexts/TimelineItemContext.js';
 import { limitLines, type ToolRendererProps } from './components/shared.js';
+import { logger } from '../../../../../utils/logger.js';
 
 export function FileWriteToolRenderer({ item }: ToolRendererProps) {
   const { isExpanded } = useTimelineItem();
   
-  // Extract data directly
-  const { file_path, content } = item.call.arguments as { file_path: string; content: string };
+  // Extract and validate data
+  const args = item.call.arguments as Record<string, unknown>;
+  
+  if (typeof args.file_path !== 'string') {
+    logger.warn('FileWriteToolRenderer: Invalid file_path argument', { 
+      file_path: args.file_path, 
+      callId: item.call.id 
+    });
+    return null;
+  }
+  
+  if (typeof args.content !== 'string') {
+    logger.warn('FileWriteToolRenderer: Invalid content argument', { 
+      content: typeof args.content, 
+      callId: item.call.id 
+    });
+    return null;
+  }
+  
+  const file_path = args.file_path;
+  const content = args.content;
   const hasError = item.result?.isError;
   const isRunning = !item.result;
   

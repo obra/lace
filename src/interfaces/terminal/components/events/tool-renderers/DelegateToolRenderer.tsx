@@ -24,17 +24,48 @@ interface DelegateResult {
 }
 
 function parseDelegateResult(result: any): DelegateResult | null {
-  if (!result?.content?.[0]?.text) return null;
+  if (!result?.content?.[0]?.text) {
+    logger.debug('DelegateToolRenderer: No content in result');
+    return null;
+  }
   
   try {
     const text = result.content[0].text;
+    
     // Try to parse as JSON first
     if (text.trim().startsWith('{')) {
-      return JSON.parse(text);
+      const parsed = JSON.parse(text);
+      
+      // Validate structure
+      if (typeof parsed !== 'object' || parsed === null) {
+        logger.warn('DelegateToolRenderer: Parsed result is not an object', { parsed });
+        return { error: text };
+      }
+      
+      // Validate optional fields have correct types if present
+      if (parsed.threadId !== undefined && typeof parsed.threadId !== 'string') {
+        logger.warn('DelegateToolRenderer: Invalid threadId type', { threadId: parsed.threadId });
+      }
+      
+      if (parsed.status !== undefined && 
+          !['active', 'completed', 'error'].includes(parsed.status)) {
+        logger.warn('DelegateToolRenderer: Invalid status value', { status: parsed.status });
+      }
+      
+      if (parsed.totalTokens !== undefined && typeof parsed.totalTokens !== 'number') {
+        logger.warn('DelegateToolRenderer: Invalid totalTokens type', { totalTokens: parsed.totalTokens });
+      }
+      
+      return parsed as DelegateResult;
     }
+    
     // Otherwise return as error text
     return { error: text };
-  } catch {
+  } catch (error) {
+    logger.warn('DelegateToolRenderer: Failed to parse delegate result JSON', {
+      error: error instanceof Error ? error.message : String(error),
+      content: result.content[0].text?.slice(0, 200) + '...'
+    });
     return { error: result.content[0].text };
   }
 }
@@ -44,8 +75,23 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, ToolRendererProp
 }, ref) => {
   const { isExpanded, isSelected } = useTimelineItem();
   
-  // Extract data directly
-  const task = (item.call.arguments.task || item.call.arguments.prompt || 'Unknown task') as string;
+  // Extract and validate data
+  const args = item.call.arguments as Record<string, unknown>;
+  
+  // Get task from either task or prompt argument
+  let task: string;
+  if (typeof args.task === 'string') {
+    task = args.task;
+  } else if (typeof args.prompt === 'string') {
+    task = args.prompt;
+  } else {
+    logger.warn('DelegateToolRenderer: No valid task or prompt argument', { 
+      args, 
+      callId: item.call.id 
+    });
+    task = 'Unknown task';
+  }
+  
   const delegateResult = item.result ? parseDelegateResult(item.result) : null;
   const hasError = item.result?.isError || delegateResult?.status === 'error';
   const isRunning = !item.result;

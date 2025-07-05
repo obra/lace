@@ -7,6 +7,7 @@ import { TimelineEntry, TimelineStatus } from '../../ui/TimelineEntry.js';
 import { useTimelineItem } from '../contexts/TimelineItemContext.js';
 import { limitLines, type ToolRendererProps } from './components/shared.js';
 import { ToolResult } from '../../../../../tools/types.js';
+import { logger } from '../../../../../utils/logger.js';
 
 // Bash tool output structure
 interface BashOutput {
@@ -19,17 +20,37 @@ interface BashOutput {
 function parseBashResult(result: ToolResult): BashOutput | null {
   try {
     const content = result?.content?.[0]?.text;
-    if (!content) return null;
+    if (!content) {
+      logger.debug('BashToolRenderer: No content in result');
+      return null;
+    }
     
     const parsed = JSON.parse(content);
-    if (typeof parsed === 'object' && 
-        typeof parsed.stdout === 'string' && 
-        typeof parsed.stderr === 'string' &&
-        typeof parsed.exitCode === 'number') {
-      return parsed as BashOutput;
+    
+    // Validate the parsed structure
+    if (typeof parsed !== 'object' || parsed === null) {
+      logger.warn('BashToolRenderer: Parsed result is not an object', { parsed });
+      return null;
     }
-    return null;
-  } catch {
+    
+    if (typeof parsed.stdout !== 'string' || 
+        typeof parsed.stderr !== 'string' ||
+        typeof parsed.exitCode !== 'number') {
+      logger.warn('BashToolRenderer: Invalid bash result structure', {
+        hasStdout: typeof parsed.stdout,
+        hasStderr: typeof parsed.stderr,
+        hasExitCode: typeof parsed.exitCode,
+        parsed
+      });
+      return null;
+    }
+    
+    return parsed as BashOutput;
+  } catch (error) {
+    logger.warn('BashToolRenderer: Failed to parse bash result JSON', {
+      error: error instanceof Error ? error.message : String(error),
+      content: result?.content?.[0]?.text?.slice(0, 200) + '...' // Log first 200 chars
+    });
     return null;
   }
 }
@@ -37,8 +58,20 @@ function parseBashResult(result: ToolResult): BashOutput | null {
 export function BashToolRenderer({ item }: ToolRendererProps) {
   const { isExpanded } = useTimelineItem();
   
-  // Extract data directly - no abstraction needed
-  const { command, description } = item.call.arguments as { command: string; description?: string };
+  // Extract and validate data
+  const args = item.call.arguments as Record<string, unknown>;
+  
+  if (typeof args.command !== 'string') {
+    logger.warn('BashToolRenderer: Invalid command argument', { 
+      command: args.command, 
+      callId: item.call.id 
+    });
+    return null;
+  }
+  
+  const command = args.command;
+  const description = typeof args.description === 'string' ? args.description : undefined;
+  
   const bashOutput = item.result ? parseBashResult(item.result) : null;
   const hasError = item.result?.isError || (bashOutput && bashOutput.exitCode !== 0);
   const isRunning = !item.result;

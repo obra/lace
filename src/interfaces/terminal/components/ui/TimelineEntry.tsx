@@ -110,15 +110,25 @@ export function TimelineEntry({
 
   // Debounced height measurement function
   const measureHeight = useCallback(() => {
-    if (contentAreaRef.current) {
-      try {
-        const { height } = measureElement(contentAreaRef.current);
-        const newHeight = Math.max(1, height);
-        setMeasuredHeight(prev => prev !== newHeight ? newHeight : prev);
-      } catch (error) {
-        setMeasuredHeight(prev => prev !== 1 ? 1 : prev);
-      }
+    // Clear any existing timeout
+    if (measureTimeoutRef.current) {
+      clearTimeout(measureTimeoutRef.current);
     }
+    
+    // Debounce the measurement to avoid excessive calls
+    measureTimeoutRef.current = setTimeout(() => {
+      if (contentAreaRef.current) {
+        try {
+          const { height } = measureElement(contentAreaRef.current);
+          const newHeight = Math.max(1, height);
+          setMeasuredHeight(prev => prev !== newHeight ? newHeight : prev);
+        } catch (error) {
+          // Log error for debugging but fallback gracefully
+          console.warn('TimelineEntry: Failed to measure height', error);
+          setMeasuredHeight(prev => prev !== 1 ? 1 : prev);
+        }
+      }
+    }, 16); // ~60fps debounce
   }, []);
 
   // Detect expansion state changes and trigger remeasurement
