@@ -23,7 +23,14 @@ class MockRetryProvider extends AIProvider {
   }
 
   private _shouldEmitRetryEvents = false;
-  private _retryEventData: { attempt?: number; delay?: number; error?: Error; attempts?: number; lastError?: Error; type?: 'attempt' | 'exhausted' } | null = null;
+  private _retryEventData: {
+    attempt?: number;
+    delay?: number;
+    error?: Error;
+    attempts?: number;
+    lastError?: Error;
+    type?: 'attempt' | 'exhausted';
+  } | null = null;
 
   async createResponse(
     _messages: ProviderMessage[],
@@ -32,15 +39,15 @@ class MockRetryProvider extends AIProvider {
   ): Promise<ProviderResponse> {
     if (this._shouldEmitRetryEvents && this._retryEventData) {
       if (this._retryEventData.type === 'attempt') {
-        this.emit('retry_attempt', { 
-          attempt: this._retryEventData.attempt!, 
-          delay: this._retryEventData.delay!, 
-          error: this._retryEventData.error! 
+        this.emit('retry_attempt', {
+          attempt: this._retryEventData.attempt!,
+          delay: this._retryEventData.delay!,
+          error: this._retryEventData.error!,
         });
       } else if (this._retryEventData.type === 'exhausted') {
-        this.emit('retry_exhausted', { 
-          attempts: this._retryEventData.attempts!, 
-          lastError: this._retryEventData.lastError! 
+        this.emit('retry_exhausted', {
+          attempts: this._retryEventData.attempts!,
+          lastError: this._retryEventData.lastError!,
         });
       }
     }
@@ -58,15 +65,15 @@ class MockRetryProvider extends AIProvider {
   ): Promise<ProviderResponse> {
     if (this._shouldEmitRetryEvents && this._retryEventData) {
       if (this._retryEventData.type === 'attempt') {
-        this.emit('retry_attempt', { 
-          attempt: this._retryEventData.attempt!, 
-          delay: this._retryEventData.delay!, 
-          error: this._retryEventData.error! 
+        this.emit('retry_attempt', {
+          attempt: this._retryEventData.attempt!,
+          delay: this._retryEventData.delay!,
+          error: this._retryEventData.error!,
         });
       } else if (this._retryEventData.type === 'exhausted') {
-        this.emit('retry_exhausted', { 
-          attempts: this._retryEventData.attempts!, 
-          lastError: this._retryEventData.lastError! 
+        this.emit('retry_exhausted', {
+          attempts: this._retryEventData.attempts!,
+          lastError: this._retryEventData.lastError!,
         });
       }
     }
@@ -99,7 +106,7 @@ describe('Agent retry event forwarding', () => {
   beforeEach(async () => {
     threadId = 'test-thread-id';
     mockProvider = new MockRetryProvider({});
-    
+
     // Mock ToolExecutor
     mockToolExecutor = {
       executeTool: vi.fn(),
@@ -153,7 +160,7 @@ describe('Agent retry event forwarding', () => {
     it('should forward retry_attempt events during non-streaming response', async () => {
       // Disable streaming for this test
       mockProvider.config.streaming = false;
-      
+
       const retryAttemptSpy = vi.fn();
       agent.on('retry_attempt', retryAttemptSpy);
 
@@ -193,7 +200,7 @@ describe('Agent retry event forwarding', () => {
     it('should forward retry_exhausted events during non-streaming response', async () => {
       // Disable streaming for this test
       mockProvider.config.streaming = false;
-      
+
       const retryExhaustedSpy = vi.fn();
       agent.on('retry_exhausted', retryExhaustedSpy);
 
@@ -227,7 +234,7 @@ describe('Agent retry event forwarding', () => {
     it('should clean up retry event listeners after non-streaming response', async () => {
       // Disable streaming for this test
       mockProvider.config.streaming = false;
-      
+
       const retryExhaustedSpy = vi.fn();
       agent.on('retry_exhausted', retryExhaustedSpy);
 

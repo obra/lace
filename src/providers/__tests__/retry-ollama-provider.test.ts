@@ -4,38 +4,28 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OllamaProvider } from '../ollama-provider.js';
 import { ProviderMessage } from '../base-provider.js';
-import { Ollama } from 'ollama';
+
+// Create mock functions that we'll reference
+const mockChat = vi.fn();
+const mockList = vi.fn();
 
 // Mock the Ollama SDK
 vi.mock('ollama', () => {
-  const mockChat = vi.fn();
-  const mockList = vi.fn();
-
   const MockOllama = vi.fn().mockImplementation(() => ({
     chat: mockChat,
     list: mockList,
   }));
-
-  // Add these as static properties so we can access them in tests
-  MockOllama.mockChat = mockChat;
-  MockOllama.mockList = mockList;
 
   return { Ollama: MockOllama };
 });
 
 describe('OllamaProvider retry functionality', () => {
   let provider: OllamaProvider;
-  let mockChat: any;
-  let mockList: any;
   let mockDiagnose: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-
-    // Get references to the mocked methods
-    mockChat = (Ollama as any).mockChat;
-    mockList = (Ollama as any).mockList;
 
     // Reset the mocks before each test
     mockChat.mockReset();

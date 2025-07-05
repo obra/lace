@@ -4,13 +4,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LMStudioProvider } from '../lmstudio-provider.js';
 import { ProviderMessage } from '../base-provider.js';
-import { LMStudioClient } from '@lmstudio/sdk';
+
+// Create mock functions that we'll reference
+const mockListLoaded = vi.fn();
+const mockLoad = vi.fn();
 
 // Mock the LMStudio SDK
 vi.mock('@lmstudio/sdk', () => {
-  const mockListLoaded = vi.fn();
-  const mockLoad = vi.fn();
-
   const MockLMStudioClient = vi.fn().mockImplementation(() => ({
     llm: {
       listLoaded: mockListLoaded,
@@ -18,26 +18,16 @@ vi.mock('@lmstudio/sdk', () => {
     },
   }));
 
-  // Add these as static properties so we can access them in tests
-  MockLMStudioClient.mockListLoaded = mockListLoaded;
-  MockLMStudioClient.mockLoad = mockLoad;
-
   return { LMStudioClient: MockLMStudioClient };
 });
 
 describe('LMStudioProvider retry functionality', () => {
   let provider: LMStudioProvider;
-  let mockListLoaded: any;
-  let mockLoad: any;
   let mockDiagnose: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-
-    // Get references to the mocked methods
-    mockListLoaded = (LMStudioClient as any).mockListLoaded;
-    mockLoad = (LMStudioClient as any).mockLoad;
 
     // Reset the mocks before each test
     mockListLoaded.mockReset();

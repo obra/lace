@@ -32,11 +32,6 @@ export class LMStudioProvider extends AIProvider {
   public _cachedModel: LMStudioModel | null = null;
   private _cachedModelId: string | null = null;
 
-  // Expose RETRY_CONFIG for testing
-  get RETRY_CONFIG() {
-    return super['RETRY_CONFIG'];
-  }
-
   constructor(config: LMStudioProviderConfig = {}) {
     super(config);
     this._baseUrl = config.baseUrl || 'ws://localhost:1234';

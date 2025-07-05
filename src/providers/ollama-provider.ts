@@ -34,11 +34,6 @@ export class OllamaProvider extends AIProvider {
   private readonly _ollama: Ollama;
   private readonly _host: string;
 
-  // Expose RETRY_CONFIG for testing
-  get RETRY_CONFIG() {
-    return super['RETRY_CONFIG'];
-  }
-
   constructor(config: OllamaProviderConfig = {}) {
     super(config);
     this._host = config.host || 'http://localhost:11434';

@@ -58,7 +58,7 @@ class MockRetryMetricsProvider extends AIProvider {
         this.emit('retry_attempt', { attempt, delay, error });
 
         // Simulate delay
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       }
 
       if (this.retryCount >= 3) {
@@ -113,14 +113,18 @@ describe('Agent Retry Metrics Tracking', () => {
 
   describe('Turn metrics initialization', () => {
     it('should initialize retry metrics with default values', async () => {
-      const turnStartEvents: Array<{ turnId: string; userInput: string; metrics: CurrentTurnMetrics }> = [];
+      const turnStartEvents: Array<{
+        turnId: string;
+        userInput: string;
+        metrics: CurrentTurnMetrics;
+      }> = [];
       agent.on('turn_start', (data) => turnStartEvents.push(data));
 
       await agent.sendMessage('Test message');
 
       expect(turnStartEvents).toHaveLength(1);
       const metrics = turnStartEvents[0].metrics;
-      
+
       expect(metrics.retryMetrics).toBeDefined();
       expect(metrics.retryMetrics?.totalAttempts).toBe(0);
       expect(metrics.retryMetrics?.totalDelayMs).toBe(0);
@@ -138,7 +142,7 @@ describe('Agent Retry Metrics Tracking', () => {
 
       expect(turnCompleteEvents).toHaveLength(1);
       const metrics = turnCompleteEvents[0].metrics;
-      
+
       expect(metrics.retryMetrics?.totalAttempts).toBe(0);
       expect(metrics.retryMetrics?.totalDelayMs).toBe(0);
       expect(metrics.retryMetrics?.successful).toBe(true);
@@ -161,7 +165,7 @@ describe('Agent Retry Metrics Tracking', () => {
 
       const retryAttemptEvents: Array<{ attempt: number; delay: number; error: Error }> = [];
       const turnCompleteEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
-      
+
       agent.on('retry_attempt', (data) => retryAttemptEvents.push(data));
       agent.on('turn_complete', (data) => turnCompleteEvents.push(data));
 
@@ -175,7 +179,7 @@ describe('Agent Retry Metrics Tracking', () => {
       // Verify final metrics reflect successful retries
       expect(turnCompleteEvents).toHaveLength(1);
       const metrics = turnCompleteEvents[0].metrics;
-      
+
       expect(metrics.retryMetrics?.totalAttempts).toBe(2);
       expect(metrics.retryMetrics?.totalDelayMs).toBeGreaterThan(0); // Should have accumulated delays
       expect(metrics.retryMetrics?.successful).toBe(true); // Eventually succeeded
@@ -199,7 +203,7 @@ describe('Agent Retry Metrics Tracking', () => {
       const retryAttemptEvents: Array<{ attempt: number; delay: number; error: Error }> = [];
       const retryExhaustedEvents: Array<{ attempts: number; lastError: Error }> = [];
       const turnCompleteEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
-      
+
       agent.on('retry_attempt', (data) => retryAttemptEvents.push(data));
       agent.on('retry_exhausted', (data) => retryExhaustedEvents.push(data));
       agent.on('turn_complete', (data) => turnCompleteEvents.push(data));
@@ -224,7 +228,7 @@ describe('Agent Retry Metrics Tracking', () => {
       // Even though operation failed, turn metrics should still be recorded
       expect(turnCompleteEvents).toHaveLength(1);
       const metrics = turnCompleteEvents[0].metrics;
-      
+
       expect(metrics.retryMetrics?.totalAttempts).toBe(3);
       expect(metrics.retryMetrics?.totalDelayMs).toBeGreaterThan(0);
       expect(metrics.retryMetrics?.successful).toBe(false); // Failed after exhaustion
@@ -247,7 +251,7 @@ describe('Agent Retry Metrics Tracking', () => {
 
       const retryAttemptEvents: Array<{ attempt: number; delay: number; error: Error }> = [];
       const turnCompleteEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
-      
+
       agent.on('retry_attempt', (data) => retryAttemptEvents.push(data));
       agent.on('turn_complete', (data) => turnCompleteEvents.push(data));
 
@@ -256,7 +260,7 @@ describe('Agent Retry Metrics Tracking', () => {
       // Should work the same as non-streaming
       expect(retryAttemptEvents).toHaveLength(2);
       expect(turnCompleteEvents).toHaveLength(1);
-      
+
       const metrics = turnCompleteEvents[0].metrics;
       expect(metrics.retryMetrics?.totalAttempts).toBe(2);
       expect(metrics.retryMetrics?.successful).toBe(true);
@@ -282,12 +286,12 @@ describe('Agent Retry Metrics Tracking', () => {
 
       // Should have progress events that include retry metrics
       expect(turnProgressEvents.length).toBeGreaterThan(0);
-      
+
       // At least one progress event should show retry metrics
       const progressWithRetries = turnProgressEvents.find(
-        event => event.metrics.retryMetrics && event.metrics.retryMetrics.totalAttempts > 0
+        (event) => event.metrics.retryMetrics && event.metrics.retryMetrics.totalAttempts > 0
       );
-      
+
       expect(progressWithRetries).toBeDefined();
       expect(progressWithRetries?.metrics.retryMetrics?.totalAttempts).toBeGreaterThan(0);
     });
@@ -307,20 +311,20 @@ describe('Agent Retry Metrics Tracking', () => {
 
       const retryAttemptEvents: Array<{ attempt: number; delay: number; error: Error }> = [];
       const turnAbortedEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
-      
+
       agent.on('retry_attempt', (data) => retryAttemptEvents.push(data));
       agent.on('turn_aborted', (data) => turnAbortedEvents.push(data));
 
       // Start operation and abort it quickly
       const messagePromise = agent.sendMessage('Test abort with retries');
-      await new Promise(resolve => setTimeout(resolve, 5)); // Brief delay
-      
+      await new Promise((resolve) => setTimeout(resolve, 5)); // Brief delay
+
       const wasAborted = agent.abort();
       await messagePromise;
 
       expect(wasAborted).toBe(true);
       expect(turnAbortedEvents).toHaveLength(1);
-      
+
       // Aborted turn should still include any retry metrics accumulated
       const metrics = turnAbortedEvents[0].metrics;
       expect(metrics.retryMetrics).toBeDefined();

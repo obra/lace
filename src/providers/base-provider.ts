@@ -35,7 +35,7 @@ export abstract class AIProvider extends EventEmitter {
   protected _systemPrompt: string = '';
 
   // Retry configuration - can be modified in tests
-  protected RETRY_CONFIG = {
+  public RETRY_CONFIG = {
     maxRetries: 10,
     initialDelayMs: 1000,
     maxDelayMs: 30000,
@@ -161,14 +161,14 @@ export abstract class AIProvider extends EventEmitter {
         'ECONNRESET',
         'EHOSTUNREACH',
       ];
-      if (retryableCodes.includes(err.code)) {
+      if (typeof err.code === 'string' && retryableCodes.includes(err.code)) {
         return true;
       }
     }
 
     // Check for HTTP status codes
     const status = err.status || err.statusCode;
-    if (status) {
+    if (typeof status === 'number') {
       // Retry on server errors and rate limits
       if (status >= 500 || status === 429 || status === 408) {
         return true;

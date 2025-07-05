@@ -21,11 +21,6 @@ export interface OpenAIProviderConfig extends ProviderConfig {
 export class OpenAIProvider extends AIProvider {
   private readonly _openai: OpenAI;
 
-  // Expose RETRY_CONFIG for testing
-  get RETRY_CONFIG() {
-    return super['RETRY_CONFIG'];
-  }
-
   constructor(config: OpenAIProviderConfig) {
     super(config);
 

@@ -4,12 +4,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OpenAIProvider } from '../openai-provider.js';
 import { ProviderMessage } from '../base-provider.js';
-import OpenAI from 'openai';
+
+// Create mock function that we'll reference
+const mockCreate = vi.fn();
 
 // Mock the OpenAI SDK
 vi.mock('openai', () => {
-  const mockCreate = vi.fn();
-
   const MockOpenAI = vi.fn().mockImplementation(() => ({
     chat: {
       completions: {
@@ -18,22 +18,15 @@ vi.mock('openai', () => {
     },
   }));
 
-  // Add this as a static property so we can access it in tests
-  MockOpenAI.mockCreate = mockCreate;
-
   return { default: MockOpenAI };
 });
 
 describe('OpenAIProvider retry functionality', () => {
   let provider: OpenAIProvider;
-  let mockCreate: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-
-    // Get reference to the mocked method
-    mockCreate = (OpenAI as any).mockCreate;
 
     // Reset the mock before each test
     mockCreate.mockReset();

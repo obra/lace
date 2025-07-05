@@ -31,7 +31,7 @@ describe('Retry System Integration Tests', () => {
     it('should verify retry metrics are properly initialized in turn tracking', async () => {
       // This test verifies that all the retry components are properly wired together
       // by checking that turn metrics include retry tracking structure
-      
+
       // Use a mock provider to avoid external dependencies
       const mockProvider = {
         providerName: 'mock-integration',
@@ -43,7 +43,7 @@ describe('Retry System Integration Tests', () => {
         setSystemPrompt: vi.fn(),
         countTokens: vi.fn().mockResolvedValue(null),
         cleanup: vi.fn(),
-        
+
         // Mock successful response without retries
         createResponse: vi.fn().mockResolvedValue({
           content: 'Mock response for integration test',
@@ -55,7 +55,7 @@ describe('Retry System Integration Tests', () => {
             totalTokens: 30,
           },
         }),
-        
+
         createStreamingResponse: vi.fn().mockResolvedValue({
           content: 'Mock streaming response',
           toolCalls: [],
@@ -66,7 +66,7 @@ describe('Retry System Integration Tests', () => {
             totalTokens: 30,
           },
         }),
-        
+
         // Mock event emitter methods
         on: vi.fn(),
         off: vi.fn(),
@@ -85,7 +85,7 @@ describe('Retry System Integration Tests', () => {
 
       const turnStartEvents: any[] = [];
       const turnCompleteEvents: any[] = [];
-      
+
       agent.on('turn_start', (data) => turnStartEvents.push(data));
       agent.on('turn_complete', (data) => turnCompleteEvents.push(data));
 
@@ -112,7 +112,7 @@ describe('Retry System Integration Tests', () => {
 
     it('should verify Agent forwards retry events from providers', async () => {
       // This test verifies that the Agent properly sets up retry event forwarding
-      
+
       const mockProvider = {
         providerName: 'mock-retry-events',
         defaultModel: 'mock-model',
@@ -123,21 +123,21 @@ describe('Retry System Integration Tests', () => {
         setSystemPrompt: vi.fn(),
         countTokens: vi.fn().mockResolvedValue(null),
         cleanup: vi.fn(),
-        
+
         createResponse: vi.fn().mockResolvedValue({
           content: 'Mock response',
           toolCalls: [],
           stopReason: 'stop',
           usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
         }),
-        
+
         createStreamingResponse: vi.fn().mockResolvedValue({
           content: 'Mock response',
           toolCalls: [],
           stopReason: 'stop',
           usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
         }),
-        
+
         // Track event listener setup
         on: vi.fn(),
         off: vi.fn(),
@@ -159,16 +159,22 @@ describe('Retry System Integration Tests', () => {
       // Verify that the Agent sets up retry event listeners on the provider
       expect(mockProvider.on).toHaveBeenCalledWith('retry_attempt', expect.any(Function));
       expect(mockProvider.on).toHaveBeenCalledWith('retry_exhausted', expect.any(Function));
-      
+
       // Verify cleanup removes the listeners
-      expect(mockProvider.removeListener).toHaveBeenCalledWith('retry_attempt', expect.any(Function));
-      expect(mockProvider.removeListener).toHaveBeenCalledWith('retry_exhausted', expect.any(Function));
+      expect(mockProvider.removeListener).toHaveBeenCalledWith(
+        'retry_attempt',
+        expect.any(Function)
+      );
+      expect(mockProvider.removeListener).toHaveBeenCalledWith(
+        'retry_exhausted',
+        expect.any(Function)
+      );
     });
 
     it('should verify UI theme includes retry symbols', async () => {
       // Import the UI theme and verify retry symbols are defined
       const { UI_SYMBOLS } = await import('../interfaces/terminal/theme.js');
-      
+
       expect(UI_SYMBOLS.RETRY).toBeDefined();
       expect(typeof UI_SYMBOLS.RETRY).toBe('string');
       expect(UI_SYMBOLS.RETRY.length).toBeGreaterThan(0);
@@ -177,7 +183,7 @@ describe('Retry System Integration Tests', () => {
     it('should verify StatusBar component accepts retry status', async () => {
       // Import StatusBar and verify it accepts retry status props
       const StatusBarModule = await import('../interfaces/terminal/components/status-bar.js');
-      
+
       // This test verifies the component exists and can be imported
       // The actual functionality is tested in the component-specific tests
       expect(StatusBarModule.default).toBeDefined();
@@ -187,16 +193,16 @@ describe('Retry System Integration Tests', () => {
       // This test validates that all providers have retry test files
       const { promises: fs } = await import('fs');
       const path = await import('path');
-      
+
       const testDir = path.join(process.cwd(), 'src/providers/__tests__');
       const files = await fs.readdir(testDir);
-      
-      const retryTestFiles = files.filter(file => file.includes('retry-'));
-      
+
+      const retryTestFiles = files.filter((file) => file.includes('retry-'));
+
       // Verify we have retry tests for each major provider
       const expectedProviders = ['anthropic', 'openai', 'lmstudio', 'ollama'];
-      expectedProviders.forEach(provider => {
-        const hasRetryTests = retryTestFiles.some(file => file.includes(provider));
+      expectedProviders.forEach((provider) => {
+        const hasRetryTests = retryTestFiles.some((file) => file.includes(provider));
         expect(hasRetryTests).toBe(true);
       });
     });
@@ -205,7 +211,7 @@ describe('Retry System Integration Tests', () => {
   describe('Error handling integration', () => {
     it('should verify turn completion occurs even with provider errors', async () => {
       // Test that turn tracking completes properly even when providers fail
-      
+
       const mockProvider = {
         providerName: 'mock-error',
         defaultModel: 'mock-model',
@@ -216,11 +222,11 @@ describe('Retry System Integration Tests', () => {
         setSystemPrompt: vi.fn(),
         countTokens: vi.fn().mockResolvedValue(null),
         cleanup: vi.fn(),
-        
+
         // Mock provider that throws an error
         createResponse: vi.fn().mockRejectedValue(new Error('Mock provider error')),
         createStreamingResponse: vi.fn().mockRejectedValue(new Error('Mock provider error')),
-        
+
         on: vi.fn(),
         off: vi.fn(),
         removeListener: vi.fn(),
@@ -239,7 +245,7 @@ describe('Retry System Integration Tests', () => {
       const turnStartEvents: any[] = [];
       const turnCompleteEvents: any[] = [];
       const errorEvents: any[] = [];
-      
+
       agent.on('turn_start', (data) => turnStartEvents.push(data));
       agent.on('turn_complete', (data) => turnCompleteEvents.push(data));
       agent.on('error', (data) => errorEvents.push(data));

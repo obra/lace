@@ -4,13 +4,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AnthropicProvider } from '../anthropic-provider.js';
 import { ProviderMessage } from '../base-provider.js';
-import Anthropic from '@anthropic-ai/sdk';
+
+// Create mock functions that we'll reference
+const mockCreate = vi.fn();
+const mockStream = vi.fn();
 
 // Mock the Anthropic SDK
 vi.mock('@anthropic-ai/sdk', () => {
-  const mockCreate = vi.fn();
-  const mockStream = vi.fn();
-
   const MockAnthropic = vi.fn().mockImplementation(() => ({
     messages: {
       create: mockCreate,
@@ -23,25 +23,15 @@ vi.mock('@anthropic-ai/sdk', () => {
     },
   }));
 
-  // Add these as static properties so we can access them in tests
-  MockAnthropic.mockCreate = mockCreate;
-  MockAnthropic.mockStream = mockStream;
-
   return { default: MockAnthropic };
 });
 
 describe('AnthropicProvider retry functionality', () => {
   let provider: AnthropicProvider;
-  let mockCreate: any;
-  let mockStream: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-
-    // Get references to the mocked methods
-    mockCreate = (Anthropic as any).mockCreate;
-    mockStream = (Anthropic as any).mockStream;
 
     // Reset the mocks before each test
     mockCreate.mockReset();
