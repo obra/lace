@@ -101,8 +101,12 @@ describe('CLI Flow Tests', () => {
     const { Agent } = vi.mocked(await import('../agents/agent.js'));
     const { logger } = vi.mocked(await import('../utils/logger.js'));
     const { enableTrafficLogging } = vi.mocked(await import('../utils/traffic-logger.js'));
-    const { NonInteractiveInterface } = vi.mocked(await import('../interfaces/non-interactive-interface.js'));
-    const { TerminalInterface } = vi.mocked(await import('../interfaces/terminal/terminal-interface.js'));
+    const { NonInteractiveInterface } = vi.mocked(
+      await import('../interfaces/non-interactive-interface.js')
+    );
+    const { TerminalInterface } = vi.mocked(
+      await import('../interfaces/terminal/terminal-interface.js')
+    );
     const { createGlobalPolicyCallback } = vi.mocked(await import('../tools/policy-wrapper.js'));
 
     // Mock environment variables
@@ -147,7 +151,7 @@ describe('CLI Flow Tests', () => {
       eventNames: vi.fn(),
       once: vi.fn(),
     };
-    Agent.mockImplementation(() => mockAgentInstance as any);
+    vi.mocked(Agent).mockImplementation(() => mockAgentInstance as any);
 
     // Mock interfaces
     NonInteractiveInterface.prototype.executePrompt = vi.fn().mockResolvedValue(undefined);
@@ -178,9 +182,9 @@ describe('CLI Flow Tests', () => {
   describe('provider initialization', () => {
     it('should initialize Anthropic provider with API key', async () => {
       const { AnthropicProvider } = await import('../providers/anthropic-provider.js');
-      
+
       await run(mockCliOptions);
-      
+
       expect(AnthropicProvider).toHaveBeenCalledWith({
         apiKey: 'mock-anthropic-key',
         model: 'claude-3-opus',
@@ -190,9 +194,9 @@ describe('CLI Flow Tests', () => {
     it('should initialize OpenAI provider with API key', async () => {
       const { OpenAIProvider } = await import('../providers/openai-provider.js');
       const options = { ...mockCliOptions, provider: 'openai', model: 'gpt-4' };
-      
+
       await run(options);
-      
+
       expect(OpenAIProvider).toHaveBeenCalledWith({
         apiKey: 'mock-openai-key',
         model: 'gpt-4',
@@ -202,9 +206,9 @@ describe('CLI Flow Tests', () => {
     it('should initialize LMStudio provider without API key', async () => {
       const { LMStudioProvider } = await import('../providers/lmstudio-provider.js');
       const options = { ...mockCliOptions, provider: 'lmstudio', model: 'local-model' };
-      
+
       await run(options);
-      
+
       expect(LMStudioProvider).toHaveBeenCalledWith({
         model: 'local-model',
       });
@@ -213,9 +217,9 @@ describe('CLI Flow Tests', () => {
     it('should initialize Ollama provider without API key', async () => {
       const { OllamaProvider } = await import('../providers/ollama-provider.js');
       const options = { ...mockCliOptions, provider: 'ollama', model: 'llama2' };
-      
+
       await run(options);
-      
+
       expect(OllamaProvider).toHaveBeenCalledWith({
         model: 'llama2',
       });
@@ -244,7 +248,7 @@ describe('CLI Flow Tests', () => {
 
     it('should throw error for unknown provider', async () => {
       const options = { ...mockCliOptions, provider: 'unknown-provider' };
-      
+
       await expect(run(options)).rejects.toThrow('Unknown provider: unknown-provider');
     });
   });
@@ -252,9 +256,9 @@ describe('CLI Flow Tests', () => {
   describe('session management', () => {
     it('should create new session when no continue specified', async () => {
       const { ThreadManager } = vi.mocked(await import('../threads/thread-manager.js'));
-      
+
       await run(mockCliOptions);
-      
+
       expect(ThreadManager.prototype.resumeOrCreate).toHaveBeenCalledWith(undefined);
       expect(console.log).toHaveBeenCalledWith('🆕 Starting conversation test-thread-123');
     });
@@ -267,9 +271,9 @@ describe('CLI Flow Tests', () => {
         resumeError: undefined,
       });
       const options = { ...mockCliOptions, continue: true };
-      
+
       await run(options);
-      
+
       expect(ThreadManager.prototype.resumeOrCreate).toHaveBeenCalledWith(undefined);
       expect(console.log).toHaveBeenCalledWith('📖 Continuing conversation resumed-thread-456');
     });
@@ -282,9 +286,9 @@ describe('CLI Flow Tests', () => {
         resumeError: undefined,
       });
       const options = { ...mockCliOptions, continue: 'specific-thread-789' };
-      
+
       await run(options);
-      
+
       expect(ThreadManager.prototype.resumeOrCreate).toHaveBeenCalledWith('specific-thread-789');
       expect(console.log).toHaveBeenCalledWith('📖 Continuing conversation specific-thread-789');
     });
@@ -296,9 +300,9 @@ describe('CLI Flow Tests', () => {
         isResumed: false,
         resumeError: 'Mock resume error',
       });
-      
+
       await run(mockCliOptions);
-      
+
       expect(console.warn).toHaveBeenCalledWith('⚠️  Mock resume error');
       expect(console.log).toHaveBeenCalledWith('🆕 Starting new conversation new-thread-123');
     });
@@ -306,21 +310,25 @@ describe('CLI Flow Tests', () => {
 
   describe('interface selection', () => {
     it('should use NonInteractiveInterface for prompt execution', async () => {
-      const { NonInteractiveInterface } = vi.mocked(await import('../interfaces/non-interactive-interface.js'));
+      const { NonInteractiveInterface } = vi.mocked(
+        await import('../interfaces/non-interactive-interface.js')
+      );
       const options = { ...mockCliOptions, prompt: 'test prompt' };
-      
+
       await run(options);
-      
+
       expect(NonInteractiveInterface).toHaveBeenCalledWith(expect.any(Object));
       expect(NonInteractiveInterface.prototype.executePrompt).toHaveBeenCalledWith('test prompt');
       expect(process.exit).toHaveBeenCalledWith(0);
     });
 
     it('should use TerminalInterface for interactive mode', async () => {
-      const { TerminalInterface } = vi.mocked(await import('../interfaces/terminal/terminal-interface.js'));
-      
+      const { TerminalInterface } = vi.mocked(
+        await import('../interfaces/terminal/terminal-interface.js')
+      );
+
       await run(mockCliOptions);
-      
+
       expect(TerminalInterface).toHaveBeenCalledWith(expect.any(Object));
       expect(TerminalInterface.prototype.startInteractive).toHaveBeenCalled();
     });
@@ -329,30 +337,30 @@ describe('CLI Flow Tests', () => {
   describe('logging and configuration', () => {
     it('should configure logger with provided options', async () => {
       const { logger } = vi.mocked(await import('../utils/logger.js'));
-      const options = { ...mockCliOptions, logLevel: 'debug', logFile: 'test.log' };
-      
+      const options = { ...mockCliOptions, logLevel: 'debug' as const, logFile: 'test.log' };
+
       await run(options);
-      
+
       expect(logger.configure).toHaveBeenCalledWith('debug', 'test.log');
     });
 
     it('should enable traffic logging when harFile specified', async () => {
       const { enableTrafficLogging } = vi.mocked(await import('../utils/traffic-logger.js'));
       const options = { ...mockCliOptions, harFile: 'test.har' };
-      
+
       await run(options);
-      
+
       expect(enableTrafficLogging).toHaveBeenCalledWith('test.har');
     });
 
     it('should set up global policy callback', async () => {
       const { createGlobalPolicyCallback } = vi.mocked(await import('../tools/policy-wrapper.js'));
       const { Agent } = vi.mocked(await import('../agents/agent.js'));
-      
+
       await run(mockCliOptions);
-      
+
       expect(createGlobalPolicyCallback).toHaveBeenCalled();
-      const agentInstance = Agent.mock.results[0].value;
+      const agentInstance = vi.mocked(Agent).mock.results[0].value;
       expect(agentInstance.toolExecutor.setApprovalCallback).toHaveBeenCalled();
     });
   });
@@ -360,9 +368,9 @@ describe('CLI Flow Tests', () => {
   describe('agent and tool setup', () => {
     it('should create Agent with correct configuration', async () => {
       const { Agent } = vi.mocked(await import('../agents/agent.js'));
-      
+
       await run(mockCliOptions);
-      
+
       expect(Agent).toHaveBeenCalledWith({
         provider: expect.any(Object),
         toolExecutor: expect.any(Object),
@@ -374,9 +382,9 @@ describe('CLI Flow Tests', () => {
 
     it('should register all available tools', async () => {
       const { ToolExecutor } = vi.mocked(await import('../tools/executor.js'));
-      
+
       await run(mockCliOptions);
-      
+
       expect(ToolExecutor.prototype.registerAllAvailableTools).toHaveBeenCalled();
     });
 
@@ -394,12 +402,12 @@ describe('CLI Flow Tests', () => {
         setDependencies: vi.fn(),
       };
       ToolExecutor.prototype.getTool = vi.fn().mockReturnValue(mockDelegateTool);
-      
+
       await run(mockCliOptions);
-      
+
       expect(mockDelegateTool.setDependencies).toHaveBeenCalledWith(
         expect.any(Object), // ThreadManager
-        expect.any(Object)  // ToolExecutor
+        expect.any(Object) // ToolExecutor
       );
     });
   });
