@@ -376,10 +376,10 @@ export class OpenAIProvider extends AIProvider {
           throw error;
         }
       },
-      { 
+      {
         signal,
         isStreaming: true,
-        canRetry: () => !streamingStarted
+        canRetry: () => !streamingStarted,
       }
     );
   }

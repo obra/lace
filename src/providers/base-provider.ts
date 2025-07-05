@@ -33,14 +33,14 @@ export interface ProviderResponse {
 export abstract class AIProvider extends EventEmitter {
   protected readonly _config: ProviderConfig;
   protected _systemPrompt: string = '';
-  
+
   // Retry configuration - can be modified in tests
   protected RETRY_CONFIG = {
     maxRetries: 10,
     initialDelayMs: 1000,
     maxDelayMs: 30000,
     backoffFactor: 2,
-    jitterFactor: 0.1
+    jitterFactor: 0.1,
   };
 
   constructor(config: ProviderConfig) {
@@ -159,7 +159,7 @@ export abstract class AIProvider extends EventEmitter {
         'ENOTFOUND',
         'ETIMEDOUT',
         'ECONNRESET',
-        'EHOSTUNREACH'
+        'EHOSTUNREACH',
       ];
       if (retryableCodes.includes(err.code)) {
         return true;
@@ -229,7 +229,7 @@ export abstract class AIProvider extends EventEmitter {
         lastError = error;
 
         // Check if we should retry
-        const shouldRetry = 
+        const shouldRetry =
           attempt < maxAttempts &&
           this.isRetryableError(error) &&
           (options?.canRetry ? options.canRetry() : true);
@@ -239,7 +239,7 @@ export abstract class AIProvider extends EventEmitter {
           if (attempt === maxAttempts && this.isRetryableError(error)) {
             this.emit('retry_exhausted', {
               attempts: maxAttempts,
-              lastError: error as Error
+              lastError: error as Error,
             });
           }
           throw error;
@@ -252,7 +252,7 @@ export abstract class AIProvider extends EventEmitter {
         this.emit('retry_attempt', {
           attempt,
           delay,
-          error: error as Error
+          error: error as Error,
         });
 
         // Wait before retrying

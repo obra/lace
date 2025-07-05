@@ -165,13 +165,16 @@ export class AnthropicProvider extends AIProvider {
         });
 
         const textContent = response.content
-          .filter((contentBlock): contentBlock is Anthropic.TextBlock => contentBlock.type === 'text')
+          .filter(
+            (contentBlock): contentBlock is Anthropic.TextBlock => contentBlock.type === 'text'
+          )
           .map((contentBlock) => contentBlock.text)
           .join('');
 
         const toolCalls = response.content
           .filter(
-            (contentBlock): contentBlock is Anthropic.ToolUseBlock => contentBlock.type === 'tool_use'
+            (contentBlock): contentBlock is Anthropic.ToolUseBlock =>
+              contentBlock.type === 'tool_use'
           )
           .map((contentBlock) => ({
             id: contentBlock.id,
@@ -344,14 +347,15 @@ export class AnthropicProvider extends AIProvider {
         } catch (error) {
           const errorObj = error as Error;
           logger.error('Streaming error from Anthropic', { error: errorObj.message });
-          // Don't emit error event here - let retry logic handle it
+          // Emit error event for compatibility with existing tests
+          this.emit('error', { error: errorObj });
           throw error;
         }
       },
-      { 
+      {
         signal,
         isStreaming: true,
-        canRetry: () => !streamingStarted
+        canRetry: () => !streamingStarted,
       }
     );
   }

@@ -7,9 +7,13 @@ import { Tool } from '../../tools/tool.js';
 
 // Mock implementation for testing
 class TestProvider extends AIProvider {
-  get providerName(): string { return 'test'; }
-  get defaultModel(): string { return 'test-model'; }
-  
+  get providerName(): string {
+    return 'test';
+  }
+  get defaultModel(): string {
+    return 'test-model';
+  }
+
   async createResponse(
     _messages: ProviderMessage[],
     _tools: Tool[],
@@ -17,7 +21,7 @@ class TestProvider extends AIProvider {
   ): Promise<ProviderResponse> {
     return {
       content: 'test response',
-      toolCalls: []
+      toolCalls: [],
     };
   }
 
@@ -65,10 +69,10 @@ describe('AIProvider retry functionality', () => {
         { code: 'ENOTFOUND' },
         { code: 'ETIMEDOUT' },
         { code: 'ECONNRESET' },
-        { code: 'EHOSTUNREACH' }
+        { code: 'EHOSTUNREACH' },
       ];
 
-      networkErrors.forEach(error => {
+      networkErrors.forEach((error) => {
         expect(provider.isRetryableError(error)).toBe(true);
       });
     });
@@ -80,10 +84,10 @@ describe('AIProvider retry functionality', () => {
         { status: 503 },
         { status: 504 },
         { statusCode: 500 }, // Alternative property name
-        { statusCode: 502 }
+        { statusCode: 502 },
       ];
 
-      serverErrors.forEach(error => {
+      serverErrors.forEach((error) => {
         expect(provider.isRetryableError(error)).toBe(true);
       });
     });
@@ -92,10 +96,10 @@ describe('AIProvider retry functionality', () => {
       const rateLimitErrors = [
         { status: 429 },
         { statusCode: 429 },
-        { status: 408 } // Request timeout
+        { status: 408 }, // Request timeout
       ];
 
-      rateLimitErrors.forEach(error => {
+      rateLimitErrors.forEach((error) => {
         expect(provider.isRetryableError(error)).toBe(true);
       });
     });
@@ -105,23 +109,18 @@ describe('AIProvider retry functionality', () => {
         { status: 401 },
         { status: 403 },
         { statusCode: 401 },
-        { statusCode: 403 }
+        { statusCode: 403 },
       ];
 
-      authErrors.forEach(error => {
+      authErrors.forEach((error) => {
         expect(provider.isRetryableError(error)).toBe(false);
       });
     });
 
     it('should not retry client errors', () => {
-      const clientErrors = [
-        { status: 400 },
-        { status: 404 },
-        { status: 422 },
-        { statusCode: 400 }
-      ];
+      const clientErrors = [{ status: 400 }, { status: 404 }, { status: 422 }, { statusCode: 400 }];
 
-      clientErrors.forEach(error => {
+      clientErrors.forEach((error) => {
         expect(provider.isRetryableError(error)).toBe(false);
       });
     });
@@ -179,27 +178,28 @@ describe('AIProvider retry functionality', () => {
   describe('withRetry', () => {
     it('should return immediately on successful call', async () => {
       const operation = vi.fn().mockResolvedValue('success');
-      
+
       const result = await provider.withRetry(operation);
-      
+
       expect(result).toBe('success');
       expect(operation).toHaveBeenCalledTimes(1);
     });
 
     it('should retry on retryable error', async () => {
-      const operation = vi.fn()
+      const operation = vi
+        .fn()
         .mockRejectedValueOnce({ code: 'ECONNREFUSED' })
         .mockResolvedValueOnce('success');
 
       const promise = provider.withRetry(operation);
-      
+
       // Wait for first call
       await vi.advanceTimersByTimeAsync(0);
       expect(operation).toHaveBeenCalledTimes(1);
-      
+
       // Advance past retry delay
       await vi.advanceTimersByTimeAsync(1500);
-      
+
       const result = await promise;
       expect(result).toBe('success');
       expect(operation).toHaveBeenCalledTimes(2);
@@ -218,18 +218,19 @@ describe('AIProvider retry functionality', () => {
 
       const promise = provider.withRetry(operation, { maxAttempts: 3 });
       promise.catch(() => {}); // Prevent unhandled rejection
-      
+
       // Advance through all retries
       for (let i = 0; i < 3; i++) {
         await vi.advanceTimersByTimeAsync(i === 0 ? 0 : 2000 * Math.pow(2, i - 1));
       }
-      
+
       await expect(promise).rejects.toMatchObject({ code: 'ECONNREFUSED' });
       expect(operation).toHaveBeenCalledTimes(3);
     });
 
     it('should emit retry events', async () => {
-      const operation = vi.fn()
+      const operation = vi
+        .fn()
         .mockRejectedValueOnce({ code: 'ECONNREFUSED' })
         .mockResolvedValueOnce('success');
 
@@ -237,22 +238,22 @@ describe('AIProvider retry functionality', () => {
       provider.on('retry_attempt', retryAttemptSpy);
 
       const promise = provider.withRetry(operation);
-      
+
       await vi.advanceTimersByTimeAsync(0);
       await vi.advanceTimersByTimeAsync(1500);
-      
+
       await promise;
 
       expect(retryAttemptSpy).toHaveBeenCalledWith({
         attempt: 1,
         delay: expect.any(Number),
-        error: expect.objectContaining({ code: 'ECONNREFUSED' })
+        error: expect.objectContaining({ code: 'ECONNREFUSED' }),
       });
     });
 
     it('should emit retry exhausted event', async () => {
       vi.useRealTimers(); // Use real timers for this test
-      
+
       const operation = vi.fn().mockRejectedValue({ code: 'ECONNREFUSED' });
 
       const exhaustedSpy = vi.fn();
@@ -264,36 +265,38 @@ describe('AIProvider retry functionality', () => {
       provider.RETRY_CONFIG.initialDelayMs = 1;
       provider.RETRY_CONFIG.maxDelayMs = 2;
 
-      await expect(
-        provider.withRetry(operation, { maxAttempts: 2 })
-      ).rejects.toMatchObject({ code: 'ECONNREFUSED' });
+      await expect(provider.withRetry(operation, { maxAttempts: 2 })).rejects.toMatchObject({
+        code: 'ECONNREFUSED',
+      });
 
       // Check retry was attempted
       expect(operation).toHaveBeenCalledTimes(2);
       expect(retrySpy).toHaveBeenCalledTimes(1);
-      
+
       // The exhausted event should have been emitted
       expect(exhaustedSpy).toHaveBeenCalledTimes(1);
       expect(exhaustedSpy).toHaveBeenCalledWith({
         attempts: 2,
-        lastError: expect.objectContaining({ code: 'ECONNREFUSED' })
+        lastError: expect.objectContaining({ code: 'ECONNREFUSED' }),
       });
-      
+
       // Restore fake timers
       vi.useFakeTimers();
     });
 
     it('should respect abort signal', async () => {
-      const operation = vi.fn()
+      const operation = vi
+        .fn()
         .mockRejectedValueOnce({ code: 'ECONNREFUSED' })
         .mockResolvedValueOnce('success');
 
       // Abort immediately
       abortController.abort();
 
-      await expect(provider.withRetry(operation, { signal: abortController.signal }))
-        .rejects.toThrow('Aborted');
-      
+      await expect(
+        provider.withRetry(operation, { signal: abortController.signal })
+      ).rejects.toThrow('Aborted');
+
       expect(operation).toHaveBeenCalledTimes(0);
     });
 
@@ -306,15 +309,15 @@ describe('AIProvider retry functionality', () => {
 
       const promise = provider.withRetry(operation, { signal: abortController.signal });
       promise.catch(() => {}); // Prevent unhandled rejection
-      
+
       // First attempt
       await vi.advanceTimersByTimeAsync(0);
       expect(callCount).toBe(1);
-      
+
       // Abort during retry delay
       abortController.abort();
       await vi.advanceTimersByTimeAsync(1500);
-      
+
       await expect(promise).rejects.toThrow('Aborted');
       expect(operation).toHaveBeenCalledTimes(1);
     });
@@ -336,36 +339,37 @@ describe('AIProvider retry functionality', () => {
       const promise = provider.withRetry(operation, {
         isStreaming: true,
         canRetry: () => !streamingStarted,
-        maxAttempts: 3
+        maxAttempts: 3,
       });
       promise.catch(() => {}); // Prevent unhandled rejection
-      
+
       // First attempt
       await vi.advanceTimersByTimeAsync(0);
       expect(callCount).toBe(1);
-      
+
       // Second attempt
       await vi.advanceTimersByTimeAsync(1500);
       expect(callCount).toBe(2);
-      
+
       await expect(promise).rejects.toMatchObject({ code: 'ECONNREFUSED' });
       // Should only try twice: once initially, once after retry (then streaming started)
       expect(operation).toHaveBeenCalledTimes(2);
     });
 
     it('should wait appropriate delay between retries', async () => {
-      const operation = vi.fn()
+      const operation = vi
+        .fn()
         .mockRejectedValueOnce({ code: 'ECONNREFUSED' })
         .mockResolvedValueOnce('success');
 
       const promise = provider.withRetry(operation);
-      
+
       // Should not retry immediately
       expect(operation).toHaveBeenCalledTimes(1);
-      
+
       // Advance timers to trigger retry
       await vi.advanceTimersByTimeAsync(1500);
-      
+
       await promise;
       expect(operation).toHaveBeenCalledTimes(2);
     });

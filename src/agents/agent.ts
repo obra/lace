@@ -245,7 +245,7 @@ export class Agent extends EventEmitter {
 
   // Get the current active thread ID for INTERNAL operations
   // DESIGN EXPLANATION: This is the heart of the canonical ID mapping system
-  // 
+  //
   // EXTERNAL CONTRACT: agent.getThreadId() always returns the stable canonical ID
   // INTERNAL OPERATIONS: We use the current working thread (may be compacted)
   //
@@ -256,7 +256,7 @@ export class Agent extends EventEmitter {
   // 4. This enables seamless compaction without breaking external thread ID contracts
   //
   // Example flow:
-  // - User creates thread "abc123" 
+  // - User creates thread "abc123"
   // - agent.getThreadId() returns "abc123" (canonical ID)
   // - After compaction, internal operations use "abc123_v2" (compacted thread)
   // - agent.getThreadId() STILL returns "abc123" (stable external contract)

@@ -331,7 +331,7 @@ export class ThreadManager extends EventEmitter {
     //
     // DESIGN PRINCIPLES:
     // 1. External thread IDs NEVER change (canonical IDs are stable)
-    // 2. Internal working threads may be compacted versions 
+    // 2. Internal working threads may be compacted versions
     // 3. Canonical ID mapping resolves any thread to its stable external ID
     //
     // HOW IT WORKS:
@@ -360,7 +360,7 @@ export class ThreadManager extends EventEmitter {
   }
 
   // TRANSPARENT THREAD COMPACTION - Creates compacted version while preserving external IDs
-  // 
+  //
   // WHAT THIS METHOD DOES:
   // 1. Creates a new compacted thread with reduced event history
   // 2. Establishes canonical ID mapping for transparent access
