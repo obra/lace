@@ -96,7 +96,11 @@ export abstract class AIProvider extends EventEmitter {
     }
 
     if (config.jitterFactor !== undefined) {
-      if (typeof config.jitterFactor !== 'number' || config.jitterFactor < 0 || config.jitterFactor >= 1) {
+      if (
+        typeof config.jitterFactor !== 'number' ||
+        config.jitterFactor < 0 ||
+        config.jitterFactor >= 1
+      ) {
         throw new Error('jitterFactor must be a number between 0 (inclusive) and 1 (exclusive)');
       }
     }
@@ -104,7 +108,7 @@ export abstract class AIProvider extends EventEmitter {
     // Cross-validation
     const newInitialDelay = config.initialDelayMs ?? this._retryConfig.initialDelayMs;
     const newMaxDelay = config.maxDelayMs ?? this._retryConfig.maxDelayMs;
-    
+
     if (newInitialDelay > newMaxDelay) {
       throw new Error('initialDelayMs cannot be greater than maxDelayMs');
     }

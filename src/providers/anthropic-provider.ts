@@ -238,7 +238,7 @@ export class AnthropicProvider extends AIProvider {
         const stream = this._anthropic.messages.stream(requestPayload, {
           signal,
         });
-        
+
         // Mark that stream is created to prevent retries after this point
         streamCreated = true;
 
