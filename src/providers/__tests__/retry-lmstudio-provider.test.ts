@@ -229,6 +229,7 @@ describe('LMStudioProvider retry functionality', () => {
       mockLoad.mockResolvedValue(mockModel);
 
       const promise = provider.createStreamingResponse(messages, []);
+      promise.catch(() => {}); // Prevent unhandled rejection during retry
 
       // Wait for first attempt to fail
       await vi.advanceTimersByTimeAsync(0);
