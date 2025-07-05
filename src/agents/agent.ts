@@ -63,6 +63,9 @@ export interface AgentEvents {
   turn_progress: [{ metrics: CurrentTurnMetrics }];
   turn_complete: [{ turnId: string; metrics: CurrentTurnMetrics }];
   turn_aborted: [{ turnId: string; metrics: CurrentTurnMetrics }];
+  // Retry events forwarded from providers
+  retry_attempt: [{ attempt: number; delay: number; error: Error }];
+  retry_exhausted: [{ attempts: number; lastError: Error }];
   approval_request: [
     {
       toolName: string;
@@ -563,10 +566,20 @@ export class Agent extends EventEmitter {
       });
     };
 
+    const retryAttemptListener = ({ attempt, delay, error }: { attempt: number; delay: number; error: Error }) => {
+      this.emit('retry_attempt', { attempt, delay, error });
+    };
+
+    const retryExhaustedListener = ({ attempts, lastError }: { attempts: number; lastError: Error }) => {
+      this.emit('retry_exhausted', { attempts, lastError });
+    };
+
     // Subscribe to provider events
     this._provider.on('token', tokenListener);
     this._provider.on('token_usage_update', tokenUsageListener);
     this._provider.on('error', errorListener);
+    this._provider.on('retry_attempt', retryAttemptListener);
+    this._provider.on('retry_exhausted', retryExhaustedListener);
 
     try {
       const response = await this._provider.createStreamingResponse(messages, tools, signal);
@@ -606,6 +619,8 @@ export class Agent extends EventEmitter {
       this._provider.removeListener('token', tokenListener);
       this._provider.removeListener('token_usage_update', tokenUsageListener);
       this._provider.removeListener('error', errorListener);
+      this._provider.removeListener('retry_attempt', retryAttemptListener);
+      this._provider.removeListener('retry_exhausted', retryExhaustedListener);
     }
   }
 
@@ -614,38 +629,57 @@ export class Agent extends EventEmitter {
     tools: Tool[],
     signal?: AbortSignal
   ): Promise<AgentResponse> {
-    const response = await this._provider.createResponse(messages, tools, signal);
-
-    // Apply stop reason handling to filter incomplete tool calls
-    const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
-
-    // Record token usage if budget tracking is enabled
-    if (this._tokenBudgetManager) {
-      this._tokenBudgetManager.recordUsage(processedResponse);
-
-      // Emit warning if approaching budget limits
-      const recommendations = this._tokenBudgetManager.getRecommendations();
-      if (recommendations.warningMessage) {
-        this.emit('token_budget_warning', {
-          message: recommendations.warningMessage,
-          usage: this._tokenBudgetManager.getBudgetStatus(),
-          recommendations,
-        });
-      }
-    }
-
-    // Add provider response tokens to current turn metrics
-    this._addProviderResponseTokensToTurn(processedResponse);
-
-    // Always emit token usage for UI updates
-    if (processedResponse.usage) {
-      this.emit('token_usage_update', { usage: processedResponse.usage });
-    }
-
-    return {
-      content: processedResponse.content,
-      toolCalls: processedResponse.toolCalls,
+    // Set up retry event listeners for non-streaming requests
+    const retryAttemptListener = ({ attempt, delay, error }: { attempt: number; delay: number; error: Error }) => {
+      this.emit('retry_attempt', { attempt, delay, error });
     };
+
+    const retryExhaustedListener = ({ attempts, lastError }: { attempts: number; lastError: Error }) => {
+      this.emit('retry_exhausted', { attempts, lastError });
+    };
+
+    // Subscribe to provider retry events
+    this._provider.on('retry_attempt', retryAttemptListener);
+    this._provider.on('retry_exhausted', retryExhaustedListener);
+
+    try {
+      const response = await this._provider.createResponse(messages, tools, signal);
+
+      // Apply stop reason handling to filter incomplete tool calls
+      const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
+
+      // Record token usage if budget tracking is enabled
+      if (this._tokenBudgetManager) {
+        this._tokenBudgetManager.recordUsage(processedResponse);
+
+        // Emit warning if approaching budget limits
+        const recommendations = this._tokenBudgetManager.getRecommendations();
+        if (recommendations.warningMessage) {
+          this.emit('token_budget_warning', {
+            message: recommendations.warningMessage,
+            usage: this._tokenBudgetManager.getBudgetStatus(),
+            recommendations,
+          });
+        }
+      }
+
+      // Add provider response tokens to current turn metrics
+      this._addProviderResponseTokensToTurn(processedResponse);
+
+      // Always emit token usage for UI updates
+      if (processedResponse.usage) {
+        this.emit('token_usage_update', { usage: processedResponse.usage });
+      }
+
+      return {
+        content: processedResponse.content,
+        toolCalls: processedResponse.toolCalls,
+      };
+    } finally {
+      // Clean up retry event listeners
+      this._provider.removeListener('retry_attempt', retryAttemptListener);
+      this._provider.removeListener('retry_exhausted', retryExhaustedListener);
+    }
   }
 
   private async _executeToolCalls(toolCalls: ProviderToolCall[]): Promise<void> {
