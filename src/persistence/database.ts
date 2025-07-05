@@ -2,7 +2,14 @@
 // ABOUTME: Handles database schema, CRUD operations, and data serialization for all entities
 
 import Database from 'better-sqlite3';
-import { Thread, ThreadEvent, EventType, VersionHistoryEntry, ThreadId, AssigneeId } from '../threads/types.js';
+import {
+  Thread,
+  ThreadEvent,
+  EventType,
+  VersionHistoryEntry,
+  ThreadId,
+  AssigneeId,
+} from '../threads/types.js';
 import { Task, TaskNote } from '../tools/implementations/task-manager/types.js';
 
 export class DatabasePersistence {
