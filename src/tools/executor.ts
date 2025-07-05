@@ -13,7 +13,7 @@ import { FileListTool } from './implementations/file-list.js';
 import { RipgrepSearchTool } from './implementations/ripgrep-search.js';
 import { FileFindTool } from './implementations/file-find.js';
 import {
-  TaskAddTool,
+  TaskCreateTool,
   TaskListTool,
   TaskCompleteTool,
   TaskUpdateTool,
@@ -67,7 +67,7 @@ export class ToolExecutor {
       new FileListTool(),
       new RipgrepSearchTool(),
       new FileFindTool(),
-      new TaskAddTool(),
+      new TaskCreateTool(),
       new TaskListTool(),
       new TaskCompleteTool(),
       new TaskUpdateTool(),

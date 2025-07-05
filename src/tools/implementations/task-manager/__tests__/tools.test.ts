@@ -25,11 +25,9 @@ describe('Enhanced Task Manager Tools', () => {
   const agent2ThreadId = asThreadId('lace_20250703_parent.2');
 
   beforeEach(async () => {
-    // Reset module cache to ensure tools pick up new LACE_DIR
-    vi.resetModules();
-
-    // Create persistence instance for test assertions
-    persistence = new TaskPersistence(getTestDbPath(tempDirContext));
+    // Create persistence instance using the same path the tools will use
+    const { getLaceDbPath } = await import('../../../../config/lace-dir.js');
+    persistence = new TaskPersistence(getLaceDbPath());
 
     context = {
       threadId: agent1ThreadId,

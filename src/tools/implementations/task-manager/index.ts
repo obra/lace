@@ -3,7 +3,7 @@
 
 export { TaskPersistence } from './persistence.js';
 export {
-  TaskCreateTool as TaskAddTool,
+  TaskCreateTool,
   TaskListTool,
   TaskCompleteTool,
   TaskUpdateTool,
