@@ -76,16 +76,15 @@ describe('SummarizeStrategy', () => {
 
       const compacted = strategy.compact(events);
 
-      // Should have: all user/agent messages + 1 summary for tool events + 3 recent events
-      // Important events: 1, 2, 5, 6 (all user/agent messages)
-      // Summarizable events: 3, 4 (tool call/result)
+      // With new strategy: all user/agent messages + tool events are preserved + recent events
+      // Important events: 1, 2, 3, 4, 5, 6 (all user/agent messages + tool events now preserved)
       // Recent events: 4, 5, 6 (last 3)
-      // Result: [summary] + [1, 2] + [4, 5, 6] = 6 events
+      // Result: all events preserved since tool events are now considered important
       expect(compacted).toHaveLength(6);
 
-      // First event should be summary
-      expect(compacted[0].type).toBe('LOCAL_SYSTEM_MESSAGE');
-      expect(compacted[0].data).toContain('**Compaction Summary**');
+      // First event should be first user message (no summary needed since all events preserved)
+      expect(compacted[0].type).toBe('USER_MESSAGE');
+      expect(compacted[0].id).toBe('1');
 
       // All user and agent messages should be preserved
       const userAgentEvents = compacted.filter(
@@ -126,14 +125,13 @@ describe('SummarizeStrategy', () => {
 
       const compacted = strategy.compact(events);
 
-      // Should have: [summary for tool events] + [preserved user message] + [recent user message]
-      // Since event 3 is both important (user message) and recent, it appears once
-      expect(compacted).toHaveLength(2);
-      expect(compacted[0].type).toBe('LOCAL_SYSTEM_MESSAGE');
-      expect(compacted[0].data).toContain('🗜️ **Compaction Summary**');
-      expect(compacted[0].data).toContain('2 events');
-      expect(compacted[0].data).toContain('compressed');
-      expect(compacted[1].id).toBe('3'); // The user message is preserved
+      // With new strategy: tool events are preserved as important events
+      // All events are considered important: tool call, tool result, user message
+      expect(compacted).toHaveLength(3);
+      expect(compacted[0].type).toBe('TOOL_CALL');
+      expect(compacted[1].type).toBe('TOOL_RESULT');
+      expect(compacted[2].type).toBe('USER_MESSAGE');
+      expect(compacted[2].id).toBe('3');
     });
   });
 
@@ -164,14 +162,16 @@ describe('SummarizeStrategy', () => {
 
       const compacted = strategy.compact(events);
 
-      // Should have: [summary for tool events] + [all user/agent messages] + [recent events]
-      // Important: 4, 5 (user/agent messages)
+      // With new strategy: all events preserved since tool events are now important
+      // Important: 1, 2, 3, 4, 5 (all tool events + user/agent messages)
       // Recent: 4, 5 (last 2)
-      // Summary: for events 1, 2, 3
-      expect(compacted).toHaveLength(3); // summary + 2 user/agent messages
-      expect(compacted[0].type).toBe('LOCAL_SYSTEM_MESSAGE');
-      expect(compacted[1].type).toBe('USER_MESSAGE');
-      expect(compacted[2].type).toBe('AGENT_MESSAGE');
+      // Result: all events preserved
+      expect(compacted).toHaveLength(5); // all events preserved
+      expect(compacted[0].type).toBe('TOOL_CALL');
+      expect(compacted[1].type).toBe('TOOL_RESULT');
+      expect(compacted[2].type).toBe('TOOL_CALL');
+      expect(compacted[3].type).toBe('USER_MESSAGE');
+      expect(compacted[4].type).toBe('AGENT_MESSAGE');
     });
   });
 });

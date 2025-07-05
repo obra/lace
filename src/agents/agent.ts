@@ -2,12 +2,7 @@
 // ABOUTME: Core conversation engine that emits events instead of direct I/O for multiple interface support
 
 import { EventEmitter } from 'events';
-import {
-  AIProvider,
-  ProviderMessage,
-  ProviderToolCall,
-  ProviderToolResult,
-} from '../providers/base-provider.js';
+import { AIProvider, ProviderMessage, ProviderToolCall } from '../providers/base-provider.js';
 import { ToolCall, ToolResult } from '../tools/types.js';
 import { Tool } from '../tools/tool.js';
 import { ToolExecutor } from '../tools/executor.js';
@@ -939,11 +934,14 @@ export class Agent extends EventEmitter {
         // Find the most recent assistant message with tool calls that contains this tool result ID
         let targetAssistantMessage: ProviderMessage | undefined;
         let targetAssistantIndex = -1;
-        
+
         for (let j = messages.length - 1; j >= 0; j--) {
           const msg = messages[j];
-          if (msg.role === 'assistant' && msg.toolCalls && 
-              msg.toolCalls.some(tc => tc.id === toolResult.id)) {
+          if (
+            msg.role === 'assistant' &&
+            msg.toolCalls &&
+            msg.toolCalls.some((tc) => tc.id === toolResult.id)
+          ) {
             targetAssistantMessage = msg;
             targetAssistantIndex = j;
             break;
@@ -973,19 +971,20 @@ export class Agent extends EventEmitter {
             messages.push({
               role: 'user',
               content: '',
-              toolResults: [{
-                id: toolResult.id || '',
-                content: toolResult.content,
-                isError: toolResult.isError,
-              }],
+              toolResults: [
+                {
+                  id: toolResult.id || '',
+                  content: toolResult.content,
+                  isError: toolResult.isError,
+                },
+              ],
             });
           }
         } else {
           // This tool result doesn't correspond to any assistant message with tool calls
           // Try to find the corresponding TOOL_CALL event to create a synthetic assistant message
-          const correspondingToolCallEvent = events.find(e => 
-            e.type === 'TOOL_CALL' && 
-            (e.data as ToolCall).id === toolResult.id
+          const correspondingToolCallEvent = events.find(
+            (e) => e.type === 'TOOL_CALL' && (e.data as ToolCall).id === toolResult.id
           );
 
           if (correspondingToolCallEvent) {
@@ -994,24 +993,28 @@ export class Agent extends EventEmitter {
             const syntheticAssistantMessage: ProviderMessage = {
               role: 'assistant',
               content: '', // No text content for synthetic message
-              toolCalls: [{
-                id: toolCallData.id,
-                name: toolCallData.name,
-                input: toolCallData.arguments,
-              }],
+              toolCalls: [
+                {
+                  id: toolCallData.id,
+                  name: toolCallData.name,
+                  input: toolCallData.arguments,
+                },
+              ],
             };
-            
+
             messages.push(syntheticAssistantMessage);
 
             // Now create the user message with the tool result
             messages.push({
               role: 'user',
               content: '',
-              toolResults: [{
-                id: toolResult.id || '',
-                content: toolResult.content,
-                isError: toolResult.isError,
-              }],
+              toolResults: [
+                {
+                  id: toolResult.id || '',
+                  content: toolResult.content,
+                  isError: toolResult.isError,
+                },
+              ],
             });
           } else {
             // Truly orphaned tool result - no corresponding tool call found
