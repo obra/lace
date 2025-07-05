@@ -11,10 +11,10 @@ async function main() {
   // Load environment variables from .env file before anything else
   loadEnvFile();
 
-  // Parse arguments
+  // Parse arguments (handles --help and --list-tools, exits early if needed)
   const options = await parseArgs();
 
-  // Initialize provider registry for validation
+  // Initialize provider registry for validation (only after args parsed)
   const registry = await ProviderRegistry.createWithAutoDiscovery();
 
   // Validate provider against registry
