@@ -135,68 +135,73 @@ export class AnthropicProvider extends AIProvider {
     tools: Tool[] = [],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    const requestPayload = this._createRequestPayload(messages, tools);
+    return this.withRetry(
+      async () => {
+        const requestPayload = this._createRequestPayload(messages, tools);
 
-    logger.debug('Sending request to Anthropic', {
-      provider: 'anthropic',
-      model: requestPayload.model,
-      messageCount: requestPayload.messages.length,
-      systemPromptLength: requestPayload.system?.length,
-      toolCount: requestPayload.tools?.length,
-      toolNames: requestPayload.tools?.map((t) => t.name),
-    });
+        logger.debug('Sending request to Anthropic', {
+          provider: 'anthropic',
+          model: requestPayload.model,
+          messageCount: requestPayload.messages.length,
+          systemPromptLength: requestPayload.system?.length,
+          toolCount: requestPayload.tools?.length,
+          toolNames: requestPayload.tools?.map((t) => t.name),
+        });
 
-    // Log full request payload for debugging
-    logger.debug('Anthropic request payload', {
-      provider: 'anthropic',
-      payload: JSON.stringify(requestPayload, null, 2),
-    });
+        // Log full request payload for debugging
+        logger.debug('Anthropic request payload', {
+          provider: 'anthropic',
+          payload: JSON.stringify(requestPayload, null, 2),
+        });
 
-    const response = (await this._anthropic.messages.create(requestPayload, {
-      signal,
-    })) as Anthropic.Messages.Message;
+        const response = (await this._anthropic.messages.create(requestPayload, {
+          signal,
+        })) as Anthropic.Messages.Message;
 
-    // Log full response for debugging
-    logger.debug('Anthropic response payload', {
-      provider: 'anthropic',
-      response: JSON.stringify(response, null, 2),
-    });
+        // Log full response for debugging
+        logger.debug('Anthropic response payload', {
+          provider: 'anthropic',
+          response: JSON.stringify(response, null, 2),
+        });
 
-    const textContent = response.content
-      .filter((contentBlock): contentBlock is Anthropic.TextBlock => contentBlock.type === 'text')
-      .map((contentBlock) => contentBlock.text)
-      .join('');
+        const textContent = response.content
+          .filter((contentBlock): contentBlock is Anthropic.TextBlock => contentBlock.type === 'text')
+          .map((contentBlock) => contentBlock.text)
+          .join('');
 
-    const toolCalls = response.content
-      .filter(
-        (contentBlock): contentBlock is Anthropic.ToolUseBlock => contentBlock.type === 'tool_use'
-      )
-      .map((contentBlock) => ({
-        id: contentBlock.id,
-        name: contentBlock.name,
-        input: contentBlock.input as Record<string, unknown>,
-      }));
+        const toolCalls = response.content
+          .filter(
+            (contentBlock): contentBlock is Anthropic.ToolUseBlock => contentBlock.type === 'tool_use'
+          )
+          .map((contentBlock) => ({
+            id: contentBlock.id,
+            name: contentBlock.name,
+            input: contentBlock.input as Record<string, unknown>,
+          }));
 
-    logger.debug('Received response from Anthropic', {
-      provider: 'anthropic',
-      contentLength: textContent.length,
-      toolCallCount: toolCalls.length,
-      toolCallNames: toolCalls.map((tc) => tc.name),
-      usage: response.usage,
-    });
+        logger.debug('Received response from Anthropic', {
+          provider: 'anthropic',
+          contentLength: textContent.length,
+          toolCallCount: toolCalls.length,
+          toolCallNames: toolCalls.map((tc) => tc.name),
+          usage: response.usage,
+        });
 
-    return {
-      content: textContent,
-      toolCalls,
-      stopReason: this.normalizeStopReason(response.stop_reason),
-      usage: response.usage
-        ? {
-            promptTokens: response.usage.input_tokens,
-            completionTokens: response.usage.output_tokens,
-            totalTokens: response.usage.input_tokens + response.usage.output_tokens,
-          }
-        : undefined,
-    };
+        return {
+          content: textContent,
+          toolCalls,
+          stopReason: this.normalizeStopReason(response.stop_reason),
+          usage: response.usage
+            ? {
+                promptTokens: response.usage.input_tokens,
+                completionTokens: response.usage.output_tokens,
+                totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+              }
+            : undefined,
+        };
+      },
+      { signal }
+    );
   }
 
   async createStreamingResponse(
@@ -204,139 +209,151 @@ export class AnthropicProvider extends AIProvider {
     tools: Tool[] = [],
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    const requestPayload = this._createRequestPayload(messages, tools);
+    let streamingStarted = false;
 
-    logger.debug('Sending streaming request to Anthropic', {
-      provider: 'anthropic',
-      model: requestPayload.model,
-      messageCount: requestPayload.messages.length,
-      systemPromptLength: requestPayload.system?.length,
-      toolCount: requestPayload.tools?.length,
-      toolNames: requestPayload.tools?.map((t) => t.name),
-    });
+    return this.withRetry(
+      async () => {
+        const requestPayload = this._createRequestPayload(messages, tools);
 
-    // Log full request payload for debugging
-    logger.debug('Anthropic streaming request payload', {
-      provider: 'anthropic',
-      payload: JSON.stringify(requestPayload, null, 2),
-    });
-
-    // Use the streaming API
-    const stream = this._anthropic.messages.stream(requestPayload, {
-      signal,
-    });
-
-    let toolCalls: ProviderToolCall[] = [];
-
-    try {
-      // Handle streaming events - use the 'text' event for token-by-token streaming
-      stream.on('text', (text) => {
-        // Emit token events for real-time display
-        this.emit('token', { token: text });
-      });
-
-      // Track progressive token estimation
-      let estimatedOutputTokens = 0;
-
-      // Listen for progressive token usage updates during streaming
-      stream.on('streamEvent', (event) => {
-        if (event.type === 'message_delta' && event.usage) {
-          const usage = event.usage;
-          this.emit('token_usage_update', {
-            usage: {
-              promptTokens: usage.input_tokens || 0,
-              completionTokens: usage.output_tokens || 0,
-              totalTokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
-            },
-          });
-        }
-      });
-
-      // Estimate progressive tokens from text chunks
-      stream.on('text', (text) => {
-        // Rough token estimation: ~4 characters per token
-        const newTokens = this.estimateTokens(text);
-        estimatedOutputTokens += newTokens;
-
-        // Emit progressive token estimate
-        this.emit('token_usage_update', {
-          usage: {
-            promptTokens: 0, // Unknown during streaming
-            completionTokens: estimatedOutputTokens,
-            totalTokens: estimatedOutputTokens,
-          },
+        logger.debug('Sending streaming request to Anthropic', {
+          provider: 'anthropic',
+          model: requestPayload.model,
+          messageCount: requestPayload.messages.length,
+          systemPromptLength: requestPayload.system?.length,
+          toolCount: requestPayload.tools?.length,
+          toolNames: requestPayload.tools?.map((t) => t.name),
         });
-      });
 
-      // Listen for message completion to get final token usage
-      stream.on('message', (message) => {
-        // This fires when the message is complete - provides final token usage
-        if (message.usage) {
-          this.emit('token_usage_update', {
-            usage: {
-              promptTokens: message.usage.input_tokens,
-              completionTokens: message.usage.output_tokens,
-              totalTokens: message.usage.input_tokens + message.usage.output_tokens,
-            },
+        // Log full request payload for debugging
+        logger.debug('Anthropic streaming request payload', {
+          provider: 'anthropic',
+          payload: JSON.stringify(requestPayload, null, 2),
+        });
+
+        // Use the streaming API
+        const stream = this._anthropic.messages.stream(requestPayload, {
+          signal,
+        });
+
+        let toolCalls: ProviderToolCall[] = [];
+
+        try {
+          // Handle streaming events - use the 'text' event for token-by-token streaming
+          stream.on('text', (text) => {
+            streamingStarted = true; // Mark that streaming has begun
+            // Emit token events for real-time display
+            this.emit('token', { token: text });
           });
-        }
-      });
 
-      // Wait for the stream to complete and get the final message
-      const finalMessage = await stream.finalMessage();
+          // Track progressive token estimation
+          let estimatedOutputTokens = 0;
 
-      // Extract text content from the final message
-      const textContent = finalMessage.content
-        .filter((content): content is Anthropic.TextBlock => content.type === 'text')
-        .map((content) => content.text)
-        .join('');
-
-      // Extract tool calls from the final message
-      toolCalls = finalMessage.content
-        .filter((content): content is Anthropic.ToolUseBlock => content.type === 'tool_use')
-        .map((content) => ({
-          id: content.id,
-          name: content.name,
-          input: content.input as Record<string, unknown>,
-        }));
-
-      // Log full response for debugging
-      logger.debug('Anthropic streaming response payload', {
-        provider: 'anthropic',
-        response: JSON.stringify(finalMessage, null, 2),
-      });
-
-      logger.debug('Received streaming response from Anthropic', {
-        provider: 'anthropic',
-        contentLength: textContent.length,
-        toolCallCount: toolCalls.length,
-        toolCallNames: toolCalls.map((tc: ProviderToolCall) => tc.name),
-        usage: finalMessage.usage,
-      });
-
-      const response = {
-        content: textContent,
-        toolCalls,
-        stopReason: this.normalizeStopReason(finalMessage.stop_reason),
-        usage: finalMessage.usage
-          ? {
-              promptTokens: finalMessage.usage.input_tokens,
-              completionTokens: finalMessage.usage.output_tokens,
-              totalTokens: finalMessage.usage.input_tokens + finalMessage.usage.output_tokens,
+          // Listen for progressive token usage updates during streaming
+          stream.on('streamEvent', (event) => {
+            if (event.type === 'message_delta' && event.usage) {
+              const usage = event.usage;
+              this.emit('token_usage_update', {
+                usage: {
+                  promptTokens: usage.input_tokens || 0,
+                  completionTokens: usage.output_tokens || 0,
+                  totalTokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
+                },
+              });
             }
-          : undefined,
-      };
+          });
 
-      // Emit completion event
-      this.emit('complete', { response });
+          // Estimate progressive tokens from text chunks
+          stream.on('text', (text) => {
+            // Rough token estimation: ~4 characters per token
+            const newTokens = this.estimateTokens(text);
+            estimatedOutputTokens += newTokens;
 
-      return response;
-    } catch (error) {
-      const errorObj = error as Error;
-      logger.error('Streaming error from Anthropic', { error: errorObj.message });
-      this.emit('error', { error: errorObj });
-      throw error;
-    }
+            // Emit progressive token estimate
+            this.emit('token_usage_update', {
+              usage: {
+                promptTokens: 0, // Unknown during streaming
+                completionTokens: estimatedOutputTokens,
+                totalTokens: estimatedOutputTokens,
+              },
+            });
+          });
+
+          // Listen for message completion to get final token usage
+          stream.on('message', (message) => {
+            // This fires when the message is complete - provides final token usage
+            if (message.usage) {
+              this.emit('token_usage_update', {
+                usage: {
+                  promptTokens: message.usage.input_tokens,
+                  completionTokens: message.usage.output_tokens,
+                  totalTokens: message.usage.input_tokens + message.usage.output_tokens,
+                },
+              });
+            }
+          });
+
+          // Wait for the stream to complete and get the final message
+          const finalMessage = await stream.finalMessage();
+
+          // Extract text content from the final message
+          const textContent = finalMessage.content
+            .filter((content): content is Anthropic.TextBlock => content.type === 'text')
+            .map((content) => content.text)
+            .join('');
+
+          // Extract tool calls from the final message
+          toolCalls = finalMessage.content
+            .filter((content): content is Anthropic.ToolUseBlock => content.type === 'tool_use')
+            .map((content) => ({
+              id: content.id,
+              name: content.name,
+              input: content.input as Record<string, unknown>,
+            }));
+
+          // Log full response for debugging
+          logger.debug('Anthropic streaming response payload', {
+            provider: 'anthropic',
+            response: JSON.stringify(finalMessage, null, 2),
+          });
+
+          logger.debug('Received streaming response from Anthropic', {
+            provider: 'anthropic',
+            contentLength: textContent.length,
+            toolCallCount: toolCalls.length,
+            toolCallNames: toolCalls.map((tc: ProviderToolCall) => tc.name),
+            usage: finalMessage.usage,
+          });
+
+          const response = {
+            content: textContent,
+            toolCalls,
+            stopReason: this.normalizeStopReason(finalMessage.stop_reason),
+            usage: finalMessage.usage
+              ? {
+                  promptTokens: finalMessage.usage.input_tokens,
+                  completionTokens: finalMessage.usage.output_tokens,
+                  totalTokens: finalMessage.usage.input_tokens + finalMessage.usage.output_tokens,
+                }
+              : undefined,
+          };
+
+          // Emit completion event
+          this.emit('complete', { response });
+
+          return response;
+        } catch (error) {
+          const errorObj = error as Error;
+          logger.error('Streaming error from Anthropic', { error: errorObj.message });
+          // Don't emit error event here - let retry logic handle it
+          throw error;
+        }
+      },
+      { 
+        signal,
+        isStreaming: true,
+        canRetry: () => !streamingStarted
+      }
+    );
   }
 
   protected normalizeStopReason(stopReason: string | null | undefined): string | undefined {

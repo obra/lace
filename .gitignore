@@ -57,4 +57,5 @@ lace-memory.db
 .lace/
 
 # Model output files
-anthropic*
+anthropic-*.txt
+anthropic-*.json
