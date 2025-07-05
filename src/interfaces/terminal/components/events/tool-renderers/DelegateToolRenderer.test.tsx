@@ -18,6 +18,17 @@ vi.mock('../../../../../utils/logger.js', () => ({
   },
 }));
 
+// Mock the expansion toggle hooks
+vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
+  TimelineExpansionProvider: ({ children }: any) => children,
+  useTimelineItemExpansion: () => ({
+    isExpanded: false,
+    onExpand: vi.fn(),
+    onCollapse: vi.fn(),
+  }),
+  useTimelineItemFocusEntry: vi.fn(),
+}));
+
 const mockDelegateCall = {
   id: 'call-123',
   name: 'delegate',
