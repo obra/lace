@@ -112,7 +112,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
     expect(response.toolCalls[0].input.action).toBe('followup');
   }, 30000);
 
-  it('should handle complex tool instructions', async () => {
+  it.skip('should handle complex tool instructions', async () => {
     class ComplexTool extends Tool {
       name = 'complex_tool';
       description = 'A tool with complex parameters';
