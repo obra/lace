@@ -26,7 +26,7 @@ export interface LMStudioProviderConfig extends ProviderConfig {
 }
 
 export class LMStudioProvider extends AIProvider {
-  private readonly _client: LMStudioClient;
+  private _client: LMStudioClient | null = null;
   private readonly _verbose: boolean;
   private readonly _baseUrl: string;
   public _cachedModel: LMStudioModel | null = null;
@@ -35,10 +35,16 @@ export class LMStudioProvider extends AIProvider {
   constructor(config: LMStudioProviderConfig = {}) {
     super(config);
     this._baseUrl = config.baseUrl || 'ws://localhost:1234';
-    this._client = new LMStudioClient({
-      baseUrl: this._baseUrl,
-    });
     this._verbose = config.verbose ?? false;
+  }
+
+  private getClient(): LMStudioClient {
+    if (!this._client) {
+      this._client = new LMStudioClient({
+        baseUrl: this._baseUrl,
+      });
+    }
+    return this._client;
   }
 
   get providerName(): string {
@@ -57,8 +63,19 @@ export class LMStudioProvider extends AIProvider {
     try {
       logger.info('Connecting to LMStudio', { baseUrl: this._baseUrl });
 
-      // Try to list loaded models to test connection
-      const models = await this._client.llm.listLoaded();
+      // Create a timeout promise that rejects after 3 seconds
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        const timer = setTimeout(() => {
+          reject(new Error(`LMStudio connection timeout after 3000ms`));
+        }, 3000);
+        // Ensure timeout is cleaned up
+        timer.unref();
+      });
+
+      // Try to list loaded models to test connection with timeout
+      const modelsPromise = this.getClient().llm.listLoaded();
+      const models = await Promise.race([modelsPromise, timeoutPromise]);
+
       logger.info('Connected to LMStudio successfully');
       logger.info('Loaded models from LMStudio', {
         count: models.length,
@@ -141,7 +158,7 @@ export class LMStudioProvider extends AIProvider {
     if (diagnostics.models.includes(modelId)) {
       logger.info('Found already loaded model', { modelId });
       // Get reference to existing loaded model from the list
-      const loadedModels = await this._client.llm.listLoaded();
+      const loadedModels = await this.getClient().llm.listLoaded();
       const existingModel = loadedModels.find((m) => m.identifier === modelId);
 
       if (existingModel) {
@@ -159,7 +176,7 @@ export class LMStudioProvider extends AIProvider {
       logger.info('Attempting to load model', { modelId });
 
       try {
-        this._cachedModel = (await this._client.llm.load(modelId, {
+        this._cachedModel = (await this.getClient().llm.load(modelId, {
           verbose: this._verbose,
         })) as unknown as LMStudioModel;
         this._cachedModelId = modelId;

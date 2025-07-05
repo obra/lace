@@ -18,6 +18,15 @@ vi.mock('../../../../../utils/logger.js', () => ({
   },
 }));
 
+// Mock useInput to avoid document global issues
+vi.mock('ink', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ink')>();
+  return {
+    ...actual,
+    useInput: vi.fn(),
+  };
+});
+
 // Mock the expansion toggle hooks
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
   TimelineExpansionProvider: ({ children }: any) => children,
