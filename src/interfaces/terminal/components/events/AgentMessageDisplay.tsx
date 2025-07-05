@@ -7,43 +7,31 @@ import { ThreadEvent } from '../../../../threads/types.js';
 import { ThinkingAwareContent } from '../ui/ThinkingAwareContent.js';
 import { TimelineEntry } from '../ui/TimelineEntry.js';
 import { parseThinkingBlocks } from './utils/thinking-parser.js';
-import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
+import { useTimelineItem } from './contexts/TimelineItemContext.js';
 import { UI_SYMBOLS } from '../../theme.js';
 
 interface AgentMessageDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
   isFocused?: boolean;
-  isSelected?: boolean;
-  onToggle?: () => void;
+  // Selection and expansion state comes from context
 }
 
 export function AgentMessageDisplay({
   event,
   isStreaming,
   isFocused,
-  isSelected,
-  onToggle,
 }: AgentMessageDisplayProps) {
   const message = event.data as string;
 
   // Parse thinking blocks from message content
   const parsed = useMemo(() => parseThinkingBlocks(message), [message]);
 
-  // Use shared expansion state management  
-  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected || false, (expanded) => onToggle?.());
+  // Get expansion state from context
+  const { isExpanded, isSelected } = useTimelineItem();
   
   // Force expand when streaming to show the (thinking...) indicator
   const effectiveIsExpanded = isExpanded || (isStreaming ?? false);
-
-  // Create handler that works with TimelineEntry interface
-  const handleExpandedChange = (expanded: boolean) => {
-    if (expanded) {
-      onExpand();
-    } else {
-      onCollapse();
-    }
-  };
 
   // Check if content has any thinking blocks (completed or unclosed)
   const hasAnyThinking = parsed.hasThinking || message.includes('<think>');
@@ -65,9 +53,6 @@ export function AgentMessageDisplay({
         )
       }
       isExpanded={effectiveIsExpanded}
-      onExpandedChange={handleExpandedChange}
-      isSelected={isSelected}
-      onToggle={onToggle}
       status={isStreaming ? 'pending' : 'success'}
       isExpandable={!isStreaming}
       isStreaming={isStreaming}
