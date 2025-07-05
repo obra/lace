@@ -209,17 +209,23 @@ describe('Timeline Entry Focus E2E Tests', () => {
         // Simulate the timeline interaction workflow
         React.useEffect(() => {
           if (canTimelineItemAcceptFocus(delegateItem)) {
-            // Step 1: User navigates to delegate item and presses Return
-            setTimeout(() => setSimulatedFocusState('entering'), 10);
+            const timeouts = [
+              // Step 1: User navigates to delegate item and presses Return
+              setTimeout(() => setSimulatedFocusState('entering'), 10),
+              
+              // Step 2: Focus entry completes
+              setTimeout(() => setSimulatedFocusState('focused'), 20),
+              
+              // Step 3: User presses Escape to exit
+              setTimeout(() => setSimulatedFocusState('exiting'), 30),
+              
+              // Step 4: Focus exit completes
+              setTimeout(() => setSimulatedFocusState('none'), 40),
+            ];
             
-            // Step 2: Focus entry completes
-            setTimeout(() => setSimulatedFocusState('focused'), 20);
-            
-            // Step 3: User presses Escape to exit
-            setTimeout(() => setSimulatedFocusState('exiting'), 30);
-            
-            // Step 4: Focus exit completes
-            setTimeout(() => setSimulatedFocusState('none'), 40);
+            return () => {
+              timeouts.forEach(timeout => clearTimeout(timeout));
+            };
           }
         }, []);
         
