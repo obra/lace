@@ -1,107 +1,139 @@
-// ABOUTME: Specialized tool renderer for delegate tool executions with inline delegation timeline display
-// ABOUTME: Combines tool execution display with delegation timeline using TimelineEntry for consistency
+// ABOUTME: Renderer for delegate tool executions using TimelineEntry
+// ABOUTME: Displays delegation with thread information and completion status
 
-import React, { useState, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { Box, Text, useInput } from 'ink';
-import { TimelineEntry, type TimelineStatus } from '../../ui/TimelineEntry.js';
-import { ToolCall, ToolResult } from '../../../../../tools/types.js';
-import { CompactOutput } from '../../ui/CompactOutput.js';
-import { CodeDisplay } from '../../ui/CodeDisplay.js';
-import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
-import { useTimelineItemExpansion, useTimelineItemFocusEntry, TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
-import { useThreadManager, useThreadProcessor } from '../../../terminal-interface.js';
-import { calculateTokens, formatTokenCount } from '../../../../../utils/token-estimation.js';
-import { useLaceFocus, FocusRegions, FocusLifecycleWrapper } from '../../../focus/index.js';
-import TimelineDisplay from '../TimelineDisplay.js';
-import { logger } from '../../../../../utils/logger.js';
+import React, { forwardRef, useImperativeHandle, useState, useCallback } from 'react';
+import { Box, Text } from 'ink';
+import { TimelineEntry, TimelineStatus } from '../../ui/TimelineEntry.js';
+import { useTimelineItem } from '../contexts/TimelineItemContext.js';
+import { type ToolRendererProps } from './components/shared.js';
 import { TimelineItemRef } from '../../timeline-item-focus.js';
-import {
-  extractDelegateThreadId,
-  isThreadComplete,
-  extractTaskFromTimeline,
-  calculateDuration,
-} from '../utils/timeline-utils.js';
+import { formatTokenCount } from '../../../../../utils/token-estimation.js';
+import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
+import { useInput } from 'ink';
+import { useLaceFocus, FocusRegions } from '../../../focus/index.js';
+import { useTimelineItemFocusEntry } from '../hooks/useTimelineExpansionToggle.js';
+import { logger } from '../../../../../utils/logger.js';
 
-// Extract tool execution timeline item type
-type ToolExecutionItem = {
-  type: 'tool_execution';
-  call: ToolCall;
-  result?: ToolResult;
-  timestamp: Date;
-  callId: string;
-};
-
-interface DelegateToolRendererProps {
-  item: ToolExecutionItem;
-  isStreaming?: boolean;
-  isSelected?: boolean; // Whether timeline cursor is on this item
-  _isFocused?: boolean; // Whether this item has keyboard focus (unused)
-  onToggle?: () => void;
+// Parse delegate result to extract structured data
+interface DelegateResult {
+  threadId?: string;
+  status?: 'active' | 'completed' | 'error';
+  summary?: string;
+  totalTokens?: number;
+  error?: string;
 }
 
-function isJsonOutput(output: string): boolean {
-  if (!output || typeof output !== 'string') return false;
-
-  const trimmed = output.trim();
-  return (
-    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-    (trimmed.startsWith('[') && trimmed.endsWith(']'))
-  );
-}
-
-export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRendererProps>(({
-  item,
-  isStreaming,
-  isSelected,
-  _isFocused,
-  onToggle,
-}, ref) => {
-  // Use shared expansion management for consistent behavior
-  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
-    isSelected || false,
-    (_expanded) => onToggle?.()
-  );
-
-  // Focus state management
-  const [isEntered, setIsEntered] = useState(false);
-  const delegateThreadId = useMemo(() => extractDelegateThreadId(item), [item]);
-  const { isFocused } = useLaceFocus(delegateThreadId ? FocusRegions.delegate(delegateThreadId) : 'none', { autoFocus: false });
-
-  // Handle keyboard input when focused - only for focus management
-  useInput((input: string, key: any) => {
-    if (!isFocused) return;
+function parseDelegateResult(result: any): DelegateResult | null {
+  if (!result?.content?.[0]?.text) {
+    logger.debug('DelegateToolRenderer: No content in result');
+    return null;
+  }
+  
+  try {
+    const text = result.content[0].text;
     
-    if (key.escape) {
-      logger.debug('DelegateToolRenderer: Escape pressed, exiting delegate focus');
-      setIsEntered(false); // Let FocusLifecycleWrapper handle popFocus
-      return;
+    // Try to parse as JSON first
+    if (text.trim().startsWith('{')) {
+      const parsed = JSON.parse(text);
+      
+      // Validate structure
+      if (typeof parsed !== 'object' || parsed === null) {
+        logger.warn('DelegateToolRenderer: Parsed result is not an object', { parsed });
+        return { error: text };
+      }
+      
+      // Validate optional fields have correct types if present
+      if (parsed.threadId !== undefined && typeof parsed.threadId !== 'string') {
+        logger.warn('DelegateToolRenderer: Invalid threadId type', { threadId: parsed.threadId });
+      }
+      
+      if (parsed.status !== undefined && 
+          !['active', 'completed', 'error'].includes(parsed.status)) {
+        logger.warn('DelegateToolRenderer: Invalid status value', { status: parsed.status });
+      }
+      
+      if (parsed.totalTokens !== undefined && typeof parsed.totalTokens !== 'number') {
+        logger.warn('DelegateToolRenderer: Invalid totalTokens type', { totalTokens: parsed.totalTokens });
+      }
+      
+      return parsed as DelegateResult;
     }
     
-    // Let embedded TimelineViewport handle all navigation keys
-    // Don't try to "consume" events - Ink broadcasts to all handlers
-    
-  }, { isActive: isFocused });
+    // Otherwise return as error text
+    return { error: text };
+  } catch (error) {
+    logger.warn('DelegateToolRenderer: Failed to parse delegate result JSON', {
+      error: error instanceof Error ? error.message : String(error),
+      content: result.content[0].text?.slice(0, 200) + '...'
+    });
+    return { error: result.content[0].text };
+  }
+}
 
-  // Handle focus entry events from timeline
+export const DelegateToolRenderer = forwardRef<TimelineItemRef, ToolRendererProps>(({
+  item,
+}, ref) => {
+  const { isExpanded, isSelected } = useTimelineItem();
+  
+  // Extract and validate data
+  const args = item.call.arguments as Record<string, unknown>;
+  
+  // Get task from either task or prompt argument
+  let task: string;
+  if (typeof args.task === 'string') {
+    task = args.task;
+  } else if (typeof args.prompt === 'string') {
+    task = args.prompt;
+  } else {
+    logger.warn('DelegateToolRenderer: No valid task or prompt argument', { 
+      args, 
+      callId: item.call.id 
+    });
+    task = 'Unknown task';
+  }
+  
+  const delegateResult = item.result ? parseDelegateResult(item.result) : null;
+  const hasError = item.result?.isError || delegateResult?.status === 'error';
+  const isRunning = !item.result;
+  
+  // Determine status
+  const status: TimelineStatus = isRunning ? 'pending' : hasError ? 'error' : 'success';
+  
+  // Delegation-specific state
+  const [isEntered, setIsEntered] = useState(false);
+  const delegateThreadId = delegateResult?.threadId || null;
+  const focusId = delegateThreadId ? FocusRegions.delegate(delegateThreadId) : 'none';
+  const { isFocused } = useLaceFocus(focusId, { autoFocus: false });
+  const [delegationExpanded, setDelegationExpanded] = useState(true);
+  
+  // Handle keyboard input when focused
+  useInput(
+    (input: string, key: { escape?: boolean }) => {
+      if (!isFocused) return;
+
+      if (key.escape) {
+        logger.debug('DelegateToolRenderer: Escape pressed, exiting delegate focus');
+        setIsEntered(false);
+        return;
+      }
+    },
+    { isActive: isFocused }
+  );
+
+  // Handle focus entry
   const handleFocusEntry = useCallback(() => {
     logger.debug('DelegateToolRenderer: handleFocusEntry called', {
       delegateThreadId,
     });
     if (delegateThreadId) {
       setIsEntered(true);
-      logger.debug('DelegateToolRenderer: setIsEntered(true) called via event', {
-        delegateThreadId,
-        focusId: FocusRegions.delegate(delegateThreadId),
-      });
-    } else {
-      logger.warn('DelegateToolRenderer: handleFocusEntry called but no delegateThreadId');
     }
   }, [delegateThreadId]);
 
-  // Listen for focus entry events when this item is selected
-  useTimelineItemFocusEntry(isSelected || false, handleFocusEntry);
-
-  // Expose enterFocus method through ref (kept for compatibility)
+  // Listen for focus entry events
+  useTimelineItemFocusEntry(isSelected, handleFocusEntry);
+  
+  // Expose enterFocus method through ref
   useImperativeHandle(ref, () => ({
     enterFocus: () => {
       logger.debug('DelegateToolRenderer: enterFocus called via ref', {
@@ -110,229 +142,127 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, DelegateToolRend
       });
       if (delegateThreadId) {
         setIsEntered(true);
-        logger.debug('DelegateToolRenderer: setIsEntered(true) called via ref', {
-          delegateThreadId,
-          focusId: FocusRegions.delegate(delegateThreadId),
-        });
-      } else {
-        logger.warn('DelegateToolRenderer: enterFocus called but no delegateThreadId');
       }
     },
   }), [delegateThreadId, isEntered]);
-
-  // Create handler that works with TimelineEntry interface
-  const handleExpandedChange = (expanded: boolean) => {
-    if (expanded) {
-      onExpand();
-    } else {
-      onCollapse();
-    }
-  };
-
-  const { call, result } = item;
-  const { arguments: input } = call;
-
-  const success = result ? !result.isError : true;
-  const output = result?.content?.[0]?.text;
-  const error = result?.isError ? output : undefined;
-  const markerStatus: TimelineStatus = isStreaming ? 'pending' : success ? 'success' : result ? 'error' : 'none';
-
-  // Extract delegate task from input
-  const delegateTask = ((input.task || input.prompt) as string) || 'Unknown task';
-  const statusIcon = success ? UI_SYMBOLS.SUCCESS : result ? UI_SYMBOLS.ERROR : UI_SYMBOLS.PENDING;
-
-  // Extract delegate thread ID from result metadata (moved to focus section above)
-
-  // Get thread data from context
-  const threadManager = useThreadManager();
-  const threadProcessor = useThreadProcessor();
-
-  // Manage delegation expansion state - mutable for local control
-  const [delegationExpanded, setDelegationExpanded] = useState(true); // Default to expanded for delegation
-
-  // Fetch and process delegate thread data (only if threadId exists)
-  const timeline = useMemo(() => {
-    if (!delegateThreadId) {
-      return {
-        items: [],
-        metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
-      };
-    }
-
-    try {
-      const events = threadManager.getEvents(delegateThreadId);
-      const processed = threadProcessor.processThreads(events);
-      return processed; // processThreads now returns Timeline directly
-    } catch (error) {
-      logger.error('Failed to load delegate thread', {
-        threadId: delegateThreadId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return {
-        items: [],
-        metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
-      };
-    }
-  }, [delegateThreadId]);
-
-  // Determine delegation status
-  const isComplete = isThreadComplete(timeline);
-  const taskDescription = extractTaskFromTimeline(timeline);
-  const duration = calculateDuration(timeline);
-  const tokens = calculateTokens(timeline);
-
-  // Create compact summary for collapsed state
-  const delegateSummary = (
-    <Box flexDirection="column">
-      <Box>
-        <Text color={UI_COLORS.TOOL}>{UI_SYMBOLS.TOOL} </Text>
-        <Text color={UI_COLORS.TOOL} bold>
-          delegate
-        </Text>
-        <Text color="gray"> </Text>
-        <Text color="white">"{delegateTask}"</Text>
-        <Text color="gray"> </Text>
-        <Text color={success ? UI_COLORS.SUCCESS : result ? UI_COLORS.ERROR : UI_COLORS.PENDING}>
-          {statusIcon}
-        </Text>
-        {isStreaming && <Text color="gray"> (running...)</Text>}
-        <Text color="cyan"> [DELEGATE]</Text>
-      </Box>
-
-      {/* Show delegation status when collapsed */}
-      {delegateThreadId && (
-        <Box marginLeft={2} marginTop={1}>
-          <Text color={UI_COLORS.DELEGATE}>{UI_SYMBOLS.DELEGATE} </Text>
-          <Text color="gray">Thread: {delegateThreadId}</Text>
-          {result && success && <Text color={UI_COLORS.SUCCESS}> - Delegation active</Text>}
-        </Box>
-      )}
-
-      {/* Compact output preview when collapsed and successful */}
-      {result && success && output && !delegateThreadId && (
-        <Box marginLeft={2} marginTop={1}>
-          <CompactOutput
-            output={output}
-            language={isJsonOutput(output) ? 'json' : 'text'}
-            maxLines={3}
-            canExpand={false}
-          />
-        </Box>
-      )}
+  
+  // Build header with task and delegation indicator
+  const header = (
+    <Box>
+      <Text color={UI_COLORS.TOOL} bold>delegate</Text>
+      <Text>: "{task}"</Text>
+      <Text color="cyan"> [DELEGATE]</Text>
     </Box>
   );
-
-  // Create expanded content showing full input/output + delegation
+  
+  // Build preview content 
+  const preview = delegateResult && item.result && !isRunning ? (() => {
+    return (
+      <Box flexDirection="column">
+        {/* Show delegation status info */}
+        {delegateThreadId && (
+          <Box>
+            <Text color={UI_COLORS.DELEGATE}>{UI_SYMBOLS.DELEGATE} </Text>
+            <Text color="gray">Thread: {delegateThreadId}</Text>
+            {delegateResult?.status === 'active' && (
+              <Text color={UI_COLORS.SUCCESS}> - Delegation active</Text>
+            )}
+          </Box>
+        )}
+        
+        {/* Show result or error */}
+        {delegateResult.error ? (
+          <Text color="red">{delegateResult.error}</Text>
+        ) : delegateResult.summary ? (
+          <Box flexDirection="column">
+            <Text>{delegateResult.summary}</Text>
+            {delegateResult.totalTokens && (
+              <Text color="gray">{formatTokenCount(delegateResult.totalTokens)}</Text>
+            )}
+          </Box>
+        ) : (
+          <Text color="gray">Delegation in progress...</Text>
+        )}
+      </Box>
+    );
+  })() : null;
+  
+  // Build expanded content
   const expandedContent = (
     <Box flexDirection="column">
       {/* Input parameters */}
       <Box flexDirection="column" marginBottom={1}>
         <Text color="yellow">Input:</Text>
         <Box marginLeft={2}>
-          <CodeDisplay code={JSON.stringify(input, null, 2)} language="json" compact={false} />
+          <Text>{JSON.stringify(item.call.arguments, null, 2)}</Text>
         </Box>
       </Box>
 
-      {/* Output */}
-      {result && (
-        <Box flexDirection="column" marginBottom={delegateThreadId ? 1 : 0}>
-          <Text color={success ? 'green' : 'red'}>{success ? 'Output:' : 'Error:'}</Text>
-          <Box marginLeft={2}>
-            {success ? (
-              <CompactOutput
-                output={output || 'No output'}
-                language={isJsonOutput(output || '') ? 'json' : 'text'}
-                maxLines={50}
-                canExpand={false}
-              />
-            ) : (
-              <Text color="red">{error || 'Unknown error'}</Text>
-            )}
-          </Box>
+      {/* Delegation result or status */}
+      {item.result && (
+        <Box flexDirection="column">
+          {delegateResult?.error ? (
+            <React.Fragment>
+              <Text color="red">Error:</Text>
+              <Box marginLeft={2}>
+                <Text color="red">{delegateResult.error}</Text>
+              </Box>
+            </React.Fragment>
+          ) : (
+            <React.Fragment>
+              <Text color="green">Delegation Status:</Text>
+              <Box marginLeft={2} flexDirection="column">
+                {delegateThreadId && (
+                  <Text>Thread ID: {delegateThreadId}</Text>
+                )}
+                {delegateResult?.status && (
+                  <Text>Status: {delegateResult.status}</Text>
+                )}
+                {delegateResult?.summary && (
+                  <Text>Summary: {delegateResult.summary}</Text>
+                )}
+                {delegateResult?.totalTokens && (
+                  <Text>Tokens: {formatTokenCount(delegateResult.totalTokens)}</Text>
+                )}
+              </Box>
+            </React.Fragment>
+          )}
         </Box>
       )}
-
-      {/* Inline delegation details when expanded */}
-      {delegateThreadId && (
-        <Box flexDirection="column">
-          <Text color="yellow">Delegation:</Text>
-          <Box marginLeft={2}>
-            <Box
-              flexDirection="column"
-              borderStyle="round"
-              borderColor={isComplete ? 'green' : 'yellow'}
-              padding={1}
-              marginY={1}
-            >
-              {/* Header */}
-              <Box justifyContent="space-between" marginBottom={delegationExpanded ? 1 : 0}>
-                <Box>
-                  <Text color={UI_COLORS.DELEGATE}>{UI_SYMBOLS.DELEGATE} </Text>
-                  <Text color="gray">{delegateThreadId}</Text>
-                  <Text color="white"> ({taskDescription})</Text>
-                </Box>
-                <Box>
-                  {isComplete ? (
-                    <Text color={UI_COLORS.SUCCESS}>
-                      {UI_SYMBOLS.SUCCESS} Complete ({duration}){' '}
-                    </Text>
-                  ) : (
-                    <Text color={UI_COLORS.PENDING}>
-                      {UI_SYMBOLS.WORKING} Working... ({duration}){' '}
-                    </Text>
-                  )}
-                  <Text color="gray">
-                    {UI_SYMBOLS.TOKEN_IN}
-                    {formatTokenCount(tokens.tokensIn)} {UI_SYMBOLS.TOKEN_OUT}
-                    {formatTokenCount(tokens.tokensOut)}{' '}
-                  </Text>
-                  <Text color="cyan">
-                    {delegationExpanded
-                      ? `[${UI_SYMBOLS.COLLAPSE_HINT} Collapse]`
-                      : `[${UI_SYMBOLS.EXPAND_HINT} Expand]`}
-                  </Text>
-                </Box>
-              </Box>
-
-              {/* Content */}
-              {delegationExpanded && (
-                <Box flexDirection="column" paddingLeft={2}>
-                  {/* Wrap TimelineDisplay with its own expansion provider to isolate events */}
-                  <TimelineExpansionProvider>
-                    <TimelineDisplay 
-                      timeline={timeline} 
-                      focusRegion={delegateThreadId ? FocusRegions.delegate(delegateThreadId) : undefined}
-                    />
-                  </TimelineExpansionProvider>
-                </Box>
-              )}
-            </Box>
+      
+      {/* Delegation instructions */}
+      {delegateThreadId && delegateResult?.status === 'active' && (
+        <Box marginTop={1} flexDirection="column">
+          <Box>
+            <Text color={UI_COLORS.DELEGATE}>{UI_SYMBOLS.DELEGATE} </Text>
+            <Text color="gray">Delegation Thread - </Text>
+            <Text color={isEntered ? 'green' : 'gray'}>
+              {isEntered
+                ? '[ESC to exit]'
+                : `[${UI_SYMBOLS.EXPAND_HINT} to enter]`}
+            </Text>
           </Box>
+          
+          {delegationExpanded && (
+            <Box marginTop={1}>
+              <Text color="gray" italic>
+                Note: Full delegation timeline display requires additional context providers.
+              </Text>
+            </Box>
+          )}
         </Box>
       )}
     </Box>
   );
 
   return (
-    <FocusLifecycleWrapper
-      focusId={delegateThreadId ? FocusRegions.delegate(delegateThreadId) : 'none'}
-      isActive={isEntered}
-      renderWhenInactive={true}
-      onFocusRestored={() => setIsEntered(false)}
+    <TimelineEntry
+      label={header}
+      summary={preview}
+      status={status}
+      isExpandable={true}
     >
-      <TimelineEntry
-        label={`delegate "${delegateTask}"`}
-        summary={delegateSummary}
-        isExpanded={isExpanded}
-        onExpandedChange={handleExpandedChange}
-        isSelected={isSelected}
-        isFocused={isFocused}
-        onToggle={onToggle}
-        status={markerStatus}
-        isExpandable={true}
-      >
-        {expandedContent}
-      </TimelineEntry>
-    </FocusLifecycleWrapper>
+      {expandedContent}
+    </TimelineEntry>
   );
 });

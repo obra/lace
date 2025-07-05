@@ -1,17 +1,14 @@
-// ABOUTME: Specialized renderer for file-list tool executions with tree structure display
+// ABOUTME: Renderer for file-list tool executions using TimelineEntry
 // ABOUTME: Shows directory trees with proper indentation, file sizes, and type indicators
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { 
-  useToolRenderer, 
-  ToolRendererProps,
-  limitLines,
-  parseBasicToolResult 
-} from './useToolRenderer.js';
+import { TimelineEntry, TimelineStatus } from '../../ui/TimelineEntry.js';
+import { useTimelineItem } from '../contexts/TimelineItemContext.js';
+import { limitLines, type ToolRendererProps } from './components/shared.js';
 
-// Helper function to count tree elements for summary
-function countTreeElements(text: string): { files: number; dirs: number; lines: number } {
+// Helper function to count tree elements
+function countTreeElements(text: string): { files: number; dirs: number } {
   const lines = text.split('\n');
   let files = 0;
   let dirs = 0;
@@ -24,102 +21,80 @@ function countTreeElements(text: string): { files: number; dirs: number; lines: 
     }
   }
   
-  return { files, dirs, lines: lines.length };
+  return { files, dirs };
 }
 
-// Helper function to extract directory path from arguments
-function getDirectoryPath(input: Record<string, unknown>): string {
-  const path = input.path as string;
-  if (!path || path === '.') {
-    return 'current directory';
-  }
-  return path;
-}
-
-// Helper function to create parameter summary
-function getParameterSummary(input: Record<string, unknown>): string {
-  const parts: string[] = [];
+export function FileListToolRenderer({ item }: ToolRendererProps) {
+  const { isExpanded } = useTimelineItem();
   
-  if (input.recursive) parts.push('recursive');
-  if (input.includeHidden) parts.push('hidden files');
-  if (input.pattern) parts.push(`pattern: ${input.pattern}`);
-  if (input.maxDepth && input.maxDepth !== 3) parts.push(`depth: ${input.maxDepth}`);
+  // Extract data directly
+  const { path, recursive } = item.call.arguments as { path: string; recursive?: boolean };
+  const output = item.result?.content?.[0]?.text || '';
+  const hasError = item.result?.isError;
+  const isRunning = !item.result;
   
-  return parts.length > 0 ? ` (${parts.join(', ')})` : '';
-}
-
-export function FileListToolRenderer({
-  item,
-  isStreaming = false,
-  isSelected = false,
-  onToggle,
-}: ToolRendererProps) {
+  // Determine status
+  const status: TimelineStatus = isRunning ? 'pending' : hasError ? 'error' : 'success';
   
-  const { timelineEntry } = useToolRenderer(
-    item,
-    {
-      toolName: 'File List',
-      streamingAction: 'scanning...',
-      
-      getPrimaryInfo: (input) => getDirectoryPath(input),
-      getSecondaryInfo: (input) => getParameterSummary(input),
-      
-      parseOutput: (result, input) => {
-        const { success, output } = parseBasicToolResult(result);
-        
-        if (!success) {
-          return {
-            success: false,
-            errorMessage: output || 'Unknown error'
-          };
-        }
-
-        const isEmpty = output === 'No files found';
-        const stats = isEmpty ? { files: 0, dirs: 0, lines: 0 } : countTreeElements(output);
-        
-        // Create stats summary
-        const statsText = `${stats.files} files, ${stats.dirs} directories`;
-
-        // Create preview content for collapsed view
-        const previewContent = isEmpty ? (
-          <Text color="gray">No files found</Text>
-        ) : (
-          <Box flexDirection="column">
-            {/* Show first few lines of tree as preview */}
-            {(() => {
-              const { lines, truncated, remaining } = limitLines(output, 3);
-              return (
-                <Box flexDirection="column">
-                  {lines.map((line, index) => (
-                    <Text key={index} color="gray">
-                      {line}
-                    </Text>
-                  ))}
-                  {truncated && (
-                    <Text color="gray">... and {remaining} more lines</Text>
-                  )}
-                </Box>
-              );
-            })()}
-          </Box>
-        );
-
-        // Create main content for expanded view
-        const mainContent = isEmpty ? null : <Text>{output}</Text>;
-
-        return {
-          success,
-          isEmpty,
-          stats: statsText,
-          previewContent,
-          mainContent
-        };
-      }
-    },
-    isStreaming,
-    isSelected,
-    onToggle
+  // Calculate stats
+  const isEmpty = output === 'No files found';
+  const counts = isEmpty || !output ? { files: 0, dirs: 0 } : countTreeElements(output);
+  
+  // Build header with path and file/directory counts
+  const header = (
+    <Box>
+      <Text bold>file-list: </Text>
+      <Text>{path || 'current directory'}</Text>
+      {recursive && <Text color="gray"> (recursive)</Text>}
+      {item.result && !hasError && !isEmpty && (
+        <React.Fragment>
+          <Text color="gray"> - </Text>
+          <Text color="cyan">{counts.files} files, {counts.dirs} dirs</Text>
+        </React.Fragment>
+      )}
+    </Box>
+  );
+  
+  // Build preview content
+  const preview = output && item.result && !isRunning ? (() => {
+    if (isEmpty) {
+      return <Text color="gray">No files found</Text>;
+    }
+    const { lines, truncated, remaining } = limitLines(output, 3);
+    return (
+      <Box flexDirection="column">
+        {lines.map((line, index) => (
+          <Text key={index} color="gray">{line}</Text>
+        ))}
+        {truncated && (
+          <Text color="gray">... and {remaining} more lines</Text>
+        )}
+      </Box>
+    );
+  })() : null;
+  
+  // Build expanded content
+  const expandedContent = hasError && item.result ? (
+    <Box flexDirection="column">
+      <Text color="red">Error:</Text>
+      <Box marginLeft={2}>
+        <Text color="red">{item.result.content?.[0]?.text || 'Unknown error'}</Text>
+      </Box>
+    </Box>
+  ) : isEmpty ? (
+    <Text color="gray">No files found</Text>
+  ) : (
+    <Text>{output}</Text>
   );
 
-  return timelineEntry;
+  return (
+    <TimelineEntry
+      label={header}
+      summary={preview}
+      status={status}
+      isExpandable={true}
+    >
+      {expandedContent}
+    </TimelineEntry>
+  );
 }

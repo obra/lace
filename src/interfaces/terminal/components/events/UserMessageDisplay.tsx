@@ -5,17 +5,14 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { ThreadEvent } from '../../../../threads/types.js';
 import { TimelineEntry } from '../ui/TimelineEntry.js';
-import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
+import { useTimelineItem } from './contexts/TimelineItemContext.js';
 import { UI_SYMBOLS } from '../../theme.js';
 
 interface UserMessageDisplayProps {
   event: ThreadEvent;
   isStreaming?: boolean;
   isFocused?: boolean;
-  focusedLine?: number;
-  itemStartLine?: number;
-  isSelected?: boolean;
-  onToggle?: () => void;
+  // Selection and expansion state comes from context
 }
 
 // Text processing utilities
@@ -70,21 +67,14 @@ export function UserMessageDisplay({
   event, 
   isStreaming, 
   isFocused = true, // Default to true since we don't have focus logic for user messages yet
-  focusedLine,
-  itemStartLine,
-  isSelected = false,
-  onToggle
 }: UserMessageDisplayProps) {
   const rawMessage = event.data as string;
   const trimmedMessage = trimEmptyLines(rawMessage);
   const lines = trimmedMessage.split('\n');
   const shouldAutoCollapse = lines.length > 8;
   
-  // Use shared expansion state management
-  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
-    isSelected || false, 
-    (expanded) => onToggle?.()
-  );
+  // Get expansion state from context
+  const { isExpanded, onExpand, onCollapse } = useTimelineItem();
   
   // For short messages, auto-expand on mount
   React.useEffect(() => {
@@ -92,14 +82,6 @@ export function UserMessageDisplay({
       onExpand();
     }
   }, [shouldAutoCollapse, isExpanded, onExpand]);
-  
-  const handleExpandedChange = (expanded: boolean) => {
-    if (expanded) {
-      onExpand();
-    } else {
-      onCollapse();
-    }
-  };
   
   // For collapsed state (> 8 lines), show truncated with ellipsis
   const { content: displayContent, wasTruncated } = truncateToLines(trimmedMessage, 8);
@@ -121,10 +103,6 @@ export function UserMessageDisplay({
     <TimelineEntry
       label={messageDisplay}
       summary={null}
-      isExpanded={isExpanded}
-      onExpandedChange={handleExpandedChange}
-      isSelected={isSelected}
-      onToggle={onToggle}
       status="none"
       isExpandable={shouldAutoCollapse}
     >

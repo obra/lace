@@ -8,6 +8,8 @@ import { EventDisplay } from '../EventDisplay.js';
 import { ThreadEvent } from '../../../../../threads/types.js';
 import { ToolCall, ToolResult } from '../../../../../tools/types.js';
 import { UI_SYMBOLS } from '../../../theme.js';
+import { TimelineItemProvider } from '../contexts/TimelineItemContext.js';
+import { TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
 
 // Mock expansion hook
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
@@ -16,7 +18,22 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
     onExpand: vi.fn(),
     onCollapse: vi.fn(),
   }),
+  TimelineExpansionProvider: ({ children }: any) => children,
 }));
+
+// Helper to render with required providers
+function renderWithProviders(component: React.ReactElement) {
+  return render(
+    <TimelineExpansionProvider>
+      <TimelineItemProvider
+        isSelected={false}
+        onToggle={() => {}}
+      >
+        {component}
+      </TimelineItemProvider>
+    </TimelineExpansionProvider>
+  );
+}
 
 describe('EventDisplay', () => {
   it('should render USER_MESSAGE events', () => {
@@ -28,7 +45,7 @@ describe('EventDisplay', () => {
       data: 'Hello, world!',
     };
 
-    const { lastFrame } = render(<EventDisplay event={event} />);
+    const { lastFrame } = renderWithProviders(<EventDisplay event={event} />);
     expect(lastFrame()).toContain(UI_SYMBOLS.TOOLBOX_SINGLE);
     expect(lastFrame()).toContain('"Hello, world!"');
   });
@@ -42,7 +59,7 @@ describe('EventDisplay', () => {
       data: 'Hello there!',
     };
 
-    const { lastFrame } = render(<EventDisplay event={event} />);
+    const { lastFrame } = renderWithProviders(<EventDisplay event={event} />);
     expect(lastFrame()).toContain('Hello there!');
   });
 
@@ -61,7 +78,7 @@ describe('EventDisplay', () => {
       data: toolCallData,
     };
 
-    const { lastFrame } = render(<EventDisplay event={event} />);
+    const { lastFrame } = renderWithProviders(<EventDisplay event={event} />);
     expect(lastFrame()).toContain(UI_SYMBOLS.TOOL);
     expect(lastFrame()).toContain('bash');
     expect(lastFrame()).toContain('#ll-123'); // Last 6 chars of call-123
@@ -82,7 +99,7 @@ describe('EventDisplay', () => {
       data: toolResultData,
     };
 
-    const { lastFrame } = render(<EventDisplay event={event} />);
+    const { lastFrame } = renderWithProviders(<EventDisplay event={event} />);
     expect(lastFrame()).toContain('Tool Result');
     expect(lastFrame()).toContain('File listing complete');
   });
@@ -96,7 +113,7 @@ describe('EventDisplay', () => {
       data: 'System notification',
     };
 
-    const { lastFrame } = render(<EventDisplay event={event} />);
+    const { lastFrame } = renderWithProviders(<EventDisplay event={event} />);
     expect(lastFrame()).toContain(UI_SYMBOLS.INFO + ' System');
     expect(lastFrame()).toContain('System notification');
   });
@@ -110,7 +127,7 @@ describe('EventDisplay', () => {
       data: 'Streaming response...',
     };
 
-    const { lastFrame } = render(<EventDisplay event={event} isStreaming={true} />);
+    const { lastFrame } = renderWithProviders(<EventDisplay event={event} isStreaming={true} />);
     expect(lastFrame()).toContain('thinking...');
   });
 
@@ -123,7 +140,7 @@ describe('EventDisplay', () => {
       data: 'You are a helpful AI assistant.',
     };
 
-    const { lastFrame } = render(<EventDisplay event={event} />);
+    const { lastFrame } = renderWithProviders(<EventDisplay event={event} />);
     expect(lastFrame()).toContain(`${UI_SYMBOLS.TOOL} System Prompt`);
     // The toggle hint only appears when isSelected={true}
   });
@@ -137,7 +154,7 @@ describe('EventDisplay', () => {
       data: 'Always be concise and helpful.',
     };
 
-    const { lastFrame } = render(<EventDisplay event={event} />);
+    const { lastFrame } = renderWithProviders(<EventDisplay event={event} />);
     expect(lastFrame()).toContain(`${UI_SYMBOLS.USER} User Instructions`);
     // The toggle hint only appears when isSelected={true}
   });

@@ -1,199 +1,117 @@
-// ABOUTME: Generic tool renderer component using TimelineEntry
-// ABOUTME: Provides consistent expansion behavior for any tool execution with input/output display
+// ABOUTME: Generic tool renderer using TimelineEntry for unknown/unsupported tools
+// ABOUTME: Provides fallback display for any tool execution with input/output visualization
 
 import React, { forwardRef, useImperativeHandle } from 'react';
 import { Box, Text } from 'ink';
-import { TimelineEntry, type TimelineStatus } from '../../ui/TimelineEntry.js';
-import { ToolCall, ToolResult } from '../../../../../tools/types.js';
-import { CompactOutput } from '../../ui/CompactOutput.js';
-import { CodeDisplay } from '../../ui/CodeDisplay.js';
-import { UI_SYMBOLS, UI_COLORS } from '../../../theme.js';
-import { useTimelineItemExpansion } from '../hooks/useTimelineExpansionToggle.js';
+import { TimelineEntry, TimelineStatus } from '../../ui/TimelineEntry.js';
+import { useTimelineItem } from '../contexts/TimelineItemContext.js';
+import { limitLines, type ToolRendererProps } from './components/shared.js';
 import { TimelineItemRef } from '../../timeline-item-focus.js';
 
-// Extract tool execution timeline item type
-type ToolExecutionItem = {
-  type: 'tool_execution';
-  call: ToolCall;
-  result?: ToolResult;
-  timestamp: Date;
-  callId: string;
-};
-
-interface GenericToolRendererProps {
-  item: ToolExecutionItem;
-  isStreaming?: boolean;
-  isSelected?: boolean; // Whether timeline cursor is on this item
-  onToggle?: () => void;
+// Extract primary info from tool arguments
+function getPrimaryInfo(toolName: string, args: Record<string, unknown>): string {
+  // Special handling for known tools
+  switch (toolName) {
+    case 'bash':
+      return `$ ${args.command || ''}`;
+    case 'file-write':
+    case 'file-read':
+    case 'file-edit':
+      return (args.path || args.file_path || '') as string;
+    case 'ripgrep-search':
+      return `"${args.pattern || ''}" in ${args.path || 'current directory'}`;
+    case 'delegate':
+      return `"${args.task || args.prompt || 'Unknown task'}"`;
+    default:
+      // For unknown tools, use the first argument value if it's short
+      const firstValue = Object.values(args)[0];
+      if (firstValue && typeof firstValue === 'string' && firstValue.length <= 50) {
+        return firstValue;
+      }
+      return 'unknown';
+  }
 }
 
-// Default props for optional boolean values
-const defaultProps = {
-  isStreaming: false,
-  isSelected: false,
-} as const;
-
-function isJsonOutput(output: string): boolean {
-  if (!output || typeof output !== 'string') return false;
-
-  const trimmed = output.trim();
-  return (
-    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-    (trimmed.startsWith('[') && trimmed.endsWith(']'))
-  );
-}
-
-export const GenericToolRenderer = forwardRef<TimelineItemRef, GenericToolRendererProps>(({
+export const GenericToolRenderer = forwardRef<TimelineItemRef, ToolRendererProps>(({
   item,
-  isStreaming = defaultProps.isStreaming,
-  isSelected = defaultProps.isSelected,
-  onToggle,
 }, ref) => {
-  // Generic tool renderer doesn't support focus entry (only specific tools like delegate do)
+  // Generic tool renderer doesn't support focus entry
   useImperativeHandle(ref, () => ({
     enterFocus: () => {
       // No-op for generic tool renderer
     },
   }), []);
-  // Use shared expansion management for consistent behavior
-  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
-    isSelected,
-    (expanded) => onToggle?.()
-  );
-
-  // Create handler that works with TimelineEntry interface
-  const handleExpandedChange = (expanded: boolean) => {
-    if (expanded) {
-      onExpand();
-    } else {
-      onCollapse();
-    }
-  };
-
-  const { call, result } = item;
-  const { name: toolName, arguments: input } = call;
-
-  const success = result ? !result.isError : true;
-  const output = result?.content?.[0]?.text;
-  const error = result?.isError ? output : undefined;
-  const markerStatus: TimelineStatus = isStreaming ? 'pending' : success ? 'success' : result ? 'error' : 'none';
-
-  // Generate tool command summary for compact header
-  const getToolCommand = (toolName: string, input: Record<string, unknown>): string => {
-    switch (toolName) {
-      case 'bash':
-        return (input.command as string) || '';
-      case 'file-read':
-      case 'file-write':
-      case 'file-edit':
-        return (input.file_path as string) || '';
-      case 'ripgrep-search':
-        return `"${input.pattern}"` || '';
-      case 'delegate':
-        return `"${input.task || input.prompt}"` || '';
-      default:
-        // For other tools, show first parameter value if it's short
-        const firstValue = Object.values(input)[0];
-        if (typeof firstValue === 'string' && firstValue.length < 50) {
-          return firstValue;
-        }
-        return '';
-    }
-  };
-
-  const toolCommand = getToolCommand(toolName, input);
-  const statusIcon = success ? UI_SYMBOLS.SUCCESS : result ? UI_SYMBOLS.ERROR : UI_SYMBOLS.PENDING;
-
-  // Format tool name nicely (bash, file-read, etc.)
-  const formatToolName = (toolName: string | undefined): string => {
-    return (toolName || 'unknown').replace(/_/g, '-');
-  };
-
-  // Truncate long inputs for summary (first 50 chars)
-  const truncateInput = (input: Record<string, unknown>): string => {
-    const inputStr = JSON.stringify(input);
-    if (inputStr.length <= 50) return inputStr;
-    return inputStr.substring(0, 47) + '...';
-  };
-
-  // Create compact summary for collapsed state
-  const toolSummary = (
-    <Box flexDirection="column">
-      <Box>
-        <Text color={UI_COLORS.TOOL}>{UI_SYMBOLS.TOOL} </Text>
-        <Text color={UI_COLORS.TOOL} bold>
-          {formatToolName(toolName)}
-        </Text>
-        {toolCommand && (
-          <React.Fragment>
-            <Text color="gray"> </Text>
-            <Text color="white">{toolCommand}</Text>
-          </React.Fragment>
-        )}
-        <Text color="gray"> </Text>
-        <Text color={success ? UI_COLORS.SUCCESS : result ? UI_COLORS.ERROR : UI_COLORS.PENDING}>
-          {statusIcon}
-        </Text>
-        {isStreaming && <Text color="gray"> (running...)</Text>}
-        <Text color="magenta"> [GENERIC]</Text>
-      </Box>
-
-      {/* Compact output preview when collapsed */}
-      {result && success && output && (
-        <Box marginLeft={2} marginTop={1}>
-          <CompactOutput
-            output={output}
-            language={isJsonOutput(output) ? 'json' : 'text'}
-            maxLines={3}
-            canExpand={false}
-          />
-        </Box>
-      )}
+  
+  const { isExpanded } = useTimelineItem();
+  
+  // Extract data directly
+  const toolName = item.call.name;
+  const args = item.call.arguments;
+  const output = item.result?.content?.[0]?.text || '';
+  const hasError = item.result?.isError;
+  const isRunning = !item.result;
+  
+  // Determine status
+  const status: TimelineStatus = isRunning ? 'pending' : hasError ? 'error' : 'success';
+  
+  // Get primary info
+  const primaryInfo = getPrimaryInfo(toolName, args);
+  
+  // Build header with tool name and generic indicator
+  const header = (
+    <Box>
+      <Text color="magenta" bold>{toolName}</Text>
+      <Text color="gray">: </Text>
+      <Text color="white">{primaryInfo}</Text>
+      <Text color="magenta"> [GENERIC]</Text>
     </Box>
   );
-
-  // Create expanded content showing full input/output
+  
+  // Build preview content
+  const preview = output && item.result && !isRunning ? (() => {
+    const { lines, truncated, remaining } = limitLines(output, 3);
+    return (
+      <Box flexDirection="column">
+        {lines.map((line, index) => (
+          <Text key={index} dimColor>{line}</Text>
+        ))}
+        {truncated && <Text color="gray">(+ {remaining} lines)</Text>}
+      </Box>
+    );
+  })() : null;
+  
+  // Build expanded content
   const expandedContent = (
     <Box flexDirection="column">
       {/* Input parameters */}
       <Box flexDirection="column" marginBottom={1}>
         <Text color="yellow">Input:</Text>
         <Box marginLeft={2}>
-          <CodeDisplay code={JSON.stringify(input, null, 2)} language="json" compact={false} />
+          <Text>{JSON.stringify(args, null, 2)}</Text>
         </Box>
       </Box>
 
-      {/* Output */}
-      {result && (
+      {/* Output or Error */}
+      {item.result && (
         <Box flexDirection="column">
-          <Text color={success ? 'green' : 'red'}>{success ? 'Output:' : 'Error:'}</Text>
+          <Text color={hasError ? 'red' : 'green'}>
+            {hasError ? 'Error:' : 'Output:'}
+          </Text>
           <Box marginLeft={2}>
-            {success ? (
-              <CompactOutput
-                output={output || 'No output'}
-                language={isJsonOutput(output || '') ? 'json' : 'text'}
-                maxLines={50}
-                canExpand={false}
-              />
-            ) : (
-              <Text color="red">{error || 'Unknown error'}</Text>
-            )}
+            <Text color={hasError ? 'red' : undefined}>
+              {output || 'No output'}
+            </Text>
           </Box>
         </Box>
       )}
     </Box>
   );
 
-
   return (
     <TimelineEntry
-      label={`${formatToolName(toolName)}${toolCommand ? ` ${toolCommand}` : ''}`}
-      summary={toolSummary}
-      isExpanded={isExpanded}
-      onExpandedChange={handleExpandedChange}
-      isSelected={isSelected}
-      onToggle={onToggle}
-      status={markerStatus}
+      label={header}
+      summary={preview}
+      status={status}
       isExpandable={true}
     >
       {expandedContent}

@@ -52,8 +52,6 @@ export class ToolRendererErrorBoundary extends Component<
       return (
         <GenericToolRenderer
           item={errorItem}
-          isSelected={this.props.isSelected}
-          onToggle={this.props.onToggle}
         />
       );
     }

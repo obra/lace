@@ -7,14 +7,19 @@ import { render } from 'ink-testing-library';
 import { UserMessageDisplay } from '../UserMessageDisplay.js';
 import { ThreadEvent } from '../../../../../threads/types.js';
 import { UI_SYMBOLS } from '../../../theme.js';
+import { TimelineItemProvider } from '../contexts/TimelineItemContext.js';
+import { TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
 
-vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
-  useTimelineItemExpansion: () => ({
-    isExpanded: false,
-    onExpand: vi.fn(),
-    onCollapse: vi.fn(),
-  }),
-}));
+// Helper to render with provider
+const renderWithProvider = (element: React.ReactElement, isSelected = false) => {
+  return render(
+    <TimelineExpansionProvider>
+      <TimelineItemProvider isSelected={isSelected} onToggle={() => {}}>
+        {element}
+      </TimelineItemProvider>
+    </TimelineExpansionProvider>
+  );
+};
 
 describe('UserMessageDisplay', () => {
   const createUserMessageEvent = (content: string): ThreadEvent => ({
@@ -29,7 +34,7 @@ describe('UserMessageDisplay', () => {
     it('should display short user messages with non-expandable indicator', () => {
       const event = createUserMessageEvent('Hello world');
 
-      const { lastFrame } = render(<UserMessageDisplay event={event} />);
+      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} />);
 
       const frame = lastFrame();
       expect(frame).toContain('"Hello world"');
@@ -40,7 +45,7 @@ describe('UserMessageDisplay', () => {
       const longMessage = Array.from({ length: 10 }, (_, i) => `Line ${i + 1}: This is line content`).join('\n');
       const event = createUserMessageEvent(longMessage);
 
-      const { lastFrame } = render(<UserMessageDisplay event={event} />);
+      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} />);
 
       const frame = lastFrame();
       expect(frame).toContain('"Line 1: This is line content'); // Should show first line in quotes
@@ -57,7 +62,7 @@ Line 3: This is the third line with more content
 Line 4: Final line`;
       const event = createUserMessageEvent(multilineMessage);
 
-      const { lastFrame } = render(<UserMessageDisplay event={event} />);
+      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} />);
 
       const frame = lastFrame();
       expect(frame).toContain('"Line 1: This is the first line');
@@ -71,7 +76,7 @@ Line 4: Final line`;
       const specialMessage = '🚀 Special chars: áéíóú, 中文, русский, العربية, emojis: 🎉🔥💡';
       const event = createUserMessageEvent(specialMessage);
 
-      const { lastFrame } = render(<UserMessageDisplay event={event} />);
+      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} />);
 
       expect(lastFrame()).toContain(specialMessage);
     });
@@ -80,7 +85,7 @@ Line 4: Final line`;
       const messageWithEmptyLines = '\n\n   Content with leading and trailing spaces   \n\n';
       const event = createUserMessageEvent(messageWithEmptyLines);
 
-      const { lastFrame } = render(<UserMessageDisplay event={event} />);
+      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} />);
 
       const frame = lastFrame();
       expect(frame).toContain('"Content with leading and trailing spaces"');
@@ -92,18 +97,18 @@ Line 4: Final line`;
     it('should have collapsible structure with appropriate indicators', () => {
       const event = createUserMessageEvent('Regular user message');
 
-      const { lastFrame } = render(<UserMessageDisplay event={event} />);
+      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} />);
 
       const frame = lastFrame();
       expect(frame).toContain('"Regular user message"');
       expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE); // Non-expandable for short messages
     });
 
-    it('should accept onToggle prop for expansion control', () => {
+    it('should work with timeline context for expansion control', () => {
       const event = createUserMessageEvent('Test message');
 
-      // This should compile with onToggle prop
-      const { lastFrame } = render(<UserMessageDisplay event={event} onToggle={() => {}} />);
+      // Component uses context for expansion control
+      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} />);
 
       expect(lastFrame()).toContain('Test message');
     });
@@ -113,7 +118,7 @@ Line 4: Final line`;
     it('should render with normal colors when focused', () => {
       const event = createUserMessageEvent('Focused message');
 
-      const { lastFrame } = render(<UserMessageDisplay event={event} isFocused={true} />);
+      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} isFocused={true} />);
 
       expect(lastFrame()).toContain('Focused message');
     });
@@ -121,7 +126,7 @@ Line 4: Final line`;
     it('should render with dimmed colors when not focused', () => {
       const event = createUserMessageEvent('Unfocused message');
 
-      const { lastFrame } = render(<UserMessageDisplay event={event} isFocused={false} />);
+      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} isFocused={false} />);
 
       expect(lastFrame()).toContain('Unfocused message');
     });
@@ -131,7 +136,7 @@ Line 4: Final line`;
     it('should show typing indicator when streaming', () => {
       const event = createUserMessageEvent('Streaming message');
 
-      const { lastFrame } = render(<UserMessageDisplay event={event} isStreaming={true} />);
+      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} isStreaming={true} />);
 
       const frame = lastFrame();
       expect(frame).toContain('Streaming message');
@@ -141,7 +146,7 @@ Line 4: Final line`;
     it('should not show typing indicator when not streaming', () => {
       const event = createUserMessageEvent('Complete message');
 
-      const { lastFrame } = render(<UserMessageDisplay event={event} isStreaming={false} />);
+      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} isStreaming={false} />);
 
       const frame = lastFrame();
       expect(frame).toContain('Complete message');
@@ -153,7 +158,7 @@ Line 4: Final line`;
     it('should include quoted message content', () => {
       const event = createUserMessageEvent('Message with label');
 
-      const { lastFrame } = render(<UserMessageDisplay event={event} />);
+      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} />);
 
       const frame = lastFrame();
       expect(frame).toContain('"Message with label"');
@@ -164,7 +169,7 @@ Line 4: Final line`;
       const longSingleLineMessage = 'A'.repeat(200); // Very long single line
       const event = createUserMessageEvent(longSingleLineMessage);
 
-      const { lastFrame } = render(<UserMessageDisplay event={event} />);
+      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} />);
 
       const frame = lastFrame();
       // Content should be present (may be wrapped) - check for substantial presence

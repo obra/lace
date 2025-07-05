@@ -1,137 +1,105 @@
-// ABOUTME: Specialized renderer for file-write tool executions with path and content summary
+// ABOUTME: Renderer for file-write tool executions using TimelineEntry
 // ABOUTME: Shows file write operations with character counts and content preview
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { 
-  useToolRenderer, 
-  ToolRendererProps,
-  limitLines,
-  parseBasicToolResult 
-} from './useToolRenderer.js';
+import { TimelineEntry, TimelineStatus } from '../../ui/TimelineEntry.js';
+import { useTimelineItem } from '../contexts/TimelineItemContext.js';
+import { limitLines, type ToolRendererProps } from './components/shared.js';
+import { logger } from '../../../../../utils/logger.js';
 
-// Helper function to parse write result
-function parseWriteResult(output: string): { characterCount: number; filePath: string } | null {
-  // Parse "Successfully wrote X characters to path"
-  const pattern = /Successfully wrote (\d+) characters to (.+)/;
-  const match = output.match(pattern);
+export function FileWriteToolRenderer({ item }: ToolRendererProps) {
+  const { isExpanded } = useTimelineItem();
   
-  if (match) {
-    return {
-      characterCount: parseInt(match[1], 10),
-      filePath: match[2]
-    };
+  // Extract and validate data
+  const args = item.call.arguments as Record<string, unknown>;
+  
+  if (typeof args.file_path !== 'string') {
+    logger.warn('FileWriteToolRenderer: Invalid file_path argument', { 
+      file_path: args.file_path, 
+      callId: item.call.id 
+    });
+    return null;
   }
   
-  return null;
-}
-
-// Helper function to format character count
-function formatCharacterCount(count: number): string {
-  if (count === 0) return '0 characters';
-  if (count === 1) return '1 character';
-  
-  if (count >= 1000000) {
-    return `${(count / 1000000).toFixed(1)}M characters`;
-  } else if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}K characters`;
+  if (typeof args.content !== 'string') {
+    logger.warn('FileWriteToolRenderer: Invalid content argument', { 
+      content: typeof args.content, 
+      callId: item.call.id 
+    });
+    return null;
   }
   
-  return `${count} characters`;
-}
-
-export function FileWriteToolRenderer({
-  item,
-  isStreaming = false,
-  isSelected = false,
-  onToggle,
-}: ToolRendererProps) {
+  const file_path = args.file_path;
+  const content = args.content;
+  const hasError = item.result?.isError;
+  const isRunning = !item.result;
   
-  const { timelineEntry } = useToolRenderer(
-    item,
-    {
-      toolName: 'Write',
-      streamingAction: 'writing...',
-      
-      getPrimaryInfo: (input) => (input.path as string) || '',
-      
-      parseOutput: (result, input) => {
-        const { success, output } = parseBasicToolResult(result);
-        
-        if (!success) {
-          return {
-            success: false,
-            errorMessage: output || 'Unknown error'
-          };
-        }
-
-        const writeResult = parseWriteResult(output);
-        const content = (input.content as string) || '';
-        
-        if (!writeResult) {
-          return {
-            success: false,
-            errorMessage: 'Could not parse write result'
-          };
-        }
-
-        // Create stats summary
-        const statsText = formatCharacterCount(writeResult.characterCount);
-
-        // Create preview content for collapsed view
-        const previewContent = (
-          <Box flexDirection="column">
-            {(() => {
-              const { lines, truncated } = limitLines(content, 2);
-              return (
-                <Box flexDirection="column">
-                  {lines.map((line, index) => (
-                    <Text key={index} color="gray">
-                      {line}
-                    </Text>
-                  ))}
-                  {truncated && (
-                    <Text color="gray">... and more</Text>
-                  )}
-                </Box>
-              );
-            })()}
-          </Box>
+  // Determine status
+  const status: TimelineStatus = isRunning ? 'pending' : hasError ? 'error' : 'success';
+  
+  // Calculate character count and line count
+  const charCount = content ? content.length : 0;
+  const lineCount = content ? content.split('\n').length : 0;
+  
+  // Build header with file path and character count
+  const header = (
+    <Box>
+      <Text bold>file-write: </Text>
+      <Text>{file_path}</Text>
+      <Text color="gray"> - </Text>
+      <Text color="cyan">{charCount} chars</Text>
+      {lineCount > 1 && (
+        <React.Fragment>
+          <Text color="gray">, </Text>
+          <Text color="gray">{lineCount} lines</Text>
+        </React.Fragment>
+      )}
+    </Box>
+  );
+  
+  // Build preview content (only show when complete and has content)
+  const preview = content && item.result && !isRunning ? (() => {
+    const { lines, truncated } = limitLines(content, 2);
+    return (
+      <Box flexDirection="column">
+        {lines.map((line, index) => (
+          <Text key={index}>{line}</Text>
+        ))}
+        {truncated && <Text color="gray">... and more</Text>}
+      </Box>
+    );
+  })() : null;
+  
+  // Build expanded content
+  const expandedContent = content ? (
+    <Box flexDirection="column">
+      {(() => {
+        const { lines, truncated, remaining } = limitLines(content, 50);
+        return (
+          <React.Fragment>
+            {lines.map((line, index) => (
+              <Text key={index}>{line}</Text>
+            ))}
+            {truncated && (
+              <Text color="gray">... ({remaining} more lines)</Text>
+            )}
+          </React.Fragment>
         );
-
-        // Create main content for expanded view
-        const mainContent = (
-          <Box flexDirection="column">
-            {(() => {
-              const { lines, truncated, remaining } = limitLines(content, 5);
-              return (
-                <Box flexDirection="column">
-                  {lines.map((line, index) => (
-                    <Text key={index}>
-                      {line}
-                    </Text>
-                  ))}
-                  {truncated && (
-                    <Text color="gray">... ({remaining} more lines)</Text>
-                  )}
-                </Box>
-              );
-            })()}
-          </Box>
-        );
-
-        return {
-          success,
-          stats: statsText,
-          previewContent,
-          mainContent
-        };
-      }
-    },
-    isStreaming,
-    isSelected,
-    onToggle
+      })()}
+    </Box>
+  ) : (
+    <Text color="gray">(empty file)</Text>
   );
 
-  return timelineEntry;
+  return (
+    <TimelineEntry
+      label={header}
+      summary={preview}
+      status={status}
+      isExpandable={true}
+    >
+      {expandedContent}
+    </TimelineEntry>
+  );
 }

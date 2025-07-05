@@ -4,6 +4,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Box, Text, measureElement, DOMElement } from 'ink';
 import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
+import { useTimelineItemOptional } from '../events/contexts/TimelineItemContext.js';
 
 export type TimelineStatus = 'none' | 'pending' | 'success' | 'error';
 
@@ -11,11 +12,11 @@ interface TimelineEntryProps {
   children: React.ReactNode;
   label?: string | React.ReactNode;
   summary?: React.ReactNode;
-  isExpanded: boolean;
-  onExpandedChange: (expanded: boolean) => void;
-  isSelected?: boolean;
+  isExpanded?: boolean;  // Optional - uses context if available
+  onExpandedChange?: (expanded: boolean) => void;  // Optional - uses context if available
+  isSelected?: boolean;  // Optional - uses context if available
   isFocused?: boolean;
-  onToggle?: () => void;
+  onToggle?: () => void;  // Optional - uses context if available
   status?: TimelineStatus;
   isExpandable?: boolean;
   isStreaming?: boolean;
@@ -53,15 +54,35 @@ function getMarkerColor(status: TimelineStatus, isSelected: boolean): string {
   return colorMap[status];
 }
 
+function getStatusSymbol(status: TimelineStatus): string | null {
+  const symbolMap = {
+    none: null,
+    pending: UI_SYMBOLS.PENDING,
+    success: UI_SYMBOLS.SUCCESS,
+    error: UI_SYMBOLS.ERROR,
+  };
+  return symbolMap[status];
+}
+
+function getStatusColor(status: TimelineStatus): string {
+  const colorMap = {
+    none: 'gray',
+    pending: 'yellow',
+    success: 'green', 
+    error: 'red',
+  };
+  return colorMap[status];
+}
+
 export function TimelineEntry({
   children,
   label,
   summary,
-  isExpanded,
-  onExpandedChange,
-  isSelected = false,
+  isExpanded: isExpandedProp,
+  onExpandedChange: onExpandedChangeProp,
+  isSelected: isSelectedProp,
   isFocused = false,
-  onToggle,
+  onToggle: onToggleProp,
   status = 'none',
   isExpandable = false,
   isStreaming = false,
@@ -70,18 +91,44 @@ export function TimelineEntry({
   const [measuredHeight, setMeasuredHeight] = useState<number>(1);
   const prevExpandedRef = useRef<boolean | undefined>(undefined);
   const measureTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Get context values if available
+  const context = useTimelineItemOptional();
+  
+  // Use context values if available, otherwise fall back to props
+  const isSelected = isSelectedProp ?? context?.isSelected ?? false;
+  const isExpanded = isExpandedProp ?? context?.isExpanded ?? false;
+  const onToggle = onToggleProp ?? context?.onToggle;
+  const onExpandedChange = onExpandedChangeProp ?? 
+    (context ? (expanded: boolean) => {
+      if (expanded) {
+        context.onExpand();
+      } else {
+        context.onCollapse();
+      }
+    } : undefined);
 
   // Debounced height measurement function
   const measureHeight = useCallback(() => {
-    if (contentAreaRef.current) {
-      try {
-        const { height } = measureElement(contentAreaRef.current);
-        const newHeight = Math.max(1, height);
-        setMeasuredHeight(prev => prev !== newHeight ? newHeight : prev);
-      } catch (error) {
-        setMeasuredHeight(prev => prev !== 1 ? 1 : prev);
-      }
+    // Clear any existing timeout
+    if (measureTimeoutRef.current) {
+      clearTimeout(measureTimeoutRef.current);
     }
+    
+    // Debounce the measurement to avoid excessive calls
+    measureTimeoutRef.current = setTimeout(() => {
+      if (contentAreaRef.current) {
+        try {
+          const { height } = measureElement(contentAreaRef.current);
+          const newHeight = Math.max(1, height);
+          setMeasuredHeight(prev => prev !== newHeight ? newHeight : prev);
+        } catch (error) {
+          // Log error for debugging but fallback gracefully
+          console.warn('TimelineEntry: Failed to measure height', error);
+          setMeasuredHeight(prev => prev !== 1 ? 1 : prev);
+        }
+      }
+    }, 16); // ~60fps debounce
   }, []);
 
   // Detect expansion state changes and trigger remeasurement
@@ -139,13 +186,22 @@ export function TimelineEntry({
         : `${UI_SYMBOLS.ARROW_RIGHT} to open`})`
     : ' ';
 
+  // Get status symbol and color
+  const statusSymbol = getStatusSymbol(status);
+  const statusColor = getStatusColor(status);
+
   // Content area - simplified to reduce empty space
   const actualContent = isExpanded ? children : (summary && summary);
   
   const contentArea = (
     <Box ref={contentAreaRef} marginBottom={0} flexDirection="column">
       {label && (
-        <Box marginBottom={0}>
+        <Box marginBottom={0} flexDirection="row">
+          {statusSymbol && (
+            <React.Fragment>
+              <Text color={statusColor}>{statusSymbol} </Text>
+            </React.Fragment>
+          )}
           {typeof label === 'string' ? (
             <Text color="gray">{label}</Text>
           ) : (
