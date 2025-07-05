@@ -2,7 +2,6 @@
 // ABOUTME: This module initializes all major components and starts the appropriate interface.
 
 import { Agent } from './agents/agent.js';
-import { ProviderRegistry } from './providers/registry.js';
 import { AIProvider } from './providers/base-provider.js';
 import { ToolExecutor } from './tools/executor.js';
 import { DelegateTool } from './tools/implementations/delegate.js';
@@ -44,10 +43,7 @@ const providerInitializers: Record<
   },
 };
 
-async function createProvider(
-  providerType: string,
-  model?: string,
-): Promise<AIProvider> {
+async function createProvider(providerType: string, model?: string): Promise<AIProvider> {
   const initializer = providerInitializers[providerType];
   if (!initializer) {
     throw new Error(`Unknown provider: ${providerType}`);
@@ -64,7 +60,7 @@ async function createProvider(
     apiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_KEY;
     if (!apiKey) {
       console.error(
-        'Error: OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider',
+        'Error: OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider'
       );
       process.exit(1);
     }
@@ -117,7 +113,7 @@ async function setupAgent(options: CLIOptions, threadId: string): Promise<Agent>
 
 async function handleSession(
   threadManager: ThreadManager,
-  continueMode?: boolean | string,
+  continueMode?: boolean | string
 ): Promise<string> {
   let continueThreadId: string | undefined;
   if (continueMode) {
