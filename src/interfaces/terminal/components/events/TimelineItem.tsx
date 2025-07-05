@@ -13,7 +13,6 @@ import { EventDisplay } from './EventDisplay.js';
 import { GenericToolRenderer } from './tool-renderers/GenericToolRenderer.js';
 import { getToolRenderer } from './tool-renderers/getToolRenderer.js';
 import { ToolRendererErrorBoundary } from './ToolRendererErrorBoundary.js';
-import { ToolExecutionTimelineEntry } from './ToolExecutionTimelineEntry.js';
 import MessageDisplay from '../message-display.js';
 import { logger } from '../../../../utils/logger.js';
 import { ToolRendererProps } from './tool-renderers/components/shared.js';
@@ -56,9 +55,8 @@ function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRenderer
   // For cached renderers, this will only show briefly on first render
   if (isLoading) {
     return (
-      <ToolExecutionTimelineEntry
+      <GenericToolRenderer
         item={item}
-        ToolRenderer={GenericToolRenderer}
         isSelected={isSelected}
         onToggle={onToggle}
       />
@@ -67,9 +65,8 @@ function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRenderer
 
   const RendererComponent = ToolRenderer || GenericToolRenderer;
   return (
-    <ToolExecutionTimelineEntry
+    <RendererComponent
       item={item}
-      ToolRenderer={RendererComponent}
       isSelected={isSelected}
       onToggle={onToggle}
     />
@@ -83,82 +80,42 @@ export function TimelineItem({
   itemStartLine,
   onToggle,
 }: TimelineItemProps) {
-  const content = (() => {
-    switch (item.type) {
+  switch (item.type) {
     case 'user_message':
       return (
-        <EventDisplay
-          event={{
-            id: item.id,
-            threadId: '',
-            type: 'USER_MESSAGE',
-            timestamp: item.timestamp,
-            data: item.content,
-          }}
+        <TimelineItemProvider
           isSelected={isSelected}
+          onToggle={onToggle}
           focusedLine={selectedLine}
           itemStartLine={itemStartLine}
-          onToggle={onToggle}
-        />
+        >
+          <EventDisplay
+            event={{
+              id: item.id,
+              threadId: '',
+              type: 'USER_MESSAGE',
+              timestamp: item.timestamp,
+              data: item.content,
+            }}
+            isSelected={isSelected}
+            focusedLine={selectedLine}
+            itemStartLine={itemStartLine}
+            onToggle={onToggle}
+          />
+        </TimelineItemProvider>
       );
 
     case 'agent_message':
       return (
-        <EventDisplay
-          event={{
-            id: item.id,
-            threadId: '',
-            type: 'AGENT_MESSAGE',
-            timestamp: item.timestamp,
-            data: item.content,
-          }}
+        <TimelineItemProvider
           isSelected={isSelected}
+          onToggle={onToggle}
           focusedLine={selectedLine}
           itemStartLine={itemStartLine}
-          onToggle={onToggle}
-        />
-      );
-
-    case 'system_message':
-      return (
-        <EventDisplay
-          event={{
-            id: item.id,
-            threadId: '',
-            type: (item.originalEventType || 'LOCAL_SYSTEM_MESSAGE') as EventType,
-            timestamp: item.timestamp,
-            data: item.content,
-          }}
-          isSelected={isSelected}
-          focusedLine={selectedLine}
-          itemStartLine={itemStartLine}
-          onToggle={onToggle}
-        />
-      );
-
-    case 'tool_execution':
-      return (
-        <ToolRendererErrorBoundary
-          item={item}
-          isSelected={isSelected}
-          onToggle={onToggle}
         >
-          <DynamicToolRenderer
-            item={item}
-            isSelected={isSelected}
-              onToggle={onToggle}
-          />
-        </ToolRendererErrorBoundary>
-      );
-
-    case 'ephemeral_message':
-      // For assistant ephemeral messages, use EventDisplay with AgentMessageDisplay
-      // which provides proper thinking block handling and side indicators
-      if (item.messageType === 'assistant') {
-        return (
           <EventDisplay
             event={{
-              id: `ephemeral-${item.timestamp.getTime()}`,
+              id: item.id,
               threadId: '',
               type: 'AGENT_MESSAGE',
               timestamp: item.timestamp,
@@ -168,8 +125,82 @@ export function TimelineItem({
             focusedLine={selectedLine}
             itemStartLine={itemStartLine}
             onToggle={onToggle}
-            isStreaming={true}
           />
+        </TimelineItemProvider>
+      );
+
+    case 'system_message':
+      return (
+        <TimelineItemProvider
+          isSelected={isSelected}
+          onToggle={onToggle}
+          focusedLine={selectedLine}
+          itemStartLine={itemStartLine}
+        >
+          <EventDisplay
+            event={{
+              id: item.id,
+              threadId: '',
+              type: (item.originalEventType || 'LOCAL_SYSTEM_MESSAGE') as EventType,
+              timestamp: item.timestamp,
+              data: item.content,
+            }}
+            isSelected={isSelected}
+            focusedLine={selectedLine}
+            itemStartLine={itemStartLine}
+            onToggle={onToggle}
+          />
+        </TimelineItemProvider>
+      );
+
+    case 'tool_execution':
+      return (
+        <TimelineItemProvider
+          isSelected={isSelected}
+          onToggle={onToggle}
+          focusedLine={selectedLine}
+          itemStartLine={itemStartLine}
+        >
+          <ToolRendererErrorBoundary
+            item={item}
+            isSelected={isSelected}
+            onToggle={onToggle}
+          >
+            <DynamicToolRenderer
+              item={item}
+              isSelected={isSelected}
+              onToggle={onToggle}
+            />
+          </ToolRendererErrorBoundary>
+        </TimelineItemProvider>
+      );
+
+    case 'ephemeral_message':
+      // For assistant ephemeral messages, use EventDisplay with AgentMessageDisplay
+      // which provides proper thinking block handling and side indicators
+      if (item.messageType === 'assistant') {
+        return (
+          <TimelineItemProvider
+            isSelected={isSelected}
+            onToggle={onToggle}
+            focusedLine={selectedLine}
+            itemStartLine={itemStartLine}
+          >
+            <EventDisplay
+              event={{
+                id: `ephemeral-${item.timestamp.getTime()}`,
+                threadId: '',
+                type: 'AGENT_MESSAGE',
+                timestamp: item.timestamp,
+                data: item.content,
+              }}
+              isSelected={isSelected}
+              focusedLine={selectedLine}
+              itemStartLine={itemStartLine}
+              onToggle={onToggle}
+              isStreaming={true}
+            />
+          </TimelineItemProvider>
         );
       }
       
@@ -190,17 +221,5 @@ export function TimelineItem({
           <Text>Unknown timeline item type</Text>
         </Box>
       );
-    }
-  })();
-
-  return (
-    <TimelineItemProvider
-      isSelected={isSelected}
-      onToggle={onToggle}
-      focusedLine={selectedLine}
-      itemStartLine={itemStartLine}
-    >
-      {content}
-    </TimelineItemProvider>
-  );
+  }
 }
