@@ -35,7 +35,7 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
     onExpand: vi.fn(),
     onCollapse: vi.fn(),
   }),
-  useTimelineItemFocusEntry: vi.fn(),
+  useTimelineItemFocusEntry: vi.fn(() => vi.fn()),
 }));
 
 const mockDelegateCall = {
