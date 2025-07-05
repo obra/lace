@@ -9,13 +9,14 @@ describe('Enhanced Task Data Model', () => {
   let testTask: Task;
   const creatorThreadId = createThreadId('lace_20250703_abc123');
   const parentThreadId = createThreadId('lace_20250703_abc123');
-  
+
   beforeEach(() => {
     testTask = {
       id: 'task_20250703_test01',
       title: 'Implement authentication',
       description: 'Add user login functionality',
-      prompt: 'Create a secure authentication system with JWT tokens. Include login, logout, and session management.',
+      prompt:
+        'Create a secure authentication system with JWT tokens. Include login, logout, and session management.',
       status: 'pending',
       priority: 'high',
       createdBy: creatorThreadId,
@@ -60,8 +61,8 @@ describe('Enhanced Task Data Model', () => {
   describe('Task status transitions', () => {
     it('should support all status values', () => {
       const statuses: Task['status'][] = ['pending', 'in_progress', 'completed', 'blocked'];
-      
-      statuses.forEach(status => {
+
+      statuses.forEach((status) => {
         testTask.status = status;
         expect(testTask.status).toBe(status);
       });

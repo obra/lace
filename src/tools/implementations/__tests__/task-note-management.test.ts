@@ -44,7 +44,7 @@ describe('Task Note Management', () => {
 
     it('should add multiple notes from different agents', () => {
       const task = createTestTask();
-      
+
       const note1: TaskNote = {
         id: '1',
         author: agent1ThreadId,
@@ -78,7 +78,7 @@ describe('Task Note Management', () => {
   describe('Note ordering', () => {
     it('should maintain chronological order', () => {
       const task = createTestTask();
-      
+
       const timestamps = [
         new Date('2025-01-01T10:00:00Z'),
         new Date('2025-01-01T11:00:00Z'),
@@ -126,7 +126,8 @@ describe('Task Note Management', () => {
 
     it('should support technical content with special characters', () => {
       const task = createTestTask();
-      const technicalContent = 'Fixed bug in `auth.validate()` function: changed regex from /^[a-z]+$/ to /^[a-zA-Z0-9_-]+$/';
+      const technicalContent =
+        'Fixed bug in `auth.validate()` function: changed regex from /^[a-z]+$/ to /^[a-zA-Z0-9_-]+$/';
 
       const note: TaskNote = {
         id: '1',

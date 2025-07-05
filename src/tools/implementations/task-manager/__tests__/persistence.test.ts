@@ -12,12 +12,12 @@ import { createThreadId, createNewAgentSpec } from '../../../../threads/types.js
 describe('TaskPersistence', () => {
   let tempDbPath: string;
   let persistence: TaskPersistence;
-  
+
   // Test data
   const parentThreadId = createThreadId('lace_20250703_parent');
   const agent1ThreadId = createThreadId('lace_20250703_parent.1');
   const agent2ThreadId = createThreadId('lace_20250703_parent.2');
-  
+
   beforeEach(() => {
     // Create temporary database file
     tempDbPath = path.join(os.tmpdir(), `lace-tasks-test-${Date.now()}.db`);
@@ -129,7 +129,7 @@ describe('TaskPersistence', () => {
       };
 
       await persistence.saveTask(task);
-      
+
       // Update task
       await persistence.updateTask(task.id, {
         title: 'Updated title',
@@ -204,7 +204,7 @@ describe('TaskPersistence', () => {
     it('should load tasks by thread', () => {
       const tasks = persistence.loadTasksByThread(parentThreadId);
       expect(tasks).toHaveLength(2);
-      expect(tasks.every(t => t.threadId === parentThreadId)).toBe(true);
+      expect(tasks.every((t) => t.threadId === parentThreadId)).toBe(true);
     });
 
     it('should load tasks by assignee', () => {
@@ -288,7 +288,7 @@ describe('TaskPersistence', () => {
 
       const loaded = persistence.loadTask(task.id);
       expect(loaded?.notes).toHaveLength(3);
-      
+
       // Verify chronological order
       for (let i = 1; i < loaded!.notes.length; i++) {
         expect(loaded!.notes[i].timestamp.getTime()).toBeGreaterThan(

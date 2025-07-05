@@ -111,19 +111,19 @@ describe('TaskFormatter', () => {
       const result = TaskFormatter.formatTaskList(tasks, { groupBy: 'status' });
 
       const lines = result.split('\n');
-      
+
       // Find group headers
-      const pendingIndex = lines.findIndex(l => l.includes('Status: pending'));
-      const inProgressIndex = lines.findIndex(l => l.includes('Status: in_progress'));
-      const completedIndex = lines.findIndex(l => l.includes('Status: completed'));
-      const blockedIndex = lines.findIndex(l => l.includes('Status: blocked'));
+      const pendingIndex = lines.findIndex((l) => l.includes('Status: pending'));
+      const inProgressIndex = lines.findIndex((l) => l.includes('Status: in_progress'));
+      const completedIndex = lines.findIndex((l) => l.includes('Status: completed'));
+      const blockedIndex = lines.findIndex((l) => l.includes('Status: blocked'));
 
       // Verify groups exist
       expect(pendingIndex).toBeGreaterThan(-1);
       expect(inProgressIndex).toBeGreaterThan(-1);
       expect(completedIndex).toBeGreaterThan(-1);
       expect(blockedIndex).toBeGreaterThan(-1);
-      
+
       // Verify they're in the expected order (pending, in_progress, blocked, completed)
       expect(inProgressIndex).toBeGreaterThan(pendingIndex);
       expect(blockedIndex).toBeGreaterThan(inProgressIndex);
@@ -135,11 +135,11 @@ describe('TaskFormatter', () => {
       const result = TaskFormatter.formatTaskList(tasks, { groupBy: 'priority' });
 
       const lines = result.split('\n');
-      
+
       // Find group headers
-      const highIndex = lines.findIndex(l => l.includes('High Priority'));
-      const mediumIndex = lines.findIndex(l => l.includes('Medium Priority'));
-      const lowIndex = lines.findIndex(l => l.includes('Low Priority'));
+      const highIndex = lines.findIndex((l) => l.includes('High Priority'));
+      const mediumIndex = lines.findIndex((l) => l.includes('Medium Priority'));
+      const lowIndex = lines.findIndex((l) => l.includes('Low Priority'));
 
       // Verify groups exist and are in order
       expect(highIndex).toBeGreaterThan(-1);
@@ -161,9 +161,9 @@ describe('TaskFormatter', () => {
         [agent2ThreadId, { displayName: 'Bob' }],
       ]);
 
-      const result = TaskFormatter.formatTaskList(tasks, { 
+      const result = TaskFormatter.formatTaskList(tasks, {
         showAssignee: true,
-        threadMetadata: metadata 
+        threadMetadata: metadata,
       });
 
       expect(result).toContain('Bob'); // agent2 display name

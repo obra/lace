@@ -18,7 +18,7 @@ export class TaskFormatter {
     }
 
     const opts = options || {};
-    
+
     if (opts.groupBy) {
       return this.formatGroupedTasks(tasks, opts);
     }
@@ -28,7 +28,7 @@ export class TaskFormatter {
 
   private static formatFlatTasks(tasks: Task[], options: FormatOptions): string {
     const lines: string[] = [];
-    
+
     for (const task of tasks) {
       lines.push(this.formatTaskLine(task, options));
     }
@@ -56,7 +56,7 @@ export class TaskFormatter {
         default:
           groupKey = 'all';
       }
-      
+
       if (!groups.has(groupKey)) {
         groups.set(groupKey, []);
       }
@@ -86,7 +86,7 @@ export class TaskFormatter {
     // Format groups
     for (const [groupKey, groupTasks] of sortedGroups) {
       lines.push(''); // Empty line before group
-      
+
       // Format group header
       let header: string;
       if (options.groupBy === 'priority') {
@@ -96,10 +96,10 @@ export class TaskFormatter {
       } else {
         header = `## Assignee: ${this.formatAssignee(groupKey as AssigneeId, options.threadMetadata)}`;
       }
-      
+
       lines.push(header);
       lines.push('');
-      
+
       // Add tasks in group
       for (const task of groupTasks) {
         lines.push(this.formatTaskLine(task, options));
@@ -130,7 +130,7 @@ export class TaskFormatter {
 
   static formatTask(task: Task, detailed?: boolean): string {
     const lines: string[] = [];
-    
+
     // Basic info
     lines.push(`Task: ${task.id}`);
     lines.push(`Title: ${task.title}`);
@@ -166,27 +166,34 @@ export class TaskFormatter {
 
   private static getStatusIcon(status: Task['status']): string {
     switch (status) {
-      case 'pending': return '○';
-      case 'in_progress': return '◐';
-      case 'completed': return '✓';
-      case 'blocked': return '⊗';
+      case 'pending':
+        return '○';
+      case 'in_progress':
+        return '◐';
+      case 'completed':
+        return '✓';
+      case 'blocked':
+        return '⊗';
     }
   }
 
   // Make this protected instead of private so tests can access it
-  protected static formatAssignee(assignee: AssigneeId, metadata?: Map<ThreadId, { displayName?: string }>): string {
+  protected static formatAssignee(
+    assignee: AssigneeId,
+    metadata?: Map<ThreadId, { displayName?: string }>
+  ): string {
     // Handle "new:provider/model" format
     if (assignee.startsWith('new:')) {
       return assignee;
     }
-    
+
     const threadId = assignee as ThreadId;
     const displayName = metadata?.get(threadId)?.displayName;
-    
+
     if (displayName) {
       return displayName;
     }
-    
+
     // Extract last part of hierarchical thread ID
     const parts = threadId.split('.');
     return parts.length > 1 ? parts[parts.length - 1] : threadId;

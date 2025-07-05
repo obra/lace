@@ -25,13 +25,24 @@ const createTaskSchema = z.object({
   assignedTo: z.string().optional().describe('Thread ID or "new:provider/model"'),
 });
 
+// Singleton persistence instance
+let persistenceInstance: TaskPersistence | null = null;
+
+async function getPersistence(): Promise<TaskPersistence> {
+  if (!persistenceInstance) {
+    const { getLaceDbPath } = await import('../../../config/lace-dir.js');
+    persistenceInstance = new TaskPersistence(getLaceDbPath());
+  }
+  return persistenceInstance;
+}
+
 export class TaskCreateTool extends Tool {
-  name = 'task_create';
+  name = 'task_add';
   description = 'Create a new task with detailed instructions for execution';
   schema = createTaskSchema;
 
-  constructor(private persistence: TaskPersistence) {
-    super();
+  private async getPersistence(): Promise<TaskPersistence> {
+    return getPersistence();
   }
 
   protected async executeValidated(
@@ -63,13 +74,14 @@ export class TaskCreateTool extends Tool {
     };
 
     try {
-      await this.persistence.saveTask(task);
-      
+      const persistence = await this.getPersistence();
+      await persistence.saveTask(task);
+
       let message = `Created task ${task.id}: ${task.title}`;
       if (task.assignedTo) {
         message += ` (assigned to ${task.assignedTo})`;
       }
-      
+
       return this.createResult(message);
     } catch (error) {
       return this.createError(
@@ -90,8 +102,8 @@ export class TaskListTool extends Tool {
   description = 'List tasks filtered by assignment, creation, or thread';
   schema = listTasksSchema;
 
-  constructor(private persistence: TaskPersistence) {
-    super();
+  private async getPersistence(): Promise<TaskPersistence> {
+    return getPersistence();
   }
 
   protected async executeValidated(
@@ -106,37 +118,39 @@ export class TaskListTool extends Tool {
     let tasks: Task[] = [];
 
     try {
+      const persistence = await this.getPersistence();
       switch (args.filter) {
         case 'mine':
           // Tasks assigned to me
-          tasks = this.persistence.loadTasksByAssignee(context.threadId);
+          tasks = persistence.loadTasksByAssignee(context.threadId);
           break;
-        
+
         case 'created':
           // Tasks I created
-          tasks = this.persistence.loadTasksByThread(parentThreadId)
-            .filter(t => t.createdBy === context.threadId);
+          tasks = persistence
+            .loadTasksByThread(parentThreadId)
+            .filter((t) => t.createdBy === context.threadId);
           break;
-        
+
         case 'thread':
           // All tasks in parent thread
-          tasks = this.persistence.loadTasksByThread(parentThreadId);
+          tasks = persistence.loadTasksByThread(parentThreadId);
           break;
-        
+
         case 'all':
           // All tasks I can see (assigned to me or in my thread)
-          const assignedToMe = this.persistence.loadTasksByAssignee(context.threadId);
-          const inThread = this.persistence.loadTasksByThread(parentThreadId);
+          const assignedToMe = persistence.loadTasksByAssignee(context.threadId);
+          const inThread = persistence.loadTasksByThread(parentThreadId);
           const taskMap = new Map<string, Task>();
-          
-          [...assignedToMe, ...inThread].forEach(t => taskMap.set(t.id, t));
+
+          [...assignedToMe, ...inThread].forEach((t) => taskMap.set(t.id, t));
           tasks = Array.from(taskMap.values());
           break;
       }
 
       // Filter completed if needed
       if (!args.includeCompleted) {
-        tasks = tasks.filter(t => t.status !== 'completed');
+        tasks = tasks.filter((t) => t.status !== 'completed');
       }
 
       // Sort by priority and creation date
@@ -152,27 +166,31 @@ export class TaskListTool extends Tool {
       }
 
       // Format task list
-      const lines = tasks.map(task => {
-        const status = task.status === 'completed' ? '✓' : 
-                      task.status === 'in_progress' ? '◐' : 
-                      task.status === 'blocked' ? '⊗' : '○';
-        
+      const lines = tasks.map((task) => {
+        const status =
+          task.status === 'completed'
+            ? '✓'
+            : task.status === 'in_progress'
+              ? '◐'
+              : task.status === 'blocked'
+                ? '⊗'
+                : '○';
+
         let line = `${status} ${task.id} [${task.priority}] ${task.title}`;
-        
+
         if (task.assignedTo) {
           line += ` → ${task.assignedTo}`;
         }
-        
+
         if (task.status !== 'pending') {
           line += ` [${task.status}]`;
         }
-        
+
         return line;
       });
 
       const header = `Tasks (${args.filter}): ${tasks.length} found`;
       return this.createResult(`${header}\n\n${lines.join('\n')}`);
-      
     } catch (error) {
       return this.createError(
         `Failed to list tasks: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -181,84 +199,105 @@ export class TaskListTool extends Tool {
   }
 }
 
-// Schema for status update
-const updateStatusSchema = z.object({
-  taskId: NonEmptyString,
-  status: z.enum(['pending', 'in_progress', 'completed', 'blocked']),
+// Schema for task completion (backwards compatibility)
+const completeTaskSchema = z.object({
+  id: NonEmptyString,
 });
 
-export class TaskUpdateStatusTool extends Tool {
-  name = 'task_update_status';
-  description = 'Update the status of a task';
-  schema = updateStatusSchema;
+export class TaskCompleteTool extends Tool {
+  name = 'task_complete';
+  description = 'Mark a task as completed';
+  schema = completeTaskSchema;
 
-  constructor(private persistence: TaskPersistence) {
-    super();
+  private async getPersistence(): Promise<TaskPersistence> {
+    return getPersistence();
   }
 
   protected async executeValidated(
-    args: z.infer<typeof updateStatusSchema>,
+    args: z.infer<typeof completeTaskSchema>,
     context?: ToolContext
   ): Promise<ToolResult> {
     try {
-      const task = this.persistence.loadTask(args.taskId);
+      const persistence = await this.getPersistence();
+      const task = persistence.loadTask(args.id);
       if (!task) {
-        return this.createError(`Task ${args.taskId} not found`);
+        return this.createError(`Task ${args.id} not found`);
       }
 
-      await this.persistence.updateTask(args.taskId, { status: args.status });
-      
-      return this.createResult(
-        `Updated task ${args.taskId} status to ${args.status}`
-      );
+      await persistence.updateTask(args.id, { status: 'completed' });
+
+      return this.createResult(`Completed task ${args.id}: ${task.title}`);
     } catch (error) {
       return this.createError(
-        `Failed to update task: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to complete task: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }
 }
 
-// Schema for reassignment
-const reassignTaskSchema = z.object({
-  taskId: NonEmptyString,
-  assignTo: z.string().describe('Thread ID or "new:provider/model"'),
-});
+// Schema for general task updates
+const updateTaskSchema = z
+  .object({
+    taskId: NonEmptyString,
+    status: z.enum(['pending', 'in_progress', 'completed', 'blocked']).optional(),
+    assignTo: z.string().describe('Thread ID or "new:provider/model"').optional(),
+    priority: z.enum(['high', 'medium', 'low']).optional(),
+    title: z.string().max(200).optional(),
+    description: z.string().max(1000).optional(),
+    prompt: z.string().optional(),
+  })
+  .refine(
+    (data) => Object.keys(data).length > 1, // At least one field besides taskId
+    { message: 'Must provide at least one field to update' }
+  );
 
-export class TaskReassignTool extends Tool {
-  name = 'task_reassign';
-  description = 'Reassign a task to another agent';
-  schema = reassignTaskSchema;
+export class TaskUpdateTool extends Tool {
+  name = 'task_update';
+  description = 'Update task properties (status, assignment, priority, etc.)';
+  schema = updateTaskSchema;
 
-  constructor(private persistence: TaskPersistence) {
-    super();
+  private async getPersistence(): Promise<TaskPersistence> {
+    return getPersistence();
   }
 
   protected async executeValidated(
-    args: z.infer<typeof reassignTaskSchema>,
+    args: z.infer<typeof updateTaskSchema>,
     context?: ToolContext
   ): Promise<ToolResult> {
-    // Validate assignee format
-    if (!isAssigneeId(args.assignTo)) {
-      return this.createError(`Invalid assignee format: ${args.assignTo}`);
-    }
-
     try {
-      const task = this.persistence.loadTask(args.taskId);
+      const persistence = await this.getPersistence();
+      const task = persistence.loadTask(args.taskId);
       if (!task) {
         return this.createError(`Task ${args.taskId} not found`);
       }
 
-      await this.persistence.updateTask(args.taskId, { 
-        assignedTo: args.assignTo as AssigneeId 
-      });
-      
-      return this.createResult(
-        `Reassigned task ${args.taskId} to ${args.assignTo}`
-      );
+      // Validate assignee if provided
+      if (args.assignTo && !isAssigneeId(args.assignTo)) {
+        return this.createError(`Invalid assignee format: ${args.assignTo}`);
+      }
+
+      const updates: Partial<Task> = {};
+      if (args.status) updates.status = args.status;
+      if (args.assignTo) updates.assignedTo = args.assignTo as AssigneeId;
+      if (args.priority) updates.priority = args.priority;
+      if (args.title) updates.title = args.title;
+      if (args.description) updates.description = args.description;
+      if (args.prompt) updates.prompt = args.prompt;
+
+      await persistence.updateTask(args.taskId, updates);
+
+      const updateMessages = [];
+      if (args.status) updateMessages.push(`status to ${args.status}`);
+      if (args.assignTo) updateMessages.push(`assigned to ${args.assignTo}`);
+      if (args.priority) updateMessages.push(`priority to ${args.priority}`);
+      if (args.title) updateMessages.push('title');
+      if (args.description) updateMessages.push('description');
+      if (args.prompt) updateMessages.push('prompt');
+
+      return this.createResult(`Updated task ${args.taskId}: ${updateMessages.join(', ')}`);
     } catch (error) {
       return this.createError(
-        `Failed to reassign task: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to update task: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }
@@ -275,8 +314,8 @@ export class TaskAddNoteTool extends Tool {
   description = 'Add a note to a task for communication between agents';
   schema = addNoteSchema;
 
-  constructor(private persistence: TaskPersistence) {
-    super();
+  private async getPersistence(): Promise<TaskPersistence> {
+    return getPersistence();
   }
 
   protected async executeValidated(
@@ -294,11 +333,10 @@ export class TaskAddNoteTool extends Tool {
         timestamp: new Date(),
       };
 
-      await this.persistence.addNote(args.taskId, note);
-      
-      return this.createResult(
-        `Added note to task ${args.taskId}`
-      );
+      const persistence = await this.getPersistence();
+      await persistence.addNote(args.taskId, note);
+
+      return this.createResult(`Added note to task ${args.taskId}`);
     } catch (error) {
       return this.createError(
         `Failed to add note: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -317,8 +355,8 @@ export class TaskViewTool extends Tool {
   description = 'View detailed information about a specific task';
   schema = viewTaskSchema;
 
-  constructor(private persistence: TaskPersistence) {
-    super();
+  private async getPersistence(): Promise<TaskPersistence> {
+    return getPersistence();
   }
 
   protected async executeValidated(
@@ -326,7 +364,8 @@ export class TaskViewTool extends Tool {
     context?: ToolContext
   ): Promise<ToolResult> {
     try {
-      const task = this.persistence.loadTask(args.taskId);
+      const persistence = await this.getPersistence();
+      const task = persistence.loadTask(args.taskId);
       if (!task) {
         return this.createError(`Task ${args.taskId} not found`);
       }
@@ -360,7 +399,6 @@ export class TaskViewTool extends Tool {
       }
 
       return this.createResult(lines.join('\n'));
-      
     } catch (error) {
       return this.createError(
         `Failed to view task: ${error instanceof Error ? error.message : 'Unknown error'}`

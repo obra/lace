@@ -12,7 +12,14 @@ import { FileInsertTool } from './implementations/file-insert.js';
 import { FileListTool } from './implementations/file-list.js';
 import { RipgrepSearchTool } from './implementations/ripgrep-search.js';
 import { FileFindTool } from './implementations/file-find.js';
-import { TaskAddTool, TaskListTool, TaskCompleteTool } from './implementations/task-manager.js';
+import {
+  TaskAddTool,
+  TaskListTool,
+  TaskCompleteTool,
+  TaskUpdateTool,
+  TaskAddNoteTool,
+  TaskViewTool,
+} from './implementations/task-manager/index.js';
 import { DelegateTool } from './implementations/delegate.js';
 import { UrlFetchTool } from './implementations/url-fetch.js';
 
@@ -63,6 +70,9 @@ export class ToolExecutor {
       new TaskAddTool(),
       new TaskListTool(),
       new TaskCompleteTool(),
+      new TaskUpdateTool(),
+      new TaskAddNoteTool(),
+      new TaskViewTool(),
       new DelegateTool(),
       new UrlFetchTool(),
     ];

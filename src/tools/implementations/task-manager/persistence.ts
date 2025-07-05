@@ -10,13 +10,13 @@ export class TaskPersistence {
 
   constructor(dbPath: string) {
     this.db = new Database(dbPath);
-    
+
     // Enable WAL mode for better concurrency
     this.db.pragma('journal_mode = WAL');
-    
+
     // Set busy timeout (5 seconds)
     this.db.pragma('busy_timeout = 5000');
-    
+
     this.initializeSchema();
   }
 
@@ -66,7 +66,7 @@ export class TaskPersistence {
                           assigned_to, created_by, thread_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      
+
       stmt.run(
         task.id,
         task.title,
@@ -87,7 +87,7 @@ export class TaskPersistence {
     const stmt = this.db.prepare(`
       SELECT * FROM tasks WHERE id = ?
     `);
-    
+
     const row = stmt.get(taskId) as any;
     if (!row) return null;
 
@@ -97,9 +97,9 @@ export class TaskPersistence {
       WHERE task_id = ? 
       ORDER BY timestamp ASC
     `);
-    
+
     const noteRows = notesStmt.all(taskId) as any[];
-    const notes: TaskNote[] = noteRows.map(noteRow => ({
+    const notes: TaskNote[] = noteRows.map((noteRow) => ({
       id: String(noteRow.id),
       author: noteRow.author as ThreadId,
       content: noteRow.content,
@@ -128,9 +128,9 @@ export class TaskPersistence {
       WHERE thread_id = ? 
       ORDER BY created_at DESC
     `);
-    
+
     const rows = stmt.all(threadId) as any[];
-    return rows.map(row => this.loadTask(row.id)!).filter(task => task !== null);
+    return rows.map((row) => this.loadTask(row.id)!).filter((task) => task !== null);
   }
 
   loadTasksByAssignee(assignee: AssigneeId): Task[] {
@@ -139,9 +139,9 @@ export class TaskPersistence {
       WHERE assigned_to = ? 
       ORDER BY created_at DESC
     `);
-    
+
     const rows = stmt.all(assignee) as any[];
-    return rows.map(row => this.loadTask(row.id)!).filter(task => task !== null);
+    return rows.map((row) => this.loadTask(row.id)!).filter((task) => task !== null);
   }
 
   async updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
@@ -211,12 +211,7 @@ export class TaskPersistence {
         VALUES (?, ?, ?, ?)
       `);
 
-      stmt.run(
-        taskId,
-        note.author,
-        note.content,
-        note.timestamp.toISOString()
-      );
+      stmt.run(taskId, note.author, note.content, note.timestamp.toISOString());
 
       // Update task's updated_at timestamp
       const updateStmt = this.db.prepare(`
