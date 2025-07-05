@@ -473,6 +473,9 @@ export class Agent extends EventEmitter {
           error: error instanceof Error ? error : new Error(String(error)),
           context: { phase: 'provider_response', threadId: this._threadId },
         });
+
+        // Complete turn tracking even when provider error occurs
+        this._completeTurn();
         return;
       }
 
