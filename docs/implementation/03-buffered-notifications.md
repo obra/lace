@@ -308,13 +308,12 @@ Scenarios:
 
 Add commands to clear/inspect queue:
 - `/queue` - Show queue contents
-- `/queue clear` - Clear all queued
-- `/queue clear user` - Clear user messages only
+- `/queue clear` - Clear all queued user messages (not system messages)
 
 ## Testing Strategy
 
 ### Unit Tests
-- Queue operations (add, remove, reorder)
+- Queue operations (add, remove)
 - State transition hooks
 - Event emissions
 - Priority handling
@@ -375,7 +374,5 @@ const MyComponent: React.FC = () => {
 
 ## Future Enhancements
 
-- Persist queue to disk
-- Queue expiration times
+- Edit queued messages
 - Cancel specific queued messages
-- Queue analytics/metrics
