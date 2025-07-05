@@ -18,6 +18,12 @@ vi.mock('../contexts/TimelineItemContext.js', () => ({
     onExpand: vi.fn(),
     onCollapse: vi.fn(),
   }),
+  useTimelineItemOptional: () => ({
+    isExpanded: false,
+    isSelected: false,
+    onExpand: vi.fn(),
+    onCollapse: vi.fn(),
+  }),
 }));
 
 vi.mock('../ui/MarkdownDisplay.js', () => ({

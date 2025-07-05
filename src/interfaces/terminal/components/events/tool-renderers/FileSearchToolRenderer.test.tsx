@@ -44,9 +44,7 @@ function renderWithProviders(component: React.ReactElement) {
     <TimelineExpansionProvider>
       <TimelineItemProvider
         isSelected={false}
-        isExpanded={false}
-        onExpand={() => {}}
-        onCollapse={() => {}}
+        onToggle={() => {}}
       >
         {component}
       </TimelineItemProvider>

@@ -57,8 +57,6 @@ function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRenderer
     return (
       <GenericToolRenderer
         item={item}
-        isSelected={isSelected}
-        onToggle={onToggle}
       />
     );
   }
@@ -67,8 +65,6 @@ function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRenderer
   return (
     <RendererComponent
       item={item}
-      isSelected={isSelected}
-      onToggle={onToggle}
     />
   );
 }
