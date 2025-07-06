@@ -156,7 +156,7 @@ export class Agent extends EventEmitter {
 
     if (content.trim()) {
       // Add user message to active thread (could be compacted thread after compaction)
-      this._threadManager.addEvent(this._getActiveThreadId(), 'USER_MESSAGE', content);
+      this._addEventAndEmit(this._getActiveThreadId(), 'USER_MESSAGE', content);
     }
 
     try {
@@ -196,8 +196,8 @@ export class Agent extends EventEmitter {
     );
 
     if (!hasConversationStarted) {
-      this._threadManager.addEvent(this._threadId, 'SYSTEM_PROMPT', promptConfig.systemPrompt);
-      this._threadManager.addEvent(
+      this._addEventAndEmit(this._threadId, 'SYSTEM_PROMPT', promptConfig.systemPrompt);
+      this._addEventAndEmit(
         this._threadId,
         'USER_SYSTEM_PROMPT',
         promptConfig.userInstructions
@@ -489,7 +489,7 @@ export class Agent extends EventEmitter {
       // Process agent response
       if (response.content) {
         // Store raw content (with thinking blocks) for model context
-        this._threadManager.addEvent(this._getActiveThreadId(), 'AGENT_MESSAGE', response.content);
+        this._addEventAndEmit(this._getActiveThreadId(), 'AGENT_MESSAGE', response.content);
 
         // Extract clean content for UI display and events
         const cleanedContent = response.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
@@ -786,7 +786,7 @@ export class Agent extends EventEmitter {
       };
 
       // Add tool call to thread
-      this._threadManager.addEvent(this._getActiveThreadId(), 'TOOL_CALL', toolCall);
+      this._addEventAndEmit(this._getActiveThreadId(), 'TOOL_CALL', toolCall);
 
       // Emit tool call start event
       this.emit('tool_call_start', {
@@ -821,7 +821,7 @@ export class Agent extends EventEmitter {
         });
 
         // Add tool result to thread
-        this._threadManager.addEvent(this._getActiveThreadId(), 'TOOL_RESULT', result);
+        this._addEventAndEmit(this._getActiveThreadId(), 'TOOL_RESULT', result);
 
         // Add tool output tokens to current turn metrics (estimated)
         this._addTokensToCurrentTurn('in', this._estimateTokens(outputText));
@@ -847,7 +847,7 @@ export class Agent extends EventEmitter {
         });
 
         // Add failed tool result to thread
-        this._threadManager.addEvent(this._getActiveThreadId(), 'TOOL_RESULT', failedResult);
+        this._addEventAndEmit(this._getActiveThreadId(), 'TOOL_RESULT', failedResult);
       }
     }
   }
@@ -1243,5 +1243,15 @@ export class Agent extends EventEmitter {
         this._addTokensToCurrentTurn('out', estimatedOutputTokens);
       }
     }
+  }
+
+  /**
+   * Helper method to add event to ThreadManager and emit Agent event
+   * This ensures Agent is the single event source for UI updates
+   */
+  private _addEventAndEmit(threadId: string, type: string, data: any): ThreadEvent {
+    const event = this._threadManager.addEvent(threadId, type as any, data);
+    this.emit('thread_event_added', { event, threadId });
+    return event;
   }
 }
