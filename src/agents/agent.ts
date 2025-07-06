@@ -76,6 +76,9 @@ export interface AgentEvents {
       resolve: (decision: ApprovalDecision) => void;
     },
   ];
+  // Thread events proxied from ThreadManager
+  thread_event_added: [{ event: ThreadEvent; threadId: string }];
+  thread_state_changed: [{ threadId: string; eventType: string }];
 }
 
 export class Agent extends EventEmitter {
@@ -122,6 +125,15 @@ export class Agent extends EventEmitter {
     this._tokenBudgetManager = config.tokenBudget
       ? new TokenBudgetManager(config.tokenBudget)
       : null;
+
+    // Proxy ThreadManager events as Agent events
+    this._threadManager.on('event_added', (data) => {
+      this.emit('thread_event_added', data);
+    });
+
+    this._threadManager.on('thread_updated', (data) => {
+      this.emit('thread_state_changed', data);
+    });
   }
 
   // Core conversation methods
