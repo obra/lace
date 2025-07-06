@@ -33,7 +33,8 @@ describe('Delegation Integration Tests', () => {
     toolExecutor.registerTool('bash', bashTool);
 
     const delegateTool = new DelegateTool();
-    delegateTool.setDependencies(threadManager, toolExecutor);
+    // Note: setDependencies now takes (parentAgent, toolExecutor) but we don't have an agent in setup
+    // The delegate tool will be properly initialized when the Agent is created
     toolExecutor.registerTool('delegate', delegateTool);
   });
 
@@ -203,12 +204,6 @@ describe('Delegation Integration Tests', () => {
       }),
     });
 
-    // Mock the DelegateTool's createProvider method to return our test provider
-    const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
-    const createProviderSpy = vi
-      .spyOn(delegateTool as any, 'createProvider')
-      .mockResolvedValue(mockProvider);
-
     // Create main agent with any provider (won't be used for delegation due to mock)
     const mainThreadId = threadManager.generateThreadId();
     threadManager.createThread(mainThreadId);
@@ -220,6 +215,15 @@ describe('Delegation Integration Tests', () => {
       threadId: mainThreadId,
       tools: toolExecutor.getAllTools(),
     });
+
+    // Initialize delegate tool with the agent now that it's created
+    const delegateToolInstance = toolExecutor.getTool('delegate') as DelegateTool;
+    delegateToolInstance.setDependencies(agent, toolExecutor);
+
+    // Mock the DelegateTool's createProvider method to return our test provider
+    const createProviderSpy = vi
+      .spyOn(delegateToolInstance as any, 'createProvider')
+      .mockResolvedValue(mockProvider);
 
     await agent.start();
 
@@ -240,7 +244,7 @@ describe('Delegation Integration Tests', () => {
       name: 'delegate',
       arguments: delegateInput,
     };
-    const result = await delegateTool.execute(toolCall.arguments);
+    const result = await delegateToolInstance.execute(toolCall.arguments);
 
     // Debug: Print the result to see what went wrong
     if (result.isError) {

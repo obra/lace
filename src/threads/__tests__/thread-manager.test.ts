@@ -22,22 +22,7 @@ describe('ThreadManager', () => {
   });
 
   describe('addEvent', () => {
-    it('should NOT emit event_added during normal operation', () => {
-      // Arrange
-      const threadId = threadManager.generateThreadId();
-      threadManager.createThread(threadId);
-      
-      const eventSpy = vi.fn();
-      threadManager.on('event_added', eventSpy);
-      
-      // Act
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test message');
-      
-      // Assert
-      expect(eventSpy).not.toHaveBeenCalled();
-    });
-
-    it('should still properly store events in database', () => {
+    it('should properly store events in database', () => {
       // Arrange
       const threadId = threadManager.generateThreadId();
       threadManager.createThread(threadId);
@@ -56,19 +41,24 @@ describe('ThreadManager', () => {
       expect(events[0].data).toBe('Test message');
     });
 
-    it('should NOT emit thread_updated during normal operation', () => {
+    it('should function as pure data layer without event emission', () => {
       // Arrange
       const threadId = threadManager.generateThreadId();
       threadManager.createThread(threadId);
       
-      const eventSpy = vi.fn();
-      threadManager.on('thread_updated', eventSpy);
+      // Act - ThreadManager now operates as pure data layer
+      const event1 = threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
+      const event2 = threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there');
       
-      // Act
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test message');
+      // Assert - Data operations work correctly
+      expect(event1.type).toBe('USER_MESSAGE');
+      expect(event2.type).toBe('AGENT_MESSAGE');
       
-      // Assert
-      expect(eventSpy).not.toHaveBeenCalled();
+      const events = threadManager.getEvents(threadId);
+      expect(events).toHaveLength(2);
+      expect(events[0].data).toBe('Hello');
+      expect(events[1].data).toBe('Hi there');
     });
+
   });
 });

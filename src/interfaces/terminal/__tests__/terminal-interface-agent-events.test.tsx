@@ -27,7 +27,7 @@ describe('TerminalInterface Agent Events', () => {
     threadManager = new ThreadManager(join(testDir, 'test.db'));
     
     const provider = new TestProvider();
-    const toolExecutor = new ToolExecutor([], {});
+    const toolExecutor = new ToolExecutor();
     const threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
     
@@ -38,6 +38,11 @@ describe('TerminalInterface Agent Events', () => {
       threadId,
       tools: [],
     });
+    
+    // Mock Agent methods to avoid database calls during rendering
+    vi.spyOn(agent, 'getMainAndDelegateEvents').mockReturnValue([]);
+    vi.spyOn(agent, 'getThreadEvents').mockReturnValue([]);
+    vi.spyOn(agent, 'getCurrentThreadId').mockReturnValue(threadId);
     
     await agent.start();
     
@@ -51,29 +56,27 @@ describe('TerminalInterface Agent Events', () => {
   });
 
   describe('event subscriptions', () => {
-    it('should subscribe to Agent thread_event_added events', () => {
+    it('should subscribe to Agent thread_event_added events', async () => {
       // Arrange
       const onSpy = vi.spyOn(agent, 'on');
-      const threadManagerOnSpy = vi.spyOn(threadManager, 'on');
       
       // Act
-      render(
+      const { rerender } = render(
         <TerminalInterfaceComponent
           agent={agent}
         />
       );
       
-      // Assert - Should subscribe to Agent events
-      expect(onSpy).toHaveBeenCalledWith('thread_event_added', expect.any(Function));
+      // Wait for all effects to complete
+      await new Promise(resolve => setTimeout(resolve, 0));
       
-      // Assert - Should NOT subscribe to ThreadManager events
-      expect(threadManagerOnSpy).not.toHaveBeenCalledWith('event_added', expect.any(Function));
-      expect(threadManagerOnSpy).not.toHaveBeenCalledWith('thread_updated', expect.any(Function));
+      // Assert - Should subscribe to Agent events only (ThreadManager no longer has event methods)
+      expect(onSpy).toHaveBeenCalledWith('thread_event_added', expect.any(Function));
     });
 
-    it('should not directly access ThreadManager event methods', () => {
-      // Arrange
-      const threadManagerOnSpy = vi.spyOn(threadManager, 'on');
+    it('should use Agent API instead of ThreadManager event methods', () => {
+      // ThreadManager no longer has event methods - this test verifies the architecture
+      // by confirming ThreadManager is a pure data layer
       
       // Act
       render(
@@ -82,8 +85,9 @@ describe('TerminalInterface Agent Events', () => {
         />
       );
       
-      // Assert
-      expect(threadManagerOnSpy).not.toHaveBeenCalled();
+      // Assert - ThreadManager should not have event emitter methods
+      expect(typeof (threadManager as any).on).toBe('undefined');
+      expect(typeof (threadManager as any).emit).toBe('undefined');
     });
   });
 
@@ -103,7 +107,7 @@ describe('TerminalInterface Agent Events', () => {
       expect(agentGetCurrentThreadIdSpy).toHaveBeenCalled();
     });
 
-    it('should use Agent.getThreadEvents() instead of direct ThreadManager access', () => {
+    it('should use Agent.getThreadEvents() instead of direct ThreadManager access', async () => {
       // Arrange  
       const agentGetThreadEventsSpy = vi.spyOn(agent, 'getThreadEvents');
       
@@ -113,6 +117,9 @@ describe('TerminalInterface Agent Events', () => {
           agent={agent}
         />
       );
+      
+      // Wait for all effects to complete
+      await new Promise(resolve => setTimeout(resolve, 0));
       
       // Assert - Should use Agent API
       expect(agentGetThreadEventsSpy).toHaveBeenCalled();

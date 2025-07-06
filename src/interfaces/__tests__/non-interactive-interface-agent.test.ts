@@ -22,7 +22,7 @@ describe('NonInteractiveInterface Agent API Usage', () => {
     threadManager = new ThreadManager(join(testDir, 'test.db'));
     
     const provider = new TestProvider();
-    const toolExecutor = new ToolExecutor([], {});
+    const toolExecutor = new ToolExecutor();
     const threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
     
@@ -78,15 +78,7 @@ describe('NonInteractiveInterface Agent API Usage', () => {
       expect(agentCreateThreadSpy).toHaveBeenCalledWith('test-thread-123');
     });
 
-    it('should not directly access agent.threadManager', () => {
-      // Arrange
-      const threadManagerSpy = vi.spyOn(agent, 'threadManager', 'get');
-      
-      // Act
-      nonInteractiveInterface.clearSession();
-      
-      // Assert - Should not access threadManager getter
-      expect(threadManagerSpy).not.toHaveBeenCalled();
-    });
+    // Test removed: threadManager getter no longer exists
+    // Architecture now enforces that all thread operations go through Agent API
   });
 });

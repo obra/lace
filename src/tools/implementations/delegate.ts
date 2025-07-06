@@ -59,7 +59,7 @@ Examples:
   };
 
   // Dependencies injected by the main agent's context
-  private threadManager?: ThreadManager;
+  private parentAgent?: Agent;
   private parentToolExecutor?: ToolExecutor;
   private defaultTimeout: number = 300000; // 5 minutes default
 
@@ -96,11 +96,10 @@ Examples:
         return this.createError(`Unknown provider: ${providerName}`);
       }
 
-      // Use shared thread manager from parent (avoids multiple SQLite connections)
-      if (!this.threadManager) {
-        return this.createError('Delegate tool not properly initialized - missing ThreadManager');
+      // Use parent agent for delegation
+      if (!this.parentAgent) {
+        return this.createError('Delegate tool not properly initialized - missing parent Agent');
       }
-      const threadManager = this.threadManager;
 
       // Create restricted tool executor for subagent (remove delegate to prevent recursion)
       if (!this.parentToolExecutor) {
@@ -110,15 +109,6 @@ Examples:
       }
 
       const toolExecutor = this.createRestrictedToolExecutor();
-
-      // Create new delegate thread for subagent
-      const parentThreadId = this.threadManager.getCurrentThreadId();
-      if (!parentThreadId) {
-        throw new Error('No active thread for delegation');
-      }
-
-      const delegateThread = this.threadManager.createDelegateThreadFor(parentThreadId);
-      const subagentThreadId = delegateThread.id;
 
       // Note: Delegation metadata is now shown in the delegation box UI
 
@@ -132,18 +122,11 @@ Examples:
         reserveTokens: 1000, // Keep some tokens in reserve
       };
 
-      // Create subagent
+      // Create subagent using parent Agent's delegation method
       let subagent: Agent | null = null; // Declare outside try block
-      logger.debug('DelegateTool: Creating subagent', { subagentThreadId });
+      logger.debug('DelegateTool: Creating subagent via parent Agent');
       try {
-        subagent = new Agent({
-          provider,
-          toolExecutor,
-          threadManager,
-          threadId: subagentThreadId,
-          tools: availableTools,
-          tokenBudget,
-        });
+        subagent = this.parentAgent.createDelegateAgent(toolExecutor, provider, tokenBudget);
 
         // Collect responses
         const responses: string[] = [];
@@ -166,19 +149,19 @@ Examples:
         // Create promise that resolves when conversation completes or times out
         const resultPromise = new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => {
-            logger.error('DelegateTool: Subagent timed out', { subagentThreadId });
+            logger.error('DelegateTool: Subagent timed out', { title });
             reject(new Error(`Subagent timeout after ${this.defaultTimeout}ms`));
           }, this.defaultTimeout);
 
           const completeHandler = () => {
-            logger.debug('DelegateTool: Subagent conversation complete', { subagentThreadId });
+            logger.debug('DelegateTool: Subagent conversation complete', { title });
             clearTimeout(timeout);
             resolve();
           };
 
           const errorHandler = ({ error }: { error: Error }) => {
             logger.error('DelegateTool: Subagent error during conversation', {
-              subagentThreadId,
+              title,
               error: error.message,
             });
             clearTimeout(timeout);
@@ -202,7 +185,7 @@ Examples:
           combinedResponseLength: combinedResponse.length,
         });
         return this.createResult(combinedResponse || 'Subagent completed without response', {
-          threadId: subagentThreadId,
+          taskTitle: title,
         });
       } catch (error) {
         logger.error('DelegateTool: Error during subagent execution', {
@@ -270,8 +253,8 @@ IMPORTANT: Once you have gathered enough information to provide the expected res
   }
 
   // Method to inject dependencies (called by main agent setup)
-  setDependencies(threadManager: ThreadManager, toolExecutor: ToolExecutor): void {
-    this.threadManager = threadManager;
+  setDependencies(parentAgent: Agent, toolExecutor: ToolExecutor): void {
+    this.parentAgent = parentAgent;
     this.parentToolExecutor = toolExecutor;
   }
 

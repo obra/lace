@@ -24,19 +24,19 @@ describe('System Commands', () => {
     helpCommand = createHelpCommand(registry);
 
     mockAgent = {
-      threadManager: {
-        getCurrentThreadId: vi.fn().mockReturnValue('test-thread-123'),
-        generateThreadId: vi.fn().mockReturnValue('new-thread-456'),
-        createThread: vi.fn(),
-        compact: vi.fn(),
-        getEvents: vi.fn().mockReturnValue([
-          {
-            type: 'LOCAL_SYSTEM_MESSAGE',
-            data: 'Compacted 5 tool results to save tokens',
-          },
-        ]),
-      },
+      // Agent API methods (new structure)
+      getCurrentThreadId: vi.fn().mockReturnValue('test-thread-123'),
+      generateThreadId: vi.fn().mockReturnValue('new-thread-456'),
+      createThread: vi.fn(),
+      compact: vi.fn(),
+      getThreadEvents: vi.fn().mockReturnValue([
+        {
+          type: 'LOCAL_SYSTEM_MESSAGE',
+          data: 'Compacted 5 tool results to save tokens',
+        },
+      ]),
       providerName: 'test-provider',
+      // ThreadManager access removed - Agent is now single interface
       toolExecutor: {
         getAllTools: vi.fn().mockReturnValue([]),
       },
@@ -134,7 +134,7 @@ describe('System Commands', () => {
     });
 
     it('should handle missing thread ID', async () => {
-      mockAgent.threadManager.getCurrentThreadId.mockReturnValue(null);
+      mockAgent.getCurrentThreadId.mockReturnValue(null);
 
       await statusCommand.execute('', mockUI);
 
@@ -160,33 +160,33 @@ describe('System Commands', () => {
     it('should compact current thread and show message', async () => {
       await compactCommand.execute('', mockUI);
 
-      expect(mockAgent.threadManager.compact).toHaveBeenCalledWith('test-thread-123');
-      expect(mockAgent.threadManager.getEvents).toHaveBeenCalledWith('test-thread-123');
+      expect(mockAgent.compact).toHaveBeenCalledWith('test-thread-123');
+      expect(mockAgent.getThreadEvents).toHaveBeenCalledWith('test-thread-123');
       expect(mockUI.displayMessage).toHaveBeenCalledWith(
         '✅ Compacted 5 tool results to save tokens'
       );
     });
 
     it('should handle no active thread', async () => {
-      mockAgent.threadManager.getCurrentThreadId.mockReturnValue(null);
+      mockAgent.getCurrentThreadId.mockReturnValue(null);
 
       await compactCommand.execute('', mockUI);
 
       expect(mockUI.displayMessage).toHaveBeenCalledWith('❌ No active thread to compact');
-      expect(mockAgent.threadManager.compact).not.toHaveBeenCalled();
+      expect(mockAgent.compact).not.toHaveBeenCalled();
     });
 
     it('should handle compact with no system message', async () => {
-      mockAgent.threadManager.getEvents.mockReturnValue([]);
+      mockAgent.getThreadEvents.mockReturnValue([]);
 
       await compactCommand.execute('', mockUI);
 
-      expect(mockAgent.threadManager.compact).toHaveBeenCalledWith('test-thread-123');
+      expect(mockAgent.compact).toHaveBeenCalledWith('test-thread-123');
       expect(mockUI.displayMessage).toHaveBeenCalledWith('✅ Compacted thread test-thread-123');
     });
 
     it('should handle events without system message', async () => {
-      mockAgent.threadManager.getEvents.mockReturnValue([
+      mockAgent.getThreadEvents.mockReturnValue([
         { type: 'USER_MESSAGE', data: 'Hello' },
         { type: 'AGENT_MESSAGE', data: 'Hi there' },
       ]);
@@ -199,7 +199,7 @@ describe('System Commands', () => {
     it('should ignore arguments', async () => {
       await compactCommand.execute('some args', mockUI);
 
-      expect(mockAgent.threadManager.compact).toHaveBeenCalledWith('test-thread-123');
+      expect(mockAgent.compact).toHaveBeenCalledWith('test-thread-123');
     });
   });
 

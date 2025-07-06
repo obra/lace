@@ -12,16 +12,23 @@ describe('Command System Integration', () => {
 
   beforeEach(() => {
     mockAgent = {
+      // Agent API methods (new structure)
+      getCurrentThreadId: vi.fn().mockReturnValue('test-thread'),
+      generateThreadId: vi.fn().mockReturnValue('new-thread'),
+      createThread: vi.fn(),
+      compact: vi.fn(),
+      getThreadEvents: vi.fn().mockReturnValue([]),
+      providerName: 'test-provider',
+      toolExecutor: {
+        getAllTools: vi.fn().mockReturnValue([]),
+      },
+      // ThreadManager for legacy compatibility in some tests
       threadManager: {
         getCurrentThreadId: vi.fn().mockReturnValue('test-thread'),
         generateThreadId: vi.fn().mockReturnValue('new-thread'),
         createThread: vi.fn(),
         compact: vi.fn(),
         getEvents: vi.fn().mockReturnValue([]),
-      },
-      providerName: 'test-provider',
-      toolExecutor: {
-        getAllTools: vi.fn().mockReturnValue([]),
       },
     };
 
@@ -107,8 +114,8 @@ describe('Command System Integration', () => {
       // Execute compact command
       await executor.execute('/compact', mockUI);
 
-      // Should call threadManager compact
-      expect(mockAgent.threadManager.compact).toHaveBeenCalledWith('test-thread');
+      // Should call agent compact (new API)
+      expect(mockAgent.compact).toHaveBeenCalledWith('test-thread');
     });
 
     it('should handle unknown commands gracefully', async () => {

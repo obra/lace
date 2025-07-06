@@ -20,7 +20,7 @@ describe('Agent Thread Events', () => {
     threadManager = new ThreadManager(join(testDir, 'test.db'));
     
     const provider = new TestProvider();
-    const toolExecutor = new ToolExecutor([], {});
+    const toolExecutor = new ToolExecutor();
     const threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
     

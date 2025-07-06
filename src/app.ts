@@ -115,7 +115,7 @@ async function setupAgent(
 
   const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
   if (delegateTool) {
-    delegateTool.setDependencies(threadManager, toolExecutor);
+    delegateTool.setDependencies(agent, toolExecutor);
   }
 
   return agent;
@@ -160,9 +160,8 @@ async function handleSessionWithAgent(
     if (typeof continueMode === 'string') {
       continueThreadId = continueMode;
     } else {
-      // For now, we can't get latest thread ID through Agent API
-      // This would require adding getLatestThreadId to Agent API
-      continueThreadId = await agent.threadManager.getLatestThreadId() || undefined;
+      // Get latest thread ID through Agent API
+      continueThreadId = await agent.getLatestThreadId() || undefined;
     }
   }
 

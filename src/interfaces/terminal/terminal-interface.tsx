@@ -27,7 +27,7 @@ import { CommandExecutor } from '../../commands/executor.js';
 import type { UserInterface } from '../../commands/types.js';
 import { ThreadEvent } from '../../threads/types.js';
 import { ThreadProcessor } from '../thread-processor.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
+// ThreadManager import removed - Agent provides all thread operations
 import { LaceFocusProvider } from './focus/index.js';
 import { useProjectContext } from './hooks/use-project-context.js';
 import { logger } from '../../utils/logger.js';
@@ -44,15 +44,7 @@ export const useThreadProcessor = (): ThreadProcessor => {
 };
 
 // ThreadManager context for direct thread data access
-const ThreadManagerContext = createContext<ThreadManager | null>(null);
-
-export const useThreadManager = (): ThreadManager => {
-  const manager = useContext(ThreadManagerContext);
-  if (!manager) {
-    throw new Error('useThreadManager must be used within ThreadManagerContext.Provider');
-  }
-  return manager;
-};
+// ThreadManager context removed - Agent is now the single interface for thread operations
 
 // Interface context for SIGINT communication
 const InterfaceContext = createContext<{
@@ -283,7 +275,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   const syncEvents = useCallback(() => {
     const threadId = agent.getCurrentThreadId();
     if (threadId) {
-      const threadEvents = agent.threadManager.getMainAndDelegateEvents(threadId);
+      const threadEvents = agent.getMainAndDelegateEvents(threadId);
       setEvents([...threadEvents]);
     }
   }, [agent]);
@@ -463,17 +455,12 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     const handleError = ({ error }: { error: Error }) => {
       const threadId = agent.getCurrentThreadId();
       if (threadId) {
-        agent.threadManager.addEvent(
-          threadId,
-          'LOCAL_SYSTEM_MESSAGE',
-          `❌ Error: ${error.message}`
-        );
+        agent.addSystemMessage(`❌ Error: ${error.message}`, threadId);
 
         if (agent.providerName === 'lmstudio') {
-          agent.threadManager.addEvent(
-            threadId,
-            'LOCAL_SYSTEM_MESSAGE',
-            '💡 Try using Anthropic Claude instead: node dist/cli.js --provider anthropic'
+          agent.addSystemMessage(
+            '💡 Try using Anthropic Claude instead: node dist/cli.js --provider anthropic',
+            threadId
           );
         }
         syncEvents();
@@ -993,7 +980,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   return (
     <LaceFocusProvider>
       <ThreadProcessorContext.Provider value={threadProcessor}>
-        <ThreadManagerContext.Provider value={agent.threadManager}>
           <InterfaceContext.Provider value={{ showAlert, clearAlert }}>
         {/* SIGINT Handler */}
         <SigintHandler agent={agent} showAlert={showAlert} />
@@ -1105,7 +1091,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
           </Box>
         </Box>
           </InterfaceContext.Provider>
-        </ThreadManagerContext.Provider>
       </ThreadProcessorContext.Provider>
     </LaceFocusProvider>
   );

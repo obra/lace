@@ -93,10 +93,12 @@ export class Agent extends EventEmitter {
     return this._toolExecutor;
   }
 
-  // Public access to thread manager for interfaces
-  get threadManager(): ThreadManager {
-    return this._threadManager;
+  // Public access to provider name for interfaces
+  get providerName(): string {
+    return this._provider.providerName;
   }
+
+  // ThreadManager access removed - Agent provides all thread operations through public API
 
   // Public access to thread ID for delegation
   // IMPORTANT: This returns the CANONICAL thread ID, which remains stable across compactions
@@ -126,14 +128,8 @@ export class Agent extends EventEmitter {
       ? new TokenBudgetManager(config.tokenBudget)
       : null;
 
-    // Proxy ThreadManager events as Agent events
-    this._threadManager.on('event_added', (data) => {
-      this.emit('thread_event_added', data);
-    });
-
-    this._threadManager.on('thread_updated', (data) => {
-      this.emit('thread_state_changed', data);
-    });
+    // Agent is now the single event source - no need to proxy ThreadManager events
+    // Events are emitted through _addEventAndEmit() helper method
   }
 
   // Core conversation methods
@@ -292,10 +288,6 @@ export class Agent extends EventEmitter {
 
   getAvailableTools(): Tool[] {
     return [...this._tools]; // Return copy to prevent mutation
-  }
-
-  get providerName(): string {
-    return this._provider.providerName;
   }
 
   get provider(): AIProvider {
@@ -1295,6 +1287,54 @@ export class Agent extends EventEmitter {
     }
     
     return result;
+  }
+  
+  async getLatestThreadId(): Promise<string | null> {
+    return this._threadManager.getLatestThreadId();
+  }
+  
+  getMainAndDelegateEvents(mainThreadId: string): ThreadEvent[] {
+    return this._threadManager.getMainAndDelegateEvents(mainThreadId);
+  }
+  
+  compact(threadId: string): void {
+    this._threadManager.compact(threadId);
+  }
+  
+  createDelegateAgent(toolExecutor: ToolExecutor, provider?: AIProvider, tokenBudget?: TokenBudgetConfig): Agent {
+    // Get current thread as parent
+    const parentThreadId = this.getCurrentThreadId();
+    if (!parentThreadId) {
+      throw new Error('No active thread for delegation');
+    }
+
+    // Create delegate thread
+    const delegateThread = this._threadManager.createDelegateThreadFor(parentThreadId);
+    const delegateThreadId = delegateThread.id;
+
+    // Create new Agent instance for the delegate thread
+    const delegateAgent = new Agent({
+      provider: provider || this._provider, // Use provided provider or fallback to parent's provider
+      toolExecutor,
+      threadManager: this._threadManager,
+      threadId: delegateThreadId,
+      tools: toolExecutor.getAllTools(),
+      tokenBudget,
+    });
+
+    return delegateAgent;
+  }
+
+  /**
+   * Add a system message to the current thread
+   * Used for error messages, notifications, etc.
+   */
+  addSystemMessage(message: string, threadId?: string): ThreadEvent {
+    const targetThreadId = threadId || this.getCurrentThreadId();
+    if (!targetThreadId) {
+      throw new Error('No active thread available for system message');
+    }
+    return this._addEventAndEmit(targetThreadId, 'LOCAL_SYSTEM_MESSAGE', message);
   }
 
   /**

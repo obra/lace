@@ -1,5 +1,5 @@
-// ABOUTME: Integration test for dual event system during transition phase
-// ABOUTME: Verifies both ThreadManager and Agent events work simultaneously 
+// ABOUTME: Integration test for Agent as single event source architecture
+// ABOUTME: Verifies Agent correctly emits events for thread operations
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Agent } from '../agents/agent.js';
@@ -7,7 +7,7 @@ import { ThreadManager } from '../threads/thread-manager.js';
 import { ToolExecutor } from '../tools/executor.js';
 import { createMockProvider } from './utils/mock-provider.js';
 
-describe('Agent-ThreadManager Dual Event System Integration', () => {
+describe('Agent Single Event Source Integration', () => {
   let agent: Agent;
   let threadManager: ThreadManager;
   let toolExecutor: ToolExecutor;
@@ -15,7 +15,7 @@ describe('Agent-ThreadManager Dual Event System Integration', () => {
   beforeEach(() => {
     const mockProvider = createMockProvider();
     threadManager = new ThreadManager(':memory:');
-    toolExecutor = new ToolExecutor([], {});
+    toolExecutor = new ToolExecutor();
     
     agent = new Agent({
       provider: mockProvider,
@@ -26,108 +26,59 @@ describe('Agent-ThreadManager Dual Event System Integration', () => {
     });
   });
 
-  it('should emit both ThreadManager and Agent events during transition phase', async () => {
-    // Set up listeners for both event systems
-    const threadManagerEventAdded = vi.fn();
-    const threadManagerThreadUpdated = vi.fn();
+  it('should emit Agent events for thread operations', async () => {
+    // Set up listeners for Agent events only
     const agentThreadEventAdded = vi.fn();
-    const agentThreadStateChanged = vi.fn();
 
-    threadManager.on('event_added', threadManagerEventAdded);
-    threadManager.on('thread_updated', threadManagerThreadUpdated);
     agent.on('thread_event_added', agentThreadEventAdded);
-    agent.on('thread_state_changed', agentThreadStateChanged);
 
-    // Create thread and add event
+    // Create thread
     threadManager.createThread('integration-test-thread');
-    const event = threadManager.addEvent('integration-test-thread', 'USER_MESSAGE', 'test message');
+    
+    // Start agent so we can send messages (which will trigger _addEventAndEmit)
+    await agent.start();
 
-    // Verify ThreadManager events
-    expect(threadManagerEventAdded).toHaveBeenCalledWith({
-      event,
-      threadId: 'integration-test-thread',
-    });
-    expect(threadManagerThreadUpdated).toHaveBeenCalledWith({
-      threadId: 'integration-test-thread',
-      eventType: 'USER_MESSAGE',
-    });
+    // Use Agent methods that trigger _addEventAndEmit internally
+    await agent.sendMessage('test message');
 
-    // Verify Agent events (proxied)
+    // Verify Agent events are emitted
     expect(agentThreadEventAdded).toHaveBeenCalledWith({
-      event,
+      event: expect.objectContaining({
+        type: 'USER_MESSAGE',
+        data: 'test message',
+      }),
       threadId: 'integration-test-thread',
-    });
-    expect(agentThreadStateChanged).toHaveBeenCalledWith({
-      threadId: 'integration-test-thread',
-      eventType: 'USER_MESSAGE',
     });
   });
 
-  it('should maintain event timing and ordering between systems', async () => {
-    const allEvents: Array<{ source: string; type: string; timestamp: number }> = [];
-
-    // Capture events with timestamps
-    threadManager.on('event_added', () => {
-      allEvents.push({ source: 'ThreadManager', type: 'event_added', timestamp: Date.now() });
-    });
-    
-    threadManager.on('thread_updated', () => {
-      allEvents.push({ source: 'ThreadManager', type: 'thread_updated', timestamp: Date.now() });
-    });
-
-    agent.on('thread_event_added', () => {
-      allEvents.push({ source: 'Agent', type: 'thread_event_added', timestamp: Date.now() });
-    });
-
-    agent.on('thread_state_changed', () => {
-      allEvents.push({ source: 'Agent', type: 'thread_state_changed', timestamp: Date.now() });
-    });
-
-    // Create thread and add multiple events
+  it('should provide Agent API methods for thread operations', () => {
+    // Create the agent's thread
     threadManager.createThread('integration-test-thread');
-    threadManager.addEvent('integration-test-thread', 'USER_MESSAGE', 'message 1');
-    threadManager.addEvent('integration-test-thread', 'AGENT_MESSAGE', 'response 1');
-
-    // Verify all events were captured
-    expect(allEvents).toHaveLength(8); // 4 events × 2 listeners each
     
-    // Verify events are in reasonable temporal order (allow for small timing variations)
-    for (let i = 1; i < allEvents.length; i++) {
-      expect(allEvents[i].timestamp).toBeGreaterThanOrEqual(allEvents[i-1].timestamp - 10);
-    }
+    // Test Agent API methods exist and work
+    expect(agent.getCurrentThreadId()).toBe('integration-test-thread');
+    expect(typeof agent.getThreadEvents).toBe('function');
+    expect(typeof agent.compact).toBe('function');
+    expect(typeof agent.resumeOrCreateThread).toBe('function');
+    
+    // Verify getThreadEvents returns events
+    const events = agent.getThreadEvents('integration-test-thread');
+    expect(Array.isArray(events)).toBe(true);
   });
 
-  it('should handle multiple rapid events without event loss', async () => {
-    const threadManagerEvents: string[] = [];
-    const agentEvents: string[] = [];
-
-    threadManager.on('event_added', (data) => {
-      threadManagerEvents.push(`event_added:${data.threadId}`);
-    });
+  it('should handle Agent API operations correctly', async () => {
+    // Create thread and add some events
+    threadManager.createThread('api-test-thread');
+    threadManager.addEvent('api-test-thread', 'USER_MESSAGE', 'test message 1');
+    threadManager.addEvent('api-test-thread', 'AGENT_MESSAGE', 'test response 1');
     
-    agent.on('thread_event_added', (data) => {
-      agentEvents.push(`thread_event_added:${data.threadId}`);
-    });
-
-    // Create thread and add rapid fire events
-    threadManager.createThread('integration-test-thread');
+    // Test getThreadEvents
+    const events = agent.getThreadEvents('api-test-thread');
+    expect(events.length).toBe(2);
+    expect(events[0].type).toBe('USER_MESSAGE');
+    expect(events[1].type).toBe('AGENT_MESSAGE');
     
-    const eventCount = 10;
-    for (let i = 0; i < eventCount; i++) {
-      threadManager.addEvent('integration-test-thread', 'USER_MESSAGE', `message ${i}`);
-    }
-
-    // Verify no events were lost in either system
-    expect(threadManagerEvents).toHaveLength(eventCount);
-    expect(agentEvents).toHaveLength(eventCount);
-    
-    // Verify all events have correct thread ID
-    threadManagerEvents.forEach(event => {
-      expect(event).toBe('event_added:integration-test-thread');
-    });
-    
-    agentEvents.forEach(event => {
-      expect(event).toBe('thread_event_added:integration-test-thread');
-    });
+    // Test compact (should not throw)
+    expect(() => agent.compact('api-test-thread')).not.toThrow();
   });
 });
