@@ -78,7 +78,6 @@ describe('NonInteractiveInterface Agent API Usage', () => {
       expect(agentCreateThreadSpy).toHaveBeenCalledWith('test-thread-123');
     });
 
-    // Test removed: threadManager getter no longer exists
-    // Architecture now enforces that all thread operations go through Agent API
+    // All thread operations go through Agent API
   });
 });

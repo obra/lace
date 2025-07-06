@@ -1,5 +1,5 @@
-// ABOUTME: Unit tests for ThreadManager focusing on event emission behavior
-// ABOUTME: Tests verify ThreadManager becomes pure data layer without event emission
+// ABOUTME: Unit tests for ThreadManager data layer operations
+// ABOUTME: Tests verify ThreadManager operates as pure data persistence layer
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ThreadManager } from '../thread-manager.js';

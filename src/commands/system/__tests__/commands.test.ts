@@ -24,7 +24,7 @@ describe('System Commands', () => {
     helpCommand = createHelpCommand(registry);
 
     mockAgent = {
-      // Agent API methods (new structure)
+      // Agent API methods
       getCurrentThreadId: vi.fn().mockReturnValue('test-thread-123'),
       generateThreadId: vi.fn().mockReturnValue('new-thread-456'),
       createThread: vi.fn(),
@@ -36,7 +36,7 @@ describe('System Commands', () => {
         },
       ]),
       providerName: 'test-provider',
-      // ThreadManager access removed - Agent is now single interface
+      // Mock tool executor
       toolExecutor: {
         getAllTools: vi.fn().mockReturnValue([]),
       },

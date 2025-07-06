@@ -98,7 +98,6 @@ export class Agent extends EventEmitter {
     return this._provider.providerName;
   }
 
-  // ThreadManager access removed - Agent provides all thread operations through public API
 
   // Public access to thread ID for delegation
   // IMPORTANT: This returns the CANONICAL thread ID, which remains stable across compactions
@@ -128,7 +127,6 @@ export class Agent extends EventEmitter {
       ? new TokenBudgetManager(config.tokenBudget)
       : null;
 
-    // Agent is now the single event source - no need to proxy ThreadManager events
     // Events are emitted through _addEventAndEmit() helper method
   }
 

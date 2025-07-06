@@ -27,7 +27,6 @@ import { CommandExecutor } from '../../commands/executor.js';
 import type { UserInterface } from '../../commands/types.js';
 import { ThreadEvent } from '../../threads/types.js';
 import { ThreadProcessor } from '../thread-processor.js';
-// ThreadManager import removed - Agent provides all thread operations
 import { LaceFocusProvider } from './focus/index.js';
 import { useProjectContext } from './hooks/use-project-context.js';
 import { logger } from '../../utils/logger.js';
@@ -43,8 +42,6 @@ export const useThreadProcessor = (): ThreadProcessor => {
   return processor;
 };
 
-// ThreadManager context for direct thread data access
-// ThreadManager context removed - Agent is now the single interface for thread operations
 
 // Interface context for SIGINT communication
 const InterfaceContext = createContext<{

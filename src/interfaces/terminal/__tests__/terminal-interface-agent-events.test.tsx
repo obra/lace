@@ -1,5 +1,5 @@
-// ABOUTME: Unit tests for terminal interface using Agent events only
-// ABOUTME: Tests verify terminal interface subscribes only to Agent events, not ThreadManager
+// ABOUTME: Unit tests for terminal interface Agent event integration  
+// ABOUTME: Tests verify terminal interface subscribes to Agent events for thread updates
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
@@ -70,13 +70,12 @@ describe('TerminalInterface Agent Events', () => {
       // Wait for all effects to complete
       await new Promise(resolve => setTimeout(resolve, 0));
       
-      // Assert - Should subscribe to Agent events only (ThreadManager no longer has event methods)
+      // Assert - Should subscribe to Agent events
       expect(onSpy).toHaveBeenCalledWith('thread_event_added', expect.any(Function));
     });
 
-    it('should use Agent API instead of ThreadManager event methods', () => {
-      // ThreadManager no longer has event methods - this test verifies the architecture
-      // by confirming ThreadManager is a pure data layer
+    it('should use Agent API for thread operations', () => {
+      // Verifies ThreadManager operates as pure data layer without event methods
       
       // Act
       render(
