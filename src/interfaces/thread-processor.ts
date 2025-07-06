@@ -4,46 +4,13 @@
 import { ThreadEvent } from '../threads/types.js';
 import { ToolCall, ToolResult } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
-
-export interface Timeline {
-  items: TimelineItem[];
-  metadata: {
-    eventCount: number;
-    messageCount: number;
-    lastActivity: Date;
-  };
-}
-
-export type TimelineItem =
-  | { type: 'user_message'; content: string; timestamp: Date; id: string }
-  | { type: 'agent_message'; content: string; timestamp: Date; id: string }
-  | {
-      type: 'tool_execution';
-      call: ToolCall;
-      result?: ToolResult;
-      timestamp: Date;
-      callId: string;
-    }
-  | {
-      type: 'system_message';
-      content: string;
-      timestamp: Date;
-      id: string;
-      originalEventType?: string;
-    }
-  | { type: 'ephemeral_message'; messageType: string; content: string; timestamp: Date };
-
-// Cached processed events (from persisted ThreadEvents)
-export type ProcessedThreadItems = Exclude<TimelineItem, { type: 'ephemeral_message' }>[];
-
-// Fast processing for streaming messages
-export type EphemeralTimelineItems = Extract<TimelineItem, { type: 'ephemeral_message' }>[];
-
-export interface EphemeralMessage {
-  type: 'user' | 'assistant' | 'system' | 'tool';
-  content: string;
-  timestamp: Date;
-}
+import { 
+  Timeline, 
+  TimelineItem, 
+  ProcessedThreadItems, 
+  EphemeralTimelineItems, 
+  EphemeralMessage 
+} from './timeline-types.js';
 
 export class ThreadProcessor {
   // Cache individual parsed events
