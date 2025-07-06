@@ -175,7 +175,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   const [bottomSectionHeight, setBottomSectionHeight] = useState<number>(0);
   const [timelineContainerHeight, setTimelineContainerHeight] = useState<number>(0);
   const [, terminalHeight] = useStdoutDimensions();
-  const [events, setEvents] = useState<ThreadEvent[]>([]);
+  // Remove events array - StreamingTimelineProcessor manages timeline state
   const [ephemeralMessages, setEphemeralMessages] = useState<Message[]>([]);
   const [currentInput, setCurrentInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -282,14 +282,36 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   }, []);
 
 
-  // Sync events from agent's thread (including delegate threads)
-  const syncEvents = useCallback(() => {
-    const threadId = agent.getCurrentThreadId();
-    if (threadId) {
-      const threadEvents = agent.getMainAndDelegateEvents(threadId);
-      setEvents([...threadEvents]);
+  // Add an ephemeral message
+  const addMessage = useCallback((message: Message) => {
+    setEphemeralMessages((prev) => [...prev, message]);
+  }, []);
+
+  // Initialize StreamingTimelineProcessor for session resumption (O(n), one time only)
+  const initializeStreamingSession = useCallback(async (threadId?: string) => {
+    try {
+      const result = await agent.resumeOrCreateThread(threadId);
+      
+      if (result.isResumed) {
+        // Load historical events directly into streaming processor (bulk load once)
+        const historicalEvents = agent.getThreadEvents(result.threadId);
+        streamingTimelineProcessor.reset();
+        streamingTimelineProcessor.loadEvents(historicalEvents);
+        
+        logger.debug('StreamingTimelineProcessor loaded historical events', {
+          threadId: result.threadId,
+          eventCount: historicalEvents.length,
+        });
+      }
+    } catch (error) {
+      logger.error('Session initialization failed', { error });
+      addMessage({
+        type: 'system',
+        content: `❌ Failed to initialize session: ${error instanceof Error ? error.message : String(error)}`,
+        timestamp: new Date(),
+      });
     }
-  }, [agent]);
+  }, [agent, streamingTimelineProcessor, addMessage]);
 
   // Initialize token counts for resumed conversations
   useEffect(() => {
@@ -336,11 +358,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       }
     }
   }, []); // Run once on mount
-
-  // Add an ephemeral message
-  const addMessage = useCallback((message: Message) => {
-    setEphemeralMessages((prev) => [...prev, message]);
-  }, []);
 
   // Handle tool approval modal decision
   const handleApprovalDecision = useCallback(
@@ -389,34 +406,31 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       }
       setRetryStatus(null);
       
-      syncEvents();
+      // No need to sync events - streaming processor handles them automatically
     };
 
     // Handle tool execution events to show delegation boxes immediately
     const handleToolCallStart = ({ toolName }: { toolName: string }) => {
-      // Sync events when delegation tool starts to show delegation box immediately
-      if (toolName === 'delegate') {
-        syncEvents();
-      }
+      // No need to sync events - streaming processor handles them automatically via thread_event_added
+      // Delegation boxes will appear when the TOOL_CALL event flows through
     };
 
     const handleToolCallComplete = ({ toolName }: { toolName: string }) => {
-      // Sync events after any tool completes (including during delegation)
-      syncEvents();
+      // No need to sync events - streaming processor handles them automatically via thread_event_added
     };
 
     // Handle delegation lifecycle events
     const handleDelegationStart = ({ toolName }: { toolName: string }) => {
       if (toolName === 'delegate') {
         setIsDelegating(true);
-        syncEvents();
+        // No need to sync events - streaming processor handles them automatically
       }
     };
 
     const handleDelegationEnd = ({ toolName }: { toolName: string }) => {
       if (toolName === 'delegate') {
         setIsDelegating(false);
-        syncEvents();
+        // No need to sync events - streaming processor handles them automatically
       }
     };
 
@@ -474,7 +488,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             threadId
           );
         }
-        syncEvents();
+        // No need to sync events - streaming processor handles them automatically via thread_event_added
       }
       setIsProcessing(false);
     };
@@ -798,9 +812,9 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         retryCountdownRef.current = null;
       }
     };
-  }, [agent, addMessage, syncEvents, streamingContent]);
+  }, [agent, addMessage, streamingContent]);
 
-  // Listen to Agent events for real-time updates
+  // Listen to Agent events for pure streaming updates (O(1) per event)
   useEffect(() => {
     const handleEventAdded = ({
       event,
@@ -811,8 +825,14 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     }) => {
       const currentThreadId = agent.getCurrentThreadId();
       if (threadId === currentThreadId) {
-        // Sync events when current thread is updated
-        syncEvents();
+        // Stream event directly to processor (O(1) operation)
+        streamingTimelineProcessor.appendEvent(event);
+        
+        logger.debug('StreamingTimelineProcessor appended event', {
+          eventType: event.type,
+          eventId: event.id,
+          threadId,
+        });
       }
     };
 
@@ -821,7 +841,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     return () => {
       agent.off('thread_event_added', handleEventAdded);
     };
-  }, [agent, syncEvents]);
+  }, [agent, streamingTimelineProcessor]);
 
   // Get Ink app instance for proper exit handling
   const app = useApp();
@@ -843,8 +863,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         // Create new thread and agent
         const newThreadId = agent.generateThreadId();
         agent.createThread(newThreadId);
-        // Reset React state
-        setEvents([]);
+        // Reset streaming processor and ephemeral state
+        streamingTimelineProcessor.reset();
         setEphemeralMessages([]);
         addMessage({
           type: 'system',
@@ -918,7 +938,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       // Send to agent (it will create the USER_MESSAGE ThreadEvent)
       try {
         await agent.sendMessage(trimmedInput);
-        syncEvents(); // Ensure we have the latest events including the user message
+        // No need to sync events - streaming processor handles them automatically via thread_event_added
       } catch (error) {
         addMessage({
           type: 'system',
@@ -928,7 +948,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         setIsProcessing(false);
       }
     },
-    [agent, addMessage, handleSlashCommand, syncEvents, isTurnActive, approvalRequest]
+    [agent, addMessage, handleSlashCommand, isTurnActive, approvalRequest]
   );
 
   // Initialize command system
@@ -952,8 +972,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
   // Initialize agent on mount
   useEffect(() => {
-    // Sync existing events from the thread
-    syncEvents();
+    // Initialize streaming session (loads historical events into StreamingTimelineProcessor)
+    initializeStreamingSession();
 
     addMessage({
       type: 'system',
@@ -972,7 +992,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     });
 
     // Initial focus is handled by LaceFocusProvider default stack
-  }, [agent, addMessage, syncEvents]);
+  }, [agent, addMessage, initializeStreamingSession]);
 
   // Approval modal focus is handled by ModalWrapper automatically
 
@@ -986,7 +1006,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       const { height } = measureElement(timelineContainerRef.current);
       setTimelineContainerHeight(height);
     }
-  }, [events.length, ephemeralMessages.length, currentInput]); // Re-measure when content or input changes
+  }, [ephemeralMessages.length, currentInput]); // Re-measure when ephemeral content or input changes
 
   return (
     <LaceFocusProvider>
@@ -1059,7 +1079,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               threadId={agent.getCurrentThreadId() || undefined}
               cumulativeTokens={cumulativeTokens}
               isProcessing={isProcessing}
-              messageCount={events.length + ephemeralMessages.length}
+              messageCount={streamingTimelineProcessor.getTimeline().metadata.eventCount + ephemeralMessages.length}
               isTurnActive={isTurnActive}
               turnMetrics={currentTurnMetrics}
               projectContext={projectContext}
