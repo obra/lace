@@ -254,9 +254,7 @@ export function validateProvider(provider: string, registry: ProviderRegistry): 
 }
 
 export async function showHelp(): Promise<void> {
-  console.log(`[CLI] ${new Date().toISOString()} Starting showHelp()...`);
   const providerHelpText = await getProviderHelpText();
-  console.log(`[CLI] ${new Date().toISOString()} Got provider help text, showing help...`);
 
   // Commander generates help automatically, just trigger it
   const program = new Command();
@@ -296,5 +294,4 @@ export async function showHelp(): Promise<void> {
     .option('--list-tools', 'Show available tools and their descriptions');
 
   program.outputHelp();
-  console.log(`[CLI] ${new Date().toISOString()} Help output complete`);
 }

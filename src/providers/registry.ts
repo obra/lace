@@ -26,51 +26,32 @@ export class ProviderRegistry {
   }
 
   static async createWithAutoDiscovery(): Promise<ProviderRegistry> {
-    const timestamp = () => new Date().toISOString();
-    console.log(`[Registry] ${timestamp()} Starting auto-discovery...`);
-    const startTime = Date.now();
     const registry = new ProviderRegistry();
 
     // Get the directory path for the providers folder
     const currentFile = fileURLToPath(import.meta.url);
     const providersDir = dirname(currentFile);
-    console.log(`[Registry] ${timestamp()} Provider dir: ${providersDir}`);
 
     // Find all provider files matching *-provider.ts pattern
-    console.log(`[Registry] ${timestamp()} Globbing for JS files...`);
-    const globStart = Date.now();
     const providerFiles = await glob('*-provider.js', {
       cwd: providersDir.replace('/src/', '/dist/'),
       absolute: true,
       ignore: 'base-provider.js',
     });
-    console.log(
-      `[Registry] ${timestamp()} JS glob took ${Date.now() - globStart}ms, found: ${providerFiles}`
-    );
 
     // Also check for TypeScript files in development
-    console.log(`[Registry] ${timestamp()} Globbing for TS files...`);
-    const tsGlobStart = Date.now();
     const tsProviderFiles = await glob('*-provider.ts', {
       cwd: providersDir,
       absolute: true,
       ignore: '**/base-provider.ts',
     });
-    console.log(
-      `[Registry] ${timestamp()} TS glob took ${Date.now() - tsGlobStart}ms, found: ${tsProviderFiles}`
-    );
 
     // Use TS files if available (development), otherwise use JS files (production)
     const filesToProcess = tsProviderFiles.length > 0 ? tsProviderFiles : providerFiles;
 
     for (const file of filesToProcess) {
       try {
-        console.log(`[Registry] ${timestamp()} Importing ${file}...`);
-        const importStart = Date.now();
         const module = await import(file);
-        console.log(
-          `[Registry] ${timestamp()} Import of ${file} took ${Date.now() - importStart}ms`
-        );
 
         // Check all exports in the module
         for (const exportedValue of Object.values(module)) {
@@ -122,9 +103,6 @@ export class ProviderRegistry {
       }
     }
 
-    console.log(
-      `[Registry] ${timestamp()} Auto-discovery completed in ${Date.now() - startTime}ms`
-    );
     return registry;
   }
 
