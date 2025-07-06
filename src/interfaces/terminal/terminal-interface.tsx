@@ -26,22 +26,11 @@ import { CommandRegistry } from '../../commands/registry.js';
 import { CommandExecutor } from '../../commands/executor.js';
 import type { UserInterface } from '../../commands/types.js';
 import { ThreadEvent } from '../../threads/types.js';
-import { ThreadProcessor } from '../thread-processor.js';
 import { StreamingTimelineProcessor } from '../streaming-timeline-processor.js';
 import { LaceFocusProvider } from './focus/index.js';
 import { useProjectContext } from './hooks/use-project-context.js';
 import { logger } from '../../utils/logger.js';
 
-// ThreadProcessor context for interface-level caching
-const ThreadProcessorContext = createContext<ThreadProcessor | null>(null);
-
-export const useThreadProcessor = (): ThreadProcessor => {
-  const processor = useContext(ThreadProcessorContext);
-  if (!processor) {
-    throw new Error('useThreadProcessor must be used within ThreadProcessorContext.Provider');
-  }
-  return processor;
-};
 
 // StreamingTimelineProcessor context for O(1) timeline processing
 const StreamingTimelineProcessorContext = createContext<StreamingTimelineProcessor | null>(null);
@@ -166,16 +155,28 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   approvalCallback,
   interfaceContext,
 }) => {
-  // Create one ThreadProcessor instance per interface
-  const threadProcessor = useMemo(() => new ThreadProcessor(), []);
   // Create StreamingTimelineProcessor for O(1) timeline processing
-  const streamingTimelineProcessor = useMemo(() => new StreamingTimelineProcessor(), []);
+  const streamingTimelineProcessor = useMemo(() => {
+    const processor = new StreamingTimelineProcessor();
+    // Set up callback to trigger React updates when timeline changes
+    processor.setChangeCallback(() => {
+      const newVersion = processor.getVersion();
+      logger.debug('React timeline version update', {
+        newVersion,
+        timelineItemCount: processor.getTimeline().items.length,
+      });
+      setTimelineVersion(newVersion);
+    });
+    return processor;
+  }, []);
   const bottomSectionRef = useRef<any>(null);
   const timelineContainerRef = useRef<any>(null);
   const [bottomSectionHeight, setBottomSectionHeight] = useState<number>(0);
   const [timelineContainerHeight, setTimelineContainerHeight] = useState<number>(0);
   const [, terminalHeight] = useStdoutDimensions();
   // Remove events array - StreamingTimelineProcessor manages timeline state
+  // Track timeline version for React updates
+  const [timelineVersion, setTimelineVersion] = useState(0);
   const [ephemeralMessages, setEphemeralMessages] = useState<Message[]>([]);
   const [currentInput, setCurrentInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -288,20 +289,21 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   }, []);
 
   // Initialize StreamingTimelineProcessor for session resumption (O(n), one time only)
-  const initializeStreamingSession = useCallback(async (threadId?: string) => {
+  const initializeStreamingSession = useCallback(async () => {
     try {
-      const result = await agent.resumeOrCreateThread(threadId);
-      
-      if (result.isResumed) {
-        // Load historical events directly into streaming processor (bulk load once)
-        const historicalEvents = agent.getThreadEvents(result.threadId);
+      // Thread resumption already handled by app.ts, just load historical events
+      const currentThreadId = agent.getCurrentThreadId();
+      if (currentThreadId) {
+        const historicalEvents = agent.getThreadEvents(currentThreadId);
         streamingTimelineProcessor.reset();
         streamingTimelineProcessor.loadEvents(historicalEvents);
         
         logger.debug('StreamingTimelineProcessor loaded historical events', {
-          threadId: result.threadId,
+          threadId: currentThreadId,
           eventCount: historicalEvents.length,
         });
+      } else {
+        logger.warn('No current thread found during session initialization');
       }
     } catch (error) {
       logger.error('Session initialization failed', { error });
@@ -390,7 +392,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
     // Handle agent thinking complete
     const handleThinkingComplete = () => {
-      // No action needed - thinking blocks are handled via ThreadProcessor from ThreadEvents
+      // No action needed - thinking blocks are handled via StreamingTimelineProcessor from Agent events
     };
 
     // Handle agent response complete
@@ -1010,8 +1012,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
   return (
     <LaceFocusProvider>
-      <ThreadProcessorContext.Provider value={threadProcessor}>
-        <StreamingTimelineProcessorContext.Provider value={streamingTimelineProcessor}>
+      <StreamingTimelineProcessorContext.Provider value={streamingTimelineProcessor}>
           <InterfaceContext.Provider value={{ showAlert, clearAlert }}>
         {/* SIGINT Handler */}
         <SigintHandler agent={agent} showAlert={showAlert} />
@@ -1062,6 +1063,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               ]}
               bottomSectionHeight={bottomSectionHeight}
               isTimelineLayoutDebugVisible={isTimelineLayoutDebugVisible}
+              timelineVersion={timelineVersion}
             />
             </TimelineExpansionProvider>
           </Box>
@@ -1123,7 +1125,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         </Box>
           </InterfaceContext.Provider>
         </StreamingTimelineProcessorContext.Provider>
-      </ThreadProcessorContext.Provider>
     </LaceFocusProvider>
   );
 };

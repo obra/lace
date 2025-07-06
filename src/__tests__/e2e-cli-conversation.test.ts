@@ -111,10 +111,10 @@ describe('CLI Conversation Tests', () => {
         });
 
         expect(session2.exitCode).toBe(0);
-        const sessionIdMatch = session2.stdout.match(
-          /Starting conversation (lace_\d{8}_[a-z0-9]{6})/
-        );
-        const latestSessionId = sessionIdMatch![1];
+        // const sessionIdMatch = session2.stdout.match(
+        //   /Starting conversation (lace_\d{8}_[a-z0-9]{6})/
+        // );
+        // const latestSessionId = sessionIdMatch![1];
 
         // Continue without specifying ID - should get latest
         const session3 = await runCLI(

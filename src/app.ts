@@ -161,7 +161,7 @@ async function handleSessionWithAgent(
       continueThreadId = continueMode;
     } else {
       // Get latest thread ID through Agent API
-      continueThreadId = await agent.getLatestThreadId() || undefined;
+      continueThreadId = (await agent.getLatestThreadId()) || undefined;
     }
   }
 
@@ -184,12 +184,12 @@ export async function run(options: CLIOptions): Promise<void> {
   await initializeServices(options);
 
   const threadManager = new ThreadManager(getLaceDbPath());
-  
+
   // Create a temporary agent to handle session resumption
   const tempThreadId = threadManager.generateThreadId();
   threadManager.createThread(tempThreadId);
   const agent = await setupAgent(options, tempThreadId, threadManager);
-  
+
   // Use Agent to handle session resumption with automatic replay
   const sessionThreadId = await handleSessionWithAgent(agent, options.continue);
 

@@ -47,10 +47,10 @@ export interface EphemeralMessage {
 export interface TimelineProcessor {
   // Incremental processing (O(1))
   appendEvent(event: ThreadEvent): void;
-  
+
   // Bulk loading for session resumption (O(n))
   loadEvents(events: ThreadEvent[]): void;
-  
+
   // State access
   getTimeline(): Timeline;
   reset(): void;

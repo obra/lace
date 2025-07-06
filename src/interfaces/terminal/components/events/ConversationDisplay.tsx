@@ -17,20 +17,23 @@ interface ConversationDisplayProps {
   ephemeralMessages: Message[];
   bottomSectionHeight?: number;
   isTimelineLayoutDebugVisible?: boolean;
+  timelineVersion?: number; // For triggering React updates when timeline changes
 }
 
 export function ConversationDisplay({
   ephemeralMessages,
   bottomSectionHeight,
   isTimelineLayoutDebugVisible,
+  timelineVersion,
 }: ConversationDisplayProps) {
   // Use StreamingTimelineProcessor for O(1) timeline access
   const streamingProcessor = useStreamingTimelineProcessor();
 
   // Get current timeline state (O(1) operation)
+  // Use timelineVersion to trigger updates when timeline changes
   const timeline = useMemo(() => {
     return streamingProcessor.getTimeline();
-  }, [streamingProcessor]);
+  }, [streamingProcessor, timelineVersion]);
 
   // Convert ephemeral messages to EphemeralMessage format and merge into timeline
   const finalTimeline = useMemo(() => {

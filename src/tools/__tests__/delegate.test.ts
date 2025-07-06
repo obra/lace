@@ -96,7 +96,7 @@ describe('DelegateTool', () => {
   it('should delegate a simple task with default model', async () => {
     // Get the mock subagent that will be returned by createDelegateAgent
     const mockSubagent = mockAgent.createDelegateAgent();
-    
+
     // Setup subagent event handling for 'on' listeners
     mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'agent_response_complete') {
@@ -138,7 +138,7 @@ describe('DelegateTool', () => {
 
   it('should handle custom provider:model format', async () => {
     const mockSubagent = mockAgent.createDelegateAgent();
-    
+
     mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'agent_response_complete') {
         setTimeout(() => handler({ content: 'Custom model response' }), 0);
@@ -171,7 +171,7 @@ describe('DelegateTool', () => {
   it('should create delegate thread and execute subagent', async () => {
     // Mock subagent behavior
     const mockSubagent = mockAgent.createDelegateAgent();
-    
+
     mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'agent_response_complete') {
         setTimeout(() => handler({ content: 'Directory listed successfully' }), 10);
@@ -205,7 +205,7 @@ describe('DelegateTool', () => {
 
   it('should handle subagent errors gracefully', async () => {
     const mockSubagent = mockAgent.createDelegateAgent();
-    
+
     mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'error') {
         setTimeout(() => handler({ error: new Error('Subagent failed') }), 0);
@@ -243,7 +243,7 @@ describe('DelegateTool', () => {
 
   it('should format the subagent system prompt correctly', async () => {
     const mockSubagent = mockAgent.createDelegateAgent();
-    
+
     mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'agent_response_complete') {
         setTimeout(() => handler({ content: 'Done' }), 0);
@@ -288,7 +288,7 @@ describe('DelegateTool', () => {
 
   it('should collect all subagent responses', async () => {
     const mockSubagent = mockAgent.createDelegateAgent();
-    
+
     mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'agent_response_complete') {
         // Simulate multiple responses
@@ -318,7 +318,7 @@ describe('DelegateTool', () => {
 
   it('should include delegate thread ID in result metadata', async () => {
     const mockSubagent = mockAgent.createDelegateAgent();
-    
+
     mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'agent_response_complete') {
         setTimeout(() => handler({ content: 'Delegation complete' }), 0);

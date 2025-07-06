@@ -16,7 +16,7 @@ describe('Agent Single Event Source Integration', () => {
     const mockProvider = createMockProvider();
     threadManager = new ThreadManager(':memory:');
     toolExecutor = new ToolExecutor();
-    
+
     agent = new Agent({
       provider: mockProvider,
       toolExecutor,
@@ -34,7 +34,7 @@ describe('Agent Single Event Source Integration', () => {
 
     // Create thread
     threadManager.createThread('integration-test-thread');
-    
+
     // Start agent so we can send messages (which will trigger _addEventAndEmit)
     await agent.start();
 
@@ -54,13 +54,13 @@ describe('Agent Single Event Source Integration', () => {
   it('should provide Agent API methods for thread operations', () => {
     // Create the agent's thread
     threadManager.createThread('integration-test-thread');
-    
+
     // Test Agent API methods exist and work
     expect(agent.getCurrentThreadId()).toBe('integration-test-thread');
     expect(typeof agent.getThreadEvents).toBe('function');
     expect(typeof agent.compact).toBe('function');
     expect(typeof agent.resumeOrCreateThread).toBe('function');
-    
+
     // Verify getThreadEvents returns events
     const events = agent.getThreadEvents('integration-test-thread');
     expect(Array.isArray(events)).toBe(true);
@@ -71,13 +71,13 @@ describe('Agent Single Event Source Integration', () => {
     threadManager.createThread('api-test-thread');
     threadManager.addEvent('api-test-thread', 'USER_MESSAGE', 'test message 1');
     threadManager.addEvent('api-test-thread', 'AGENT_MESSAGE', 'test response 1');
-    
+
     // Test getThreadEvents
     const events = agent.getThreadEvents('api-test-thread');
     expect(events.length).toBe(2);
     expect(events[0].type).toBe('USER_MESSAGE');
     expect(events[1].type).toBe('AGENT_MESSAGE');
-    
+
     // Test compact (should not throw)
     expect(() => agent.compact('api-test-thread')).not.toThrow();
   });

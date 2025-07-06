@@ -8,7 +8,7 @@ import { Tool } from '../tools/tool.js';
 import { ToolExecutor } from '../tools/executor.js';
 import { ApprovalDecision } from '../tools/approval-types.js';
 import { ThreadManager, ThreadSessionInfo } from '../threads/thread-manager.js';
-import { ThreadEvent, asThreadId } from '../threads/types.js';
+import { ThreadEvent, EventType, asThreadId } from '../threads/types.js';
 import { logger } from '../utils/logger.js';
 import { StopReasonHandler } from '../token-management/stop-reason-handler.js';
 import { TokenBudgetManager } from '../token-management/token-budget-manager.js';
@@ -97,7 +97,6 @@ export class Agent extends EventEmitter {
   get providerName(): string {
     return this._provider.providerName;
   }
-
 
   // Public access to thread ID for delegation
   // IMPORTANT: This returns the CANONICAL thread ID, which remains stable across compactions
@@ -191,11 +190,7 @@ export class Agent extends EventEmitter {
 
     if (!hasConversationStarted) {
       this._addEventAndEmit(this._threadId, 'SYSTEM_PROMPT', promptConfig.systemPrompt);
-      this._addEventAndEmit(
-        this._threadId,
-        'USER_SYSTEM_PROMPT',
-        promptConfig.userInstructions
-      );
+      this._addEventAndEmit(this._threadId, 'USER_SYSTEM_PROMPT', promptConfig.userInstructions);
     }
 
     this._isRunning = true;
@@ -1241,17 +1236,17 @@ export class Agent extends EventEmitter {
    */
   async replaySessionEvents(): Promise<void> {
     const events = this._threadManager.getEvents(this._getActiveThreadId());
-    
+
     logger.debug('Agent: Replaying session events', {
       threadId: this._threadId,
       eventCount: events.length,
     });
-    
+
     // Emit each historical event for UI rebuilding
     for (const event of events) {
       this.emit('thread_event_added', { event, threadId: event.threadId });
     }
-    
+
     logger.debug('Agent: Session replay complete', {
       threadId: this._threadId,
       eventsReplayed: events.length,
@@ -1262,44 +1257,48 @@ export class Agent extends EventEmitter {
   getCurrentThreadId(): string | null {
     return this._threadManager.getCurrentThreadId();
   }
-  
+
   getThreadEvents(threadId?: string): ThreadEvent[] {
     const targetThreadId = threadId || this._getActiveThreadId();
     return this._threadManager.getEvents(targetThreadId);
   }
-  
+
   generateThreadId(): string {
     return this._threadManager.generateThreadId();
   }
-  
+
   createThread(threadId: string): void {
     this._threadManager.createThread(threadId);
   }
-  
+
   async resumeOrCreateThread(threadId?: string): Promise<ThreadSessionInfo> {
     const result = await this._threadManager.resumeOrCreate(threadId);
-    
+
     // If resuming existing thread, replay events for UI
     if (result.isResumed) {
       await this.replaySessionEvents();
     }
-    
+
     return result;
   }
-  
+
   async getLatestThreadId(): Promise<string | null> {
     return this._threadManager.getLatestThreadId();
   }
-  
+
   getMainAndDelegateEvents(mainThreadId: string): ThreadEvent[] {
     return this._threadManager.getMainAndDelegateEvents(mainThreadId);
   }
-  
+
   compact(threadId: string): void {
     this._threadManager.compact(threadId);
   }
-  
-  createDelegateAgent(toolExecutor: ToolExecutor, provider?: AIProvider, tokenBudget?: TokenBudgetConfig): Agent {
+
+  createDelegateAgent(
+    toolExecutor: ToolExecutor,
+    provider?: AIProvider,
+    tokenBudget?: TokenBudgetConfig
+  ): Agent {
     // Get current thread as parent
     const parentThreadId = this.getCurrentThreadId();
     if (!parentThreadId) {
@@ -1339,8 +1338,12 @@ export class Agent extends EventEmitter {
    * Helper method to add event to ThreadManager and emit Agent event
    * This ensures Agent is the single event source for UI updates
    */
-  private _addEventAndEmit(threadId: string, type: string, data: any): ThreadEvent {
-    const event = this._threadManager.addEvent(threadId, type as any, data);
+  private _addEventAndEmit(
+    threadId: string,
+    type: string,
+    data: string | ToolCall | ToolResult
+  ): ThreadEvent {
+    const event = this._threadManager.addEvent(threadId, type as EventType, data);
     this.emit('thread_event_added', { event, threadId });
     return event;
   }

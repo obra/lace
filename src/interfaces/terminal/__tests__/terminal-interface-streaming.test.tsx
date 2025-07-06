@@ -65,7 +65,7 @@ describe('TerminalInterface Streaming Event Flow', () => {
       const calls = threadEventAddedSpy.mock.calls;
       const userMessageCall = calls.find(call => call[0].event.type === 'USER_MESSAGE');
       expect(userMessageCall).toBeDefined();
-      expect(userMessageCall[0].event.data).toBe('Test message');
+      expect(userMessageCall![0].event.data).toBe('Test message');
     });
 
     it('should handle session initialization without events array', () => {

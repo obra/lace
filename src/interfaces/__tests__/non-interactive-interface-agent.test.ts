@@ -20,12 +20,12 @@ describe('NonInteractiveInterface Agent API Usage', () => {
   beforeEach(async () => {
     testDir = await mkdtemp(join(tmpdir(), 'lace-non-interactive-test-'));
     threadManager = new ThreadManager(join(testDir, 'test.db'));
-    
+
     const provider = new TestProvider();
     const toolExecutor = new ToolExecutor();
     const threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
-    
+
     agent = new Agent({
       provider,
       toolExecutor,
@@ -33,7 +33,7 @@ describe('NonInteractiveInterface Agent API Usage', () => {
       threadId,
       tools: [],
     });
-    
+
     nonInteractiveInterface = new NonInteractiveInterface(agent);
   });
 
@@ -46,10 +46,10 @@ describe('NonInteractiveInterface Agent API Usage', () => {
     it('should use Agent.generateThreadId() instead of direct ThreadManager access', () => {
       // Arrange
       const agentGenerateThreadIdSpy = vi.spyOn(agent, 'generateThreadId');
-      
+
       // Act
       nonInteractiveInterface.clearSession();
-      
+
       // Assert - Should use Agent API
       expect(agentGenerateThreadIdSpy).toHaveBeenCalled();
     });
@@ -57,22 +57,24 @@ describe('NonInteractiveInterface Agent API Usage', () => {
     it('should use Agent.createThread() instead of direct ThreadManager access', () => {
       // Arrange
       const agentCreateThreadSpy = vi.spyOn(agent, 'createThread');
-      
+
       // Act
       nonInteractiveInterface.clearSession();
-      
+
       // Assert - Should use Agent API
       expect(agentCreateThreadSpy).toHaveBeenCalled();
     });
 
     it('should create new thread through Agent API', () => {
       // Arrange
-      const agentGenerateThreadIdSpy = vi.spyOn(agent, 'generateThreadId').mockReturnValue('test-thread-123');
+      const agentGenerateThreadIdSpy = vi
+        .spyOn(agent, 'generateThreadId')
+        .mockReturnValue('test-thread-123');
       const agentCreateThreadSpy = vi.spyOn(agent, 'createThread');
-      
+
       // Act
       nonInteractiveInterface.clearSession();
-      
+
       // Assert
       expect(agentGenerateThreadIdSpy).toHaveBeenCalled();
       expect(agentCreateThreadSpy).toHaveBeenCalledWith('test-thread-123');

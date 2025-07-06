@@ -13,7 +13,7 @@ import { canTimelineItemAcceptFocus, getTimelineItemFocusId } from '../../timeli
 
 // Mock dependencies to create focused integration test environment
 vi.mock('../../../terminal-interface.js', () => ({
-  useThreadProcessor: () => ({
+  useStreamingTimelineProcessor: () => ({
     processThreads: vi.fn(() => ({
       items: [],
       metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },

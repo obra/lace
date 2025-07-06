@@ -18,12 +18,12 @@ describe('Agent ThreadManager Encapsulation', () => {
   beforeEach(async () => {
     testDir = await mkdtemp(join(tmpdir(), 'lace-encapsulation-test-'));
     threadManager = new ThreadManager(join(testDir, 'test.db'));
-    
+
     const provider = new TestProvider();
     const toolExecutor = new ToolExecutor();
     const threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
-    
+
     agent = new Agent({
       provider,
       toolExecutor,
@@ -31,7 +31,7 @@ describe('Agent ThreadManager Encapsulation', () => {
       threadId,
       tools: [],
     });
-    
+
     await agent.start();
   });
 
@@ -46,15 +46,15 @@ describe('Agent ThreadManager Encapsulation', () => {
       // Thread ID operations
       expect(typeof agent.getCurrentThreadId).toBe('function');
       expect(typeof agent.generateThreadId).toBe('function');
-      
+
       // Thread management
       expect(typeof agent.createThread).toBe('function');
       expect(typeof agent.resumeOrCreateThread).toBe('function');
-      
+
       // Event operations
       expect(typeof agent.getThreadEvents).toBe('function');
       expect(typeof agent.replaySessionEvents).toBe('function');
-      
+
       // Agent should provide complete functionality without ThreadManager exposure
     });
 
@@ -62,31 +62,31 @@ describe('Agent ThreadManager Encapsulation', () => {
       // Test core thread operations work through Agent
       const newThreadId = agent.generateThreadId();
       expect(typeof newThreadId).toBe('string');
-      
+
       agent.createThread(newThreadId);
-      
+
       const currentThreadId = agent.getCurrentThreadId();
       expect(typeof currentThreadId).toBe('string');
-      
+
       const events = agent.getThreadEvents();
       expect(Array.isArray(events)).toBe(true);
     });
 
     it('should not need ThreadManager getter for normal operations', () => {
       // Test that common operations work without accessing threadManager
-      
+
       // Thread identification
       const threadId = agent.getCurrentThreadId();
       expect(threadId).toBeDefined();
-      
+
       // Event access
       const events = agent.getThreadEvents();
       expect(Array.isArray(events)).toBe(true);
-      
+
       // Thread creation
       const newThreadId = agent.generateThreadId();
       agent.createThread(newThreadId);
-      
+
       // All operations completed without needing direct ThreadManager access
       expect(true).toBe(true);
     });
@@ -96,19 +96,19 @@ describe('Agent ThreadManager Encapsulation', () => {
     it('should provide equivalent functionality to ThreadManager public methods', () => {
       // The Agent API should cover all the public ThreadManager functionality
       // that external code needs access to
-      
+
       // Thread creation and management
       expect(typeof agent.generateThreadId).toBe('function');
       expect(typeof agent.createThread).toBe('function');
       expect(typeof agent.resumeOrCreateThread).toBe('function');
-      
+
       // Thread identification
       expect(typeof agent.getCurrentThreadId).toBe('function');
-      
+
       // Event access
       expect(typeof agent.getThreadEvents).toBe('function');
       expect(typeof agent.replaySessionEvents).toBe('function');
-      
+
       // Note: Some ThreadManager methods like compact(), getMainAndDelegateEvents()
       // may need to be added to Agent API if they're needed by external code
     });

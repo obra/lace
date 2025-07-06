@@ -289,7 +289,7 @@ describe('CLI Flow Tests', () => {
     it('should resume session when continue is true', async () => {
       const { Agent } = vi.mocked(await import('../agents/agent.js'));
       const { ToolExecutor } = vi.mocked(await import('../tools/executor.js'));
-      
+
       // Override the mock to return resumed session
       const mockAgentInstance = {
         ...(Agent as any).mock.results[0]?.value,
@@ -302,7 +302,7 @@ describe('CLI Flow Tests', () => {
         getLatestThreadId: vi.fn().mockResolvedValue('resumed-thread-456'),
       };
       (Agent as any).mockImplementation(() => mockAgentInstance as any);
-      
+
       const options = { ...mockCliOptions, continue: true };
 
       await run(options);
@@ -315,7 +315,7 @@ describe('CLI Flow Tests', () => {
     it('should resume specific session when thread ID provided', async () => {
       const { Agent } = vi.mocked(await import('../agents/agent.js'));
       const { ToolExecutor } = vi.mocked(await import('../tools/executor.js'));
-      
+
       // Override the mock to return specific session
       const mockAgentInstance = {
         ...(Agent as any).mock.results[0]?.value,
@@ -327,7 +327,7 @@ describe('CLI Flow Tests', () => {
         }),
       };
       (Agent as any).mockImplementation(() => mockAgentInstance as any);
-      
+
       const options = { ...mockCliOptions, continue: 'specific-thread-789' };
 
       await run(options);
@@ -340,7 +340,7 @@ describe('CLI Flow Tests', () => {
     it('should handle resume error gracefully', async () => {
       const { Agent } = vi.mocked(await import('../agents/agent.js'));
       const { ToolExecutor } = vi.mocked(await import('../tools/executor.js'));
-      
+
       // Override the mock to return error case
       const mockAgentInstance = {
         ...(Agent as any).mock.results[0]?.value,

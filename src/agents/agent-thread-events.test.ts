@@ -6,7 +6,6 @@ import { Agent } from './agent.js';
 import { ThreadManager } from '../threads/thread-manager.js';
 import { ToolExecutor } from '../tools/executor.js';
 import { createMockProvider } from '../__tests__/utils/mock-provider.js';
-import { ThreadEvent } from '../threads/types.js';
 
 describe('Agent Thread Event Proxying', () => {
   let agent: Agent;
@@ -17,7 +16,7 @@ describe('Agent Thread Event Proxying', () => {
     const mockProvider = createMockProvider();
     threadManager = new ThreadManager(':memory:');
     toolExecutor = new ToolExecutor();
-    
+
     agent = new Agent({
       provider: mockProvider,
       toolExecutor,
@@ -29,14 +28,14 @@ describe('Agent Thread Event Proxying', () => {
 
   it('should emit thread_event_added when Agent processes user messages', async () => {
     const threadEventAddedSpy = vi.fn();
-    
+
     // Listen to Agent event
     agent.on('thread_event_added', threadEventAddedSpy);
 
     // Create thread and start agent
     agent.createThread('test-thread');
     await agent.start();
-    
+
     // Send message through Agent (this should emit events)
     await agent.sendMessage('test message');
 
@@ -45,7 +44,7 @@ describe('Agent Thread Event Proxying', () => {
       expect.objectContaining({
         event: expect.objectContaining({
           type: 'USER_MESSAGE',
-          data: 'test message'
+          data: 'test message',
         }),
         threadId: 'test-thread',
       })
@@ -54,14 +53,14 @@ describe('Agent Thread Event Proxying', () => {
 
   it('should emit thread_event_added for each event during conversation', async () => {
     const threadEventAddedSpy = vi.fn();
-    
+
     // Listen to Agent events
     agent.on('thread_event_added', threadEventAddedSpy);
 
     // Create thread and start agent
     agent.createThread('test-thread');
     await agent.start();
-    
+
     // Send message through Agent
     await agent.sendMessage('test message');
 
@@ -69,12 +68,12 @@ describe('Agent Thread Event Proxying', () => {
     expect(threadEventAddedSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         event: expect.objectContaining({
-          type: 'USER_MESSAGE'
+          type: 'USER_MESSAGE',
         }),
         threadId: 'test-thread',
       })
     );
-    
+
     // Should have been called at least once for the user message
     expect(threadEventAddedSpy).toHaveBeenCalled();
   });
@@ -86,7 +85,7 @@ describe('Agent Thread Event Proxying', () => {
     // Create thread and start agent
     agent.createThread('test-thread');
     await agent.start();
-    
+
     // Send message
     await agent.sendMessage('test message');
 
@@ -98,7 +97,7 @@ describe('Agent Thread Event Proxying', () => {
           threadId: 'test-thread',
           type: 'USER_MESSAGE',
           data: 'test message',
-          timestamp: expect.any(Date)
+          timestamp: expect.any(Date),
         }),
         threadId: 'test-thread',
       })
@@ -109,7 +108,7 @@ describe('Agent Thread Event Proxying', () => {
     // Create thread and start agent with no listeners
     agent.createThread('test-thread');
     await agent.start();
-    
+
     // Should not throw error when sending messages with no listeners
     await expect(agent.sendMessage('test message')).resolves.not.toThrow();
   });

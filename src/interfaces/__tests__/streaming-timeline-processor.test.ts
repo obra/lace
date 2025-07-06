@@ -5,20 +5,17 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { ThreadEvent } from '../../threads/types.js';
 import { ToolCall, ToolResult } from '../../tools/types.js';
 import { StreamingTimelineProcessor } from '../streaming-timeline-processor.js';
-import { ThreadProcessor } from '../thread-processor.js';
 import { Timeline, TimelineItem } from '../timeline-types.js';
 
 describe('StreamingTimelineProcessor', () => {
   let streamingProcessor: StreamingTimelineProcessor;
-  let threadProcessor: ThreadProcessor;
 
   beforeEach(() => {
     streamingProcessor = new StreamingTimelineProcessor();
-    threadProcessor = new ThreadProcessor();
   });
 
-  describe('Feature Parity with ThreadProcessor', () => {
-    it('should produce identical output for same event sequence', () => {
+  describe('Event Processing', () => {
+    it('should process basic event sequence correctly', () => {
       const events: ThreadEvent[] = [
         {
           id: '1',
@@ -28,7 +25,7 @@ describe('StreamingTimelineProcessor', () => {
           threadId: 'thread-1',
         },
         {
-          id: '2', 
+          id: '2',
           type: 'AGENT_MESSAGE',
           data: 'Hi there!',
           timestamp: new Date('2023-01-01T10:00:01Z'),
@@ -36,33 +33,20 @@ describe('StreamingTimelineProcessor', () => {
         },
       ];
 
-      // Process with ThreadProcessor
-      const threadProcessorResult = threadProcessor.processThreads(events);
-      
       // Process with StreamingTimelineProcessor
       streamingProcessor.loadEvents(events);
-      const streamingResult = streamingProcessor.getTimeline();
+      const result = streamingProcessor.getTimeline();
 
-      // Compare results
-      expect(streamingResult.items).toHaveLength(threadProcessorResult.items.length);
-      expect(streamingResult.metadata.eventCount).toBe(threadProcessorResult.metadata.eventCount);
-      expect(streamingResult.metadata.messageCount).toBe(threadProcessorResult.metadata.messageCount);
-      
-      // Compare each timeline item
-      for (let i = 0; i < streamingResult.items.length; i++) {
-        const streamingItem = streamingResult.items[i];
-        const threadItem = threadProcessorResult.items[i];
-        
-        expect(streamingItem.type).toBe(threadItem.type);
-        expect(streamingItem.timestamp).toEqual(threadItem.timestamp);
-        
-        if ('content' in streamingItem && 'content' in threadItem) {
-          expect(streamingItem.content).toBe(threadItem.content);
-        }
-        if ('id' in streamingItem && 'id' in threadItem) {
-          expect(streamingItem.id).toBe(threadItem.id);
-        }
-      }
+      // Verify results
+      expect(result.items).toHaveLength(2);
+      expect(result.metadata.eventCount).toBe(2);
+      expect(result.metadata.messageCount).toBe(2);
+
+      // Verify timeline items
+      expect(result.items[0].type).toBe('user_message');
+      expect(result.items[0].timestamp).toEqual(new Date('2023-01-01T10:00:00Z'));
+      expect(result.items[1].type).toBe('agent_message');
+      expect(result.items[1].timestamp).toEqual(new Date('2023-01-01T10:00:01Z'));
     });
 
     it('should handle all event types correctly', () => {
@@ -76,7 +60,7 @@ describe('StreamingTimelineProcessor', () => {
         },
         {
           id: '2',
-          type: 'AGENT_MESSAGE', 
+          type: 'AGENT_MESSAGE',
           data: 'Hi there!',
           timestamp: new Date('2023-01-01T10:00:01Z'),
           threadId: 'thread-1',
@@ -149,10 +133,10 @@ describe('StreamingTimelineProcessor', () => {
       const timeline = streamingProcessor.getTimeline();
 
       expect(timeline.items).toHaveLength(1);
-      
+
       const toolItem = timeline.items[0];
       expect(toolItem.type).toBe('tool_execution');
-      
+
       if (toolItem.type === 'tool_execution') {
         expect(toolItem.call).toEqual(toolCall);
         expect(toolItem.result).toEqual(toolResult);
@@ -181,10 +165,10 @@ describe('StreamingTimelineProcessor', () => {
       const timeline = streamingProcessor.getTimeline();
 
       expect(timeline.items).toHaveLength(1);
-      
+
       const item = timeline.items[0];
       expect(item.type).toBe('system_message');
-      
+
       if (item.type === 'system_message') {
         expect(item.content).toContain('Tool result (orphaned)');
         expect(item.content).toContain('Orphaned result');
@@ -212,10 +196,10 @@ describe('StreamingTimelineProcessor', () => {
       const timeline = streamingProcessor.getTimeline();
 
       expect(timeline.items).toHaveLength(1);
-      
+
       const toolItem = timeline.items[0];
       expect(toolItem.type).toBe('tool_execution');
-      
+
       if (toolItem.type === 'tool_execution') {
         expect(toolItem.call).toEqual(toolCall);
         expect(toolItem.result).toBeUndefined();
@@ -286,7 +270,7 @@ describe('StreamingTimelineProcessor', () => {
 
       const timeline = streamingProcessor.getTimeline();
       expect(timeline.items).toHaveLength(3);
-      
+
       if (timeline.items[0].type === 'user_message') {
         expect(timeline.items[0].content).toBe('First');
       }

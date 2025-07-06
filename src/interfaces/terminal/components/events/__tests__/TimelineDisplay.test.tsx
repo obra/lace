@@ -36,8 +36,8 @@ vi.mock('../../../../../utils/logger.js', () => ({
 }));
 
 vi.mock('../../terminal-interface.js', () => ({
-  useThreadProcessor: () => ({
-    // Mock implementation
+  useStreamingTimelineProcessor: () => ({
+    getTimeline: () => ({ items: [], metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() } }),
   }),
 }));
 

@@ -15,7 +15,7 @@ describe('Timeline Types', () => {
         lastActivity: new Date(),
       },
     };
-    
+
     expect(timeline.items).toBeDefined();
     expect(timeline.metadata).toBeDefined();
     expect(timeline.metadata.eventCount).toBe(0);
@@ -33,7 +33,7 @@ describe('Timeline Types', () => {
     };
     expect(userMessage.type).toBe('user_message');
 
-    // Test agent_message variant  
+    // Test agent_message variant
     const agentMessage: TimelineItem = {
       type: 'agent_message',
       content: 'Hi there',

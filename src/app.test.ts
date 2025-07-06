@@ -294,7 +294,7 @@ describe('App Initialization (run function)', () => {
       Object.setPrototypeOf(mockAgentInstance, Agent.prototype);
       return mockAgentInstance as any;
     });
-    
+
     const options = { ...mockCliOptions, continue: 'specific-thread-789' };
     await run(options);
     // Session handling now goes through Agent.resumeOrCreateThread

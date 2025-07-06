@@ -48,12 +48,12 @@ describe('Session Resumption with Agent API', () => {
   beforeEach(async () => {
     testDir = await mkdtemp(join(tmpdir(), 'lace-session-test-'));
     threadManager = new ThreadManager(join(testDir, 'test.db'));
-    
+
     const provider = new TestProvider();
     const toolExecutor = new ToolExecutor();
     const threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
-    
+
     agent = new Agent({
       provider,
       toolExecutor,
@@ -61,7 +61,7 @@ describe('Session Resumption with Agent API', () => {
       threadId,
       tools: [],
     });
-    
+
     await agent.start();
   });
 
@@ -74,10 +74,10 @@ describe('Session Resumption with Agent API', () => {
     it('should use Agent.resumeOrCreateThread for session resumption', async () => {
       // Arrange
       const resumeOrCreateThreadSpy = vi.spyOn(agent, 'resumeOrCreateThread');
-      
+
       // Act
       await handleSessionWithAgent(agent, true);
-      
+
       // Assert
       expect(resumeOrCreateThreadSpy).toHaveBeenCalled();
     });
@@ -87,13 +87,13 @@ describe('Session Resumption with Agent API', () => {
       const existingThreadId = agent.getCurrentThreadId()!;
       threadManager.clearEvents(existingThreadId);
       threadManager.addEvent(existingThreadId, 'USER_MESSAGE', 'Previous message');
-      
+
       const eventSpy = vi.fn();
       agent.on('thread_event_added', eventSpy);
-      
+
       // Act
       const threadId = await handleSessionWithAgent(agent, existingThreadId);
-      
+
       // Assert
       expect(threadId).toBe(existingThreadId);
       expect(eventSpy).toHaveBeenCalledWith({
@@ -108,10 +108,10 @@ describe('Session Resumption with Agent API', () => {
     it('should create new thread when no existing thread specified', async () => {
       // Arrange
       const resumeOrCreateThreadSpy = vi.spyOn(agent, 'resumeOrCreateThread');
-      
+
       // Act
       const threadId = await handleSessionWithAgent(agent);
-      
+
       // Assert
       expect(threadId).toBeDefined();
       expect(resumeOrCreateThreadSpy).toHaveBeenCalledWith(undefined);
@@ -121,10 +121,10 @@ describe('Session Resumption with Agent API', () => {
       // Arrange
       const specificThreadId = 'test-thread-123';
       const resumeOrCreateThreadSpy = vi.spyOn(agent, 'resumeOrCreateThread');
-      
+
       // Act
       await handleSessionWithAgent(agent, specificThreadId);
-      
+
       // Assert
       expect(resumeOrCreateThreadSpy).toHaveBeenCalledWith(specificThreadId);
     });
