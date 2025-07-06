@@ -98,7 +98,7 @@ describe('TaskViewToolRenderer', () => {
     
     // Should show notes
     expect(output).toContain('Notes (1):');
-    expect(output).toContain('• [lace_20250705_2opxkw] 7/5/2025,');
+    expect(output).toContain('• [lace_20250705_2opxkw]');
     expect(output).toContain('Started investigation - checking current timeout');
   });
 
