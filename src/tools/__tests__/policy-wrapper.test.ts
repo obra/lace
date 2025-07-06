@@ -65,6 +65,27 @@ describe('Global Policy Wrapper', () => {
   });
 
   describe('policy precedence', () => {
+    it('should auto-approve safe internal tools', async () => {
+      // Create a mock tool with safeInternal annotation
+      const mockSafeTool = {
+        name: 'safe_tool',
+        annotations: { safeInternal: true },
+        description: 'A safe internal tool',
+        schema: {},
+        execute: async () => ({ content: [{ type: 'text', text: 'success' }], isError: false }),
+      };
+      
+      toolExecutor.registerTool('safe_tool', mockSafeTool as any);
+      
+      const options = baseCLIOptions; // No special policies
+      const policyCallback = createGlobalPolicyCallback(mockInterface, options, toolExecutor);
+
+      const result = await policyCallback.requestApproval('safe_tool', { param: 'value' });
+
+      expect(result).toBe(ApprovalDecision.ALLOW_ONCE);
+      expect(mockInterface.callLog).toHaveLength(0); // Should not call interface
+    });
+
     it('should deny tools when disableAllTools is true', async () => {
       const options = { ...baseCLIOptions, disableAllTools: true };
       const policyCallback = createGlobalPolicyCallback(mockInterface, options, toolExecutor);

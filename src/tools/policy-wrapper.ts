@@ -20,6 +20,12 @@ export function createGlobalPolicyCallback(
         return ApprovalDecision.ALLOW_SESSION;
       }
 
+      // 1.5. Check if tool is marked as safe internal
+      const tool = toolExecutor.getTool(toolName);
+      if (tool?.annotations?.safeInternal === true) {
+        return ApprovalDecision.ALLOW_ONCE;
+      }
+
       // 2. Check if all tools are disabled (highest policy precedence)
       if (cliOptions.disableAllTools) {
         return ApprovalDecision.DENY;
