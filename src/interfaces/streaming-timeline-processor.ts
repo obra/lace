@@ -6,15 +6,34 @@ import { ToolCall, ToolResult } from '../tools/types.js';
 import { logger } from '../utils/logger.js';
 import { Timeline, TimelineItem, TimelineProcessor } from './timeline-types.js';
 
+interface PerformanceMetrics {
+  totalAppendTime: number;
+  appendCount: number;
+  averageAppendTime: number;
+  maxAppendTime: number;
+  fastPathHits: number;
+  slowPathHits: number;
+}
+
 export class StreamingTimelineProcessor implements TimelineProcessor {
   private _timeline: TimelineItem[] = [];
   private _pendingToolCalls = new Map<string, { event: ThreadEvent; call: ToolCall }>();
   private _eventCount = 0;
+  private _metrics: PerformanceMetrics = {
+    totalAppendTime: 0,
+    appendCount: 0,
+    averageAppendTime: 0,
+    maxAppendTime: 0,
+    fastPathHits: 0,
+    slowPathHits: 0,
+  };
 
   /**
    * Append a single event for incremental processing (O(1))
    */
   appendEvent(event: ThreadEvent): void {
+    const startTime = performance.now();
+    
     logger.debug('StreamingTimelineProcessor.appendEvent', {
       eventType: event.type,
       eventId: event.id,
@@ -22,11 +41,18 @@ export class StreamingTimelineProcessor implements TimelineProcessor {
     });
 
     const newItems = this._processEvent(event);
-    this._timeline.push(...newItems);
+    
+    // For real-time events, insert in chronological order (O(1) for most cases)
+    if (newItems.length > 0) {
+      this._insertItemsInOrder(newItems);
+    }
+    
     this._eventCount++;
-
-    // Sort timeline to maintain chronological order
-    this._timeline.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    
+    // Track performance metrics
+    const endTime = performance.now();
+    const appendTime = endTime - startTime;
+    this._updateMetrics(appendTime);
   }
 
   /**
@@ -92,6 +118,70 @@ export class StreamingTimelineProcessor implements TimelineProcessor {
     this._timeline = [];
     this._pendingToolCalls.clear();
     this._eventCount = 0;
+    this._metrics = {
+      totalAppendTime: 0,
+      appendCount: 0,
+      averageAppendTime: 0,
+      maxAppendTime: 0,
+      fastPathHits: 0,
+      slowPathHits: 0,
+    };
+  }
+
+  /**
+   * Get performance metrics for monitoring
+   */
+  getMetrics(): PerformanceMetrics {
+    return { ...this._metrics };
+  }
+
+  /**
+   * Update performance metrics after append operation
+   */
+  private _updateMetrics(appendTime: number): void {
+    this._metrics.totalAppendTime += appendTime;
+    this._metrics.appendCount++;
+    this._metrics.averageAppendTime = this._metrics.totalAppendTime / this._metrics.appendCount;
+    this._metrics.maxAppendTime = Math.max(this._metrics.maxAppendTime, appendTime);
+  }
+
+  /**
+   * Efficiently insert items maintaining chronological order (O(1) for ordered insertions)
+   */
+  private _insertItemsInOrder(newItems: TimelineItem[]): void {
+    for (const item of newItems) {
+      // Fast path: if timeline is empty or item belongs at the end (common case for real-time events)
+      if (this._timeline.length === 0 || 
+          item.timestamp.getTime() >= this._timeline[this._timeline.length - 1].timestamp.getTime()) {
+        this._timeline.push(item);
+        this._metrics.fastPathHits++;
+      } else {
+        // Slow path: find insertion point (rare for real-time events)
+        const insertIndex = this._findInsertionPoint(item.timestamp);
+        this._timeline.splice(insertIndex, 0, item);
+        this._metrics.slowPathHits++;
+      }
+    }
+  }
+
+  /**
+   * Binary search to find insertion point for out-of-order events
+   */
+  private _findInsertionPoint(timestamp: Date): number {
+    let left = 0;
+    let right = this._timeline.length;
+    const targetTime = timestamp.getTime();
+    
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (this._timeline[mid].timestamp.getTime() <= targetTime) {
+        left = mid + 1;
+      } else {
+        right = mid;
+      }
+    }
+    
+    return left;
   }
 
   /**
