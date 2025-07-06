@@ -15,6 +15,7 @@ export interface ToolAnnotations {
   destructiveHint?: boolean;
   idempotentHint?: boolean;
   openWorldHint?: boolean;
+  safeInternal?: boolean;
 }
 
 export interface ToolCall {

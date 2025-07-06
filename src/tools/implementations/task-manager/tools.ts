@@ -40,6 +40,9 @@ export class TaskCreateTool extends Tool {
   name = 'task_add';
   description = 'Create a new task with detailed instructions for execution';
   schema = createTaskSchema;
+  annotations = {
+    safeInternal: true,
+  };
 
   private async getPersistence(): Promise<DatabasePersistence> {
     return getPersistence();
@@ -101,6 +104,9 @@ export class TaskListTool extends Tool {
   name = 'task_list';
   description = 'List tasks filtered by assignment, creation, or thread';
   schema = listTasksSchema;
+  annotations = {
+    safeInternal: true,
+  };
 
   private async getPersistence(): Promise<DatabasePersistence> {
     return getPersistence();
@@ -208,6 +214,9 @@ export class TaskCompleteTool extends Tool {
   name = 'task_complete';
   description = 'Mark a task as completed';
   schema = completeTaskSchema;
+  annotations = {
+    safeInternal: true,
+  };
 
   private async getPersistence(): Promise<DatabasePersistence> {
     return getPersistence();
@@ -255,6 +264,9 @@ export class TaskUpdateTool extends Tool {
   name = 'task_update';
   description = 'Update task properties (status, assignment, priority, etc.)';
   schema = updateTaskSchema;
+  annotations = {
+    safeInternal: true,
+  };
 
   private async getPersistence(): Promise<DatabasePersistence> {
     return getPersistence();
@@ -313,6 +325,9 @@ export class TaskAddNoteTool extends Tool {
   name = 'task_add_note';
   description = 'Add a note to a task for communication between agents';
   schema = addNoteSchema;
+  annotations = {
+    safeInternal: true,
+  };
 
   private async getPersistence(): Promise<DatabasePersistence> {
     return getPersistence();
@@ -354,6 +369,9 @@ export class TaskViewTool extends Tool {
   name = 'task_view';
   description = 'View detailed information about a specific task';
   schema = viewTaskSchema;
+  annotations = {
+    safeInternal: true,
+  };
 
   private async getPersistence(): Promise<DatabasePersistence> {
     return getPersistence();
