@@ -187,4 +187,100 @@ describe('Agent Thread Events', () => {
       expect(eventSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe('thread management API', () => {
+    it('should provide getCurrentThreadId method', () => {
+      // Act
+      const threadId = agent.getCurrentThreadId();
+      
+      // Assert
+      expect(threadId).toBe(threadManager.getCurrentThreadId());
+      expect(typeof threadId).toBe('string');
+    });
+
+    it('should provide getThreadEvents method', () => {
+      // Arrange
+      const threadId = threadManager.getCurrentThreadId()!;
+      threadManager.clearEvents(threadId);
+      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test message');
+      
+      // Act
+      const events = agent.getThreadEvents();
+      
+      // Assert
+      expect(events).toHaveLength(1);
+      expect(events[0].type).toBe('USER_MESSAGE');
+      expect(events[0].data).toBe('Test message');
+    });
+
+    it('should provide getThreadEvents with specific threadId', () => {
+      // Arrange
+      const threadId = threadManager.getCurrentThreadId()!;
+      threadManager.clearEvents(threadId);
+      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Specific thread message');
+      
+      // Act
+      const events = agent.getThreadEvents(threadId);
+      
+      // Assert
+      expect(events).toHaveLength(1);
+      expect(events[0].data).toBe('Specific thread message');
+    });
+
+    it('should provide generateThreadId method', () => {
+      // Act
+      const threadId = agent.generateThreadId();
+      
+      // Assert
+      expect(typeof threadId).toBe('string');
+      expect(threadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
+    });
+
+    it('should provide createThread method', () => {
+      // Arrange
+      const newThreadId = agent.generateThreadId();
+      
+      // Act
+      agent.createThread(newThreadId);
+      
+      // Assert
+      const thread = threadManager.getThread(newThreadId);
+      expect(thread).toBeDefined();
+      expect(thread!.id).toBe(newThreadId);
+    });
+
+    it('should provide resumeOrCreateThread method that replays events on resume', async () => {
+      // Arrange
+      const existingThreadId = threadManager.getCurrentThreadId()!;
+      threadManager.clearEvents(existingThreadId);
+      threadManager.addEvent(existingThreadId, 'USER_MESSAGE', 'Existing message');
+      
+      const eventSpy = vi.fn();
+      agent.on('thread_event_added', eventSpy);
+      
+      // Act
+      const result = await agent.resumeOrCreateThread(existingThreadId);
+      
+      // Assert
+      expect(result.threadId).toBe(existingThreadId);
+      expect(result.isResumed).toBe(true);
+      expect(eventSpy).toHaveBeenCalledWith({
+        event: expect.objectContaining({
+          type: 'USER_MESSAGE',
+          data: 'Existing message',
+        }),
+        threadId: existingThreadId,
+      });
+    });
+
+    it('should provide resumeOrCreateThread method that creates new thread when needed', async () => {
+      // Act
+      const result = await agent.resumeOrCreateThread();
+      
+      // Assert
+      expect(result.threadId).toBeDefined();
+      expect(result.isResumed).toBe(false);
+      expect(typeof result.threadId).toBe('string');
+    });
+  });
 });

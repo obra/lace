@@ -7,7 +7,7 @@ import { ToolCall, ToolResult } from '../tools/types.js';
 import { Tool } from '../tools/tool.js';
 import { ToolExecutor } from '../tools/executor.js';
 import { ApprovalDecision } from '../tools/approval-types.js';
-import { ThreadManager } from '../threads/thread-manager.js';
+import { ThreadManager, ThreadSessionInfo } from '../threads/thread-manager.js';
 import { ThreadEvent, asThreadId } from '../threads/types.js';
 import { logger } from '../utils/logger.js';
 import { StopReasonHandler } from '../token-management/stop-reason-handler.js';
@@ -1266,6 +1266,35 @@ export class Agent extends EventEmitter {
       threadId: this._threadId,
       eventsReplayed: events.length,
     });
+  }
+
+  // Thread management API - proxies to ThreadManager
+  getCurrentThreadId(): string | null {
+    return this._threadManager.getCurrentThreadId();
+  }
+  
+  getThreadEvents(threadId?: string): ThreadEvent[] {
+    const targetThreadId = threadId || this._getActiveThreadId();
+    return this._threadManager.getEvents(targetThreadId);
+  }
+  
+  generateThreadId(): string {
+    return this._threadManager.generateThreadId();
+  }
+  
+  createThread(threadId: string): void {
+    this._threadManager.createThread(threadId);
+  }
+  
+  async resumeOrCreateThread(threadId?: string): Promise<ThreadSessionInfo> {
+    const result = await this._threadManager.resumeOrCreate(threadId);
+    
+    // If resuming existing thread, replay events for UI
+    if (result.isResumed) {
+      await this.replaySessionEvents();
+    }
+    
+    return result;
   }
 
   /**
