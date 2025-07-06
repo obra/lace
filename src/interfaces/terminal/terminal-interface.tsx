@@ -281,7 +281,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
   // Sync events from agent's thread (including delegate threads)
   const syncEvents = useCallback(() => {
-    const threadId = agent.threadManager.getCurrentThreadId();
+    const threadId = agent.getCurrentThreadId();
     if (threadId) {
       const threadEvents = agent.threadManager.getMainAndDelegateEvents(threadId);
       setEvents([...threadEvents]);
@@ -290,9 +290,9 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
   // Initialize token counts for resumed conversations
   useEffect(() => {
-    const threadId = agent.threadManager.getCurrentThreadId();
+    const threadId = agent.getCurrentThreadId();
     if (threadId) {
-      const events = agent.threadManager.getEvents(threadId);
+      const events = agent.getThreadEvents(threadId);
       
       // If we have existing events, estimate the current context size
       if (events.length > 0) {
@@ -461,7 +461,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     const handleError = ({ error }: { error: Error }) => {
-      const threadId = agent.threadManager.getCurrentThreadId();
+      const threadId = agent.getCurrentThreadId();
       if (threadId) {
         agent.threadManager.addEvent(
           threadId,
@@ -802,25 +802,28 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
   }, [agent, addMessage, syncEvents, streamingContent]);
 
-  // Listen to ThreadManager events for real-time delegation updates
+  // Listen to Agent events for real-time updates
   useEffect(() => {
-    const handleThreadUpdated = ({
+    const handleEventAdded = ({
+      event,
       threadId,
-      eventType,
     }: {
+      event: ThreadEvent;
       threadId: string;
-      eventType: string;
     }) => {
-      // Sync events whenever ANY thread is updated (main or delegate)
-      syncEvents();
+      const currentThreadId = agent.getCurrentThreadId();
+      if (threadId === currentThreadId) {
+        // Sync events when current thread is updated
+        syncEvents();
+      }
     };
 
-    agent.threadManager.on('thread_updated', handleThreadUpdated);
+    agent.on('thread_event_added', handleEventAdded);
 
     return () => {
-      agent.threadManager.off('thread_updated', handleThreadUpdated);
+      agent.off('thread_event_added', handleEventAdded);
     };
-  }, [agent.threadManager, syncEvents]);
+  }, [agent, syncEvents]);
 
   // Get Ink app instance for proper exit handling
   const app = useApp();
@@ -840,8 +843,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
       clearSession(): void {
         // Create new thread and agent
-        const newThreadId = agent.threadManager.generateThreadId();
-        agent.threadManager.createThread(newThreadId);
+        const newThreadId = agent.generateThreadId();
+        agent.createThread(newThreadId);
         // Reset React state
         setEvents([]);
         setEphemeralMessages([]);
@@ -1056,7 +1059,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             <StatusBar
               providerName={agent.providerName || 'unknown'}
               modelName={agent.provider?.modelName || undefined}
-              threadId={agent.threadManager.getCurrentThreadId() || undefined}
+              threadId={agent.getCurrentThreadId() || undefined}
               cumulativeTokens={cumulativeTokens}
               isProcessing={isProcessing}
               messageCount={events.length + ephemeralMessages.length}
