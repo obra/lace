@@ -3,6 +3,7 @@
 
 import React, { useEffect, ReactNode, useRef } from 'react';
 import { useLaceFocusContext } from './focus-provider.js';
+import { useLaceFocus } from './use-lace-focus.js';
 import { logger } from '../../../utils/logger.js';
 
 /**
@@ -30,6 +31,13 @@ interface FocusLifecycleWrapperProps {
    * - false: hide children when inactive (for modals)
    */
   renderWhenInactive?: boolean;
+  
+  /**
+   * Whether to automatically take focus when becoming active
+   * - true: automatically focus when isActive becomes true (for modals)
+   * - false: only push onto focus stack, don't auto-focus (default)
+   */
+  autoFocus?: boolean;
   
   /**
    * Optional callback when focus is activated
@@ -91,10 +99,12 @@ export function FocusLifecycleWrapper({
   isActive,
   children,
   renderWhenInactive = false,
+  autoFocus = false,
   onFocusActivated,
   onFocusRestored,
 }: FocusLifecycleWrapperProps) {
   const { pushFocus, popFocus } = useLaceFocusContext();
+  const { takeFocus } = useLaceFocus(focusId);
   const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isActiveRef = useRef(isActive);
   
@@ -118,8 +128,18 @@ export function FocusLifecycleWrapper({
       // Component is becoming active - push focus
       logger.debug('FocusLifecycleWrapper: calling pushFocus', {
         focusId,
+        autoFocus,
       });
       pushFocus(focusId);
+      
+      // Auto-focus if requested
+      if (autoFocus) {
+        logger.debug('FocusLifecycleWrapper: auto-focusing component', {
+          focusId,
+        });
+        takeFocus();
+      }
+      
       onFocusActivated?.();
       
       // Return cleanup function for when component becomes inactive
