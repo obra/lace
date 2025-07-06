@@ -1246,6 +1246,29 @@ export class Agent extends EventEmitter {
   }
 
   /**
+   * Replay all historical events from current thread for session resumption
+   * Used during --continue and post-compaction state rebuilding
+   */
+  async replaySessionEvents(): Promise<void> {
+    const events = this._threadManager.getEvents(this._getActiveThreadId());
+    
+    logger.debug('Agent: Replaying session events', {
+      threadId: this._threadId,
+      eventCount: events.length,
+    });
+    
+    // Emit each historical event for UI rebuilding
+    for (const event of events) {
+      this.emit('thread_event_added', { event, threadId: event.threadId });
+    }
+    
+    logger.debug('Agent: Session replay complete', {
+      threadId: this._threadId,
+      eventsReplayed: events.length,
+    });
+  }
+
+  /**
    * Helper method to add event to ThreadManager and emit Agent event
    * This ensures Agent is the single event source for UI updates
    */

@@ -103,4 +103,88 @@ describe('Agent Thread Events', () => {
       expect(firstCall.event.threadId).toBe(secondCall.event.threadId);
     });
   });
+
+  describe('replaySessionEvents', () => {
+    it('should emit thread_event_added for all historical events', async () => {
+      // Arrange - Clear existing events and add test events
+      const threadId = threadManager.getCurrentThreadId()!;
+      threadManager.clearEvents(threadId);
+      
+      threadManager.addEvent(threadId, 'USER_MESSAGE', 'First message');
+      threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'First response');
+      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Second message');
+      
+      const eventSpy = vi.fn();
+      agent.on('thread_event_added', eventSpy);
+      
+      // Act
+      await agent.replaySessionEvents();
+      
+      // Assert
+      expect(eventSpy).toHaveBeenCalledTimes(3);
+      expect(eventSpy).toHaveBeenNthCalledWith(1, {
+        event: expect.objectContaining({
+          type: 'USER_MESSAGE',
+          data: 'First message',
+        }),
+        threadId,
+      });
+      expect(eventSpy).toHaveBeenNthCalledWith(2, {
+        event: expect.objectContaining({
+          type: 'AGENT_MESSAGE',
+          data: 'First response',
+        }),
+        threadId,
+      });
+      expect(eventSpy).toHaveBeenNthCalledWith(3, {
+        event: expect.objectContaining({
+          type: 'USER_MESSAGE',
+          data: 'Second message',
+        }),
+        threadId,
+      });
+    });
+
+    it('should replay events in chronological order', async () => {
+      // Arrange - Clear existing events and create test events with different timestamps
+      const threadId = threadManager.getCurrentThreadId()!;
+      threadManager.clearEvents(threadId);
+      
+      const event1 = threadManager.addEvent(threadId, 'USER_MESSAGE', 'Message 1');
+      const event2 = threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Response 1');
+      const event3 = threadManager.addEvent(threadId, 'USER_MESSAGE', 'Message 2');
+      
+      const eventSpy = vi.fn();
+      agent.on('thread_event_added', eventSpy);
+      
+      // Act
+      await agent.replaySessionEvents();
+      
+      // Assert - Events should be emitted in chronological order
+      expect(eventSpy).toHaveBeenCalledTimes(3);
+      const calls = eventSpy.mock.calls.map(call => call[0].event);
+      
+      expect(calls[0].timestamp.getTime()).toBeLessThanOrEqual(calls[1].timestamp.getTime());
+      expect(calls[1].timestamp.getTime()).toBeLessThanOrEqual(calls[2].timestamp.getTime());
+      
+      expect(calls[0].id).toBe(event1.id);
+      expect(calls[1].id).toBe(event2.id);
+      expect(calls[2].id).toBe(event3.id);
+    });
+
+    it('should handle empty thread gracefully', async () => {
+      // Arrange - Clear thread to make it empty
+      const threadId = threadManager.getCurrentThreadId()!;
+      threadManager.clearEvents(threadId);
+      
+      const eventSpy = vi.fn();
+      agent.on('thread_event_added', eventSpy);
+      
+      // Act
+      await agent.replaySessionEvents();
+      
+      // Assert
+      expect(eventSpy).not.toHaveBeenCalled();
+    });
+  });
 });
