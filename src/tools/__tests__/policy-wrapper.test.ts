@@ -74,9 +74,9 @@ describe('Global Policy Wrapper', () => {
         schema: {},
         execute: async () => ({ content: [{ type: 'text', text: 'success' }], isError: false }),
       };
-      
+
       toolExecutor.registerTool('safe_tool', mockSafeTool as any);
-      
+
       const options = baseCLIOptions; // No special policies
       const policyCallback = createGlobalPolicyCallback(mockInterface, options, toolExecutor);
 
