@@ -157,9 +157,7 @@ export class ThreadManager extends EventEmitter {
       console.error('Failed to save event:', error);
     }
 
-    // Emit events for UI synchronization
-    this.emit('event_added', { event, threadId });
-    this.emit('thread_updated', { threadId, eventType: type });
+    // Event emission removed - Agent will handle event emission for UI synchronization
 
     return event;
   }
