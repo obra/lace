@@ -3,6 +3,7 @@ import typescript from '@typescript-eslint/eslint-plugin';
 import typescriptParser from '@typescript-eslint/parser';
 import prettier from 'eslint-plugin-prettier';
 import prettierConfig from 'eslint-config-prettier';
+import noRelativeImportPaths from 'eslint-plugin-no-relative-import-paths';
 import globals from 'globals';
 
 export default [
@@ -18,6 +19,12 @@ export default [
     plugins: {
       '@typescript-eslint': typescript,
       prettier,
+      'no-relative-import-paths': noRelativeImportPaths,
+    },
+    settings: {
+      'import/resolver': {
+        typescript: {}
+      }
     },
     rules: {
       ...typescript.configs.recommended.rules,
@@ -26,6 +33,18 @@ export default [
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-explicit-any': 'warn',
+      'no-relative-import-paths/no-relative-import-paths': [
+        'warn',
+        { allowSameFolder: true, rootDir: 'src', prefix: '~' }
+      ],
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: ['../*'],
+            message: 'Use ~ alias instead of relative parent imports'
+          }
+        ]
+      }]
     },
   },
   {
