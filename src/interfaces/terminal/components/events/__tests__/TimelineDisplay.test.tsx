@@ -5,7 +5,7 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import TimelineDisplay from '../TimelineDisplay.js';
-import { Timeline, TimelineItem } from '../../../../thread-processor.js';
+import { Timeline, TimelineItem } from '../../../../timeline-types.js';
 import { LaceFocusProvider } from '../../../focus/focus-provider.js';
 
 // Mock expansion hooks

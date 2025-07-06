@@ -3,7 +3,7 @@
 
 import React, { Component, ReactNode } from 'react';
 import { GenericToolRenderer } from './tool-renderers/GenericToolRenderer.js';
-import { Timeline } from '../../../thread-processor.js';
+import { Timeline } from '../../../timeline-types.js';
 
 interface ToolRendererErrorBoundaryProps {
   children: ReactNode;

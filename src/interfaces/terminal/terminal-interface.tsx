@@ -27,6 +27,7 @@ import { CommandExecutor } from '../../commands/executor.js';
 import type { UserInterface } from '../../commands/types.js';
 import { ThreadEvent } from '../../threads/types.js';
 import { ThreadProcessor } from '../thread-processor.js';
+import { StreamingTimelineProcessor } from '../streaming-timeline-processor.js';
 import { LaceFocusProvider } from './focus/index.js';
 import { useProjectContext } from './hooks/use-project-context.js';
 import { logger } from '../../utils/logger.js';
@@ -38,6 +39,17 @@ export const useThreadProcessor = (): ThreadProcessor => {
   const processor = useContext(ThreadProcessorContext);
   if (!processor) {
     throw new Error('useThreadProcessor must be used within ThreadProcessorContext.Provider');
+  }
+  return processor;
+};
+
+// StreamingTimelineProcessor context for O(1) timeline processing
+const StreamingTimelineProcessorContext = createContext<StreamingTimelineProcessor | null>(null);
+
+export const useStreamingTimelineProcessor = (): StreamingTimelineProcessor => {
+  const processor = useContext(StreamingTimelineProcessorContext);
+  if (!processor) {
+    throw new Error('useStreamingTimelineProcessor must be used within StreamingTimelineProcessorContext.Provider');
   }
   return processor;
 };
@@ -156,6 +168,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 }) => {
   // Create one ThreadProcessor instance per interface
   const threadProcessor = useMemo(() => new ThreadProcessor(), []);
+  // Create StreamingTimelineProcessor for O(1) timeline processing
+  const streamingTimelineProcessor = useMemo(() => new StreamingTimelineProcessor(), []);
   const bottomSectionRef = useRef<any>(null);
   const timelineContainerRef = useRef<any>(null);
   const [bottomSectionHeight, setBottomSectionHeight] = useState<number>(0);
@@ -977,6 +991,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   return (
     <LaceFocusProvider>
       <ThreadProcessorContext.Provider value={threadProcessor}>
+        <StreamingTimelineProcessorContext.Provider value={streamingTimelineProcessor}>
           <InterfaceContext.Provider value={{ showAlert, clearAlert }}>
         {/* SIGINT Handler */}
         <SigintHandler agent={agent} showAlert={showAlert} />
@@ -1002,7 +1017,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             */}
             <TimelineExpansionProvider>
               <ConversationDisplay
-              events={events}
               ephemeralMessages={[
                 ...ephemeralMessages,
                 // Add streaming content as ephemeral message
@@ -1088,6 +1102,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
           </Box>
         </Box>
           </InterfaceContext.Provider>
+        </StreamingTimelineProcessorContext.Provider>
       </ThreadProcessorContext.Provider>
     </LaceFocusProvider>
   );

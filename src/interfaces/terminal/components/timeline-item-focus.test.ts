@@ -9,7 +9,7 @@ import {
   extractDelegateThreadId,
   isDelegateToolExecution,
 } from './timeline-item-focus.js';
-import { TimelineItem } from '../../thread-processor.js';
+import { TimelineItem } from '../../timeline-types.js';
 import { FocusRegions } from '../focus/index.js';
 
 describe('timeline-item-focus', () => {

@@ -3,7 +3,7 @@
 
 import React, { useRef, useCallback, useMemo } from 'react';
 import { Box } from 'ink';
-import { Timeline, TimelineItem as TimelineItemType } from '../../../thread-processor.js';
+import { Timeline, TimelineItem as TimelineItemType } from '../../../timeline-types.js';
 import { TimelineItem } from './TimelineItem.js';
 import { TimelineItemRef } from '../timeline-item-focus.js';
 

@@ -4,7 +4,7 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TimelineContent } from './TimelineContent.js';
-import { Timeline } from '../../../thread-processor.js';
+import { Timeline } from '../../../timeline-types.js';
 
 // Mock TimelineItem since we're testing ref management, not item rendering
 vi.mock('./TimelineItem.js', () => ({

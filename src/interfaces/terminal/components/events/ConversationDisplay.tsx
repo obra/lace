@@ -1,11 +1,10 @@
-// ABOUTME: Performance-optimized conversation display using ThreadProcessor with caching
-// ABOUTME: Processes thread events only when changed, ephemeral messages on every render
+// ABOUTME: O(1) conversation display using StreamingTimelineProcessor for optimal performance
+// ABOUTME: Eliminates O(n) reprocessing by using incremental timeline updates
 
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo } from 'react';
 import { Box } from 'ink';
-import { ThreadEvent } from '../../../../threads/types.js';
-import { ThreadProcessor, Timeline, ProcessedThreadItems } from '../../../thread-processor.js';
-import { useThreadProcessor } from '../../terminal-interface.js';
+import { Timeline, EphemeralMessage } from '../../../timeline-types.js';
+import { useStreamingTimelineProcessor } from '../../terminal-interface.js';
 import TimelineDisplay from './TimelineDisplay.js';
 
 interface Message {
@@ -15,46 +14,65 @@ interface Message {
 }
 
 interface ConversationDisplayProps {
-  events: ThreadEvent[];
   ephemeralMessages: Message[];
   bottomSectionHeight?: number;
   isTimelineLayoutDebugVisible?: boolean;
 }
 
 export function ConversationDisplay({
-  events,
   ephemeralMessages,
   bottomSectionHeight,
   isTimelineLayoutDebugVisible,
 }: ConversationDisplayProps) {
-  // Use shared ThreadProcessor from context
-  const threadProcessor = useThreadProcessor();
+  // Use StreamingTimelineProcessor for O(1) timeline access
+  const streamingProcessor = useStreamingTimelineProcessor();
 
-  // Process main thread only
-  const mainThreadProcessed = useMemo(() => {
-    return threadProcessor.processThreads(events);
-  }, [events, threadProcessor]);
+  // Get current timeline state (O(1) operation)
+  const timeline = useMemo(() => {
+    return streamingProcessor.getTimeline();
+  }, [streamingProcessor]);
 
-  // Process ephemeral messages (main thread only)
-  const ephemeralItems = useMemo(() => {
-    return threadProcessor.processEphemeralEvents(ephemeralMessages);
-  }, [ephemeralMessages, threadProcessor]);
+  // Convert ephemeral messages to EphemeralMessage format and merge into timeline
+  const finalTimeline = useMemo(() => {
+    if (ephemeralMessages.length === 0) {
+      return timeline;
+    }
 
-  // Build main timeline with ephemeral messages
-  const mainTimeline = useMemo(() => {
-    // Filter out ephemeral items to get proper ProcessedThreadItems type
-    const processedItems = mainThreadProcessed.items.filter(
-      (item): item is Exclude<typeof item, { type: 'ephemeral_message' }> => 
-        item.type !== 'ephemeral_message'
-    ) as ProcessedThreadItems;
-    
-    return threadProcessor.buildTimeline(processedItems, ephemeralItems);
-  }, [mainThreadProcessed, ephemeralItems, threadProcessor]);
+    // Convert Message[] to EphemeralMessage[] format
+    const ephemeralItems: EphemeralMessage[] = ephemeralMessages.map(msg => ({
+      type: msg.type,
+      content: msg.content,
+      timestamp: msg.timestamp,
+    }));
+
+    // Create ephemeral timeline items
+    const ephemeralTimelineItems = ephemeralItems.map(msg => ({
+      type: 'ephemeral_message' as const,
+      messageType: msg.type,
+      content: msg.content,
+      timestamp: msg.timestamp,
+    }));
+
+    // Merge with existing timeline and sort chronologically
+    const allItems = [...timeline.items, ...ephemeralTimelineItems].sort(
+      (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+    );
+
+    return {
+      items: allItems,
+      metadata: {
+        ...timeline.metadata,
+        lastActivity: allItems.length > 0 
+          ? new Date(Math.max(...allItems.map(item => item.timestamp.getTime())))
+          : timeline.metadata.lastActivity,
+      },
+    };
+  }, [timeline, ephemeralMessages]);
 
   return (
     <Box flexDirection="column" flexGrow={1} overflow="hidden">
       <TimelineDisplay
-        timeline={mainTimeline}
+        timeline={finalTimeline}
         bottomSectionHeight={bottomSectionHeight}
         isTimelineLayoutDebugVisible={isTimelineLayoutDebugVisible}
       />

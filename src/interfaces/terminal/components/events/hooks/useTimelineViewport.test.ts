@@ -4,7 +4,7 @@
 import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Timeline } from '../../../../thread-processor.js';
+import { Timeline } from '../../../../timeline-types.js';
 
 // Mock Ink's measureElement function before importing the hook
 vi.mock('ink', () => ({

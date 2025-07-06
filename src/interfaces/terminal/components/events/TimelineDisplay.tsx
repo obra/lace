@@ -2,7 +2,7 @@
 // ABOUTME: Renders timeline content with item interaction handling, viewport managed by TimelineViewport
 
 import React, { useCallback } from 'react';
-import { Timeline } from '../../../thread-processor.js';
+import { Timeline } from '../../../timeline-types.js';
 import { TimelineViewport } from './TimelineViewport.js';
 import { TimelineContent } from './TimelineContent.js';
 import { useExpansionExpand, useExpansionCollapse, useTimelineFocusEntry } from './hooks/useTimelineExpansionToggle.js';

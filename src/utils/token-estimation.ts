@@ -1,7 +1,7 @@
 // ABOUTME: Token estimation utilities for UI display and analysis
 // ABOUTME: Provides consistent token counting across components
 
-import { Timeline } from '../interfaces/thread-processor.js';
+import { Timeline } from '../interfaces/timeline-types.js';
 
 /**
  * Estimate token count for text content

@@ -5,7 +5,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { Text } from 'ink';
-import { Timeline, TimelineItem } from '../../../../thread-processor.js';
+import { Timeline, TimelineItem } from '../../../../timeline-types.js';
 import { TimelineContent } from '../TimelineContent.js';
 import { LaceFocusProvider } from '../../../focus/focus-provider.js';
 

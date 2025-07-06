@@ -3,7 +3,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { measureElement, DOMElement } from 'ink';
-import { Timeline } from '../../../../thread-processor.js';
+import { Timeline } from '../../../../timeline-types.js';
 
 export interface ViewportState {
   selectedLine: number;

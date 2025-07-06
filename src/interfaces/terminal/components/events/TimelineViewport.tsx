@@ -4,7 +4,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Box, useInput, Text, useFocus } from 'ink';
 import useStdoutDimensions from '../../../../utils/use-stdout-dimensions.js';
-import { Timeline } from '../../../thread-processor.js';
+import { Timeline } from '../../../timeline-types.js';
 import { useTimelineViewport } from './hooks/useTimelineViewport.js';
 import { logger } from '../../../../utils/logger.js';
 import { FocusRegions, useLaceFocus, useLaceFocusContext } from '../../focus/index.js';

@@ -125,6 +125,7 @@ describe('StreamingTimelineProcessor', () => {
       const toolResult: ToolResult = {
         id: 'call-123',
         content: [{ type: 'text', text: 'Tool result' }],
+        isError: false,
       };
 
       const events: ThreadEvent[] = [
@@ -163,6 +164,7 @@ describe('StreamingTimelineProcessor', () => {
       const toolResult: ToolResult = {
         id: 'orphaned-call',
         content: [{ type: 'text', text: 'Orphaned result' }],
+        isError: false,
       };
 
       const events: ThreadEvent[] = [

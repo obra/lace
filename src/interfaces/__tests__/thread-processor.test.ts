@@ -3,11 +3,11 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  ThreadProcessor,
   ProcessedThreadItems,
   EphemeralTimelineItems,
   EphemeralMessage,
-} from '../thread-processor.js';
+} from '../timeline-types.js';
+import { ThreadProcessor } from '../thread-processor.js';
 import { ThreadEvent } from '../../threads/types.js';
 import { ToolCall, ToolResult } from '../../tools/types.js';
 
