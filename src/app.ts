@@ -151,13 +151,48 @@ async function handleSession(
   return threadId;
 }
 
+async function handleSessionWithAgent(
+  agent: Agent,
+  continueMode?: boolean | string
+): Promise<string> {
+  let continueThreadId: string | undefined;
+  if (continueMode) {
+    if (typeof continueMode === 'string') {
+      continueThreadId = continueMode;
+    } else {
+      // For now, we can't get latest thread ID through Agent API
+      // This would require adding getLatestThreadId to Agent API
+      continueThreadId = await agent.threadManager.getLatestThreadId() || undefined;
+    }
+  }
+
+  const sessionInfo = await agent.resumeOrCreateThread(continueThreadId);
+  const { threadId } = sessionInfo;
+
+  if (sessionInfo.isResumed) {
+    console.log(`📖 Continuing conversation ${threadId}`);
+  } else if (sessionInfo.resumeError) {
+    console.warn(`⚠️  ${sessionInfo.resumeError}`);
+    console.log(`🆕 Starting new conversation ${threadId}`);
+  } else {
+    console.log(`🆕 Starting conversation ${threadId}`);
+  }
+
+  return threadId;
+}
+
 export async function run(options: CLIOptions): Promise<void> {
   await initializeServices(options);
 
   const threadManager = new ThreadManager(getLaceDbPath());
-  const threadId = await handleSession(threadManager, options.continue);
-
-  const agent = await setupAgent(options, threadId, threadManager);
+  
+  // Create a temporary agent to handle session resumption
+  const tempThreadId = threadManager.generateThreadId();
+  threadManager.createThread(tempThreadId);
+  const agent = await setupAgent(options, tempThreadId, threadManager);
+  
+  // Use Agent to handle session resumption with automatic replay
+  const sessionThreadId = await handleSessionWithAgent(agent, options.continue);
 
   if (options.prompt) {
     const nonInteractive = new NonInteractiveInterface(agent);
