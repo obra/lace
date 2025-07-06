@@ -25,28 +25,29 @@ This document outlines the comprehensive implementation plan for adding custom t
 
 ## Implementation Steps
 
-### Phase 1: Add Safe Internal Tool Annotation System
+### Phase 1: Add Safe Internal Tool Annotation System ✅ COMPLETE
 
-#### 1.1 Update Tool Type System
+#### 1.1 Update Tool Type System ✅ COMPLETE
 - **File**: `src/tools/types.ts`
 - **Changes**: Add `safeInternal?: boolean` to `ToolAnnotations` interface
 - **Purpose**: Enable tools to bypass approval prompts
 
-#### 1.2 Update Task Management Tools
-- **Files**: All task management tool implementations
-  - `src/tools/implementations/task-manager/task-add.ts`
-  - `src/tools/implementations/task-manager/task-list.ts`
-  - `src/tools/implementations/task-manager/task-view.ts`
-  - `src/tools/implementations/task-manager/task-update.ts`
-  - `src/tools/implementations/task-manager/task-add-note.ts`
-  - `src/tools/implementations/task-manager/task-complete.ts`
+#### 1.2 Update Task Management Tools ✅ COMPLETE
+- **Files**: All task management tool implementations in `src/tools/implementations/task-manager/tools.ts`
+  - `TaskCreateTool` (task_add)
+  - `TaskListTool` (task_list)
+  - `TaskViewTool` (task_view)
+  - `TaskUpdateTool` (task_update)
+  - `TaskAddNoteTool` (task_add_note)
+  - `TaskCompleteTool` (task_complete)
 - **Changes**: Add `annotations: { safeInternal: true }` to each tool class
 - **Purpose**: Mark all task tools as safe internal to bypass approval
 
-#### 1.3 Update Tool Processing Logic
-- **Files**: Need to identify where tool approval logic exists
-- **Changes**: Check for `safeInternal` annotation and skip approval prompts
+#### 1.3 Update Tool Processing Logic ✅ COMPLETE
+- **File**: `src/tools/policy-wrapper.ts`
+- **Changes**: Added safe internal check at step 1.5 in policy flow
 - **Purpose**: Implement the safe internal behavior
+- **Test Coverage**: Added comprehensive test in `policy-wrapper.test.ts`
 
 ### Phase 2: Implement Task Tool Renderers
 
