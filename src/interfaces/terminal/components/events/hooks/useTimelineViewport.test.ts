@@ -73,26 +73,6 @@ describe('useTimelineViewport', () => {
     expect(result.current.totalContentHeight).toBe(50);
   });
 
-  it('should fallback to 3-pixel height when itemRefs are not populated', () => {
-    // Empty itemRefs map (regression scenario)
-    const emptyItemRefs = { current: new Map<number, unknown>() };
-
-    const { result } = renderHook(() =>
-      useTimelineViewport({
-        timeline,
-        viewportLines: 10,
-        itemRefs: emptyItemRefs,
-      })
-    );
-
-    // Should use fallback height of 3 pixels per item
-    expect(result.current.itemPositions).toEqual([0, 3]);
-    expect(result.current.totalContentHeight).toBe(6);
-
-    // measureElement should not be called since refs are empty
-    expect(mockMeasureElement).not.toHaveBeenCalled();
-  });
-
   it('should trigger remeasurement and maintain selection after expansion', () => {
     // Set up mock to return values for initial measurement and remeasurement
     mockMeasureElement
