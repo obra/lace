@@ -34,8 +34,8 @@ export default [
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-relative-import-paths/no-relative-import-paths': [
-        'warn',
-        { allowSameFolder: true, rootDir: 'src', prefix: '~' }
+        'error',
+        { allowSameFolder: false, rootDir: 'src', prefix: '~' }
       ],
       'no-restricted-imports': ['error', {
         patterns: [

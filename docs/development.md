@@ -97,6 +97,30 @@ Never skip or disable pre-commit hooks.
 - Match the style of surrounding code
 - Never remove code comments unless they're actively false
 
+### Import Style
+
+Use `~/*` path aliases for all internal imports instead of relative paths:
+
+```typescript
+// ✅ Good: Use ~ alias
+import { Agent } from '~/agents/agent.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
+
+// ❌ Bad: Relative paths
+import { Agent } from '../../agents/agent.js';
+import { ToolExecutor } from '../tools/executor.js';
+import { TimelineEntry } from '../../../ui/TimelineEntry.js';
+```
+
+Benefits:
+- **Readable**: Clear what module you're importing
+- **Refactor-safe**: Imports don't break when moving files
+- **Consistent**: All imports follow the same pattern
+- **Maintainable**: Easier to track dependencies
+
+The `~` prefix maps to `src/` via TypeScript path mapping in `tsconfig.json`.
+
 ### Architecture Patterns
 
 - **Event-sourcing**: All conversations are immutable event sequences

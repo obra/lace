@@ -40,6 +40,12 @@ Good naming is VERY VERY important. Think hard about naming things. It's always 
 - Pre-commit hooks automatically run linting, formatting, and related tests
 - All code must pass TypeScript strict mode compilation
 
+### Import Style
+- Use `~/*` path aliases for internal imports instead of relative paths
+- Example: `import { Agent } from '~/agents/agent.js'` instead of `import { Agent } from '../../agents/agent.js'`
+- This makes imports more readable and prevents breakage when moving files
+- The `~` prefix maps to the `src/` directory via TypeScript path mapping
+
 ## Core Architecture
 
 ### Event-Sourcing Foundation
