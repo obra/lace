@@ -40,7 +40,10 @@ describe('TimelineContent itemRefs management', () => {
     viewportState = {
       selectedItemIndex: 0,
       selectedLine: 0,
+      lineScrollOffset: 0,
       itemPositions: [0, 3],
+      totalContentHeight: 20,
+      measurementTrigger: 0,
     };
     viewportActions = {
       triggerRemeasurement: vi.fn(),
@@ -48,12 +51,13 @@ describe('TimelineContent itemRefs management', () => {
   });
 
   it('should have ref callback function for each timeline item', () => {
-    const component = TimelineContent({
-      timeline,
-      viewportState,
-      viewportActions,
-      itemRefs,
-    });
+    const component = <TimelineContent
+      timeline={timeline}
+      viewportState={viewportState}
+      viewportActions={viewportActions}
+      itemRefs={itemRefs}
+      viewportLines={20}
+    />;
 
     // Component should be a React Fragment with mapped items
     expect(component).toBeDefined();
@@ -93,12 +97,13 @@ describe('TimelineContent itemRefs management', () => {
       metadata: { eventCount: 3, messageCount: 3, lastActivity: new Date() },
     };
 
-    const component = TimelineContent({
-      timeline: timelineWithDifferentTypes,
-      viewportState,
-      viewportActions,
-      itemRefs,
-    });
+    const component = <TimelineContent
+      timeline={timelineWithDifferentTypes}
+      viewportState={viewportState}
+      viewportActions={viewportActions}
+      itemRefs={itemRefs}
+      viewportLines={20}
+    />;
 
     expect(React.isValidElement(component)).toBe(true);
   });
@@ -109,12 +114,13 @@ describe('TimelineContent itemRefs management', () => {
       triggerRemeasurement: mockTriggerRemeasurement,
     };
 
-    const component = TimelineContent({
-      timeline,
-      viewportState,
-      viewportActions: viewportActionsWithMock,
-      itemRefs,
-    });
+    const component = <TimelineContent
+      timeline={timeline}
+      viewportState={viewportState}
+      viewportActions={viewportActionsWithMock}
+      itemRefs={itemRefs}
+      viewportLines={20}
+    />;
 
     expect(React.isValidElement(component)).toBe(true);
     // The onToggle prop should be passed as triggerRemeasurement
@@ -124,12 +130,13 @@ describe('TimelineContent itemRefs management', () => {
   it('should handle empty timeline correctly', () => {
     const emptyTimeline = { items: [], metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() } };
 
-    const component = TimelineContent({
-      timeline: emptyTimeline,
-      viewportState: { ...viewportState, itemPositions: [] },
-      viewportActions,
-      itemRefs,
-    });
+    const component = <TimelineContent
+      timeline={emptyTimeline}
+      viewportState={{ ...viewportState, itemPositions: [] }}
+      viewportActions={viewportActions}
+      itemRefs={itemRefs}
+      viewportLines={20}
+    />;
 
     expect(React.isValidElement(component)).toBe(true);
   });

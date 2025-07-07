@@ -37,14 +37,7 @@ export function ConversationDisplay({
     const endTime = performance.now();
     const renderTime = endTime - startTime;
     
-    // Log performance for monitoring (only if significant)
-    if (renderTime > 1) {
-      console.debug('Timeline rendering performance', {
-        timelineItems: result.items.length,
-        renderTimeMs: renderTime.toFixed(3),
-        itemsPerMs: (result.items.length / renderTime).toFixed(1),
-      });
-    }
+    // Performance monitoring removed to eliminate render overhead
     
     return result;
   }, [streamingProcessor, timelineVersion]);
@@ -90,15 +83,7 @@ export function ConversationDisplay({
     const endTime = performance.now();
     const mergeTime = endTime - startTime;
     
-    // Log performance for ephemeral message merging (only if significant)
-    if (mergeTime > 1) {
-      console.debug('Timeline ephemeral merge performance', {
-        timelineItems: timeline.items.length,
-        ephemeralItems: ephemeralMessages.length,
-        totalItems: result.items.length,
-        mergeTimeMs: mergeTime.toFixed(3),
-      });
-    }
+    // Performance monitoring removed to eliminate render overhead
     
     return result;
   }, [timeline, ephemeralMessages]);

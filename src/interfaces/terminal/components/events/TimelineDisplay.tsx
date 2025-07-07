@@ -72,7 +72,7 @@ export default function TimelineDisplay({
         }
       }
     },
-    [emitCollapse, emitExpand, emitFocusEntry, timeline.items]
+    [emitCollapse, emitExpand, emitFocusEntry, timeline.items.length]
   );
 
   return (
@@ -83,12 +83,13 @@ export default function TimelineDisplay({
       onItemInteraction={handleItemInteraction}
       isTimelineLayoutDebugVisible={isTimelineLayoutDebugVisible}
     >
-      {({ timeline: tl, viewportState, viewportActions, itemRefs }) => (
+      {({ timeline: tl, viewportState, viewportActions, itemRefs, viewportLines }) => (
         <TimelineContent
           timeline={tl}
           viewportState={viewportState}
           viewportActions={viewportActions}
           itemRefs={itemRefs}
+          viewportLines={viewportLines}
         />
       )}
     </TimelineViewport>

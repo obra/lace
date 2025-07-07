@@ -69,12 +69,16 @@ describe('TimelineContent Component', () => {
     viewportState: {
       selectedItemIndex: 0,
       selectedLine: 0,
+      lineScrollOffset: 0,
       itemPositions: [0, 5, 10],
+      totalContentHeight: 20,
+      measurementTrigger: 0,
     },
     viewportActions: {
       triggerRemeasurement: mockTriggerRemeasurement,
     },
     itemRefs: mockItemRefs,
+    viewportLines: 20,
   });
 
   describe('Basic rendering', () => {
@@ -111,7 +115,10 @@ describe('TimelineContent Component', () => {
       const viewportState = {
         selectedItemIndex: 1, // Second item focused
         selectedLine: 0,
+        lineScrollOffset: 0,
         itemPositions: [0, 5, 10],
+        totalContentHeight: 20,
+        measurementTrigger: 0,
       };
 
       const { lastFrame } = renderWithFocus(
@@ -134,7 +141,10 @@ describe('TimelineContent Component', () => {
       const viewportState = {
         selectedItemIndex: 5, // Out of bounds
         selectedLine: 0,
+        lineScrollOffset: 0,
         itemPositions: [0, 5],
+        totalContentHeight: 20,
+        measurementTrigger: 0,
       };
 
       const { lastFrame } = renderWithFocus(
@@ -156,7 +166,10 @@ describe('TimelineContent Component', () => {
       const viewportState = {
         selectedItemIndex: -1, // Negative index
         selectedLine: 0,
+        lineScrollOffset: 0,
         itemPositions: [0, 5],
+        totalContentHeight: 20,
+        measurementTrigger: 0,
       };
 
       const { lastFrame } = renderWithFocus(
@@ -192,7 +205,10 @@ describe('TimelineContent Component', () => {
       const viewportState = {
         selectedItemIndex: 0,
         selectedLine: 10,
-        itemPositions: [100, 200], // Custom positions
+        lineScrollOffset: 0,
+        itemPositions: [5, 15], // Custom positions within viewport
+        totalContentHeight: 30,
+        measurementTrigger: 0,
       };
 
       // Since our mock doesn't expose the detailed props, we test by ensuring
@@ -209,7 +225,10 @@ describe('TimelineContent Component', () => {
       const viewportState = {
         selectedItemIndex: 0,
         selectedLine: 0,
+        lineScrollOffset: 0,
         itemPositions: [], // Empty positions array
+        totalContentHeight: 0,
+        measurementTrigger: 0,
       };
 
       const { lastFrame } = renderWithFocus(

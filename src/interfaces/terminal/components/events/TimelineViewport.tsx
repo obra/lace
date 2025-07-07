@@ -30,6 +30,7 @@ interface TimelineViewportProps {
       triggerRemeasurement: () => void;
     };
     itemRefs: React.MutableRefObject<Map<number, any>>;
+    viewportLines: number;
   }) => React.ReactNode;
 }
 
@@ -163,6 +164,7 @@ export function TimelineViewport({
               triggerRemeasurement: viewport.triggerRemeasurement,
             },
             itemRefs,
+            viewportLines,
           })}
         </Box>
 
