@@ -35,7 +35,7 @@ export function MarkdownDisplay({
       .join('\n');
 
     return (
-      <Box flexDirection="column" marginBottom={1}>
+      <Box flexDirection="column">
         <Text wrap="wrap" dimColor={dimmed}>
           {cleanedContent}
         </Text>
@@ -46,7 +46,7 @@ export function MarkdownDisplay({
     const trimmedContent = content.trim();
     
     return (
-      <Box flexDirection="column" marginBottom={1}>
+      <Box flexDirection="column">
         <Text color={dimmed ? 'dim' : 'white'} wrap="wrap">
           {trimmedContent}
         </Text>

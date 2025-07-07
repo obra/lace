@@ -129,4 +129,16 @@ export const UI_BACKGROUNDS = {
   TOOLBOX: '#2d2d2d',
   SIDEBAR: '#1a1a1a',
   HEADER: '#0d1117',
+
+  // Timeline item backgrounds
+  TIMELINE_NONE: '#333333',
+  TIMELINE_PENDING: '#3d3d2d',
+  TIMELINE_SUCCESS: '#2d2e2d',
+  TIMELINE_ERROR: '#3d2d2d',
+  TIMELINE_SELECTED: '#444444',
+
+  // Message type backgrounds
+  TIMELINE_TOOL: '#2d2d3d',
+  TIMELINE_AGENT: 'transparent',
+  TIMELINE_USER: '#666666',
 } as const;

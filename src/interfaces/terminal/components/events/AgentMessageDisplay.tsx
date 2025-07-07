@@ -54,7 +54,8 @@ export function AgentMessageDisplay({
       }
       isExpanded={effectiveIsExpanded}
       status={isStreaming ? 'pending' : 'success'}
-      isExpandable={!isStreaming}
+      messageType="agent"
+      isExpandable={hasAnyThinking && !isStreaming}
       isStreaming={isStreaming}
     >
       <Box flexDirection="column">

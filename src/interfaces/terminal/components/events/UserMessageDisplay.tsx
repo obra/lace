@@ -104,6 +104,7 @@ export function UserMessageDisplay({
       label={messageDisplay}
       summary={null}
       status="none"
+      messageType="user"
       isExpandable={shouldAutoCollapse}
     >
       {null}

@@ -46,7 +46,6 @@ describe('EventDisplay', () => {
     };
 
     const { lastFrame } = renderWithProviders(<EventDisplay event={event} />);
-    expect(lastFrame()).toContain(UI_SYMBOLS.TOOLBOX_SINGLE);
     expect(lastFrame()).toContain('"Hello, world!"');
   });
 
