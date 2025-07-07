@@ -211,7 +211,6 @@ const ShellInput: React.FC<ShellInputProps> = ({
       setAutocompleteItems(completions);
       setAutocompleteOriginalItems(completions);
     } catch (error) {
-      console.error('Failed to load completions:', error);
       setAutocompleteItems([]);
       setAutocompleteOriginalItems([]);
     }
@@ -404,7 +403,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
       if (matchesAction(input, key, 'PASTE')) {
         // Ctrl+V on non-Mac, Cmd+V on Mac
         bufferOps.pasteFromClipboard().catch((error) => {
-          console.warn('Paste operation failed:', error);
+          logger.warn('Paste operation failed:', error);
         });
         return;
       }
