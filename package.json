@@ -4,11 +4,13 @@
   "type": "module",
   "author": "Jesse Vincent <jesse@fsck.com>",
   "bin": {
-    "lace": "./dist/cli.js"
+    "lace": "./dist/cli.js",
+    "debug-thread": "./dist/debug-thread.js"
   },
   "scripts": {
     "build": "tsc && cp -r src/config/prompts dist/config/ 2>/dev/null || true",
     "start": "npm run build && node dist/cli.js",
+    "debug-thread": "npm run build && node dist/debug-thread.js",
     "test": "vitest",
     "test:integration": "vitest run \"integration\"",
     "test:unit": "vitest run --exclude=\"**/*{e2e,integration}*\"",
