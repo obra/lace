@@ -3,16 +3,16 @@
 // ABOUTME: Outputs thread data in JSON or readable format with provider-specific conversation structure
 
 import { Command } from 'commander';
-import { DatabasePersistence } from './persistence/database.js';
 import { ThreadManager } from './threads/thread-manager.js';
 import { Agent } from './agents/agent.js';
 import { ProviderRegistry } from './providers/registry.js';
-import { AIProvider } from './providers/base-provider.js';
 import { estimateTokens } from './utils/token-estimation.js';
 import { convertToAnthropicFormat } from './providers/format-converters.js';
 import { getLaceDir } from './config/lace-dir.js';
 import { join } from 'path';
 import { loadEnvFile } from './config/env-loader.js';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 interface DebugOptions {
   threadId: string;
@@ -48,7 +48,6 @@ async function debugThread(options: DebugOptions): Promise<ThreadDebugInfo> {
   // Initialize database and thread manager
   const laceDir = getLaceDir();
   const dbPath = join(laceDir, 'lace.db');
-  const persistence = new DatabasePersistence(dbPath);
   const threadManager = new ThreadManager(dbPath);
 
   // Load thread events
@@ -86,7 +85,7 @@ async function debugThread(options: DebugOptions): Promise<ThreadDebugInfo> {
 
   // Convert to provider-specific format if needed
   let conversation: any = providerMessages;
-  
+
   if (options.provider === 'anthropic') {
     conversation = convertToAnthropicFormat(providerMessages);
   } else if (options.provider === 'openai') {
@@ -114,7 +113,7 @@ function calculateTokenCounts(events: any[], providerMessages: any[]): any {
   let systemPrompts = 0;
 
   // Count tokens from events
-  events.forEach(event => {
+  events.forEach((event) => {
     const content = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
     const tokens = estimateTokens(content);
 
@@ -143,8 +142,13 @@ function calculateTokenCounts(events: any[], providerMessages: any[]): any {
     const content = msg.content || '';
     const toolCallsContent = msg.toolCalls ? JSON.stringify(msg.toolCalls) : '';
     const toolResultsContent = msg.toolResults ? JSON.stringify(msg.toolResults) : '';
-    
-    return sum + estimateTokens(content) + estimateTokens(toolCallsContent) + estimateTokens(toolResultsContent);
+
+    return (
+      sum +
+      estimateTokens(content) +
+      estimateTokens(toolCallsContent) +
+      estimateTokens(toolResultsContent)
+    );
   }, 0);
 
   return {
@@ -182,11 +186,11 @@ function formatAsText(debugInfo: ThreadDebugInfo): string {
 
   lines.push(`Conversation (${debugInfo.provider} format):`);
   lines.push(`${'='.repeat(40)}`);
-  
+
   if (Array.isArray(debugInfo.conversation)) {
     debugInfo.conversation.forEach((msg, index) => {
       lines.push(`Message ${index + 1} (${msg.role}):`);
-      
+
       if (typeof msg.content === 'string') {
         lines.push(`  ${msg.content}`);
       } else if (Array.isArray(msg.content)) {
@@ -206,7 +210,7 @@ function formatAsText(debugInfo: ThreadDebugInfo): string {
           }
         });
       }
-      
+
       if (msg.toolCalls?.length > 0) {
         lines.push(`  Tool Calls: ${msg.toolCalls.length}`);
         msg.toolCalls.forEach((call: any, callIndex: number) => {
@@ -214,14 +218,16 @@ function formatAsText(debugInfo: ThreadDebugInfo): string {
           lines.push(`       Input: ${JSON.stringify(call.input, null, 2)}`);
         });
       }
-      
+
       if (msg.toolResults?.length > 0) {
         lines.push(`  Tool Results: ${msg.toolResults.length}`);
         msg.toolResults.forEach((result: any, resultIndex: number) => {
           lines.push(`    ${resultIndex + 1}. ${result.id}:`);
           if (result.content) {
             result.content.forEach((contentBlock: any, contentIndex: number) => {
-              lines.push(`       Content ${contentIndex + 1}: ${contentBlock.text || JSON.stringify(contentBlock)}`);
+              lines.push(
+                `       Content ${contentIndex + 1}: ${contentBlock.text || JSON.stringify(contentBlock)}`
+              );
             });
           }
           if (result.isError) {
@@ -229,7 +235,7 @@ function formatAsText(debugInfo: ThreadDebugInfo): string {
           }
         });
       }
-      
+
       lines.push('');
     });
   }
@@ -251,7 +257,7 @@ function formatAsText(debugInfo: ThreadDebugInfo): string {
 
 async function main() {
   const program = new Command();
-  
+
   program
     .name('debug-thread')
     .description('Debug tool for inspecting thread conversations and token counts')
@@ -259,7 +265,10 @@ async function main() {
 
   program
     .requiredOption('-t, --thread-id <threadId>', 'Thread ID to debug')
-    .requiredOption('-p, --provider <provider>', 'Provider to use for conversation format (anthropic, openai, lmstudio, ollama)')
+    .requiredOption(
+      '-p, --provider <provider>',
+      'Provider to use for conversation format (anthropic, openai, lmstudio, ollama)'
+    )
     .option('-f, --format <format>', 'Output format (json or text)', 'json')
     .option('-o, --output <file>', 'Output file path (defaults to stdout)');
 
@@ -275,7 +284,7 @@ async function main() {
 
   try {
     const debugInfo = await debugThread(options);
-    
+
     let output: string;
     if (options.format === 'json') {
       output = JSON.stringify(debugInfo, null, 2);

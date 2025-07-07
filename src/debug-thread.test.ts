@@ -2,10 +2,6 @@
 // ABOUTME: Tests the core thread debugging functionality without requiring real threads
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ThreadManager } from './threads/thread-manager.js';
-import { DatabasePersistence } from './persistence/database.js';
-import { ProviderRegistry } from './providers/registry.js';
-import { Agent } from './agents/agent.js';
 import { estimateTokens } from './utils/token-estimation.js';
 import { ThreadEvent } from './threads/types.js';
 
@@ -35,7 +31,7 @@ describe('debug-thread functionality', () => {
   it('should estimate tokens correctly', () => {
     const text = 'Hello world! This is a test message.';
     const tokens = estimateTokens(text);
-    
+
     // Rough estimation: 1 token ≈ 4 characters
     expect(tokens).toBeGreaterThan(0);
     expect(tokens).toBeLessThan(text.length);
