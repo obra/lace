@@ -3,13 +3,13 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { existsSync, unlinkSync, readFileSync } from 'fs';
-import { parseArgs } from '../cli/args.js';
+import { parseArgs } from '~/cli/args.js';
 import {
   initializeHARRecording,
   getHARRecorder,
   disableHARRecording,
-} from '../utils/har-recorder.js';
-import { enableTrafficLogging, resetTrafficLogging } from '../utils/traffic-logger.js';
+} from '~/utils/har-recorder.js';
+import { enableTrafficLogging, resetTrafficLogging } from '~/utils/traffic-logger.js';
 
 const TEST_HAR_FILE = '/tmp/test-cli-har.har';
 

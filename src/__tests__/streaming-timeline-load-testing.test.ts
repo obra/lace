@@ -2,9 +2,9 @@
 // ABOUTME: Tests O(1) behavior across conversation sizes from small to very large (1000+ events)
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { StreamingTimelineProcessor } from '../interfaces/streaming-timeline-processor.js';
-import { ThreadEvent } from '../threads/types.js';
-import { ToolCall, ToolResult } from '../tools/types.js';
+import { StreamingTimelineProcessor } from '~/interfaces/streaming-timeline-processor.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { ToolCall, ToolResult } from '~/tools/types.js';
 
 describe('StreamingTimelineProcessor Load Testing', () => {
   let processor: StreamingTimelineProcessor;

@@ -2,16 +2,16 @@
 // ABOUTME: Wraps Anthropic SDK in the common provider interface
 
 import Anthropic from '@anthropic-ai/sdk';
-import { AIProvider } from './base-provider.js';
+import { AIProvider } from '~/providers/base-provider.js';
 import {
   ProviderMessage,
   ProviderResponse,
   ProviderConfig,
   ProviderToolCall,
-} from './base-provider.js';
-import { Tool } from '../tools/tool.js';
-import { logger } from '../utils/logger.js';
-import { convertToAnthropicFormat } from './format-converters.js';
+} from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { logger } from '~/utils/logger.js';
+import { convertToAnthropicFormat } from '~/providers/format-converters.js';
 
 export interface AnthropicProviderConfig extends ProviderConfig {
   apiKey: string;

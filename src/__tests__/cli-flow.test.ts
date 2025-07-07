@@ -6,8 +6,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { run } from '../app.js';
-import { CLIOptions } from '../cli/args.js';
+import { run } from '~/app.js';
+import { CLIOptions } from '~/cli/args.js';
 
 // Mock all external dependencies
 vi.mock('../agents/agent.js');

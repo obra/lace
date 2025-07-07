@@ -2,8 +2,8 @@
 // ABOUTME: Handles all CLI flags, validation, and help text generation with fail-early validation
 
 import { Command, Option } from 'commander';
-import { ToolExecutor } from '../tools/executor.js';
-import { ProviderRegistry } from '../providers/registry.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ProviderRegistry } from '~/providers/registry.js';
 
 export interface CLIOptions {
   provider: string;

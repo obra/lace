@@ -1,13 +1,13 @@
 // ABOUTME: Enhanced thread management with SQLite persistence support
 // ABOUTME: Maintains backward compatibility with immediate event persistence
 
-import { DatabasePersistence } from '../persistence/database.js';
-import { Thread, ThreadEvent, EventType } from './types.js';
-import { ToolCall, ToolResult } from '../tools/types.js';
-import { logger } from '../utils/logger.js';
-import { SummarizeStrategy } from './compaction/index.js';
-import { estimateTokens } from '../utils/token-estimation.js';
-import { AIProvider } from '../providers/base-provider.js';
+import { DatabasePersistence } from '~/persistence/database.js';
+import { Thread, ThreadEvent, EventType } from '~/threads/types.js';
+import { ToolCall, ToolResult } from '~/tools/types.js';
+import { logger } from '~/utils/logger.js';
+import { SummarizeStrategy } from '~/threads/compaction/index.js';
+import { estimateTokens } from '~/utils/token-estimation.js';
+import { AIProvider } from '~/providers/base-provider.js';
 
 export interface ThreadSessionInfo {
   threadId: string;

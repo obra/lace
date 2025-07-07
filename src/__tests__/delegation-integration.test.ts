@@ -2,12 +2,12 @@
 // ABOUTME: Tests end-to-end delegation workflow including UI component rendering
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ThreadManager } from '../threads/thread-manager.js';
-import { Agent } from '../agents/agent.js';
-import { ToolExecutor } from '../tools/executor.js';
-import { DelegateTool } from '../tools/implementations/delegate.js';
-import { BashTool } from '../tools/implementations/bash.js';
-import { TestProvider } from './utils/test-provider.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { Agent } from '~/agents/agent.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { DelegateTool } from '~/tools/implementations/delegate.js';
+import { BashTool } from '~/tools/implementations/bash.js';
+import { TestProvider } from '~/__tests__/utils/test-provider.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';

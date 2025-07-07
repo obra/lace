@@ -1,8 +1,12 @@
 // ABOUTME: Provider-specific format conversion functions for enhanced ProviderMessage format
 // ABOUTME: Converts generic tool call format to provider-specific native formats
 
-import { ProviderMessage, ProviderToolCall, ProviderToolResult } from './base-provider.js';
-import { Tool } from '../tools/tool.js';
+import {
+  ProviderMessage,
+  ProviderToolCall,
+  ProviderToolResult,
+} from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
 import Anthropic from '@anthropic-ai/sdk';
 
 /**

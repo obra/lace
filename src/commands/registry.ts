@@ -4,7 +4,7 @@
 import { glob } from 'glob';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import type { Command } from './types.js';
+import type { Command } from '~/commands/types.js';
 
 /**
  * Check if an export is a valid Command

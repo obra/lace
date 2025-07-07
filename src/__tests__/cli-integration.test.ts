@@ -2,10 +2,10 @@
 // ABOUTME: Tests provider creation, tool setup, and CLIInterface integration
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseArgs } from '../cli/args.js';
-import { AnthropicProvider } from '../providers/anthropic-provider.js';
-import { LMStudioProvider } from '../providers/lmstudio-provider.js';
-import { OllamaProvider } from '../providers/ollama-provider.js';
+import { parseArgs } from '~/cli/args.js';
+import { AnthropicProvider } from '~/providers/anthropic-provider.js';
+import { LMStudioProvider } from '~/providers/lmstudio-provider.js';
+import { OllamaProvider } from '~/providers/ollama-provider.js';
 
 // Mock the CLIInterface to avoid readline complications
 vi.mock('../cli/interface.js', () => ({

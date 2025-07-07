@@ -2,19 +2,19 @@
 // ABOUTME: Core conversation engine that emits events instead of direct I/O for multiple interface support
 
 import { EventEmitter } from 'events';
-import { AIProvider, ProviderMessage, ProviderToolCall } from '../providers/base-provider.js';
-import { ToolCall, ToolResult } from '../tools/types.js';
-import { Tool } from '../tools/tool.js';
-import { ToolExecutor } from '../tools/executor.js';
-import { ApprovalDecision } from '../tools/approval-types.js';
-import { ThreadManager, ThreadSessionInfo } from '../threads/thread-manager.js';
-import { ThreadEvent, EventType, asThreadId } from '../threads/types.js';
-import { logger } from '../utils/logger.js';
-import { StopReasonHandler } from '../token-management/stop-reason-handler.js';
-import { TokenBudgetManager } from '../token-management/token-budget-manager.js';
-import { TokenBudgetConfig } from '../token-management/types.js';
-import { loadPromptConfig } from '../config/prompts.js';
-import { estimateTokens } from '../utils/token-estimation.js';
+import { AIProvider, ProviderMessage, ProviderToolCall } from '~/providers/base-provider.js';
+import { ToolCall, ToolResult } from '~/tools/types.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ApprovalDecision } from '~/tools/approval-types.js';
+import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager.js';
+import { ThreadEvent, EventType, asThreadId } from '~/threads/types.js';
+import { logger } from '~/utils/logger.js';
+import { StopReasonHandler } from '~/token-management/stop-reason-handler.js';
+import { TokenBudgetManager } from '~/token-management/token-budget-manager.js';
+import { TokenBudgetConfig } from '~/token-management/types.js';
+import { loadPromptConfig } from '~/config/prompts.js';
+import { estimateTokens } from '~/utils/token-estimation.js';
 
 export interface AgentConfig {
   provider: AIProvider;

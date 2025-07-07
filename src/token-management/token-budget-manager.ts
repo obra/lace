@@ -1,15 +1,15 @@
 // ABOUTME: Tracks and manages token usage across conversations with proactive budget enforcement
 // ABOUTME: Prevents token exhaustion by monitoring usage and providing recommendations for optimization
 
-import { ProviderResponse } from '../providers/base-provider.js';
-import { logger } from '../utils/logger.js';
+import { ProviderResponse } from '~/providers/base-provider.js';
+import { logger } from '~/utils/logger.js';
 import {
   TokenBudgetConfig,
   TokenUsage,
   BudgetStatus,
   BudgetRecommendations,
   ConversationMessage,
-} from './types.js';
+} from '~/token-management/types.js';
 
 export class TokenBudgetManager {
   private readonly _config: TokenBudgetConfig;
