@@ -38,7 +38,7 @@ describe('UserMessageDisplay', () => {
 
       const frame = lastFrame();
       expect(frame).toContain('"Hello world"');
-      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE); // Non-expandable for short messages
+      expect(frame).not.toContain(UI_SYMBOLS.COLLAPSED); // Non-expandable for short messages
     });
 
     it('should auto-collapse long user messages and show ellipsis', () => {
@@ -52,7 +52,7 @@ describe('UserMessageDisplay', () => {
       expect(frame).toContain('Line 8: This is line content'); // Should show first 8 lines
       expect(frame).not.toContain('Line 9: This is line content'); // Should not show beyond 8 lines
       expect(frame).toContain('...'); // Should show ellipsis
-      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE_EXPANDABLE); // Expandable for long messages
+      expect(frame).toContain(UI_SYMBOLS.COLLAPSED); // Expandable for long messages
     });
 
     it('should display short multiline user messages expanded', () => {
@@ -69,7 +69,7 @@ Line 4: Final line`;
       expect(frame).toContain('Line 2: This is the second line');
       expect(frame).toContain('Line 3: This is the third line with more content');
       expect(frame).toContain('Line 4: Final line');
-      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE); // Non-expandable for short messages
+      expect(frame).not.toContain(UI_SYMBOLS.COLLAPSED); // Non-expandable for short messages
     });
 
     it('should display special characters and unicode completely', () => {
@@ -101,7 +101,7 @@ Line 4: Final line`;
 
       const frame = lastFrame();
       expect(frame).toContain('"Regular user message"');
-      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE); // Non-expandable for short messages
+      expect(frame).not.toContain(UI_SYMBOLS.COLLAPSED); // Non-expandable for short messages
     });
 
     it('should work with timeline context for expansion control', () => {
@@ -162,7 +162,7 @@ Line 4: Final line`;
 
       const frame = lastFrame();
       expect(frame).toContain('"Message with label"');
-      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE);
+      expect(frame).not.toContain(UI_SYMBOLS.COLLAPSED);
     });
 
     it('should wrap long content appropriately', () => {

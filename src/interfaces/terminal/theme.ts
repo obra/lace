@@ -107,3 +107,38 @@ export const UI_COLORS = {
   TOOLBOX_SUCCESS_BRIGHT: 'greenBright',
   TOOLBOX_ERROR_BRIGHT: 'redBright',
 } as const;
+
+/**
+ * Background colors for UI components
+ */
+export const UI_BACKGROUNDS = {
+  // Input and interactive elements
+  SHELL_INPUT: '#666666',
+
+  // Modal and overlay backgrounds
+  MODAL: '#333333',
+  OVERLAY: '#222222',
+
+  // Status backgrounds
+  SUCCESS: '#004400',
+  ERROR: '#440000',
+  WARNING: '#444400',
+  INFO: '#000044',
+
+  // Component backgrounds
+  TOOLBOX: '#2d2d2d',
+  SIDEBAR: '#1a1a1a',
+  HEADER: '#0d1117',
+
+  // Timeline item backgrounds
+  TIMELINE_NONE: '#333333',
+  TIMELINE_PENDING: '#3d3d2d',
+  TIMELINE_SUCCESS: '#2d2e2d',
+  TIMELINE_ERROR: '#3d2d2d',
+  TIMELINE_SELECTED: '#444444',
+
+  // Message type backgrounds
+  TIMELINE_TOOL: '#2d2d3d',
+  TIMELINE_AGENT: 'transparent',
+  TIMELINE_USER: '#666666',
+} as const;

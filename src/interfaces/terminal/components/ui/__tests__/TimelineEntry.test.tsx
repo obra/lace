@@ -203,7 +203,7 @@ describe('TimelineEntry Height Measurement', () => {
   });
 
   describe('Marker sizing based on measured height', () => {
-    it('should use minimum 2 lines for expandable items', () => {
+    it('should show expansion indicator for expandable items', () => {
       mockMeasureElement.mockReturnValue({ height: 1, width: 40 });
 
       const { lastFrame } = render(
@@ -219,13 +219,12 @@ describe('TimelineEntry Height Measurement', () => {
       // Advance timers to trigger measurement
       vi.advanceTimersByTime(100);
 
-      // Should show multi-line markers even with height 1
+      // Should show collapsed expansion indicator
       const frame = lastFrame();
-      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_TOP_EXPANDABLE); // ⤹
-      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_BOTTOM); // ╰
+      expect(frame).toContain(UI_SYMBOLS.COLLAPSED); // ▶
     });
 
-    it('should use actual height for non-expandable items', () => {
+    it('should not show expansion indicator for non-expandable items', () => {
       mockMeasureElement.mockReturnValue({ height: 1, width: 40 });
 
       const { lastFrame } = render(
@@ -241,12 +240,13 @@ describe('TimelineEntry Height Measurement', () => {
       // Advance timers to trigger measurement
       vi.advanceTimersByTime(100);
 
-      // Should show single line marker
+      // Should not show expansion indicators
       const frame = lastFrame();
-      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_SINGLE); // ⊂
+      expect(frame).not.toContain(UI_SYMBOLS.COLLAPSED); // ▶
+      expect(frame).not.toContain(UI_SYMBOLS.EXPANDED); // ▼
     });
 
-    it('should render markers for multi-line content', () => {
+    it('should show expanded indicator for expanded items', () => {
       const { lastFrame } = render(
         <TimelineEntry
           isExpanded={true}
@@ -258,9 +258,8 @@ describe('TimelineEntry Height Measurement', () => {
       );
 
       const frame = lastFrame();
-      // Should render top and bottom markers at minimum
-      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_TOP); // ╭
-      expect(frame).toContain(UI_SYMBOLS.TOOLBOX_BOTTOM); // ╰
+      // Should show expanded indicator
+      expect(frame).toContain(UI_SYMBOLS.EXPANDED); // ▼
     });
   });
 

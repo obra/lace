@@ -7,6 +7,7 @@ import { useTextBuffer } from '../hooks/use-text-buffer.js';
 import TextRenderer from './text-renderer.js';
 import FileAutocomplete from './file-autocomplete.js';
 import { FocusRegions, useLaceFocus } from '../focus/index.js';
+import { UI_BACKGROUNDS } from '../theme.js';
 import { logger } from '../../../utils/logger.js';
 
 // Keyboard shortcut system - list-based approach
@@ -210,7 +211,6 @@ const ShellInput: React.FC<ShellInputProps> = ({
       setAutocompleteItems(completions);
       setAutocompleteOriginalItems(completions);
     } catch (error) {
-      console.error('Failed to load completions:', error);
       setAutocompleteItems([]);
       setAutocompleteOriginalItems([]);
     }
@@ -403,7 +403,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
       if (matchesAction(input, key, 'PASTE')) {
         // Ctrl+V on non-Mac, Cmd+V on Mac
         bufferOps.pasteFromClipboard().catch((error) => {
-          console.warn('Paste operation failed:', error);
+          logger.warn('Paste operation failed:', error);
         });
         return;
       }
@@ -488,7 +488,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
   }, [autocompleteVisible, autocompleteItems, autocompleteSelectedIndex, getCurrentWord]);
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" backgroundColor={UI_BACKGROUNDS.SHELL_INPUT} width="100%" margin={1} padding={1} marginRight={2}>
       <Box>
         <Text color="cyan">&gt; </Text>
         <Box flexDirection="column" flexGrow={1}>
