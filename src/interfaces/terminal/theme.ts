@@ -107,3 +107,26 @@ export const UI_COLORS = {
   TOOLBOX_SUCCESS_BRIGHT: 'greenBright',
   TOOLBOX_ERROR_BRIGHT: 'redBright',
 } as const;
+
+/**
+ * Background colors for UI components
+ */
+export const UI_BACKGROUNDS = {
+  // Input and interactive elements
+  SHELL_INPUT: '#666666',
+
+  // Modal and overlay backgrounds
+  MODAL: '#333333',
+  OVERLAY: '#222222',
+
+  // Status backgrounds
+  SUCCESS: '#004400',
+  ERROR: '#440000',
+  WARNING: '#444400',
+  INFO: '#000044',
+
+  // Component backgrounds
+  TOOLBOX: '#2d2d2d',
+  SIDEBAR: '#1a1a1a',
+  HEADER: '#0d1117',
+} as const;
