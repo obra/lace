@@ -4,7 +4,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { measureElement, DOMElement } from 'ink';
 import { Timeline } from '../../../../timeline-types.js';
-import { logger } from '../../../../utils/logger.js';
+import { logger } from '../../../../../utils/logger.js';
 
 export interface ViewportState {
   selectedLine: number;
@@ -75,10 +75,10 @@ export function useTimelineViewport({
 
       // Measure all rendered items - ensure we have refs for all of them
       const renderedIndices = Array.from(itemRefs.current.keys()).sort((a, b) => a - b);
-      
+
       for (const i of renderedIndices) {
         positions[i] = currentPosition;
-        
+
         const itemRef = itemRefs.current.get(i);
         if (itemRef && typeof itemRef === 'object' && 'nodeName' in itemRef) {
           const { height } = measureElement(itemRef as DOMElement);

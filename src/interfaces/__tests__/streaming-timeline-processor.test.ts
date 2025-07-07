@@ -5,7 +5,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { ThreadEvent } from '../../threads/types.js';
 import { ToolCall, ToolResult } from '../../tools/types.js';
 import { StreamingTimelineProcessor } from '../streaming-timeline-processor.js';
-import { Timeline, TimelineItem } from '../timeline-types.js';
 
 describe('StreamingTimelineProcessor', () => {
   let streamingProcessor: StreamingTimelineProcessor;
@@ -377,7 +376,7 @@ describe('StreamingTimelineProcessor', () => {
       }
 
       const metrics = streamingProcessor.getMetrics();
-      
+
       expect(metrics.appendCount).toBe(5);
       expect(metrics.averageAppendTime).toBeGreaterThanOrEqual(0);
       expect(metrics.maxAppendTime).toBeGreaterThanOrEqual(0);
@@ -395,7 +394,7 @@ describe('StreamingTimelineProcessor', () => {
       });
 
       const summary = streamingProcessor.getPerformanceSummary();
-      
+
       expect(summary).toContain('Timeline Performance Summary:');
       expect(summary).toContain('Events processed: 1');
       expect(summary).toContain('Average append time:');

@@ -9,10 +9,7 @@ export const debugUiPerformanceCommand: Command = {
 
   async execute(args: string, ui: UserInterface): Promise<void> {
     // Check if the UI supports performance metrics display
-    if (
-      'getPerformanceMetrics' in ui &&
-      typeof ui.getPerformanceMetrics === 'function'
-    ) {
+    if ('getPerformanceMetrics' in ui && typeof ui.getPerformanceMetrics === 'function') {
       const metrics = (
         ui as UserInterface & { getPerformanceMetrics(): string }
       ).getPerformanceMetrics();

@@ -9,7 +9,7 @@ describe('Delegate Thread Isolation Verification', () => {
   describe('StreamingTimelineProcessor Isolation', () => {
     it('should only process events passed to it (does not auto-fetch delegate events)', () => {
       const processor = new StreamingTimelineProcessor();
-      
+
       // Main thread events
       const mainEvent1: ThreadEvent = {
         id: 'main-1',
@@ -37,7 +37,7 @@ describe('Delegate Thread Isolation Verification', () => {
       expect(timeline.items).toHaveLength(2);
       expect(timeline.metadata.eventCount).toBe(2);
       expect(timeline.metadata.messageCount).toBe(2);
-      
+
       // Verify the events are the ones we added
       expect(timeline.items[0].type).toBe('user_message');
       expect(timeline.items[1].type).toBe('agent_message');
@@ -45,7 +45,7 @@ describe('Delegate Thread Isolation Verification', () => {
 
     it('should handle delegate tool calls in main thread without processing delegate thread events', () => {
       const processor = new StreamingTimelineProcessor();
-      
+
       // Delegate tool call in main thread (this should appear)
       const delegateToolCall: ThreadEvent = {
         id: 'delegate-call',
@@ -64,14 +64,16 @@ describe('Delegate Thread Isolation Verification', () => {
         type: 'TOOL_RESULT',
         data: {
           id: 'call-delegate',
-          content: [{ 
-            type: 'text', 
-            text: JSON.stringify({
-              threadId: 'delegate-thread-123',
-              status: 'active',
-              summary: 'Delegation started'
-            })
-          }],
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                threadId: 'delegate-thread-123',
+                status: 'active',
+                summary: 'Delegation started',
+              }),
+            },
+          ],
           isError: false,
         },
         timestamp: new Date('2023-01-01T10:00:01Z'),
@@ -86,7 +88,7 @@ describe('Delegate Thread Isolation Verification', () => {
       // Should show the delegate tool execution in main timeline
       expect(timeline.items).toHaveLength(1);
       expect(timeline.items[0].type).toBe('tool_execution');
-      
+
       if (timeline.items[0].type === 'tool_execution') {
         expect(timeline.items[0].call.name).toBe('delegate');
       }
@@ -124,7 +126,7 @@ describe('Delegate Thread Isolation Verification', () => {
       const endTime = performance.now();
 
       const processingTime = endTime - startTime;
-      
+
       // Should be very fast - O(1) behavior
       expect(processingTime).toBeLessThan(10); // 10ms threshold
       expect(processor.getTimeline().items).toHaveLength(101);
@@ -162,18 +164,18 @@ describe('Delegate Thread Isolation Verification', () => {
       // Processors are completely isolated
       expect(mainProcessor.getTimeline().items).toHaveLength(1);
       expect(delegateProcessor.getTimeline().items).toHaveLength(1);
-      
+
       expect(mainProcessor.getTimeline().metadata.eventCount).toBe(1);
       expect(delegateProcessor.getTimeline().metadata.eventCount).toBe(1);
 
       // No cross-contamination
       const mainItems = mainProcessor.getTimeline().items;
       const delegateItems = delegateProcessor.getTimeline().items;
-      
+
       if (mainItems[0].type === 'user_message') {
         expect(mainItems[0].content).toBe('Main thread message');
       }
-      
+
       if (delegateItems[0].type === 'user_message') {
         expect(delegateItems[0].content).toBe('Delegate thread message');
       }
