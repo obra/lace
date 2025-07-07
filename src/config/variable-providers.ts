@@ -5,8 +5,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execSync, type StdioOptions } from 'child_process';
-import { logger } from '../utils/logger.js';
-import { TemplateContext } from './template-engine.js';
+import { logger } from '~/utils/logger.js';
+import { TemplateContext } from '~/config/template-engine.js';
 
 export interface VariableProvider {
   getVariables(): Promise<Record<string, unknown>>;

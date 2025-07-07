@@ -2,11 +2,11 @@
 // ABOUTME: Validates that new Tool classes work with existing executor infrastructure
 
 import { describe, it, expect } from 'vitest';
-import { ToolExecutor } from './executor.js';
-import { FileReadTool } from './implementations/file-read.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { FileReadTool } from '~/tools/implementations/file-read.js';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
-import { createTestTempDir } from './__tests__/test-utils.js';
+import { createTestTempDir } from '~/tools/__tests__/test-utils.js';
 
 describe('ToolExecutor with new schema-based tools', () => {
   const tempDir = createTestTempDir();

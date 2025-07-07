@@ -9,14 +9,14 @@ import {
   VersionHistoryEntry,
   ThreadId,
   AssigneeId,
-} from '../threads/types.js';
+} from '~/threads/types.js';
 import {
   Task,
   TaskNote,
   TaskStatus,
   TaskPriority,
-} from '../tools/implementations/task-manager/types.js';
-import { logger } from '../utils/logger.js';
+} from '~/tools/implementations/task-manager/types.js';
+import { logger } from '~/utils/logger.js';
 
 export class DatabasePersistence {
   private db: Database.Database | null = null;

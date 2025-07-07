@@ -8,7 +8,7 @@
     "debug-thread": "./dist/debug-thread.js"
   },
   "scripts": {
-    "build": "tsc && cp -r src/config/prompts dist/config/ 2>/dev/null || true",
+    "build": "tsc && tsc-alias && cp -r src/config/prompts dist/config/ 2>/dev/null || true",
     "start": "npm run build && node dist/cli.js",
     "debug-thread": "npm run build && node dist/debug-thread.js",
     "test": "vitest",
@@ -69,6 +69,8 @@
     "@vitest/coverage-v8": "^3.2.3",
     "eslint": "^9.29.0",
     "eslint-config-prettier": "^10.1.5",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-no-relative-import-paths": "^1.6.1",
     "eslint-plugin-prettier": "^5.4.1",
     "execa": "^9.6.0",
     "globals": "^16.2.0",
@@ -78,6 +80,7 @@
     "lint-staged": "^16.1.1",
     "prettier": "^3.5.3",
     "react-devtools-core": "^4.28.5",
+    "tsc-alias": "^1.8.16",
     "typescript": "^5.6.0",
     "vitest": "^3.2.3"
   }

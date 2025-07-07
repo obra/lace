@@ -2,10 +2,10 @@
 // ABOUTME: Ensures Agent methods emit thread_event_added events for UI updates
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Agent } from './agent.js';
-import { ThreadManager } from '../threads/thread-manager.js';
-import { ToolExecutor } from '../tools/executor.js';
-import { createMockProvider } from '../__tests__/utils/mock-provider.js';
+import { Agent } from '~/agents/agent.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { createMockProvider } from '~/__tests__/utils/mock-provider.js';
 
 describe('Agent Thread Event Proxying', () => {
   let agent: Agent;

@@ -1,8 +1,8 @@
 // ABOUTME: Command executor that parses slash commands and executes them
 // ABOUTME: Handles parsing /command args syntax and coordinating with registry for execution
 
-import type { UserInterface, ParsedCommand } from './types.js';
-import type { CommandRegistry } from './registry.js';
+import type { UserInterface, ParsedCommand } from '~/commands/types.js';
+import type { CommandRegistry } from '~/commands/registry.js';
 
 /**
  * Executes commands by parsing input and coordinating with registry

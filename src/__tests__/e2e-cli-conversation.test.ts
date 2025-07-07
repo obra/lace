@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { runCLI } from './helpers/cli-runner.js';
+import { runCLI } from '~/__tests__/helpers/cli-runner.js';
 
 describe('CLI Conversation Tests', () => {
   let tempDbPath: string;

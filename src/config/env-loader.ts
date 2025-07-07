@@ -3,7 +3,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
-import { logger } from '../utils/logger.js';
+import { logger } from '~/utils/logger.js';
 
 export function loadEnvFile(): void {
   const envPath = path.resolve(process.cwd(), '.env');

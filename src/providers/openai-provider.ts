@@ -2,16 +2,16 @@
 // ABOUTME: Wraps OpenAI SDK in the common provider interface
 
 import OpenAI, { ClientOptions } from 'openai';
-import { AIProvider } from './base-provider.js';
+import { AIProvider } from '~/providers/base-provider.js';
 import {
   ProviderMessage,
   ProviderResponse,
   ProviderConfig,
   ProviderToolCall,
-} from './base-provider.js';
-import { Tool } from '../tools/tool.js';
-import { logger } from '../utils/logger.js';
-import { convertToOpenAIFormat } from './format-converters.js';
+} from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { logger } from '~/utils/logger.js';
+import { convertToOpenAIFormat } from '~/providers/format-converters.js';
 
 export interface OpenAIProviderConfig extends ProviderConfig {
   apiKey: string;
