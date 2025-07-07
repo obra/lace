@@ -10,14 +10,19 @@ import { LaceFocusProvider } from './focus-provider.js';
 // Mock focus context
 const mockPushFocus = vi.fn();
 const mockPopFocus = vi.fn();
+const mockGetFocusStack = vi.fn(() => ['test']);
+const mockIsFocusActive = vi.fn(() => true);
 
 vi.mock('./focus-provider.js', async () => {
   const actual = await vi.importActual('./focus-provider.js');
   return {
     ...actual,
     useLaceFocusContext: () => ({
+      currentFocus: 'test',
       pushFocus: mockPushFocus,
       popFocus: mockPopFocus,
+      getFocusStack: mockGetFocusStack,
+      isFocusActive: mockIsFocusActive,
     }),
   };
 });
@@ -30,6 +35,9 @@ describe('FocusLifecycleWrapper', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    // Reset mock implementations
+    mockGetFocusStack.mockReturnValue(['test']);
+    mockIsFocusActive.mockReturnValue(true);
   });
 
   afterEach(() => {

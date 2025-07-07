@@ -7,7 +7,7 @@ import {
   Timeline,
   TimelineItem as TimelineItemType,
   EphemeralMessage,
-} from '../../../thread-processor.js';
+} from '../../../timeline-types.js';
 import { EventType } from '../../../../threads/types.js';
 import { EventDisplay } from './EventDisplay.js';
 import { GenericToolRenderer } from './tool-renderers/GenericToolRenderer.js';

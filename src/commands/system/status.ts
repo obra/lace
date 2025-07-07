@@ -8,7 +8,7 @@ export const statusCommand: Command = {
   description: 'Show current status',
 
   async execute(args: string, ui: UserInterface): Promise<void> {
-    const threadId = ui.agent.threadManager.getCurrentThreadId();
+    const threadId = ui.agent.getCurrentThreadId();
     const toolCount = ui.agent.toolExecutor.getAllTools().length;
     const providerName = ui.agent.providerName;
 

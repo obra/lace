@@ -6,7 +6,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import { Text } from 'ink';
 import { TimelineViewport } from '../TimelineViewport.js';
-import { Timeline } from '../../../../thread-processor.js';
+import { Timeline } from '../../../../timeline-types.js';
 import { LaceFocusProvider } from '../../../focus/focus-provider.js';
 
 // Mock external dependencies that aren't core to the component logic

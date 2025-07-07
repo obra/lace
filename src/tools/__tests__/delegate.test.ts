@@ -54,8 +54,8 @@ describe('DelegateTool', () => {
     // Mock the provider constructor
     vi.mocked(AnthropicProvider).mockImplementation(() => mockProvider);
 
-    // Mock Agent behavior
-    mockAgent = {
+    // Create mock subagent
+    const mockSubagent = {
       start: vi.fn(),
       sendMessage: vi.fn(),
       on: vi.fn(),
@@ -63,12 +63,22 @@ describe('DelegateTool', () => {
       removeAllListeners: vi.fn(),
     };
 
+    // Mock Agent behavior
+    mockAgent = {
+      start: vi.fn(),
+      sendMessage: vi.fn(),
+      on: vi.fn(),
+      once: vi.fn(),
+      removeAllListeners: vi.fn(),
+      createDelegateAgent: vi.fn().mockReturnValue(mockSubagent),
+    };
+
     vi.mocked(Agent).mockImplementation(() => mockAgent);
 
     // Create tool instance - it will get dependencies injected when needed
     tool = new DelegateTool();
     // Inject dependencies for testing
-    tool.setDependencies(mockThreadManager, mockToolExecutor);
+    tool.setDependencies(mockAgent, mockToolExecutor);
   });
 
   afterEach(() => {
@@ -84,22 +94,25 @@ describe('DelegateTool', () => {
   });
 
   it('should delegate a simple task with default model', async () => {
-    // Setup agent event handling for 'on' listeners
-    mockAgent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+    // Get the mock subagent that will be returned by createDelegateAgent
+    const mockSubagent = mockAgent.createDelegateAgent();
+
+    // Setup subagent event handling for 'on' listeners
+    mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'agent_response_complete') {
         // Simulate immediate response
         setTimeout(() => handler({ content: 'Analysis complete: 3 tests failed' }), 0);
       }
-      return mockAgent;
+      return mockSubagent;
     });
 
-    // Setup agent event handling for 'once' listeners
-    mockAgent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+    // Setup subagent event handling for 'once' listeners
+    mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'conversation_complete') {
         // Fire conversation complete after response
         setTimeout(() => handler(), 10);
       }
-      return mockAgent;
+      return mockSubagent;
     });
 
     const result = await tool.execute({
@@ -111,40 +124,33 @@ describe('DelegateTool', () => {
     expect(result.isError).toBe(false);
     expect(result.content[0]?.text).toContain('Analysis complete: 3 tests failed');
 
-    // Verify agent was created with correct config
-    expect(Agent).toHaveBeenCalledWith(
+    // Verify createDelegateAgent was called
+    expect(mockAgent.createDelegateAgent).toHaveBeenCalledWith(
+      expect.any(Object), // toolExecutor
+      mockProvider,
       expect.objectContaining({
-        provider: mockProvider,
-        toolExecutor: expect.any(Object),
-        threadManager: mockThreadManager,
-        threadId: expect.stringMatching(/\.\d+$/), // Delegate threads end with .1, .2, etc.
-        tools: expect.any(Array),
-        tokenBudget: expect.objectContaining({
-          warningThreshold: 0.7,
-          maxTokens: 50000,
-          reserveTokens: 1000,
-        }),
+        warningThreshold: 0.7,
+        maxTokens: 50000,
+        reserveTokens: 1000,
       })
     );
-
-    // Verify delegate tool was excluded from subagent's tools
-    const agentConfig = vi.mocked(Agent).mock.calls[0][0];
-    expect(agentConfig.tools.find((t: any) => t.name === 'delegate'));
   });
 
   it('should handle custom provider:model format', async () => {
-    mockAgent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+    const mockSubagent = mockAgent.createDelegateAgent();
+
+    mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'agent_response_complete') {
         setTimeout(() => handler({ content: 'Custom model response' }), 0);
       }
-      return mockAgent;
+      return mockSubagent;
     });
 
-    mockAgent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+    mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'conversation_complete') {
         setTimeout(() => handler(), 10);
       }
-      return mockAgent;
+      return mockSubagent;
     });
 
     const result = await tool.execute({
@@ -164,18 +170,20 @@ describe('DelegateTool', () => {
 
   it('should create delegate thread and execute subagent', async () => {
     // Mock subagent behavior
-    mockAgent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+    const mockSubagent = mockAgent.createDelegateAgent();
+
+    mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'agent_response_complete') {
         setTimeout(() => handler({ content: 'Directory listed successfully' }), 10);
       }
-      return mockAgent;
+      return mockSubagent;
     });
 
-    mockAgent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+    mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'conversation_complete') {
         setTimeout(() => handler(), 20);
       }
-      return mockAgent;
+      return mockSubagent;
     });
 
     const result = await tool.execute({
@@ -188,20 +196,21 @@ describe('DelegateTool', () => {
     expect(result.isError).toBe(false);
     expect(result.content[0]?.text).toContain('Directory listed successfully');
 
-    // Verify Agent was created with delegate thread ID
-    const agentConfig = vi.mocked(Agent).mock.calls[0][0];
-    expect(agentConfig.threadId).toMatch(/\.\d+$/); // Delegate thread format
+    // Verify createDelegateAgent was called
+    expect(mockAgent.createDelegateAgent).toHaveBeenCalled();
 
     // Note: Tool calls from subagent are now captured in the delegate thread
     // and displayed in the delegation box UI, not forwarded as events
   });
 
   it('should handle subagent errors gracefully', async () => {
-    mockAgent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+    const mockSubagent = mockAgent.createDelegateAgent();
+
+    mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'error') {
         setTimeout(() => handler({ error: new Error('Subagent failed') }), 0);
       }
-      return mockAgent;
+      return mockSubagent;
     });
 
     const result = await tool.execute({
@@ -219,7 +228,7 @@ describe('DelegateTool', () => {
 
     // Create a custom tool instance with short default timeout
     const quickTimeoutTool = new DelegateTool();
-    quickTimeoutTool.setDependencies(mockThreadManager, mockToolExecutor);
+    quickTimeoutTool.setDependencies(mockAgent, mockToolExecutor);
     (quickTimeoutTool as any).defaultTimeout = 100; // 100ms default timeout
 
     const result = await quickTimeoutTool.execute({
@@ -233,18 +242,20 @@ describe('DelegateTool', () => {
   });
 
   it('should format the subagent system prompt correctly', async () => {
-    mockAgent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+    const mockSubagent = mockAgent.createDelegateAgent();
+
+    mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'agent_response_complete') {
         setTimeout(() => handler({ content: 'Done' }), 0);
       }
-      return mockAgent;
+      return mockSubagent;
     });
 
-    mockAgent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+    mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'conversation_complete') {
         setTimeout(() => handler(), 10);
       }
-      return mockAgent;
+      return mockSubagent;
     });
 
     await tool.execute({
@@ -276,20 +287,22 @@ describe('DelegateTool', () => {
   });
 
   it('should collect all subagent responses', async () => {
-    mockAgent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+    const mockSubagent = mockAgent.createDelegateAgent();
+
+    mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'agent_response_complete') {
         // Simulate multiple responses
         setTimeout(() => handler({ content: 'First response' }), 0);
         setTimeout(() => handler({ content: 'Second response' }), 10);
       }
-      return mockAgent;
+      return mockSubagent;
     });
 
-    mockAgent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+    mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'conversation_complete') {
         setTimeout(() => handler(), 20);
       }
-      return mockAgent;
+      return mockSubagent;
     });
 
     const result = await tool.execute({
@@ -304,18 +317,20 @@ describe('DelegateTool', () => {
   });
 
   it('should include delegate thread ID in result metadata', async () => {
-    mockAgent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+    const mockSubagent = mockAgent.createDelegateAgent();
+
+    mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'agent_response_complete') {
         setTimeout(() => handler({ content: 'Delegation complete' }), 0);
       }
-      return mockAgent;
+      return mockSubagent;
     });
 
-    mockAgent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+    mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
       if (event === 'conversation_complete') {
         setTimeout(() => handler(), 10);
       }
-      return mockAgent;
+      return mockSubagent;
     });
 
     const result = await tool.execute({
@@ -326,8 +341,7 @@ describe('DelegateTool', () => {
 
     expect(result.isError).toBe(false);
     expect(result.metadata).toBeDefined();
-    expect(result.metadata?.threadId).toBeDefined();
-    expect(typeof result.metadata?.threadId).toBe('string');
-    expect(result.metadata?.threadId).toMatch(/\.\d+$/); // Delegate thread format
+    expect(result.metadata?.taskTitle).toBeDefined();
+    expect(result.metadata?.taskTitle).toBe('Test metadata');
   });
 });

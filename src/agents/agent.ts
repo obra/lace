@@ -7,8 +7,8 @@ import { ToolCall, ToolResult } from '../tools/types.js';
 import { Tool } from '../tools/tool.js';
 import { ToolExecutor } from '../tools/executor.js';
 import { ApprovalDecision } from '../tools/approval-types.js';
-import { ThreadManager } from '../threads/thread-manager.js';
-import { ThreadEvent, asThreadId } from '../threads/types.js';
+import { ThreadManager, ThreadSessionInfo } from '../threads/thread-manager.js';
+import { ThreadEvent, EventType, asThreadId } from '../threads/types.js';
 import { logger } from '../utils/logger.js';
 import { StopReasonHandler } from '../token-management/stop-reason-handler.js';
 import { TokenBudgetManager } from '../token-management/token-budget-manager.js';
@@ -76,6 +76,9 @@ export interface AgentEvents {
       resolve: (decision: ApprovalDecision) => void;
     },
   ];
+  // Thread events proxied from ThreadManager
+  thread_event_added: [{ event: ThreadEvent; threadId: string }];
+  thread_state_changed: [{ threadId: string; eventType: string }];
 }
 
 export class Agent extends EventEmitter {
@@ -90,9 +93,9 @@ export class Agent extends EventEmitter {
     return this._toolExecutor;
   }
 
-  // Public access to thread manager for interfaces
-  get threadManager(): ThreadManager {
-    return this._threadManager;
+  // Public access to provider name for interfaces
+  get providerName(): string {
+    return this._provider.providerName;
   }
 
   // Public access to thread ID for delegation
@@ -122,6 +125,8 @@ export class Agent extends EventEmitter {
     this._tokenBudgetManager = config.tokenBudget
       ? new TokenBudgetManager(config.tokenBudget)
       : null;
+
+    // Events are emitted through _addEventAndEmit() helper method
   }
 
   // Core conversation methods
@@ -144,7 +149,7 @@ export class Agent extends EventEmitter {
 
     if (content.trim()) {
       // Add user message to active thread (could be compacted thread after compaction)
-      this._threadManager.addEvent(this._getActiveThreadId(), 'USER_MESSAGE', content);
+      this._addEventAndEmit(this._getActiveThreadId(), 'USER_MESSAGE', content);
     }
 
     try {
@@ -184,12 +189,8 @@ export class Agent extends EventEmitter {
     );
 
     if (!hasConversationStarted) {
-      this._threadManager.addEvent(this._threadId, 'SYSTEM_PROMPT', promptConfig.systemPrompt);
-      this._threadManager.addEvent(
-        this._threadId,
-        'USER_SYSTEM_PROMPT',
-        promptConfig.userInstructions
-      );
+      this._addEventAndEmit(this._threadId, 'SYSTEM_PROMPT', promptConfig.systemPrompt);
+      this._addEventAndEmit(this._threadId, 'USER_SYSTEM_PROMPT', promptConfig.userInstructions);
     }
 
     this._isRunning = true;
@@ -280,10 +281,6 @@ export class Agent extends EventEmitter {
 
   getAvailableTools(): Tool[] {
     return [...this._tools]; // Return copy to prevent mutation
-  }
-
-  get providerName(): string {
-    return this._provider.providerName;
   }
 
   get provider(): AIProvider {
@@ -477,7 +474,7 @@ export class Agent extends EventEmitter {
       // Process agent response
       if (response.content) {
         // Store raw content (with thinking blocks) for model context
-        this._threadManager.addEvent(this._getActiveThreadId(), 'AGENT_MESSAGE', response.content);
+        this._addEventAndEmit(this._getActiveThreadId(), 'AGENT_MESSAGE', response.content);
 
         // Extract clean content for UI display and events
         const cleanedContent = response.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
@@ -774,7 +771,7 @@ export class Agent extends EventEmitter {
       };
 
       // Add tool call to thread
-      this._threadManager.addEvent(this._getActiveThreadId(), 'TOOL_CALL', toolCall);
+      this._addEventAndEmit(this._getActiveThreadId(), 'TOOL_CALL', toolCall);
 
       // Emit tool call start event
       this.emit('tool_call_start', {
@@ -809,7 +806,7 @@ export class Agent extends EventEmitter {
         });
 
         // Add tool result to thread
-        this._threadManager.addEvent(this._getActiveThreadId(), 'TOOL_RESULT', result);
+        this._addEventAndEmit(this._getActiveThreadId(), 'TOOL_RESULT', result);
 
         // Add tool output tokens to current turn metrics (estimated)
         this._addTokensToCurrentTurn('in', this._estimateTokens(outputText));
@@ -835,7 +832,7 @@ export class Agent extends EventEmitter {
         });
 
         // Add failed tool result to thread
-        this._threadManager.addEvent(this._getActiveThreadId(), 'TOOL_RESULT', failedResult);
+        this._addEventAndEmit(this._getActiveThreadId(), 'TOOL_RESULT', failedResult);
       }
     }
   }
@@ -1231,5 +1228,123 @@ export class Agent extends EventEmitter {
         this._addTokensToCurrentTurn('out', estimatedOutputTokens);
       }
     }
+  }
+
+  /**
+   * Replay all historical events from current thread for session resumption
+   * Used during --continue and post-compaction state rebuilding
+   */
+  async replaySessionEvents(): Promise<void> {
+    const events = this._threadManager.getEvents(this._getActiveThreadId());
+
+    logger.debug('Agent: Replaying session events', {
+      threadId: this._threadId,
+      eventCount: events.length,
+    });
+
+    // Emit each historical event for UI rebuilding
+    for (const event of events) {
+      this.emit('thread_event_added', { event, threadId: event.threadId });
+    }
+
+    logger.debug('Agent: Session replay complete', {
+      threadId: this._threadId,
+      eventsReplayed: events.length,
+    });
+  }
+
+  // Thread management API - proxies to ThreadManager
+  getCurrentThreadId(): string | null {
+    return this._threadManager.getCurrentThreadId();
+  }
+
+  getThreadEvents(threadId?: string): ThreadEvent[] {
+    const targetThreadId = threadId || this._getActiveThreadId();
+    return this._threadManager.getEvents(targetThreadId);
+  }
+
+  generateThreadId(): string {
+    return this._threadManager.generateThreadId();
+  }
+
+  createThread(threadId: string): void {
+    this._threadManager.createThread(threadId);
+  }
+
+  async resumeOrCreateThread(threadId?: string): Promise<ThreadSessionInfo> {
+    const result = await this._threadManager.resumeOrCreate(threadId);
+
+    // If resuming existing thread, replay events for UI
+    if (result.isResumed) {
+      await this.replaySessionEvents();
+    }
+
+    return result;
+  }
+
+  async getLatestThreadId(): Promise<string | null> {
+    return this._threadManager.getLatestThreadId();
+  }
+
+  getMainAndDelegateEvents(mainThreadId: string): ThreadEvent[] {
+    return this._threadManager.getMainAndDelegateEvents(mainThreadId);
+  }
+
+  compact(threadId: string): void {
+    this._threadManager.compact(threadId);
+  }
+
+  createDelegateAgent(
+    toolExecutor: ToolExecutor,
+    provider?: AIProvider,
+    tokenBudget?: TokenBudgetConfig
+  ): Agent {
+    // Get current thread as parent
+    const parentThreadId = this.getCurrentThreadId();
+    if (!parentThreadId) {
+      throw new Error('No active thread for delegation');
+    }
+
+    // Create delegate thread
+    const delegateThread = this._threadManager.createDelegateThreadFor(parentThreadId);
+    const delegateThreadId = delegateThread.id;
+
+    // Create new Agent instance for the delegate thread
+    const delegateAgent = new Agent({
+      provider: provider || this._provider, // Use provided provider or fallback to parent's provider
+      toolExecutor,
+      threadManager: this._threadManager,
+      threadId: delegateThreadId,
+      tools: toolExecutor.getAllTools(),
+      tokenBudget,
+    });
+
+    return delegateAgent;
+  }
+
+  /**
+   * Add a system message to the current thread
+   * Used for error messages, notifications, etc.
+   */
+  addSystemMessage(message: string, threadId?: string): ThreadEvent {
+    const targetThreadId = threadId || this.getCurrentThreadId();
+    if (!targetThreadId) {
+      throw new Error('No active thread available for system message');
+    }
+    return this._addEventAndEmit(targetThreadId, 'LOCAL_SYSTEM_MESSAGE', message);
+  }
+
+  /**
+   * Helper method to add event to ThreadManager and emit Agent event
+   * This ensures Agent is the single event source for UI updates
+   */
+  private _addEventAndEmit(
+    threadId: string,
+    type: string,
+    data: string | ToolCall | ToolResult
+  ): ThreadEvent {
+    const event = this._threadManager.addEvent(threadId, type as EventType, data);
+    this.emit('thread_event_added', { event, threadId });
+    return event;
   }
 }

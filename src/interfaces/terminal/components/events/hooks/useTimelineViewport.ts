@@ -3,7 +3,8 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { measureElement, DOMElement } from 'ink';
-import { Timeline } from '../../../../thread-processor.js';
+import { Timeline } from '../../../../timeline-types.js';
+import { logger } from '../../../../../utils/logger.js';
 
 export interface ViewportState {
   selectedLine: number;
@@ -72,7 +73,10 @@ export function useTimelineViewport({
       let currentPosition = 0;
       const measuredHeights: number[] = [];
 
-      for (let i = 0; i < timeline.items.length; i++) {
+      // Measure all rendered items - ensure we have refs for all of them
+      const renderedIndices = Array.from(itemRefs.current.keys()).sort((a, b) => a - b);
+
+      for (const i of renderedIndices) {
         positions[i] = currentPosition;
 
         const itemRef = itemRefs.current.get(i);
@@ -81,7 +85,8 @@ export function useTimelineViewport({
           measuredHeights[i] = height;
           currentPosition += height;
         } else {
-          // Only use fallback until ref is available
+          // This should not happen - all rendered items should have refs
+          logger.warn('Timeline item missing ref during measurement', { itemIndex: i });
           measuredHeights[i] = 3;
           currentPosition += 3;
         }
@@ -92,7 +97,7 @@ export function useTimelineViewport({
     };
 
     measureAfterDOMUpdate();
-  }, [timeline.items, itemRefs, measurementTrigger]);
+  }, [timeline.items.length, itemRefs, measurementTrigger]);
 
   // After re-measurement, reselect the first line of the remembered item
   useEffect(() => {
@@ -163,10 +168,11 @@ export function useTimelineViewport({
   useEffect(() => {
     // Handle initial positioning when measurement becomes available (addresses race condition)
     if (totalContentHeight > 0 && !hasInitiallyPositioned && timeline.items.length > 0) {
+      // Since we're only rendering recent items, position to show the most recent content
       const bottomLine = Math.max(0, totalContentHeight - 1);
       setSelectedLine(bottomLine);
 
-      // Update viewport scroll to show bottom
+      // For windowed rendering, scroll to show the bottom of rendered content
       const maxScroll = Math.max(0, totalContentHeight - viewportLines);
       setLineScrollOffset(maxScroll);
 

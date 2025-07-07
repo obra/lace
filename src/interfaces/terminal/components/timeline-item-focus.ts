@@ -1,7 +1,7 @@
 // ABOUTME: Timeline item focus interface and detection utilities for enabling keyboard focus on specific timeline items
 // ABOUTME: Provides type-safe way to identify focusable timeline items and manage focus entry/exit
 
-import { TimelineItem } from '../../thread-processor.js';
+import { TimelineItem } from '../../timeline-types.js';
 import { FocusRegions } from '../focus/index.js';
 
 /**

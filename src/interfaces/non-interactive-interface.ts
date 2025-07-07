@@ -21,8 +21,8 @@ export class NonInteractiveInterface implements UserInterface {
 
   clearSession(): void {
     // Create new thread and agent
-    const newThreadId = this.agent.threadManager.generateThreadId();
-    this.agent.threadManager.createThread(newThreadId);
+    const newThreadId = this.agent.generateThreadId();
+    this.agent.createThread(newThreadId);
   }
 
   exit(): void {

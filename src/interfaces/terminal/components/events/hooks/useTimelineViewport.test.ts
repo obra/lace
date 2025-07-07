@@ -4,7 +4,7 @@
 import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Timeline } from '../../../../thread-processor.js';
+import { Timeline } from '../../../../timeline-types.js';
 
 // Mock Ink's measureElement function before importing the hook
 vi.mock('ink', () => ({
@@ -71,26 +71,6 @@ describe('useTimelineViewport', () => {
     // Wait for initial measurement
     expect(result.current.itemPositions).toEqual([0, 20]);
     expect(result.current.totalContentHeight).toBe(50);
-  });
-
-  it('should fallback to 3-pixel height when itemRefs are not populated', () => {
-    // Empty itemRefs map (regression scenario)
-    const emptyItemRefs = { current: new Map<number, unknown>() };
-
-    const { result } = renderHook(() =>
-      useTimelineViewport({
-        timeline,
-        viewportLines: 10,
-        itemRefs: emptyItemRefs,
-      })
-    );
-
-    // Should use fallback height of 3 pixels per item
-    expect(result.current.itemPositions).toEqual([0, 3]);
-    expect(result.current.totalContentHeight).toBe(6);
-
-    // measureElement should not be called since refs are empty
-    expect(mockMeasureElement).not.toHaveBeenCalled();
   });
 
   it('should trigger remeasurement and maintain selection after expansion', () => {

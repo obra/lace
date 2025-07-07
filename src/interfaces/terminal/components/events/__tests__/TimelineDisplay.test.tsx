@@ -5,7 +5,7 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import TimelineDisplay from '../TimelineDisplay.js';
-import { Timeline, TimelineItem } from '../../../../thread-processor.js';
+import { Timeline, TimelineItem } from '../../../../timeline-types.js';
 import { LaceFocusProvider } from '../../../focus/focus-provider.js';
 
 // Mock expansion hooks
@@ -36,8 +36,8 @@ vi.mock('../../../../../utils/logger.js', () => ({
 }));
 
 vi.mock('../../terminal-interface.js', () => ({
-  useThreadProcessor: () => ({
-    // Mock implementation
+  useStreamingTimelineProcessor: () => ({
+    getTimeline: () => ({ items: [], metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() } }),
   }),
 }));
 

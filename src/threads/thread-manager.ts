@@ -1,7 +1,6 @@
 // ABOUTME: Enhanced thread management with SQLite persistence support
 // ABOUTME: Maintains backward compatibility with immediate event persistence
 
-import { EventEmitter } from 'events';
 import { DatabasePersistence } from '../persistence/database.js';
 import { Thread, ThreadEvent, EventType } from './types.js';
 import { ToolCall, ToolResult } from '../tools/types.js';
@@ -16,14 +15,13 @@ export interface ThreadSessionInfo {
   resumeError?: string;
 }
 
-export class ThreadManager extends EventEmitter {
+export class ThreadManager {
   private _currentThread: Thread | null = null;
   private _persistence: DatabasePersistence;
   private _compactionStrategy: SummarizeStrategy;
   private _providerStrategyCache = new Map<string, SummarizeStrategy>();
 
   constructor(dbPath: string) {
-    super();
     this._persistence = new DatabasePersistence(dbPath);
     this._compactionStrategy = new SummarizeStrategy();
   }
@@ -157,8 +155,7 @@ export class ThreadManager extends EventEmitter {
       console.error('Failed to save event:', error);
     }
 
-    // Emit thread_updated event for UI to sync
-    this.emit('thread_updated', { threadId, eventType: type });
+    // Event emission removed - Agent will handle event emission for UI synchronization
 
     return event;
   }

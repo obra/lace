@@ -3,7 +3,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ThreadManager } from '../threads/thread-manager.js';
-import { ThreadProcessor } from '../interfaces/thread-processor.js';
 import { Agent } from '../agents/agent.js';
 import { ToolExecutor } from '../tools/executor.js';
 import { DelegateTool } from '../tools/implementations/delegate.js';
@@ -33,7 +32,8 @@ describe('Delegation Integration Tests', () => {
     toolExecutor.registerTool('bash', bashTool);
 
     const delegateTool = new DelegateTool();
-    delegateTool.setDependencies(threadManager, toolExecutor);
+    // Note: setDependencies now takes (parentAgent, toolExecutor) but we don't have an agent in setup
+    // The delegate tool will be properly initialized when the Agent is created
     toolExecutor.registerTool('delegate', delegateTool);
   });
 
@@ -96,58 +96,6 @@ describe('Delegation Integration Tests', () => {
     expect(allEvents[2].data).toBe('Delegate 2 message');
   });
 
-  it('should process main thread only in ThreadProcessor', () => {
-    const mainThreadId = threadManager.generateThreadId();
-    const delegateThreadId = `${mainThreadId}.1`;
-
-    // Create mixed events
-    const events = [
-      {
-        id: 'evt1',
-        threadId: mainThreadId,
-        type: 'USER_MESSAGE' as const,
-        timestamp: new Date('2025-01-01T10:00:00Z'),
-        data: 'Main message 1',
-      },
-      {
-        id: 'evt2',
-        threadId: delegateThreadId,
-        type: 'AGENT_MESSAGE' as const,
-        timestamp: new Date('2025-01-01T10:01:00Z'),
-        data: 'Delegate message 1',
-      },
-      {
-        id: 'evt3',
-        threadId: delegateThreadId,
-        type: 'AGENT_MESSAGE' as const,
-        timestamp: new Date('2025-01-01T10:02:00Z'),
-        data: 'Delegate message 2',
-      },
-      {
-        id: 'evt4',
-        threadId: mainThreadId,
-        type: 'AGENT_MESSAGE' as const,
-        timestamp: new Date('2025-01-01T10:03:00Z'),
-        data: 'Main message 2',
-      },
-    ];
-
-    const processor = new ThreadProcessor();
-    const result = processor.processThreads(events);
-
-    // Should return Timeline with main thread events only (ignores delegates)
-    expect(result.items).toHaveLength(2);
-    expect(result.items[0].type).toBe('user_message');
-    expect(result.items[1].type).toBe('agent_message');
-
-    // Delegate events are ignored by simplified processor
-    const hasDelegate = result.items.some(
-      (item) =>
-        'content' in item && typeof item.content === 'string' && item.content.includes('Delegate')
-    );
-    expect(hasDelegate).toBe(false);
-  });
-
   it('should handle nested delegations', () => {
     const mainThread = 'lace_20250101_abc123';
     const delegate1 = threadManager.generateDelegateThreadId(mainThread);
@@ -203,12 +151,6 @@ describe('Delegation Integration Tests', () => {
       }),
     });
 
-    // Mock the DelegateTool's createProvider method to return our test provider
-    const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
-    const createProviderSpy = vi
-      .spyOn(delegateTool as any, 'createProvider')
-      .mockResolvedValue(mockProvider);
-
     // Create main agent with any provider (won't be used for delegation due to mock)
     const mainThreadId = threadManager.generateThreadId();
     threadManager.createThread(mainThreadId);
@@ -220,6 +162,15 @@ describe('Delegation Integration Tests', () => {
       threadId: mainThreadId,
       tools: toolExecutor.getAllTools(),
     });
+
+    // Initialize delegate tool with the agent now that it's created
+    const delegateToolInstance = toolExecutor.getTool('delegate') as DelegateTool;
+    delegateToolInstance.setDependencies(agent, toolExecutor);
+
+    // Mock the DelegateTool's createProvider method to return our test provider
+    const createProviderSpy = vi
+      .spyOn(delegateToolInstance as any, 'createProvider')
+      .mockResolvedValue(mockProvider);
 
     await agent.start();
 
@@ -240,7 +191,7 @@ describe('Delegation Integration Tests', () => {
       name: 'delegate',
       arguments: delegateInput,
     };
-    const result = await delegateTool.execute(toolCall.arguments);
+    const result = await delegateToolInstance.execute(toolCall.arguments);
 
     // Debug: Print the result to see what went wrong
     if (result.isError) {
@@ -272,61 +223,4 @@ describe('Delegation Integration Tests', () => {
     // Cleanup
     createProviderSpy.mockRestore();
   }); // Should complete quickly with mock provider
-
-  it('should process main thread only for UI timeline', () => {
-    const mainThreadId = threadManager.generateThreadId();
-    const delegateThreadId = `${mainThreadId}.1`;
-
-    const events = [
-      {
-        id: 'evt1',
-        threadId: mainThreadId,
-        type: 'USER_MESSAGE' as const,
-        timestamp: new Date(),
-        data: 'Analyze this code',
-      },
-      {
-        id: 'evt2',
-        threadId: delegateThreadId,
-        type: 'AGENT_MESSAGE' as const,
-        timestamp: new Date(),
-        data: 'Starting analysis...',
-      },
-      {
-        id: 'evt3',
-        threadId: delegateThreadId,
-        type: 'TOOL_CALL' as const,
-        timestamp: new Date(),
-        data: { id: 'call1', name: 'bash', arguments: { command: 'find .' } },
-      },
-      {
-        id: 'evt4',
-        threadId: delegateThreadId,
-        type: 'TOOL_RESULT' as const,
-        timestamp: new Date(),
-        data: {
-          id: 'call1',
-          content: [{ type: 'text' as const, text: 'Found files' }],
-          isError: false,
-        },
-      },
-      {
-        id: 'evt5',
-        threadId: delegateThreadId,
-        type: 'AGENT_MESSAGE' as const,
-        timestamp: new Date(),
-        data: 'Analysis complete',
-      },
-    ];
-
-    const processor = new ThreadProcessor();
-    const result = processor.processThreads(events);
-
-    // Simplified processor only returns main thread events
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0].type).toBe('user_message');
-
-    // Delegate events are processed separately by DelegationBox components
-    // when they fetch their own delegate thread data
-  });
 });

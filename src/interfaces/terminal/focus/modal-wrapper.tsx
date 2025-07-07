@@ -97,6 +97,7 @@ export function ModalWrapper({
       focusId={focusId}
       isActive={isOpen}
       renderWhenInactive={false}
+      autoFocus={true}
       onFocusActivated={onFocusActivated}
       onFocusRestored={onFocusRestored}
     >

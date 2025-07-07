@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { Box } from 'ink';
 import TimelineDisplay from '../TimelineDisplay.js';
-import { Timeline } from '../../../../thread-processor.js';
+import { Timeline } from '../../../../timeline-types.js';
 import { LaceFocusProvider } from '../../../focus/focus-provider.js';
 import { TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
 import { FocusRegions } from '../../../focus/focus-regions.js';

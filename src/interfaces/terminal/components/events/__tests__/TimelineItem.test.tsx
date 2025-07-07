@@ -5,7 +5,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { TimelineItem } from '../TimelineItem.js';
-import { TimelineItem as TimelineItemType } from '../../../../thread-processor.js';
+import { TimelineItem as TimelineItemType } from '../../../../timeline-types.js';
 import { Text } from 'ink';
 import { TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
 

@@ -26,33 +26,23 @@ import { CommandRegistry } from '../../commands/registry.js';
 import { CommandExecutor } from '../../commands/executor.js';
 import type { UserInterface } from '../../commands/types.js';
 import { ThreadEvent } from '../../threads/types.js';
-import { ThreadProcessor } from '../thread-processor.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
+import { StreamingTimelineProcessor } from '../streaming-timeline-processor.js';
 import { LaceFocusProvider } from './focus/index.js';
 import { useProjectContext } from './hooks/use-project-context.js';
 import { logger } from '../../utils/logger.js';
 
-// ThreadProcessor context for interface-level caching
-const ThreadProcessorContext = createContext<ThreadProcessor | null>(null);
 
-export const useThreadProcessor = (): ThreadProcessor => {
-  const processor = useContext(ThreadProcessorContext);
+// StreamingTimelineProcessor context for O(1) timeline processing
+const StreamingTimelineProcessorContext = createContext<StreamingTimelineProcessor | null>(null);
+
+export const useStreamingTimelineProcessor = (): StreamingTimelineProcessor => {
+  const processor = useContext(StreamingTimelineProcessorContext);
   if (!processor) {
-    throw new Error('useThreadProcessor must be used within ThreadProcessorContext.Provider');
+    throw new Error('useStreamingTimelineProcessor must be used within StreamingTimelineProcessorContext.Provider');
   }
   return processor;
 };
 
-// ThreadManager context for direct thread data access
-const ThreadManagerContext = createContext<ThreadManager | null>(null);
-
-export const useThreadManager = (): ThreadManager => {
-  const manager = useContext(ThreadManagerContext);
-  if (!manager) {
-    throw new Error('useThreadManager must be used within ThreadManagerContext.Provider');
-  }
-  return manager;
-};
 
 // Interface context for SIGINT communication
 const InterfaceContext = createContext<{
@@ -165,14 +155,28 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   approvalCallback,
   interfaceContext,
 }) => {
-  // Create one ThreadProcessor instance per interface
-  const threadProcessor = useMemo(() => new ThreadProcessor(), []);
+  // Create StreamingTimelineProcessor for O(1) timeline processing
+  const streamingTimelineProcessor = useMemo(() => {
+    const processor = new StreamingTimelineProcessor();
+    // Set up callback to trigger React updates when timeline changes
+    processor.setChangeCallback(() => {
+      const newVersion = processor.getVersion();
+      logger.debug('React timeline version update', {
+        newVersion,
+        timelineItemCount: processor.getTimeline().items.length,
+      });
+      setTimelineVersion(newVersion);
+    });
+    return processor;
+  }, []);
   const bottomSectionRef = useRef<any>(null);
   const timelineContainerRef = useRef<any>(null);
   const [bottomSectionHeight, setBottomSectionHeight] = useState<number>(0);
   const [timelineContainerHeight, setTimelineContainerHeight] = useState<number>(0);
   const [, terminalHeight] = useStdoutDimensions();
-  const [events, setEvents] = useState<ThreadEvent[]>([]);
+  // Remove events array - StreamingTimelineProcessor manages timeline state
+  // Track timeline version for React updates
+  const [timelineVersion, setTimelineVersion] = useState(0);
   const [ephemeralMessages, setEphemeralMessages] = useState<Message[]>([]);
   const [currentInput, setCurrentInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -279,20 +283,44 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   }, []);
 
 
-  // Sync events from agent's thread (including delegate threads)
-  const syncEvents = useCallback(() => {
-    const threadId = agent.threadManager.getCurrentThreadId();
-    if (threadId) {
-      const threadEvents = agent.threadManager.getMainAndDelegateEvents(threadId);
-      setEvents([...threadEvents]);
+  // Add an ephemeral message
+  const addMessage = useCallback((message: Message) => {
+    setEphemeralMessages((prev) => [...prev, message]);
+  }, []);
+
+  // Initialize StreamingTimelineProcessor for session resumption (O(n), one time only)
+  const initializeStreamingSession = useCallback(async () => {
+    try {
+      // Thread resumption already handled by app.ts, just load historical events
+      const currentThreadId = agent.getCurrentThreadId();
+      if (currentThreadId) {
+        const historicalEvents = agent.getThreadEvents(currentThreadId);
+        streamingTimelineProcessor.reset();
+        streamingTimelineProcessor.loadEvents(historicalEvents);
+        
+        logger.debug('StreamingTimelineProcessor loaded historical events', {
+          threadId: currentThreadId,
+          eventCount: historicalEvents.length,
+        });
+      } else {
+        logger.warn('No current thread found during session initialization');
+      }
+    } catch (error) {
+      logger.error('Session initialization failed', { error });
+      addMessage({
+        type: 'system',
+        content: `❌ Failed to initialize session: ${error instanceof Error ? error.message : String(error)}`,
+        timestamp: new Date(),
+      });
     }
-  }, [agent]);
+  }, [agent, streamingTimelineProcessor, addMessage]);
+
 
   // Initialize token counts for resumed conversations
   useEffect(() => {
-    const threadId = agent.threadManager.getCurrentThreadId();
+    const threadId = agent.getCurrentThreadId();
     if (threadId) {
-      const events = agent.threadManager.getEvents(threadId);
+      const events = agent.getThreadEvents(threadId);
       
       // If we have existing events, estimate the current context size
       if (events.length > 0) {
@@ -334,11 +362,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     }
   }, []); // Run once on mount
 
-  // Add an ephemeral message
-  const addMessage = useCallback((message: Message) => {
-    setEphemeralMessages((prev) => [...prev, message]);
-  }, []);
-
   // Handle tool approval modal decision
   const handleApprovalDecision = useCallback(
     (decision: ApprovalDecision) => {
@@ -370,7 +393,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
     // Handle agent thinking complete
     const handleThinkingComplete = () => {
-      // No action needed - thinking blocks are handled via ThreadProcessor from ThreadEvents
+      // No action needed - thinking blocks are handled via StreamingTimelineProcessor from Agent events
     };
 
     // Handle agent response complete
@@ -386,34 +409,31 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       }
       setRetryStatus(null);
       
-      syncEvents();
+      // No need to sync events - streaming processor handles them automatically
     };
 
     // Handle tool execution events to show delegation boxes immediately
     const handleToolCallStart = ({ toolName }: { toolName: string }) => {
-      // Sync events when delegation tool starts to show delegation box immediately
-      if (toolName === 'delegate') {
-        syncEvents();
-      }
+      // No need to sync events - streaming processor handles them automatically via thread_event_added
+      // Delegation boxes will appear when the TOOL_CALL event flows through
     };
 
     const handleToolCallComplete = ({ toolName }: { toolName: string }) => {
-      // Sync events after any tool completes (including during delegation)
-      syncEvents();
+      // No need to sync events - streaming processor handles them automatically via thread_event_added
     };
 
     // Handle delegation lifecycle events
     const handleDelegationStart = ({ toolName }: { toolName: string }) => {
       if (toolName === 'delegate') {
         setIsDelegating(true);
-        syncEvents();
+        // No need to sync events - streaming processor handles them automatically
       }
     };
 
     const handleDelegationEnd = ({ toolName }: { toolName: string }) => {
       if (toolName === 'delegate') {
         setIsDelegating(false);
-        syncEvents();
+        // No need to sync events - streaming processor handles them automatically
       }
     };
 
@@ -461,22 +481,17 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     const handleError = ({ error }: { error: Error }) => {
-      const threadId = agent.threadManager.getCurrentThreadId();
+      const threadId = agent.getCurrentThreadId();
       if (threadId) {
-        agent.threadManager.addEvent(
-          threadId,
-          'LOCAL_SYSTEM_MESSAGE',
-          `❌ Error: ${error.message}`
-        );
+        agent.addSystemMessage(`❌ Error: ${error.message}`, threadId);
 
         if (agent.providerName === 'lmstudio') {
-          agent.threadManager.addEvent(
-            threadId,
-            'LOCAL_SYSTEM_MESSAGE',
-            '💡 Try using Anthropic Claude instead: node dist/cli.js --provider anthropic'
+          agent.addSystemMessage(
+            '💡 Try using Anthropic Claude instead: node dist/cli.js --provider anthropic',
+            threadId
           );
         }
-        syncEvents();
+        // No need to sync events - streaming processor handles them automatically via thread_event_added
       }
       setIsProcessing(false);
     };
@@ -800,27 +815,36 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         retryCountdownRef.current = null;
       }
     };
-  }, [agent, addMessage, syncEvents, streamingContent]);
+  }, [agent, addMessage, streamingContent]);
 
-  // Listen to ThreadManager events for real-time delegation updates
+  // Listen to Agent events for pure streaming updates (O(1) per event)
   useEffect(() => {
-    const handleThreadUpdated = ({
+    const handleEventAdded = ({
+      event,
       threadId,
-      eventType,
     }: {
+      event: ThreadEvent;
       threadId: string;
-      eventType: string;
     }) => {
-      // Sync events whenever ANY thread is updated (main or delegate)
-      syncEvents();
+      const currentThreadId = agent.getCurrentThreadId();
+      if (threadId === currentThreadId) {
+        // Stream event directly to processor (O(1) operation)
+        streamingTimelineProcessor.appendEvent(event);
+        
+        logger.debug('StreamingTimelineProcessor appended event', {
+          eventType: event.type,
+          eventId: event.id,
+          threadId,
+        });
+      }
     };
 
-    agent.threadManager.on('thread_updated', handleThreadUpdated);
+    agent.on('thread_event_added', handleEventAdded);
 
     return () => {
-      agent.threadManager.off('thread_updated', handleThreadUpdated);
+      agent.off('thread_event_added', handleEventAdded);
     };
-  }, [agent.threadManager, syncEvents]);
+  }, [agent, streamingTimelineProcessor]);
 
   // Get Ink app instance for proper exit handling
   const app = useApp();
@@ -840,10 +864,10 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
       clearSession(): void {
         // Create new thread and agent
-        const newThreadId = agent.threadManager.generateThreadId();
-        agent.threadManager.createThread(newThreadId);
-        // Reset React state
-        setEvents([]);
+        const newThreadId = agent.generateThreadId();
+        agent.createThread(newThreadId);
+        // Reset streaming processor and ephemeral state
+        streamingTimelineProcessor.reset();
         setEphemeralMessages([]);
         addMessage({
           type: 'system',
@@ -865,8 +889,12 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         setIsTimelineLayoutDebugVisible(prev => !prev);
         return !isTimelineLayoutDebugVisible;
       },
+
+      getPerformanceMetrics(): string {
+        return streamingTimelineProcessor.getPerformanceSummary();
+      },
     }),
-    [agent, app, addMessage, isFocusDebugVisible, isTimelineLayoutDebugVisible]
+    [agent, app, addMessage, isFocusDebugVisible, isTimelineLayoutDebugVisible, streamingTimelineProcessor]
   );
 
   // Handle slash commands using new command system
@@ -917,7 +945,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       // Send to agent (it will create the USER_MESSAGE ThreadEvent)
       try {
         await agent.sendMessage(trimmedInput);
-        syncEvents(); // Ensure we have the latest events including the user message
+        // No need to sync events - streaming processor handles them automatically via thread_event_added
       } catch (error) {
         addMessage({
           type: 'system',
@@ -927,7 +955,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         setIsProcessing(false);
       }
     },
-    [agent, addMessage, handleSlashCommand, syncEvents, isTurnActive, approvalRequest]
+    [agent, addMessage, handleSlashCommand, isTurnActive, approvalRequest]
   );
 
   // Initialize command system
@@ -951,8 +979,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
   // Initialize agent on mount
   useEffect(() => {
-    // Sync existing events from the thread
-    syncEvents();
+    // Initialize streaming session (loads historical events into StreamingTimelineProcessor)
+    initializeStreamingSession();
 
     addMessage({
       type: 'system',
@@ -971,7 +999,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     });
 
     // Initial focus is handled by LaceFocusProvider default stack
-  }, [agent, addMessage, syncEvents]);
+  }, [agent, addMessage, initializeStreamingSession]);
 
   // Approval modal focus is handled by ModalWrapper automatically
 
@@ -985,12 +1013,12 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       const { height } = measureElement(timelineContainerRef.current);
       setTimelineContainerHeight(height);
     }
-  }, [events.length, ephemeralMessages.length, currentInput]); // Re-measure when content or input changes
+  }, [ephemeralMessages.length, currentInput]); // Re-measure when ephemeral content or input changes
+
 
   return (
     <LaceFocusProvider>
-      <ThreadProcessorContext.Provider value={threadProcessor}>
-        <ThreadManagerContext.Provider value={agent.threadManager}>
+      <StreamingTimelineProcessorContext.Provider value={streamingTimelineProcessor}>
           <InterfaceContext.Provider value={{ showAlert, clearAlert }}>
         {/* SIGINT Handler */}
         <SigintHandler agent={agent} showAlert={showAlert} />
@@ -1016,7 +1044,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             */}
             <TimelineExpansionProvider>
               <ConversationDisplay
-              events={events}
               ephemeralMessages={[
                 ...ephemeralMessages,
                 // Add streaming content as ephemeral message
@@ -1042,6 +1069,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               ]}
               bottomSectionHeight={bottomSectionHeight}
               isTimelineLayoutDebugVisible={isTimelineLayoutDebugVisible}
+              timelineVersion={timelineVersion}
             />
             </TimelineExpansionProvider>
           </Box>
@@ -1056,10 +1084,10 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             <StatusBar
               providerName={agent.providerName || 'unknown'}
               modelName={agent.provider?.modelName || undefined}
-              threadId={agent.threadManager.getCurrentThreadId() || undefined}
+              threadId={agent.getCurrentThreadId() || undefined}
               cumulativeTokens={cumulativeTokens}
               isProcessing={isProcessing}
-              messageCount={events.length + ephemeralMessages.length}
+              messageCount={streamingTimelineProcessor.getTimeline().metadata.eventCount + ephemeralMessages.length}
               isTurnActive={isTurnActive}
               turnMetrics={currentTurnMetrics}
               projectContext={projectContext}
@@ -1102,8 +1130,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
           </Box>
         </Box>
           </InterfaceContext.Provider>
-        </ThreadManagerContext.Provider>
-      </ThreadProcessorContext.Provider>
+        </StreamingTimelineProcessorContext.Provider>
     </LaceFocusProvider>
   );
 };

@@ -8,16 +8,16 @@ export const compactCommand: Command = {
   description: 'Compress thread history to save tokens',
 
   async execute(args: string, ui: UserInterface): Promise<void> {
-    const threadId = ui.agent.threadManager.getCurrentThreadId();
+    const threadId = ui.agent.getCurrentThreadId();
     if (!threadId) {
       ui.displayMessage('❌ No active thread to compact');
       return;
     }
 
-    ui.agent.threadManager.compact(threadId);
+    ui.agent.compact(threadId);
 
     // Get the system message that was added
-    const events = ui.agent.threadManager.getEvents(threadId);
+    const events = ui.agent.getThreadEvents(threadId);
     const systemMessage = events.find(
       (e: ThreadEvent) =>
         e.type === 'LOCAL_SYSTEM_MESSAGE' &&

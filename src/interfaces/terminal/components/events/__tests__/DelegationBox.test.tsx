@@ -2,7 +2,7 @@
 // ABOUTME: Verifies timeline analysis functions for delegation and thread processing
 
 import { describe, it, expect } from 'vitest';
-import { Timeline } from '../../../../thread-processor.js';
+import { Timeline } from '../../../../timeline-types.js';
 import {
   isThreadComplete,
   extractTaskFromTimeline,

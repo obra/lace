@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { Timeline } from '../../../thread-processor.js';
+import { Timeline } from '../../../timeline-types.js';
 import { ViewportState } from '../events/hooks/useTimelineViewport.js';
 
 interface RenderDebugPanelProps {

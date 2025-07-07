@@ -3,14 +3,17 @@
 
 import React, { useRef, useCallback, useMemo } from 'react';
 import { Box } from 'ink';
-import { Timeline, TimelineItem as TimelineItemType } from '../../../thread-processor.js';
+import { Timeline, TimelineItem as TimelineItemType } from '../../../timeline-types.js';
 import { TimelineItem } from './TimelineItem.js';
 import { TimelineItemRef } from '../timeline-item-focus.js';
 
 interface ViewportState {
   selectedItemIndex: number;
   selectedLine: number;
+  lineScrollOffset: number;
   itemPositions: number[];
+  totalContentHeight: number;
+  measurementTrigger: number;
 }
 
 interface ViewportActions {
@@ -22,6 +25,7 @@ interface TimelineContentProps {
   viewportState: ViewportState;
   viewportActions: ViewportActions;
   itemRefs: React.MutableRefObject<Map<number, unknown>>;
+  viewportLines: number;
 }
 
 // Helper function to get stable key for timeline items
@@ -46,20 +50,38 @@ export function TimelineContent({
   viewportState,
   viewportActions,
   itemRefs,
+  viewportLines,
 }: TimelineContentProps) {
+  // Only render items that fit in viewport + small buffer for fast startup
+  const itemsToRender = useMemo(() => {
+    const buffer = 5;
+    const maxItems = viewportLines + buffer;
+    
+    if (timeline.items.length <= maxItems) {
+      return timeline.items.map((item, index) => ({ item, originalIndex: index }));
+    }
+    
+    // Only render the most recent items
+    const startIndex = timeline.items.length - maxItems;
+    return timeline.items.slice(startIndex).map((item, index) => ({ 
+      item, 
+      originalIndex: startIndex + index 
+    }));
+  }, [timeline.items, viewportLines]);
+
   return (
     <React.Fragment>
-      {timeline.items.map((item, index) => {
-        const isItemSelected = index === viewportState.selectedItemIndex;
+      {itemsToRender.map(({ item, originalIndex }) => {
+        const isItemSelected = originalIndex === viewportState.selectedItemIndex;
         return (
           <Box
-            key={getTimelineItemKey(item, index)}
+            key={getTimelineItemKey(item, originalIndex)}
             flexDirection="column"
             ref={(ref) => {
               if (ref) {
-                itemRefs.current.set(index, ref);
+                itemRefs.current.set(originalIndex, ref);
               } else {
-                itemRefs.current.delete(index);
+                itemRefs.current.delete(originalIndex);
               }
             }}
           >
@@ -67,7 +89,7 @@ export function TimelineContent({
               item={item}
               isSelected={isItemSelected}
               selectedLine={viewportState.selectedLine}
-              itemStartLine={viewportState.itemPositions[index] || 0}
+              itemStartLine={viewportState.itemPositions[originalIndex] || 0}
               onToggle={viewportActions.triggerRemeasurement}
             />
           </Box>
