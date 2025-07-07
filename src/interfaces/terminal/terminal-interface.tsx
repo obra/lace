@@ -315,6 +315,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     }
   }, [agent, streamingTimelineProcessor, addMessage]);
 
+
   // Initialize token counts for resumed conversations
   useEffect(() => {
     const threadId = agent.getCurrentThreadId();
@@ -888,8 +889,12 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         setIsTimelineLayoutDebugVisible(prev => !prev);
         return !isTimelineLayoutDebugVisible;
       },
+
+      getPerformanceMetrics(): string {
+        return streamingTimelineProcessor.getPerformanceSummary();
+      },
     }),
-    [agent, app, addMessage, isFocusDebugVisible, isTimelineLayoutDebugVisible]
+    [agent, app, addMessage, isFocusDebugVisible, isTimelineLayoutDebugVisible, streamingTimelineProcessor]
   );
 
   // Handle slash commands using new command system
@@ -1009,6 +1014,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       setTimelineContainerHeight(height);
     }
   }, [ephemeralMessages.length, currentInput]); // Re-measure when ephemeral content or input changes
+
 
   return (
     <LaceFocusProvider>

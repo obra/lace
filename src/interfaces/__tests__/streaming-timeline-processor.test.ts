@@ -362,4 +362,45 @@ describe('StreamingTimelineProcessor', () => {
       expect(timeline.metadata.lastActivity).toEqual(new Date('2023-01-01T10:00:02Z'));
     });
   });
+
+  describe('Performance Monitoring', () => {
+    it('should provide performance metrics after processing events', () => {
+      // Add some events to generate metrics
+      for (let i = 0; i < 5; i++) {
+        streamingProcessor.appendEvent({
+          id: `test-${i}`,
+          type: 'USER_MESSAGE',
+          data: `Message ${i}`,
+          timestamp: new Date(),
+          threadId: 'thread-1',
+        });
+      }
+
+      const metrics = streamingProcessor.getMetrics();
+      
+      expect(metrics.appendCount).toBe(5);
+      expect(metrics.averageAppendTime).toBeGreaterThanOrEqual(0);
+      expect(metrics.maxAppendTime).toBeGreaterThanOrEqual(0);
+      expect(metrics.fastPathHits + metrics.slowPathHits).toBe(5);
+    });
+
+    it('should provide readable performance summary', () => {
+      // Add some events
+      streamingProcessor.appendEvent({
+        id: 'test-1',
+        type: 'USER_MESSAGE',
+        data: 'Test message',
+        timestamp: new Date(),
+        threadId: 'thread-1',
+      });
+
+      const summary = streamingProcessor.getPerformanceSummary();
+      
+      expect(summary).toContain('Timeline Performance Summary:');
+      expect(summary).toContain('Events processed: 1');
+      expect(summary).toContain('Average append time:');
+      expect(summary).toContain('Fast path efficiency:');
+      expect(summary).toContain('Timeline size: 1 items');
+    });
+  });
 });

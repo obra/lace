@@ -90,7 +90,7 @@ export class StreamingTimelineProcessor implements TimelineProcessor {
 
     // Final sort to ensure chronological order
     this._timeline.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-    
+
     // Notify React of timeline change (only if we actually loaded events)
     if (events.length > 0) {
       this._notifyChange();
@@ -157,6 +157,27 @@ export class StreamingTimelineProcessor implements TimelineProcessor {
    */
   getMetrics(): PerformanceMetrics {
     return { ...this._metrics };
+  }
+
+  /**
+   * Get performance summary for debugging/monitoring
+   */
+  getPerformanceSummary(): string {
+    const metrics = this._metrics;
+    const fastPathPercentage =
+      metrics.appendCount > 0
+        ? ((metrics.fastPathHits / metrics.appendCount) * 100).toFixed(1)
+        : '0.0';
+
+    return [
+      `Timeline Performance Summary:`,
+      `  Events processed: ${metrics.appendCount}`,
+      `  Average append time: ${metrics.averageAppendTime.toFixed(3)}ms`,
+      `  Max append time: ${metrics.maxAppendTime.toFixed(3)}ms`,
+      `  Fast path efficiency: ${fastPathPercentage}% (${metrics.fastPathHits}/${metrics.appendCount})`,
+      `  Timeline size: ${this._timeline.length} items`,
+      `  Version: ${this._version}`,
+    ].join('\n');
   }
 
   /**
