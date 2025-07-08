@@ -198,14 +198,14 @@ describe('TimelineViewport', () => {
       <TimelineViewport timeline={timeline}>
         {({ windowState }) => (
           <Text>
-            Window: {windowState.windowStartIndex}-{windowState.windowStartIndex + windowState.windowSize}
+            Selected: {windowState.selectedItemIndex}, Scroll: {windowState.scrollTop}
           </Text>
         )}
       </TimelineViewport>
     );
 
-    // Should show window range at bottom
-    expect(lastFrame()).toContain('Window: 950-1000');
+    // Should show selected item at bottom
+    expect(lastFrame()).toContain('Selected: 999');
   });
 
   it('should handle custom focus region', () => {

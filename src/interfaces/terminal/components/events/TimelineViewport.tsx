@@ -136,7 +136,7 @@ export function TimelineViewport({
     }
     
     windowState.setItemHeights(heights);
-  }, [windowState.windowStartIndex, timeline.items.length, windowState.setItemHeights]);
+  }, [windowState.scrollTop, timeline.items.length, windowState.setItemHeights]);
 
   // Trigger remeasurement function
   const triggerRemeasurement = () => {
