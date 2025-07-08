@@ -15,8 +15,6 @@ interface TimelineContentProps {
   windowState: Pick<TimelineWindowState, 
     'selectedItemIndex' | 
     'selectedLineInItem' | 
-    'windowStartIndex' | 
-    'windowSize' | 
     'itemHeights' |
     'getWindowItems' |
     'getCursorViewportLine'
@@ -50,33 +48,31 @@ export function TimelineContent({
   const { 
     selectedItemIndex, 
     selectedLineInItem,
-    windowStartIndex,
     getWindowItems,
   } = windowState;
 
-  // Get items in the current window
-  const windowItems = getWindowItems();
+  // Get all items (Ink will clip with overflow)
+  const allItems = getWindowItems();
 
   // Helper to calculate if an item is selected
-  const isItemSelected = useCallback((globalIndex: number): boolean => {
-    return globalIndex === selectedItemIndex;
+  const isItemSelected = useCallback((index: number): boolean => {
+    return index === selectedItemIndex;
   }, [selectedItemIndex]);
 
   return (
     <React.Fragment>
-      {windowItems.map((item, windowIndex) => {
-        const globalIndex = windowStartIndex + windowIndex;
-        const isSelected = isItemSelected(globalIndex);
+      {allItems.map((item, index) => {
+        const isSelected = isItemSelected(index);
         
         return (
           <Box
-            key={getTimelineItemKey(item, globalIndex)}
+            key={getTimelineItemKey(item, index)}
             flexDirection="column"
             ref={(ref) => {
               if (ref) {
-                itemRefs.current.set(globalIndex, ref);
+                itemRefs.current.set(index, ref);
               } else {
-                itemRefs.current.delete(globalIndex);
+                itemRefs.current.delete(index);
               }
             }}
           >
@@ -84,7 +80,7 @@ export function TimelineContent({
               item={item}
               isSelected={isSelected}
               selectedLine={isSelected ? selectedLineInItem : 0}
-              itemStartLine={0} // Not used in window-based approach
+              itemStartLine={0} // Not used anymore
               onToggle={viewportActions.triggerRemeasurement}
             />
           </Box>

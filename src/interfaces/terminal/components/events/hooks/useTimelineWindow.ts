@@ -1,5 +1,5 @@
-// ABOUTME: Sliding window state management for timeline virtualization
-// ABOUTME: Replaces line-based navigation with item-based + window management
+// ABOUTME: Line-based scrolling state management for timeline virtualization
+// ABOUTME: Implements smooth line-by-line scrolling with overflow hidden
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Timeline, TimelineItem } from '~/interfaces/timeline-types.js';
@@ -8,8 +8,7 @@ import { logger } from '~/utils/logger.js';
 export interface UseTimelineWindowOptions {
   timeline: Timeline;
   viewportHeight: number; // Terminal lines available
-  windowSize?: number; // Items to render (default: 50)
-  edgeThreshold?: number; // Items from edge before sliding (default: 5) - not used in smooth scrolling
+  windowSize?: number; // Items to render (default: 100 for better scrolling)
 }
 
 export interface TimelineWindowState {
@@ -17,12 +16,13 @@ export interface TimelineWindowState {
   selectedItemIndex: number;
   selectedLineInItem: number;
 
-  // Window state
-  windowStartIndex: number;
-  windowSize: number;
+  // Scroll state
+  scrollTop: number;
+  innerHeight: number; // Total height of all rendered items
 
   // Measurements (only for rendered items)
   itemHeights: Map<number, number>;
+  itemPositions: Map<number, number>; // Cumulative line position of each item
 
   // Navigation methods
   navigateToPreviousLine: () => void;
@@ -41,12 +41,12 @@ export interface TimelineWindowState {
   // Utility methods
   getWindowItems: () => TimelineItem[];
   getCursorViewportLine: () => number;
+  getCursorAbsoluteLine: () => number;
 }
 
 export function useTimelineWindow({
   timeline,
   viewportHeight,
-  windowSize = 50,
 }: UseTimelineWindowOptions): TimelineWindowState {
   // Track if we've initialized to prevent re-initialization on timeline object changes
   const hasInitializedRef = useRef(false);
@@ -54,8 +54,7 @@ export function useTimelineWindow({
   // Calculate initial values
   const getInitialValues = () => {
     const itemIndex = timeline.items.length > 0 ? timeline.items.length - 1 : -1;
-    const windowStart = Math.max(0, timeline.items.length - windowSize);
-    return { itemIndex, windowStart };
+    return { itemIndex };
   };
 
   // Use lazy initialization to prevent re-initialization
@@ -66,66 +65,98 @@ export function useTimelineWindow({
   });
 
   const [selectedLineInItem, setSelectedLineInItem] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [innerHeight, setInnerHeight] = useState(0);
 
-  const [windowStartIndex, setWindowStartIndex] = useState(() => {
-    const { windowStart } = getInitialValues();
-    return windowStart;
-  });
-
+  // Item measurements
   const [itemHeights, setItemHeights] = useState<Map<number, number>>(new Map());
+  const [itemPositions, setItemPositions] = useState<Map<number, number>>(new Map());
 
-  // Update window position to keep selected item centered
-  const updateWindowForSelection = useCallback(
-    (newSelectedIndex: number) => {
-      if (timeline.items.length === 0) return;
+  // Calculate item positions whenever heights change
+  useEffect(() => {
+    const positions = new Map<number, number>();
+    let cumulativeHeight = 0;
+    
+    for (let i = 0; i < timeline.items.length; i++) {
+      positions.set(i, cumulativeHeight);
+      cumulativeHeight += itemHeights.get(i) || 1;
+    }
+    
+    setItemPositions(positions);
+    setInnerHeight(cumulativeHeight);
+  }, [itemHeights, timeline.items.length]);
 
-      setWindowStartIndex(() => {
-        // If timeline fits in window, start at 0
-        if (timeline.items.length <= windowSize) {
-          return 0;
-        }
+  // Calculate absolute line position of cursor
+  const getCursorAbsoluteLine = useCallback((): number => {
+    const itemPosition = itemPositions.get(selectedItemIndex) || 0;
+    return itemPosition + selectedLineInItem;
+  }, [selectedItemIndex, selectedLineInItem, itemPositions]);
 
-        const windowCenter = Math.floor(windowSize / 2);
-        const idealStart = newSelectedIndex - windowCenter;
+  // Calculate cursor position within viewport (accounting for scroll)
+  const getCursorViewportLine = useCallback((): number => {
+    const absoluteLine = getCursorAbsoluteLine();
+    return absoluteLine - scrollTop;
+  }, [getCursorAbsoluteLine, scrollTop]);
 
-        // Clamp to valid range
-        const minStart = 0;
-        const maxStart = timeline.items.length - windowSize;
+  // Update scroll position to keep cursor visible
+  const updateScrollForCursor = useCallback(() => {
+    const cursorAbsoluteLine = getCursorAbsoluteLine();
+    const cursorViewportLine = cursorAbsoluteLine - scrollTop;
 
-        return Math.max(minStart, Math.min(maxStart, idealStart));
+    let newScrollTop = scrollTop;
+
+    // Scroll up if cursor above viewport
+    if (cursorViewportLine < 0) {
+      newScrollTop = cursorAbsoluteLine;
+    }
+    // Scroll down if cursor below viewport
+    else if (cursorViewportLine >= viewportHeight) {
+      newScrollTop = cursorAbsoluteLine - viewportHeight + 1;
+    }
+
+    // Clamp to valid range
+    const maxScroll = Math.max(0, innerHeight - viewportHeight);
+    newScrollTop = Math.max(0, Math.min(maxScroll, newScrollTop));
+
+    if (newScrollTop !== scrollTop) {
+      logger.debug('[useTimelineWindow] Scrolling:', {
+        oldScrollTop: scrollTop,
+        newScrollTop,
+        cursorAbsoluteLine,
+        cursorViewportLine,
+        viewportHeight,
+        reason: cursorViewportLine < 0 ? 'cursor-above' : 'cursor-below'
       });
-    },
-    [timeline.items.length, windowSize]
-  );
+      setScrollTop(newScrollTop);
+    }
+  }, [getCursorAbsoluteLine, scrollTop, viewportHeight, innerHeight]);
 
-  // Navigate to a specific item (updates window to keep it centered)
+  // Navigate to a specific item
   const navigateToItem = useCallback(
     (index: number, lineInItem = 0) => {
       if (timeline.items.length === 0) return;
 
       const clampedIndex = Math.max(0, Math.min(timeline.items.length - 1, index));
-      logger.debug('[useTimelineWindow] navigateToItem called:', {
+      
+      logger.debug('[useTimelineWindow] navigateToItem:', {
         requestedIndex: index,
         clampedIndex,
         lineInItem,
         currentSelectedItemIndex: selectedItemIndex,
       });
+
       setSelectedItemIndex(clampedIndex);
       setSelectedLineInItem(lineInItem);
-      updateWindowForSelection(clampedIndex);
-
-      // Log stack trace if we're jumping more than 5 items
-      if (Math.abs(clampedIndex - selectedItemIndex) > 5) {
-        logger.warn('[useTimelineWindow] Large jump detected!', {
-          from: selectedItemIndex,
-          to: clampedIndex,
-          jump: clampedIndex - selectedItemIndex,
-          stack: new Error().stack,
-        });
-      }
+      
+      // Update scroll will be called in effect
     },
-    [timeline.items.length, updateWindowForSelection, selectedItemIndex]
+    [timeline.items.length, selectedItemIndex]
   );
+
+  // Update scroll whenever selection changes
+  useEffect(() => {
+    updateScrollForCursor();
+  }, [selectedItemIndex, selectedLineInItem, updateScrollForCursor]);
 
   // Line navigation
   const navigateToPreviousLine = useCallback(() => {
@@ -141,22 +172,9 @@ export function useTimelineWindow({
   }, [selectedItemIndex, selectedLineInItem, itemHeights, navigateToItem]);
 
   const navigateToNextLine = useCallback(() => {
-    // Only use line-based navigation if we have height info for current item
-    const hasHeightInfo = itemHeights.has(selectedItemIndex);
     const currentItemHeight = itemHeights.get(selectedItemIndex) || 1;
 
-    logger.debug('[useTimelineWindow] navigateToNextLine called:', {
-      selectedItemIndex,
-      selectedLineInItem,
-      currentItemHeight,
-      hasHeightInfo,
-      itemHeightsSize: itemHeights.size,
-    });
-
-    // If we don't have height info, just move to next item
-    if (!hasHeightInfo && selectedItemIndex < timeline.items.length - 1) {
-      navigateToItem(selectedItemIndex + 1, 0);
-    } else if (selectedLineInItem < currentItemHeight - 1) {
+    if (selectedLineInItem < currentItemHeight - 1) {
       // Move down within current item
       setSelectedLineInItem((prev) => prev + 1);
     } else if (selectedItemIndex < timeline.items.length - 1) {
@@ -180,25 +198,56 @@ export function useTimelineWindow({
 
   // Page navigation
   const navigatePageUp = useCallback(() => {
-    const newIndex = Math.max(0, selectedItemIndex - viewportHeight);
-    navigateToItem(newIndex);
-  }, [selectedItemIndex, viewportHeight, navigateToItem]);
+    // Scroll up by viewport height
+    const newScrollTop = Math.max(0, scrollTop - viewportHeight);
+    setScrollTop(newScrollTop);
+    
+    // Find item at new scroll position
+    let targetIndex = 0;
+    for (let i = 0; i < timeline.items.length; i++) {
+      const itemPos = itemPositions.get(i) || 0;
+      if (itemPos >= newScrollTop) {
+        targetIndex = i;
+        break;
+      }
+    }
+    navigateToItem(targetIndex, 0);
+  }, [scrollTop, viewportHeight, timeline.items.length, itemPositions, navigateToItem]);
 
   const navigatePageDown = useCallback(() => {
-    const newIndex = Math.min(timeline.items.length - 1, selectedItemIndex + viewportHeight);
-    navigateToItem(newIndex);
-  }, [selectedItemIndex, viewportHeight, timeline.items.length, navigateToItem]);
+    // Scroll down by viewport height
+    const maxScroll = Math.max(0, innerHeight - viewportHeight);
+    const newScrollTop = Math.min(maxScroll, scrollTop + viewportHeight);
+    setScrollTop(newScrollTop);
+    
+    // Find item at new scroll position
+    let targetIndex = timeline.items.length - 1;
+    for (let i = 0; i < timeline.items.length; i++) {
+      const itemPos = itemPositions.get(i) || 0;
+      if (itemPos >= newScrollTop + viewportHeight - 1) {
+        targetIndex = Math.max(0, i - 1);
+        break;
+      }
+    }
+    navigateToItem(targetIndex, 0);
+  }, [scrollTop, viewportHeight, innerHeight, timeline.items.length, itemPositions, navigateToItem]);
 
   // Jump navigation
   const jumpToStart = useCallback(() => {
-    navigateToItem(0);
+    setScrollTop(0);
+    navigateToItem(0, 0);
   }, [navigateToItem]);
 
   const jumpToEnd = useCallback(() => {
     if (timeline.items.length > 0) {
-      navigateToItem(timeline.items.length - 1);
+      const lastIndex = timeline.items.length - 1;
+      navigateToItem(lastIndex, 0);
+      
+      // Scroll to bottom
+      const maxScroll = Math.max(0, innerHeight - viewportHeight);
+      setScrollTop(maxScroll);
     }
-  }, [timeline.items.length, navigateToItem]);
+  }, [timeline.items.length, navigateToItem, innerHeight, viewportHeight]);
 
   const jumpToItem = useCallback(
     (index: number) => {
@@ -207,28 +256,11 @@ export function useTimelineWindow({
     [navigateToItem]
   );
 
-  // Get items in current window
+  // Get items that should be rendered (all items for now, Ink will clip with overflow)
   const getWindowItems = useCallback((): TimelineItem[] => {
-    const endIndex = Math.min(windowStartIndex + windowSize, timeline.items.length);
-    return timeline.items.slice(windowStartIndex, endIndex);
-  }, [timeline.items, windowStartIndex, windowSize]);
-
-  // Calculate cursor position within viewport
-  const getCursorViewportLine = useCallback((): number => {
-    let line = 0;
-
-    // Sum heights of all items before selected item in the window
-    for (let i = windowStartIndex; i < selectedItemIndex; i++) {
-      if (i < windowStartIndex + windowSize) {
-        line += itemHeights.get(i) || 1;
-      }
-    }
-
-    // Add selected line within item
-    line += selectedLineInItem;
-
-    return line;
-  }, [windowStartIndex, selectedItemIndex, selectedLineInItem, itemHeights, windowSize]);
+    // Return all items - let Ink handle clipping with overflow="hidden"
+    return timeline.items;
+  }, [timeline.items]);
 
   // Track if we should auto-scroll to bottom when timeline changes
   const prevTimelineLengthRef = useRef(timeline.items.length);
@@ -245,43 +277,30 @@ export function useTimelineWindow({
         selectedItemIndex,
       });
 
-      // Handle initial load case: if we went from empty to having items (resume scenario)
-      // Only jump once to avoid multiple jumps during incremental loading
+      // Handle initial load case: if we went from empty to having items
       if (prevLength === 0 && currentLength > 0 && !hasJumpedToBottomRef.current) {
         logger.debug('[useTimelineWindow] Jumping to bottom on initial load');
         hasJumpedToBottomRef.current = true;
-        // Jump to bottom
-        const lastIndex = currentLength - 1;
-        setSelectedItemIndex(lastIndex);
-        setSelectedLineInItem(0);
-        setWindowStartIndex(Math.max(0, currentLength - windowSize));
+        jumpToEnd();
       }
       // If timeline grew and we were at the end, stay at the end
       else if (currentLength > prevLength && selectedItemIndex === prevLength - 1) {
-        logger.debug('[useTimelineWindow] Following to new bottom', {
-          currentLength,
-          prevLength,
-          selectedItemIndex,
-          willJumpTo: currentLength - 1,
-        });
-        // Follow to new bottom
-        const lastIndex = currentLength - 1;
-        setSelectedItemIndex(lastIndex);
-        setSelectedLineInItem(0);
-        setWindowStartIndex(Math.max(0, currentLength - windowSize));
+        logger.debug('[useTimelineWindow] Following to new bottom');
+        jumpToEnd();
       }
 
       prevTimelineLengthRef.current = currentLength;
     }
-  }, [timeline.items.length, selectedItemIndex, windowSize]);
+  }, [timeline.items.length, selectedItemIndex, jumpToEnd]);
 
   return {
     // State
     selectedItemIndex,
     selectedLineInItem,
-    windowStartIndex,
-    windowSize,
+    scrollTop,
+    innerHeight,
     itemHeights,
+    itemPositions,
 
     // Navigation
     navigateToPreviousLine,
@@ -300,5 +319,6 @@ export function useTimelineWindow({
     // Utilities
     getWindowItems,
     getCursorViewportLine,
+    getCursorAbsoluteLine,
   };
 }

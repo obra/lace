@@ -33,6 +33,14 @@ export function TimelineViewport({
   isTimelineLayoutDebugVisible,
   children,
 }: TimelineViewportProps) {
+  // Debug: log when component mounts/unmounts
+  useEffect(() => {
+    logger.debug('TimelineViewport mounted', { timelineLength: timeline.items.length });
+    return () => {
+      logger.debug('TimelineViewport unmounted');
+    };
+  }, []);
+
   // Use Lace focus system with custom focus region or default
   const { isFocused, takeFocus } = useLaceFocus(focusRegion || FocusRegions.timeline, { autoFocus: false });
   const [, terminalHeight] = useStdoutDimensions();
@@ -45,11 +53,10 @@ export function TimelineViewport({
     ? Math.max(10, (terminalHeight || 30) - bottomSectionHeight)
     : 10;
 
-  // Use the window-based viewport hook
+  // Use the window-based viewport hook with line scrolling
   const windowState = useTimelineWindow({
     timeline,
     viewportHeight: viewportLines,
-    windowSize: 50, // Default window size
   });
 
   // Get focus context to check for delegate focus
@@ -144,8 +151,12 @@ export function TimelineViewport({
     <Box flexDirection="column" flexGrow={1}>
       {/* Viewport container with cursor overlay */}
       <Box height={viewportLines} flexDirection="column" overflow="hidden">
-        {/* Content container */}
-        <Box flexDirection="column" flexShrink={0}>
+        {/* Content container with negative margin for scrolling */}
+        <Box 
+          flexDirection="column" 
+          flexShrink={0}
+          marginTop={-windowState.scrollTop}
+        >
           {children({
             windowState,
             viewportActions: {
@@ -175,9 +186,9 @@ export function TimelineViewport({
         timeline={timeline}
         viewportState={{
           selectedLine: windowState.getCursorViewportLine(),
-          lineScrollOffset: 0, // Not used in window approach
-          itemPositions: [], // Not used in window approach
-          totalContentHeight: timeline.items.length,
+          lineScrollOffset: windowState.scrollTop,
+          itemPositions: [], // Not used in this approach
+          totalContentHeight: windowState.innerHeight,
           selectedItemIndex: windowState.selectedItemIndex,
           measurementTrigger,
         }}
