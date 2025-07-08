@@ -90,7 +90,9 @@ export async function createPTYSession(
         ...process.env,
         LACE_DIR: process.env.LACE_DIR,
         LACE_TEST_MODE: 'true',
-        TERM: 'xterm-color',
+        TERM: 'xterm-256color',
+        COLORTERM: 'truecolor',
+        FORCE_COLOR: '3',
         ANTHROPIC_KEY: 'sk-ant-test-key-for-testing',
       },
     });
