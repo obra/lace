@@ -85,35 +85,30 @@ export function useTimelineWindow({
   const [windowBounds, setWindowBounds] = useState({ start: 0, end: 50 });
   const [topSpacerHeight, setTopSpacerHeight] = useState(0);
 
+  // Track known heights for all items (not just window)
+  const [allItemHeights] = useState<Map<number, number>>(new Map());
+  
   // Calculate item positions whenever heights change
   useEffect(() => {
     const positions = new Map<number, number>();
     let cumulativeHeight = topSpacerHeight; // Start with spacer
 
-    // Only calculate positions for items in or near the window
-    const calcStart = Math.max(0, windowBounds.start - 10);
-    const calcEnd = Math.min(timeline.items.length, windowBounds.end + 10);
-    
-    // For items before the calculation range, use the spacer height
-    for (let i = 0; i < calcStart; i++) {
-      positions.set(i, topSpacerHeight); // Approximate - items are in the spacer
+    // Update our persistent heights map with any new measurements
+    for (const [index, height] of itemHeights) {
+      allItemHeights.set(index, height);
     }
     
-    // Calculate actual positions for items near the window
-    for (let i = calcStart; i < calcEnd; i++) {
+    // Calculate positions for all items using known or default heights
+    for (let i = 0; i < timeline.items.length; i++) {
       positions.set(i, cumulativeHeight);
-      cumulativeHeight += itemHeights.get(i) || 1;
-    }
-    
-    // For items after the window, approximate
-    for (let i = calcEnd; i < timeline.items.length; i++) {
-      positions.set(i, cumulativeHeight);
-      cumulativeHeight += 1; // Default height
+      // Use known height if available, otherwise default
+      const itemHeight = allItemHeights.get(i) || 1;
+      cumulativeHeight += itemHeight;
     }
 
     setItemPositions(positions);
     setInnerHeight(cumulativeHeight);
-  }, [itemHeights, timeline.items.length, topSpacerHeight, windowBounds]);
+  }, [itemHeights, timeline.items.length, topSpacerHeight, allItemHeights]);
 
   // Calculate absolute line position of cursor
   const getCursorAbsoluteLine = useCallback((): number => {
@@ -333,10 +328,10 @@ export function useTimelineWindow({
         // Trim from top if window is too large
         if (newEnd - newStart > WINDOW_SIZE) {
           const trimCount = newEnd - newStart - WINDOW_SIZE;
-          // Calculate height of items we're trimming
+          // Calculate height of items we're trimming using persistent heights
           let trimmedHeight = 0;
           for (let i = newStart; i < newStart + trimCount; i++) {
-            trimmedHeight += itemHeights.get(i) || 1;
+            trimmedHeight += allItemHeights.get(i) || 1;
           }
           setTopSpacerHeight(prev => prev + trimmedHeight);
           newStart += trimCount;
@@ -351,7 +346,7 @@ export function useTimelineWindow({
         // Reduce top spacer since we're showing real items
         let restoredHeight = 0;
         for (let i = newStart; i < prev.start; i++) {
-          restoredHeight += itemHeights.get(i) || 1;
+          restoredHeight += allItemHeights.get(i) || 1;
         }
         setTopSpacerHeight(prev => Math.max(0, prev - restoredHeight));
         
@@ -376,7 +371,7 @@ export function useTimelineWindow({
       
       return { start: newStart, end: newEnd };
     });
-  }, [selectedItemIndex, timeline.items.length, itemHeights]);
+  }, [selectedItemIndex, timeline.items.length, itemHeights, allItemHeights]);
 
   // Get items that should be rendered (only visible items plus buffer)
   const getWindowItems = useCallback((): TimelineItem[] => {
@@ -391,16 +386,24 @@ export function useTimelineWindow({
   // Track if we should auto-scroll to bottom when timeline changes
   const prevTimelineLengthRef = useRef(timeline.items.length);
   const hasJumpedToBottomRef = useRef(false);
+  const prevInnerHeightRef = useRef(innerHeight);
 
   useEffect(() => {
     const currentLength = timeline.items.length;
     const prevLength = prevTimelineLengthRef.current;
 
-    if (currentLength !== prevLength) {
-      logger.debug('[useTimelineWindow] Timeline length changed:', {
+    if (currentLength !== prevLength || innerHeight !== prevInnerHeightRef.current) {
+      const maxScroll = Math.max(0, prevInnerHeightRef.current - viewportHeight);
+      const wasAtBottom = scrollTop >= maxScroll - 1; // Within 1 line of bottom
+      
+      logger.debug('[useTimelineWindow] Timeline changed:', {
         prevLength,
         currentLength,
         selectedItemIndex,
+        wasAtBottom,
+        scrollTop,
+        maxScroll,
+        innerHeight,
       });
 
       // Handle initial load case: if we went from empty to having items
@@ -409,15 +412,22 @@ export function useTimelineWindow({
         hasJumpedToBottomRef.current = true;
         jumpToEnd();
       }
-      // If timeline grew and we were at the end, stay at the end
+      // If we were at the bottom, stay at the bottom (for streaming content)
+      else if (wasAtBottom && currentLength >= prevLength) {
+        logger.debug('[useTimelineWindow] Staying at bottom during streaming');
+        const newMaxScroll = Math.max(0, innerHeight - viewportHeight);
+        setScrollTop(newMaxScroll);
+      }
+      // If timeline grew and we were at the end item, follow to new bottom
       else if (currentLength > prevLength && selectedItemIndex === prevLength - 1) {
         logger.debug('[useTimelineWindow] Following to new bottom');
         jumpToEnd();
       }
 
       prevTimelineLengthRef.current = currentLength;
+      prevInnerHeightRef.current = innerHeight;
     }
-  }, [timeline.items.length, selectedItemIndex, jumpToEnd]);
+  }, [timeline.items.length, selectedItemIndex, jumpToEnd, scrollTop, innerHeight, viewportHeight]);
 
   return {
     // State
