@@ -148,7 +148,7 @@ export async function waitForText(
       if (Date.now() - startTime > timeout) {
         reject(
           new Error(
-            `Timeout waiting for text: "${expectedText}". Got: "${stripAnsi(session.output.slice(-500))}"`
+            `Timeout waiting for text: "${expectedText}". Full output: "${stripAnsi(session.output)}"`
           )
         );
         return;
