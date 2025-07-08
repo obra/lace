@@ -807,4 +807,229 @@ function MinimalStatusBarTest() {
 5. **When tests pass but users report issues**, suspect environment mismatches in tests
 6. **Terminal rendering behavior is complex** - don't trust mocked environments for layout issues
 
+## Background Colors and Theme Systems
+
+### Using Forked Ink with Background Support
+
+Standard Ink doesn't support background colors. For the timeline redesign, we used a fork that adds this capability:
+
+```json
+{
+  "dependencies": {
+    "ink": "github:obra/ink#v5.2.1-background-colors"
+  }
+}
+```
+
+### Background Color Implementation
+
+```typescript
+// Add background colors to theme system
+export const UI_BACKGROUNDS = {
+  // Input elements
+  SHELL_INPUT: '#666666',
+  
+  // Timeline items with subtle differentiation
+  TIMELINE_AGENT: 'transparent',     // Clean, minimal
+  TIMELINE_USER: '#666666',          // Same as shell input
+  TIMELINE_TOOL: '#2d2d3d',          // Slight blue tint
+  TIMELINE_SELECTED: '#444444',      // Highlight color
+  
+  // Status-based backgrounds (very subtle)
+  TIMELINE_SUCCESS: '#2d2e2d',       // Barely visible green hint
+  TIMELINE_ERROR: '#3d2d2d',         // Subtle red tint
+  TIMELINE_PENDING: '#3d3d2d',       // Muted yellow
+} as const;
+```
+
+### Applying Background Colors
+
+```typescript
+function TimelineEntry({ messageType, status, isSelected }) {
+  const backgroundColor = getBackgroundColor(status, messageType, isSelected);
+  
+  return (
+    <Box 
+      backgroundColor={backgroundColor}
+      width="100%" 
+      padding={1}
+    >
+      {children}
+    </Box>
+  );
+}
+
+function getBackgroundColor(status, messageType, isSelected) {
+  // Selection takes precedence
+  if (isSelected) {
+    return UI_BACKGROUNDS.TIMELINE_SELECTED;
+  }
+  
+  // Message type colors for differentiation
+  const messageTypeColors = {
+    agent: UI_BACKGROUNDS.TIMELINE_AGENT,
+    user: UI_BACKGROUNDS.TIMELINE_USER,
+    tool: UI_BACKGROUNDS.TIMELINE_TOOL,
+  };
+  
+  if (messageTypeColors[messageType]) {
+    return messageTypeColors[messageType];
+  }
+  
+  // Fall back to status colors
+  return UI_BACKGROUNDS[`TIMELINE_${status.toUpperCase()}`];
+}
+```
+
+### Layout Stability with Background Colors
+
+**Critical Pattern**: Avoid layout reflow when changing visual states:
+
+```typescript
+// ❌ WRONG: Margins change with selection state
+<Box 
+  marginLeft={isSelected ? 0 : 1}
+  backgroundColor={backgroundColor}
+  borderStyle={isSelected ? "single" : undefined}
+>
+  {children}
+</Box>
+
+// ✅ CORRECT: Stable layout, only colors change
+<Box 
+  marginLeft={1} 
+  marginRight={1}
+  backgroundColor={backgroundColor}
+  padding={1}
+>
+  {children}
+</Box>
+```
+
+### Border vs Background Color Selection
+
+We experimented with borders for selection indication but found issues:
+
+**Border Problems**:
+- Borders take up character space, causing layout shifts
+- Complex margin adjustments needed to prevent reflow
+- Negative margins create visual artifacts
+
+**Background Color Solution**:
+- No layout impact - colors change without affecting dimensions
+- Consistent spacing and padding
+- Cleaner visual appearance
+
+### Expansion Indicators in Background System
+
+Instead of side indicators, use corner indicators with backgrounds:
+
+```typescript
+function TimelineEntry({ isExpandable, isExpanded }) {
+  const expansionIndicator = isExpandable 
+    ? (isExpanded ? '▼' : '▶') 
+    : '';
+
+  return (
+    <Box backgroundColor={backgroundColor} padding={1}>
+      <Box flexDirection="row">
+        {/* Top-left corner indicator */}
+        {expansionIndicator && (
+          <Box marginRight={1}>
+            <Text color={isSelected ? 'white' : 'gray'}>
+              {expansionIndicator}
+            </Text>
+          </Box>
+        )}
+        
+        {/* Main content */}
+        <Box flexGrow={1}>
+          {children}
+        </Box>
+      </Box>
+      
+      {/* Always show hint line for consistent spacing */}
+      <Box marginTop={0}>
+        <Text color="gray">
+          {isExpandable ? (isSelected ? expandHint : ' ') : ' '}
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+```
+
+### Testing Background Color Components
+
+Background colors affect test assertions:
+
+```typescript
+// ❌ May fail due to ANSI codes in output
+expect(lastFrame()).toContain('Expected text');
+
+// ✅ More flexible content testing
+expect(lastFrame()).toContain('💬'); // Test for symbols
+expect(lastFrame()).not.toContain(UI_SYMBOLS.COLLAPSED); // Test for absence
+
+// ✅ Focus on behavior, not exact formatting
+expect(lastFrame()).toContain(isExpanded ? 'Full content' : 'Summary');
+```
+
+### TypeScript Considerations
+
+Background color props require TypeScript updates:
+
+```typescript
+// Text components don't accept margin props
+// ❌ This causes TypeScript errors
+<Text marginRight={1} color="gray">Content</Text>
+
+// ✅ Wrap in Box for layout props
+<Box marginRight={1}>
+  <Text color="gray">Content</Text>
+</Box>
+```
+
+### Theme Migration Patterns
+
+When moving from side indicators to background colors:
+
+1. **Preserve Visual Hierarchy**: Use subtle color differences for status
+2. **Maintain Content Spacing**: Replace side margins with padding
+3. **Update Tests Gradually**: Focus on behavior over exact visual output
+4. **Consider Accessibility**: Ensure sufficient contrast for all backgrounds
+
+### Message Type Differentiation
+
+Use consistent patterns for different content types:
+
+```typescript
+const MESSAGE_TYPE_BACKGROUNDS = {
+  // User input: matches shell input for consistency
+  user: UI_BACKGROUNDS.SHELL_INPUT,
+  
+  // Agent responses: clean, transparent
+  agent: 'transparent',
+  
+  // Tool output: subtle colored background
+  tool: UI_BACKGROUNDS.TIMELINE_TOOL,
+} as const;
+```
+
+### Performance with Background Colors
+
+Background colors can affect rendering performance:
+
+- **Use CSS-style hex values** instead of named colors when possible
+- **Limit color changes** to avoid excessive re-renders
+- **Cache background calculations** when they depend on complex logic
+
+### Common Background Color Patterns
+
+1. **Subtle Differentiation**: Very close colors with slight tints
+2. **Semantic Grouping**: Same background for related content types  
+3. **Selection Highlighting**: Slightly lighter background for selected items
+4. **Status Indication**: Color hints for success/error/pending states
+5. **Transparency for Minimal UI**: Use `transparent` for clean appearances
+
 This document should be updated as we discover new patterns and solutions for Ink development.
