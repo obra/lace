@@ -40,6 +40,7 @@ export interface TimelineWindowState {
 
   // Utility methods
   getWindowItems: () => TimelineItem[];
+  getWindowStartIndex: () => number; // First item index in window
   getCursorViewportLine: () => number;
   getCursorAbsoluteLine: () => number;
 }
@@ -76,12 +77,12 @@ export function useTimelineWindow({
   useEffect(() => {
     const positions = new Map<number, number>();
     let cumulativeHeight = 0;
-    
+
     for (let i = 0; i < timeline.items.length; i++) {
       positions.set(i, cumulativeHeight);
       cumulativeHeight += itemHeights.get(i) || 1;
     }
-    
+
     setItemPositions(positions);
     setInnerHeight(cumulativeHeight);
   }, [itemHeights, timeline.items.length]);
@@ -125,7 +126,7 @@ export function useTimelineWindow({
         cursorAbsoluteLine,
         cursorViewportLine,
         viewportHeight,
-        reason: cursorViewportLine < 0 ? 'cursor-above' : 'cursor-below'
+        reason: cursorViewportLine < 0 ? 'cursor-above' : 'cursor-below',
       });
       setScrollTop(newScrollTop);
     }
@@ -137,7 +138,7 @@ export function useTimelineWindow({
       if (timeline.items.length === 0) return;
 
       const clampedIndex = Math.max(0, Math.min(timeline.items.length - 1, index));
-      
+
       logger.debug('[useTimelineWindow] navigateToItem:', {
         requestedIndex: index,
         clampedIndex,
@@ -147,7 +148,7 @@ export function useTimelineWindow({
 
       setSelectedItemIndex(clampedIndex);
       setSelectedLineInItem(lineInItem);
-      
+
       // Update scroll will be called in effect
     },
     [timeline.items.length, selectedItemIndex]
@@ -201,7 +202,7 @@ export function useTimelineWindow({
     // Scroll up by viewport height
     const newScrollTop = Math.max(0, scrollTop - viewportHeight);
     setScrollTop(newScrollTop);
-    
+
     // Find item at new scroll position
     let targetIndex = 0;
     for (let i = 0; i < timeline.items.length; i++) {
@@ -219,7 +220,7 @@ export function useTimelineWindow({
     const maxScroll = Math.max(0, innerHeight - viewportHeight);
     const newScrollTop = Math.min(maxScroll, scrollTop + viewportHeight);
     setScrollTop(newScrollTop);
-    
+
     // Find item at new scroll position
     let targetIndex = timeline.items.length - 1;
     for (let i = 0; i < timeline.items.length; i++) {
@@ -230,7 +231,14 @@ export function useTimelineWindow({
       }
     }
     navigateToItem(targetIndex, 0);
-  }, [scrollTop, viewportHeight, innerHeight, timeline.items.length, itemPositions, navigateToItem]);
+  }, [
+    scrollTop,
+    viewportHeight,
+    innerHeight,
+    timeline.items.length,
+    itemPositions,
+    navigateToItem,
+  ]);
 
   // Jump navigation
   const jumpToStart = useCallback(() => {
@@ -242,7 +250,7 @@ export function useTimelineWindow({
     if (timeline.items.length > 0) {
       const lastIndex = timeline.items.length - 1;
       navigateToItem(lastIndex, 0);
-      
+
       // Scroll to bottom
       const maxScroll = Math.max(0, innerHeight - viewportHeight);
       setScrollTop(maxScroll);
@@ -256,11 +264,66 @@ export function useTimelineWindow({
     [navigateToItem]
   );
 
-  // Get items that should be rendered (all items for now, Ink will clip with overflow)
+  // Track window bounds for rendering optimization
+  const [windowBounds, setWindowBounds] = useState({ start: 0, end: 50 });
+
+  // Calculate visible window based on scroll position
+  useEffect(() => {
+    if (timeline.items.length === 0) {
+      setWindowBounds({ start: 0, end: 0 });
+      return;
+    }
+
+    // Find first visible item based on scroll position
+    let startIndex = 0;
+    let accumulatedHeight = 0;
+
+    for (let i = 0; i < timeline.items.length; i++) {
+      const itemHeight = itemHeights.get(i) || 1;
+      if (accumulatedHeight + itemHeight > scrollTop) {
+        startIndex = Math.max(0, i - 5); // Include 5 items before for smooth scrolling
+        break;
+      }
+      accumulatedHeight += itemHeight;
+    }
+
+    // Find last visible item
+    let endIndex = startIndex;
+    let visibleHeight = 0;
+
+    for (let i = startIndex; i < timeline.items.length; i++) {
+      if (visibleHeight > viewportHeight + scrollTop - accumulatedHeight + 50) {
+        // 50 lines buffer
+        endIndex = Math.min(timeline.items.length, i + 5); // Include 5 items after
+        break;
+      }
+      visibleHeight += itemHeights.get(i) || 1;
+    }
+
+    if (endIndex === startIndex) {
+      endIndex = Math.min(timeline.items.length, startIndex + 50); // At least 50 items
+    }
+
+    setWindowBounds({ start: startIndex, end: endIndex });
+
+    logger.debug('[useTimelineWindow] Window bounds updated:', {
+      totalItems: timeline.items.length,
+      startIndex,
+      endIndex,
+      scrollTop,
+      viewportHeight,
+    });
+  }, [timeline.items.length, scrollTop, viewportHeight, itemHeights]);
+
+  // Get items that should be rendered (only visible items plus buffer)
   const getWindowItems = useCallback((): TimelineItem[] => {
-    // Return all items - let Ink handle clipping with overflow="hidden"
-    return timeline.items;
-  }, [timeline.items]);
+    return timeline.items.slice(windowBounds.start, windowBounds.end);
+  }, [timeline.items, windowBounds]);
+
+  // Get the starting index of the window
+  const getWindowStartIndex = useCallback((): number => {
+    return windowBounds.start;
+  }, [windowBounds]);
 
   // Track if we should auto-scroll to bottom when timeline changes
   const prevTimelineLengthRef = useRef(timeline.items.length);
@@ -318,6 +381,7 @@ export function useTimelineWindow({
 
     // Utilities
     getWindowItems,
+    getWindowStartIndex,
     getCursorViewportLine,
     getCursorAbsoluteLine,
   };

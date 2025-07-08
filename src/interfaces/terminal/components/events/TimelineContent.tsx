@@ -17,6 +17,7 @@ interface TimelineContentProps {
     'selectedLineInItem' | 
     'itemHeights' |
     'getWindowItems' |
+    'getWindowStartIndex' |
     'getCursorViewportLine'
   >;
   viewportActions: ViewportActions;
@@ -49,30 +50,33 @@ export function TimelineContent({
     selectedItemIndex, 
     selectedLineInItem,
     getWindowItems,
+    getWindowStartIndex,
   } = windowState;
 
-  // Get all items (Ink will clip with overflow)
-  const allItems = getWindowItems();
+  // Get window items and start index
+  const windowItems = getWindowItems();
+  const windowStartIndex = getWindowStartIndex();
 
   // Helper to calculate if an item is selected
-  const isItemSelected = useCallback((index: number): boolean => {
-    return index === selectedItemIndex;
+  const isItemSelected = useCallback((globalIndex: number): boolean => {
+    return globalIndex === selectedItemIndex;
   }, [selectedItemIndex]);
 
   return (
     <React.Fragment>
-      {allItems.map((item, index) => {
-        const isSelected = isItemSelected(index);
+      {windowItems.map((item, windowIndex) => {
+        const globalIndex = windowStartIndex + windowIndex;
+        const isSelected = isItemSelected(globalIndex);
         
         return (
           <Box
-            key={getTimelineItemKey(item, index)}
+            key={getTimelineItemKey(item, globalIndex)}
             flexDirection="column"
             ref={(ref) => {
               if (ref) {
-                itemRefs.current.set(index, ref);
+                itemRefs.current.set(globalIndex, ref);
               } else {
-                itemRefs.current.delete(index);
+                itemRefs.current.delete(globalIndex);
               }
             }}
           >
