@@ -5,7 +5,7 @@
  * @vitest-environment node
  */
 
-import { it, expect, beforeEach } from 'vitest';
+import { it, expect } from 'vitest';
 import {
   describeE2E,
   createPTYSession,
@@ -20,12 +20,11 @@ import {
 } from '~/__tests__/helpers/terminal-e2e-helpers.js';
 
 describeE2E('PTY Terminal E2E Tests', () => {
-
   it.sequential(
     'should complete full interactive workflow with LMStudio provider',
     async () => {
       const lmstudioAvailable = await isLMStudioAvailable();
-      
+
       const session = await createPTYSession();
 
       try {

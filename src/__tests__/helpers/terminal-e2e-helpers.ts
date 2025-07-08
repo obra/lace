@@ -48,9 +48,9 @@ export function setupE2EEnvironment(): E2ETestEnvironment {
   const uniqueId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   const tempDbPath = path.join(os.tmpdir(), `lace-e2e-test-${uniqueId}.db`);
   const originalEnv = process.env.LACE_DIR;
-  
+
   process.env.LACE_DIR = path.dirname(tempDbPath);
-  
+
   return { tempDbPath, originalEnv };
 }
 
@@ -103,7 +103,11 @@ export async function createPTYSession(
 
     terminal.onExit((event) => {
       if (event.exitCode !== 0) {
-        reject(new Error(`PTY session exited with code ${event.exitCode}, signal ${event.signal}. Output: ${stripAnsi(output)}`));
+        reject(
+          new Error(
+            `PTY session exited with code ${event.exitCode}, signal ${event.signal}. Output: ${stripAnsi(output)}`
+          )
+        );
       }
     });
 
