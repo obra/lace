@@ -43,7 +43,7 @@ export interface TimelineWindowState {
   getWindowStartIndex: () => number; // First item index in window
   getCursorViewportLine: () => number;
   getCursorAbsoluteLine: () => number;
-  
+
   // Spacer heights for virtualization
   topSpacerHeight: number;
 }
@@ -80,14 +80,14 @@ export function useTimelineWindow({
   // Item measurements
   const [itemHeights, setItemHeights] = useState<Map<number, number>>(new Map());
   const [itemPositions, setItemPositions] = useState<Map<number, number>>(new Map());
-  
+
   // Track window bounds and spacer heights
   const [windowBounds, setWindowBounds] = useState({ start: 0, end: 50 });
   const [topSpacerHeight, setTopSpacerHeight] = useState(0);
 
   // Track known heights for all items (not just window)
   const [allItemHeights] = useState<Map<number, number>>(new Map());
-  
+
   // Calculate item positions whenever heights change
   useEffect(() => {
     const positions = new Map<number, number>();
@@ -97,7 +97,7 @@ export function useTimelineWindow({
     for (const [index, height] of itemHeights) {
       allItemHeights.set(index, height);
     }
-    
+
     // Calculate positions for all items using known or default heights
     for (let i = 0; i < timeline.items.length; i++) {
       positions.set(i, cumulativeHeight);
@@ -302,11 +302,11 @@ export function useTimelineWindow({
 
     const WINDOW_SIZE = 50; // Total items to render
     const EXTEND_THRESHOLD = 10; // Extend when cursor is within this many items of edge
-    
+
     setWindowBounds((prev) => {
       let newStart = prev.start;
       let newEnd = prev.end;
-      
+
       // Initial window
       if (prev.end === 0 || prev.end > timeline.items.length) {
         // Start at the end for initial load
@@ -315,16 +315,16 @@ export function useTimelineWindow({
         setTopSpacerHeight(0);
         return { start: newStart, end: newEnd };
       }
-      
+
       // Check if we need to extend the window
       const distanceFromStart = selectedItemIndex - prev.start;
       const distanceFromEnd = prev.end - 1 - selectedItemIndex;
-      
+
       // Extend downward
       if (distanceFromEnd < EXTEND_THRESHOLD && prev.end < timeline.items.length) {
         const extendBy = Math.min(10, timeline.items.length - prev.end);
         newEnd = prev.end + extendBy;
-        
+
         // Trim from top if window is too large
         if (newEnd - newStart > WINDOW_SIZE) {
           const trimCount = newEnd - newStart - WINDOW_SIZE;
@@ -333,23 +333,23 @@ export function useTimelineWindow({
           for (let i = newStart; i < newStart + trimCount; i++) {
             trimmedHeight += allItemHeights.get(i) || 1;
           }
-          setTopSpacerHeight(prev => prev + trimmedHeight);
+          setTopSpacerHeight((prev) => prev + trimmedHeight);
           newStart += trimCount;
         }
       }
-      
+
       // Extend upward
       if (distanceFromStart < EXTEND_THRESHOLD && prev.start > 0) {
         const extendBy = Math.min(10, prev.start);
         newStart = prev.start - extendBy;
-        
+
         // Reduce top spacer since we're showing real items
         let restoredHeight = 0;
         for (let i = newStart; i < prev.start; i++) {
           restoredHeight += allItemHeights.get(i) || 1;
         }
-        setTopSpacerHeight(prev => Math.max(0, prev - restoredHeight));
-        
+        setTopSpacerHeight((prev) => Math.max(0, prev - restoredHeight));
+
         // Trim from bottom if window is too large
         if (newEnd - newStart > WINDOW_SIZE) {
           const trimCount = newEnd - newStart - WINDOW_SIZE;
@@ -357,18 +357,18 @@ export function useTimelineWindow({
           newEnd -= trimCount;
         }
       }
-      
+
       if (newStart === prev.start && newEnd === prev.end) {
         return prev; // No change
       }
-      
+
       logger.debug('[useTimelineWindow] Window sliding:', {
         selectedItemIndex,
         oldWindow: `${prev.start}-${prev.end}`,
         newWindow: `${newStart}-${newEnd}`,
         topSpacerHeight,
       });
-      
+
       return { start: newStart, end: newEnd };
     });
   }, [selectedItemIndex, timeline.items.length, itemHeights, allItemHeights]);
@@ -387,6 +387,7 @@ export function useTimelineWindow({
   const prevTimelineLengthRef = useRef(timeline.items.length);
   const hasJumpedToBottomRef = useRef(false);
   const prevInnerHeightRef = useRef(0); // Start at 0 to detect first change
+  const isAutoScrollingRef = useRef(false); // Prevent feedback loops
 
   useEffect(() => {
     const currentLength = timeline.items.length;
@@ -395,13 +396,13 @@ export function useTimelineWindow({
     // Check if content changed
     const heightChanged = innerHeight !== prevInnerHeightRef.current;
     const lengthChanged = currentLength !== prevLength;
-    
+
     if (lengthChanged || heightChanged) {
       // Calculate if we were near bottom using the PREVIOUS height
       const prevMaxScroll = Math.max(0, prevInnerHeightRef.current - viewportHeight);
       const distanceFromBottom = prevMaxScroll - scrollTop;
       const wasNearBottom = distanceFromBottom <= viewportHeight;
-      
+
       logger.debug('[useTimelineWindow] Content changed:', {
         prevLength,
         currentLength,
@@ -424,13 +425,26 @@ export function useTimelineWindow({
         jumpToEnd();
       }
       // If we were near the bottom and height increased, auto-scroll
-      else if (wasNearBottom && innerHeight > prevInnerHeightRef.current) {
+      else if (
+        wasNearBottom &&
+        innerHeight > prevInnerHeightRef.current &&
+        !isAutoScrollingRef.current
+      ) {
         logger.debug('[useTimelineWindow] Auto-scrolling to bottom (height increased)');
+        isAutoScrollingRef.current = true;
         const newMaxScroll = Math.max(0, innerHeight - viewportHeight);
         setScrollTop(newMaxScroll);
+        // Reset flag after a short delay
+        setTimeout(() => {
+          isAutoScrollingRef.current = false;
+        }, 100);
       }
       // If timeline grew and we were at the end item, follow to new bottom
-      else if (lengthChanged && currentLength > prevLength && selectedItemIndex === prevLength - 1) {
+      else if (
+        lengthChanged &&
+        currentLength > prevLength &&
+        selectedItemIndex === prevLength - 1
+      ) {
         logger.debug('[useTimelineWindow] Following to new bottom (selected last item)');
         jumpToEnd();
       }
@@ -443,7 +457,15 @@ export function useTimelineWindow({
       prevTimelineLengthRef.current = currentLength;
       prevInnerHeightRef.current = innerHeight;
     }
-  }, [timeline.items.length, selectedItemIndex, jumpToEnd, scrollTop, innerHeight, viewportHeight, updateScrollForCursor]);
+  }, [
+    timeline.items.length,
+    selectedItemIndex,
+    jumpToEnd,
+    scrollTop,
+    innerHeight,
+    viewportHeight,
+    updateScrollForCursor,
+  ]);
 
   return {
     // State
@@ -473,7 +495,7 @@ export function useTimelineWindow({
     getWindowStartIndex,
     getCursorViewportLine,
     getCursorAbsoluteLine,
-    
+
     // Spacer
     topSpacerHeight,
   };

@@ -53,11 +53,46 @@ export function TimelineViewport({
     ? Math.max(10, (terminalHeight || 30) - bottomSectionHeight)
     : 10;
 
+  // State for triggering remeasurement
+  const [measurementTrigger, setMeasurementTrigger] = useState(0);
+
   // Use the window-based viewport hook with line scrolling
   const windowState = useTimelineWindow({
     timeline,
     viewportHeight: viewportLines,
   });
+  
+  // Track timeline content for streaming updates
+  const timelineContentRef = useRef<string>('');
+  const measurementTimeoutRef = useRef<NodeJS.Timeout>();
+  const currentContent = JSON.stringify(timeline.items.map(item => 
+    'content' in item ? item.content : 
+    'result' in item ? item.result?.content : 
+    'text' in item ? item.text : ''
+  ));
+  
+  // Trigger remeasurement when content changes (streaming) with debouncing
+  useEffect(() => {
+    if (currentContent !== timelineContentRef.current) {
+      timelineContentRef.current = currentContent;
+      
+      // Clear any pending measurement
+      if (measurementTimeoutRef.current) {
+        clearTimeout(measurementTimeoutRef.current);
+      }
+      
+      // Debounce measurement to avoid rapid updates
+      measurementTimeoutRef.current = setTimeout(() => {
+        setMeasurementTrigger(prev => prev + 1);
+      }, 100);
+    }
+    
+    return () => {
+      if (measurementTimeoutRef.current) {
+        clearTimeout(measurementTimeoutRef.current);
+      }
+    };
+  }, [currentContent]);
 
   // Get focus context to check for delegate focus
   const { currentFocus } = useLaceFocusContext();
@@ -165,7 +200,7 @@ export function TimelineViewport({
       });
       windowState.setItemHeights(heights);
     }
-  }, [windowState.scrollTop, timeline.items.length, windowState.setItemHeights, windowState.itemHeights, windowState.getWindowStartIndex]);
+  }, [windowState.scrollTop, timeline.items.length, windowState.setItemHeights, windowState.itemHeights, windowState.getWindowStartIndex, measurementTrigger]);
 
   // Trigger remeasurement function
   const triggerRemeasurement = () => {
@@ -173,8 +208,6 @@ export function TimelineViewport({
     // This will cause useEffect to run again and remeasure
     setMeasurementTrigger(prev => prev + 1);
   };
-
-  const [measurementTrigger, setMeasurementTrigger] = useState(0);
 
   return (
     <Box flexDirection="column" flexGrow={1}>
