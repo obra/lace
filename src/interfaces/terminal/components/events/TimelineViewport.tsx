@@ -1,11 +1,11 @@
-// ABOUTME: Viewport container component for timeline display with scrolling and navigation
-// ABOUTME: Manages viewport state and keyboard input, renders content and scroll indicators
+// ABOUTME: Viewport container component for timeline display with window-based scrolling
+// ABOUTME: Manages window state, keyboard navigation, and cursor rendering with virtualization
 
 import React, { useRef, useEffect, useState } from 'react';
-import { Box, useInput, Text, useFocus } from 'ink';
+import { Box, useInput, Text, useFocus, measureElement } from 'ink';
 import useStdoutDimensions from '../../../../utils/use-stdout-dimensions.js';
 import { Timeline } from '../../../timeline-types.js';
-import { useTimelineViewport } from './hooks/useTimelineViewport.js';
+import { useTimelineWindow, TimelineWindowState } from './hooks/useTimelineWindow.js';
 import { logger } from '../../../../utils/logger.js';
 import { FocusRegions, useLaceFocus, useLaceFocusContext } from '../../focus/index.js';
 import { RenderDebugPanel } from '../debug/RenderDebugPanel.js';
@@ -17,20 +17,11 @@ interface TimelineViewportProps {
   onItemInteraction?: (selectedItemIndex: number, input: string, key: any, itemRefs?: React.MutableRefObject<Map<number, any>>) => void;
   isTimelineLayoutDebugVisible?: boolean;
   children: (props: {
-    timeline: Timeline;
-    viewportState: {
-      selectedLine: number;
-      lineScrollOffset: number;
-      itemPositions: number[];
-      totalContentHeight: number;
-      selectedItemIndex: number;
-      measurementTrigger: number;
-    };
+    windowState: TimelineWindowState;
     viewportActions: {
       triggerRemeasurement: () => void;
     };
     itemRefs: React.MutableRefObject<Map<number, any>>;
-    viewportLines: number;
   }) => React.ReactNode;
 }
 
@@ -46,7 +37,6 @@ export function TimelineViewport({
   const { isFocused, takeFocus } = useLaceFocus(focusRegion || FocusRegions.timeline, { autoFocus: false });
   const [, terminalHeight] = useStdoutDimensions();
 
-
   // Item refs for measurement
   const itemRefs = useRef<Map<number, any>>(new Map());
 
@@ -55,23 +45,12 @@ export function TimelineViewport({
     ? Math.max(10, (terminalHeight || 30) - bottomSectionHeight)
     : 10;
 
-  // Use the viewport hook
-  const viewport = useTimelineViewport({
+  // Use the window-based viewport hook
+  const windowState = useTimelineWindow({
     timeline,
-    viewportLines,
-    itemRefs,
-    isFocused,
+    viewportHeight: viewportLines,
+    windowSize: 50, // Default window size
   });
-
-  // Measure scroll indicator heights
-  const topIndicatorRef = useRef<any>(null);
-  const bottomIndicatorRef = useRef<any>(null);
-
-  // Calculate scroll indicator visibility
-  const hasMoreAbove = viewport.lineScrollOffset > 0;
-  const hasMoreBelow =
-    viewport.totalContentHeight > 0 &&
-    viewport.lineScrollOffset + viewportLines < viewport.totalContentHeight;
 
   // Get focus context to check for delegate focus
   const { currentFocus } = useLaceFocusContext();
@@ -85,7 +64,7 @@ export function TimelineViewport({
         isFocused,
         currentFocus,
         focusRegion: focusRegion || FocusRegions.timeline,
-        isActive: isFocused && viewport.totalContentHeight > 0,
+        isActive: isFocused && timeline.items.length > 0,
       });
 
       // Don't handle keys if focus is in a delegate context and this is the main timeline
@@ -105,101 +84,100 @@ export function TimelineViewport({
         return; // Let delegate timeline handle all keys
       }
 
-
       // No escape handling - provider handles global escape to pop focus stack
 
       if (key.upArrow) {
-        viewport.navigateUp();
+        windowState.navigateToPreviousLine();
       } else if (key.downArrow) {
-        viewport.navigateDown();
+        windowState.navigateToNextLine();
       } else if (key.pageUp) {
-        viewport.navigatePageUp();
+        windowState.navigatePageUp();
       } else if (key.pageDown) {
-        viewport.navigatePageDown();
+        windowState.navigatePageDown();
       } else if (input === 'g') {
-        viewport.navigateToTop();
+        windowState.jumpToStart();
       } else if (input === 'G') {
-        viewport.navigateToBottom();
+        windowState.jumpToEnd();
       } else if (key.leftArrow || key.rightArrow || key.return) {
         // Forward item interactions to parent with itemRefs
         logger.debug('TimelineViewport: Forwarding item interaction', {
           currentFocus,
           focusRegion: focusRegion || FocusRegions.timeline,
-          selectedItemIndex: viewport.selectedItemIndex,
+          selectedItemIndex: windowState.selectedItemIndex,
           key: Object.keys(key).filter(k => (key as any)[k]).join('+'),
           hasCallback: !!onItemInteraction,
         });
         if (onItemInteraction) {
-          onItemInteraction(viewport.selectedItemIndex, input, key, itemRefs);
+          onItemInteraction(windowState.selectedItemIndex, input, key, itemRefs);
         }
       }
     },
     { isActive: isFocused }
   ); // Always active when focused, not just when content exists
 
+  // Update item heights after measurement
+  useEffect(() => {
+    const heights = new Map<number, number>();
+    
+    for (const [index, ref] of itemRefs.current.entries()) {
+      if (ref && typeof ref === 'object' && 'nodeName' in ref) {
+        const { height } = measureElement(ref);
+        heights.set(index, height);
+      }
+    }
+    
+    windowState.setItemHeights(heights);
+  }, [windowState.windowStartIndex, timeline.items.length, windowState]);
+
+  // Trigger remeasurement function
+  const triggerRemeasurement = () => {
+    // Force re-render by updating a state variable
+    // This will cause useEffect to run again and remeasure
+    setMeasurementTrigger(prev => prev + 1);
+  };
+
+  const [measurementTrigger, setMeasurementTrigger] = useState(0);
+
   return (
     <Box flexDirection="column" flexGrow={1}>
-      {/* Scroll indicator - more content above */}
-      {hasMoreAbove && (
-        <Box justifyContent="center" ref={topIndicatorRef}>
-          <Text color="dim">↑ content above (line {viewport.lineScrollOffset}) ↑</Text>
-        </Box>
-      )}
-
       {/* Viewport container with cursor overlay */}
       <Box height={viewportLines} flexDirection="column" overflow="hidden">
         {/* Content container */}
-        <Box flexDirection="column" marginTop={-viewport.lineScrollOffset} flexShrink={0}>
+        <Box flexDirection="column" flexShrink={0}>
           {children({
-            timeline,
-            viewportState: {
-              selectedLine: viewport.selectedLine,
-              lineScrollOffset: viewport.lineScrollOffset,
-              itemPositions: viewport.itemPositions,
-              totalContentHeight: viewport.totalContentHeight,
-              selectedItemIndex: viewport.selectedItemIndex,
-              measurementTrigger: viewport.measurementTrigger,
-            },
+            windowState,
             viewportActions: {
-              triggerRemeasurement: viewport.triggerRemeasurement,
+              triggerRemeasurement,
             },
             itemRefs,
-            viewportLines,
           })}
         </Box>
 
         {/* Cursor overlay */}
- 	{ isFocused && 
-        <Box
-          position="absolute"
-          flexDirection="column"
-          marginTop={-viewport.lineScrollOffset + viewport.selectedLine}
-        >
-          <Text backgroundColor="white" color="black">
-            {'>'}
-          </Text>
-        </Box>
-	}
+        {isFocused && (
+          <Box
+            position="absolute"
+            flexDirection="column"
+            marginTop={windowState.getCursorViewportLine()}
+          >
+            <Text backgroundColor="white" color="black">
+              {'>'}
+            </Text>
+          </Box>
+        )}
       </Box>
-
-      {/* Scroll indicator - more content below */}
-      {hasMoreBelow && (
-        <Box justifyContent="center" ref={bottomIndicatorRef}>
-          <Text color="dim">↓ content below ↓</Text>
-        </Box>
-      )}
 
       {/* Debug panel */}
       <RenderDebugPanel
         isVisible={!!isTimelineLayoutDebugVisible}
         timeline={timeline}
         viewportState={{
-          selectedLine: viewport.selectedLine,
-          lineScrollOffset: viewport.lineScrollOffset,
-          itemPositions: viewport.itemPositions,
-          totalContentHeight: viewport.totalContentHeight,
-          selectedItemIndex: viewport.selectedItemIndex,
-          measurementTrigger: viewport.measurementTrigger,
+          selectedLine: windowState.getCursorViewportLine(),
+          lineScrollOffset: 0, // Not used in window approach
+          itemPositions: [], // Not used in window approach
+          totalContentHeight: timeline.items.length,
+          selectedItemIndex: windowState.selectedItemIndex,
+          measurementTrigger,
         }}
         onClose={() => {}}
       />

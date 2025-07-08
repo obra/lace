@@ -1,5 +1,5 @@
-// ABOUTME: Tests for TimelineViewport component focusing on integration behavior
-// ABOUTME: Validates viewport rendering and content management without mocking core dependencies
+// ABOUTME: Tests for TimelineViewport component with window-based virtualization
+// ABOUTME: Validates viewport rendering, window management, and navigation behavior
 
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
@@ -58,8 +58,8 @@ describe('TimelineViewport', () => {
 
     const { lastFrame } = renderWithFocus(
       <TimelineViewport timeline={timeline}>
-        {({ timeline: tl, viewportState, itemRefs }) =>
-          tl.items.map((item, index) => (
+        {({ windowState }) => 
+          windowState.getWindowItems().map((item, index) => (
             <Text key={`${item.type}-${index}`}>
               {item.type === 'user_message' ? item.content : `Item ${index}`}
             </Text>
@@ -69,32 +69,55 @@ describe('TimelineViewport', () => {
     );
 
     // Should render timeline content through children render prop
-    // Note: cursor overlay covers first character, so we see '>essage 0' instead of 'Message 0'
-    expect(lastFrame()).toContain('essage 0');
+    // Window should start at beginning for small timeline
+    expect(lastFrame()).toContain('Message 0');
     expect(lastFrame()).toContain('Message 1');
     expect(lastFrame()).toContain('Message 2');
   });
 
-  it('should provide viewport state to children', () => {
-    const timeline = createMockTimeline(2);
+  it('should provide window state to children', () => {
+    const timeline = createMockTimeline(100);
     let capturedState: any = null;
 
     renderWithFocus(
       <TimelineViewport timeline={timeline}>
-        {({ viewportState }) => {
-          capturedState = viewportState;
+        {({ windowState }) => {
+          capturedState = windowState;
           return <Text>Test content</Text>;
         }}
       </TimelineViewport>
     );
 
-    // Should provide viewport state
+    // Should provide window state
     expect(capturedState).toBeDefined();
-    expect(capturedState.selectedLine).toBeDefined();
-    expect(capturedState.lineScrollOffset).toBeDefined();
-    expect(capturedState.itemPositions).toBeDefined();
-    expect(capturedState.totalContentHeight).toBeDefined();
-    expect(capturedState.selectedItemIndex).toBeDefined();
+    expect(capturedState.selectedItemIndex).toBe(99); // Should start at bottom
+    expect(capturedState.selectedLineInItem).toBe(0);
+    expect(capturedState.windowStartIndex).toBe(50); // 100 - 50 window size
+    expect(capturedState.windowSize).toBe(50);
+    expect(capturedState.itemHeights).toBeInstanceOf(Map);
+    expect(capturedState.getWindowItems).toBeTypeOf('function');
+  });
+
+  it('should provide window navigation actions to children', () => {
+    const timeline = createMockTimeline(10);
+    let capturedState: any = null;
+
+    renderWithFocus(
+      <TimelineViewport timeline={timeline}>
+        {({ windowState }) => {
+          capturedState = windowState;
+          return <Text>Test content</Text>;
+        }}
+      </TimelineViewport>
+    );
+
+    // Should provide navigation methods
+    expect(capturedState.navigateToPreviousLine).toBeTypeOf('function');
+    expect(capturedState.navigateToNextLine).toBeTypeOf('function');
+    expect(capturedState.navigatePageUp).toBeTypeOf('function');
+    expect(capturedState.navigatePageDown).toBeTypeOf('function');
+    expect(capturedState.jumpToStart).toBeTypeOf('function');
+    expect(capturedState.jumpToEnd).toBeTypeOf('function');
   });
 
   it('should provide viewport actions to children', () => {
@@ -133,19 +156,19 @@ describe('TimelineViewport', () => {
     expect(capturedRefs.current).toBeInstanceOf(Map);
   });
 
-  it('should render cursor overlay when focused', () => {
-    const timeline = createMockTimeline(1);
+  it('should render cursor when focused', () => {
+    const timeline = createMockTimeline(3);
 
     const { lastFrame } = renderWithFocus(
       <TimelineViewport timeline={timeline}>
-        {() => <Text>Content</Text>}
+        {({ windowState }) => (
+          <Text>Line {windowState.getCursorViewportLine()}</Text>
+        )}
       </TimelineViewport>
     );
 
-    // Should contain cursor indicator when focused  
-    // Note: cursor only shows when component is actually focused via Ink's focus system
-    // In tests, we'll just check that the content renders without error
-    expect(lastFrame()).toContain('Content');
+    // Should render cursor position
+    expect(lastFrame()).toContain('Line');
   });
 
   it('should handle empty timeline', () => {
@@ -160,26 +183,55 @@ describe('TimelineViewport', () => {
 
     const { lastFrame } = renderWithFocus(
       <TimelineViewport timeline={timeline}>
-        {({ timeline: tl }) => <Text>Items: {tl.items.length}</Text>}
+        {({ windowState }) => <Text>Items: {windowState.getWindowItems().length}</Text>}
       </TimelineViewport>
     );
 
     // Should render without crashing
-    // Note: cursor overlay covers first character
-    expect(lastFrame()).toContain('tems: 0');
+    expect(lastFrame()).toContain('Items: 0');
   });
 
-  it('should accept focus configuration', () => {
-    const timeline = createMockTimeline(1);
+  it('should handle large timeline with window', () => {
+    const timeline = createMockTimeline(1000);
 
     const { lastFrame } = renderWithFocus(
       <TimelineViewport timeline={timeline}>
-        {() => <Text>Focused content</Text>}
+        {({ windowState }) => (
+          <Text>
+            Window: {windowState.windowStartIndex}-{windowState.windowStartIndex + windowState.windowSize}
+          </Text>
+        )}
       </TimelineViewport>
     );
 
-    // Should render without crashing with focus props
-    // Note: cursor overlay covers first character
-    expect(lastFrame()).toContain('ocused content');
+    // Should show window range at bottom
+    expect(lastFrame()).toContain('Window: 950-1000');
+  });
+
+  it('should handle custom focus region', () => {
+    const timeline = createMockTimeline(1);
+
+    const { lastFrame } = renderWithFocus(
+      <TimelineViewport timeline={timeline} focusRegion="custom-region">
+        {() => <Text>Custom focus content</Text>}
+      </TimelineViewport>
+    );
+
+    // Should render without crashing with custom focus region
+    expect(lastFrame()).toContain('Custom focus content');
+  });
+
+  it('should accept onItemInteraction callback', () => {
+    const timeline = createMockTimeline(3);
+    const mockInteraction = vi.fn();
+
+    renderWithFocus(
+      <TimelineViewport timeline={timeline} onItemInteraction={mockInteraction}>
+        {() => <Text>Interactive content</Text>}
+      </TimelineViewport>
+    );
+
+    // Callback should not be called during render
+    expect(mockInteraction).not.toHaveBeenCalled();
   });
 });
