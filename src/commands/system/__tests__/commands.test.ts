@@ -7,6 +7,7 @@ import { exitCommand } from '../exit.js';
 import { clearCommand } from '../clear.js';
 import { statusCommand } from '../status.js';
 import { compactCommand } from '../compact.js';
+import { queueCommand } from '../queue.js';
 import { CommandRegistry } from '../../registry.js';
 import type { UserInterface } from '../../types.js';
 
@@ -36,6 +37,13 @@ describe('System Commands', () => {
         },
       ]),
       providerName: 'test-provider',
+      // Queue methods for queue command
+      getQueueStats: vi.fn().mockReturnValue({
+        queueLength: 0,
+        highPriorityCount: 0,
+      }),
+      getQueueContents: vi.fn().mockReturnValue([]),
+      clearQueue: vi.fn().mockReturnValue(0),
       // Mock tool executor
       toolExecutor: {
         getAllTools: vi.fn().mockReturnValue([]),
@@ -203,9 +211,32 @@ describe('System Commands', () => {
     });
   });
 
+  describe('queueCommand', () => {
+    it('should have correct metadata', () => {
+      expect(queueCommand.name).toBe('queue');
+      expect(queueCommand.description).toBe('View message queue or clear queued messages');
+      expect(typeof queueCommand.execute).toBe('function');
+    });
+
+    it('should handle empty queue', async () => {
+      await queueCommand.execute('', mockUI);
+      
+      expect(mockUI.displayMessage).toHaveBeenCalledWith('📬 Message queue is empty');
+    });
+
+    it('should handle queue clearing', async () => {
+      mockAgent.clearQueue.mockReturnValue(2);
+      
+      await queueCommand.execute('clear', mockUI);
+      
+      expect(mockAgent.clearQueue).toHaveBeenCalled();
+      expect(mockUI.displayMessage).toHaveBeenCalledWith('📬 Cleared 2 user messages from queue');
+    });
+  });
+
   describe('command structure validation', () => {
     it('should have all required fields for each command', () => {
-      const commands = [helpCommand, exitCommand, clearCommand, statusCommand, compactCommand];
+      const commands = [helpCommand, exitCommand, clearCommand, statusCommand, compactCommand, queueCommand];
 
       commands.forEach((command) => {
         expect(command.name).toBeDefined();
@@ -222,14 +253,14 @@ describe('System Commands', () => {
     });
 
     it('should have unique command names', () => {
-      const commands = [helpCommand, exitCommand, clearCommand, statusCommand, compactCommand];
+      const commands = [helpCommand, exitCommand, clearCommand, statusCommand, compactCommand, queueCommand];
       const names = commands.map((cmd) => cmd.name);
       const uniqueNames = new Set(names);
       expect(uniqueNames.size).toBe(names.length);
     });
 
     it('should not have aliases defined (per YAGNI)', () => {
-      const commands = [helpCommand, exitCommand, clearCommand, statusCommand, compactCommand];
+      const commands = [helpCommand, exitCommand, clearCommand, statusCommand, compactCommand, queueCommand];
       commands.forEach((command) => {
         expect(command.aliases).toBeUndefined();
       });

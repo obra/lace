@@ -1432,6 +1432,10 @@ export class Agent extends EventEmitter {
     };
   }
 
+  getQueueContents(): readonly QueuedMessage[] {
+    return [...this._messageQueue];
+  }
+
   clearQueue(filter?: (msg: QueuedMessage) => boolean): number {
     if (!filter) {
       const clearedCount = this._messageQueue.length;
