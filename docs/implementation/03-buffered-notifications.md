@@ -158,7 +158,6 @@ async sendMessage(
 
 Tests:
 - Test queue option works
-- Test backwards compatibility
 - Test events emitted
 
 **Commit**: "feat: add queue option to sendMessage"
