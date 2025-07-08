@@ -3,6 +3,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Timeline, TimelineItem } from '~/interfaces/timeline-types.js';
+import { logger } from '~/utils/logger.js';
 
 export interface UseTimelineWindowOptions {
   timeline: Timeline;
@@ -50,6 +51,12 @@ export function useTimelineWindow({
   // Initialize at bottom of timeline
   const initialItemIndex = timeline.items.length > 0 ? timeline.items.length - 1 : -1;
   const initialWindowStart = Math.max(0, timeline.items.length - windowSize);
+
+  logger.debug('[useTimelineWindow] Initializing with:', {
+    timelineLength: timeline.items.length,
+    initialItemIndex,
+    initialWindowStart,
+  });
 
   const [selectedItemIndex, setSelectedItemIndex] = useState(initialItemIndex);
   const [selectedLineInItem, setSelectedLineInItem] = useState(0);
@@ -185,14 +192,24 @@ export function useTimelineWindow({
 
   // Track if we should auto-scroll to bottom when timeline changes
   const prevTimelineLengthRef = useRef(timeline.items.length);
+  const hasJumpedToBottomRef = useRef(false);
 
   useEffect(() => {
     const currentLength = timeline.items.length;
     const prevLength = prevTimelineLengthRef.current;
 
     if (currentLength !== prevLength) {
+      logger.debug('[useTimelineWindow] Timeline length changed:', {
+        prevLength,
+        currentLength,
+        selectedItemIndex,
+      });
+
       // Handle initial load case: if we went from empty to having items (resume scenario)
-      if (prevLength === 0 && currentLength > 0) {
+      // Only jump once to avoid multiple jumps during incremental loading
+      if (prevLength === 0 && currentLength > 0 && !hasJumpedToBottomRef.current) {
+        logger.debug('[useTimelineWindow] Jumping to bottom on initial load');
+        hasJumpedToBottomRef.current = true;
         // Jump to bottom
         const lastIndex = currentLength - 1;
         setSelectedItemIndex(lastIndex);
@@ -201,6 +218,7 @@ export function useTimelineWindow({
       }
       // If timeline grew and we were at the end, stay at the end
       else if (currentLength > prevLength && selectedItemIndex === prevLength - 1) {
+        logger.debug('[useTimelineWindow] Following to new bottom');
         // Follow to new bottom
         const lastIndex = currentLength - 1;
         setSelectedItemIndex(lastIndex);
