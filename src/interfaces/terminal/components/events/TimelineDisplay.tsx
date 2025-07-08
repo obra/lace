@@ -83,13 +83,11 @@ export default function TimelineDisplay({
       onItemInteraction={handleItemInteraction}
       isTimelineLayoutDebugVisible={isTimelineLayoutDebugVisible}
     >
-      {({ timeline: tl, viewportState, viewportActions, itemRefs, viewportLines }) => (
+      {({ windowState, viewportActions, itemRefs }) => (
         <TimelineContent
-          timeline={tl}
-          viewportState={viewportState}
+          windowState={windowState}
           viewportActions={viewportActions}
           itemRefs={itemRefs}
-          viewportLines={viewportLines}
         />
       )}
     </TimelineViewport>
