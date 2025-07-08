@@ -205,7 +205,7 @@ export function closePTY(session: PTYSession): void {
  * Wait for application to be ready for commands
  */
 export async function waitForReady(session: PTYSession, timeout = DEFAULT_TIMEOUT): Promise<void> {
-  await waitForText(session, 'Ready', timeout);
+  // Wait for either the "Ready" status indicator or the prompt
   await waitForText(session, '> ', timeout);
   // Give command processor time to initialize
   await new Promise((resolve) => setTimeout(resolve, 1000));
