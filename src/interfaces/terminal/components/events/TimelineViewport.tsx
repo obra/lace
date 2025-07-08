@@ -127,7 +127,7 @@ export function TimelineViewport({
     }
     
     windowState.setItemHeights(heights);
-  }, [windowState.windowStartIndex, timeline.items.length, windowState]);
+  }, [windowState.windowStartIndex, timeline.items.length, windowState.setItemHeights]);
 
   // Trigger remeasurement function
   const triggerRemeasurement = () => {

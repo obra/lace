@@ -1,7 +1,7 @@
 // ABOUTME: Sliding window state management for timeline virtualization
 // ABOUTME: Replaces line-based navigation with item-based + window management
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Timeline, TimelineItem } from '~/interfaces/timeline-types.js';
 
 export interface UseTimelineWindowOptions {
@@ -183,18 +183,34 @@ export function useTimelineWindow({
     return line;
   }, [windowStartIndex, selectedItemIndex, selectedLineInItem, itemHeights, windowSize]);
 
-  // Update window when timeline changes (e.g., new items added)
-  const timelineLength = timeline.items.length;
-  const [lastTimelineLength, setLastTimelineLength] = useState(timelineLength);
+  // Track if we should auto-scroll to bottom when timeline changes
+  const prevTimelineLengthRef = useRef(timeline.items.length);
 
-  if (timelineLength !== lastTimelineLength) {
-    setLastTimelineLength(timelineLength);
+  useEffect(() => {
+    const currentLength = timeline.items.length;
+    const prevLength = prevTimelineLengthRef.current;
 
-    // If timeline grew and we were at the end, stay at the end
-    if (timelineLength > lastTimelineLength && selectedItemIndex === lastTimelineLength - 1) {
-      jumpToEnd();
+    if (currentLength !== prevLength) {
+      // Handle initial load case: if we went from empty to having items (resume scenario)
+      if (prevLength === 0 && currentLength > 0) {
+        // Jump to bottom
+        const lastIndex = currentLength - 1;
+        setSelectedItemIndex(lastIndex);
+        setSelectedLineInItem(0);
+        setWindowStartIndex(Math.max(0, currentLength - windowSize));
+      }
+      // If timeline grew and we were at the end, stay at the end
+      else if (currentLength > prevLength && selectedItemIndex === prevLength - 1) {
+        // Follow to new bottom
+        const lastIndex = currentLength - 1;
+        setSelectedItemIndex(lastIndex);
+        setSelectedLineInItem(0);
+        setWindowStartIndex(Math.max(0, currentLength - windowSize));
+      }
+
+      prevTimelineLengthRef.current = currentLength;
     }
-  }
+  }, [timeline.items.length, selectedItemIndex, windowSize]);
 
   return {
     // State

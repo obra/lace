@@ -10,8 +10,7 @@ function createMockTimeline(itemCount: number): Timeline {
   const items = Array.from({ length: itemCount }, (_, i) => ({
     type: 'user_message' as const,
     id: `msg-${i}`,
-    sender: 'user',
-    text: `Message ${i}`,
+    content: `Message ${i}`,
     timestamp: new Date(Date.now() - (itemCount - i) * 1000),
   }));
 
