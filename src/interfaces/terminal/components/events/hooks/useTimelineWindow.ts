@@ -394,13 +394,13 @@ export function useTimelineWindow({
 
     if (currentLength !== prevLength || innerHeight !== prevInnerHeightRef.current) {
       const maxScroll = Math.max(0, prevInnerHeightRef.current - viewportHeight);
-      const wasAtBottom = scrollTop >= maxScroll - 1; // Within 1 line of bottom
+      const wasNearBottom = scrollTop >= maxScroll - viewportHeight; // Within one viewport of bottom
       
       logger.debug('[useTimelineWindow] Timeline changed:', {
         prevLength,
         currentLength,
         selectedItemIndex,
-        wasAtBottom,
+        wasNearBottom,
         scrollTop,
         maxScroll,
         innerHeight,
@@ -412,9 +412,9 @@ export function useTimelineWindow({
         hasJumpedToBottomRef.current = true;
         jumpToEnd();
       }
-      // If we were at the bottom, stay at the bottom (for streaming content)
-      else if (wasAtBottom && currentLength >= prevLength) {
-        logger.debug('[useTimelineWindow] Staying at bottom during streaming');
+      // If we were near the bottom, stay at the bottom (for streaming content)
+      else if (wasNearBottom && currentLength >= prevLength) {
+        logger.debug('[useTimelineWindow] Auto-scrolling to bottom during streaming');
         const newMaxScroll = Math.max(0, innerHeight - viewportHeight);
         setScrollTop(newMaxScroll);
       }
