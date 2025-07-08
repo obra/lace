@@ -386,24 +386,35 @@ export function useTimelineWindow({
   // Track if we should auto-scroll to bottom when timeline changes
   const prevTimelineLengthRef = useRef(timeline.items.length);
   const hasJumpedToBottomRef = useRef(false);
-  const prevInnerHeightRef = useRef(innerHeight);
+  const prevInnerHeightRef = useRef(0); // Start at 0 to detect first change
 
   useEffect(() => {
     const currentLength = timeline.items.length;
     const prevLength = prevTimelineLengthRef.current;
 
-    if (currentLength !== prevLength || innerHeight !== prevInnerHeightRef.current) {
-      const maxScroll = Math.max(0, prevInnerHeightRef.current - viewportHeight);
-      const wasNearBottom = scrollTop >= maxScroll - viewportHeight; // Within one viewport of bottom
+    // Check if content changed
+    const heightChanged = innerHeight !== prevInnerHeightRef.current;
+    const lengthChanged = currentLength !== prevLength;
+    
+    if (lengthChanged || heightChanged) {
+      // Calculate if we were near bottom using the PREVIOUS height
+      const prevMaxScroll = Math.max(0, prevInnerHeightRef.current - viewportHeight);
+      const distanceFromBottom = prevMaxScroll - scrollTop;
+      const wasNearBottom = distanceFromBottom <= viewportHeight;
       
-      logger.debug('[useTimelineWindow] Timeline changed:', {
+      logger.debug('[useTimelineWindow] Content changed:', {
         prevLength,
         currentLength,
+        prevHeight: prevInnerHeightRef.current,
+        innerHeight,
+        heightChanged,
+        lengthChanged,
         selectedItemIndex,
         wasNearBottom,
         scrollTop,
-        maxScroll,
-        innerHeight,
+        prevMaxScroll,
+        distanceFromBottom,
+        viewportHeight,
       });
 
       // Handle initial load case: if we went from empty to having items
@@ -412,22 +423,27 @@ export function useTimelineWindow({
         hasJumpedToBottomRef.current = true;
         jumpToEnd();
       }
-      // If we were near the bottom, stay at the bottom (for streaming content)
-      else if (wasNearBottom && currentLength >= prevLength) {
-        logger.debug('[useTimelineWindow] Auto-scrolling to bottom during streaming');
+      // If we were near the bottom and height increased, auto-scroll
+      else if (wasNearBottom && innerHeight > prevInnerHeightRef.current) {
+        logger.debug('[useTimelineWindow] Auto-scrolling to bottom (height increased)');
         const newMaxScroll = Math.max(0, innerHeight - viewportHeight);
         setScrollTop(newMaxScroll);
       }
       // If timeline grew and we were at the end item, follow to new bottom
-      else if (currentLength > prevLength && selectedItemIndex === prevLength - 1) {
-        logger.debug('[useTimelineWindow] Following to new bottom');
+      else if (lengthChanged && currentLength > prevLength && selectedItemIndex === prevLength - 1) {
+        logger.debug('[useTimelineWindow] Following to new bottom (selected last item)');
         jumpToEnd();
+      }
+      // Also handle case where cursor needs to stay at bottom
+      else if (wasNearBottom && selectedItemIndex === timeline.items.length - 1) {
+        logger.debug('[useTimelineWindow] Keeping cursor at bottom');
+        updateScrollForCursor();
       }
 
       prevTimelineLengthRef.current = currentLength;
       prevInnerHeightRef.current = innerHeight;
     }
-  }, [timeline.items.length, selectedItemIndex, jumpToEnd, scrollTop, innerHeight, viewportHeight]);
+  }, [timeline.items.length, selectedItemIndex, jumpToEnd, scrollTop, innerHeight, viewportHeight, updateScrollForCursor]);
 
   return {
     // State
