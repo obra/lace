@@ -7,6 +7,8 @@ import useStdoutDimensions from '../../../utils/use-stdout-dimensions.js';
 import { CurrentTurnMetrics } from '../../../agents/agent.js';
 import { UI_SYMBOLS } from '../theme.js';
 import type { ProjectContext } from '../hooks/use-project-context.js';
+import type { MessageQueueStats } from '../../../agents/types.js';
+import { QueueIndicator } from './queue-indicator.js';
 
 interface CumulativeTokens {
   promptTokens: number;      // Current context size
@@ -37,6 +39,7 @@ interface StatusBarProps {
   projectContext?: ProjectContext;
   contextWindow?: number;  // Provider's context window limit
   retryStatus?: RetryStatus | null;
+  queueStats?: MessageQueueStats;
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({
@@ -51,6 +54,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   projectContext,
   contextWindow,
   retryStatus = null,
+  queueStats,
 }) => {
   // Format cumulative session tokens for display with context awareness
   const formatCumulativeTokens = (tokens?: CumulativeTokens, contextLimit?: number) => {
@@ -255,6 +259,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
         <Text backgroundColor="blueBright" color="black">
           {' ' + row2LeftContent + row2PaddingStr + row2RightContent + ' '}
         </Text>
+        {queueStats && <QueueIndicator stats={queueStats} />}
       </Box>
     );
   } else {
@@ -283,9 +288,12 @@ const StatusBar: React.FC<StatusBarProps> = ({
     const padding = ' '.repeat(paddingNeeded);
 
     return (
-      <Text backgroundColor="blueBright" color="black">
-        {' ' + finalLeftContent + padding + finalRightContent + ' '}
-      </Text>
+      <Box flexDirection="column">
+        <Text backgroundColor="blueBright" color="black">
+          {' ' + finalLeftContent + padding + finalRightContent + ' '}
+        </Text>
+        {queueStats && <QueueIndicator stats={queueStats} />}
+      </Box>
     );
   }
 };
