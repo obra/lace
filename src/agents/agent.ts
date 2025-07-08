@@ -15,6 +15,7 @@ import { TokenBudgetManager } from '~/token-management/token-budget-manager.js';
 import { TokenBudgetConfig } from '~/token-management/types.js';
 import { loadPromptConfig } from '~/config/prompts.js';
 import { estimateTokens } from '~/utils/token-estimation.js';
+import { QueuedMessage, MessageQueueStats } from './types.js';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -113,6 +114,8 @@ export class Agent extends EventEmitter {
   private _progressTimer: number | null = null;
   private _abortController: AbortController | null = null;
   private _lastStreamingTokenCount = 0; // Track last cumulative token count from streaming
+  private _messageQueue: QueuedMessage[] = [];
+  private _isProcessingQueue = false;
 
   constructor(config: AgentConfig) {
     super();
@@ -1346,5 +1349,61 @@ export class Agent extends EventEmitter {
     const event = this._threadManager.addEvent(threadId, type as EventType, data);
     this.emit('thread_event_added', { event, threadId });
     return event;
+  }
+
+  // Message queue methods
+  queueMessage(
+    content: string,
+    type: QueuedMessage['type'] = 'user',
+    metadata?: QueuedMessage['metadata']
+  ): string {
+    const id = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const message: QueuedMessage = {
+      id,
+      type,
+      content,
+      timestamp: new Date(),
+      metadata,
+    };
+
+    // High priority messages go to the front
+    if (metadata?.priority === 'high') {
+      this._messageQueue.unshift(message);
+    } else {
+      this._messageQueue.push(message);
+    }
+
+    return id;
+  }
+
+  getQueueStats(): MessageQueueStats {
+    const queueLength = this._messageQueue.length;
+    const highPriorityCount = this._messageQueue.filter(
+      (msg) => msg.metadata?.priority === 'high'
+    ).length;
+
+    let oldestMessageAge: number | undefined;
+    if (queueLength > 0) {
+      const oldestMessage = this._messageQueue[this._messageQueue.length - 1];
+      oldestMessageAge = Math.max(0, Date.now() - oldestMessage.timestamp.getTime());
+    }
+
+    return {
+      queueLength,
+      oldestMessageAge,
+      highPriorityCount,
+    };
+  }
+
+  clearQueue(filter?: (msg: QueuedMessage) => boolean): number {
+    if (!filter) {
+      const clearedCount = this._messageQueue.length;
+      this._messageQueue = [];
+      return clearedCount;
+    }
+
+    const originalLength = this._messageQueue.length;
+    this._messageQueue = this._messageQueue.filter((msg) => !filter(msg));
+    return originalLength - this._messageQueue.length;
   }
 }
