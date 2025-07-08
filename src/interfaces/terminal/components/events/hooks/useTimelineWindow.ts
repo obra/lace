@@ -48,19 +48,30 @@ export function useTimelineWindow({
   viewportHeight,
   windowSize = 50,
 }: UseTimelineWindowOptions): TimelineWindowState {
-  // Initialize at bottom of timeline
-  const initialItemIndex = timeline.items.length > 0 ? timeline.items.length - 1 : -1;
-  const initialWindowStart = Math.max(0, timeline.items.length - windowSize);
+  // Track if we've initialized to prevent re-initialization on timeline object changes
+  const hasInitializedRef = useRef(false);
 
-  logger.debug('[useTimelineWindow] Initializing with:', {
-    timelineLength: timeline.items.length,
-    initialItemIndex,
-    initialWindowStart,
+  // Calculate initial values
+  const getInitialValues = () => {
+    const itemIndex = timeline.items.length > 0 ? timeline.items.length - 1 : -1;
+    const windowStart = Math.max(0, timeline.items.length - windowSize);
+    return { itemIndex, windowStart };
+  };
+
+  // Use lazy initialization to prevent re-initialization
+  const [selectedItemIndex, setSelectedItemIndex] = useState(() => {
+    const { itemIndex } = getInitialValues();
+    hasInitializedRef.current = true;
+    return itemIndex;
   });
 
-  const [selectedItemIndex, setSelectedItemIndex] = useState(initialItemIndex);
   const [selectedLineInItem, setSelectedLineInItem] = useState(0);
-  const [windowStartIndex, setWindowStartIndex] = useState(initialWindowStart);
+
+  const [windowStartIndex, setWindowStartIndex] = useState(() => {
+    const { windowStart } = getInitialValues();
+    return windowStart;
+  });
+
   const [itemHeights, setItemHeights] = useState<Map<number, number>>(new Map());
 
   // Update window position to keep selected item centered
@@ -93,11 +104,27 @@ export function useTimelineWindow({
       if (timeline.items.length === 0) return;
 
       const clampedIndex = Math.max(0, Math.min(timeline.items.length - 1, index));
+      logger.debug('[useTimelineWindow] navigateToItem called:', {
+        requestedIndex: index,
+        clampedIndex,
+        lineInItem,
+        currentSelectedItemIndex: selectedItemIndex,
+      });
       setSelectedItemIndex(clampedIndex);
       setSelectedLineInItem(lineInItem);
       updateWindowForSelection(clampedIndex);
+
+      // Log stack trace if we're jumping more than 5 items
+      if (Math.abs(clampedIndex - selectedItemIndex) > 5) {
+        logger.warn('[useTimelineWindow] Large jump detected!', {
+          from: selectedItemIndex,
+          to: clampedIndex,
+          jump: clampedIndex - selectedItemIndex,
+          stack: new Error().stack,
+        });
+      }
     },
-    [timeline.items.length, updateWindowForSelection]
+    [timeline.items.length, updateWindowForSelection, selectedItemIndex]
   );
 
   // Line navigation
@@ -114,9 +141,22 @@ export function useTimelineWindow({
   }, [selectedItemIndex, selectedLineInItem, itemHeights, navigateToItem]);
 
   const navigateToNextLine = useCallback(() => {
+    // Only use line-based navigation if we have height info for current item
+    const hasHeightInfo = itemHeights.has(selectedItemIndex);
     const currentItemHeight = itemHeights.get(selectedItemIndex) || 1;
 
-    if (selectedLineInItem < currentItemHeight - 1) {
+    logger.debug('[useTimelineWindow] navigateToNextLine called:', {
+      selectedItemIndex,
+      selectedLineInItem,
+      currentItemHeight,
+      hasHeightInfo,
+      itemHeightsSize: itemHeights.size,
+    });
+
+    // If we don't have height info, just move to next item
+    if (!hasHeightInfo && selectedItemIndex < timeline.items.length - 1) {
+      navigateToItem(selectedItemIndex + 1, 0);
+    } else if (selectedLineInItem < currentItemHeight - 1) {
       // Move down within current item
       setSelectedLineInItem((prev) => prev + 1);
     } else if (selectedItemIndex < timeline.items.length - 1) {
@@ -218,7 +258,12 @@ export function useTimelineWindow({
       }
       // If timeline grew and we were at the end, stay at the end
       else if (currentLength > prevLength && selectedItemIndex === prevLength - 1) {
-        logger.debug('[useTimelineWindow] Following to new bottom');
+        logger.debug('[useTimelineWindow] Following to new bottom', {
+          currentLength,
+          prevLength,
+          selectedItemIndex,
+          willJumpTo: currentLength - 1,
+        });
         // Follow to new bottom
         const lastIndex = currentLength - 1;
         setSelectedItemIndex(lastIndex);

@@ -87,8 +87,10 @@ export function TimelineViewport({
       // No escape handling - provider handles global escape to pop focus stack
 
       if (key.upArrow) {
+        logger.debug('TimelineViewport: Up arrow pressed');
         windowState.navigateToPreviousLine();
       } else if (key.downArrow) {
+        logger.debug('TimelineViewport: Down arrow pressed');
         windowState.navigateToNextLine();
       } else if (key.pageUp) {
         windowState.navigatePageUp();

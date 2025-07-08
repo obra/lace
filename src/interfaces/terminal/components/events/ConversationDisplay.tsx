@@ -40,15 +40,16 @@ export function ConversationDisplay({
     // Performance monitoring removed to eliminate render overhead
     
     return result;
-  }, [streamingProcessor, timelineVersion]);
+  }, [timelineVersion]); // Only depend on version, not the processor itself
 
   // Convert ephemeral messages to EphemeralMessage format and merge into timeline
   const finalTimeline = useMemo(() => {
-    const startTime = performance.now();
-    
+    // If no ephemeral messages, return the original timeline object (important for stability)
     if (ephemeralMessages.length === 0) {
       return timeline;
     }
+
+    const startTime = performance.now();
 
     // Convert Message[] to EphemeralMessage[] format
     const ephemeralItems: EphemeralMessage[] = ephemeralMessages.map(msg => ({
