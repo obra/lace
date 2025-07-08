@@ -1,5 +1,5 @@
-// ABOUTME: Tests for extracted TimelineContent component
-// ABOUTME: Verifies timeline item rendering, focus management, and prop forwarding
+// ABOUTME: Tests for window-based TimelineContent component
+// ABOUTME: Verifies timeline item rendering within sliding window and focus management
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -66,204 +66,205 @@ describe('TimelineContent Component', () => {
   };
 
   const getDefaultProps = () => ({
-    viewportState: {
-      selectedItemIndex: 0,
-      selectedLine: 0,
-      lineScrollOffset: 0,
-      itemPositions: [0, 5, 10],
-      totalContentHeight: 20,
-      measurementTrigger: 0,
-    },
     viewportActions: {
       triggerRemeasurement: mockTriggerRemeasurement,
     },
     itemRefs: mockItemRefs,
-    viewportLines: 20,
   });
 
-  describe('Basic rendering', () => {
-    it('should render all timeline items', () => {
-      const timeline = createMockTimeline(3);
+  describe('Window-based rendering', () => {
+    it('should render only items in the window', () => {
+      const timeline = createMockTimeline(100);
+      const windowState = {
+        selectedItemIndex: 50,
+        selectedLineInItem: 0,
+        windowStartIndex: 40,
+        windowSize: 20,
+        itemHeights: new Map(),
+        getWindowItems: () => timeline.items.slice(40, 60),
+        getCursorViewportLine: () => 10,
+      };
 
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
+      const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
 
       const frame = lastFrame();
-      expect(frame).toContain('TLI:user_message:FOCUS:timeline'); // First item focused
-      expect(frame).toContain('TLI:user_message:UNFOCUS:timeline'); // Others unfocused
+      // Should render exactly 20 items from the window
+      const itemMatches = frame?.match(/TLI:user_message/g);
+      expect(itemMatches).toHaveLength(20);
     });
 
-    it('should handle empty timeline', () => {
-      const timeline = createMockTimeline(0);
+    it('should handle empty window', () => {
+      const windowState = {
+        selectedItemIndex: -1,
+        selectedLineInItem: 0,
+        windowStartIndex: 0,
+        windowSize: 50,
+        itemHeights: new Map(),
+        getWindowItems: () => [],
+        getCursorViewportLine: () => 0,
+      };
 
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
+      const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
 
       expect(lastFrame()).toBe('');
     });
 
-    it('should render single item timeline', () => {
-      const timeline = createMockTimeline(1);
+    it('should handle window at start of timeline', () => {
+      const timeline = createMockTimeline(100);
+      const windowState = {
+        selectedItemIndex: 0,
+        selectedLineInItem: 0,
+        windowStartIndex: 0,
+        windowSize: 50,
+        itemHeights: new Map(),
+        getWindowItems: () => timeline.items.slice(0, 50),
+        getCursorViewportLine: () => 0,
+      };
 
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
+      const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
+
+      const frame = lastFrame();
+      const itemMatches = frame?.match(/TLI:user_message/g);
+      expect(itemMatches).toHaveLength(50);
+    });
+
+    it('should handle window at end of timeline', () => {
+      const timeline = createMockTimeline(100);
+      const windowState = {
+        selectedItemIndex: 99,
+        selectedLineInItem: 0,
+        windowStartIndex: 50,
+        windowSize: 50,
+        itemHeights: new Map(),
+        getWindowItems: () => timeline.items.slice(50, 100),
+        getCursorViewportLine: () => 49,
+      };
+
+      const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
+
+      const frame = lastFrame();
+      const itemMatches = frame?.match(/TLI:user_message/g);
+      expect(itemMatches).toHaveLength(50);
+    });
+  });
+
+  describe('Focus management within window', () => {
+    it('should focus correct item when selected item is in window', () => {
+      const timeline = createMockTimeline(10);
+      const windowState = {
+        selectedItemIndex: 6,
+        selectedLineInItem: 0,
+        windowStartIndex: 5,
+        windowSize: 5,
+        itemHeights: new Map(),
+        getWindowItems: () => timeline.items.slice(5, 10),
+        getCursorViewportLine: () => 1,
+      };
+
+      const { lastFrame } = renderWithFocus(
+        <TimelineContent windowState={windowState} {...getDefaultProps()} />
+      );
+
+      const frame = lastFrame();
+      expect(frame).toBeDefined();
+      // Should have exactly one focused item
+      const focusedMatches = frame!.match(/:FOCUS:/g);
+      expect(focusedMatches).toHaveLength(1);
+
+      // Should have four unfocused items
+      const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
+      expect(unfocusedMatches).toHaveLength(4);
+    });
+
+    it('should not focus any item when selected item is outside window', () => {
+      const timeline = createMockTimeline(100);
+      const windowState = {
+        selectedItemIndex: 5, // Selected item is outside window
+        selectedLineInItem: 0,
+        windowStartIndex: 50,
+        windowSize: 10,
+        itemHeights: new Map(),
+        getWindowItems: () => timeline.items.slice(50, 60),
+        getCursorViewportLine: () => 0,
+      };
+
+      const { lastFrame } = renderWithFocus(
+        <TimelineContent windowState={windowState} {...getDefaultProps()} />
+      );
+
+      const frame = lastFrame();
+      expect(frame).toBeDefined();
+      // All items should be unfocused
+      const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
+      expect(unfocusedMatches).toHaveLength(10);
+
+      const focusedMatches = frame!.match(/:FOCUS:/g);
+      expect(focusedMatches).toBeNull();
+    });
+  });
+
+  describe('Line selection', () => {
+    it('should pass selectedLineInItem to focused item', () => {
+      const timeline = createMockTimeline(5);
+      const windowState = {
+        selectedItemIndex: 2,
+        selectedLineInItem: 3, // Line 3 within item 2
+        windowStartIndex: 0,
+        windowSize: 5,
+        itemHeights: new Map([[2, 5]]), // Item 2 has 5 lines
+        getWindowItems: () => timeline.items,
+        getCursorViewportLine: () => 8, // Previous items + 3 lines
+      };
+
+      // Our mock doesn't expose line selection, but we verify the prop is passed
+      const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
 
       expect(lastFrame()).toContain('TLI:user_message:FOCUS:timeline');
     });
   });
 
-  describe('Focus management', () => {
-    it('should focus correct item based on selectedItemIndex', () => {
-      const timeline = createMockTimeline(3);
-      const viewportState = {
-        selectedItemIndex: 1, // Second item focused
-        selectedLine: 0,
-        lineScrollOffset: 0,
-        itemPositions: [0, 5, 10],
-        totalContentHeight: 20,
-        measurementTrigger: 0,
-      };
-
-      const { lastFrame } = renderWithFocus(
-        <TimelineContent timeline={timeline} {...getDefaultProps()} viewportState={viewportState} />
-      );
-
-      const frame = lastFrame();
-      expect(frame).toBeDefined();
-      // Should have exactly one focused item (index 1)
-      const focusedMatches = frame!.match(/:FOCUS:/g);
-      expect(focusedMatches).toHaveLength(1);
-
-      // Should have two unfocused items (indices 0 and 2)
-      const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
-      expect(unfocusedMatches).toHaveLength(2);
-    });
-
-    it('should handle selectedItemIndex out of bounds', () => {
-      const timeline = createMockTimeline(2);
-      const viewportState = {
-        selectedItemIndex: 5, // Out of bounds
-        selectedLine: 0,
-        lineScrollOffset: 0,
-        itemPositions: [0, 5],
-        totalContentHeight: 20,
-        measurementTrigger: 0,
-      };
-
-      const { lastFrame } = renderWithFocus(
-        <TimelineContent timeline={timeline} {...getDefaultProps()} viewportState={viewportState} />
-      );
-
-      const frame = lastFrame();
-      expect(frame).toBeDefined();
-      // All items should be unfocused when selectedItemIndex is out of bounds
-      const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
-      expect(unfocusedMatches).toHaveLength(2);
-
-      const focusedMatches = frame!.match(/:FOCUS:/g);
-      expect(focusedMatches).toBeNull();
-    });
-
-    it('should handle negative selectedItemIndex', () => {
-      const timeline = createMockTimeline(2);
-      const viewportState = {
-        selectedItemIndex: -1, // Negative index
-        selectedLine: 0,
-        lineScrollOffset: 0,
-        itemPositions: [0, 5],
-        totalContentHeight: 20,
-        measurementTrigger: 0,
-      };
-
-      const { lastFrame } = renderWithFocus(
-        <TimelineContent timeline={timeline} {...getDefaultProps()} viewportState={viewportState} />
-      );
-
-      const frame = lastFrame();
-      expect(frame).toBeDefined();
-      // All items should be unfocused when selectedItemIndex is negative
-      const unfocusedMatches = frame!.match(/:UNFOCUS:/g);
-      expect(unfocusedMatches).toHaveLength(2);
-
-      const focusedMatches = frame!.match(/:FOCUS:/g);
-      expect(focusedMatches).toBeNull();
-    });
-  });
-
-  describe('Prop forwarding', () => {
-    // Note: delegateTimelines prop has been removed - delegate logic is now internal to DelegationBox
-
-    it('should render without focus props', () => {
-      const timeline = createMockTimeline(1);
-
-      const { lastFrame } = renderWithFocus(
-        <TimelineContent timeline={timeline} {...getDefaultProps()} />
-      );
-
-      expect(lastFrame()).toBeDefined();
-    });
-
-    it('should pass viewportState data to items', () => {
-      const timeline = createMockTimeline(2);
-      const viewportState = {
+  describe('Item measurement', () => {
+    it('should set refs for items in window', () => {
+      const timeline = createMockTimeline(5);
+      const windowState = {
         selectedItemIndex: 0,
-        selectedLine: 10,
-        lineScrollOffset: 0,
-        itemPositions: [5, 15], // Custom positions within viewport
-        totalContentHeight: 30,
-        measurementTrigger: 0,
+        selectedLineInItem: 0,
+        windowStartIndex: 0,
+        windowSize: 5,
+        itemHeights: new Map(),
+        getWindowItems: () => timeline.items,
+        getCursorViewportLine: () => 0,
       };
 
-      // Since our mock doesn't expose the detailed props, we test by ensuring
-      // the component renders without errors with the position data
-      const { lastFrame } = renderWithFocus(
-        <TimelineContent timeline={timeline} {...getDefaultProps()} viewportState={viewportState} />
-      );
+      render(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
 
-      expect(lastFrame()).toContain('TLI:user_message:FOCUS');
+      // Refs should be managed (though we can't test the exact ref values
+      // since they're set asynchronously)
+      expect(mockItemRefs.current).toBeDefined();
     });
 
-    it('should handle missing itemPositions gracefully', () => {
-      const timeline = createMockTimeline(2);
-      const viewportState = {
-        selectedItemIndex: 0,
-        selectedLine: 0,
-        lineScrollOffset: 0,
-        itemPositions: [], // Empty positions array
-        totalContentHeight: 0,
-        measurementTrigger: 0,
+    it('should track window indices for ref management', () => {
+      const timeline = createMockTimeline(100);
+      const windowState = {
+        selectedItemIndex: 75,
+        selectedLineInItem: 0,
+        windowStartIndex: 70,
+        windowSize: 10,
+        itemHeights: new Map(),
+        getWindowItems: () => timeline.items.slice(70, 80),
+        getCursorViewportLine: () => 5,
       };
 
-      const { lastFrame } = renderWithFocus(
-        <TimelineContent timeline={timeline} {...getDefaultProps()} viewportState={viewportState} />
-      );
+      const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
 
-      // Should render without crashing (fallback to 0 for missing positions)
-      expect(lastFrame()).toContain('TLI:user_message:FOCUS');
-    });
-  });
-
-  describe('State management', () => {
-    it('should forward expand states', () => {
-      const timeline = createMockTimeline(1);
-      // These props are passed through but don't affect our mock output
-      // This test verifies the props are accepted without errors
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
-
-      expect(lastFrame()).toContain('TLI:user_message');
-    });
-
-    it('should call triggerRemeasurement through onToggle', () => {
-      const timeline = createMockTimeline(1);
-
-      render(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
-
-      // The onToggle prop is passed to TimelineItem, but we can't easily trigger it
-      // in this test since our mock doesn't expose the callback. This test verifies
-      // the prop is passed without errors.
-      expect(mockTriggerRemeasurement).not.toHaveBeenCalled(); // Not called during render
+      const frame = lastFrame();
+      const itemMatches = frame?.match(/TLI:user_message/g);
+      expect(itemMatches).toHaveLength(10);
     });
   });
 
   describe('Mixed timeline item types', () => {
-    it('should handle different timeline item types', () => {
+    it('should handle different timeline item types in window', () => {
       const timeline: Timeline = {
         items: [
           {
@@ -296,7 +297,17 @@ describe('TimelineContent Component', () => {
         },
       };
 
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
+      const windowState = {
+        selectedItemIndex: 0,
+        selectedLineInItem: 0,
+        windowStartIndex: 0,
+        windowSize: 50,
+        itemHeights: new Map(),
+        getWindowItems: () => timeline.items,
+        getCursorViewportLine: () => 0,
+      };
+
+      const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
 
       const frame = lastFrame();
       expect(frame).toContain('TLI:user_message:FOCUS'); // First item focused
@@ -305,43 +316,25 @@ describe('TimelineContent Component', () => {
     });
   });
 
-  describe('Key generation and refs', () => {
-    it('should generate unique keys for timeline items', () => {
-      const timeline = createMockTimeline(3);
+  describe('Performance', () => {
+    it('should handle large timeline with window efficiently', () => {
+      const timeline = createMockTimeline(10000);
+      const windowState = {
+        selectedItemIndex: 5000,
+        selectedLineInItem: 0,
+        windowStartIndex: 4975,
+        windowSize: 50,
+        itemHeights: new Map(),
+        getWindowItems: () => timeline.items.slice(4975, 5025),
+        getCursorViewportLine: () => 25,
+      };
 
-      // This is tested implicitly - if keys weren't unique, React would warn
-      // The test passing without warnings indicates proper key generation
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
+      const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
 
-      expect(lastFrame()).toContain('TLI:user_message');
-    });
-
-    it('should manage itemRefs correctly', () => {
-      const timeline = createMockTimeline(2);
-
-      render(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
-
-      // ItemRefs should be managed (though we can't test the exact ref values
-      // since they're set asynchronously)
-      expect(mockItemRefs.current).toBeDefined();
-    });
-  });
-
-  describe('Edge cases', () => {
-    it('should handle component without errors', () => {
-      const timeline = createMockTimeline(1);
-
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
-
-      expect(lastFrame()).toContain('TLI:user_message');
-    });
-
-    it('should handle empty expand state maps', () => {
-      const timeline = createMockTimeline(1);
-
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
-
-      expect(lastFrame()).toContain('TLI:user_message');
+      const frame = lastFrame();
+      // Should only render 50 items despite 10k total items
+      const itemMatches = frame?.match(/TLI:user_message/g);
+      expect(itemMatches).toHaveLength(50);
     });
   });
 });

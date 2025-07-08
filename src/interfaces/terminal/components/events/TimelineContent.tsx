@@ -1,31 +1,28 @@
-// ABOUTME: Timeline content component for rendering timeline items list
-// ABOUTME: Manages item refs, positioning, and coordinates between viewport state and item rendering
+// ABOUTME: Timeline content component for rendering timeline items within a sliding window
+// ABOUTME: Implements virtualization by only rendering items visible in the current window
 
-import React, { useRef, useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import { Box } from 'ink';
-import { Timeline, TimelineItem as TimelineItemType } from '../../../timeline-types.js';
+import { TimelineItem as TimelineItemType } from '../../../timeline-types.js';
 import { TimelineItem } from './TimelineItem.js';
-import { TimelineItemRef } from '../timeline-item-focus.js';
-
-interface ViewportState {
-  selectedItemIndex: number;
-  selectedLine: number;
-  lineScrollOffset: number;
-  itemPositions: number[];
-  totalContentHeight: number;
-  measurementTrigger: number;
-}
+import { TimelineWindowState } from './hooks/useTimelineWindow.js';
 
 interface ViewportActions {
   triggerRemeasurement: () => void;
 }
 
 interface TimelineContentProps {
-  timeline: Timeline;
-  viewportState: ViewportState;
+  windowState: Pick<TimelineWindowState, 
+    'selectedItemIndex' | 
+    'selectedLineInItem' | 
+    'windowStartIndex' | 
+    'windowSize' | 
+    'itemHeights' |
+    'getWindowItems' |
+    'getCursorViewportLine'
+  >;
   viewportActions: ViewportActions;
   itemRefs: React.MutableRefObject<Map<number, unknown>>;
-  viewportLines: number;
 }
 
 // Helper function to get stable key for timeline items
@@ -46,50 +43,48 @@ function getTimelineItemKey(item: TimelineItemType, index: number): string {
 }
 
 export function TimelineContent({
-  timeline,
-  viewportState,
+  windowState,
   viewportActions,
   itemRefs,
-  viewportLines,
 }: TimelineContentProps) {
-  // Only render items that fit in viewport + small buffer for fast startup
-  const itemsToRender = useMemo(() => {
-    const buffer = 5;
-    const maxItems = viewportLines + buffer;
-    
-    if (timeline.items.length <= maxItems) {
-      return timeline.items.map((item, index) => ({ item, originalIndex: index }));
-    }
-    
-    // Only render the most recent items
-    const startIndex = timeline.items.length - maxItems;
-    return timeline.items.slice(startIndex).map((item, index) => ({ 
-      item, 
-      originalIndex: startIndex + index 
-    }));
-  }, [timeline.items, viewportLines]);
+  const { 
+    selectedItemIndex, 
+    selectedLineInItem,
+    windowStartIndex,
+    getWindowItems,
+  } = windowState;
+
+  // Get items in the current window
+  const windowItems = getWindowItems();
+
+  // Helper to calculate if an item is selected
+  const isItemSelected = useCallback((globalIndex: number): boolean => {
+    return globalIndex === selectedItemIndex;
+  }, [selectedItemIndex]);
 
   return (
     <React.Fragment>
-      {itemsToRender.map(({ item, originalIndex }) => {
-        const isItemSelected = originalIndex === viewportState.selectedItemIndex;
+      {windowItems.map((item, windowIndex) => {
+        const globalIndex = windowStartIndex + windowIndex;
+        const isSelected = isItemSelected(globalIndex);
+        
         return (
           <Box
-            key={getTimelineItemKey(item, originalIndex)}
+            key={getTimelineItemKey(item, globalIndex)}
             flexDirection="column"
             ref={(ref) => {
               if (ref) {
-                itemRefs.current.set(originalIndex, ref);
+                itemRefs.current.set(globalIndex, ref);
               } else {
-                itemRefs.current.delete(originalIndex);
+                itemRefs.current.delete(globalIndex);
               }
             }}
           >
             <TimelineItem
               item={item}
-              isSelected={isItemSelected}
-              selectedLine={viewportState.selectedLine}
-              itemStartLine={viewportState.itemPositions[originalIndex] || 0}
+              isSelected={isSelected}
+              selectedLine={isSelected ? selectedLineInItem : 0}
+              itemStartLine={0} // Not used in window-based approach
               onToggle={viewportActions.triggerRemeasurement}
             />
           </Box>
