@@ -15,6 +15,20 @@ export const PTY_SESSION_TIMEOUT = 30000;
 export const HELP_COMMAND_TIMEOUT = 15000;
 export const AGENT_RESPONSE_TIMEOUT = 15000;
 
+/**
+ * Check if LMStudio is available for testing
+ */
+export async function isLMStudioAvailable(): Promise<boolean> {
+  try {
+    const response = await fetch('http://localhost:1234/v1/models', {
+      signal: AbortSignal.timeout(3000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 // Types
 export interface PTYSession {
   terminal: pty.IPty;
@@ -77,6 +91,7 @@ export async function createPTYSession(
         LACE_DIR: process.env.LACE_DIR,
         LACE_TEST_MODE: 'true',
         TERM: 'xterm-color',
+        ANTHROPIC_KEY: 'sk-ant-test-key-for-testing',
       },
     });
 
@@ -86,9 +101,15 @@ export async function createPTYSession(
       output += data;
     });
 
+    terminal.onExit((event) => {
+      if (event.exitCode !== 0) {
+        reject(new Error(`PTY session exited with code ${event.exitCode}, signal ${event.signal}. Output: ${stripAnsi(output)}`));
+      }
+    });
+
     const timeoutId = setTimeout(() => {
       terminal.kill();
-      reject(new Error(`PTY session timed out after ${timeout}ms`));
+      reject(new Error(`PTY session timed out after ${timeout}ms. Output: ${stripAnsi(output)}`));
     }, timeout);
 
     const session: PTYSession = {
