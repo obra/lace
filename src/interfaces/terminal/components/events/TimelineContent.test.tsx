@@ -84,6 +84,7 @@ describe('TimelineContent Component', () => {
         itemHeights: new Map(),
         getWindowItems: () => timeline.items.slice(40, 60),
         getCursorViewportLine: () => 10,
+        topSpacerHeight: 0,
       };
 
       const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
@@ -104,6 +105,7 @@ describe('TimelineContent Component', () => {
         itemHeights: new Map(),
         getWindowItems: () => [],
         getCursorViewportLine: () => 0,
+        topSpacerHeight: 0,
       };
 
       const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
@@ -122,6 +124,7 @@ describe('TimelineContent Component', () => {
         itemHeights: new Map(),
         getWindowItems: () => timeline.items.slice(0, 50),
         getCursorViewportLine: () => 0,
+        topSpacerHeight: 0,
       };
 
       const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
@@ -142,6 +145,7 @@ describe('TimelineContent Component', () => {
         itemHeights: new Map(),
         getWindowItems: () => timeline.items.slice(50, 100),
         getCursorViewportLine: () => 49,
+        topSpacerHeight: 0,
       };
 
       const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
@@ -164,6 +168,7 @@ describe('TimelineContent Component', () => {
         itemHeights: new Map(),
         getWindowItems: () => timeline.items.slice(5, 10),
         getCursorViewportLine: () => 1,
+        topSpacerHeight: 0,
       };
 
       const { lastFrame } = renderWithFocus(
@@ -192,6 +197,7 @@ describe('TimelineContent Component', () => {
         itemHeights: new Map(),
         getWindowItems: () => timeline.items.slice(50, 60),
         getCursorViewportLine: () => 0,
+        topSpacerHeight: 0,
       };
 
       const { lastFrame } = renderWithFocus(
@@ -221,6 +227,7 @@ describe('TimelineContent Component', () => {
         itemHeights: new Map([[2, 5]]), // Item 2 has 5 lines
         getWindowItems: () => timeline.items,
         getCursorViewportLine: () => 8, // Previous items + 3 lines
+        topSpacerHeight: 0,
       };
 
       // Our mock doesn't expose line selection, but we verify the prop is passed
@@ -242,6 +249,7 @@ describe('TimelineContent Component', () => {
         itemHeights: new Map(),
         getWindowItems: () => timeline.items,
         getCursorViewportLine: () => 0,
+        topSpacerHeight: 0,
       };
 
       render(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
@@ -262,6 +270,7 @@ describe('TimelineContent Component', () => {
         itemHeights: new Map(),
         getWindowItems: () => timeline.items.slice(70, 80),
         getCursorViewportLine: () => 5,
+        topSpacerHeight: 0,
       };
 
       const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
@@ -315,6 +324,7 @@ describe('TimelineContent Component', () => {
         itemHeights: new Map(),
         getWindowItems: () => timeline.items,
         getCursorViewportLine: () => 0,
+        topSpacerHeight: 0,
       };
 
       const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);
@@ -338,6 +348,7 @@ describe('TimelineContent Component', () => {
         itemHeights: new Map(),
         getWindowItems: () => timeline.items.slice(4975, 5025),
         getCursorViewportLine: () => 25,
+        topSpacerHeight: 0,
       };
 
       const { lastFrame } = renderWithFocus(<TimelineContent windowState={windowState} {...getDefaultProps()} />);

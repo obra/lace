@@ -24,10 +24,6 @@ export async function getToolRenderer(
   // Check cache first
   if (rendererCache.has(toolName)) {
     const cached = rendererCache.get(toolName)!;
-    logger.debug('Tool renderer cache hit', {
-      toolName,
-      found: !!cached,
-    });
     return cached;
   }
   try {

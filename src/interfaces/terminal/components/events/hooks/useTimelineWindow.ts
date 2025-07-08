@@ -43,12 +43,20 @@ export interface TimelineWindowState {
   getWindowStartIndex: () => number; // First item index in window
   getCursorViewportLine: () => number;
   getCursorAbsoluteLine: () => number;
+  
+  // Spacer heights for virtualization
+  topSpacerHeight: number;
 }
 
 export function useTimelineWindow({
   timeline,
   viewportHeight,
 }: UseTimelineWindowOptions): TimelineWindowState {
+  // Debug: Log renders
+  logger.debug('[useTimelineWindow] Rendering', {
+    timelineLength: timeline.items.length,
+    viewportHeight,
+  });
   // Track if we've initialized to prevent re-initialization on timeline object changes
   const hasInitializedRef = useRef(false);
 
@@ -72,20 +80,40 @@ export function useTimelineWindow({
   // Item measurements
   const [itemHeights, setItemHeights] = useState<Map<number, number>>(new Map());
   const [itemPositions, setItemPositions] = useState<Map<number, number>>(new Map());
+  
+  // Track window bounds and spacer heights
+  const [windowBounds, setWindowBounds] = useState({ start: 0, end: 50 });
+  const [topSpacerHeight, setTopSpacerHeight] = useState(0);
 
   // Calculate item positions whenever heights change
   useEffect(() => {
     const positions = new Map<number, number>();
-    let cumulativeHeight = 0;
+    let cumulativeHeight = topSpacerHeight; // Start with spacer
 
-    for (let i = 0; i < timeline.items.length; i++) {
+    // Only calculate positions for items in or near the window
+    const calcStart = Math.max(0, windowBounds.start - 10);
+    const calcEnd = Math.min(timeline.items.length, windowBounds.end + 10);
+    
+    // For items before the calculation range, use the spacer height
+    for (let i = 0; i < calcStart; i++) {
+      positions.set(i, topSpacerHeight); // Approximate - items are in the spacer
+    }
+    
+    // Calculate actual positions for items near the window
+    for (let i = calcStart; i < calcEnd; i++) {
       positions.set(i, cumulativeHeight);
       cumulativeHeight += itemHeights.get(i) || 1;
+    }
+    
+    // For items after the window, approximate
+    for (let i = calcEnd; i < timeline.items.length; i++) {
+      positions.set(i, cumulativeHeight);
+      cumulativeHeight += 1; // Default height
     }
 
     setItemPositions(positions);
     setInnerHeight(cumulativeHeight);
-  }, [itemHeights, timeline.items.length]);
+  }, [itemHeights, timeline.items.length, topSpacerHeight, windowBounds]);
 
   // Calculate absolute line position of cursor
   const getCursorAbsoluteLine = useCallback((): number => {
@@ -157,7 +185,7 @@ export function useTimelineWindow({
   // Update scroll whenever selection changes
   useEffect(() => {
     updateScrollForCursor();
-  }, [selectedItemIndex, selectedLineInItem, updateScrollForCursor]);
+  }, [updateScrollForCursor]);
 
   // Line navigation
   const navigateToPreviousLine = useCallback(() => {
@@ -264,56 +292,91 @@ export function useTimelineWindow({
     [navigateToItem]
   );
 
-  // Track window bounds for rendering optimization
-  const [windowBounds, setWindowBounds] = useState({ start: 0, end: 50 });
-
-  // Calculate visible window based on scroll position
+  // Calculate window bounds with sliding behavior
   useEffect(() => {
     if (timeline.items.length === 0) {
-      setWindowBounds({ start: 0, end: 0 });
+      setWindowBounds((prev) => {
+        if (prev.start === 0 && prev.end === 0) {
+          return prev; // Already empty
+        }
+        return { start: 0, end: 0 };
+      });
+      setTopSpacerHeight(0);
       return;
     }
 
-    // Find first visible item based on scroll position
-    let startIndex = 0;
-    let accumulatedHeight = 0;
-
-    for (let i = 0; i < timeline.items.length; i++) {
-      const itemHeight = itemHeights.get(i) || 1;
-      if (accumulatedHeight + itemHeight > scrollTop) {
-        startIndex = Math.max(0, i - 5); // Include 5 items before for smooth scrolling
-        break;
+    const WINDOW_SIZE = 50; // Total items to render
+    const EXTEND_THRESHOLD = 10; // Extend when cursor is within this many items of edge
+    
+    setWindowBounds((prev) => {
+      let newStart = prev.start;
+      let newEnd = prev.end;
+      
+      // Initial window
+      if (prev.end === 0 || prev.end > timeline.items.length) {
+        // Start at the end for initial load
+        newEnd = timeline.items.length;
+        newStart = Math.max(0, newEnd - WINDOW_SIZE);
+        setTopSpacerHeight(0);
+        return { start: newStart, end: newEnd };
       }
-      accumulatedHeight += itemHeight;
-    }
-
-    // Find last visible item
-    let endIndex = startIndex;
-    let visibleHeight = 0;
-
-    for (let i = startIndex; i < timeline.items.length; i++) {
-      if (visibleHeight > viewportHeight + scrollTop - accumulatedHeight + 50) {
-        // 50 lines buffer
-        endIndex = Math.min(timeline.items.length, i + 5); // Include 5 items after
-        break;
+      
+      // Check if we need to extend the window
+      const distanceFromStart = selectedItemIndex - prev.start;
+      const distanceFromEnd = prev.end - 1 - selectedItemIndex;
+      
+      // Extend downward
+      if (distanceFromEnd < EXTEND_THRESHOLD && prev.end < timeline.items.length) {
+        const extendBy = Math.min(10, timeline.items.length - prev.end);
+        newEnd = prev.end + extendBy;
+        
+        // Trim from top if window is too large
+        if (newEnd - newStart > WINDOW_SIZE) {
+          const trimCount = newEnd - newStart - WINDOW_SIZE;
+          // Calculate height of items we're trimming
+          let trimmedHeight = 0;
+          for (let i = newStart; i < newStart + trimCount; i++) {
+            trimmedHeight += itemHeights.get(i) || 1;
+          }
+          setTopSpacerHeight(prev => prev + trimmedHeight);
+          newStart += trimCount;
+        }
       }
-      visibleHeight += itemHeights.get(i) || 1;
-    }
-
-    if (endIndex === startIndex) {
-      endIndex = Math.min(timeline.items.length, startIndex + 50); // At least 50 items
-    }
-
-    setWindowBounds({ start: startIndex, end: endIndex });
-
-    logger.debug('[useTimelineWindow] Window bounds updated:', {
-      totalItems: timeline.items.length,
-      startIndex,
-      endIndex,
-      scrollTop,
-      viewportHeight,
+      
+      // Extend upward
+      if (distanceFromStart < EXTEND_THRESHOLD && prev.start > 0) {
+        const extendBy = Math.min(10, prev.start);
+        newStart = prev.start - extendBy;
+        
+        // Reduce top spacer since we're showing real items
+        let restoredHeight = 0;
+        for (let i = newStart; i < prev.start; i++) {
+          restoredHeight += itemHeights.get(i) || 1;
+        }
+        setTopSpacerHeight(prev => Math.max(0, prev - restoredHeight));
+        
+        // Trim from bottom if window is too large
+        if (newEnd - newStart > WINDOW_SIZE) {
+          const trimCount = newEnd - newStart - WINDOW_SIZE;
+          // We don't track bottom spacer height since it's implicit
+          newEnd -= trimCount;
+        }
+      }
+      
+      if (newStart === prev.start && newEnd === prev.end) {
+        return prev; // No change
+      }
+      
+      logger.debug('[useTimelineWindow] Window sliding:', {
+        selectedItemIndex,
+        oldWindow: `${prev.start}-${prev.end}`,
+        newWindow: `${newStart}-${newEnd}`,
+        topSpacerHeight,
+      });
+      
+      return { start: newStart, end: newEnd };
     });
-  }, [timeline.items.length, scrollTop, viewportHeight, itemHeights]);
+  }, [selectedItemIndex, timeline.items.length, itemHeights]);
 
   // Get items that should be rendered (only visible items plus buffer)
   const getWindowItems = useCallback((): TimelineItem[] => {
@@ -384,5 +447,8 @@ export function useTimelineWindow({
     getWindowStartIndex,
     getCursorViewportLine,
     getCursorAbsoluteLine,
+    
+    // Spacer
+    topSpacerHeight,
   };
 }

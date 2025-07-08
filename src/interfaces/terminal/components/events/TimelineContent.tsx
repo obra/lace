@@ -18,7 +18,8 @@ interface TimelineContentProps {
     'itemHeights' |
     'getWindowItems' |
     'getWindowStartIndex' |
-    'getCursorViewportLine'
+    'getCursorViewportLine' |
+    'topSpacerHeight'
   >;
   viewportActions: ViewportActions;
   itemRefs: React.MutableRefObject<Map<number, unknown>>;
@@ -51,6 +52,7 @@ export function TimelineContent({
     selectedLineInItem,
     getWindowItems,
     getWindowStartIndex,
+    topSpacerHeight,
   } = windowState;
 
   // Get window items and start index
@@ -64,6 +66,12 @@ export function TimelineContent({
 
   return (
     <React.Fragment>
+      {/* Top spacer for virtualization */}
+      {topSpacerHeight > 0 && (
+        <Box height={topSpacerHeight} flexShrink={0} />
+      )}
+      
+      {/* Rendered window items */}
       {windowItems.map((item, windowIndex) => {
         const globalIndex = windowStartIndex + windowIndex;
         const isSelected = isItemSelected(globalIndex);

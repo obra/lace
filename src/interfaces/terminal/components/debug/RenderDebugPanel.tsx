@@ -4,7 +4,17 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Timeline } from '../../../timeline-types.js';
-import { ViewportState } from '../events/hooks/useTimelineViewport.js';
+
+interface ViewportState {
+  selectedLine: number;
+  lineScrollOffset: number;
+  itemPositions: number[];
+  totalContentHeight: number;
+  selectedItemIndex: number;
+  measurementTrigger: number;
+  windowStart?: number;
+  windowSize?: number;
+}
 
 interface RenderDebugPanelProps {
   isVisible: boolean;
@@ -49,10 +59,13 @@ export function RenderDebugPanel({
       <Box marginTop={1}>
         <Text color="cyan" bold>Viewport State:</Text>
       </Box>
-      <Text>Selected Line: {viewportState.selectedLine}</Text>
-      <Text>Selected Item: {viewportState.selectedItemIndex}</Text>
-      <Text>Scroll Offset: {viewportState.lineScrollOffset}</Text>
-      <Text>Total Height: {viewportState.totalContentHeight}</Text>
+      <Text>Cursor Viewport Line: {viewportState.selectedLine}</Text>
+      <Text>Selected Item Index: {viewportState.selectedItemIndex >= 0 ? viewportState.selectedItemIndex : 'None'} (global)</Text>
+      <Text>Scroll Top: {viewportState.lineScrollOffset} lines</Text>
+      <Text>Total Content Height: {viewportState.totalContentHeight} lines</Text>
+      {viewportState.windowStart !== undefined && (
+        <Text>Window: items {viewportState.windowStart} to {viewportState.windowStart + (viewportState.windowSize || 0) - 1} ({viewportState.windowSize} items)</Text>
+      )}
       
       <Box marginTop={1}>
         <Text color="cyan" bold>Timeline Items ({timeline.items.length}):</Text>

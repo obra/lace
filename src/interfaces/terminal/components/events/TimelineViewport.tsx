@@ -126,8 +126,10 @@ export function TimelineViewport({
 
   // Update item heights after measurement
   useEffect(() => {
-    const heights = new Map<number, number>();
+    // Create new heights map starting with existing heights
+    const heights = new Map(windowState.itemHeights);
     
+    // Update heights for currently rendered items
     for (const [index, ref] of itemRefs.current.entries()) {
       if (ref && typeof ref === 'object' && 'nodeName' in ref) {
         const { height } = measureElement(ref);
@@ -135,8 +137,35 @@ export function TimelineViewport({
       }
     }
     
-    windowState.setItemHeights(heights);
-  }, [windowState.scrollTop, timeline.items.length, windowState.setItemHeights]);
+    // Remove heights for items that no longer exist
+    for (const [index] of heights) {
+      if (index >= timeline.items.length) {
+        heights.delete(index);
+      }
+    }
+    
+    // Only update if heights actually changed
+    const currentHeights = windowState.itemHeights;
+    let hasChanged = heights.size !== currentHeights.size;
+    
+    if (!hasChanged) {
+      for (const [index, height] of heights) {
+        if (currentHeights.get(index) !== height) {
+          hasChanged = true;
+          break;
+        }
+      }
+    }
+    
+    if (hasChanged) {
+      logger.debug('[TimelineViewport] Item heights changed, updating', {
+        oldSize: currentHeights.size,
+        newSize: heights.size,
+        windowStart: windowState.getWindowStartIndex(),
+      });
+      windowState.setItemHeights(heights);
+    }
+  }, [windowState.scrollTop, timeline.items.length, windowState.setItemHeights, windowState.itemHeights, windowState.getWindowStartIndex]);
 
   // Trigger remeasurement function
   const triggerRemeasurement = () => {
@@ -191,6 +220,8 @@ export function TimelineViewport({
           totalContentHeight: windowState.innerHeight,
           selectedItemIndex: windowState.selectedItemIndex,
           measurementTrigger,
+          windowStart: windowState.getWindowStartIndex(),
+          windowSize: windowState.getWindowItems().length,
         }}
         onClose={() => {}}
       />

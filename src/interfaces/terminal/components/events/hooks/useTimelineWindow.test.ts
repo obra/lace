@@ -283,14 +283,20 @@ describe('useTimelineWindow', () => {
   });
 
   describe('scrolling behavior', () => {
-    it('returns all items for rendering', () => {
+    it('returns only windowed items for rendering', () => {
       const timeline = createMockTimeline(100);
       const { result } = renderHook(() => useTimelineWindow({ timeline, ...defaultOptions }));
 
+      // At the end of timeline, we should have a window of items
       const items = result.current.getWindowItems();
-      expect(items.length).toBe(100); // All items
-      expect(items[0]).toBe(timeline.items[0]);
-      expect(items[99]).toBe(timeline.items[99]);
+      expect(items.length).toBeLessThan(timeline.items.length); // Only windowed items
+      expect(items.length).toBeGreaterThan(0); // But at least some items
+      
+      // The window should include the selected item (last item)
+      const windowStart = result.current.getWindowStartIndex();
+      expect(result.current.selectedItemIndex).toBe(99); // Last item selected
+      expect(windowStart).toBeLessThanOrEqual(99); // Window includes item 99
+      expect(windowStart + items.length).toBeGreaterThanOrEqual(100); // Window extends to end
     });
 
     it('updates item positions when heights change', () => {

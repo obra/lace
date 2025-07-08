@@ -92,10 +92,15 @@ describe('TimelineViewport', () => {
     expect(capturedState).toBeDefined();
     expect(capturedState.selectedItemIndex).toBe(99); // Should start at bottom
     expect(capturedState.selectedLineInItem).toBe(0);
-    expect(capturedState.windowStartIndex).toBe(50); // 100 - 50 window size
-    expect(capturedState.windowSize).toBe(50);
+    expect(capturedState.getWindowStartIndex).toBeTypeOf('function');
     expect(capturedState.itemHeights).toBeInstanceOf(Map);
     expect(capturedState.getWindowItems).toBeTypeOf('function');
+    
+    // Check window actually includes the selected item
+    const windowStart = capturedState.getWindowStartIndex();
+    const windowItems = capturedState.getWindowItems();
+    expect(windowStart).toBeLessThanOrEqual(99);
+    expect(windowStart + windowItems.length).toBeGreaterThanOrEqual(100); // Window extends to end of timeline
   });
 
   it('should provide window navigation actions to children', () => {
@@ -193,19 +198,26 @@ describe('TimelineViewport', () => {
 
   it('should handle large timeline with window', () => {
     const timeline = createMockTimeline(1000);
+    let capturedState: any = null;
 
     const { lastFrame } = renderWithFocus(
       <TimelineViewport timeline={timeline}>
-        {({ windowState }) => (
-          <Text>
-            Selected: {windowState.selectedItemIndex}, Scroll: {windowState.scrollTop}
-          </Text>
-        )}
+        {({ windowState }) => {
+          capturedState = windowState;
+          return (
+            <Text>
+              Selected: {windowState.selectedItemIndex}
+            </Text>
+          );
+        }}
       </TimelineViewport>
     );
 
     // Should show selected item at bottom
-    expect(lastFrame()).toContain('Selected: 999');
+    const frame = lastFrame();
+    expect(capturedState).toBeDefined();
+    expect(capturedState.selectedItemIndex).toBe(999);
+    expect(frame).toContain('Selected: 999');
   });
 
   it('should handle custom focus region', () => {
