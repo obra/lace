@@ -80,6 +80,10 @@ export interface AgentEvents {
   // Thread events proxied from ThreadManager
   thread_event_added: [{ event: ThreadEvent; threadId: string }];
   thread_state_changed: [{ threadId: string; eventType: string }];
+  // Queue events
+  queue_processing_start: [];
+  queue_processing_complete: [];
+  message_queued: [{ id: string; queueLength: number }];
 }
 
 export class Agent extends EventEmitter {
@@ -133,11 +137,34 @@ export class Agent extends EventEmitter {
   }
 
   // Core conversation methods
-  async sendMessage(content: string): Promise<void> {
+  async sendMessage(
+    content: string, 
+    options?: { 
+      queue?: boolean;
+      metadata?: QueuedMessage['metadata'];
+    }
+  ): Promise<void> {
     if (!this._isRunning) {
       throw new Error('Agent is not started. Call start() first.');
     }
 
+    if (this._state === 'idle') {
+      // Process immediately
+      return this._processMessage(content);
+    }
+    
+    if (options?.queue) {
+      // Queue for later
+      const id = this.queueMessage(content, 'user', options.metadata);
+      this.emit('message_queued', { id, queueLength: this._messageQueue.length });
+      return;
+    }
+    
+    // Current behavior - throw error
+    throw new Error(`Agent is ${this._state}, cannot accept messages`);
+  }
+
+  private async _processMessage(content: string): Promise<void> {
     logger.debug('AGENT: Processing user message', {
       threadId: this._threadId,
       contentLength: content.length,
@@ -851,6 +878,16 @@ export class Agent extends EventEmitter {
         from: oldState,
         to: newState,
       });
+
+      // Process queue when returning to idle
+      if (newState === 'idle' && !this._isProcessingQueue) {
+        this.processQueuedMessages().catch((error) => {
+          logger.error('AGENT: Failed to process queue on state change', {
+            threadId: this._threadId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+      }
     }
   }
 
@@ -1405,5 +1442,32 @@ export class Agent extends EventEmitter {
     const originalLength = this._messageQueue.length;
     this._messageQueue = this._messageQueue.filter((msg) => !filter(msg));
     return originalLength - this._messageQueue.length;
+  }
+
+  async processQueuedMessages(): Promise<void> {
+    if (this._isProcessingQueue || this._messageQueue.length === 0) {
+      return;
+    }
+
+    this._isProcessingQueue = true;
+    this.emit('queue_processing_start');
+
+    try {
+      while (this._messageQueue.length > 0) {
+        const message = this._messageQueue.shift()!;
+        
+        try {
+          await this._processMessage(message.content);
+        } catch (error) {
+          logger.warn('AGENT: Failed to process queued message', {
+            messageId: message.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    } finally {
+      this._isProcessingQueue = false;
+      this.emit('queue_processing_complete');
+    }
   }
 }
