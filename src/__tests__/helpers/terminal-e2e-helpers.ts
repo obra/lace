@@ -92,6 +92,7 @@ export async function createPTYSession(
         LACE_TEST_MODE: 'true',
         TERM: 'xterm-color',
         ANTHROPIC_KEY: 'sk-ant-test-key-for-testing',
+        CI: 'false', // to get ink to let us run interactive in CI
       },
     });
 
