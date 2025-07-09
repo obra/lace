@@ -119,6 +119,9 @@ describe('Session Resumption with Agent API', () => {
 
     it('should handle thread ID string for specific thread resumption', async () => {
       // Arrange
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      
       const specificThreadId = 'test-thread-123';
       const resumeOrCreateThreadSpy = vi.spyOn(agent, 'resumeOrCreateThread');
 
@@ -127,6 +130,9 @@ describe('Session Resumption with Agent API', () => {
 
       // Assert
       expect(resumeOrCreateThreadSpy).toHaveBeenCalledWith(specificThreadId);
+      
+      consoleWarnSpy.mockRestore();
+      consoleLogSpy.mockRestore();
     });
   });
 });

@@ -210,21 +210,29 @@ describe('App Initialization (run function)', () => {
   });
 
   it('should exit if Anthropic API key is missing', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    
     vi.mocked(getEnvVar).mockImplementation((key: string) => {
       if (key === 'ANTHROPIC_KEY') return undefined;
       return undefined;
     });
     const options = { ...mockCliOptions, provider: 'anthropic' };
     await expect(run(options)).rejects.toThrow('Anthropic API key is required');
+    
+    consoleErrorSpy.mockRestore();
   });
 
   it('should exit if OpenAI API key is missing', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    
     vi.mocked(getEnvVar).mockImplementation((key: string) => {
       if (key === 'OPENAI_API_KEY' || key === 'OPENAI_KEY') return undefined;
       return undefined;
     });
     const options = { ...mockCliOptions, provider: 'openai' };
     await expect(run(options)).rejects.toThrow('OpenAI API key is required');
+    
+    consoleErrorSpy.mockRestore();
   });
 
   it('should throw error for unknown provider', async () => {

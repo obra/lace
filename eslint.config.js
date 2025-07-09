@@ -3,6 +3,7 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-plugin-prettier';
 import prettierConfig from 'eslint-config-prettier';
 import noRelativeImportPaths from 'eslint-plugin-no-relative-import-paths';
+import vitest from 'eslint-plugin-vitest';
 import globals from 'globals';
 
 export default [
@@ -34,6 +35,7 @@ export default [
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unsafe-assignment': 'error',
+      'no-console': ['error', { allow: ['warn', 'error'] }],
       'no-relative-import-paths/no-relative-import-paths': [
         'error',
         { allowSameFolder: false, rootDir: 'src', prefix: '~' }
@@ -49,13 +51,24 @@ export default [
     },
   },
   {
+    files: ['src/cli/**/*.ts', 'src/interfaces/**/*.ts', 'src/app.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+  {
     files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
     ...tseslint.configs.disableTypeChecked,
   },
   {
     files: ['**/*.test.ts', '**/*.spec.ts'],
+    plugins: {
+      vitest,
+    },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      'no-console': 'off',
+      ...vitest.configs.recommended.rules,
     },
   },
 ];

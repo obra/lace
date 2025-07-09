@@ -247,6 +247,8 @@ describe('CLI Flow Tests', () => {
     });
 
     it('should throw error for missing Anthropic API key', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
       const { getEnvVar } = vi.mocked(await import('../config/env-loader.js'));
       getEnvVar.mockImplementation((key) => {
         if (key === 'ANTHROPIC_KEY') return undefined;
@@ -254,9 +256,13 @@ describe('CLI Flow Tests', () => {
       });
 
       await expect(run(mockCliOptions)).rejects.toThrow('Anthropic API key is required');
+      
+      consoleErrorSpy.mockRestore();
     });
 
     it('should throw error for missing OpenAI API key', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
       const { getEnvVar } = vi.mocked(await import('../config/env-loader.js'));
       getEnvVar.mockImplementation((key) => {
         if (key === 'OPENAI_API_KEY' || key === 'OPENAI_KEY') return undefined;
@@ -265,6 +271,8 @@ describe('CLI Flow Tests', () => {
       const options = { ...mockCliOptions, provider: 'openai' };
 
       await expect(run(options)).rejects.toThrow('OpenAI API key is required');
+      
+      consoleErrorSpy.mockRestore();
     });
 
     it('should throw error for unknown provider', async () => {

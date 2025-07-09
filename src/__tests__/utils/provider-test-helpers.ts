@@ -13,6 +13,10 @@ export async function checkProviderAvailability(
   providerName: string,
   provider: { diagnose(): Promise<{ connected: boolean; models: string[]; error?: string }> }
 ): Promise<boolean> {
+  // Suppress stderr noise from provider connection attempts
+  const originalStderrWrite = process.stderr.write;
+  process.stderr.write = () => true;
+  
   try {
     // Add timeout to prevent hanging (give extra time for provider's own timeout)
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -28,5 +32,8 @@ export async function checkProviderAvailability(
   } catch (error) {
     console.log(`Skipping ${providerName} tests - ${error}`);
     return false;
+  } finally {
+    // Restore stderr
+    process.stderr.write = originalStderrWrite;
   }
 }
