@@ -55,10 +55,6 @@ describe('CLI Conversation Tests', () => {
           },
         });
 
-        if (session1.exitCode !== 0) {
-          console.log('CLI failed. stdout:', session1.stdout);
-          console.log('CLI failed. stderr:', session1.stderr);
-        }
         expect(session1.exitCode).toBe(0);
         expect(session1.stdout).toContain('Starting conversation');
 

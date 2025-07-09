@@ -193,10 +193,6 @@ describe('Delegation Integration Tests', () => {
     };
     const result = await delegateToolInstance.execute(toolCall.arguments);
 
-    // Debug: Print the result to see what went wrong
-    if (result.isError) {
-      console.log('Delegation failed:', result.content[0]?.text);
-    }
 
     expect(result.isError).toBe(false);
 
