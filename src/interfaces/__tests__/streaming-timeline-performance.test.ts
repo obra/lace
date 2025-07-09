@@ -2,8 +2,8 @@
 // ABOUTME: Verifies constant-time processing regardless of conversation length
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ThreadEvent } from '../../threads/types.js';
-import { StreamingTimelineProcessor } from '../streaming-timeline-processor.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { StreamingTimelineProcessor } from '~/interfaces/streaming-timeline-processor.js';
 
 describe('StreamingTimelineProcessor Performance', () => {
   let processor: StreamingTimelineProcessor;
@@ -59,7 +59,6 @@ describe('StreamingTimelineProcessor Performance', () => {
       // Performance should not degrade by more than 10x even with 100x more data
       const performanceDegradation = lastMeasurement.avgTime / firstMeasurement.avgTime;
       expect(performanceDegradation).toBeLessThan(10);
-
     });
 
     it('should handle rapid event additions without performance degradation', () => {
@@ -84,7 +83,6 @@ describe('StreamingTimelineProcessor Performance', () => {
       // Last quarter should not be more than 5x slower than first quarter
       const degradation = avgLast / avgFirst;
       expect(degradation).toBeLessThan(5);
-
     });
   });
 
@@ -111,7 +109,6 @@ describe('StreamingTimelineProcessor Performance', () => {
       const maxExpectedGrowth = 10000 * expectedGrowthPerEvent * 2; // 2x buffer
 
       expect(heapGrowth).toBeLessThan(maxExpectedGrowth);
-
     });
 
     it('should clean up tool call correlation state', () => {
@@ -168,7 +165,6 @@ describe('StreamingTimelineProcessor Performance', () => {
 
       // Should complete within reasonable time (less than 1 second for 5000 events)
       expect(loadTime).toBeLessThan(1000);
-
     });
   });
 
@@ -206,7 +202,7 @@ describe('StreamingTimelineProcessor Performance', () => {
       operations.push({ operation: 'reset', time: end - start });
 
       // All operations should complete quickly regardless of timeline size
-      for (const { operation, time } of operations) {
+      for (const { time } of operations) {
         expect(time).toBeLessThan(100); // Less than 100ms for any operation
       }
 
