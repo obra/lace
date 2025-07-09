@@ -74,7 +74,9 @@ describe('queueCommand', () => {
       expect(call).toContain('📬 Message Queue (2 messages)');
       expect(call).toContain('Oldest: 5s ago');
       expect(call).toContain('1. [USER] First message');
-      expect(call).toContain('2. [SYSTEM] System notification about something important (task_system)');
+      expect(call).toContain(
+        '2. [SYSTEM] System notification about something important (task_system)'
+      );
       expect(call).toContain('Use /queue clear to remove user messages from queue');
     });
 
@@ -116,7 +118,7 @@ describe('queueCommand', () => {
 
     it('should truncate long messages in preview', async () => {
       const longMessage = 'A'.repeat(60);
-      
+
       mockAgent.getQueueStats.mockReturnValue({
         queueLength: 1,
         highPriorityCount: 0,
@@ -167,7 +169,7 @@ describe('queueCommand', () => {
 
       expect(mockAgent.clearQueue).toHaveBeenCalledWith(expect.any(Function));
       expect(mockUI.displayMessage).toHaveBeenCalledWith('📬 Cleared 3 user messages from queue');
-      
+
       // Test the filter function
       const filterFn = mockAgent.clearQueue.mock.calls[0][0];
       expect(filterFn({ type: 'user' })).toBe(true);

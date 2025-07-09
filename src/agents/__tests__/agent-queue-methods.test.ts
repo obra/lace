@@ -58,7 +58,7 @@ describe('Agent Queue Methods', () => {
       createCompactedVersion: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
     } as any;
-    
+
     agent = new Agent({
       provider: mockProvider,
       toolExecutor: mockToolExecutor,
@@ -71,14 +71,14 @@ describe('Agent Queue Methods', () => {
   describe('queueMessage', () => {
     it('should queue a message and return message ID', () => {
       const messageId = agent.queueMessage('test message');
-      
+
       expect(messageId).toBeTruthy();
       expect(typeof messageId).toBe('string');
     });
 
     it('should queue message with specified type', () => {
       const messageId = agent.queueMessage('task message', 'task_notification');
-      
+
       expect(messageId).toBeTruthy();
     });
 
@@ -87,15 +87,15 @@ describe('Agent Queue Methods', () => {
         taskId: 'task-123',
         priority: 'high' as const,
       };
-      
+
       const messageId = agent.queueMessage('urgent task', 'task_notification', metadata);
-      
+
       expect(messageId).toBeTruthy();
     });
 
     it('should default to user type when no type specified', () => {
       const messageId = agent.queueMessage('user message');
-      
+
       expect(messageId).toBeTruthy();
     });
   });
@@ -103,7 +103,7 @@ describe('Agent Queue Methods', () => {
   describe('getQueueStats', () => {
     it('should return empty stats for empty queue', () => {
       const stats = agent.getQueueStats();
-      
+
       expect(stats.queueLength).toBe(0);
       expect(stats.highPriorityCount).toBe(0);
       expect(stats.oldestMessageAge).toBeUndefined();
@@ -112,9 +112,9 @@ describe('Agent Queue Methods', () => {
     it('should return correct stats after queueing messages', () => {
       agent.queueMessage('message 1');
       agent.queueMessage('message 2', 'user', { priority: 'high' });
-      
+
       const stats = agent.getQueueStats();
-      
+
       expect(stats.queueLength).toBe(2);
       expect(stats.highPriorityCount).toBe(1);
       expect(stats.oldestMessageAge).toBeGreaterThanOrEqual(0);
@@ -123,15 +123,15 @@ describe('Agent Queue Methods', () => {
     it('should calculate oldest message age correctly', () => {
       const startTime = Date.now();
       agent.queueMessage('old message');
-      
+
       // Wait a bit to create age difference
       vi.useFakeTimers();
       vi.advanceTimersByTime(5000);
-      
+
       const stats = agent.getQueueStats();
-      
+
       expect(stats.oldestMessageAge).toBeGreaterThanOrEqual(5000);
-      
+
       vi.useRealTimers();
     });
   });
@@ -145,35 +145,35 @@ describe('Agent Queue Methods', () => {
 
     it('should clear all messages when no filter provided', () => {
       const clearedCount = agent.clearQueue();
-      
+
       expect(clearedCount).toBe(3);
-      
+
       const stats = agent.getQueueStats();
       expect(stats.queueLength).toBe(0);
     });
 
     it('should clear only filtered messages when filter provided', () => {
       const clearedCount = agent.clearQueue((msg) => msg.type === 'user');
-      
+
       expect(clearedCount).toBe(1);
-      
+
       const stats = agent.getQueueStats();
       expect(stats.queueLength).toBe(2);
     });
 
     it('should return 0 when clearing empty queue', () => {
       agent.clearQueue(); // Clear all first
-      
+
       const clearedCount = agent.clearQueue();
-      
+
       expect(clearedCount).toBe(0);
     });
 
     it('should filter by message metadata', () => {
       agent.queueMessage('high priority', 'user', { priority: 'high' });
-      
+
       const clearedCount = agent.clearQueue((msg) => msg.metadata?.priority === 'high');
-      
+
       expect(clearedCount).toBe(1);
     });
   });

@@ -36,7 +36,7 @@ describe('Agent getQueueContents', () => {
   let mockProvider: MockProvider;
   let mockToolExecutor: ToolExecutor;
   let mockThreadManager: ThreadManager;
-  
+
   beforeEach(async () => {
     mockProvider = new MockProvider();
     mockToolExecutor = {
@@ -56,7 +56,7 @@ describe('Agent getQueueContents', () => {
       createCompactedVersion: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
     } as any;
-    
+
     agent = new Agent({
       provider: mockProvider,
       toolExecutor: mockToolExecutor,
@@ -64,7 +64,7 @@ describe('Agent getQueueContents', () => {
       threadId: 'test-thread',
       tools: [],
     });
-    
+
     await agent.start();
   });
 
@@ -76,7 +76,7 @@ describe('Agent getQueueContents', () => {
 
   it('should return empty array for empty queue', () => {
     const contents = agent.getQueueContents();
-    
+
     expect(contents).toEqual([]);
     expect(Array.isArray(contents)).toBe(true);
   });
@@ -84,9 +84,9 @@ describe('Agent getQueueContents', () => {
   it('should return queue contents as readonly array', () => {
     agent.queueMessage('test message 1');
     agent.queueMessage('test message 2', 'system');
-    
+
     const contents = agent.getQueueContents();
-    
+
     expect(contents).toHaveLength(2);
     expect(contents[0].content).toBe('test message 1');
     expect(contents[0].type).toBe('user');
@@ -96,16 +96,16 @@ describe('Agent getQueueContents', () => {
 
   it('should return copy of queue (not direct reference)', () => {
     agent.queueMessage('original message');
-    
+
     const contents1 = agent.getQueueContents();
     const contents2 = agent.getQueueContents();
-    
+
     // Should be different array instances
     expect(contents1).not.toBe(contents2);
-    
+
     // But should have same content
     expect(contents1).toEqual(contents2);
-    
+
     // Modifying returned array shouldn't affect internal queue
     const originalLength = contents1.length;
     // TypeScript should prevent this, but let's verify runtime behavior
@@ -127,11 +127,11 @@ describe('Agent getQueueContents', () => {
       fromAgent: 'coordinator',
       source: 'task_system' as const,
     };
-    
+
     agent.queueMessage('high priority message', 'task_notification', metadata);
-    
+
     const contents = agent.getQueueContents();
-    
+
     expect(contents).toHaveLength(1);
     expect(contents[0].content).toBe('high priority message');
     expect(contents[0].type).toBe('task_notification');
@@ -145,9 +145,9 @@ describe('Agent getQueueContents', () => {
     agent.queueMessage('normal 1');
     agent.queueMessage('high priority', 'user', { priority: 'high' });
     agent.queueMessage('normal 2');
-    
+
     const contents = agent.getQueueContents();
-    
+
     expect(contents).toHaveLength(3);
     // Should return in internal queue order (high priority messages are at the front)
     expect(contents[0].metadata?.priority).toBe('high');
@@ -159,22 +159,22 @@ describe('Agent getQueueContents', () => {
   it('should handle queue modifications between calls', () => {
     agent.queueMessage('message 1');
     agent.queueMessage('message 2');
-    
+
     let contents = agent.getQueueContents();
     expect(contents).toHaveLength(2);
-    
+
     // Add another message
     agent.queueMessage('message 3');
-    
+
     contents = agent.getQueueContents();
     expect(contents).toHaveLength(3);
     expect(contents[2].content).toBe('message 3');
-    
+
     // Clear some messages
     agent.clearQueue((msg) => msg.content === 'message 1');
-    
+
     contents = agent.getQueueContents();
     expect(contents).toHaveLength(2);
-    expect(contents.find(msg => msg.content === 'message 1')).toBeUndefined();
+    expect(contents.find((msg) => msg.content === 'message 1')).toBeUndefined();
   });
 });

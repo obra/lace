@@ -28,7 +28,7 @@ describe('QueuedMessage', () => {
     };
 
     const systemMessage: QueuedMessage = {
-      id: '2', 
+      id: '2',
       type: 'system',
       content: 'system message',
       timestamp: new Date(),

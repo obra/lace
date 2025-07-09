@@ -220,15 +220,15 @@ describe('System Commands', () => {
 
     it('should handle empty queue', async () => {
       await queueCommand.execute('', mockUI);
-      
+
       expect(mockUI.displayMessage).toHaveBeenCalledWith('📬 Message queue is empty');
     });
 
     it('should handle queue clearing', async () => {
       mockAgent.clearQueue.mockReturnValue(2);
-      
+
       await queueCommand.execute('clear', mockUI);
-      
+
       expect(mockAgent.clearQueue).toHaveBeenCalled();
       expect(mockUI.displayMessage).toHaveBeenCalledWith('📬 Cleared 2 user messages from queue');
     });
@@ -236,7 +236,14 @@ describe('System Commands', () => {
 
   describe('command structure validation', () => {
     it('should have all required fields for each command', () => {
-      const commands = [helpCommand, exitCommand, clearCommand, statusCommand, compactCommand, queueCommand];
+      const commands = [
+        helpCommand,
+        exitCommand,
+        clearCommand,
+        statusCommand,
+        compactCommand,
+        queueCommand,
+      ];
 
       commands.forEach((command) => {
         expect(command.name).toBeDefined();
@@ -253,14 +260,28 @@ describe('System Commands', () => {
     });
 
     it('should have unique command names', () => {
-      const commands = [helpCommand, exitCommand, clearCommand, statusCommand, compactCommand, queueCommand];
+      const commands = [
+        helpCommand,
+        exitCommand,
+        clearCommand,
+        statusCommand,
+        compactCommand,
+        queueCommand,
+      ];
       const names = commands.map((cmd) => cmd.name);
       const uniqueNames = new Set(names);
       expect(uniqueNames.size).toBe(names.length);
     });
 
     it('should not have aliases defined (per YAGNI)', () => {
-      const commands = [helpCommand, exitCommand, clearCommand, statusCommand, compactCommand, queueCommand];
+      const commands = [
+        helpCommand,
+        exitCommand,
+        clearCommand,
+        statusCommand,
+        compactCommand,
+        queueCommand,
+      ];
       commands.forEach((command) => {
         expect(command.aliases).toBeUndefined();
       });
