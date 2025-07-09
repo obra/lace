@@ -10,6 +10,7 @@ import {
   ThreadId,
   AssigneeId,
 } from '~/threads/types.js';
+import type { ToolCall, ToolResult } from '~/tools/types.js';
 import {
   Task,
   TaskNote,
@@ -279,7 +280,7 @@ export class DatabasePersistence {
           threadId: row.thread_id,
           type: row.type as EventType,
           timestamp: new Date(row.timestamp),
-          data: JSON.parse(row.data) as unknown,
+          data: JSON.parse(row.data) as string | ToolCall | ToolResult,
         };
       } catch (error) {
         throw new Error(
