@@ -26,7 +26,8 @@ class MockProvider extends AIProvider {
   async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
     return {
       content: 'mock response',
-      usage: { inputTokens: 10, outputTokens: 5 },
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      toolCalls: [],
     };
   }
 }
@@ -39,13 +40,31 @@ describe('Agent Queue Methods', () => {
 
   beforeEach(() => {
     mockProvider = new MockProvider();
-    mockToolExecutor = {} as ToolExecutor;
-    mockThreadManager = {} as ThreadManager;
+    mockToolExecutor = {
+      registerAllAvailableTools: vi.fn(),
+      getRegisteredTools: vi.fn().mockReturnValue([]),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as any;
+    mockThreadManager = {
+      addEvent: vi.fn(),
+      getEvents: vi.fn().mockReturnValue([]),
+      getSessionInfo: vi.fn().mockReturnValue({
+        threadId: 'test-thread',
+        model: 'test-model',
+        provider: 'test-provider',
+      }),
+      getCurrentThreadId: vi.fn().mockReturnValue('test-thread'),
+      needsCompaction: vi.fn().mockResolvedValue(false),
+      createCompactedVersion: vi.fn(),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as any;
     
     agent = new Agent({
       provider: mockProvider,
       toolExecutor: mockToolExecutor,
       threadManager: mockThreadManager,
+      threadId: 'test-thread',
+      tools: [],
     });
   });
 

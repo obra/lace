@@ -70,7 +70,7 @@ describe('queueCommand', () => {
 
       await queueCommand.execute('', mockUI);
 
-      const call = mockUI.displayMessage.mock.calls[0][0];
+      const call = (mockUI.displayMessage as any).mock.calls[0][0];
       expect(call).toContain('📬 Message Queue (2 messages)');
       expect(call).toContain('Oldest: 5s ago');
       expect(call).toContain('1. [USER] First message');
@@ -109,7 +109,7 @@ describe('queueCommand', () => {
 
       await queueCommand.execute('', mockUI);
 
-      const call = mockUI.displayMessage.mock.calls[0][0];
+      const call = (mockUI.displayMessage as any).mock.calls[0][0];
       expect(call).toContain('High priority: 1');
       expect(call).toContain('[HIGH] Urgent message');
     });
@@ -133,7 +133,7 @@ describe('queueCommand', () => {
 
       await queueCommand.execute('', mockUI);
 
-      const call = mockUI.displayMessage.mock.calls[0][0];
+      const call = (mockUI.displayMessage as any).mock.calls[0][0];
       expect(call).toContain('1. [USER] ' + 'A'.repeat(47) + '...');
     });
 
@@ -154,7 +154,7 @@ describe('queueCommand', () => {
 
       await queueCommand.execute('', mockUI);
 
-      const call = mockUI.displayMessage.mock.calls[0][0];
+      const call = (mockUI.displayMessage as any).mock.calls[0][0];
       expect(call).toContain('📬 Message Queue (1 message)'); // singular
     });
   });
@@ -238,7 +238,7 @@ describe('queueCommand', () => {
 
       await queueCommand.execute('', mockUI);
 
-      const call = mockUI.displayMessage.mock.calls[0][0];
+      const call = (mockUI.displayMessage as any).mock.calls[0][0];
       expect(call).toContain('📬 Message Queue (1 message)');
       expect(call).not.toContain('Oldest:');
     });
@@ -261,7 +261,7 @@ describe('queueCommand', () => {
 
       await queueCommand.execute('', mockUI);
 
-      const call = mockUI.displayMessage.mock.calls[0][0];
+      const call = (mockUI.displayMessage as any).mock.calls[0][0];
       expect(call).toContain('1. [USER] Message without metadata');
       expect(call).not.toContain('[HIGH]');
       // Should not contain source parentheses for this specific message

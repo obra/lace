@@ -26,7 +26,8 @@ class MockProvider extends AIProvider {
   async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
     return {
       content: 'mock response',
-      usage: { inputTokens: 10, outputTokens: 5 },
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      toolCalls: [],
     };
   }
 }
@@ -39,7 +40,11 @@ describe('Agent Queue Processing', () => {
 
   beforeEach(() => {
     mockProvider = new MockProvider();
-    mockToolExecutor = {} as ToolExecutor;
+    mockToolExecutor = {
+      registerAllAvailableTools: vi.fn(),
+      getRegisteredTools: vi.fn().mockReturnValue([]),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as any;
     mockThreadManager = {
       addEvent: vi.fn(),
       getEvents: vi.fn().mockReturnValue([]),
@@ -48,6 +53,10 @@ describe('Agent Queue Processing', () => {
         model: 'test-model',
         provider: 'test-provider',
       }),
+      getCurrentThreadId: vi.fn().mockReturnValue('test-thread'),
+      needsCompaction: vi.fn().mockResolvedValue(false),
+      createCompactedVersion: vi.fn(),
+      close: vi.fn().mockResolvedValue(undefined),
     } as any;
     
     agent = new Agent({
@@ -90,8 +99,9 @@ describe('Agent Queue Processing', () => {
       
       const processedMessages: string[] = [];
       const processMessageSpy = vi.spyOn(agent as any, '_processMessage');
-      processMessageSpy.mockImplementation(async (content) => {
-        processedMessages.push(content);
+      processMessageSpy.mockImplementation(async (...args: any[]) => {
+        processedMessages.push(args[0] as string);
+        return;
       });
       
       await agent.processQueuedMessages();
@@ -144,8 +154,12 @@ describe('Agent Queue Processing', () => {
       const processingStartEvents: any[] = [];
       const processingCompleteEvents: any[] = [];
       
-      agent.on('queue_processing_start', (data) => processingStartEvents.push(data));
-      agent.on('queue_processing_complete', (data) => processingCompleteEvents.push(data));
+      agent.on('queue_processing_start' as any, (data: any) => {
+        processingStartEvents.push(data);
+      });
+      agent.on('queue_processing_complete' as any, (data: any) => {
+        processingCompleteEvents.push(data);
+      });
       
       const processMessageSpy = vi.spyOn(agent as any, '_processMessage');
       processMessageSpy.mockImplementation(async () => {});

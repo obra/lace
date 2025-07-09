@@ -26,7 +26,8 @@ class MockProvider extends AIProvider {
   async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
     return {
       content: 'mock response',
-      usage: { inputTokens: 10, outputTokens: 5 },
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      toolCalls: [],
     };
   }
 }
@@ -42,6 +43,7 @@ describe('Agent sendMessage Queue Option', () => {
     mockToolExecutor = {
       registerAllAvailableTools: vi.fn(),
       getRegisteredTools: vi.fn().mockReturnValue([]),
+      close: vi.fn().mockResolvedValue(undefined),
     } as any;
     mockThreadManager = {
       addEvent: vi.fn(),
@@ -54,6 +56,7 @@ describe('Agent sendMessage Queue Option', () => {
       getCurrentThreadId: vi.fn().mockReturnValue('test-thread'),
       needsCompaction: vi.fn().mockResolvedValue(false),
       createCompactedVersion: vi.fn(),
+      close: vi.fn().mockResolvedValue(undefined),
     } as any;
     
     agent = new Agent({
@@ -168,8 +171,9 @@ describe('Agent sendMessage Queue Option', () => {
       const processedMessages: string[] = [];
       
       // Mock _processMessage instead since that's what gets called during queue processing
-      vi.spyOn(agent as any, '_processMessage').mockImplementation(async (content) => {
-        processedMessages.push(content);
+      vi.spyOn(agent as any, '_processMessage').mockImplementation(async (...args: any[]) => {
+        processedMessages.push(args[0] as string);
+        return;
       });
       
       // Return to idle

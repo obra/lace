@@ -15,7 +15,7 @@ import { TokenBudgetManager } from '~/token-management/token-budget-manager.js';
 import { TokenBudgetConfig } from '~/token-management/types.js';
 import { loadPromptConfig } from '~/config/prompts.js';
 import { estimateTokens } from '~/utils/token-estimation.js';
-import { QueuedMessage, MessageQueueStats } from './types.js';
+import { QueuedMessage, MessageQueueStats } from '~/agents/types.js';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -138,8 +138,8 @@ export class Agent extends EventEmitter {
 
   // Core conversation methods
   async sendMessage(
-    content: string, 
-    options?: { 
+    content: string,
+    options?: {
       queue?: boolean;
       metadata?: QueuedMessage['metadata'];
     }
@@ -152,14 +152,14 @@ export class Agent extends EventEmitter {
       // Process immediately
       return this._processMessage(content);
     }
-    
+
     if (options?.queue) {
       // Queue for later
       const id = this.queueMessage(content, 'user', options.metadata);
       this.emit('message_queued', { id, queueLength: this._messageQueue.length });
       return;
     }
-    
+
     // Current behavior - throw error
     throw new Error(`Agent is ${this._state}, cannot accept messages`);
   }
@@ -1459,7 +1459,7 @@ export class Agent extends EventEmitter {
     try {
       while (this._messageQueue.length > 0) {
         const message = this._messageQueue.shift()!;
-        
+
         try {
           await this._processMessage(message.content);
         } catch (error) {

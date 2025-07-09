@@ -25,7 +25,8 @@ class MockProvider extends AIProvider {
   async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
     return {
       content: 'mock response',
-      usage: { inputTokens: 10, outputTokens: 5 },
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      toolCalls: [],
     };
   }
 }
