@@ -1,422 +1,325 @@
-# Agent Spawning and Management Implementation Specification
+# Agent Spawning Implementation Specification
 
 ## Overview
-Implement the ability to spawn multiple agents within a session, manage their lifecycle, and coordinate their work. This builds on the existing delegate thread pattern but makes agents persistent and switchable.
+Enable task-based agent spawning by extending the existing delegate pattern and task manager. Agents are created when tasks are assigned to "new:provider/model" and inherit the existing thread hierarchy.
 
 ## Background for Engineers
 
-### Current Architecture
-- Single agent per conversation
-- Delegate tool creates temporary sub-agents
-- No concept of sessions or agent teams
-- Thread IDs like `lace_20250703_abc123`
+### Current Delegate Pattern
+- Location: `src/tools/implementations/delegate.ts`
+- Creates child threads: `parent.1`, `parent.2`, etc.
+- Temporary sub-agents for specific tasks
+- Returns to parent when done
 
-### What We're Building
-- Sessions containing multiple agents
-- Persistent agents you can switch between
-- Agent lifecycle (active, suspended, completed)
-- Spawning agents with specific roles/models
+### What We're Adding
+- Persistent child threads (don't terminate when task done)
+- Task assignment to "new:provider/model" triggers agent creation
+- UI can switch between child threads
+- No complex agent management - just thread switching
 
 ### Key Files to Understand
-- `src/agents/agent.ts` - Agent class
-- `src/threads/thread-manager.ts` - Thread management
 - `src/tools/implementations/delegate.ts` - Current delegation pattern
-- `src/cli.ts` - CLI entry point and agent initialization
+- `src/tools/implementations/task-manager.ts` - Task assignment
+- `src/threads/thread-manager.ts` - Thread creation and management
+- `src/agents/agent.ts` - Agent initialization
 
 ## Implementation Plan
 
-### Phase 1: Session Infrastructure
+### Phase 1: Extend Task Assignment
 
-**Task 1.1: Create Session type**
+**Task 1.1: Update task creation to support agent spawning**
 
-File: `src/sessions/types.ts` (new)
+File: `src/tools/implementations/task-manager.ts`
 
+Update `assignedTo` handling:
 ```typescript
-export interface Session {
-  id: string;                    // Parent thread ID
-  name: string;                  // Human-readable session name
-  createdAt: Date;
-  agents: AgentMetadata[];
-  activeAgentId?: string;        // Currently active agent
-}
-
-export interface AgentMetadata {
-  id: string;                    // Thread ID (parent.1, parent.2, etc)
-  name: string;                  // "pm", "architect", etc
-  type: 'persistent' | 'ephemeral';
-  provider: string;              // "anthropic", "openai", etc
-  model: string;                 // "claude-3-opus", "gpt-4", etc
-  state: 'active' | 'suspended' | 'completed';
-  currentTask?: string;          // Short description for UI
-  currentTaskId?: string;        // Link to full task
-  createdAt: Date;
-  lastActiveAt: Date;
+// In task creation
+if (args.assignedTo?.startsWith('new:')) {
+  // Parse: "new:anthropic/claude-3-sonnet"
+  const [, providerModel] = args.assignedTo.split(':');
+  const [provider, model] = providerModel.split('/');
+  
+  // Create agent and assign task
+  const agentId = await this.createTaskAgent(provider, model, task);
+  task.assignedTo = agentId;
 }
 ```
 
 Tests:
-- Type validation
-- Session creation
-- Agent metadata updates
+- Test "new:provider/model" parsing
+- Test invalid format rejection
+- Test agent creation triggered
 
-**Commit**: "feat: define session and agent types"
+**Commit**: "feat: add new agent spawning to task assignment"
 
-**Task 1.2: Create SessionManager**
+**Task 1.2: Add createTaskAgent method**
 
-File: `src/sessions/session-manager.ts` (new)
+File: `src/tools/implementations/task-manager.ts`
 
 ```typescript
-export class SessionManager {
-  constructor(
-    private threadManager: ThreadManager,
-    private dbPath: string
-  ) {}
+private async createTaskAgent(
+  provider: string, 
+  model: string, 
+  task: Task
+): Promise<string> {
+  // Get current session (parent thread)
+  const parentThreadId = this.context?.threadId;
+  if (!parentThreadId) {
+    throw new Error('No session context for agent creation');
+  }
   
-  // Create new session
-  createSession(name: string): Session
+  // Create delegate thread (reuse existing pattern)
+  const delegateThread = this.threadManager.createDelegateThreadFor(parentThreadId);
+  const agentThreadId = delegateThread.id;
   
-  // Load existing session
-  loadSession(sessionId: string): Session | null
+  // Store agent metadata (simple approach)
+  await this.storeAgentMetadata(agentThreadId, {
+    name: `agent-${Date.now()}`, // Or generate better name
+    provider,
+    model,
+    type: 'ephemeral',
+    createdFor: task.id,
+    parentThreadId
+  });
   
-  // Add agent to session
-  addAgent(
-    sessionId: string, 
-    agent: Omit<AgentMetadata, 'id' | 'createdAt' | 'lastActiveAt'>
-  ): AgentMetadata
+  // Send task notification to new agent
+  await this.notifyTaskAssignment(agentThreadId, task);
   
-  // Update agent metadata
-  updateAgent(agentId: string, updates: Partial<AgentMetadata>): void
-  
-  // Get active agent for session
-  getActiveAgent(sessionId: string): AgentMetadata | null
-  
-  // Switch active agent
-  setActiveAgent(sessionId: string, agentId: string): void
-  
-  // List agents (with filtering)
-  listAgents(sessionId: string, filter?: {
-    state?: AgentMetadata['state'];
-    type?: AgentMetadata['type'];
-  }): AgentMetadata[]
+  return agentThreadId;
 }
 ```
 
 Implementation notes:
-- Use parent thread as session container
-- Store metadata in SQLite
-- Reuse delegate thread ID pattern
+- Reuse `ThreadManager.createDelegateThreadFor()` 
+- Store minimal metadata in SQLite
+- Send task as first message to agent
 
 Tests:
-- Session CRUD operations
-- Agent management
-- Active agent switching
-- Filtering
-
-**Commit**: "feat: implement SessionManager"
-
-### Phase 2: Agent Spawning
-
-**Task 2.1: Create agent-spawn tool**
-
-File: `src/tools/implementations/agent-spawn.ts` (new)
-
-```typescript
-export class AgentSpawnTool extends Tool {
-  name = 'agent-spawn';
-  description = 'Create a new agent in the current session';
-  
-  schema = z.object({
-    name: z.string().min(1).describe('Agent name (e.g., "architect", "impl-1")'),
-    provider: z.string().describe('AI provider (anthropic, openai, etc)'),
-    model: z.string().describe('Model name (claude-3-opus, gpt-4, etc)'),
-    type: z.enum(['persistent', 'ephemeral']).default('persistent'),
-    systemPrompt: z.string().optional().describe('Custom system prompt'),
-    task: z.string().optional().describe('Initial task description'),
-  });
-  
-  async executeValidated(args: z.infer<typeof this.schema>): Promise<ToolResult> {
-    // Implementation
-  }
-}
-```
-
-Implementation:
-1. Get current session from context
-2. Create delegate thread (reuse pattern)
-3. Add agent metadata to session
-4. Initialize agent with thread
-5. Return agent info
-
-Tests:
-- Test agent creation
-- Test duplicate names rejected
-- Test invalid provider/model
 - Test thread creation
+- Test metadata storage
+- Test task notification
 
-**Commit**: "feat: add agent-spawn tool"
+**Commit**: "feat: implement task-based agent creation"
 
-**Task 2.2: Create agent management tools**
+### Phase 2: Agent Metadata Storage
 
-File: `src/tools/implementations/agent-tools.ts` (new)
+**Task 2.1: Add agent metadata table**
 
-Tools to implement:
-- `agent-list` - Show session agents
-- `agent-switch` - Change active agent  
-- `agent-suspend` - Suspend an agent
-- `agent-resume` - Resume suspended agent
+File: `src/tools/implementations/task-manager/persistence.ts`
 
-Each tool needs:
-- Zod schema
-- Implementation
-- Tests
-
-**Commit**: "feat: add agent management tools"
-
-### Phase 3: Agent Factory
-
-**Task 3.1: Create AgentFactory**
-
-File: `src/agents/agent-factory.ts` (new)
-
-```typescript
-export class AgentFactory {
-  constructor(
-    private providerRegistry: ProviderRegistry,
-    private toolExecutor: ToolExecutor,
-    private threadManager: ThreadManager
-  ) {}
-  
-  // Create agent from metadata
-  async createAgent(metadata: AgentMetadata): Promise<Agent> {
-    const provider = await this.createProvider(
-      metadata.provider,
-      metadata.model
-    );
-    
-    return new Agent({
-      provider,
-      toolExecutor: this.createRestrictedExecutor(metadata),
-      threadManager: this.threadManager,
-      threadId: metadata.id,
-      tools: this.getToolsForAgent(metadata),
-    });
-  }
-  
-  // Create provider with custom system prompt
-  private async createProvider(
-    providerName: string,
-    modelName: string,
-    systemPrompt?: string
-  ): Promise<AIProvider>
-  
-  // Create tool executor that restricts certain tools
-  private createRestrictedExecutor(
-    metadata: AgentMetadata
-  ): ToolExecutor
-  
-  // Get appropriate tools for agent type
-  private getToolsForAgent(metadata: AgentMetadata): Tool[]
-}
+```sql
+CREATE TABLE agent_metadata (
+  thread_id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  type TEXT CHECK(type IN ('persistent', 'ephemeral')) NOT NULL,
+  created_for_task TEXT,
+  parent_thread_id TEXT NOT NULL,
+  current_task TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_for_task) REFERENCES tasks(id),
+  FOREIGN KEY (parent_thread_id) REFERENCES threads(id)
+);
 ```
 
-Notes:
-- Ephemeral agents might get fewer tools
-- No delegate tool for sub-agents (prevent recursion)
-- Custom system prompts per role
+Add methods:
+```typescript
+storeAgentMetadata(threadId: string, metadata: AgentMetadata): void
+getAgentMetadata(threadId: string): AgentMetadata | null
+listSessionAgents(parentThreadId: string): AgentMetadata[]
+updateCurrentTask(threadId: string, taskDescription: string): void
+```
 
 Tests:
-- Test agent creation
-- Test tool restrictions
-- Test provider configuration
+- Test metadata CRUD
+- Test session filtering
+- Test foreign key constraints
 
-**Commit**: "feat: implement AgentFactory"
+**Commit**: "feat: add agent metadata persistence"
 
-### Phase 4: Context Passing
+### Phase 3: Agent Initialization
 
-**Task 4.1: Add session context to tools**
-
-File: `src/tools/types.ts`
-
-Update ToolContext:
-```typescript
-export interface ToolContext {
-  threadId?: string;
-  sessionId?: string;      // NEW
-  agentName?: string;      // NEW
-  agentMetadata?: AgentMetadata;  // NEW
-}
-```
+**Task 3.1: Add Agent.createForTask static method**
 
 File: `src/agents/agent.ts`
 
-Update tool execution to pass context:
 ```typescript
-const context: ToolContext = {
-  threadId: this.threadId,
-  sessionId: this.sessionId,
-  agentName: this.metadata?.name,
-  agentMetadata: this.metadata,
-};
+static async createForTask(
+  threadId: string,
+  provider: string,
+  model: string,
+  task: Task,
+  dependencies: {
+    providerRegistry: ProviderRegistry;
+    toolExecutor: ToolExecutor;
+    threadManager: ThreadManager;
+  }
+): Promise<Agent> {
+  // Create provider instance
+  const providerInstance = await dependencies.providerRegistry.createProvider(
+    provider,
+    model
+  );
+  
+  // Create agent with restricted tools (no delegate to prevent recursion)
+  const tools = dependencies.toolExecutor.getAvailableTools()
+    .filter(tool => tool.name !== 'delegate');
+  
+  const agent = new Agent({
+    provider: providerInstance,
+    toolExecutor: dependencies.toolExecutor,
+    threadManager: dependencies.threadManager,
+    threadId,
+    tools,
+  });
+  
+  // Send initial task notification
+  await agent.queueMessage(formatTaskAssignment(task), 'task_notification');
+  
+  return agent;
+}
 ```
 
-Tests:
-- Test context passed to tools
-- Test tools can access session info
-
-**Commit**: "feat: add session context to tool execution"
-
-### Phase 5: Agent Lifecycle
-
-**Task 5.1: Implement agent state transitions**
-
-File: `src/sessions/session-manager.ts`
-
-Add lifecycle methods:
-```typescript
-// Suspend agent (preserves thread)
-suspendAgent(agentId: string): void
-
-// Resume agent (reactivates)
-resumeAgent(agentId: string): void
-
-// Complete agent (ephemeral only)
-completeAgent(agentId: string): void
-
-// Archive old ephemeral agents
-archiveCompletedAgents(sessionId: string, olderThan?: Date): number
-```
-
-State rules:
-- Persistent agents: active ↔ suspended
-- Ephemeral agents: active → completed (one way)
-- Completed agents hidden from UI by default
+This is just a factory method, not a separate class.
 
 Tests:
-- Test state transitions
-- Test invalid transitions rejected
-- Test archiving
+- Test agent creation
+- Test tool filtering
+- Test initial task message
 
-**Commit**: "feat: implement agent lifecycle management"
+**Commit**: "feat: add Agent.createForTask factory method"
 
-### Phase 6: Integration
+### Phase 4: Notification Integration
 
-**Task 6.1: Update CLI initialization**
+**Task 4.1: Add task notification helpers**
 
-File: `src/cli.ts`
+File: `src/tools/implementations/task-manager/notifications.ts` (new)
 
-Add session initialization:
+Note: The buffered notifications spec (03-buffered-notifications.md) references `src/agents/notifications.ts` for these formatters, but they should actually be implemented here in the task manager since they're part of the task system integration.
+
 ```typescript
-// Check for existing session
-let session: Session;
-if (options.session) {
-  session = sessionManager.loadSession(options.session) 
-    || sessionManager.createSession(options.session);
-} else {
-  session = sessionManager.createSession('default');
+export function formatTaskAssignment(task: Task): string {
+  return `[LACE TASK SYSTEM] You have been assigned a new task:
+Title: "${task.title}"
+Created by: ${task.createdBy || 'system'}
+Priority: ${task.priority}
+
+--- TASK DETAILS ---
+${task.prompt}
+--- END TASK DETAILS ---`;
 }
 
-// Create or resume agent
-let agent: Agent;
-if (options.agent) {
-  const metadata = session.agents.find(a => a.name === options.agent);
-  if (metadata) {
-    agent = await agentFactory.createAgent(metadata);
-  } else {
-    // Create new agent
+export function formatTaskCompletion(task: Task): string {
+  return `[LACE TASK SYSTEM] Task completed notification:
+Task: "${task.title}"
+Status: ${task.status.toUpperCase()}
+
+${task.notes?.length ? 'Recent notes:\n' + task.notes.slice(-3).map(n => `- ${n.content}`).join('\n') : ''}`;
+}
+```
+
+**Commit**: "feat: add task notification formatters"
+
+**Task 4.2: Add completion notifications**
+
+Update task status changes to notify relevant agents:
+
+```typescript
+// In task-manager when status changes to 'completed'
+if (oldStatus !== 'completed' && newStatus === 'completed') {
+  // Notify creator if it's an agent
+  if (task.createdBy && task.createdBy !== task.assignedTo) {
+    await this.notifyTaskCompletion(task.createdBy, task);
   }
 }
 ```
 
-CLI arguments:
-- `--session <name>` - Session to use
-- `--agent <name>` - Agent to activate
-- `--new-agent` - Force new agent
+Tests:
+- Test completion notifications sent
+- Test no self-notification
+- Test notification content
+
+**Commit**: "feat: add task completion notifications"
+
+### Phase 5: Thread Switching Support
+
+**Task 5.1: Add thread switching utilities**
+
+File: `src/agents/agent-utils.ts` (new)
+
+```typescript
+export function getSessionAgents(
+  parentThreadId: string,
+  taskManager: TaskManager
+): Array<{ threadId: string; name: string; currentTask?: string }> {
+  return taskManager.listSessionAgents(parentThreadId);
+}
+
+export async function switchToAgent(
+  threadId: string,
+  agentFactory: typeof Agent.createForTask,
+  dependencies: AgentDependencies
+): Promise<Agent> {
+  const metadata = dependencies.taskManager.getAgentMetadata(threadId);
+  if (!metadata) {
+    throw new Error(`No agent found for thread ${threadId}`);
+  }
+  
+  // For now, create new instance (could cache later)
+  return Agent.createForTask(
+    threadId,
+    metadata.provider,
+    metadata.model,
+    null, // No initial task
+    dependencies
+  );
+}
+```
+
+This provides utilities for the UI layer without complex state management.
 
 Tests:
-- Test session creation/loading
-- Test agent selection
-- Test defaults
+- Test agent listing
+- Test thread switching
+- Test missing agent handling
 
-**Commit**: "feat: integrate sessions into CLI"
-
-### Phase 7: Testing & Documentation
-
-**Task 7.1: End-to-end tests**
-
-File: `src/sessions/__tests__/multi-agent-e2e.test.ts`
-
-Scenarios:
-1. Create session with multiple agents
-2. Switch between agents
-3. Ephemeral agent lifecycle
-4. Task assignment between agents
-
-**Task 7.2: Documentation**
-
-- Update CLI help text
-- Add examples to README
-- Document agent lifecycle
+**Commit**: "feat: add agent switching utilities"
 
 ## Testing Strategy
 
 ### Unit Tests
-- Session management operations
+- Task assignment parsing
 - Agent metadata CRUD
-- State transitions
-- Factory creation
+- Notification formatting
+- Thread creation
 
-### Integration Tests  
-- Multi-agent session flow
-- Agent switching preserves context
-- Tool context propagation
-- Lifecycle management
+### Integration Tests
+- End-to-end task assignment and agent creation
+- Task completion notifications
+- Multi-agent workflows
 
 ### Manual Testing
-1. Create session with PM agent
-2. PM spawns implementer
-3. Switch between agents
-4. Suspend/resume agents
-5. Complete ephemeral agent
+1. Create task with `assignedTo: "new:anthropic/claude-3-sonnet"`
+2. Verify agent thread created
+3. Verify task notification sent
+4. Complete task, verify notification to creator
 
-## Common Patterns
+## Migration from Delegate
 
-### Parent-Child Threads
-```
-session_thread (parent)
-├── session_thread.1 (pm agent)
-├── session_thread.2 (architect)
-└── session_thread.3 (impl-1)
-```
+This builds on the existing delegate pattern:
+- Delegate creates temporary agents
+- Task assignment creates persistent agents
+- Same thread hierarchy (`parent.1`, `parent.2`)
+- No breaking changes to delegate tool
 
-### Agent Naming
-- Persistent: role-based ("pm", "architect", "reviewer")
-- Ephemeral: numbered ("impl-1", "impl-2", "debug-1")
+## Key Differences from Original Spec
 
-### Tool Restrictions
-```typescript
-// Ephemeral agents don't get:
-- agent-spawn (prevent recursion)
-- delegate (use agent-spawn instead)
-- dangerous tools (configurable)
-```
+1. **No AgentFactory class** - Just static method on Agent
+2. **No agent-spawn tool** - Happens through task assignment
+3. **No active agent concept** - Just thread switching
+4. **No pause/resume** - Idle agents use no resources
+5. **No complex lifecycle** - Agents exist or they don't
+6. **CLI agnostic** - UI handles agent switching
 
-## Performance Considerations
-
-- Lazy load agents (don't create until switched to)
-- Cache agent instances
-- Limit active agents (memory)
-- Archive old ephemeral agents
-
-## Error Handling
-
-- Agent creation failures shouldn't break session
-- Handle missing providers gracefully
-- Validate model availability
-- Log all lifecycle events
-
-## Migration Path
-
-1. Existing threads work as single-agent sessions
-2. Delegate threads become ephemeral agents
-3. No breaking changes to current flow
-4. Progressive enhancement
+This is much simpler and builds directly on existing patterns rather than creating new infrastructure.
