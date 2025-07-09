@@ -301,6 +301,7 @@ describe('CLI Flow Tests', () => {
         }),
         getLatestThreadId: vi.fn().mockResolvedValue('resumed-thread-456'),
       };
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       (Agent as any).mockImplementation(() => mockAgentInstance as any);
 
       const options = { ...mockCliOptions, continue: true };
@@ -326,6 +327,7 @@ describe('CLI Flow Tests', () => {
           resumeError: undefined,
         }),
       };
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       (Agent as any).mockImplementation(() => mockAgentInstance as any);
 
       const options = { ...mockCliOptions, continue: 'specific-thread-789' };
@@ -351,6 +353,7 @@ describe('CLI Flow Tests', () => {
           resumeError: 'Mock resume error',
         }),
       };
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       (Agent as any).mockImplementation(() => mockAgentInstance as any);
 
       await run(mockCliOptions);

@@ -178,7 +178,10 @@ export abstract class AIProvider extends EventEmitter {
   }
 
   // Provider-specific token counting - providers can override for accurate counts
-  async countTokens(messages: ProviderMessage[], _tools: Tool[] = []): Promise<number | null> {
+  countTokens(
+    messages: ProviderMessage[],
+    _tools: Tool[] = []
+  ): Promise<number | null> | number | null {
     // Default implementation returns null to indicate estimation should be used
     return null;
   }
@@ -199,7 +202,7 @@ export abstract class AIProvider extends EventEmitter {
   }
 
   // Cleanup method to close connections and free resources
-  async cleanup(): Promise<void> {
+  cleanup(): void {
     // Default implementation - providers can override for specific cleanup
     // Remove all event listeners to prevent memory leaks
     this.removeAllListeners();

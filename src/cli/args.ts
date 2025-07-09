@@ -168,7 +168,7 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
 
   // Validate log level
   const validLogLevels = ['error', 'warn', 'info', 'debug'];
-  if (!validLogLevels.includes(options.logLevel)) {
+  if (!validLogLevels.includes(options.logLevel as string)) {
     console.error('Error: --log-level must be "error", "warn", "info", or "debug"');
     process.exit(1);
   }
@@ -185,8 +185,10 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
     return [];
   };
 
-  const finalAutoApproveTools = processToolArray(options.autoApproveTools);
-  const finalDisableTools = processToolArray(options.disableTools);
+  const finalAutoApproveTools = processToolArray(
+    options.autoApproveTools as string | string[] | undefined
+  );
+  const finalDisableTools = processToolArray(options.disableTools as string | string[] | undefined);
 
   // Create temporary ToolExecutor for validation and --list-tools
   const tempExecutor = new ToolExecutor();
@@ -202,21 +204,21 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
   }
 
   const result: CLIOptions = {
-    provider: options.provider,
-    model: options.model,
-    help: options.help || false,
-    logLevel: options.logLevel,
-    logFile: options.logFile,
-    harFile: options.har,
-    prompt: options.prompt,
-    ui: options.ui,
-    continue: options.continue,
-    allowNonDestructiveTools: options.allowNonDestructiveTools || false,
+    provider: options.provider as string,
+    model: options.model as string | undefined,
+    help: (options.help as boolean) || false,
+    logLevel: options.logLevel as 'error' | 'warn' | 'info' | 'debug',
+    logFile: options.logFile as string | undefined,
+    harFile: options.har as string | undefined,
+    prompt: options.prompt as string | undefined,
+    ui: options.ui as 'terminal',
+    continue: options.continue as string | boolean | undefined,
+    allowNonDestructiveTools: (options.allowNonDestructiveTools as boolean) || false,
     autoApproveTools: finalAutoApproveTools,
     disableTools: finalDisableTools,
-    disableAllTools: options.disableAllTools || false,
-    disableToolGuardrails: options.disableToolGuardrails || false,
-    listTools: options.listTools || false,
+    disableAllTools: (options.disableAllTools as boolean) || false,
+    disableToolGuardrails: (options.disableToolGuardrails as boolean) || false,
+    listTools: (options.listTools as boolean) || false,
   };
 
   // Handle --help (exits after showing help)

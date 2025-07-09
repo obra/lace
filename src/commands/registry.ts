@@ -90,7 +90,7 @@ export class CommandRegistry {
     // First pass: register all direct command exports
     for (const file of filesToProcess) {
       try {
-        const module = await import(file);
+        const module = (await import(file)) as Record<string, unknown>;
 
         // Check all exports in the module
         for (const [exportName, exportedValue] of Object.entries(module)) {

@@ -29,11 +29,7 @@ export function enableFetchInterception(): void {
     }
 
     const url =
-      typeof input === 'string'
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : (input as Request).url;
+      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     const startTime = Date.now();
 
     try {
@@ -45,13 +41,25 @@ export function enableFetchInterception(): void {
 
       // Record to HAR synchronously to ensure it completes before process exits
       try {
-        await harRecorder.recordFetchRequest(
-          url,
-          (init as Record<string, unknown>) || {},
-          startTime,
-          responseForHAR,
-          endTime
-        );
+        // Safely convert init to Record format for HAR recording
+        const initRecord: Record<string, unknown> = init
+          ? {
+              method: init.method,
+              headers: init.headers,
+              body: init.body,
+              ...(init.cache && { cache: init.cache }),
+              ...(init.credentials && { credentials: init.credentials }),
+              ...(init.mode && { mode: init.mode }),
+              ...(init.redirect && { redirect: init.redirect }),
+              ...(init.referrer && { referrer: init.referrer }),
+              ...(init.referrerPolicy && { referrerPolicy: init.referrerPolicy }),
+              ...(init.signal && { signal: init.signal }),
+              ...(init.integrity && { integrity: init.integrity }),
+              ...(init.keepalive && { keepalive: init.keepalive }),
+            }
+          : {};
+
+        await harRecorder.recordFetchRequest(url, initRecord, startTime, responseForHAR, endTime);
       } catch (error) {
         logger.error('Failed to record fetch request to HAR', { error, url });
       }
@@ -73,8 +81,9 @@ export function enableFetchInterception(): void {
   };
 
   // Mark the intercepted function and install it
-  (interceptedFetch as typeof fetch & { __laceIntercepted: boolean }).__laceIntercepted = true;
-  globalThis.fetch = interceptedFetch as typeof fetch;
+  const typedInterceptedFetch = interceptedFetch as typeof fetch & { __laceIntercepted: boolean };
+  typedInterceptedFetch.__laceIntercepted = true;
+  globalThis.fetch = typedInterceptedFetch;
 
   logger.debug('Global fetch interception enabled for HAR recording');
 }

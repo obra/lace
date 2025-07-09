@@ -207,7 +207,7 @@ describe('CLI Integration', () => {
       expect(continuedId).toBe(threadId);
 
       // Should have loaded previous conversation
-      let events = manager2.getEvents(continuedId);
+      const events = manager2.getEvents(continuedId);
       expect(events).toHaveLength(2); // Original user message + agent response
       expect(events[0].data).toBe('What is 2+2?');
       expect(events[1].data).toBe('2+2 equals 4.');

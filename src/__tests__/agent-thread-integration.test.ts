@@ -66,7 +66,7 @@ describe('Agent Single Event Source Integration', () => {
     expect(Array.isArray(events)).toBe(true);
   });
 
-  it('should handle Agent API operations correctly', async () => {
+  it('should handle Agent API operations correctly', () => {
     // Create thread and add some events
     threadManager.createThread('api-test-thread');
     threadManager.addEvent('api-test-thread', 'USER_MESSAGE', 'test message 1');

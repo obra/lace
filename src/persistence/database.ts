@@ -279,7 +279,7 @@ export class DatabasePersistence {
           threadId: row.thread_id,
           type: row.type as EventType,
           timestamp: new Date(row.timestamp),
-          data: JSON.parse(row.data),
+          data: JSON.parse(row.data) as unknown,
         };
       } catch (error) {
         throw new Error(

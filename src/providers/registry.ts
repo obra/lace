@@ -51,7 +51,7 @@ export class ProviderRegistry {
 
     for (const file of filesToProcess) {
       try {
-        const module = await import(file);
+        const module = (await import(file)) as Record<string, unknown>;
 
         // Check all exports in the module
         for (const exportedValue of Object.values(module)) {
@@ -84,8 +84,8 @@ export class ProviderRegistry {
                   get supportsStreaming() {
                     return true;
                   }
-                  async createResponse(): Promise<ProviderResponse> {
-                    throw new Error('Provider not properly configured');
+                  createResponse(): Promise<ProviderResponse> {
+                    return Promise.reject(new Error('Provider not properly configured'));
                   }
                 }
 
@@ -113,9 +113,10 @@ export class ProviderRegistry {
     // Check if the class name ends with "Provider" (simple heuristic)
     if (!value.name || !value.name.endsWith('Provider')) return false;
     // Check if it extends AIProvider by checking the prototype chain
-    let proto = value.prototype;
+    let proto = value.prototype as unknown;
     while (proto) {
-      if (proto.constructor.name === 'AIProvider') return true;
+      if ((proto as { constructor: { name: string } }).constructor.name === 'AIProvider')
+        return true;
       proto = Object.getPrototypeOf(proto);
     }
     return false;

@@ -48,7 +48,7 @@ export function createThreadId(value: string): ThreadId {
   if (!isThreadId(value)) {
     throw new Error(`Invalid thread ID format: ${value}`);
   }
-  return value as ThreadId;
+  return value;
 }
 
 // Unsafe cast for internal use only (e.g., when we know format is correct)

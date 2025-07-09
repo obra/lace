@@ -15,14 +15,11 @@ class TestTool extends Tool {
     optional: z.number().optional(),
   });
 
-  async executeValidated(
-    args: z.infer<typeof this.schema>,
-    _context?: ToolContext
-  ): Promise<ToolResult> {
-    return {
+  executeValidated(args: z.infer<typeof this.schema>, _context?: ToolContext): Promise<ToolResult> {
+    return Promise.resolve({
       content: [{ type: 'text' as const, text: `Got: ${args.required}` }],
       isError: false,
-    };
+    });
   }
 }
 
@@ -110,11 +107,11 @@ class ComplexTestTool extends Tool {
       }
     );
 
-  async executeValidated(_args: z.infer<typeof this.schema>): Promise<ToolResult> {
-    return {
+  executeValidated(_args: z.infer<typeof this.schema>): Promise<ToolResult> {
+    return Promise.resolve({
       content: [{ type: 'text' as const, text: 'validation passed' }],
       isError: false,
-    };
+    });
   }
 }
 

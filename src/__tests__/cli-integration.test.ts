@@ -105,7 +105,7 @@ describe('CLI Orchestration', () => {
       process.env.ANTHROPIC_KEY = 'test-key';
 
       const provider = new AnthropicProvider({
-        apiKey: process.env.ANTHROPIC_KEY!,
+        apiKey: process.env.ANTHROPIC_KEY,
         systemPrompt: 'test',
       });
 
