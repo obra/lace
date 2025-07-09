@@ -22,6 +22,7 @@ import StatusBar from './components/status-bar.js';
 import { FocusDebugPanel } from './components/FocusDebugPanel.js';
 import { Agent, CurrentTurnMetrics } from '../../agents/agent.js';
 import { ApprovalCallback, ApprovalDecision } from '../../tools/approval-types.js';
+import type { MessageQueueStats } from '../../agents/types.js';
 import { CommandRegistry } from '../../commands/registry.js';
 import { CommandExecutor } from '../../commands/executor.js';
 import type { UserInterface } from '../../commands/types.js';
@@ -247,6 +248,12 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
   // Project context hook for double status bar
   const { context: projectContext, refreshContext } = useProjectContext();
+
+  // Queue stats state
+  const [queueStats, setQueueStats] = useState<MessageQueueStats>({
+    queueLength: 0,
+    highPriorityCount: 0,
+  });
 
   // Refresh project context when processing completes (tools may have changed git status)
   useEffect(() => {
@@ -846,6 +853,39 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
   }, [agent, streamingTimelineProcessor]);
 
+  // Listen for queue events and update stats
+  useEffect(() => {
+    const updateQueueStats = () => {
+      setQueueStats(agent.getQueueStats());
+    };
+
+    const handleMessageQueued = () => {
+      updateQueueStats();
+    };
+
+    const handleQueueProcessingStart = () => {
+      updateQueueStats();
+    };
+
+    const handleQueueProcessingComplete = () => {
+      updateQueueStats();
+    };
+
+    // Initial stats
+    updateQueueStats();
+
+    // Listen for queue events
+    agent.on('message_queued', handleMessageQueued);
+    agent.on('queue_processing_start', handleQueueProcessingStart);
+    agent.on('queue_processing_complete', handleQueueProcessingComplete);
+
+    return () => {
+      agent.off('message_queued', handleMessageQueued);
+      agent.off('queue_processing_start', handleQueueProcessingStart);
+      agent.off('queue_processing_complete', handleQueueProcessingComplete);
+    };
+  }, [agent]);
+
   // Get Ink app instance for proper exit handling
   const app = useApp();
 
@@ -920,16 +960,35 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
       if (!trimmedInput) return;
 
-      // Prevent submission during processing (but allow typing)
-      if (isTurnActive || approvalRequest) {
+      // Handle tool approval - still block during approval
+      if (approvalRequest) {
         addMessage({
           type: 'system',
-          content: isTurnActive
-            ? '⚠️ Please wait for current operation to complete'
-            : '⚠️ Tool approval required',
+          content: '⚠️ Tool approval required',
           timestamp: new Date(),
         });
         return;
+      }
+      
+      // If agent is busy, automatically queue the message
+      if (isTurnActive) {
+        try {
+          await agent.sendMessage(trimmedInput, { queue: true });
+          addMessage({
+            type: 'system',
+            content: '📬 Message queued - will process when current operation completes',
+            timestamp: new Date(),
+          });
+          setCurrentInput('');
+          return;
+        } catch (error) {
+          addMessage({
+            type: 'system',
+            content: `❌ Failed to queue message: ${error instanceof Error ? error.message : String(error)}`,
+            timestamp: new Date(),
+          });
+          return;
+        }
       }
 
       // Handle slash commands
@@ -1093,6 +1152,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
               projectContext={projectContext}
               contextWindow={agent.provider?.contextWindow}
               retryStatus={retryStatus}
+              queueStats={queueStats}
             />
 
             {/* Input area or modal - takes natural height */}

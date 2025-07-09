@@ -15,6 +15,7 @@ import { TokenBudgetManager } from '~/token-management/token-budget-manager.js';
 import { TokenBudgetConfig } from '~/token-management/types.js';
 import { loadPromptConfig } from '~/config/prompts.js';
 import { estimateTokens } from '~/utils/token-estimation.js';
+import { QueuedMessage, MessageQueueStats } from '~/agents/types.js';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -79,6 +80,10 @@ export interface AgentEvents {
   // Thread events proxied from ThreadManager
   thread_event_added: [{ event: ThreadEvent; threadId: string }];
   thread_state_changed: [{ threadId: string; eventType: string }];
+  // Queue events
+  queue_processing_start: [];
+  queue_processing_complete: [];
+  message_queued: [{ id: string; queueLength: number }];
 }
 
 export class Agent extends EventEmitter {
@@ -113,6 +118,8 @@ export class Agent extends EventEmitter {
   private _progressTimer: number | null = null;
   private _abortController: AbortController | null = null;
   private _lastStreamingTokenCount = 0; // Track last cumulative token count from streaming
+  private _messageQueue: QueuedMessage[] = [];
+  private _isProcessingQueue = false;
 
   constructor(config: AgentConfig) {
     super();
@@ -130,11 +137,34 @@ export class Agent extends EventEmitter {
   }
 
   // Core conversation methods
-  async sendMessage(content: string): Promise<void> {
+  async sendMessage(
+    content: string,
+    options?: {
+      queue?: boolean;
+      metadata?: QueuedMessage['metadata'];
+    }
+  ): Promise<void> {
     if (!this._isRunning) {
       throw new Error('Agent is not started. Call start() first.');
     }
 
+    if (this._state === 'idle') {
+      // Process immediately
+      return this._processMessage(content);
+    }
+
+    if (options?.queue) {
+      // Queue for later
+      const id = this.queueMessage(content, 'user', options.metadata);
+      this.emit('message_queued', { id, queueLength: this._messageQueue.length });
+      return;
+    }
+
+    // Current behavior - throw error
+    throw new Error(`Agent is ${this._state}, cannot accept messages`);
+  }
+
+  private async _processMessage(content: string): Promise<void> {
     logger.debug('AGENT: Processing user message', {
       threadId: this._threadId,
       contentLength: content.length,
@@ -848,6 +878,16 @@ export class Agent extends EventEmitter {
         from: oldState,
         to: newState,
       });
+
+      // Process queue when returning to idle
+      if (newState === 'idle' && !this._isProcessingQueue) {
+        this.processQueuedMessages().catch((error) => {
+          logger.error('AGENT: Failed to process queue on state change', {
+            threadId: this._threadId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+      }
     }
   }
 
@@ -1346,5 +1386,92 @@ export class Agent extends EventEmitter {
     const event = this._threadManager.addEvent(threadId, type as EventType, data);
     this.emit('thread_event_added', { event, threadId });
     return event;
+  }
+
+  // Message queue methods
+  queueMessage(
+    content: string,
+    type: QueuedMessage['type'] = 'user',
+    metadata?: QueuedMessage['metadata']
+  ): string {
+    const id = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const message: QueuedMessage = {
+      id,
+      type,
+      content,
+      timestamp: new Date(),
+      metadata,
+    };
+
+    // High priority messages go to the front
+    if (metadata?.priority === 'high') {
+      this._messageQueue.unshift(message);
+    } else {
+      this._messageQueue.push(message);
+    }
+
+    return id;
+  }
+
+  getQueueStats(): MessageQueueStats {
+    const queueLength = this._messageQueue.length;
+    const highPriorityCount = this._messageQueue.filter(
+      (msg) => msg.metadata?.priority === 'high'
+    ).length;
+
+    let oldestMessageAge: number | undefined;
+    if (queueLength > 0) {
+      const oldestMessage = this._messageQueue[this._messageQueue.length - 1];
+      oldestMessageAge = Math.max(0, Date.now() - oldestMessage.timestamp.getTime());
+    }
+
+    return {
+      queueLength,
+      oldestMessageAge,
+      highPriorityCount,
+    };
+  }
+
+  getQueueContents(): readonly QueuedMessage[] {
+    return [...this._messageQueue];
+  }
+
+  clearQueue(filter?: (msg: QueuedMessage) => boolean): number {
+    if (!filter) {
+      const clearedCount = this._messageQueue.length;
+      this._messageQueue = [];
+      return clearedCount;
+    }
+
+    const originalLength = this._messageQueue.length;
+    this._messageQueue = this._messageQueue.filter((msg) => !filter(msg));
+    return originalLength - this._messageQueue.length;
+  }
+
+  async processQueuedMessages(): Promise<void> {
+    if (this._isProcessingQueue || this._messageQueue.length === 0) {
+      return;
+    }
+
+    this._isProcessingQueue = true;
+    this.emit('queue_processing_start');
+
+    try {
+      while (this._messageQueue.length > 0) {
+        const message = this._messageQueue.shift()!;
+
+        try {
+          await this._processMessage(message.content);
+        } catch (error) {
+          logger.warn('AGENT: Failed to process queued message', {
+            messageId: message.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    } finally {
+      this._isProcessingQueue = false;
+      this.emit('queue_processing_complete');
+    }
   }
 }
