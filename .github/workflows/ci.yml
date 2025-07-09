@@ -91,16 +91,23 @@ jobs:
 
       - name: Build project
         run: npm run build
-
       - name: Run unit tests
         if: matrix.test-group == 'unit'
         run: |
-          script -q -c "npm run test:unit" /dev/null
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            script -q -c "npm run test:unit" /dev/null
+          else
+            script -q /dev/null sh -c "npm run test:unit"
+          fi
 
       - name: Run integration tests
         if: matrix.test-group == 'integration'
         run: |
-          script -q -c "npm run test:integration" /dev/null
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            script -q -c "npm run test:integration" /dev/null
+          else
+            script -q /dev/null sh -c "npm run test:integration"
+          fi
 
   test-coverage:
     name: Test Coverage
@@ -136,7 +143,13 @@ jobs:
 
       - name: Run coverage
         run: |
-          script -q -c "npm run test:coverage -- --exclude '**/*lmstudio-integration*' --exclude '**/*ollama-integration*' --exclude '**/e2e-cli*'" /dev/null
+          COVER_CMD="npm run test:coverage -- --exclude '**/*lmstudio-integration*' \
+            --exclude '**/*ollama-integration*' --exclude '**/e2e-cli*'"
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            script -q -c "$COVER_CMD" /dev/null
+          else
+            script -q /dev/null sh -c "$COVER_CMD"
+          fi
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -216,7 +229,16 @@ jobs:
 
       - name: Core tests
         run: |
-          script -q -c "npm run test:run -- --exclude '**/*lmstudio-integration*' --exclude '**/*ollama-integration*' --exclude '**/e2e-cli*' --exclude '**/*sigint-integration*'" /dev/null
+          CORE_CMD="npm run test:run -- \
+            --exclude '**/*lmstudio-integration*' \
+            --exclude '**/*ollama-integration*' \
+            --exclude '**/e2e-cli*' \
+            --exclude '**/*sigint-integration*'"
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            script -q -c "$CORE_CMD" /dev/null
+          else
+            script -q /dev/null sh -c "$CORE_CMD"
+          fi
 
       - name: Build and test CLI
         run: |
