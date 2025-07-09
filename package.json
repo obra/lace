@@ -12,7 +12,7 @@
     "start": "npm run build && node dist/cli.js",
     "debug-thread": "npm run build && node dist/debug-thread.js",
     "test": "vitest",
-    "test:integration": "vitest run \"integration\"",
+    "test:integration": "vitest run \"integration\" && vitest run --config vitest.pty.config.ts",
     "test:unit": "vitest run --exclude=\"**/*{e2e,integration}*\"",
     "test:coverage": "vitest run --coverage",
     "test:run": "vitest run",
