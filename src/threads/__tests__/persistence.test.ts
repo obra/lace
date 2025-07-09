@@ -592,8 +592,8 @@ describe('Enhanced ThreadManager', () => {
       }).toThrow('Thread non_existent not found');
     });
 
-    it('should throw error when loading non-existent thread', async () => {
-      await expect(threadManager.loadThread('non_existent')).rejects.toThrow(
+    it('should throw error when loading non-existent thread', () => {
+      expect(() => threadManager.loadThread('non_existent')).toThrow(
         'Thread non_existent not found in database'
       );
     });
@@ -642,8 +642,8 @@ describe('Enhanced ThreadManager', () => {
       expect(threadManager.getCanonicalId(secondCompactedThreadId)).toBe(originalThreadId);
     });
 
-    it('should throw error when no current thread', async () => {
-      await expect(threadManager.createShadowThread('Test')).rejects.toThrow(
+    it('should throw error when no current thread', () => {
+      expect(() => threadManager.createShadowThread('Test')).toThrow(
         'No current thread to compact'
       );
     });
