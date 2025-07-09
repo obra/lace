@@ -73,8 +73,16 @@ jobs:
       - name: Install system dependencies
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
-            sudo apt-get update && sudo apt-get install -y ripgrep
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y \
+              python3 \
+              make \
+              g++ \
+              libtool \
+              pkg-config \
+              libncurses5-dev \
+              ripgrep
+          else
             brew install ripgrep
           fi
 
@@ -86,11 +94,13 @@ jobs:
 
       - name: Run unit tests
         if: matrix.test-group == 'unit'
-        run: npm run test:unit
+        run: |
+          script -q -c "npm run test:unit" /dev/null
 
       - name: Run integration tests
         if: matrix.test-group == 'integration'
-        run: npm run test:integration
+        run: |
+          script -q -c "npm run test:integration" /dev/null
 
   test-coverage:
     name: Test Coverage
@@ -108,16 +118,25 @@ jobs:
       - name: Install system dependencies
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
-            sudo apt-get update && sudo apt-get install -y ripgrep
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y \
+              python3 \
+              make \
+              g++ \
+              libtool \
+              pkg-config \
+              libncurses5-dev \
+              ripgrep
+          else
             brew install ripgrep
           fi
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests with coverage
-        run: npm run test:coverage -- --exclude "**/*lmstudio-integration*" --exclude "**/*ollama-integration*" --exclude "**/e2e-cli*"
+      - name: Run coverage
+        run: |
+          script -q -c "npm run test:coverage -- --exclude '**/*lmstudio-integration*' --exclude '**/*ollama-integration*' --exclude '**/e2e-cli*'" /dev/null
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -179,16 +198,25 @@ jobs:
       - name: Install system dependencies
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
-            sudo apt-get update && sudo apt-get install -y ripgrep
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y \
+              python3 \
+              make \
+              g++ \
+              libtool \
+              pkg-config \
+              libncurses5-dev \
+              ripgrep
+          else
             brew install ripgrep
           fi
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run core tests
-        run: npm run test:run -- --exclude "**/*lmstudio-integration*" --exclude "**/*ollama-integration*" --exclude "**/e2e-cli*" --exclude "**/*sigint-integration*"
+      - name: Core tests
+        run: |
+          script -q -c "npm run test:run -- --exclude '**/*lmstudio-integration*' --exclude '**/*ollama-integration*' --exclude '**/e2e-cli*' --exclude '**/*sigint-integration*'" /dev/null
 
       - name: Build and test CLI
         run: |
