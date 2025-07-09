@@ -87,7 +87,13 @@ export async function createPTYSession(
       rows: 30,
       cwd: process.cwd(),
       env: {
-        ...process.env,
+        // Filter out CI environment variables to ensure interactive terminal behavior
+        // This prevents Ink.js from using CI mode rendering
+        ...Object.fromEntries(
+          Object.entries(process.env).filter(
+            ([key]) => key !== 'CI' && key !== 'CONTINUOUS_INTEGRATION' && !key.startsWith('CI_')
+          )
+        ),
         LACE_DIR: process.env.LACE_DIR,
         LACE_TEST_MODE: 'true',
         TERM: 'xterm-256color',
