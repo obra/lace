@@ -18,7 +18,7 @@ export default defineConfig({
       reporter: ['text', 'html', 'lcov'],
       exclude: ['node_modules/', 'dist/', '**/*.test.ts', '**/*.spec.ts'],
     },
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
+    environment: 'jsdom', // Default to jsdom for React components
+    setupFiles: ['./src/__tests__/setup.ts'],
   },
 });
