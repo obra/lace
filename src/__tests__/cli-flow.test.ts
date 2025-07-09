@@ -163,7 +163,7 @@ describe('CLI Flow Tests', () => {
         isResumed: false,
         resumeError: undefined,
       }),
-      getLatestThreadId: vi.fn().mockResolvedValue('latest-thread-123'),
+      getLatestThreadId: vi.fn().mockReturnValue('latest-thread-123'),
       getCurrentThreadId: vi.fn().mockReturnValue('test-thread-123'),
       generateThreadId: vi.fn().mockReturnValue('generated-thread-123'),
       createThread: vi.fn(),
@@ -299,7 +299,7 @@ describe('CLI Flow Tests', () => {
           isResumed: true,
           resumeError: undefined,
         }),
-        getLatestThreadId: vi.fn().mockResolvedValue('resumed-thread-456'),
+        getLatestThreadId: vi.fn().mockReturnValue('resumed-thread-456'),
       };
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       (Agent as any).mockImplementation(() => mockAgentInstance as any);

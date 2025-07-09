@@ -1271,7 +1271,7 @@ export class Agent extends EventEmitter {
     this._threadManager.createThread(threadId);
   }
 
-  resumeOrCreateThread(threadId?: string): ThreadSessionInfo {
+  async resumeOrCreateThread(threadId?: string): Promise<ThreadSessionInfo> {
     const result = this._threadManager.resumeOrCreate(threadId);
 
     // If resuming existing thread, replay events for UI
