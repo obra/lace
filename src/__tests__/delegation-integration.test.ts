@@ -193,7 +193,6 @@ describe('Delegation Integration Tests', () => {
     };
     const result = await delegateToolInstance.execute(toolCall.arguments);
 
-
     expect(result.isError).toBe(false);
 
     // Check that delegate thread was created

@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { withConsoleCapture } from '~/__tests__/setup/console-capture.js';
 import { run } from '~/app.js';
 import { CLIOptions } from '~/cli/args.js';
 
@@ -190,9 +191,7 @@ describe('CLI Flow Tests', () => {
       requestApproval: vi.fn(),
     });
 
-    // Mock console methods to prevent test output pollution
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Console output is automatically suppressed by global setup
     vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
   });
 
@@ -247,8 +246,6 @@ describe('CLI Flow Tests', () => {
     });
 
     it('should throw error for missing Anthropic API key', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       const { getEnvVar } = vi.mocked(await import('../config/env-loader.js'));
       getEnvVar.mockImplementation((key) => {
         if (key === 'ANTHROPIC_KEY') return undefined;
@@ -256,13 +253,9 @@ describe('CLI Flow Tests', () => {
       });
 
       await expect(run(mockCliOptions)).rejects.toThrow('Anthropic API key is required');
-      
-      consoleErrorSpy.mockRestore();
     });
 
     it('should throw error for missing OpenAI API key', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       const { getEnvVar } = vi.mocked(await import('../config/env-loader.js'));
       getEnvVar.mockImplementation((key) => {
         if (key === 'OPENAI_API_KEY' || key === 'OPENAI_KEY') return undefined;
@@ -271,8 +264,6 @@ describe('CLI Flow Tests', () => {
       const options = { ...mockCliOptions, provider: 'openai' };
 
       await expect(run(options)).rejects.toThrow('OpenAI API key is required');
-      
-      consoleErrorSpy.mockRestore();
     });
 
     it('should throw error for unknown provider', async () => {
@@ -284,6 +275,7 @@ describe('CLI Flow Tests', () => {
 
   describe('session management', () => {
     it('should create new session when no continue specified', async () => {
+      const { log } = withConsoleCapture();
       const { Agent } = vi.mocked(await import('../agents/agent.js'));
 
       await run(mockCliOptions);
@@ -291,10 +283,11 @@ describe('CLI Flow Tests', () => {
       // Session handling now goes through Agent.resumeOrCreateThread
       const mockAgentInstance = (Agent as any).mock.results[0]?.value;
       expect(mockAgentInstance.resumeOrCreateThread).toHaveBeenCalledWith(undefined);
-      expect(console.log).toHaveBeenCalledWith('🆕 Starting conversation test-thread-123');
+      expect(log).toHaveBeenCalledWith('🆕 Starting conversation test-thread-123');
     });
 
     it('should resume session when continue is true', async () => {
+      const { log } = withConsoleCapture();
       const { Agent } = vi.mocked(await import('../agents/agent.js'));
       const { ToolExecutor } = vi.mocked(await import('../tools/executor.js'));
 
@@ -318,10 +311,11 @@ describe('CLI Flow Tests', () => {
 
       // Session handling now goes through Agent.resumeOrCreateThread
       expect(mockAgentInstance.resumeOrCreateThread).toHaveBeenCalledWith('resumed-thread-456');
-      expect(console.log).toHaveBeenCalledWith('📖 Continuing conversation resumed-thread-456');
+      expect(log).toHaveBeenCalledWith('📖 Continuing conversation resumed-thread-456');
     });
 
     it('should resume specific session when thread ID provided', async () => {
+      const { log } = withConsoleCapture();
       const { Agent } = vi.mocked(await import('../agents/agent.js'));
       const { ToolExecutor } = vi.mocked(await import('../tools/executor.js'));
 
@@ -344,10 +338,11 @@ describe('CLI Flow Tests', () => {
 
       // Session handling now goes through Agent.resumeOrCreateThread
       expect(mockAgentInstance.resumeOrCreateThread).toHaveBeenCalledWith('specific-thread-789');
-      expect(console.log).toHaveBeenCalledWith('📖 Continuing conversation specific-thread-789');
+      expect(log).toHaveBeenCalledWith('📖 Continuing conversation specific-thread-789');
     });
 
     it('should handle resume error gracefully', async () => {
+      const { log, warn } = withConsoleCapture();
       const { Agent } = vi.mocked(await import('../agents/agent.js'));
       const { ToolExecutor } = vi.mocked(await import('../tools/executor.js'));
 
@@ -366,8 +361,8 @@ describe('CLI Flow Tests', () => {
 
       await run(mockCliOptions);
 
-      expect(console.warn).toHaveBeenCalledWith('⚠️  Mock resume error');
-      expect(console.log).toHaveBeenCalledWith('🆕 Starting new conversation new-thread-123');
+      expect(warn).toHaveBeenCalledWith('⚠️  Mock resume error');
+      expect(log).toHaveBeenCalledWith('🆕 Starting new conversation new-thread-123');
     });
   });
 

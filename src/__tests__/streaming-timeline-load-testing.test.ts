@@ -82,7 +82,6 @@ describe('StreamingTimelineProcessor Load Testing', () => {
       const events = generateEventSequence(eventCount, 'large-thread');
       const timings: number[] = [];
 
-
       // Measure append performance in batches
       const batchSize = 100;
       const batchTimings: number[] = [];
@@ -100,7 +99,6 @@ describe('StreamingTimelineProcessor Load Testing', () => {
 
         const batchEndTime = performance.now();
         batchTimings.push(batchEndTime - batchStartTime);
-
       }
 
       // Verify timeline correctness
@@ -112,7 +110,6 @@ describe('StreamingTimelineProcessor Load Testing', () => {
       const firstBatchAvg = average(batchTimings.slice(0, 2));
       const lastBatchAvg = average(batchTimings.slice(-2));
       const performanceDrift = lastBatchAvg / firstBatchAvg;
-
 
       expect(performanceDrift).toBeLessThan(2); // No more than 2x degradation
       expect(average(timings)).toBeLessThan(2); // Individual operations stay fast
@@ -131,7 +128,6 @@ describe('StreamingTimelineProcessor Load Testing', () => {
       const bulkStartTime = performance.now();
       processor.loadEvents(initialEvents);
       const bulkEndTime = performance.now();
-
 
       // Add remaining events incrementally (simulating real-time additions)
       const incrementalEvents = generateEventSequence(500, 'stress-thread', 1500);
@@ -180,7 +176,6 @@ describe('StreamingTimelineProcessor Load Testing', () => {
 
         // Verify conversation processed correctly
         expect(processor.getTimeline().items).toHaveLength(200);
-
       }
 
       // Force garbage collection if available
@@ -198,7 +193,6 @@ describe('StreamingTimelineProcessor Load Testing', () => {
 
   describe('Mixed Event Type Performance', () => {
     it('should handle complex event sequences with tools efficiently', () => {
-
       const events = generateComplexToolSequence(500, 'tool-thread');
       const timings: number[] = [];
 
@@ -235,7 +229,6 @@ describe('StreamingTimelineProcessor Load Testing', () => {
 
   describe('Concurrent Timeline Performance', () => {
     it('should handle multiple independent processors efficiently', () => {
-
       const processors = Array.from({ length: 5 }, () => new StreamingTimelineProcessor());
       const timings: number[][] = Array.from({ length: 5 }, () => []);
 

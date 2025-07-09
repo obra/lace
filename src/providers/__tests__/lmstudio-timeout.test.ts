@@ -6,9 +6,8 @@ import { LMStudioProvider } from '../lmstudio-provider.js';
 
 describe('LMStudio Provider Timeout Handling', () => {
   it('should timeout quickly when LMStudio server is unavailable', async () => {
-    // Suppress stderr noise from LMStudio client connection failures
-    const originalStderrWrite = process.stderr.write;
-    process.stderr.write = () => true;
+    // Console output is automatically suppressed by global setup
+    // No need for manual stderr suppression
     
     // Use a non-existent port to simulate unavailable server
     const provider = new LMStudioProvider({
@@ -26,8 +25,5 @@ describe('LMStudio Provider Timeout Handling', () => {
     expect(elapsedMs).toBeLessThan(5000);
     expect(result.connected).toBe(false);
     expect(result.error).toBeDefined();
-    
-    // Restore stderr
-    process.stderr.write = originalStderrWrite;
   }, 10000); // 10 second test timeout
 });

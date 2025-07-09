@@ -5,19 +5,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NonInteractiveInterface } from '../non-interactive-interface.js';
 import type { Agent } from '../../agents/agent.js';
 import { EventEmitter } from 'events';
+import { withConsoleCapture } from '../../__tests__/setup/console-capture.js';
 
 // Mock dependencies
 
 describe('NonInteractiveInterface', () => {
   let agent: Agent;
   let nonInteractive: NonInteractiveInterface;
-  let consoleSpy: ReturnType<typeof vi.spyOn>;
   let mockEventEmitter: EventEmitter;
 
   beforeEach(() => {
-    // Mock console.log to capture output
-    consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
     // Create event emitter for agent events
     mockEventEmitter = new EventEmitter();
 
@@ -46,16 +43,16 @@ describe('NonInteractiveInterface', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-    consoleSpy.mockRestore();
   });
 
   describe('executePrompt', () => {
     it('should execute single prompt and exit gracefully', async () => {
       const agentStartSpy = vi.spyOn(agent, 'start').mockImplementation(async () => {});
+      const { log } = withConsoleCapture();
 
       await nonInteractive.executePrompt('Test prompt');
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(log).toHaveBeenCalledWith(
         expect.stringContaining('using mock-provider provider')
       );
       expect(agentStartSpy).toHaveBeenCalled();
@@ -71,10 +68,11 @@ describe('NonInteractiveInterface', () => {
 
     it('should display provider information', async () => {
       vi.spyOn(agent, 'start').mockImplementation(async () => {});
+      const { log } = withConsoleCapture();
 
       await nonInteractive.executePrompt('Test prompt');
 
-      expect(consoleSpy).toHaveBeenCalledWith('🤖 Lace Agent using mock-provider provider.\n');
+      expect(log).toHaveBeenCalledWith('🤖 Lace Agent using mock-provider provider.\n');
     });
 
     it('should work without tool executor', async () => {

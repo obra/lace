@@ -14,8 +14,6 @@ describe('CLI Integration', () => {
   beforeEach(() => {
     tempDbPath = path.join(os.tmpdir(), `lace-cli-test-${Date.now()}.db`);
     vi.spyOn(laceDir, 'getLaceDbPath').mockReturnValue(tempDbPath);
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
@@ -29,8 +27,6 @@ describe('CLI Integration', () => {
 
   describe('session management', () => {
     it('should start new session by default', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-
       const threadManager = new ThreadManager(tempDbPath);
       const sessionInfo = await threadManager.resumeOrCreate();
       const { threadId } = sessionInfo;
@@ -44,8 +40,6 @@ describe('CLI Integration', () => {
     });
 
     it('should continue session with --continue flag', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-
       // Create first session
       const manager1 = new ThreadManager(tempDbPath);
       const sessionInfo1 = await manager1.resumeOrCreate();
@@ -71,8 +65,6 @@ describe('CLI Integration', () => {
     });
 
     it('should continue latest session with --continue (no ID)', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-
       // Create first session
       const manager1 = new ThreadManager(tempDbPath);
       const sessionInfo1 = await manager1.resumeOrCreate();
@@ -104,8 +96,6 @@ describe('CLI Integration', () => {
     });
 
     it('should continue specific session with --continue and ID', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-
       // Create multiple sessions
       const manager1 = new ThreadManager(tempDbPath);
       const sessionInfo1 = await manager1.resumeOrCreate();
@@ -135,8 +125,6 @@ describe('CLI Integration', () => {
     });
 
     it('should handle graceful shutdown', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-
       const threadManager = new ThreadManager(tempDbPath);
       const sessionInfo = await threadManager.resumeOrCreate();
       const { threadId } = sessionInfo;
@@ -157,8 +145,6 @@ describe('CLI Integration', () => {
 
   describe('argument parsing', () => {
     it('should handle empty arguments', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-
       const threadManager = new ThreadManager(tempDbPath);
       const sessionInfo = await threadManager.resumeOrCreate();
       const { threadId } = sessionInfo;
@@ -171,8 +157,6 @@ describe('CLI Integration', () => {
     });
 
     it('should handle --prompt arguments without starting interactive mode', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-
       // Test that --prompt doesn't interfere with session creation
       const threadManager = new ThreadManager(tempDbPath);
       const sessionInfo = await threadManager.resumeOrCreate();
@@ -187,8 +171,6 @@ describe('CLI Integration', () => {
     });
 
     it('should support multi-turn conversations using --prompt with --continue', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-
       // Turn 1: Start new conversation with --prompt
       const manager1 = new ThreadManager(tempDbPath);
       const sessionInfo1 = await manager1.resumeOrCreate();
@@ -246,8 +228,6 @@ describe('CLI Integration', () => {
     });
 
     it('should handle unknown arguments gracefully', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-
       const threadManager = new ThreadManager(tempDbPath);
       const sessionInfo = await threadManager.resumeOrCreate();
       const { threadId } = sessionInfo;
@@ -260,9 +240,6 @@ describe('CLI Integration', () => {
     });
 
     it('should handle malformed thread IDs', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
-
       const threadManager = new ThreadManager(tempDbPath);
       const sessionInfo = await threadManager.resumeOrCreate('invalid_thread_id');
       const { threadId } = sessionInfo;
@@ -278,8 +255,6 @@ describe('CLI Integration', () => {
 
   describe('thread persistence', () => {
     it('should maintain thread state across sessions', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-
       // Session 1: Create conversation
       const manager1 = new ThreadManager(tempDbPath);
       const sessionInfo1 = await manager1.resumeOrCreate();
@@ -323,9 +298,6 @@ describe('CLI Integration', () => {
     });
 
     it('should handle database errors gracefully', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-      vi.spyOn(console, 'error').mockImplementation(() => {});
-
       // Use an invalid database path to trigger errors
       const invalidPath = '/invalid/path/database.db';
       vi.spyOn(laceDir, 'getLaceDbPath').mockReturnValue(invalidPath);
@@ -349,8 +321,6 @@ describe('CLI Integration', () => {
 
   describe('event persistence', () => {
     it('should save events immediately', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-
       const threadManager = new ThreadManager(tempDbPath);
       const sessionInfo = await threadManager.resumeOrCreate();
       const { threadId } = sessionInfo;

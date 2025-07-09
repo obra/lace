@@ -66,14 +66,13 @@ describe('Session Resumption with Agent API', () => {
   });
 
   afterEach(async () => {
-    await threadManager.close();
+    threadManager.close();
     await rm(testDir, { recursive: true, force: true });
   });
 
   describe('handleSessionWithAgent', () => {
     it('should use Agent.resumeOrCreateThread for session resumption', async () => {
       // Arrange
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const resumeOrCreateThreadSpy = vi.spyOn(agent, 'resumeOrCreateThread');
 
       // Act
@@ -81,13 +80,10 @@ describe('Session Resumption with Agent API', () => {
 
       // Assert
       expect(resumeOrCreateThreadSpy).toHaveBeenCalled();
-      
-      consoleLogSpy.mockRestore();
     });
 
     it('should replay events when resuming existing thread', async () => {
       // Arrange
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const existingThreadId = agent.getCurrentThreadId()!;
       threadManager.clearEvents(existingThreadId);
       threadManager.addEvent(existingThreadId, 'USER_MESSAGE', 'Previous message');
@@ -100,6 +96,7 @@ describe('Session Resumption with Agent API', () => {
 
       // Assert
       expect(threadId).toBe(existingThreadId);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       expect(eventSpy).toHaveBeenCalledWith({
         event: expect.objectContaining({
           type: 'USER_MESSAGE',
@@ -107,13 +104,10 @@ describe('Session Resumption with Agent API', () => {
         }),
         threadId: existingThreadId,
       });
-      
-      consoleLogSpy.mockRestore();
     });
 
     it('should create new thread when no existing thread specified', async () => {
       // Arrange
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const resumeOrCreateThreadSpy = vi.spyOn(agent, 'resumeOrCreateThread');
 
       // Act
@@ -122,15 +116,10 @@ describe('Session Resumption with Agent API', () => {
       // Assert
       expect(threadId).toBeDefined();
       expect(resumeOrCreateThreadSpy).toHaveBeenCalledWith(undefined);
-      
-      consoleLogSpy.mockRestore();
     });
 
     it('should handle thread ID string for specific thread resumption', async () => {
       // Arrange
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      
       const specificThreadId = 'test-thread-123';
       const resumeOrCreateThreadSpy = vi.spyOn(agent, 'resumeOrCreateThread');
 
@@ -139,9 +128,6 @@ describe('Session Resumption with Agent API', () => {
 
       // Assert
       expect(resumeOrCreateThreadSpy).toHaveBeenCalledWith(specificThreadId);
-      
-      consoleWarnSpy.mockRestore();
-      consoleLogSpy.mockRestore();
     });
   });
 });
