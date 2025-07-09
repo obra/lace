@@ -100,6 +100,8 @@ export async function createPTYSession(
         COLORTERM: 'truecolor',
         FORCE_COLOR: '3',
         ANTHROPIC_KEY: 'sk-ant-test-key-for-testing',
+        // Explicitly set CI to false to ensure interactive terminal behavior
+        CI: 'false',
       },
     });
 
