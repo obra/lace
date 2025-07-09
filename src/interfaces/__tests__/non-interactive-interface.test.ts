@@ -2,10 +2,10 @@
 // ABOUTME: Validates single prompt execution and graceful shutdown
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { NonInteractiveInterface } from '../non-interactive-interface.js';
-import type { Agent } from '../../agents/agent.js';
+import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface.js';
+import type { Agent } from '~/agents/agent.js';
 import { EventEmitter } from 'events';
-import { withConsoleCapture } from '../../__tests__/setup/console-capture.js';
+import { withConsoleCapture } from '~/__tests__/setup/console-capture.js';
 
 // Mock dependencies
 
@@ -15,6 +15,9 @@ describe('NonInteractiveInterface', () => {
   let mockEventEmitter: EventEmitter;
 
   beforeEach(() => {
+    // Mock stdout before creating NonInteractiveInterface to prevent "Test response" output
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
     // Create event emitter for agent events
     mockEventEmitter = new EventEmitter();
 
@@ -22,13 +25,14 @@ describe('NonInteractiveInterface', () => {
     agent = {
       providerName: 'mock-provider',
       start: vi.fn(),
-      sendMessage: vi.fn().mockImplementation(async () => {
+      sendMessage: vi.fn().mockImplementation(() => {
         // Simulate agent events during sendMessage
         setTimeout(() => {
           mockEventEmitter.emit('agent_token', { token: 'Test response' });
           mockEventEmitter.emit('agent_response_complete', { content: 'Test response' });
           mockEventEmitter.emit('conversation_complete');
         }, 10);
+        return Promise.resolve();
       }),
       stop: vi.fn().mockResolvedValue(undefined),
       // EventEmitter methods
@@ -42,7 +46,7 @@ describe('NonInteractiveInterface', () => {
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('executePrompt', () => {
@@ -52,10 +56,10 @@ describe('NonInteractiveInterface', () => {
 
       await nonInteractive.executePrompt('Test prompt');
 
-      expect(log).toHaveBeenCalledWith(
-        expect.stringContaining('using mock-provider provider')
-      );
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('using mock-provider provider'));
       expect(agentStartSpy).toHaveBeenCalled();
+      // agent.sendMessage is already a spy from beforeEach setup
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(agent.sendMessage).toHaveBeenCalledWith('Test prompt');
     });
 
@@ -77,11 +81,12 @@ describe('NonInteractiveInterface', () => {
 
     it('should work without tool executor', async () => {
       const nonInteractiveWithoutTools = new NonInteractiveInterface(agent);
-      vi.spyOn(agent, 'start').mockImplementation(async () => {});
+      const agentStartSpy = vi.spyOn(agent, 'start').mockImplementation(async () => {});
 
       await nonInteractiveWithoutTools.executePrompt('Test prompt');
 
-      expect(agent.start).toHaveBeenCalled();
+      expect(agentStartSpy).toHaveBeenCalled();
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(agent.sendMessage).toHaveBeenCalledWith('Test prompt');
     });
   });
