@@ -18,7 +18,7 @@ describe('Delegation Integration Tests', () => {
   let threadManager: ThreadManager;
   let toolExecutor: ToolExecutor;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     // Create temporary directory for test database
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-delegation-test-'));
     dbPath = path.join(tempDir, 'test.db');
@@ -37,8 +37,8 @@ describe('Delegation Integration Tests', () => {
     toolExecutor.registerTool('delegate', delegateTool);
   });
 
-  afterEach(async () => {
-    await threadManager.close();
+  afterEach(() => {
+    threadManager.close();
     // Clean up temp directory
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true });
@@ -70,7 +70,7 @@ describe('Delegation Integration Tests', () => {
     expect(subDelegate1).toBe(`${mainThreadId}.1.1`);
   });
 
-  it('should query delegate threads correctly', async () => {
+  it('should query delegate threads correctly', () => {
     const mainThreadId = threadManager.generateThreadId();
     threadManager.createThread(mainThreadId);
 

@@ -46,7 +46,7 @@ describe('Agent Single Event Source Integration', () => {
       event: expect.objectContaining({
         type: 'USER_MESSAGE',
         data: 'test message',
-      }),
+      }) as object,
       threadId: 'integration-test-thread',
     });
   });

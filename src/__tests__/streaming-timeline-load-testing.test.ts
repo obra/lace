@@ -125,9 +125,7 @@ describe('StreamingTimelineProcessor Load Testing', () => {
 
       // Use bulk loading for initial setup to test realistic resumption scenario
       const initialEvents = generateEventSequence(1500, 'stress-thread');
-      const bulkStartTime = performance.now();
       processor.loadEvents(initialEvents);
-      const bulkEndTime = performance.now();
 
       // Add remaining events incrementally (simulating real-time additions)
       const incrementalEvents = generateEventSequence(500, 'stress-thread', 1500);

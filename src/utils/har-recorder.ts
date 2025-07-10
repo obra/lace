@@ -194,7 +194,7 @@ export class HARRecorder {
 
       // Read current HAR file, add all buffered entries, write back
       const content = readFileSync(this.filePath, 'utf8');
-      const harFile: HARFile = JSON.parse(content);
+      const harFile: HARFile = JSON.parse(content) as HARFile;
       harFile.log.entries.push(...this.writeBuffer);
 
       writeFileSync(this.filePath, JSON.stringify(harFile, null, 2));
@@ -632,12 +632,12 @@ export class HARRecorder {
         let eventData;
 
         try {
-          eventData = JSON.parse(dataMatch[1]);
+          eventData = JSON.parse(dataMatch[1]) as unknown;
         } catch (e) {
           eventData = {
             raw: dataMatch[1],
             parse_error: e instanceof Error ? e.message : String(e),
-          };
+          } as unknown;
         }
 
         // Add to events array
@@ -827,6 +827,28 @@ export class HARRecorder {
     return delta.type === 'thinking_delta' && typeof delta.thinking === 'string';
   }
 
+  private isEventWithMessageContent(event: unknown): event is { message: { content: string } } {
+    return (
+      typeof event === 'object' &&
+      event !== null &&
+      'message' in event &&
+      typeof (event as Record<string, unknown>).message === 'object' &&
+      (event as Record<string, unknown>).message !== null &&
+      'content' in ((event as Record<string, unknown>).message as Record<string, unknown>) &&
+      typeof ((event as Record<string, unknown>).message as Record<string, unknown>).content ===
+        'string'
+    );
+  }
+
+  private isEventWithDone(event: unknown): event is { done: boolean } {
+    return (
+      typeof event === 'object' &&
+      event !== null &&
+      'done' in event &&
+      typeof (event as Record<string, unknown>).done === 'boolean'
+    );
+  }
+
   private getSSEEventSummary(events: Array<{ type: string }>): Record<string, unknown> {
     const byType: Record<string, number> = {};
 
@@ -916,16 +938,16 @@ export class HARRecorder {
         }
 
         try {
-          const event = JSON.parse(line);
+          const event = JSON.parse(line) as unknown;
           events.push(event);
 
           // Reconstruct the message content
-          if (event.message?.content) {
+          if (this.isEventWithMessageContent(event)) {
             reconstructedContent += event.message.content;
           }
 
           // Check if this is the final message
-          if (event.done) {
+          if (this.isEventWithDone(event)) {
             finalMessage = event;
           }
         } catch {

@@ -82,17 +82,17 @@ class MockConversationProvider extends AIProvider {
     return true;
   }
 
-  async diagnose() {
+  diagnose() {
     return { connected: true, models: ['mock-model'] };
   }
 
-  private getResponseKey(messages: any[]): string {
-    const lastMessage = messages[messages.length - 1];
-    const content = lastMessage?.content?.toLowerCase() || '';
+  private getResponseKey(messages: unknown[]): string {
+    const lastMessage = messages[messages.length - 1] as { content?: string };
+    const content = (lastMessage?.content as string)?.toLowerCase() || '';
 
     if (content.includes('list') && content.includes('files')) {
       // Check if this is after tool results
-      const hasToolResults = messages.some((msg) => msg.toolResults);
+      const hasToolResults = messages.some((msg) => (msg as { toolResults?: unknown }).toolResults);
       return hasToolResults ? 'list_files_result' : 'list_files';
     }
     if (content.includes('programming language')) return 'programming_language';
@@ -103,13 +103,13 @@ class MockConversationProvider extends AIProvider {
     return 'list_files_result';
   }
 
-  async createResponse(messages: any[], _tools: any[] = []) {
+  createResponse(messages: unknown[], _tools: unknown[] = []) {
     const key = this.getResponseKey(messages);
     return this.responseMap.get(key) || this.responseMap.get('list_files_result')!;
   }
 
-  async createStreamingResponse(messages: any[], _tools: any[] = []) {
-    const response = await this.createResponse(messages, _tools);
+  createStreamingResponse(messages: unknown[], _tools: unknown[] = []) {
+    const response = this.createResponse(messages, _tools);
 
     // Emit streaming events
     if (response.content) {
@@ -149,21 +149,21 @@ describe('Conversation State Management with Enhanced Agent', () => {
     await agent.start();
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     if (agent) {
       agent.removeAllListeners(); // Prevent EventEmitter memory leaks
-      await agent.stop();
+      agent.stop();
     }
     if (threadManager) {
       // Clear events before closing to free memory
       if (threadId) {
         threadManager.clearEvents(threadId);
       }
-      await threadManager.close();
+      threadManager.close();
     }
     // Clear provider references
-    provider = null as any;
-    toolExecutor = null as any;
+    provider = null as unknown as MockConversationProvider;
+    toolExecutor = null as unknown as ToolExecutor;
   });
 
   it('should maintain conversation context and state across multiple turns', async () => {

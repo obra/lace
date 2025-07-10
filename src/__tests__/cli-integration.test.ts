@@ -14,10 +14,10 @@ vi.mock('../cli/interface.js', () => ({
       public agent: any,
       public threadManager: any
     ) {}
-    async handleSinglePrompt(_prompt: string) {
+    handleSinglePrompt(_prompt: string) {
       return;
     }
-    async startInteractive() {
+    startInteractive() {
       return;
     }
   },
@@ -202,7 +202,7 @@ describe('CLI Orchestration', () => {
 
       // Cleanup
       agent.removeAllListeners();
-      await threadManager.close();
+      threadManager.close();
     });
   });
 });

@@ -67,7 +67,7 @@ export class NonInteractiveInterface implements UserInterface {
     } finally {
       // Always clean up agent resources, even on error
       try {
-        await this.agent.stop();
+        this.agent.stop();
       } catch (stopError) {
         // Log but don't throw stop errors - the original error is more important
         console.error('Failed to stop agent:', stopError);

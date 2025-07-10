@@ -45,7 +45,7 @@ describe('Agent Thread Event Proxying', () => {
         event: expect.objectContaining({
           type: 'USER_MESSAGE',
           data: 'test message',
-        }),
+        }) as object,
         threadId: 'test-thread',
       })
     );
@@ -69,7 +69,7 @@ describe('Agent Thread Event Proxying', () => {
       expect.objectContaining({
         event: expect.objectContaining({
           type: 'USER_MESSAGE',
-        }),
+        }) as object,
         threadId: 'test-thread',
       })
     );
@@ -93,14 +93,14 @@ describe('Agent Thread Event Proxying', () => {
     expect(threadEventAddedSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         event: expect.objectContaining({
-          id: expect.any(String),
+          id: expect.any(String) as string,
           threadId: 'test-thread',
           type: 'USER_MESSAGE',
           data: 'test message',
-          timestamp: expect.any(Date),
-        }),
+          timestamp: expect.any(Date) as Date,
+        }) as object,
         threadId: 'test-thread',
-      })
+      }) as object
     );
   });
 

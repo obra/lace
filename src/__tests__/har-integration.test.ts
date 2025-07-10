@@ -78,14 +78,14 @@ describe('HAR Integration', () => {
   });
 
   describe('HAR recording initialization', () => {
-    it('should initialize HAR recording with CLI integration pattern', () => {
+    it('should initialize HAR recording with CLI integration pattern', async () => {
       // Simulate CLI initialization pattern
       const harFile = TEST_HAR_FILE;
 
       expect(getHARRecorder()).toBeNull();
 
       // Initialize like CLI does
-      enableTrafficLogging(harFile);
+      await enableTrafficLogging(harFile);
       const recorder = getHARRecorder();
 
       expect(recorder).not.toBeNull();
@@ -125,7 +125,9 @@ describe('HAR Integration', () => {
       expect(existsSync(harFile)).toBe(true);
 
       // Verify HAR file structure
-      const content = JSON.parse(readFileSync(harFile, 'utf8'));
+      const content = JSON.parse(readFileSync(harFile, 'utf8')) as {
+        log: { version: string; creator: { name: string; version: string }; entries: unknown[] };
+      };
       expect(content.log).toMatchObject({
         version: '1.2',
         creator: {
@@ -137,9 +139,9 @@ describe('HAR Integration', () => {
             request: expect.objectContaining({
               method: 'GET',
               url: 'http://test.init',
-            }),
+            }) as { method: string; url: string },
           }),
-        ]),
+        ]) as unknown[],
       });
     });
 
@@ -191,7 +193,7 @@ describe('HAR Integration', () => {
   describe('end-to-end HAR recording', () => {
     it('should record a complete request-response cycle', async () => {
       // Initialize traffic logging like CLI does
-      enableTrafficLogging(TEST_HAR_FILE);
+      void enableTrafficLogging(TEST_HAR_FILE);
 
       // Mock fetch to simulate provider request
       const originalFetch = globalThis.fetch;
@@ -237,7 +239,7 @@ describe('HAR Integration', () => {
 
         // Force file creation by recording directly (this is what fetch interceptor should do)
         if (!existsSync(TEST_HAR_FILE)) {
-          await recorder!.recordFetchRequest(
+          void recorder!.recordFetchRequest(
             'https://api.anthropic.com/v1/messages',
             {
               method: 'POST',
@@ -262,7 +264,26 @@ describe('HAR Integration', () => {
 
         // Verify HAR file exists and contains the request
         expect(existsSync(TEST_HAR_FILE)).toBe(true);
-        const harContent = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
+        const harContent = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as {
+          log: {
+            entries: Array<{
+              request: {
+                method: string;
+                url: string;
+                headers: Array<{ name: string; value: string }>;
+                postData: { mimeType: string; text: string };
+              };
+              response: {
+                status: number;
+                statusText: string;
+                headers: Array<{ name: string; value: string }>;
+                content: { mimeType: string; text: string };
+              };
+              time: number;
+              timings: { send: number; wait: number; receive: number };
+            }>;
+          };
+        };
         expect(harContent.log.entries).toHaveLength(1);
 
         const entry = harContent.log.entries[0];
@@ -272,10 +293,10 @@ describe('HAR Integration', () => {
           headers: expect.arrayContaining([
             { name: 'authorization', value: 'Bearer sk-test' },
             { name: 'content-type', value: 'application/json' },
-          ]),
+          ]) as Array<{ name: string; value: string }>,
           postData: {
             mimeType: 'application/json',
-            text: expect.stringContaining('"model":"claude-3-sonnet-20240229"'),
+            text: expect.stringContaining('"model":"claude-3-sonnet-20240229"') as string,
           },
         });
 
@@ -285,18 +306,18 @@ describe('HAR Integration', () => {
           headers: expect.arrayContaining([
             { name: 'content-type', value: 'application/json' },
             { name: 'x-ratelimit-remaining', value: '99' },
-          ]),
+          ]) as Array<{ name: string; value: string }>,
           content: {
             mimeType: 'application/json',
-            text: expect.stringContaining('"content":"Hello world"'),
+            text: expect.stringContaining('"content":"Hello world"') as string,
           },
         });
 
         expect(entry.time).toBeGreaterThan(0);
         expect(entry.timings).toMatchObject({
-          send: expect.any(Number),
-          wait: expect.any(Number),
-          receive: expect.any(Number),
+          send: expect.any(Number) as number,
+          wait: expect.any(Number) as number,
+          receive: expect.any(Number) as number,
         });
       } finally {
         globalThis.fetch = originalFetch;
@@ -304,7 +325,7 @@ describe('HAR Integration', () => {
     });
 
     it('should handle multiple concurrent requests', async () => {
-      enableTrafficLogging(TEST_HAR_FILE);
+      void enableTrafficLogging(TEST_HAR_FILE);
 
       const originalFetch = globalThis.fetch;
       globalThis.fetch = vi.fn().mockImplementation((url) => {
@@ -327,7 +348,7 @@ describe('HAR Integration', () => {
         // Ensure HAR file is created by forcing at least one recording
         const recorder = getHARRecorder();
         if (!existsSync(TEST_HAR_FILE) && recorder) {
-          await recorder.recordFetchRequest(
+          void recorder.recordFetchRequest(
             'https://api.anthropic.com/v1/messages',
             { method: 'GET' },
             Date.now() - 50,
@@ -340,7 +361,14 @@ describe('HAR Integration', () => {
         recorder!.flush();
 
         expect(existsSync(TEST_HAR_FILE)).toBe(true);
-        const harContent = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
+        const harContent = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as {
+          log: {
+            entries: Array<{
+              request: { method: string; url: string };
+              response: { status: number };
+            }>;
+          };
+        };
 
         // We expect at least 1 entry (the forced one), but in a real scenario we'd have 3
         // The test setup has issues with concurrent fetch mocking, but the important thing
@@ -350,12 +378,12 @@ describe('HAR Integration', () => {
         // Verify the HAR structure is correct
         expect(harContent.log.entries[0]).toMatchObject({
           request: expect.objectContaining({
-            method: expect.any(String),
-            url: expect.any(String),
-          }),
+            method: expect.any(String) as string,
+            url: expect.any(String) as string,
+          }) as { method: string; url: string },
           response: expect.objectContaining({
-            status: expect.any(Number),
-          }),
+            status: expect.any(Number) as number,
+          }) as { status: number },
         });
       } finally {
         globalThis.fetch = originalFetch;
@@ -364,7 +392,7 @@ describe('HAR Integration', () => {
   });
 
   describe('error scenarios', () => {
-    it('should handle HAR recording errors gracefully', async () => {
+    it('should handle HAR recording errors gracefully', () => {
       // Initialize with invalid path to trigger errors
       const invalidPath = '/root/invalid/path/test.har';
 
@@ -379,7 +407,7 @@ describe('HAR Integration', () => {
     });
 
     it('should continue working when HAR file cannot be written', async () => {
-      enableTrafficLogging(TEST_HAR_FILE);
+      void enableTrafficLogging(TEST_HAR_FILE);
 
       // Mock HAR recorder to simulate write failures
       const harRecorder = getHARRecorder();
@@ -416,7 +444,7 @@ describe('HAR Integration', () => {
         const timeWithout = Date.now() - startWithout;
 
         // Measure with HAR recording
-        enableTrafficLogging(TEST_HAR_FILE);
+        void enableTrafficLogging(TEST_HAR_FILE);
 
         const startWith = Date.now();
         await fetch('https://test.com');

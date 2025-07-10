@@ -67,6 +67,7 @@ export default [
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/unbound-method': 'off',
       'no-console': 'off',
       ...vitest.configs.recommended.rules,
     },

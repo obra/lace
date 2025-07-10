@@ -11,10 +11,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 
 // Mock the app's handleSession function with Agent API usage
-async function handleSessionWithAgent(
-  agent: Agent,
-  continueMode?: boolean | string
-): Promise<string> {
+function handleSessionWithAgent(agent: Agent, continueMode?: boolean | string): string {
   let continueThreadId: string | undefined;
   if (continueMode) {
     if (typeof continueMode === 'string') {
@@ -25,7 +22,7 @@ async function handleSessionWithAgent(
     }
   }
 
-  const sessionInfo = await agent.resumeOrCreateThread(continueThreadId);
+  const sessionInfo = agent.resumeOrCreateThread(continueThreadId);
   const { threadId } = sessionInfo;
 
   if (sessionInfo.isResumed) {
@@ -71,18 +68,18 @@ describe('Session Resumption with Agent API', () => {
   });
 
   describe('handleSessionWithAgent', () => {
-    it('should use Agent.resumeOrCreateThread for session resumption', async () => {
+    it('should use Agent.resumeOrCreateThread for session resumption', () => {
       // Arrange
       const resumeOrCreateThreadSpy = vi.spyOn(agent, 'resumeOrCreateThread');
 
       // Act
-      await handleSessionWithAgent(agent, true);
+      handleSessionWithAgent(agent, true);
 
       // Assert
       expect(resumeOrCreateThreadSpy).toHaveBeenCalled();
     });
 
-    it('should replay events when resuming existing thread', async () => {
+    it('should replay events when resuming existing thread', () => {
       // Arrange
       const existingThreadId = agent.getCurrentThreadId()!;
       threadManager.clearEvents(existingThreadId);
@@ -92,39 +89,38 @@ describe('Session Resumption with Agent API', () => {
       agent.on('thread_event_added', eventSpy);
 
       // Act
-      const threadId = await handleSessionWithAgent(agent, existingThreadId);
+      const threadId = handleSessionWithAgent(agent, existingThreadId);
 
       // Assert
       expect(threadId).toBe(existingThreadId);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       expect(eventSpy).toHaveBeenCalledWith({
         event: expect.objectContaining({
           type: 'USER_MESSAGE',
           data: 'Previous message',
-        }),
+        }) as object,
         threadId: existingThreadId,
       });
     });
 
-    it('should create new thread when no existing thread specified', async () => {
+    it('should create new thread when no existing thread specified', () => {
       // Arrange
       const resumeOrCreateThreadSpy = vi.spyOn(agent, 'resumeOrCreateThread');
 
       // Act
-      const threadId = await handleSessionWithAgent(agent);
+      const threadId = handleSessionWithAgent(agent);
 
       // Assert
       expect(threadId).toBeDefined();
       expect(resumeOrCreateThreadSpy).toHaveBeenCalledWith(undefined);
     });
 
-    it('should handle thread ID string for specific thread resumption', async () => {
+    it('should handle thread ID string for specific thread resumption', () => {
       // Arrange
       const specificThreadId = 'test-thread-123';
       const resumeOrCreateThreadSpy = vi.spyOn(agent, 'resumeOrCreateThread');
 
       // Act
-      await handleSessionWithAgent(agent, specificThreadId);
+      handleSessionWithAgent(agent, specificThreadId);
 
       // Assert
       expect(resumeOrCreateThreadSpy).toHaveBeenCalledWith(specificThreadId);
