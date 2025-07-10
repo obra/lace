@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent.js';
 import { ToolExecutor } from '~/tools/executor.js';
 import { ThreadManager } from '~/threads/thread-manager.js';
+import { AIProvider } from '~/providers/base-provider.js';
 
 describe('Retry System Integration Tests', () => {
   let agent: Agent;
@@ -12,16 +13,16 @@ describe('Retry System Integration Tests', () => {
   let threadManager: ThreadManager;
   let threadId: string;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     toolExecutor = new ToolExecutor();
     threadManager = new ThreadManager(':memory:');
     threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     if (agent) {
-      await agent.stop();
+      agent.stop();
     }
     vi.clearAllTimers();
     vi.useRealTimers();
@@ -75,7 +76,7 @@ describe('Retry System Integration Tests', () => {
       };
 
       agent = new Agent({
-        provider: mockProvider as any,
+        provider: mockProvider as unknown as AIProvider,
         toolExecutor,
         threadManager,
         threadId,
@@ -83,8 +84,8 @@ describe('Retry System Integration Tests', () => {
       });
       await agent.start();
 
-      const turnStartEvents: any[] = [];
-      const turnCompleteEvents: any[] = [];
+      const turnStartEvents: unknown[] = [];
+      const turnCompleteEvents: unknown[] = [];
 
       agent.on('turn_start', (data) => turnStartEvents.push(data));
       agent.on('turn_complete', (data) => turnCompleteEvents.push(data));
@@ -96,7 +97,18 @@ describe('Retry System Integration Tests', () => {
       expect(turnCompleteEvents).toHaveLength(1);
 
       // Check that retry metrics are properly initialized
-      const startMetrics = turnStartEvents[0].metrics;
+      const startMetrics = (
+        turnStartEvents[0] as {
+          metrics: {
+            retryMetrics: {
+              totalAttempts: number;
+              totalDelayMs: number;
+              successful: boolean;
+              lastError?: unknown;
+            };
+          };
+        }
+      ).metrics;
       expect(startMetrics.retryMetrics).toBeDefined();
       expect(startMetrics.retryMetrics.totalAttempts).toBe(0);
       expect(startMetrics.retryMetrics.totalDelayMs).toBe(0);
@@ -104,7 +116,11 @@ describe('Retry System Integration Tests', () => {
       expect(startMetrics.retryMetrics.lastError).toBeUndefined();
 
       // Check that final metrics maintain retry structure
-      const finalMetrics = turnCompleteEvents[0].metrics;
+      const finalMetrics = (
+        turnCompleteEvents[0] as {
+          metrics: { retryMetrics: { totalAttempts: number; successful: boolean } };
+        }
+      ).metrics;
       expect(finalMetrics.retryMetrics).toBeDefined();
       expect(finalMetrics.retryMetrics.totalAttempts).toBe(0); // No retries occurred
       expect(finalMetrics.retryMetrics.successful).toBe(true);
@@ -146,7 +162,7 @@ describe('Retry System Integration Tests', () => {
       };
 
       agent = new Agent({
-        provider: mockProvider as any,
+        provider: mockProvider as unknown as AIProvider,
         toolExecutor,
         threadManager,
         threadId,
@@ -234,7 +250,7 @@ describe('Retry System Integration Tests', () => {
       };
 
       agent = new Agent({
-        provider: mockProvider as any,
+        provider: mockProvider as unknown as AIProvider,
         toolExecutor,
         threadManager,
         threadId,
@@ -242,9 +258,9 @@ describe('Retry System Integration Tests', () => {
       });
       await agent.start();
 
-      const turnStartEvents: any[] = [];
-      const turnCompleteEvents: any[] = [];
-      const errorEvents: any[] = [];
+      const turnStartEvents: unknown[] = [];
+      const turnCompleteEvents: unknown[] = [];
+      const errorEvents: unknown[] = [];
 
       agent.on('turn_start', (data) => turnStartEvents.push(data));
       agent.on('turn_complete', (data) => turnCompleteEvents.push(data));
@@ -258,7 +274,8 @@ describe('Retry System Integration Tests', () => {
       expect(errorEvents.length).toBeGreaterThan(0);
 
       // Verify retry metrics are still present
-      const finalMetrics = turnCompleteEvents[0].metrics;
+      const finalMetrics = (turnCompleteEvents[0] as { metrics: { retryMetrics: unknown } })
+        .metrics;
       expect(finalMetrics.retryMetrics).toBeDefined();
     });
   });

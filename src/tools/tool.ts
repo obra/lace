@@ -22,16 +22,27 @@ export abstract class Tool {
     if ('$ref' in jsonSchema && jsonSchema.$ref && jsonSchema.definitions) {
       const refKey = jsonSchema.$ref.replace('#/definitions/', '');
       const actualSchema = jsonSchema.definitions[refKey];
-      return actualSchema as ToolInputSchema;
+
+      // Validate the schema structure matches ToolInputSchema
+      if (actualSchema && typeof actualSchema === 'object' && 'type' in actualSchema) {
+        return actualSchema as ToolInputSchema;
+      }
+
+      throw new Error(`Invalid schema structure for tool ${this.name}`);
     }
 
-    return jsonSchema as ToolInputSchema;
+    // Validate the schema structure matches ToolInputSchema
+    if (jsonSchema && typeof jsonSchema === 'object' && 'type' in jsonSchema) {
+      return jsonSchema as ToolInputSchema;
+    }
+
+    throw new Error(`Invalid schema structure for tool ${this.name}`);
   }
 
   // Public execute method that handles validation
   async execute(args: unknown, context?: ToolContext): Promise<ToolResult> {
     try {
-      const validated = this.schema.parse(args);
+      const validated = this.schema.parse(args) as ReturnType<this['schema']['parse']>;
       return await this.executeValidated(validated, context);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -42,22 +53,31 @@ export abstract class Tool {
   }
 
   // Implement this in subclasses with validated args
-  protected abstract executeValidated(args: unknown, context?: ToolContext): Promise<ToolResult>;
+  protected abstract executeValidated(
+    args: ReturnType<this['schema']['parse']>,
+    context?: ToolContext
+  ): Promise<ToolResult>;
 
   // Output helpers for consistent result construction
 
   // Public API for creating results
-  protected createResult(content: string | object, metadata?: Record<string, unknown>): ToolResult {
+  protected createResult(
+    content: string | Record<string, unknown>,
+    metadata?: Record<string, unknown>
+  ): ToolResult {
     return this._makeResult({ content, metadata, isError: false });
   }
 
-  protected createError(content: string | object, metadata?: Record<string, unknown>): ToolResult {
+  protected createError(
+    content: string | Record<string, unknown>,
+    metadata?: Record<string, unknown>
+  ): ToolResult {
     return this._makeResult({ content, metadata, isError: true });
   }
 
   // Private implementation
   private _makeResult(options: {
-    content: string | object;
+    content: string | Record<string, unknown>;
     metadata?: Record<string, unknown>;
     isError: boolean;
   }): ToolResult {

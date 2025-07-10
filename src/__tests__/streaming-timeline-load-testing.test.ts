@@ -82,8 +82,6 @@ describe('StreamingTimelineProcessor Load Testing', () => {
       const events = generateEventSequence(eventCount, 'large-thread');
       const timings: number[] = [];
 
-      console.log(`\n📊 Load testing with ${eventCount} events...`);
-
       // Measure append performance in batches
       const batchSize = 100;
       const batchTimings: number[] = [];
@@ -101,12 +99,6 @@ describe('StreamingTimelineProcessor Load Testing', () => {
 
         const batchEndTime = performance.now();
         batchTimings.push(batchEndTime - batchStartTime);
-
-        // Log progress
-        if ((i + batchSize) % 200 === 0) {
-          const progress = Math.round(((i + batchSize) / events.length) * 100);
-          console.log(`  ${progress}% complete (${i + batchSize}/${events.length} events)`);
-        }
       }
 
       // Verify timeline correctness
@@ -119,33 +111,21 @@ describe('StreamingTimelineProcessor Load Testing', () => {
       const lastBatchAvg = average(batchTimings.slice(-2));
       const performanceDrift = lastBatchAvg / firstBatchAvg;
 
-      console.log(`  First batch avg: ${firstBatchAvg.toFixed(3)}ms`);
-      console.log(`  Last batch avg: ${lastBatchAvg.toFixed(3)}ms`);
-      console.log(`  Performance drift: ${performanceDrift.toFixed(2)}x`);
-
       expect(performanceDrift).toBeLessThan(2); // No more than 2x degradation
       expect(average(timings)).toBeLessThan(2); // Individual operations stay fast
 
       // Verify fast path efficiency remains reasonable
       const metrics = processor.getMetrics();
       const fastPathEfficiency = metrics.fastPathHits / metrics.appendCount;
-      console.log(`  Fast path efficiency: ${(fastPathEfficiency * 100).toFixed(1)}%`);
       expect(fastPathEfficiency).toBeGreaterThan(0.8); // 80%+ fast path for ordered events
-
-      console.log(`✅ Large conversation load test completed successfully`);
     });
 
     it('should handle very large conversations (2000+ events) efficiently', () => {
       const eventCount = 2000;
-      console.log(`\n🚀 Stress testing with ${eventCount} events...`);
 
       // Use bulk loading for initial setup to test realistic resumption scenario
       const initialEvents = generateEventSequence(1500, 'stress-thread');
-      const bulkStartTime = performance.now();
       processor.loadEvents(initialEvents);
-      const bulkEndTime = performance.now();
-
-      console.log(`  Bulk loaded 1500 events in ${(bulkEndTime - bulkStartTime).toFixed(3)}ms`);
 
       // Add remaining events incrementally (simulating real-time additions)
       const incrementalEvents = generateEventSequence(500, 'stress-thread', 1500);
@@ -165,7 +145,6 @@ describe('StreamingTimelineProcessor Load Testing', () => {
 
       // Verify incremental performance remains good despite large timeline
       const avgIncrementalTime = average(timings);
-      console.log(`  Average incremental append time: ${avgIncrementalTime.toFixed(3)}ms`);
       expect(avgIncrementalTime).toBeLessThan(3); // Should stay under 3ms per event
 
       // Verify getTimeline() performance with large dataset
@@ -174,18 +153,14 @@ describe('StreamingTimelineProcessor Load Testing', () => {
       const getTimelineEndTime = performance.now();
       const getTimelineTime = getTimelineEndTime - getTimelineStartTime;
 
-      console.log(`  getTimeline() with 2000 items: ${getTimelineTime.toFixed(3)}ms`);
       expect(getTimelineTime).toBeLessThan(50); // Should be fast even for large timelines
       expect(timelineCopy.items).toHaveLength(eventCount);
-
-      console.log(`✅ Stress test completed successfully`);
     });
   });
 
   describe('Memory Leak Detection', () => {
     it('should not leak memory during extended operation', () => {
       const initialHeap = getHeapUsage();
-      console.log(`\n🧠 Memory leak test starting (initial heap: ${initialHeap.toFixed(2)}MB)`);
 
       // Simulate extended operation with many small conversations
       for (let conversation = 0; conversation < 10; conversation++) {
@@ -199,11 +174,6 @@ describe('StreamingTimelineProcessor Load Testing', () => {
 
         // Verify conversation processed correctly
         expect(processor.getTimeline().items).toHaveLength(200);
-
-        if (conversation % 3 === 0) {
-          const currentHeap = getHeapUsage();
-          console.log(`  Conversation ${conversation}: ${currentHeap.toFixed(2)}MB`);
-        }
       }
 
       // Force garbage collection if available
@@ -214,20 +184,13 @@ describe('StreamingTimelineProcessor Load Testing', () => {
       const finalHeap = getHeapUsage();
       const heapGrowth = finalHeap - initialHeap;
 
-      console.log(`  Final heap: ${finalHeap.toFixed(2)}MB`);
-      console.log(`  Heap growth: ${heapGrowth.toFixed(2)}MB`);
-
       // Memory growth should be reasonable (under 50MB for this test)
       expect(heapGrowth).toBeLessThan(50);
-
-      console.log(`✅ Memory leak test completed`);
     });
   });
 
   describe('Mixed Event Type Performance', () => {
     it('should handle complex event sequences with tools efficiently', () => {
-      console.log(`\n🔧 Testing complex tool sequences...`);
-
       const events = generateComplexToolSequence(500, 'tool-thread');
       const timings: number[] = [];
 
@@ -252,7 +215,6 @@ describe('StreamingTimelineProcessor Load Testing', () => {
 
       // Performance should remain good even with complex tool correlation
       const avgTime = average(timings);
-      console.log(`  Average append time with tools: ${avgTime.toFixed(3)}ms`);
       expect(avgTime).toBeLessThan(2);
 
       // Verify no orphaned tool calls
@@ -260,15 +222,11 @@ describe('StreamingTimelineProcessor Load Testing', () => {
         (item) => item.type === 'tool_execution' && !item.result
       ).length;
       expect(pendingCalls).toBe(0); // All tool calls should have results
-
-      console.log(`✅ Complex tool sequence test completed`);
     });
   });
 
   describe('Concurrent Timeline Performance', () => {
     it('should handle multiple independent processors efficiently', () => {
-      console.log(`\n🔄 Testing concurrent timeline processors...`);
-
       const processors = Array.from({ length: 5 }, () => new StreamingTimelineProcessor());
       const timings: number[][] = Array.from({ length: 5 }, () => []);
 
@@ -299,8 +257,6 @@ describe('StreamingTimelineProcessor Load Testing', () => {
         const avgTime = average(timings[i]);
         expect(avgTime).toBeLessThan(1); // Each processor should maintain performance
       }
-
-      console.log(`✅ Concurrent processors test completed`);
     });
   });
 });

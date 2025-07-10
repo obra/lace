@@ -2,14 +2,17 @@
 // ABOUTME: Tests tool approval flags, validation, and error cases with TDD approach
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseArgs, showHelp } from '../args.js';
+import { withConsoleCapture } from '~/__tests__/setup/console-capture.js';
+import { parseArgs, showHelp } from '~/cli/args.js';
 
 describe('CLI Arguments (Commander-based)', () => {
   let consoleSpy: any;
 
   beforeEach(() => {
-    consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    // Use withConsoleCapture to get proper console spies
+    const capture = withConsoleCapture();
+    consoleSpy = capture.error;
+
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     vi.spyOn(process, 'exit').mockImplementation(() => {
@@ -122,6 +125,7 @@ describe('CLI Arguments (Commander-based)', () => {
       await expect(() => parseArgs(['--auto-approve-tools=nonexistent'])).rejects.toThrow(
         'process.exit called'
       );
+
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Unknown tool 'nonexistent'")
       );
@@ -131,6 +135,7 @@ describe('CLI Arguments (Commander-based)', () => {
       await expect(() => parseArgs(['--disable-tools=unknown,bash'])).rejects.toThrow(
         'process.exit called'
       );
+
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Unknown tool 'unknown'"));
     });
 
@@ -138,6 +143,7 @@ describe('CLI Arguments (Commander-based)', () => {
       await expect(() =>
         parseArgs(['--auto-approve-tools=bash,unknown,file_read'])
       ).rejects.toThrow('process.exit called');
+
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Unknown tool 'unknown'"));
     });
   });
@@ -147,6 +153,7 @@ describe('CLI Arguments (Commander-based)', () => {
       await expect(() =>
         parseArgs(['--disable-all-tools', '--auto-approve-tools=bash'])
       ).rejects.toThrow('process.exit called');
+
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Cannot auto-approve tools when all tools are disabled')
       );
@@ -156,6 +163,7 @@ describe('CLI Arguments (Commander-based)', () => {
       await expect(() =>
         parseArgs(['--disable-all-tools', '--allow-non-destructive-tools'])
       ).rejects.toThrow('process.exit called');
+
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Cannot allow tools when all tools are disabled')
       );
@@ -165,6 +173,7 @@ describe('CLI Arguments (Commander-based)', () => {
       await expect(() =>
         parseArgs(['--disable-tool-guardrails', '--disable-all-tools'])
       ).rejects.toThrow('process.exit called');
+
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Cannot disable guardrails and all tools simultaneously')
       );
@@ -174,6 +183,7 @@ describe('CLI Arguments (Commander-based)', () => {
       await expect(() =>
         parseArgs(['--disable-tools=bash', '--auto-approve-tools=bash'])
       ).rejects.toThrow('process.exit called');
+
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Cannot auto-approve disabled tool 'bash'")
       );
@@ -183,6 +193,7 @@ describe('CLI Arguments (Commander-based)', () => {
       await expect(() =>
         parseArgs(['--auto-approve-tools=bash', '--disable-tools=bash'])
       ).rejects.toThrow('process.exit called');
+
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Cannot auto-approve disabled tool 'bash'")
       );
@@ -230,15 +241,15 @@ describe('CLI Arguments (Commander-based)', () => {
 
   describe('help and list functionality', () => {
     it('should show help with tool approval options', async () => {
-      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const { log } = withConsoleCapture();
       // Mock process.stdout.write since Commander uses it for help output
       const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
       await showHelp();
 
       // Combine both console.log and stdout.write outputs
-      const logOutput = logSpy.mock.calls.map((call) => call[0]).join('');
-      const stdoutOutput = stdoutSpy.mock.calls.map((call) => call[0]).join('');
+      const logOutput = log.mock.calls.map((call) => String(call[0])).join('');
+      const stdoutOutput = stdoutSpy.mock.calls.map((call) => String(call[0])).join('');
       const helpText = logOutput + stdoutOutput;
 
       expect(helpText).toContain('--allow-non-destructive-tools');
@@ -248,44 +259,38 @@ describe('CLI Arguments (Commander-based)', () => {
       expect(helpText).toContain('--disable-tool-guardrails');
       expect(helpText).toContain('--list-tools');
 
-      logSpy.mockRestore();
       stdoutSpy.mockRestore();
     });
 
     it('should list tools with descriptions when --list-tools is used', async () => {
-      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const { log } = withConsoleCapture();
 
       // This would normally exit, but we'll test the behavior
       await expect(() => parseArgs(['--list-tools'])).rejects.toThrow('process.exit called');
 
       // The tool listing should have been called
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Available tools:'));
-      expect(logSpy).toHaveBeenCalledWith(
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('Available tools:'));
+      expect(log).toHaveBeenCalledWith(
         expect.stringContaining('bash - Use bash to execute unix commands')
       );
-      expect(logSpy).toHaveBeenCalledWith(
-        expect.stringContaining('file_read - Read file contents')
-      );
-
-      logSpy.mockRestore();
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('file_read - Read file contents'));
     });
 
     it('should show tool safety classification in list', async () => {
-      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const { log } = withConsoleCapture();
 
       await expect(() => parseArgs(['--list-tools'])).rejects.toThrow('process.exit called');
 
-      const logOutput = logSpy.mock.calls.map((call) => call[0]).join('');
+      const logOutput = log.mock.calls.map((call) => String(call[0])).join('');
       expect(logOutput).toContain('(destructive)');
       expect(logOutput).toContain('(read-only)');
-
-      logSpy.mockRestore();
     });
   });
 
   describe('error handling', () => {
     it('should reject unknown flags', async () => {
       await expect(() => parseArgs(['--unknown-flag'])).rejects.toThrow('process.exit called');
+
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Error: error: unknown option')
       );

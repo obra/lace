@@ -230,21 +230,21 @@ export class Agent extends EventEmitter {
     });
   }
 
-  async stop(): Promise<void> {
+  stop(): void {
     this._isRunning = false;
     this._clearProgressTimer();
     this._setState('idle');
 
     // Clean up provider resources
     try {
-      await this._provider.cleanup();
+      this._provider.cleanup();
     } catch (cleanupError) {
       logger.warn('Provider cleanup failed during stop', {
         error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
       });
     }
 
-    await this._threadManager.close();
+    this._threadManager.close();
     logger.info('AGENT: Stopped', { threadId: this._threadId });
   }
 
@@ -345,7 +345,7 @@ export class Agent extends EventEmitter {
       // Check if compaction is needed before building conversation (simplified approach)
       if (await this._threadManager.needsCompaction(this._provider)) {
         logger.info('Thread compaction triggered', { threadId: this._threadId });
-        const newThreadId = await this._threadManager.createCompactedVersion(
+        const newThreadId = this._threadManager.createCompactedVersion(
           'Auto-compaction',
           this._provider
         );
@@ -544,7 +544,7 @@ export class Agent extends EventEmitter {
 
       // Clean up provider resources on error to prevent hanging connections
       try {
-        await this._provider.cleanup();
+        this._provider.cleanup();
       } catch (cleanupError) {
         logger.warn('Provider cleanup failed', {
           error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
@@ -1068,7 +1068,7 @@ export class Agent extends EventEmitter {
         // Skip UI-only events - they're not sent to model
         continue;
       } else {
-        throw new Error(`Unknown event type: ${event.type}`);
+        throw new Error(`Unknown event type: ${(event as { type: string }).type}`);
       }
     }
 
@@ -1274,7 +1274,7 @@ export class Agent extends EventEmitter {
    * Replay all historical events from current thread for session resumption
    * Used during --continue and post-compaction state rebuilding
    */
-  async replaySessionEvents(): Promise<void> {
+  replaySessionEvents(): void {
     const events = this._threadManager.getEvents(this._getActiveThreadId());
 
     logger.debug('Agent: Replaying session events', {
@@ -1311,18 +1311,18 @@ export class Agent extends EventEmitter {
     this._threadManager.createThread(threadId);
   }
 
-  async resumeOrCreateThread(threadId?: string): Promise<ThreadSessionInfo> {
-    const result = await this._threadManager.resumeOrCreate(threadId);
+  resumeOrCreateThread(threadId?: string): ThreadSessionInfo {
+    const result = this._threadManager.resumeOrCreate(threadId);
 
     // If resuming existing thread, replay events for UI
     if (result.isResumed) {
-      await this.replaySessionEvents();
+      this.replaySessionEvents();
     }
 
     return result;
   }
 
-  async getLatestThreadId(): Promise<string | null> {
+  getLatestThreadId(): string | null {
     return this._threadManager.getLatestThreadId();
   }
 

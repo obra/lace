@@ -32,8 +32,8 @@ jobs:
       - name: Check Prettier formatting
         run: npx prettier --check "src/**/*.ts"
 
-  type-check:
-    name: TypeScript Type Check
+  build:
+    name: Build Project
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -47,9 +47,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: TypeScript compile check
-        run: npx tsc --noEmit
 
       - name: Build project
         run: npm run build
@@ -161,7 +158,7 @@ jobs:
   build-and-package:
     name: Build and Package
     runs-on: ubuntu-latest
-    needs: [lint-and-format, type-check, test]
+    needs: [lint-and-format, build, test]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

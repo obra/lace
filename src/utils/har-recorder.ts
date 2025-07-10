@@ -194,7 +194,7 @@ export class HARRecorder {
 
       // Read current HAR file, add all buffered entries, write back
       const content = readFileSync(this.filePath, 'utf8');
-      const harFile: HARFile = JSON.parse(content);
+      const harFile: HARFile = JSON.parse(content) as HARFile;
       harFile.log.entries.push(...this.writeBuffer);
 
       writeFileSync(this.filePath, JSON.stringify(harFile, null, 2));
@@ -248,17 +248,29 @@ export class HARRecorder {
     response: Response,
     endTime: number
   ): Promise<void> {
-    const method = (init.method as string) || 'GET';
+    const method = typeof init.method === 'string' ? init.method : 'GET';
     const startedDateTime = new Date(startTime).toISOString();
     const totalTime = endTime - startTime;
 
     // Parse headers
     const requestHeaders: HARHeader[] = [];
     if (init.headers) {
-      const headers =
-        init.headers instanceof Headers
-          ? init.headers
-          : new Headers(init.headers as Record<string, string>);
+      let headers: Headers;
+      if (init.headers instanceof Headers) {
+        headers = init.headers;
+      } else if (typeof init.headers === 'object' && init.headers !== null) {
+        // Safely convert object to Headers
+        const headersObject = init.headers as Record<string, string>;
+        headers = new Headers();
+        for (const [name, value] of Object.entries(headersObject)) {
+          if (typeof name === 'string' && typeof value === 'string') {
+            headers.set(name, value);
+          }
+        }
+      } else {
+        headers = new Headers();
+      }
+
       for (const [name, value] of headers.entries()) {
         requestHeaders.push({ name, value });
       }
@@ -291,11 +303,24 @@ export class HARRecorder {
         };
         requestBodySize = Buffer.byteLength(init.body, 'utf8');
       } else if (init.body instanceof URLSearchParams) {
+        const bodyText = init.body.toString();
         postData = {
           mimeType: 'application/x-www-form-urlencoded',
-          text: init.body.toString(),
+          text: bodyText,
         };
-        requestBodySize = Buffer.byteLength(init.body.toString(), 'utf8');
+        requestBodySize = Buffer.byteLength(bodyText, 'utf8');
+      } else if (init.body instanceof FormData) {
+        postData = {
+          mimeType: 'multipart/form-data',
+          text: '[FormData body - cannot serialize]',
+        };
+        requestBodySize = -1; // Unknown size
+      } else if (init.body instanceof ArrayBuffer) {
+        postData = {
+          mimeType: contentType,
+          text: '[ArrayBuffer body - binary data]',
+        };
+        requestBodySize = init.body.byteLength;
       } else {
         postData = {
           mimeType: contentType,
@@ -403,7 +428,7 @@ export class HARRecorder {
     this.recordEntry(entry);
   }
 
-  async recordHTTPRequest(
+  recordHTTPRequest(
     method: string,
     url: string,
     headers: Record<string, string>,
@@ -414,7 +439,7 @@ export class HARRecorder {
     responseHeaders: Record<string, string>,
     responseBody: string | Buffer,
     endTime: number
-  ): Promise<void> {
+  ): void {
     const startedDateTime = new Date(startTime).toISOString();
     const totalTime = endTime - startTime;
 
@@ -607,12 +632,12 @@ export class HARRecorder {
         let eventData;
 
         try {
-          eventData = JSON.parse(dataMatch[1]);
+          eventData = JSON.parse(dataMatch[1]) as unknown;
         } catch (e) {
           eventData = {
             raw: dataMatch[1],
             parse_error: e instanceof Error ? e.message : String(e),
-          };
+          } as unknown;
         }
 
         // Add to events array
@@ -647,71 +672,87 @@ export class HARRecorder {
     try {
       switch (eventType) {
         case 'message_start': {
-          const data = eventData as { message?: Record<string, unknown> };
-          if (data.message) {
-            message.id = data.message.id;
-            message.role = data.message.role;
-            message.model = data.message.model;
-            message.usage = data.message.usage;
+          if (this.isMessageStartData(eventData)) {
+            if (eventData.message) {
+              message.id = eventData.message.id;
+              message.role = eventData.message.role;
+              message.model = eventData.message.model;
+              message.usage = eventData.message.usage;
+            }
           }
           break;
         }
 
         case 'content_block_start': {
-          const data = eventData as { index: number; content_block?: { type?: string } };
-          const index = data.index;
-          const blockType = data.content_block?.type || 'unknown';
+          if (this.isContentBlockStartData(eventData)) {
+            const index = eventData.index;
+            const blockType = eventData.content_block?.type || 'unknown';
 
-          const content = message.content as Record<string, unknown>[] | undefined;
-          if (!content || !content[index]) {
-            if (!content) message.content = [];
-            (message.content as Record<string, unknown>[])[index] = {
-              type: blockType,
-              text: blockType === 'text' ? '' : null,
-              tool_use: blockType === 'tool_use' ? null : null,
-              thinking: blockType === 'thinking' ? '' : null,
-            };
+            if (!Array.isArray(message.content)) {
+              message.content = [];
+            }
+
+            const content = message.content as Record<string, unknown>[];
+            if (!content[index]) {
+              content[index] = {
+                type: blockType,
+                text: blockType === 'text' ? '' : null,
+                tool_use: blockType === 'tool_use' ? null : null,
+                thinking: blockType === 'thinking' ? '' : null,
+              };
+            }
           }
           break;
         }
 
         case 'content_block_delta': {
-          const data = eventData as { index: number; delta: Record<string, unknown> };
-          const blockIndex = data.index;
-          const delta = data.delta;
+          if (this.isContentBlockDeltaData(eventData)) {
+            const blockIndex = eventData.index;
+            const delta = eventData.delta;
 
-          const content = message.content as Record<string, unknown>[] | undefined;
-          if (!content || !content[blockIndex]) {
-            if (!content) message.content = [];
-            (message.content as Record<string, unknown>[])[blockIndex] = {
-              type: 'unknown',
-              text: '',
-            };
-          }
+            if (!Array.isArray(message.content)) {
+              message.content = [];
+            }
 
-          const block = (message.content as Record<string, unknown>[])[blockIndex];
+            const content = message.content as Record<string, unknown>[];
+            if (!content[blockIndex]) {
+              content[blockIndex] = {
+                type: 'unknown',
+                text: '',
+              };
+            }
 
-          if (delta.type === 'text_delta') {
-            block.text = String(block.text || '') + String(delta.text || '');
-          } else if (delta.type === 'tool_use_delta') {
-            block.tool_use = {
-              ...(block.tool_use || {}),
-              ...(delta.tool_use || {}),
-            };
-          } else if (delta.type === 'thinking_delta') {
-            block.thinking = String(block.thinking || '') + String(delta.thinking || '');
+            const block = content[blockIndex];
+
+            if (this.isTextDelta(delta)) {
+              const existingText = typeof block.text === 'string' ? block.text : '';
+              block.text = existingText + String(delta.text || '');
+            } else if (this.isToolUseDelta(delta)) {
+              block.tool_use = {
+                ...(typeof block.tool_use === 'object' && block.tool_use !== null
+                  ? block.tool_use
+                  : {}),
+                ...(delta.tool_use || {}),
+              };
+            } else if (this.isThinkingDelta(delta)) {
+              const existingThinking = typeof block.thinking === 'string' ? block.thinking : '';
+              block.thinking = existingThinking + String(delta.thinking || '');
+            }
           }
           break;
         }
 
         case 'message_delta': {
-          const data = eventData as { delta?: Record<string, unknown> };
-          if (data.delta) {
-            message.stop_reason = data.delta.stop_reason || message.stop_reason;
-            message.usage = {
-              ...(message.usage || {}),
-              ...(data.delta.usage || {}),
-            };
+          if (this.isMessageDeltaData(eventData)) {
+            if (eventData.delta) {
+              message.stop_reason = eventData.delta.stop_reason || message.stop_reason;
+              message.usage = {
+                ...(typeof message.usage === 'object' && message.usage !== null
+                  ? message.usage
+                  : {}),
+                ...(eventData.delta.usage || {}),
+              };
+            }
           }
           break;
         }
@@ -721,7 +762,9 @@ export class HARRecorder {
           break;
       }
     } catch (error) {
-      if (!message.errors) message.errors = [];
+      if (!Array.isArray(message.errors)) {
+        message.errors = [];
+      }
       (message.errors as Record<string, unknown>[]).push({
         event_type: eventType,
         error: error instanceof Error ? error.message : String(error),
@@ -730,17 +773,93 @@ export class HARRecorder {
     }
   }
 
+  // Type guard methods for SSE event data
+  private isMessageStartData(data: unknown): data is { message?: Record<string, unknown> } {
+    return typeof data === 'object' && data !== null;
+  }
+
+  private isContentBlockStartData(
+    data: unknown
+  ): data is { index: number; content_block?: { type?: string } } {
+    return (
+      typeof data === 'object' &&
+      data !== null &&
+      'index' in data &&
+      typeof (data as Record<string, unknown>).index === 'number'
+    );
+  }
+
+  private isContentBlockDeltaData(
+    data: unknown
+  ): data is { index: number; delta: Record<string, unknown> } {
+    return (
+      typeof data === 'object' &&
+      data !== null &&
+      'index' in data &&
+      typeof (data as Record<string, unknown>).index === 'number' &&
+      'delta' in data
+    );
+  }
+
+  private isMessageDeltaData(data: unknown): data is { delta?: Record<string, unknown> } {
+    return typeof data === 'object' && data !== null;
+  }
+
+  private isTextDelta(
+    delta: Record<string, unknown>
+  ): delta is { type: 'text_delta'; text: string } {
+    return delta.type === 'text_delta' && typeof delta.text === 'string';
+  }
+
+  private isToolUseDelta(
+    delta: Record<string, unknown>
+  ): delta is { type: 'tool_use_delta'; tool_use: Record<string, unknown> } {
+    return (
+      delta.type === 'tool_use_delta' &&
+      typeof delta.tool_use === 'object' &&
+      delta.tool_use !== null
+    );
+  }
+
+  private isThinkingDelta(
+    delta: Record<string, unknown>
+  ): delta is { type: 'thinking_delta'; thinking: string } {
+    return delta.type === 'thinking_delta' && typeof delta.thinking === 'string';
+  }
+
+  private isEventWithMessageContent(event: unknown): event is { message: { content: string } } {
+    return (
+      typeof event === 'object' &&
+      event !== null &&
+      'message' in event &&
+      typeof (event as Record<string, unknown>).message === 'object' &&
+      (event as Record<string, unknown>).message !== null &&
+      'content' in ((event as Record<string, unknown>).message as Record<string, unknown>) &&
+      typeof ((event as Record<string, unknown>).message as Record<string, unknown>).content ===
+        'string'
+    );
+  }
+
+  private isEventWithDone(event: unknown): event is { done: boolean } {
+    return (
+      typeof event === 'object' &&
+      event !== null &&
+      'done' in event &&
+      typeof (event as Record<string, unknown>).done === 'boolean'
+    );
+  }
+
   private getSSEEventSummary(events: Array<{ type: string }>): Record<string, unknown> {
-    const summary = {
-      total: events.length,
-      by_type: {} as Record<string, number>,
-    };
+    const byType: Record<string, number> = {};
 
     for (const event of events) {
-      summary.by_type[event.type] = (summary.by_type[event.type] || 0) + 1;
+      byType[event.type] = (byType[event.type] || 0) + 1;
     }
 
-    return summary;
+    return {
+      total: events.length,
+      by_type: byType,
+    };
   }
 
   private async createStreamingReader(response: Response, timeoutMs: number): Promise<string> {
@@ -819,16 +938,16 @@ export class HARRecorder {
         }
 
         try {
-          const event = JSON.parse(line);
+          const event = JSON.parse(line) as unknown;
           events.push(event);
 
           // Reconstruct the message content
-          if (event.message?.content) {
+          if (this.isEventWithMessageContent(event)) {
             reconstructedContent += event.message.content;
           }
 
           // Check if this is the final message
-          if (event.done) {
+          if (this.isEventWithDone(event)) {
             finalMessage = event;
           }
         } catch {

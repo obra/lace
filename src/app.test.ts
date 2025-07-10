@@ -14,6 +14,7 @@ import { NonInteractiveInterface } from './interfaces/non-interactive-interface.
 import { TerminalInterface } from './interfaces/terminal/terminal-interface.js';
 import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
 import { OllamaProvider } from './providers/ollama-provider.js';
+import { withConsoleCapture } from './__tests__/setup/console-capture.js';
 
 // Mock external dependencies at the module level
 vi.mock('./agents/agent.js');
@@ -148,9 +149,6 @@ describe('App Initialization (run function)', () => {
       return mockAgentInstance as any;
     });
 
-    // Mock console.log and console.warn to prevent test output pollution
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(process, 'exit').mockImplementation((() => {}) as never); // Mock process.exit
 
     // Mock TerminalInterface.prototype.startInteractive
@@ -235,10 +233,11 @@ describe('App Initialization (run function)', () => {
   });
 
   it('should initialize ThreadManager and handle new session', async () => {
+    const { log } = withConsoleCapture();
     await run(mockCliOptions);
     expect(ThreadManager).toHaveBeenCalledWith('/mock/db/path');
     // Session handling now goes through Agent.resumeOrCreateThread
-    expect(console.log).toHaveBeenCalledWith('🆕 Starting conversation new-thread-123');
+    expect(log).toHaveBeenCalledWith('🆕 Starting conversation new-thread-123');
   });
 
   it('should initialize ThreadManager and handle resumed session', async () => {
@@ -250,6 +249,7 @@ describe('App Initialization (run function)', () => {
   });
 
   it('should initialize ThreadManager and handle resumed session with ID', async () => {
+    const { log } = withConsoleCapture();
     // Update the base Agent mock to return resumed session
     const originalImplementation = vi.mocked(Agent).getMockImplementation();
     vi.mocked(Agent).mockImplementation(() => {
@@ -298,10 +298,11 @@ describe('App Initialization (run function)', () => {
     const options = { ...mockCliOptions, continue: 'specific-thread-789' };
     await run(options);
     // Session handling now goes through Agent.resumeOrCreateThread
-    expect(console.log).toHaveBeenCalledWith('📖 Continuing conversation specific-thread-789');
+    expect(log).toHaveBeenCalledWith('📖 Continuing conversation specific-thread-789');
   });
 
   it('should initialize ThreadManager and handle resume error', async () => {
+    const { log } = withConsoleCapture();
     vi.mocked(ThreadManager.prototype.resumeOrCreate).mockResolvedValue({
       threadId: 'new-thread-123',
       isResumed: false,
@@ -309,7 +310,7 @@ describe('App Initialization (run function)', () => {
     });
     await run(mockCliOptions);
     // With Agent mock, no resume error occurs by default
-    expect(console.log).toHaveBeenCalledWith('🆕 Starting conversation new-thread-123');
+    expect(log).toHaveBeenCalledWith('🆕 Starting conversation new-thread-123');
   });
 
   it('should set up ToolExecutor and Agent', async () => {

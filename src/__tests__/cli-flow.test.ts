@@ -6,8 +6,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { withConsoleCapture } from '~/__tests__/setup/console-capture.js';
 import { run } from '~/app.js';
 import { CLIOptions } from '~/cli/args.js';
+import { Agent } from '~/agents/agent.js';
 
 // Mock all external dependencies
 vi.mock('../agents/agent.js');
@@ -163,7 +165,7 @@ describe('CLI Flow Tests', () => {
         isResumed: false,
         resumeError: undefined,
       }),
-      getLatestThreadId: vi.fn().mockResolvedValue('latest-thread-123'),
+      getLatestThreadId: vi.fn().mockReturnValue('latest-thread-123'),
       getCurrentThreadId: vi.fn().mockReturnValue('test-thread-123'),
       generateThreadId: vi.fn().mockReturnValue('generated-thread-123'),
       createThread: vi.fn(),
@@ -171,8 +173,8 @@ describe('CLI Flow Tests', () => {
       getThreadEvents: vi.fn().mockReturnValue([]),
       getMainAndDelegateEvents: vi.fn().mockReturnValue([]),
       providerName: 'anthropic',
-    };
-    vi.mocked(Agent).mockImplementation(() => mockAgentInstance as any);
+    } as Partial<Agent>;
+    vi.mocked(Agent).mockImplementation(() => mockAgentInstance as Agent);
 
     // Mock interfaces
     NonInteractiveInterface.prototype.executePrompt = vi.fn().mockResolvedValue(undefined);
@@ -190,9 +192,7 @@ describe('CLI Flow Tests', () => {
       requestApproval: vi.fn(),
     });
 
-    // Mock console methods to prevent test output pollution
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Console output is automatically suppressed by global setup
     vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
   });
 
@@ -276,87 +276,91 @@ describe('CLI Flow Tests', () => {
 
   describe('session management', () => {
     it('should create new session when no continue specified', async () => {
+      const { log } = withConsoleCapture();
       const { Agent } = vi.mocked(await import('../agents/agent.js'));
 
       await run(mockCliOptions);
 
       // Session handling now goes through Agent.resumeOrCreateThread
-      const mockAgentInstance = (Agent as any).mock.results[0]?.value;
-      expect(mockAgentInstance.resumeOrCreateThread).toHaveBeenCalledWith(undefined);
-      expect(console.log).toHaveBeenCalledWith('🆕 Starting conversation test-thread-123');
+      const mockAgentInstance = vi.mocked(Agent).mock.results[0]?.value as Partial<Agent>;
+      expect(mockAgentInstance?.resumeOrCreateThread).toHaveBeenCalledWith(undefined);
+      expect(log).toHaveBeenCalledWith('🆕 Starting conversation test-thread-123');
     });
 
     it('should resume session when continue is true', async () => {
+      const { log } = withConsoleCapture();
       const { Agent } = vi.mocked(await import('../agents/agent.js'));
       const { ToolExecutor } = vi.mocked(await import('../tools/executor.js'));
 
       // Override the mock to return resumed session
       const mockAgentInstance = {
-        ...(Agent as any).mock.results[0]?.value,
+        ...vi.mocked(Agent).mock.results[0]?.value,
         toolExecutor: vi.mocked(new ToolExecutor()),
         resumeOrCreateThread: vi.fn().mockResolvedValue({
           threadId: 'resumed-thread-456',
           isResumed: true,
           resumeError: undefined,
         }),
-        getLatestThreadId: vi.fn().mockResolvedValue('resumed-thread-456'),
-      };
-      (Agent as any).mockImplementation(() => mockAgentInstance as any);
+        getLatestThreadId: vi.fn().mockReturnValue('resumed-thread-456'),
+      } as Partial<Agent>;
+      vi.mocked(Agent).mockImplementation(() => mockAgentInstance as Agent);
 
       const options = { ...mockCliOptions, continue: true };
 
       await run(options);
 
       // Session handling now goes through Agent.resumeOrCreateThread
-      expect(mockAgentInstance.resumeOrCreateThread).toHaveBeenCalledWith('resumed-thread-456');
-      expect(console.log).toHaveBeenCalledWith('📖 Continuing conversation resumed-thread-456');
+      expect(mockAgentInstance?.resumeOrCreateThread).toHaveBeenCalledWith('resumed-thread-456');
+      expect(log).toHaveBeenCalledWith('📖 Continuing conversation resumed-thread-456');
     });
 
     it('should resume specific session when thread ID provided', async () => {
+      const { log } = withConsoleCapture();
       const { Agent } = vi.mocked(await import('../agents/agent.js'));
       const { ToolExecutor } = vi.mocked(await import('../tools/executor.js'));
 
       // Override the mock to return specific session
       const mockAgentInstance = {
-        ...(Agent as any).mock.results[0]?.value,
+        ...vi.mocked(Agent).mock.results[0]?.value,
         toolExecutor: vi.mocked(new ToolExecutor()),
         resumeOrCreateThread: vi.fn().mockResolvedValue({
           threadId: 'specific-thread-789',
           isResumed: true,
           resumeError: undefined,
         }),
-      };
-      (Agent as any).mockImplementation(() => mockAgentInstance as any);
+      } as Partial<Agent>;
+      vi.mocked(Agent).mockImplementation(() => mockAgentInstance as Agent);
 
       const options = { ...mockCliOptions, continue: 'specific-thread-789' };
 
       await run(options);
 
       // Session handling now goes through Agent.resumeOrCreateThread
-      expect(mockAgentInstance.resumeOrCreateThread).toHaveBeenCalledWith('specific-thread-789');
-      expect(console.log).toHaveBeenCalledWith('📖 Continuing conversation specific-thread-789');
+      expect(mockAgentInstance?.resumeOrCreateThread).toHaveBeenCalledWith('specific-thread-789');
+      expect(log).toHaveBeenCalledWith('📖 Continuing conversation specific-thread-789');
     });
 
     it('should handle resume error gracefully', async () => {
+      const { log, warn } = withConsoleCapture();
       const { Agent } = vi.mocked(await import('../agents/agent.js'));
       const { ToolExecutor } = vi.mocked(await import('../tools/executor.js'));
 
       // Override the mock to return error case
       const mockAgentInstance = {
-        ...(Agent as any).mock.results[0]?.value,
+        ...vi.mocked(Agent).mock.results[0]?.value,
         toolExecutor: vi.mocked(new ToolExecutor()),
         resumeOrCreateThread: vi.fn().mockResolvedValue({
           threadId: 'new-thread-123',
           isResumed: false,
           resumeError: 'Mock resume error',
         }),
-      };
-      (Agent as any).mockImplementation(() => mockAgentInstance as any);
+      } as Partial<Agent>;
+      vi.mocked(Agent).mockImplementation(() => mockAgentInstance as Agent);
 
       await run(mockCliOptions);
 
-      expect(console.warn).toHaveBeenCalledWith('⚠️  Mock resume error');
-      expect(console.log).toHaveBeenCalledWith('🆕 Starting new conversation new-thread-123');
+      expect(warn).toHaveBeenCalledWith('⚠️  Mock resume error');
+      expect(log).toHaveBeenCalledWith('🆕 Starting new conversation new-thread-123');
     });
   });
 
@@ -370,7 +374,8 @@ describe('CLI Flow Tests', () => {
       await run(options);
 
       expect(NonInteractiveInterface).toHaveBeenCalledWith(expect.any(Object));
-      expect(NonInteractiveInterface.prototype.executePrompt).toHaveBeenCalledWith('test prompt');
+      const executePromptSpy = vi.mocked(NonInteractiveInterface.prototype.executePrompt);
+      expect(executePromptSpy).toHaveBeenCalledWith('test prompt');
       expect(process.exit).toHaveBeenCalledWith(0);
     });
 
@@ -382,7 +387,8 @@ describe('CLI Flow Tests', () => {
       await run(mockCliOptions);
 
       expect(TerminalInterface).toHaveBeenCalledWith(expect.any(Object));
-      expect(TerminalInterface.prototype.startInteractive).toHaveBeenCalled();
+      const startInteractiveSpy = vi.mocked(TerminalInterface.prototype.startInteractive);
+      expect(startInteractiveSpy).toHaveBeenCalled();
     });
   });
 
@@ -393,7 +399,8 @@ describe('CLI Flow Tests', () => {
 
       await run(options);
 
-      expect(logger.configure).toHaveBeenCalledWith('debug', 'test.log');
+      const configureSpy = vi.mocked(logger.configure);
+      expect(configureSpy).toHaveBeenCalledWith('debug', 'test.log');
     });
 
     it('should enable traffic logging when harFile specified', async () => {
@@ -412,8 +419,8 @@ describe('CLI Flow Tests', () => {
       await run(mockCliOptions);
 
       expect(createGlobalPolicyCallback).toHaveBeenCalled();
-      const agentInstance = vi.mocked(Agent).mock.results[0].value;
-      expect(agentInstance.toolExecutor.setApprovalCallback).toHaveBeenCalled();
+      const agentInstance = vi.mocked(Agent).mock.results[0]?.value as Partial<Agent>;
+      expect(agentInstance?.toolExecutor?.setApprovalCallback).toHaveBeenCalled();
     });
   });
 
@@ -424,11 +431,11 @@ describe('CLI Flow Tests', () => {
       await run(mockCliOptions);
 
       expect(Agent).toHaveBeenCalledWith({
-        provider: expect.any(Object),
-        toolExecutor: expect.any(Object),
-        threadManager: expect.any(Object),
-        threadId: expect.any(String), // Accept any thread ID
-        tools: expect.any(Array),
+        provider: expect.anything(), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+        toolExecutor: expect.anything(), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+        threadManager: expect.anything(), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+        threadId: expect.any(String), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+        tools: expect.anything(), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
       });
     });
 
@@ -437,7 +444,8 @@ describe('CLI Flow Tests', () => {
 
       await run(mockCliOptions);
 
-      expect(ToolExecutor.prototype.registerAllAvailableTools).toHaveBeenCalled();
+      const registerToolsSpy = vi.mocked(ToolExecutor.prototype.registerAllAvailableTools);
+      expect(registerToolsSpy).toHaveBeenCalled();
     });
 
     it('should set delegate tool dependencies if delegate tool exists', async () => {

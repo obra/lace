@@ -298,7 +298,7 @@ export class OpenAIProvider extends AIProvider {
             // Handle tool calls
             if (delta?.tool_calls) {
               for (const toolCall of delta.tool_calls) {
-                const index = toolCall.index!;
+                const index = toolCall.index;
 
                 if (!partialToolCalls.has(index)) {
                   partialToolCalls.set(index, {

@@ -377,7 +377,7 @@ export class LMStudioProvider extends AIProvider {
                 id: toolCall.id,
                 type: toolCall.type,
                 name: toolCall.function.name,
-                arguments: JSON.parse(toolCall.function.arguments),
+                arguments: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
               },
             });
           });
@@ -449,7 +449,7 @@ export class LMStudioProvider extends AIProvider {
             fuzzyPresetIdentifier: undefined,
             ignoreServerSessionConfig: this._cachedModel!.internalIgnoreServerSessionConfig,
           },
-          async (message: unknown) => {
+          (message: unknown) => {
             const msg = message as {
               type: string;
               fragment?: { content?: string };
@@ -612,7 +612,7 @@ export class LMStudioProvider extends AIProvider {
         logger.error('LMStudio channel creation failed', {
           error: error instanceof Error ? error.message : String(error),
         });
-        reject(error);
+        reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
   }
@@ -683,13 +683,13 @@ export class LMStudioProvider extends AIProvider {
     };
   }
 
-  async cleanup(): Promise<void> {
+  cleanup(): void {
     // Clean up cached model reference to help with garbage collection
     this._cachedModel = null;
     this._cachedModelId = null;
 
     // Call parent cleanup to remove event listeners
-    await super.cleanup();
+    super.cleanup();
 
     // Note: LMStudio SDK doesn't expose explicit connection close methods
     // The WebSocket connections should be cleaned up when the client object is GC'd

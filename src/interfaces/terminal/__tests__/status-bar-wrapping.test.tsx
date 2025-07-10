@@ -79,8 +79,7 @@ describe('StatusBar Layout and Truncation', () => {
       // If wrapping occurs, we'll have more than 1 line
       // This test documents the current behavior
       if (lines.length > 1) {
-        console.log('Status bar wrapped to', lines.length, 'lines in 40-column terminal');
-        lines.forEach((line, i) => console.log(`Line ${i + 1}:`, JSON.stringify(line)));
+        // Status bar wrapped - this is expected behavior for narrow terminals
       }
     });
 
@@ -102,7 +101,7 @@ describe('StatusBar Layout and Truncation', () => {
       const lines = frame!.split('\n');
       
       if (lines.length > 1) {
-        console.log('Status bar wrapped to', lines.length, 'lines in 60-column terminal');
+        // Status bar wrapped - this is expected behavior for moderately narrow terminals
       }
     });
 
@@ -191,10 +190,9 @@ describe('StatusBar Layout and Truncation', () => {
       const lines = frame!.split('\n');
       expect(lines.length).toBeGreaterThanOrEqual(2);
       
-      // Log wrapping behavior
-      console.log(`Two-row status bar wrapped to ${lines.length} lines in 50-column terminal`);
+      // Two-row status bar may wrap further depending on terminal width
       if (lines.length > 2) {
-        lines.forEach((line, i) => console.log(`  Line ${i + 1}: "${line}"`));
+        // Additional wrapping occurred beyond the expected 2 rows
       }
     });
 
@@ -217,10 +215,7 @@ describe('StatusBar Layout and Truncation', () => {
       
       const lines = frame!.split('\n');
       
-      // Log the wrapping behavior
-      console.log(`Both status bar rows in 35-column terminal resulted in ${lines.length} lines:`);
-      lines.forEach((line, i) => console.log(`  Line ${i + 1}: "${line}"`));
-      
+      // Both status bar rows may wrap in very narrow terminals
       // This documents the current behavior
       expect(lines.length).toBeGreaterThan(0);
     });

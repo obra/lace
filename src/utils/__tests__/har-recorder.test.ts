@@ -234,7 +234,7 @@ describe('HARRecorder', () => {
     it('should record HTTP request with all details', async () => {
       const recorder = new HARRecorder(TEST_HAR_FILE);
 
-      await recorder.recordHTTPRequest(
+      recorder.recordHTTPRequest(
         'POST',
         'https://api.openai.com/v1/chat/completions',
         {

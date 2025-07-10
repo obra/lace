@@ -20,13 +20,13 @@ class MockApprovalInterface implements ApprovalCallback {
     this.responses.set(toolName, decision);
   }
 
-  async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
+  requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
     this.callLog.push({ toolName, input });
     const response = this.responses.get(toolName);
     if (!response) {
-      return ApprovalDecision.DENY; // Default to deny if no response set
+      return Promise.resolve(ApprovalDecision.DENY); // Default to deny if no response set
     }
-    return response;
+    return Promise.resolve(response);
   }
 
   reset(): void {
@@ -350,8 +350,8 @@ describe('Tool Approval System Integration', () => {
   describe('error handling', () => {
     it('should handle approval callback errors gracefully', async () => {
       const errorCallback: ApprovalCallback = {
-        async requestApproval(): Promise<ApprovalDecision> {
-          throw new Error('Approval system failed');
+        requestApproval(): Promise<ApprovalDecision> {
+          return Promise.reject(new Error('Approval system failed'));
         },
       };
 

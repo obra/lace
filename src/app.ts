@@ -131,12 +131,12 @@ async function handleSession(
       continueThreadId = continueMode;
     } else {
       logger.debug('Attempting to get latest thread ID');
-      continueThreadId = (await threadManager.getLatestThreadId()) || undefined;
+      continueThreadId = threadManager.getLatestThreadId() || undefined;
       logger.debug(`Latest thread ID: ${continueThreadId}`);
     }
   }
 
-  const sessionInfo = await threadManager.resumeOrCreate(continueThreadId);
+  const sessionInfo = threadManager.resumeOrCreate(continueThreadId);
   const { threadId } = sessionInfo;
 
   if (sessionInfo.isResumed) {
@@ -161,7 +161,7 @@ async function handleSessionWithAgent(
       continueThreadId = continueMode;
     } else {
       // Get latest thread ID through Agent API
-      continueThreadId = (await agent.getLatestThreadId()) || undefined;
+      continueThreadId = agent.getLatestThreadId() || undefined;
     }
   }
 

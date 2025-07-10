@@ -57,7 +57,7 @@ export async function loadPromptConfig(options: PromptOptions = {}): Promise<Pro
 
   const promptManager = new PromptManager({ tools: options.tools });
   const systemPrompt = await promptManager.generateSystemPrompt();
-  const userInstructions = await loadUserInstructions();
+  const userInstructions = loadUserInstructions();
 
   logger.info('Loaded prompt config using template system');
   return {

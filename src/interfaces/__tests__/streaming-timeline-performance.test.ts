@@ -2,8 +2,8 @@
 // ABOUTME: Verifies constant-time processing regardless of conversation length
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ThreadEvent } from '../../threads/types.js';
-import { StreamingTimelineProcessor } from '../streaming-timeline-processor.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { StreamingTimelineProcessor } from '~/interfaces/streaming-timeline-processor.js';
 
 describe('StreamingTimelineProcessor Performance', () => {
   let processor: StreamingTimelineProcessor;
@@ -59,8 +59,6 @@ describe('StreamingTimelineProcessor Performance', () => {
       // Performance should not degrade by more than 10x even with 100x more data
       const performanceDegradation = lastMeasurement.avgTime / firstMeasurement.avgTime;
       expect(performanceDegradation).toBeLessThan(10);
-
-      console.log('Performance measurements:', measurements);
     });
 
     it('should handle rapid event additions without performance degradation', () => {
@@ -85,10 +83,6 @@ describe('StreamingTimelineProcessor Performance', () => {
       // Last quarter should not be more than 5x slower than first quarter
       const degradation = avgLast / avgFirst;
       expect(degradation).toBeLessThan(5);
-
-      console.log(`Average time first quarter: ${avgFirst.toFixed(3)}ms`);
-      console.log(`Average time last quarter: ${avgLast.toFixed(3)}ms`);
-      console.log(`Performance degradation factor: ${degradation.toFixed(2)}`);
     });
   });
 
@@ -115,10 +109,6 @@ describe('StreamingTimelineProcessor Performance', () => {
       const maxExpectedGrowth = 10000 * expectedGrowthPerEvent * 2; // 2x buffer
 
       expect(heapGrowth).toBeLessThan(maxExpectedGrowth);
-
-      console.log(`Initial heap: ${(initialMemory.heapUsed / 1024 / 1024).toFixed(2)}MB`);
-      console.log(`Final heap: ${(finalMemory.heapUsed / 1024 / 1024).toFixed(2)}MB`);
-      console.log(`Growth: ${(heapGrowth / 1024 / 1024).toFixed(2)}MB`);
     });
 
     it('should clean up tool call correlation state', () => {
@@ -175,9 +165,6 @@ describe('StreamingTimelineProcessor Performance', () => {
 
       // Should complete within reasonable time (less than 1 second for 5000 events)
       expect(loadTime).toBeLessThan(1000);
-
-      console.log(`Loaded ${eventCount} events in ${loadTime.toFixed(2)}ms`);
-      console.log(`Average time per event: ${(loadTime / eventCount).toFixed(3)}ms`);
     });
   });
 
@@ -215,9 +202,8 @@ describe('StreamingTimelineProcessor Performance', () => {
       operations.push({ operation: 'reset', time: end - start });
 
       // All operations should complete quickly regardless of timeline size
-      for (const { operation, time } of operations) {
+      for (const { time } of operations) {
         expect(time).toBeLessThan(100); // Less than 100ms for any operation
-        console.log(`${operation}: ${time.toFixed(3)}ms`);
       }
 
       expect(timeline.items).toHaveLength(largeTimelineSize);

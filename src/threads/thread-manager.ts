@@ -50,10 +50,10 @@ export class ThreadManager {
     return `${parentThreadId}.${maxCounter + 1}`;
   }
 
-  async resumeOrCreate(threadId?: string): Promise<ThreadSessionInfo> {
+  resumeOrCreate(threadId?: string): ThreadSessionInfo {
     if (threadId) {
       try {
-        await this.setCurrentThread(threadId);
+        this.setCurrentThread(threadId);
         return { threadId, isResumed: true };
       } catch (error) {
         // Fall through to create new
@@ -264,7 +264,7 @@ export class ThreadManager {
   }
 
   // New persistence methods
-  async loadThread(threadId: string): Promise<Thread> {
+  loadThread(threadId: string): Thread {
     const thread = this._persistence.loadThread(threadId);
     if (!thread) {
       throw new Error(`Thread ${threadId} not found in database`);
@@ -272,21 +272,21 @@ export class ThreadManager {
     return thread;
   }
 
-  async saveCurrentThread(): Promise<void> {
+  saveCurrentThread(): void {
     if (!this._currentThread) return;
 
     this._persistence.saveThread(this._currentThread);
   }
 
-  async setCurrentThread(threadId: string): Promise<void> {
+  setCurrentThread(threadId: string): void {
     // Save current thread before switching
-    await this.saveCurrentThread();
+    this.saveCurrentThread();
 
     // Load new thread
-    this._currentThread = await this.loadThread(threadId);
+    this._currentThread = this.loadThread(threadId);
   }
 
-  async getLatestThreadId(): Promise<string | null> {
+  getLatestThreadId(): string | null {
     return this._persistence.getLatestThreadId();
   }
 
@@ -296,7 +296,7 @@ export class ThreadManager {
   }
 
   // Legacy method - use createCompactedVersion() instead
-  async createShadowThread(reason: string, provider?: AIProvider): Promise<string> {
+  createShadowThread(reason: string, provider?: AIProvider): string {
     return this.createCompactedVersion(reason, provider);
   }
 
@@ -317,7 +317,7 @@ export class ThreadManager {
 
     if (!needsCompaction) return false;
 
-    await this.createShadowThread('Automatic compaction due to size', provider);
+    this.createShadowThread('Automatic compaction due to size', provider);
     return true;
   }
 
@@ -373,7 +373,7 @@ export class ThreadManager {
   // - New thread has compacted events (fewer tokens)
   // - Operations use the compacted thread for efficiency
   // - Canonical ID mapping enables transparent access
-  async createCompactedVersion(reason: string, provider?: AIProvider): Promise<string> {
+  createCompactedVersion(reason: string, provider?: AIProvider): string {
     if (!this._currentThread) {
       throw new Error('No current thread to compact');
     }
@@ -412,7 +412,7 @@ export class ThreadManager {
       this._persistence.createVersion(canonicalId, newThreadId, reason);
 
       // Switch to new thread (using existing method)
-      await this.setCurrentThread(newThreadId);
+      this.setCurrentThread(newThreadId);
 
       logger.info('Compacted thread created successfully', {
         originalThreadId,
@@ -444,20 +444,20 @@ export class ThreadManager {
 
     if (!needsCompaction) return false;
 
-    await this.createCompactedVersion('Automatic compaction due to size', provider);
+    this.createCompactedVersion('Automatic compaction due to size', provider);
     return true;
   }
 
   // Cleanup
-  async close(): Promise<void> {
+  close(): void {
     try {
-      await this.saveCurrentThread();
+      this.saveCurrentThread();
     } catch {
       // Ignore save errors on close
     }
     // Clear provider strategy cache
     this._providerStrategyCache.clear();
-    await this._persistence.close();
+    this._persistence.close();
   }
 
   private _getProviderStrategy(provider: AIProvider): SummarizeStrategy {

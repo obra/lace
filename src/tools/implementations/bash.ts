@@ -52,7 +52,7 @@ export class BashTool extends Tool {
         exitCode: 0,
       };
 
-      return this.createResult(result);
+      return this.createResult(result as unknown as Record<string, unknown>);
     } catch (error: unknown) {
       const err = error as { message: string; stdout?: string; stderr?: string; code?: number };
 
@@ -75,7 +75,7 @@ export class BashTool extends Tool {
           exitCode: 127,
         };
 
-        return this.createError(result);
+        return this.createError(result as unknown as Record<string, unknown>);
       }
 
       // If we have stdout or command executed in a sequence, treat as tool success
@@ -87,7 +87,7 @@ export class BashTool extends Tool {
           exitCode: err.code || 1, // Preserve actual exit code (non-zero)
         };
 
-        return this.createResult(result);
+        return this.createResult(result as unknown as Record<string, unknown>);
       }
 
       // True failure - command couldn't execute at all (rare cases)
@@ -97,7 +97,7 @@ export class BashTool extends Tool {
         exitCode: err.code || 1,
       };
 
-      return this.createError(result);
+      return this.createError(result as unknown as Record<string, unknown>);
     }
   }
 }

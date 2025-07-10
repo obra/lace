@@ -9,7 +9,7 @@ import { logger } from '~/utils/logger.js';
 import { TemplateContext } from '~/config/template-engine.js';
 
 export interface VariableProvider {
-  getVariables(): Promise<Record<string, unknown>>;
+  getVariables(): Promise<Record<string, unknown>> | Record<string, unknown>;
 }
 
 /**
@@ -41,7 +41,7 @@ export class CommandRunner {
  * Provides system-level context variables
  */
 export class SystemVariableProvider implements VariableProvider {
-  async getVariables(): Promise<Record<string, unknown>> {
+  getVariables(): Record<string, unknown> {
     try {
       return {
         system: {
@@ -69,7 +69,7 @@ export class GitVariableProvider implements VariableProvider {
     this.commandRunner = commandRunner || new CommandRunner();
   }
 
-  async getVariables(): Promise<Record<string, unknown>> {
+  getVariables(): Record<string, unknown> {
     try {
       const gitVars: Record<string, unknown> = {};
 
@@ -125,7 +125,7 @@ export class GitVariableProvider implements VariableProvider {
  * Provides project context variables
  */
 export class ProjectVariableProvider implements VariableProvider {
-  async getVariables(): Promise<Record<string, unknown>> {
+  getVariables(): Record<string, unknown> {
     try {
       const cwd = process.cwd();
 
@@ -188,7 +188,7 @@ export class ProjectVariableProvider implements VariableProvider {
 export class ToolVariableProvider implements VariableProvider {
   constructor(private tools: Array<{ name: string; description: string }> = []) {}
 
-  async getVariables(): Promise<Record<string, unknown>> {
+  getVariables(): Record<string, unknown> {
     try {
       return {
         tools: this.tools.map((tool) => ({
@@ -209,7 +209,7 @@ export class ToolVariableProvider implements VariableProvider {
  * Provides context disclaimer about conversation start timing
  */
 export class ContextDisclaimerProvider implements VariableProvider {
-  async getVariables(): Promise<Record<string, unknown>> {
+  getVariables(): Record<string, unknown> {
     return {
       context: {
         disclaimer:
@@ -234,7 +234,7 @@ export class VariableProviderManager {
 
     for (const provider of this.providers) {
       try {
-        const variables = await provider.getVariables();
+        const variables = await Promise.resolve(provider.getVariables());
         Object.assign(context, variables);
       } catch (error) {
         logger.error('Variable provider failed', {

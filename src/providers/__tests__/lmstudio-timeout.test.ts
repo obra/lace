@@ -2,10 +2,13 @@
 // ABOUTME: Ensures LMStudio provider doesn't hang indefinitely when server is unavailable
 
 import { describe, it, expect } from 'vitest';
-import { LMStudioProvider } from '../lmstudio-provider.js';
+import { LMStudioProvider } from '~/providers/lmstudio-provider.js';
 
 describe('LMStudio Provider Timeout Handling', () => {
   it('should timeout quickly when LMStudio server is unavailable', async () => {
+    // Console output is automatically suppressed by global setup
+    // No need for manual stderr suppression
+
     // Use a non-existent port to simulate unavailable server
     const provider = new LMStudioProvider({
       baseUrl: 'ws://localhost:9999', // Non-existent port

@@ -16,8 +16,9 @@
     "test:unit": "vitest run --exclude=\"**/*{e2e,integration}*\"",
     "test:coverage": "vitest run --coverage",
     "test:run": "vitest run",
-    "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix",
+    "typecheck": "tsc --noEmit",
+    "lint": "npm run typecheck && eslint src/**/*.ts",
+    "lint:fix": "npm run typecheck && eslint src/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "prepare": "husky",
     "docker:build": "docker build -t lace-test .",
@@ -72,6 +73,7 @@
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-no-relative-import-paths": "^1.6.1",
     "eslint-plugin-prettier": "^5.4.1",
+    "eslint-plugin-vitest": "^0.5.4",
     "execa": "^9.6.0",
     "globals": "^16.2.0",
     "husky": "^9.1.7",
@@ -83,6 +85,7 @@
     "react-devtools-core": "^4.28.5",
     "tsc-alias": "^1.8.16",
     "typescript": "^5.6.0",
+    "typescript-eslint": "^8.36.0",
     "vitest": "^3.2.3"
   }
 }
