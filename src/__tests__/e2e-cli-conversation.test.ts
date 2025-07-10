@@ -6,40 +6,34 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { mkdtemp, rm } from 'fs/promises';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import { runCLI } from '~/__tests__/helpers/cli-runner.js';
 
 describe('CLI Conversation Tests', () => {
-  let tempDbPath: string;
+  let testDir: string;
   let originalEnv: string | undefined;
 
-  beforeEach(() => {
-    // Use more unique identifier to avoid collisions in parallel test runs
-    const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    tempDbPath = path.join(os.tmpdir(), `lace-e2e-test-${uniqueId}.db`);
+  beforeEach(async () => {
+    // Create isolated temporary directory for this test
+    testDir = await mkdtemp(join(tmpdir(), 'lace-e2e-cli-test-'));
     originalEnv = process.env.LACE_DIR;
 
-    // Set LACE_DIR to temp directory for spawned processes
-    process.env.LACE_DIR = path.dirname(tempDbPath);
+    // Set LACE_DIR to our isolated temp directory for spawned processes
+    process.env.LACE_DIR = testDir;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Restore original LACE_DIR
     if (originalEnv !== undefined) {
       process.env.LACE_DIR = originalEnv;
     } else {
       delete process.env.LACE_DIR;
     }
 
-    // Clean up any test DB files
-    try {
-      if (fs.existsSync(tempDbPath)) {
-        fs.unlinkSync(tempDbPath);
-      }
-    } catch {
-      // Ignore cleanup errors
-    }
+    // Clean up the entire test directory
+    await rm(testDir, { recursive: true, force: true });
   });
 
   describe('session management integration', () => {
@@ -52,6 +46,7 @@ describe('CLI Conversation Tests', () => {
           env: {
             LACE_TEST_MODE: 'true',
             ANTHROPIC_KEY: 'sk-ant-test-key-for-testing',
+            LACE_DIR: testDir,
           },
         });
 
@@ -92,6 +87,7 @@ describe('CLI Conversation Tests', () => {
           env: {
             LACE_TEST_MODE: 'true',
             ANTHROPIC_KEY: 'sk-ant-test-key-for-testing',
+            LACE_DIR: testDir,
           },
         });
 
@@ -103,6 +99,7 @@ describe('CLI Conversation Tests', () => {
           env: {
             LACE_TEST_MODE: 'true',
             ANTHROPIC_KEY: 'sk-ant-test-key-for-testing',
+            LACE_DIR: testDir,
           },
         });
 
@@ -142,6 +139,7 @@ describe('CLI Conversation Tests', () => {
           env: {
             LACE_TEST_MODE: 'true',
             ANTHROPIC_KEY: 'sk-ant-test-key-for-testing',
+            LACE_DIR: testDir,
           },
         });
 
@@ -191,6 +189,7 @@ describe('CLI Conversation Tests', () => {
           env: {
             LACE_TEST_MODE: 'true',
             ANTHROPIC_KEY: 'sk-ant-test-key-for-testing',
+            LACE_DIR: testDir,
           },
         });
 
