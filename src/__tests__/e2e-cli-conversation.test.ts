@@ -68,6 +68,7 @@ describe('CLI Conversation Tests', () => {
             env: {
               LACE_TEST_MODE: 'true',
               ANTHROPIC_KEY: 'sk-ant-test-key-for-testing',
+              LACE_DIR: testDir,
             },
           }
         );
@@ -117,6 +118,7 @@ describe('CLI Conversation Tests', () => {
             env: {
               LACE_TEST_MODE: 'true',
               ANTHROPIC_KEY: 'sk-ant-test-key-for-testing',
+              LACE_DIR: testDir,
             },
           }
         );
