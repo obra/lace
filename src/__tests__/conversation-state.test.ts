@@ -103,13 +103,16 @@ class MockConversationProvider extends AIProvider {
     return 'list_files_result';
   }
 
-  createResponse(messages: unknown[], _tools: unknown[] = []) {
+  createResponse(messages: unknown[], _tools: unknown[] = []): Promise<ProviderResponse> {
     const key = this.getResponseKey(messages);
-    return this.responseMap.get(key) || this.responseMap.get('list_files_result')!;
+    return Promise.resolve(this.responseMap.get(key) || this.responseMap.get('list_files_result')!);
   }
 
-  createStreamingResponse(messages: unknown[], _tools: unknown[] = []) {
-    const response = this.createResponse(messages, _tools);
+  async createStreamingResponse(
+    messages: unknown[],
+    _tools: unknown[] = []
+  ): Promise<ProviderResponse> {
+    const response = await this.createResponse(messages, _tools);
 
     // Emit streaming events
     if (response.content) {
