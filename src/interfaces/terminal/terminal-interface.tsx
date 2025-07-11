@@ -246,6 +246,9 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   // Timeline layout debug panel state
   const [isTimelineLayoutDebugVisible, setIsTimelineLayoutDebugVisible] = useState(false);
 
+  // Track initialization state to prevent duplicate event processing during session resumption
+  const [isInitialized, setIsInitialized] = useState(false);
+
   // Project context hook for double status bar
   const { context: projectContext, refreshContext } = useProjectContext();
 
@@ -312,6 +315,10 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       } else {
         logger.warn('No current thread found during session initialization');
       }
+      
+      // Mark initialization as complete after bulk loading
+      // This prevents duplicate processing of replayed events
+      setIsInitialized(true);
     } catch (error) {
       logger.error('Session initialization failed', { error });
       addMessage({
@@ -319,6 +326,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         content: `❌ Failed to initialize session: ${error instanceof Error ? error.message : String(error)}`,
         timestamp: new Date(),
       });
+      // Still mark as initialized to allow normal operation
+      setIsInitialized(true);
     }
   }, [agent, streamingTimelineProcessor, addMessage]);
 
@@ -835,6 +844,17 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     }) => {
       const currentThreadId = agent.getCurrentThreadId();
       if (threadId === currentThreadId) {
+        // Skip processing during initialization phase
+        // Historical events are already bulk-loaded by initializeStreamingSession
+        if (!isInitialized) {
+          logger.debug('Skipping event during initialization phase', {
+            eventType: event.type,
+            eventId: event.id,
+            threadId,
+          });
+          return;
+        }
+        
         // Stream event directly to processor (O(1) operation)
         streamingTimelineProcessor.appendEvent(event);
         
@@ -851,7 +871,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     return () => {
       agent.off('thread_event_added', handleEventAdded);
     };
-  }, [agent, streamingTimelineProcessor]);
+  }, [agent, streamingTimelineProcessor, isInitialized]);
 
   // Listen for queue events and update stats
   useEffect(() => {
