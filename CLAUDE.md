@@ -262,7 +262,10 @@ ThreadProcessor caches processed events for performance.
 
 ## Configuration
 
-- **Environment**: ANTHROPIC_KEY, OPENAI_API_KEY, LACE_DIR
+- **Environment Variables**: Loaded from `.env` and `.env.local` files
+  - **Priority**: `.env.local` overrides `.env` for any conflicting variables
+  - **Key Variables**: ANTHROPIC_KEY, OPENAI_API_KEY, LACE_DIR
+  - **Usage**: Use `.env.local` for machine-specific configuration (git ignored)
 - **User Instructions**: `~/.lace/instructions.md`
 - **System Prompts**: Template-based generation in `src/config/prompts/`
 - **Database**: SQLite storage in LACE_DIR with graceful degradation
