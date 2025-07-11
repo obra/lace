@@ -36,13 +36,18 @@ export default function TimelineDisplay({
     (
       selectedItemIndex: number,
       input: string,
-      key: any,
-      _itemRefs?: React.MutableRefObject<Map<number, any>>
+      key: {
+        leftArrow?: boolean;
+        rightArrow?: boolean;
+        return?: boolean;
+        [key: string]: boolean | undefined;
+      },
+      _itemRefs?: React.MutableRefObject<Map<number, unknown>>
     ) => {
       logger.debug('TimelineDisplay: handleItemInteraction called', {
         selectedItemIndex,
         key: Object.keys(key)
-          .filter((k) => key[k])
+          .filter((k) => key[k as keyof typeof key])
           .join('+'),
         focusRegion,
       });
@@ -71,7 +76,8 @@ export default function TimelineDisplay({
           logger.debug('TimelineDisplay: Emitting expand and focus entry events', {
             selectedItemIndex,
             selectedItemType: selectedItem.type,
-            selectedItemCallName: (selectedItem as any).call?.name,
+            selectedItemCallName:
+              selectedItem.type === 'tool_execution' ? selectedItem.call.name : undefined,
           });
 
           // First expand the item (focus implies expansion)

@@ -132,7 +132,9 @@ describe('Progress Display Integration Tests', () => {
       // This test verifies the integration by checking that the agent emits
       // the correct events that the StatusBar would consume
 
-      const tokenUsageEvents: any[] = [];
+      const tokenUsageEvents: Array<{
+        usage: { totalTokens: number; promptTokens: number; completionTokens: number };
+      }> = [];
       agent.on('token_usage_update', (data) => tokenUsageEvents.push(data));
 
       // Act

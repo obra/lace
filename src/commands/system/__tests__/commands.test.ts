@@ -63,14 +63,14 @@ describe('System Commands', () => {
       toolExecutor: {
         getAllTools: vi.fn().mockReturnValue([]),
       },
-    };
+    } as MockAgent;
 
     mockUI = {
       agent: mockAgent as any,
       displayMessage: vi.fn(),
       clearSession: vi.fn(),
       exit: vi.fn(),
-    };
+    } as UserInterface;
   });
 
   describe('helpCommand', () => {

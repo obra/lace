@@ -28,13 +28,14 @@ function getPrimaryInfo(toolName: string, args: Record<string, unknown>): string
       return `"${args.pattern || ''}" in ${args.path || 'current directory'}`;
     case 'delegate':
       return `"${args.task || args.prompt || 'Unknown task'}"`;
-    default:
+    default: {
       // For unknown tools, use the first argument value if it's short
       const firstValue = Object.values(args)[0];
       if (firstValue && typeof firstValue === 'string' && firstValue.length <= 50) {
         return firstValue;
       }
       return 'unknown';
+    }
   }
 }
 

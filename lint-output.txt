@@ -1,0 +1,9 @@
+
+> LACE - A lightweight agentic coding environment@0.0.1 lint
+> npm run typecheck && eslint src
+
+
+> LACE - A lightweight agentic coding environment@0.0.1 typecheck
+> tsc --noEmit
+
+src/agents/__tests__/agent-getqueue-contents.test.ts(30,6): error TS1005: ')' expected.

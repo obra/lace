@@ -2,7 +2,7 @@
 // ABOUTME: Manages viewport state and keyboard input, renders content and scroll indicators
 
 import React, { useRef } from 'react';
-import { Box, useInput, Text } from 'ink';
+import { Box, useInput, Text, DOMElement } from 'ink';
 import useStdoutDimensions from '~/utils/use-stdout-dimensions.js';
 import { Timeline } from '~/interfaces/timeline-types.js';
 import { useTimelineViewport } from '~/interfaces/terminal/components/events/hooks/useTimelineViewport.js';
@@ -21,8 +21,13 @@ interface TimelineViewportProps {
   onItemInteraction?: (
     selectedItemIndex: number,
     input: string,
-    key: any,
-    itemRefs?: React.MutableRefObject<Map<number, any>>
+    key: {
+      leftArrow?: boolean;
+      rightArrow?: boolean;
+      return?: boolean;
+      [key: string]: boolean | undefined;
+    },
+    itemRefs?: React.MutableRefObject<Map<number, unknown>>
   ) => void;
   isTimelineLayoutDebugVisible?: boolean;
   children: (props: {
@@ -38,7 +43,7 @@ interface TimelineViewportProps {
     viewportActions: {
       triggerRemeasurement: () => void;
     };
-    itemRefs: React.MutableRefObject<Map<number, any>>;
+    itemRefs: React.MutableRefObject<Map<number, unknown>>;
     viewportLines: number;
   }) => React.ReactNode;
 }
@@ -58,7 +63,7 @@ export function TimelineViewport({
   const [, terminalHeight] = useStdoutDimensions();
 
   // Item refs for measurement
-  const itemRefs = useRef<Map<number, any>>(new Map());
+  const itemRefs = useRef<Map<number, unknown>>(new Map());
 
   // Calculate viewport height
   const viewportLines = bottomSectionHeight
@@ -74,8 +79,8 @@ export function TimelineViewport({
   });
 
   // Measure scroll indicator heights
-  const topIndicatorRef = useRef<any>(null);
-  const bottomIndicatorRef = useRef<any>(null);
+  const topIndicatorRef = useRef<DOMElement | null>(null);
+  const bottomIndicatorRef = useRef<DOMElement | null>(null);
 
   // Calculate scroll indicator visibility
   const hasMoreAbove = viewport.lineScrollOffset > 0;
@@ -136,7 +141,7 @@ export function TimelineViewport({
           focusRegion: focusRegion || FocusRegions.timeline,
           selectedItemIndex: viewport.selectedItemIndex,
           key: Object.keys(key)
-            .filter((k) => (key as any)[k])
+            .filter((k) => (key as Record<string, unknown>)[k])
             .join('+'),
           hasCallback: !!onItemInteraction,
         });

@@ -9,13 +9,26 @@ import ToolApprovalModal from '~/interfaces/terminal/components/tool-approval-mo
 import { ApprovalDecision } from '~/tools/approval-types.js';
 
 // Capture the useInput handler for direct testing
-let capturedInputHandlers: ((input: string, key: any) => void)[] = [];
+interface KeyInfo {
+  escape?: boolean;
+  return?: boolean;
+  tab?: boolean;
+  upArrow?: boolean;
+  downArrow?: boolean;
+  leftArrow?: boolean;
+  rightArrow?: boolean;
+}
+
+let capturedInputHandlers: ((input: string, key: KeyInfo) => void)[] = [];
 
 vi.mock('ink', async () => {
   const actual = await vi.importActual('ink');
   return {
     ...actual,
-    useInput: (handler: (input: string, key: any) => void, options?: { isActive?: boolean }) => {
+    useInput: (
+      handler: (input: string, key: KeyInfo) => void,
+      options?: { isActive?: boolean }
+    ) => {
       if (options?.isActive !== false) {
         capturedInputHandlers.push(handler);
       }
@@ -39,11 +52,12 @@ vi.mock('../focus/index.js', async () => {
       getFocusStack: () => ['shell-input', 'modal-approval'],
       isFocusActive: (id: string) => id === 'modal-approval',
     }),
-    ModalWrapper: ({ children, isOpen }: any) => (isOpen ? children : null),
+    ModalWrapper: ({ children, isOpen }: { children: React.ReactNode; isOpen: boolean }) =>
+      isOpen ? children : null,
   };
 });
 
-const simulateKeyPress = async (input: string, key: any = {}) => {
+const simulateKeyPress = async (input: string, key: KeyInfo = {}) => {
   // Wait a tick to ensure component is fully rendered
   await new Promise((resolve) => setTimeout(resolve, 50));
 

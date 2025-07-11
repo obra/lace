@@ -157,7 +157,7 @@ describe('OpenAIProvider retry functionality', () => {
 
       // Mock the first call to create() to throw immediately (before stream is created)
       const networkError = new Error('Connection failed');
-      (networkError as any).code = 'ECONNRESET';
+      (networkError as Error & { code: string }).code = 'ECONNRESET';
 
       // Create a successful stream for the retry
       const successStream = (async function* () {

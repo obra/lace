@@ -83,9 +83,9 @@ async function debugThread(options: DebugOptions): Promise<ThreadDebugInfo> {
   const agentWithPrivates = agent as unknown as {
     _buildConversationFromEvents: (events: any[]) => any;
   };
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
   const buildConversationFromEvents = agentWithPrivates._buildConversationFromEvents.bind(agent);
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
   const providerMessages = buildConversationFromEvents(thread.events);
 
   // Calculate token counts
@@ -208,34 +208,37 @@ function formatAsText(debugInfo: ThreadDebugInfo): string {
   lines.push(`${'='.repeat(40)}`);
 
   if (Array.isArray(debugInfo.conversation)) {
-    debugInfo.conversation.forEach((msg, index) => {
-      lines.push(`Message ${index + 1} (${msg.role}):`);
+    (debugInfo.conversation as Array<Record<string, unknown>>).forEach((msg, index) => {
+      lines.push(`Message ${index + 1} (${(msg as { role: string }).role}):`);
 
       if (typeof msg.content === 'string') {
         lines.push(`  ${msg.content}`);
       } else if (Array.isArray(msg.content)) {
-        (msg.content as Array<any>).forEach(
-          (block, blockIndex: number) => {
-            lines.push(`  Block ${blockIndex + 1} (${block.type}):`);
-            if (block.text) {
-              lines.push(`    ${block.text}`);
-            }
-            if (block.tool_use_id) {
-              lines.push(`    Tool Use ID: ${block.tool_use_id}`);
-            }
-            if (block.name) {
-              lines.push(`    Tool Name: ${block.name}`);
-            }
-            if (block.input) {
-              lines.push(`    Tool Input: ${JSON.stringify(block.input, null, 2)}`);
-            }
+        (msg.content as Array<Record<string, unknown>>).forEach((block, blockIndex: number) => {
+          lines.push(`  Block ${blockIndex + 1} (${(block as { type: string }).type}):`);
+          if ((block as { text?: string }).text) {
+            lines.push(`    ${(block as { text: string }).text}`);
           }
-        );
+          if ((block as { tool_use_id?: string }).tool_use_id) {
+            lines.push(`    Tool Use ID: ${(block as { tool_use_id: string }).tool_use_id}`);
+          }
+          if ((block as { name?: string }).name) {
+            lines.push(`    Tool Name: ${(block as { name: string }).name}`);
+          }
+          if ((block as { input?: unknown }).input) {
+            lines.push(
+              `    Tool Input: ${JSON.stringify((block as { input: unknown }).input, null, 2)}`
+            );
+          }
+        });
       }
 
-      if (msg.toolCalls?.length > 0) {
-        lines.push(`  Tool Calls: ${msg.toolCalls.length}`);
-        (msg.toolCalls as Array<{ name: string; input: any }>).forEach(
+      if (
+        (msg as { toolCalls?: unknown[] }).toolCalls?.length &&
+        (msg as { toolCalls: unknown[] }).toolCalls.length > 0
+      ) {
+        lines.push(`  Tool Calls: ${(msg as { toolCalls: unknown[] }).toolCalls.length}`);
+        (msg as { toolCalls: Array<{ name: string; input: unknown }> }).toolCalls.forEach(
           (call, callIndex: number) => {
             lines.push(`    ${callIndex + 1}. ${call.name}:`);
             lines.push(`       Input: ${JSON.stringify(call.input, null, 2)}`);
@@ -243,23 +246,26 @@ function formatAsText(debugInfo: ThreadDebugInfo): string {
         );
       }
 
-      if (msg.toolResults?.length > 0) {
-        lines.push(`  Tool Results: ${msg.toolResults.length}`);
-        (msg.toolResults as Array<{ id: string; content?: Array<{ text?: string }> }>).forEach(
-          (result, resultIndex: number) => {
-            lines.push(`    ${resultIndex + 1}. ${result.id}:`);
-            if (result.content) {
-              result.content.forEach((contentBlock: { text?: string }, contentIndex: number) => {
-                lines.push(
-                  `       Content ${contentIndex + 1}: ${contentBlock.text || JSON.stringify(contentBlock)}`
-                );
-              });
-            }
-            if ((result as any).isError) {
-              lines.push(`       Error: true`);
-            }
+      if (
+        (msg as { toolResults?: unknown[] }).toolResults?.length &&
+        (msg as { toolResults: unknown[] }).toolResults.length > 0
+      ) {
+        lines.push(`  Tool Results: ${(msg as { toolResults: unknown[] }).toolResults.length}`);
+        (
+          msg as { toolResults: Array<{ id: string; content?: Array<{ text?: string }> }> }
+        ).toolResults.forEach((result, resultIndex: number) => {
+          lines.push(`    ${resultIndex + 1}. ${result.id}:`);
+          if (result.content) {
+            result.content.forEach((contentBlock: { text?: string }, contentIndex: number) => {
+              lines.push(
+                `       Content ${contentIndex + 1}: ${contentBlock.text || JSON.stringify(contentBlock)}`
+              );
+            });
           }
-        );
+          if ((result as { isError?: boolean }).isError) {
+            lines.push(`       Error: true`);
+          }
+        });
       }
 
       lines.push('');
@@ -269,11 +275,13 @@ function formatAsText(debugInfo: ThreadDebugInfo): string {
   lines.push(`Raw Events:`);
   lines.push(`${'='.repeat(40)}`);
   debugInfo.rawEvents.forEach((event, index) => {
-    lines.push(`Event ${index + 1}: ${event.type} (${event.timestamp})`);
-    if (typeof event.data === 'string') {
-      lines.push(`  ${event.data}`);
+    lines.push(
+      `Event ${index + 1}: ${(event as { type: string; timestamp: string }).type} (${(event as { type: string; timestamp: string }).timestamp})`
+    );
+    if (typeof (event as { data: unknown }).data === 'string') {
+      lines.push(`  ${(event as { data: string }).data}`);
     } else {
-      lines.push(`  ${JSON.stringify(event.data, null, 2)}`);
+      lines.push(`  ${JSON.stringify((event as { data: unknown }).data, null, 2)}`);
     }
     lines.push('');
   });

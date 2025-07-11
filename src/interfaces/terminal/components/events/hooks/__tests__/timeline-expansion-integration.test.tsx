@@ -117,10 +117,11 @@ describe('Timeline Expansion Architecture Integration', () => {
     isSelected: boolean;
     onExpansionChange?: (expanded: boolean) => void;
   }) {
-    const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
-      isSelected,
-      onExpansionChange
-    );
+    const {
+      isExpanded,
+      onExpand: _onExpand,
+      onCollapse: _onCollapse,
+    } = useTimelineItemExpansion(isSelected, onExpansionChange);
 
     return (
       <Box>
@@ -139,7 +140,7 @@ describe('Timeline Expansion Architecture Integration', () => {
       const expandCallbacks: Record<string, MockedFunction<(expanded: boolean) => void>> = {};
 
       function TestComponent() {
-        const [selectedItem, setSelectedItem] = useState('item1');
+        const [selectedItem, _setSelectedItem] = useState('item1');
 
         // Track expansion changes for verification
         expandCallbacks.item1 = vi.fn() as MockedFunction<(expanded: boolean) => void>;
@@ -283,7 +284,7 @@ describe('Timeline Expansion Architecture Integration', () => {
       const expansionCallback = vi.fn() as MockedFunction<(expanded: boolean) => void>;
 
       function SelectionTest() {
-        const [isSelected, setIsSelected] = useState(false);
+        const [isSelected, _setIsSelected] = useState(false);
 
         return (
           <TimelineExpansionProvider>
@@ -375,10 +376,11 @@ describe('Hook usage patterns', () => {
     isSelected: boolean;
     onExpansionChange?: (expanded: boolean) => void;
   }) {
-    const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
-      isSelected,
-      onExpansionChange
-    );
+    const {
+      isExpanded,
+      onExpand: _onExpand,
+      onCollapse: _onCollapse,
+    } = useTimelineItemExpansion(isSelected, onExpansionChange);
 
     return (
       <Box>

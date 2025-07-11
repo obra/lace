@@ -44,7 +44,7 @@ describe('TerminalInterface Agent Events', () => {
   });
 
   afterEach(async () => {
-    await threadManager.close();
+    threadManager.close();
     await rm(testDir, { recursive: true, force: true });
   });
 
@@ -70,8 +70,8 @@ describe('TerminalInterface Agent Events', () => {
       render(<TerminalInterfaceComponent agent={agent} />);
 
       // Assert - ThreadManager should not have event emitter methods
-      expect(typeof (threadManager as any).on).toBe('undefined');
-      expect(typeof (threadManager as any).emit).toBe('undefined');
+      expect(typeof (threadManager as unknown as { on?: unknown }).on).toBe('undefined');
+      expect(typeof (threadManager as unknown as { emit?: unknown }).emit).toBe('undefined');
     });
   });
 

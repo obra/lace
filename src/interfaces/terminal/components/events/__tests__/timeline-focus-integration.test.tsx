@@ -57,7 +57,7 @@ vi.mock('../../../../../../utils/logger.js', () => ({
 // Mock focus system to track focus operations
 const mockPushFocus = vi.fn();
 const mockPopFocus = vi.fn();
-const mockIsFocused = vi.fn(() => false);
+const _mockIsFocused = vi.fn(() => false);
 
 vi.mock('../../../focus/index.js', () => ({
   useLaceFocus: () => ({

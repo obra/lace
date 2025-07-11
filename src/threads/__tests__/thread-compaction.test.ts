@@ -32,7 +32,7 @@ describe('Thread Compaction', () => {
     const toolResult = toolResultEvent?.data as ToolResult;
     if (!toolResult) throw new Error('No tool result found');
 
-    expect(toolResult.content[0]!.text).toContain('... [truncated 100 more words of tool output]');
+    expect(toolResult.content[0].text).toContain('... [truncated 100 more words of tool output]');
     expect(toolResult.content?.[0]?.text?.split(' ').length).toBeLessThanOrEqual(210); // ~200 words + truncation message
   });
 

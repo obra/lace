@@ -29,7 +29,7 @@ interface Task {
 // Parse task list from result content
 function parseTaskList(resultText: string): Task[] {
   try {
-    return JSON.parse(resultText);
+    return JSON.parse(resultText) as Task[];
   } catch {
     return [];
   }

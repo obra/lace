@@ -5,6 +5,10 @@ import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TimelineContent } from '~/interfaces/terminal/components/events/TimelineContent.js';
 import { Timeline } from '~/interfaces/timeline-types.js';
+import {
+  ViewportState,
+  ViewportActions,
+} from '~/interfaces/terminal/components/events/hooks/useTimelineViewport.js';
 
 // Mock TimelineItem since we're testing ref management, not item rendering
 vi.mock('./TimelineItem.js', () => ({
@@ -14,8 +18,8 @@ vi.mock('./TimelineItem.js', () => ({
 describe('TimelineContent itemRefs management', () => {
   let timeline: Timeline;
   let itemRefs: React.MutableRefObject<Map<number, unknown>>;
-  let viewportState: any;
-  let viewportActions: any;
+  let viewportState: ViewportState;
+  let viewportActions: ViewportActions;
 
   beforeEach(() => {
     timeline = {
@@ -46,7 +50,16 @@ describe('TimelineContent itemRefs management', () => {
       measurementTrigger: 0,
     };
     viewportActions = {
+      setSelectedLine: vi.fn(),
+      setLineScrollOffset: vi.fn(),
+      getSelectedItemIndex: vi.fn(() => 0),
       triggerRemeasurement: vi.fn(),
+      navigateUp: vi.fn(),
+      navigateDown: vi.fn(),
+      navigatePageUp: vi.fn(),
+      navigatePageDown: vi.fn(),
+      navigateToTop: vi.fn(),
+      navigateToBottom: vi.fn(),
     };
   });
 

@@ -11,10 +11,10 @@ import {
 } from '~/tools/implementations/task-manager/tools.js';
 import { ToolContext } from '~/tools/types.js';
 import { asThreadId, createNewAgentSpec } from '~/threads/types.js';
-import { useTempLaceDir, getTestDbPath } from '~/test-utils/temp-lace-dir.js';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir.js';
 
 describe('Multi-Agent Task Manager Integration', () => {
-  const tempDirContext = useTempLaceDir();
+  const _tempDirContext = useTempLaceDir();
 
   // Simulate three agents in a parent thread
   const parentThreadId = asThreadId('lace_20250703_parent');
@@ -158,7 +158,7 @@ describe('Multi-Agent Task Manager Integration', () => {
   describe('New agent assignment workflow', () => {
     it('should handle task assignment to new agent specification', async () => {
       const createTool = new TaskCreateTool();
-      const listTool = new TaskListTool();
+      const _listTool = new TaskListTool();
       const updateTool = new TaskUpdateTool();
 
       // Create task assigned to a new agent spec

@@ -7,7 +7,6 @@ import { NonEmptyString } from '~/tools/schemas/common.js';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types.js';
 import { ApprovalDecision } from '~/tools/approval-types.js';
 import { Agent } from '~/agents/agent.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
 import { ToolExecutor } from '~/tools/executor.js';
 import { AnthropicProvider } from '~/providers/anthropic-provider.js';
 import { LMStudioProvider } from '~/providers/lmstudio-provider.js';
@@ -111,9 +110,6 @@ Examples:
       const toolExecutor = this.createRestrictedToolExecutor();
 
       // Note: Delegation metadata is now shown in the delegation box UI
-
-      // Get all tools for the subagent
-      const availableTools = toolExecutor.getAllTools();
 
       // Configure token budget for subagent (more conservative than parent)
       const tokenBudget: TokenBudgetConfig = {

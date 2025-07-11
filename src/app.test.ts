@@ -146,7 +146,7 @@ describe('App Initialization (run function)', () => {
       };
       // Mock the prototype methods that are accessed
       Object.setPrototypeOf(mockAgentInstance, Agent.prototype);
-      return mockAgentInstance as any;
+      return mockAgentInstance as unknown as Agent;
     });
 
     vi.spyOn(process, 'exit').mockImplementation((() => {}) as never); // Mock process.exit
@@ -291,7 +291,7 @@ describe('App Initialization (run function)', () => {
         getThreadEvents: vi.fn().mockReturnValue([]),
       };
       Object.setPrototypeOf(mockAgentInstance, Agent.prototype);
-      return mockAgentInstance as any;
+      return mockAgentInstance as unknown as Agent;
     });
 
     const options = { ...mockCliOptions, continue: 'specific-thread-789' };
@@ -302,7 +302,7 @@ describe('App Initialization (run function)', () => {
 
   it('should initialize ThreadManager and handle resume error', async () => {
     const { log } = withConsoleCapture();
-    
+
     // Mock Agent constructor to return an instance with resume error
     vi.mocked(Agent).mockImplementation(() => {
       const mockAgentInstance = {
@@ -346,7 +346,7 @@ describe('App Initialization (run function)', () => {
         state: 'idle',
         threadId: 'test-thread',
       };
-      return mockAgentInstance as any;
+      return mockAgentInstance as unknown as Agent;
     });
 
     await run(mockCliOptions);
@@ -359,7 +359,7 @@ describe('App Initialization (run function)', () => {
     expect(vi.mocked(ToolExecutor.prototype.registerAllAvailableTools)).toHaveBeenCalledTimes(1);
     expect(Agent).toHaveBeenCalledTimes(1);
     // Just verify the Agent constructor gets called with the right structure
-    const agentCallArgs = vi.mocked(Agent).mock.calls[0][0];
+    const agentCallArgs = vi.mocked(Agent).mock.calls[0][0] as any;
     expect(agentCallArgs).toMatchObject({
       provider: expect.any(Object),
       toolExecutor: expect.any(Object),
@@ -415,7 +415,7 @@ describe('App Initialization (run function)', () => {
       mockCliOptions,
       expect.any(ToolExecutor) // Agent's toolExecutor
     );
-    const agentInstance = vi.mocked(Agent).mock.results[0].value;
+    const agentInstance = vi.mocked(Agent).mock.results[0].value as Agent;
     expect(agentInstance.toolExecutor.setApprovalCallback).toHaveBeenCalledWith(mockPolicyCallback);
   });
 });

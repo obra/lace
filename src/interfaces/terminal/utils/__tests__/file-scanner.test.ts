@@ -5,10 +5,27 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { FileScanner } from '~/interfaces/terminal/utils/file-scanner.js';
+import type { Dirent } from 'fs';
 
 // Mock fs module
 vi.mock('fs');
 const mockFs = vi.mocked(fs);
+
+// Helper function to create mock Dirent objects
+function createMockDirent(name: string, isDirectory: boolean): Dirent {
+  return {
+    name,
+    isDirectory: () => isDirectory,
+    isFile: () => !isDirectory,
+    isSymbolicLink: () => false,
+    isBlockDevice: () => false,
+    isCharacterDevice: () => false,
+    isFIFO: () => false,
+    isSocket: () => false,
+    path: '',
+    parentPath: '',
+  } as Dirent;
+}
 
 describe('FileScanner', () => {
   let scanner: FileScanner;
@@ -30,10 +47,10 @@ describe('FileScanner', () => {
 
       // Mock fs.readdirSync to return test files
       mockFs.readdirSync.mockReturnValue([
-        { name: 'src', isDirectory: () => true, isFile: () => false } as any,
-        { name: 'package.json', isDirectory: () => false, isFile: () => true } as any,
-        { name: 'README.md', isDirectory: () => false, isFile: () => true } as any,
-      ]);
+        createMockDirent('src', true),
+        createMockDirent('package.json', false),
+        createMockDirent('README.md', false),
+      ] as any);
 
       const completions = await scanner.getCompletions();
 
@@ -46,11 +63,11 @@ describe('FileScanner', () => {
     it('should prioritize directories over files', async () => {
       mockFs.existsSync.mockReturnValue(false);
       mockFs.readdirSync.mockReturnValue([
-        { name: 'app.ts', isDirectory: () => false, isFile: () => true } as any,
-        { name: 'src', isDirectory: () => true, isFile: () => false } as any,
-        { name: 'dist', isDirectory: () => true, isFile: () => false } as any,
-        { name: 'index.ts', isDirectory: () => false, isFile: () => true } as any,
-      ]);
+        createMockDirent('app.ts', false),
+        createMockDirent('src', true),
+        createMockDirent('dist', true),
+        createMockDirent('index.ts', false),
+      ] as any);
 
       const completions = await scanner.getCompletions();
 
@@ -64,11 +81,11 @@ describe('FileScanner', () => {
     beforeEach(() => {
       mockFs.existsSync.mockReturnValue(false);
       mockFs.readdirSync.mockReturnValue([
-        { name: 'src', isDirectory: () => true, isFile: () => false } as any,
-        { name: 'scripts', isDirectory: () => true, isFile: () => false } as any,
-        { name: 'app.ts', isDirectory: () => false, isFile: () => true } as any,
-        { name: 'server.ts', isDirectory: () => false, isFile: () => true } as any,
-      ]);
+        createMockDirent('src', true),
+        createMockDirent('scripts', true),
+        createMockDirent('app.ts', false),
+        createMockDirent('server.ts', false),
+      ] as any);
     });
 
     it('should filter by prefix match', async () => {
@@ -93,12 +110,12 @@ describe('FileScanner', () => {
       mockFs.readdirSync.mockImplementation((dirPath: any) => {
         if (dirPath.endsWith('src')) {
           return [
-            { name: 'components', isDirectory: () => true, isFile: () => false } as any,
-            { name: 'utils', isDirectory: () => true, isFile: () => false } as any,
-            { name: 'app.ts', isDirectory: () => false, isFile: () => true } as any,
-          ];
+            createMockDirent('components', true),
+            createMockDirent('utils', true),
+            createMockDirent('app.ts', false),
+          ] as any;
         }
-        return [];
+        return [] as any;
       });
 
       const completions = await scanner.getCompletions('src/');
@@ -112,12 +129,12 @@ describe('FileScanner', () => {
       mockFs.readdirSync.mockImplementation((dirPath: any) => {
         if (dirPath.endsWith('src')) {
           return [
-            { name: 'app.ts', isDirectory: () => false, isFile: () => true } as any,
-            { name: 'agent.ts', isDirectory: () => false, isFile: () => true } as any,
-            { name: 'utils', isDirectory: () => true, isFile: () => false } as any,
-          ];
+            createMockDirent('app.ts', false),
+            createMockDirent('agent.ts', false),
+            createMockDirent('utils', true),
+          ] as any;
         }
-        return [];
+        return [] as any;
       });
 
       const completions = await scanner.getCompletions('src/a');
@@ -133,13 +150,13 @@ describe('FileScanner', () => {
       mockFs.readFileSync.mockReturnValue('node_modules\n*.log\n# comment line\n\n.env');
 
       mockFs.readdirSync.mockReturnValue([
-        { name: 'src', isDirectory: () => true, isFile: () => false } as any,
-        { name: 'node_modules', isDirectory: () => true, isFile: () => false } as any,
-        { name: 'dist', isDirectory: () => true, isFile: () => false } as any,
-        { name: 'app.log', isDirectory: () => false, isFile: () => true } as any,
-        { name: 'package.json', isDirectory: () => false, isFile: () => true } as any,
-        { name: '.env', isDirectory: () => false, isFile: () => true } as any,
-      ]);
+        createMockDirent('src', true),
+        createMockDirent('node_modules', true),
+        createMockDirent('dist', true),
+        createMockDirent('app.log', false),
+        createMockDirent('package.json', false),
+        createMockDirent('.env', false),
+      ] as any);
 
       const completions = await scanner.getCompletions();
 
@@ -155,9 +172,9 @@ describe('FileScanner', () => {
     it('should handle missing .gitignore gracefully', async () => {
       mockFs.existsSync.mockReturnValue(false);
       mockFs.readdirSync.mockReturnValue([
-        { name: 'src', isDirectory: () => true, isFile: () => false } as any,
-        { name: 'node_modules', isDirectory: () => true, isFile: () => false } as any,
-      ]);
+        createMockDirent('src', true),
+        createMockDirent('node_modules', true),
+      ] as any);
 
       const completions = await scanner.getCompletions();
 
@@ -170,9 +187,7 @@ describe('FileScanner', () => {
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue('*.tmp\ntest-*\n# comment\n\n');
 
-      mockFs.readdirSync.mockReturnValue([
-        { name: 'app.ts', isDirectory: () => false, isFile: () => true } as any,
-      ]);
+      mockFs.readdirSync.mockReturnValue([createMockDirent('app.ts', false)] as any);
 
       const completions = await scanner.getCompletions();
 
@@ -185,9 +200,7 @@ describe('FileScanner', () => {
   describe('caching behavior', () => {
     beforeEach(() => {
       mockFs.existsSync.mockReturnValue(false);
-      mockFs.readdirSync.mockReturnValue([
-        { name: 'src', isDirectory: () => true, isFile: () => false } as any,
-      ]);
+      mockFs.readdirSync.mockReturnValue([createMockDirent('src', true)] as any);
     });
 
     it('should cache results and reuse them', async () => {
@@ -232,9 +245,7 @@ describe('FileScanner', () => {
       mockFs.readFileSync.mockImplementation(() => {
         throw new Error('EACCES: permission denied');
       });
-      mockFs.readdirSync.mockReturnValue([
-        { name: 'src', isDirectory: () => true, isFile: () => false } as any,
-      ]);
+      mockFs.readdirSync.mockReturnValue([createMockDirent('src', true)] as any);
 
       // Should not throw and still return results
       const completions = await scanner.getCompletions();
@@ -245,9 +256,7 @@ describe('FileScanner', () => {
   describe('path normalization', () => {
     it('should handle empty partial paths', async () => {
       mockFs.existsSync.mockReturnValue(false);
-      mockFs.readdirSync.mockReturnValue([
-        { name: 'file.ts', isDirectory: () => false, isFile: () => true } as any,
-      ]);
+      mockFs.readdirSync.mockReturnValue([createMockDirent('file.ts', false)] as any);
 
       const completions = await scanner.getCompletions('');
 
@@ -259,9 +268,9 @@ describe('FileScanner', () => {
       mockFs.existsSync.mockReturnValue(false);
       mockFs.readdirSync.mockImplementation((dirPath: any) => {
         if (dirPath.endsWith('src')) {
-          return [{ name: 'app.ts', isDirectory: () => false, isFile: () => true } as any];
+          return [createMockDirent('app.ts', false)] as any;
         }
-        return [];
+        return [] as any;
       });
 
       const completions = await scanner.getCompletions('src/');

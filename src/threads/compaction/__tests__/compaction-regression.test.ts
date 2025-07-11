@@ -16,10 +16,13 @@ const threadDataPath = join(__dirname, '../../../agents/__tests__/data/full_thre
 const rawThreadEventsData = JSON.parse(readFileSync(threadDataPath, 'utf8'));
 
 // Convert timestamp strings to Date objects for TypeScript compatibility
-const threadEventsData = rawThreadEventsData.map((event: any) => ({
-  ...event,
-  timestamp: new Date(event.timestamp),
-}));
+const threadEventsData = rawThreadEventsData.map(
+  (event: any) =>
+    ({
+      ...event,
+      timestamp: new Date(event.timestamp),
+    }) as ThreadEvent
+);
 
 describe('Compaction Regression Tests', () => {
   let strategy: SummarizeStrategy;

@@ -25,7 +25,7 @@ describe('Variable Providers', () => {
   let mockCommandRunner: MockCommandRunner;
 
   describe('SystemVariableProvider', () => {
-    it('should provide system information', async () => {
+    it('should provide system information', () => {
       const provider = new SystemVariableProvider();
       const variables = provider.getVariables();
 
@@ -44,7 +44,7 @@ describe('Variable Providers', () => {
       ).not.toThrow();
     });
 
-    it('should handle errors gracefully', async () => {
+    it('should handle errors gracefully', () => {
       // This test verifies the provider can handle missing/invalid system info
       // Since we can't easily mock os module after import, we verify normal operation
       const provider = new SystemVariableProvider();
@@ -65,7 +65,7 @@ describe('Variable Providers', () => {
       };
     });
 
-    it('should provide git information when in a git repository', async () => {
+    it('should provide git information when in a git repository', () => {
       mockCommandRunner.isGitRepository.mockReturnValue(true);
       mockCommandRunner.runCommand
         .mockReturnValueOnce('main') // git branch --show-current
@@ -95,7 +95,7 @@ describe('Variable Providers', () => {
       expect(mockCommandRunner.runCommand).toHaveBeenCalledWith('git', ['config', 'user.email']);
     });
 
-    it('should handle dirty repository status', async () => {
+    it('should handle dirty repository status', () => {
       mockCommandRunner.isGitRepository.mockReturnValue(true);
       mockCommandRunner.runCommand
         .mockReturnValueOnce('feature-branch') // git branch --show-current
@@ -110,7 +110,7 @@ describe('Variable Providers', () => {
       expect((variables.git as Record<string, unknown>).branch).toBe('feature-branch');
     });
 
-    it('should return empty git object when not in a git repository', async () => {
+    it('should return empty git object when not in a git repository', () => {
       mockCommandRunner.isGitRepository.mockReturnValue(false);
 
       const provider = new GitVariableProvider(mockCommandRunner);
@@ -120,7 +120,7 @@ describe('Variable Providers', () => {
       expect(mockCommandRunner.runCommand).not.toHaveBeenCalled();
     });
 
-    it('should handle partial git information gracefully', async () => {
+    it('should handle partial git information gracefully', () => {
       mockCommandRunner.isGitRepository.mockReturnValue(true);
       mockCommandRunner.runCommand
         .mockImplementationOnce(() => {
@@ -160,7 +160,7 @@ describe('Variable Providers', () => {
       }
     });
 
-    it('should provide project directory and tree structure', async () => {
+    it('should provide project directory and tree structure', () => {
       // Create some files and directories
       fs.writeFileSync(path.join(tempDir, 'README.md'), 'Project readme');
       fs.writeFileSync(path.join(tempDir, 'package.json'), '{}');
@@ -182,7 +182,7 @@ describe('Variable Providers', () => {
       expect(tree).toContain('index.js');
     });
 
-    it('should exclude hidden files and node_modules', async () => {
+    it('should exclude hidden files and node_modules', () => {
       // Create files that should be excluded
       fs.writeFileSync(path.join(tempDir, '.hidden'), 'hidden file');
       fs.writeFileSync(path.join(tempDir, '.env'), 'SECRET=value');
@@ -202,7 +202,7 @@ describe('Variable Providers', () => {
       expect(tree).toContain('visible.txt');
     });
 
-    it('should limit tree depth', async () => {
+    it('should limit tree depth', () => {
       // Create deeply nested structure
       const deepPath = path.join(tempDir, 'level1', 'level2', 'level3');
       fs.mkdirSync(deepPath, { recursive: true });
@@ -221,7 +221,7 @@ describe('Variable Providers', () => {
       expect(tree).not.toContain('deep-file.txt');
     });
 
-    it('should handle empty directory', async () => {
+    it('should handle empty directory', () => {
       const provider = new ProjectVariableProvider();
       const variables = provider.getVariables();
 
@@ -229,7 +229,7 @@ describe('Variable Providers', () => {
       expect((variables.project as Record<string, unknown>).tree).toBe('');
     });
 
-    it('should handle permission errors gracefully', async () => {
+    it('should handle permission errors gracefully', () => {
       // Create a directory we can't read
       const restrictedDir = path.join(tempDir, 'restricted');
       fs.mkdirSync(restrictedDir);
@@ -253,7 +253,7 @@ describe('Variable Providers', () => {
   });
 
   describe('ToolVariableProvider', () => {
-    it('should provide tool information', async () => {
+    it('should provide tool information', () => {
       const tools = [
         { name: 'bash', description: 'Execute bash commands' },
         { name: 'file-read', description: 'Read file contents' },
@@ -279,14 +279,14 @@ describe('Variable Providers', () => {
       });
     });
 
-    it('should handle empty tools list', async () => {
+    it('should handle empty tools list', () => {
       const provider = new ToolVariableProvider([]);
       const variables = provider.getVariables();
 
       expect(variables).toEqual({ tools: [] });
     });
 
-    it('should handle undefined tools list', async () => {
+    it('should handle undefined tools list', () => {
       const provider = new ToolVariableProvider();
       const variables = provider.getVariables();
 
@@ -295,7 +295,7 @@ describe('Variable Providers', () => {
   });
 
   describe('ContextDisclaimerProvider', () => {
-    it('should provide context disclaimer', async () => {
+    it('should provide context disclaimer', () => {
       const provider = new ContextDisclaimerProvider();
       const variables = provider.getVariables();
 

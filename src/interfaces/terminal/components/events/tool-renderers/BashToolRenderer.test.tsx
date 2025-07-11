@@ -10,7 +10,7 @@ import { TimelineItemProvider } from '~/interfaces/terminal/components/events/co
 
 // Mock the expansion toggle hooks
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
-  TimelineExpansionProvider: ({ children }: any) => children,
+  TimelineExpansionProvider: ({ children }: { children: React.ReactNode }) => children,
   useTimelineItemExpansion: () => ({
     isExpanded: false,
     onExpand: vi.fn(),

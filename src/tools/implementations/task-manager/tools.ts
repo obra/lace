@@ -143,7 +143,7 @@ export class TaskListTool extends Tool {
           tasks = persistence.loadTasksByThread(parentThreadId);
           break;
 
-        case 'all':
+        case 'all': {
           // All tasks I can see (assigned to me or in my thread)
           const assignedToMe = persistence.loadTasksByAssignee(context.threadId);
           const inThread = persistence.loadTasksByThread(parentThreadId);
@@ -152,6 +152,7 @@ export class TaskListTool extends Tool {
           [...assignedToMe, ...inThread].forEach((t) => taskMap.set(t.id, t));
           tasks = Array.from(taskMap.values());
           break;
+        }
       }
 
       // Filter completed if needed
@@ -224,7 +225,7 @@ export class TaskCompleteTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof completeTaskSchema>,
-    context?: ToolContext
+    _context?: ToolContext
   ): Promise<ToolResult> {
     try {
       const persistence = await this.getPersistence();
@@ -274,7 +275,7 @@ export class TaskUpdateTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof updateTaskSchema>,
-    context?: ToolContext
+    _context?: ToolContext
   ): Promise<ToolResult> {
     try {
       const persistence = await this.getPersistence();
@@ -379,7 +380,7 @@ export class TaskViewTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof viewTaskSchema>,
-    context?: ToolContext
+    _context?: ToolContext
   ): Promise<ToolResult> {
     try {
       const persistence = await this.getPersistence();

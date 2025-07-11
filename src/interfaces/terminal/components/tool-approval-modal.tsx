@@ -141,7 +141,7 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
   };
 
   // Determine risk level and colors
-  const riskLevel = isReadOnly ? 'low' : 'high';
+  const _riskLevel = isReadOnly ? 'low' : 'high';
   const riskColor = isReadOnly ? 'green' : 'red';
   const riskLabel = isReadOnly ? 'READ-ONLY' : '⚠️POSSIBLY DESTRUCTIVE';
 

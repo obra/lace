@@ -143,7 +143,9 @@ describe('LMStudioProvider', () => {
 
       // Replace the mocked client
       const { LMStudioClient } = await import('@lmstudio/sdk');
-      vi.mocked(LMStudioClient).mockImplementation(() => mockClient as any);
+      vi.mocked(LMStudioClient).mockImplementation(
+        () => mockClient as unknown as InstanceType<typeof LMStudioClient>
+      );
 
       const testProvider = new LMStudioProvider();
 
@@ -161,7 +163,9 @@ describe('LMStudioProvider', () => {
 
       // Replace the mocked client
       const { LMStudioClient } = await import('@lmstudio/sdk');
-      vi.mocked(LMStudioClient).mockImplementation(() => mockClient as any);
+      vi.mocked(LMStudioClient).mockImplementation(
+        () => mockClient as unknown as InstanceType<typeof LMStudioClient>
+      );
 
       const testProvider = new LMStudioProvider();
 
@@ -183,7 +187,9 @@ describe('LMStudioProvider', () => {
 
       // Replace the mocked client
       const { LMStudioClient } = await import('@lmstudio/sdk');
-      vi.mocked(LMStudioClient).mockImplementation(() => mockClient as any);
+      vi.mocked(LMStudioClient).mockImplementation(
+        () => mockClient as unknown as InstanceType<typeof LMStudioClient>
+      );
 
       const testProvider = new LMStudioProvider();
       const diagnostics = await testProvider.diagnose();
@@ -202,7 +208,9 @@ describe('LMStudioProvider', () => {
 
       // Replace the mocked client
       const { LMStudioClient } = await import('@lmstudio/sdk');
-      vi.mocked(LMStudioClient).mockImplementation(() => mockClient as any);
+      vi.mocked(LMStudioClient).mockImplementation(
+        () => mockClient as unknown as InstanceType<typeof LMStudioClient>
+      );
 
       const testProvider = new LMStudioProvider();
       const diagnostics = await testProvider.diagnose();

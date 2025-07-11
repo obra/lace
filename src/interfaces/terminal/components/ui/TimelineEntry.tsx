@@ -3,7 +3,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Box, Text, measureElement, DOMElement } from 'ink';
-import { UI_SYMBOLS, UI_COLORS, UI_BACKGROUNDS } from '~/interfaces/terminal/theme.js';
+import { UI_SYMBOLS, UI_BACKGROUNDS } from '~/interfaces/terminal/theme.js';
 import { useTimelineItemOptional } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
 
 export type TimelineStatus = 'none' | 'pending' | 'success' | 'error';
@@ -96,7 +96,7 @@ export function TimelineEntry({
   isStreaming = false,
 }: TimelineEntryProps) {
   const contentAreaRef = useRef<DOMElement | null>(null);
-  const [measuredHeight, setMeasuredHeight] = useState<number>(1);
+  const [_measuredHeight, setMeasuredHeight] = useState<number>(1);
   const prevExpandedRef = useRef<boolean | undefined>(undefined);
   const measureTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 

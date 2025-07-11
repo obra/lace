@@ -23,7 +23,7 @@ interface ThinkingAwareContentProps {
  */
 function parseContentParts(content: string): ContentPart[] {
   const parts: ContentPart[] = [];
-  const remaining = content;
+  const _remaining = content;
 
   // Handle complete thinking blocks
   const completeThinkingRegex = /<think>([\s\S]*?)<\/think>/g;

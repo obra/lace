@@ -107,7 +107,12 @@ describe('OpenAIProvider', () => {
       expect(response.toolCalls).toEqual([]);
       expect(mockCreate).toHaveBeenCalled();
 
-      const callArgs = mockCreate.mock.calls[0][0];
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        model: string;
+        max_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
       expect(callArgs.model).toBe('gpt-4o-mini');
       expect(callArgs.max_tokens).toBe(4000);
       expect(callArgs.messages[0]).toEqual({ role: 'system', content: 'Test system prompt' });
@@ -168,7 +173,12 @@ describe('OpenAIProvider', () => {
 
       await provider.createResponse(messages, []);
 
-      const callArgs = mockCreate.mock.calls[0][0];
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        model: string;
+        max_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
       expect(callArgs.messages[0]).toEqual({ role: 'system', content: 'Override system message' });
       expect(callArgs.messages[1]).toEqual({ role: 'user', content: 'User message' });
       expect(callArgs.messages[2]).toEqual({ role: 'assistant', content: 'Assistant message' });
@@ -458,7 +468,12 @@ describe('OpenAIProvider', () => {
 
       await customProvider.createResponse([{ role: 'user', content: 'Test' }], []);
 
-      const callArgs = mockCreate.mock.calls[0][0];
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        model: string;
+        max_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
       expect(callArgs.model).toBe('gpt-4o');
     });
 
@@ -480,7 +495,12 @@ describe('OpenAIProvider', () => {
 
       await customProvider.createResponse([{ role: 'user', content: 'Test' }], []);
 
-      const callArgs = mockCreate.mock.calls[0][0];
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        model: string;
+        max_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
       expect(callArgs.max_tokens).toBe(2000);
     });
 
@@ -501,7 +521,12 @@ describe('OpenAIProvider', () => {
 
       await noSystemProvider.createResponse([{ role: 'user', content: 'Test' }], []);
 
-      const callArgs = mockCreate.mock.calls[0][0];
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        model: string;
+        max_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
       expect(callArgs.messages[0]).toEqual({
         role: 'system',
         content: 'You are a helpful assistant.',

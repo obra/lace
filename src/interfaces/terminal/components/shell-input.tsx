@@ -26,7 +26,11 @@ const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcut | KeyboardShortcut[]> 
   ],
 };
 
-const matchesShortcut = (input: string, key: any, shortcut: KeyboardShortcut): boolean => {
+const matchesShortcut = (
+  input: string,
+  key: Record<string, boolean | undefined>,
+  shortcut: KeyboardShortcut
+): boolean => {
   // Last element is the key, everything else are modifiers
   const keyChar = shortcut[shortcut.length - 1];
   const modifiers = shortcut.slice(0, -1);
@@ -53,7 +57,11 @@ const matchesShortcut = (input: string, key: any, shortcut: KeyboardShortcut): b
   return true;
 };
 
-const matchesAction = (input: string, key: any, action: string): boolean => {
+const matchesAction = (
+  input: string,
+  key: Record<string, boolean | undefined>,
+  action: string
+): boolean => {
   const shortcuts = KEYBOARD_SHORTCUTS[action];
   if (Array.isArray(shortcuts) && Array.isArray(shortcuts[0])) {
     // Multiple shortcuts (KeyboardShortcut[])
@@ -76,13 +84,13 @@ interface ShellInputProps {
 const ShellInput: React.FC<ShellInputProps> = ({
   value = '',
   placeholder = 'Type your message...',
-  autoFocus = false,
+  autoFocus: _autoFocus = false,
   disabled = false,
   onSubmit,
   onChange,
 }) => {
   // Use Lace focus system
-  const { isFocused, takeFocus } = useLaceFocus(FocusRegions.shell);
+  const { isFocused, takeFocus: _takeFocus } = useLaceFocus(FocusRegions.shell);
   const actualIsFocused = isFocused && !disabled;
 
   // No auto-focus logic needed - provider handles initial focus
@@ -90,7 +98,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
 
   // Autocomplete state
   const [autocompleteVisible, setAutocompleteVisible] = useState(false);
-  const [autocompleteQuery, setAutocompleteQuery] = useState('');
+  const [_autocompleteQuery, setAutocompleteQuery] = useState('');
   const [autocompleteSelectedIndex, setAutocompleteSelectedIndex] = useState(0);
   const [autocompleteItems, setAutocompleteItems] = useState<string[]>([]);
   const [autocompleteOriginalItems, setAutocompleteOriginalItems] = useState<string[]>([]);
@@ -210,7 +218,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
 
       setAutocompleteItems(completions);
       setAutocompleteOriginalItems(completions);
-    } catch (error) {
+    } catch (_error) {
       setAutocompleteItems([]);
       setAutocompleteOriginalItems([]);
     }

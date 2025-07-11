@@ -23,7 +23,7 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
   isStreaming = false,
   showCursor = false,
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, _setIsCollapsed] = useState(false);
 
   // Parse code blocks and apply syntax highlighting
   const parseContent = (content: string) => {

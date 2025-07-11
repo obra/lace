@@ -39,7 +39,7 @@ export function MarkdownDisplay({
         </Text>
       </Box>
     );
-  } catch (error) {
+  } catch (_error) {
     // Fallback to plain text if markdown parsing fails
     const trimmedContent = content.trim();
 

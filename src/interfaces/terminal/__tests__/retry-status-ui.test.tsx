@@ -95,7 +95,7 @@ describe('Retry Status UI Integration', () => {
   });
 
   afterEach(async () => {
-    await agent.stop();
+    agent.stop();
     vi.useRealTimers();
   });
 

@@ -2,9 +2,9 @@
 // ABOUTME: Tests conversation processing, tool execution, state management, and event emissions
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, AgentConfig } from '~/agents/agent.js';
+import { Agent, AgentConfig, AgentState } from '~/agents/agent.js';
 import { AIProvider } from '~/providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider.js';
 import { ToolCall, ToolResult, ToolContext } from '~/tools/types.js';
 import { Tool } from '~/tools/tool.js';
 import { ToolExecutor } from '~/tools/executor.js';
@@ -74,16 +74,16 @@ describe('Enhanced Agent', () => {
     threadManager.createThread(threadId);
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     if (agent) {
       agent.removeAllListeners(); // Prevent EventEmitter memory leaks
-      await agent.stop();
+      agent.stop();
     }
     // Clear mock references to prevent circular references
-    mockProvider = null as any;
-    toolExecutor = null as any;
+    mockProvider = null as unknown as MockProvider;
+    toolExecutor = null as unknown as ToolExecutor;
 
-    await threadManager.close();
+    threadManager.close();
   });
 
   function createAgent(config?: Partial<AgentConfig>): Agent {
@@ -130,7 +130,7 @@ describe('Enhanced Agent', () => {
       await agent.start();
       expect(agent.getCurrentState()).toBe('idle');
 
-      await agent.stop();
+      agent.stop();
       expect(agent.getCurrentState()).toBe('idle');
     });
 
@@ -280,10 +280,10 @@ describe('Enhanced Agent', () => {
       });
 
       // Override createResponse to stop after first call
-      vi.spyOn(mockProvider, 'createResponse').mockImplementation(async (..._args) => {
+      vi.spyOn(mockProvider, 'createResponse').mockImplementation((..._args) => {
         callCount++;
         if (callCount === 1) {
-          return {
+          return Promise.resolve({
             content: 'I will use a tool',
             toolCalls: [
               {
@@ -292,12 +292,12 @@ describe('Enhanced Agent', () => {
                 input: { action: 'test' },
               },
             ],
-          };
+          });
         } else {
-          return {
+          return Promise.resolve({
             content: 'Tool completed, all done',
             toolCalls: [],
-          };
+          });
         }
       });
 
@@ -306,10 +306,22 @@ describe('Enhanced Agent', () => {
     });
 
     it('should execute tools and emit events', async () => {
-      const events: Array<{ type: string; data?: any }> = [];
+      const events: Array<{
+        type: string;
+        data?:
+          | {
+              toolName: string;
+              input: Record<string, unknown>;
+              callId: string;
+              result?: ToolResult;
+            }
+          | string;
+      }> = [];
 
       agent.on('tool_call_start', (data) => events.push({ type: 'tool_call_start', data }));
-      agent.on('tool_call_complete', (data) => events.push({ type: 'tool_call_complete', data }));
+      agent.on('tool_call_complete', (data) =>
+        events.push({ type: 'tool_call_complete', data: { ...data, input: {} } })
+      );
       agent.on('state_change', ({ from, to }) =>
         events.push({ type: 'state_change', data: `${from}->${to}` })
       );
@@ -328,9 +340,16 @@ describe('Enhanced Agent', () => {
         },
       });
 
-      expect(toolEvents[1].data.toolName).toBe('mock_tool');
-      expect(toolEvents[1].data.callId).toBe('call_123');
-      expect(toolEvents[1].data.result.isError).toBe(false);
+      expect(
+        (toolEvents[1].data as { toolName: string; result: ToolResult; callId: string }).toolName
+      ).toBe('mock_tool');
+      expect(
+        (toolEvents[1].data as { toolName: string; result: ToolResult; callId: string }).callId
+      ).toBe('call_123');
+      expect(
+        (toolEvents[1].data as { toolName: string; result: ToolResult; callId: string }).result
+          .isError
+      ).toBe(false);
     });
 
     it('should transition to tool_execution state during tool calls', async () => {
@@ -376,7 +395,7 @@ describe('Enhanced Agent', () => {
       const executeSpy = vi.spyOn(toolExecutor, 'executeTool');
       executeSpy.mockRejectedValueOnce(new Error('Execution error'));
 
-      const errorEvents: any[] = [];
+      const errorEvents: Array<{ toolName: string; result: ToolResult; callId: string }> = [];
       agent.on('tool_call_complete', (data) => {
         if (data.result.isError) {
           errorEvents.push(data);
@@ -393,10 +412,10 @@ describe('Enhanced Agent', () => {
     it('should recurse for next response after tool execution', async () => {
       // Set up provider to return different responses
       let callCount = 0;
-      vi.spyOn(mockProvider, 'createResponse').mockImplementation(async (..._args) => {
+      vi.spyOn(mockProvider, 'createResponse').mockImplementation((..._args) => {
         callCount++;
         if (callCount === 1) {
-          return {
+          return Promise.resolve({
             content: 'Using tool',
             toolCalls: [
               {
@@ -405,12 +424,12 @@ describe('Enhanced Agent', () => {
                 input: { action: 'test' },
               },
             ],
-          };
+          });
         } else {
-          return {
+          return Promise.resolve({
             content: 'Tool completed, here is the result',
             toolCalls: [],
-          };
+          });
         }
       });
 
@@ -442,14 +461,14 @@ describe('Enhanced Agent', () => {
       agent = createAgent({ provider: errorProvider });
       await agent.start();
 
-      const errorEvents: any[] = [];
+      const errorEvents: Array<{ error: Error; context: Record<string, unknown> }> = [];
       agent.on('error', (data) => errorEvents.push(data));
 
       await agent.sendMessage('Test');
 
       expect(errorEvents).toHaveLength(1);
       expect(errorEvents[0].error.message).toBe('Provider error');
-      expect(errorEvents[0].context.phase).toBe('provider_response');
+      expect((errorEvents[0].context as { phase: string }).phase).toBe('provider_response');
     });
 
     it('should return to idle state after error', async () => {
@@ -621,21 +640,21 @@ describe('Enhanced Agent', () => {
       });
 
       // Override to stop after first tool call
-      vi.spyOn(mockProvider, 'createResponse').mockImplementation(async (..._args) => {
+      vi.spyOn(mockProvider, 'createResponse').mockImplementation((..._args) => {
         callCount++;
         if (callCount === 1) {
-          return {
+          return Promise.resolve({
             content: 'Using multiple tools',
             toolCalls: [
               { id: 'call_1', name: 'tool_1', input: { action: 'first' } },
               { id: 'call_2', name: 'tool_2', input: { action: 'second' } },
             ],
-          };
+          });
         } else {
-          return {
+          return Promise.resolve({
             content: 'All tools completed',
             toolCalls: [],
-          };
+          });
         }
       });
 
@@ -647,8 +666,13 @@ describe('Enhanced Agent', () => {
     });
 
     it('should execute multiple tools in sequence', async () => {
-      const toolStartEvents: any[] = [];
-      const toolCompleteEvents: any[] = [];
+      const toolStartEvents: Array<{
+        toolName: string;
+        input: Record<string, unknown>;
+        callId: string;
+      }> = [];
+      const toolCompleteEvents: Array<{ toolName: string; result: ToolResult; callId: string }> =
+        [];
 
       agent.on('tool_call_start', (data) => toolStartEvents.push(data));
       agent.on('tool_call_complete', (data) => toolCompleteEvents.push(data));
@@ -684,10 +708,13 @@ describe('Enhanced Agent', () => {
   describe('streaming functionality', () => {
     class MockStreamingProvider extends MockProvider {
       private _supportsStreaming = true;
-      protected _config: any;
+      protected _config: ProviderConfig;
 
-      constructor(config: any) {
-        super(config);
+      constructor(config: ProviderConfig) {
+        super({
+          content: 'Streaming response token by token',
+          toolCalls: [],
+        });
         this._config = config;
       }
 
@@ -695,11 +722,11 @@ describe('Enhanced Agent', () => {
         return this._supportsStreaming;
       }
 
-      get config(): any {
+      get config(): ProviderConfig {
         return this._config;
       }
 
-      async createStreamingResponse(..._args: any[]): Promise<any> {
+      createStreamingResponse(..._args: any[]): Promise<ProviderResponse> {
         // Simulate streaming by emitting tokens
         const text = 'Streaming response token by token';
         const tokens = text.split(' ');
@@ -710,15 +737,15 @@ describe('Enhanced Agent', () => {
         }
 
         // Return final response
-        return {
+        return Promise.resolve({
           content: text,
           toolCalls: [],
-        };
+        });
       }
     }
 
     class MockNonStreamingProvider extends MockProvider {
-      constructor(config: any) {
+      constructor(config: ProviderConfig) {
         super({
           content: 'Non-streaming response',
           toolCalls: [],
@@ -730,11 +757,11 @@ describe('Enhanced Agent', () => {
         return false;
       }
 
-      get config(): any {
+      get config(): ProviderConfig {
         return this._config;
       }
 
-      protected _config: any;
+      protected _config: ProviderConfig;
     }
 
     describe('with streaming provider', () => {
@@ -765,7 +792,7 @@ describe('Enhanced Agent', () => {
       });
 
       it('should set state to streaming during streaming response', async () => {
-        const stateChanges: any[] = [];
+        const stateChanges: { from: AgentState; to: AgentState }[] = [];
 
         agent.on('state_change', ({ from, to }) => {
           stateChanges.push({ from, to });
@@ -778,7 +805,7 @@ describe('Enhanced Agent', () => {
       });
 
       it('should handle streaming errors properly', async () => {
-        const errorEvents: any[] = [];
+        const errorEvents: { error: Error; context: Record<string, unknown> }[] = [];
 
         agent.on('error', ({ error, context }) => {
           errorEvents.push({ error, context });
@@ -793,7 +820,7 @@ describe('Enhanced Agent', () => {
 
         expect(errorEvents.length).toBeGreaterThan(0);
         expect(errorEvents[0].error.message).toBe('Streaming failed');
-        expect(errorEvents[0].context.phase).toBe('provider_response');
+        expect((errorEvents[0].context as { phase: string }).phase).toBe('provider_response');
       });
 
       it('should clean up provider event listeners after streaming', async () => {
@@ -807,7 +834,7 @@ describe('Enhanced Agent', () => {
 
       it('should emit all tokens during streaming, thinking block extraction handled by UI layer', async () => {
         // Override the streaming provider to return content with thinking blocks
-        streamingProvider.createStreamingResponse = vi.fn().mockImplementation(async (..._args) => {
+        streamingProvider.createStreamingResponse = vi.fn().mockImplementation((..._args) => {
           // Simulate streaming tokens that include thinking blocks
           const tokens = [
             '<think>',
@@ -822,10 +849,10 @@ describe('Enhanced Agent', () => {
             streamingProvider.emit('token', { token });
           }
 
-          return {
+          return Promise.resolve({
             content: '<think>I need to think about this</think>Here is my response',
             toolCalls: [],
-          };
+          });
         });
 
         const streamingTokens: string[] = [];
@@ -883,7 +910,7 @@ describe('Enhanced Agent', () => {
       });
 
       it('should not set state to streaming with non-streaming provider', async () => {
-        const stateChanges: any[] = [];
+        const stateChanges: { from: AgentState; to: AgentState }[] = [];
 
         agent.on('state_change', ({ from, to }) => {
           stateChanges.push({ from, to });
@@ -1000,11 +1027,11 @@ describe('Enhanced Agent', () => {
         toolCalls: [],
       });
 
-      vi.spyOn(mockProvider, 'createResponse').mockImplementation(async (..._args) => {
+      vi.spyOn(mockProvider, 'createResponse').mockImplementation((..._args) => {
         callCount++;
         if (callCount === 1) {
           // First call: return tool calls
-          return {
+          return Promise.resolve({
             content: 'Using tool',
             toolCalls: [
               {
@@ -1013,13 +1040,13 @@ describe('Enhanced Agent', () => {
                 input: { action: 'test' },
               },
             ],
-          };
+          });
         } else {
           // Second call: return final response with no tool calls
-          return {
+          return Promise.resolve({
             content: 'Final response after tool execution',
             toolCalls: [],
-          };
+          });
         }
       });
 

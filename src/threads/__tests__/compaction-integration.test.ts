@@ -87,8 +87,8 @@ describe('Compaction Integration', () => {
   });
 
   afterEach(async () => {
-    await agent?.stop();
-    await threadManager?.close();
+    agent?.stop();
+    threadManager?.close();
     if (fs.existsSync(tempDbPath)) {
       fs.unlinkSync(tempDbPath);
     }
@@ -120,7 +120,7 @@ describe('Compaction Integration', () => {
 
     // Trigger compaction manually using simplified approach
     expect(await threadManager.needsCompaction()).toBe(true);
-    const newThreadId = await threadManager.createCompactedVersion('Test compaction');
+    const newThreadId = threadManager.createCompactedVersion('Test compaction');
     expect(newThreadId).toBeDefined();
 
     // Check if compaction occurred - Agent threadId should remain stable (canonical ID)
@@ -174,7 +174,7 @@ describe('Compaction Integration', () => {
 
     // Trigger compaction using simplified approach
     if (await threadManager.needsCompaction()) {
-      await threadManager.createCompactedVersion('Test compaction for conversation');
+      threadManager.createCompactedVersion('Test compaction for conversation');
     }
 
     // Verify compaction occurred - Agent threadId should remain stable

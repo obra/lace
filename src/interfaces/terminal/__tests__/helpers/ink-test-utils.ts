@@ -214,8 +214,7 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let instance: any;
+  let instance: { unmount: () => void; rerender: (tree: React.ReactElement) => void } | undefined;
   act(() => {
     instance = inkRender(tree, {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -231,6 +230,7 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
   });
 
   // Restore original methods
+  if (!instance) throw new Error('Instance not initialized');
   const originalUnmount = instance.unmount as () => void;
   instance.unmount = () => {
     process.stdout.isTTY = originalIsTTY;
@@ -249,7 +249,7 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
 
   return {
     rerender: instance.rerender,
-    unmount: () => act(() => (instance as { unmount: () => void }).unmount()),
+    unmount: () => act(() => instance!.unmount()),
     cleanup: () =>
       act(() => {
         process.stdout.isTTY = originalIsTTY;
@@ -263,7 +263,7 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
         } else {
           process.env.FORCE_COLOR = originalForceColor;
         }
-        (instance as { cleanup: () => void }).cleanup();
+        instance!.unmount();
       }),
     stdout,
     stderr,

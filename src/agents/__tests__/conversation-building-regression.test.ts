@@ -12,15 +12,9 @@ import { convertToAnthropicFormat } from '~/providers/format-converters.js';
 import { ToolExecutor } from '~/tools/executor.js';
 import { ThreadManager } from '~/threads/thread-manager.js';
 
-// Type-safe helper for accessing private method
-type AgentWithPrivates = Agent & {
-  _buildConversationFromEvents: (events: ThreadEvent[]) => ProviderMessage[];
-};
-
 // Helper function for type-safe private method access
 function buildConversationFromEvents(agent: Agent, events: ThreadEvent[]): ProviderMessage[] {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-  return (agent as any)._buildConversationFromEvents(events);
+  return (agent as unknown as { _buildConversationFromEvents: (events: ThreadEvent[]) => ProviderMessage[] })._buildConversationFromEvents(events);
 }
 
 /**
@@ -314,10 +308,7 @@ describe('Conversation Building Regression Tests', () => {
         tools: [],
       });
 
-      const conversation: ProviderMessage[] = buildConversationFromEvents(
-        mockAgent,
-        sampleEventSequence
-      );
+      const conversation = buildConversationFromEvents(mockAgent, sampleEventSequence);
 
       // Verify the conversation structure
       expect(conversation).toBeDefined();
@@ -356,10 +347,7 @@ describe('Conversation Building Regression Tests', () => {
         tools: [],
       });
 
-      const conversation: ProviderMessage[] = buildConversationFromEvents(
-        mockAgent,
-        sampleEventSequence
-      );
+      const conversation = buildConversationFromEvents(mockAgent, sampleEventSequence);
 
       // Collect all tool_use_ids and tool_result_ids
       const toolUseIds = new Set<string>();
@@ -393,10 +381,7 @@ describe('Conversation Building Regression Tests', () => {
         tools: [],
       });
 
-      const conversation: ProviderMessage[] = buildConversationFromEvents(
-        mockAgent,
-        sampleEventSequence
-      );
+      const conversation = buildConversationFromEvents(mockAgent, sampleEventSequence);
 
       // Convert to Anthropic format to ensure it would pass API validation
       expect(() => {

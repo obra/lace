@@ -90,7 +90,7 @@ export class ThreadManager {
       // Use synchronous version to maintain createThread signature
       this._persistence.saveThread(thread);
     } catch (error) {
-      console.error('Failed to save thread:', error);
+      logger.error('Failed to save thread', { error });
     }
 
     return thread;
@@ -111,7 +111,7 @@ export class ThreadManager {
     try {
       this._persistence.saveThread(thread);
     } catch (error) {
-      console.error('Failed to save delegate thread:', error);
+      logger.error('Failed to save delegate thread', { error });
     }
 
     return thread;
@@ -152,7 +152,7 @@ export class ThreadManager {
     try {
       this._persistence.saveEvent(event);
     } catch (error) {
-      console.error('Failed to save event:', error);
+      logger.error('Failed to save event', { error });
     }
 
     // Event emission removed - Agent will handle event emission for UI synchronization

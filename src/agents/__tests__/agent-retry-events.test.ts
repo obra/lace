@@ -138,8 +138,8 @@ describe('Agent retry event forwarding', () => {
     await agent.start();
   });
 
-  afterEach(async () => {
-    await agent.stop();
+  afterEach(() => {
+    agent.stop();
   });
 
   describe('retry_attempt event forwarding', () => {

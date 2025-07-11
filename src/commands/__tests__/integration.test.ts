@@ -5,7 +5,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CommandRegistry } from '~/commands/registry.js';
 import { CommandExecutor } from '~/commands/executor.js';
 import type { UserInterface } from '~/commands/types.js';
-import type { Agent } from '~/agents/agent.js';
 
 type MockAgent = {
   getCurrentThreadId: () => string;
@@ -50,14 +49,14 @@ describe('Command System Integration', () => {
         compact: vi.fn(),
         getEvents: vi.fn().mockReturnValue([]),
       },
-    };
+    } as MockAgent;
 
     mockUI = {
       agent: mockAgent as any,
       displayMessage: vi.fn(),
       clearSession: vi.fn(),
       exit: vi.fn(),
-    };
+    } as UserInterface;
   });
 
   describe('auto-discovery and execution', () => {

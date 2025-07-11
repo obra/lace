@@ -2,7 +2,7 @@
 // ABOUTME: Verifies timeline analysis functions for delegation and thread processing
 
 import { describe, it, expect } from 'vitest';
-import { Timeline } from '~/interfaces/timeline-types.js';
+import { Timeline, TimelineItem } from '~/interfaces/timeline-types.js';
 import {
   isThreadComplete,
   extractTaskFromTimeline,
@@ -11,7 +11,7 @@ import {
 } from '~/interfaces/terminal/components/events/utils/timeline-utils.js';
 
 // Create test data
-function createTestTimeline(items: any[] = []): Timeline {
+function createTestTimeline(items: TimelineItem[] = []): Timeline {
   return {
     items,
     metadata: {
@@ -24,7 +24,7 @@ function createTestTimeline(items: any[] = []): Timeline {
   };
 }
 
-function createTestToolExecutionItem(metadata?: { threadId?: string }) {
+function createTestToolExecutionItem(metadata?: { threadId?: unknown }) {
   return {
     result: {
       metadata,
@@ -190,6 +190,7 @@ describe('Timeline Utility Functions', () => {
       const timeline = createTestTimeline([
         {
           type: 'agent_message',
+          content: '',
           timestamp: new Date('2024-01-01T10:00:00Z'),
           id: 'msg-1',
         },
@@ -285,12 +286,12 @@ describe('Timeline Utility Functions', () => {
     });
 
     it('should return null when threadId is not a string', () => {
-      const item = createTestToolExecutionItem({ threadId: 123 as any });
+      const item = createTestToolExecutionItem({ threadId: 123 });
       expect(extractDelegateThreadId(item)).toBe(null);
     });
 
     it('should return null when threadId is null', () => {
-      const item = createTestToolExecutionItem({ threadId: null as any });
+      const item = createTestToolExecutionItem({ threadId: null });
       expect(extractDelegateThreadId(item)).toBe(null);
     });
   });

@@ -10,7 +10,7 @@ import React, {
   useContext,
   useRef,
 } from 'react';
-import { Box, Text, render, useApp, useFocusManager, useInput, measureElement } from 'ink';
+import { Box, Text, render, useApp, useFocusManager, useInput, measureElement, DOMElement } from 'ink';
 import { Alert } from '@inkjs/ui';
 import useStdoutDimensions from '~/utils/use-stdout-dimensions.js';
 import ShellInput from '~/interfaces/terminal/components/shell-input.js';
@@ -22,6 +22,7 @@ import StatusBar from '~/interfaces/terminal/components/status-bar.js';
 import { FocusDebugPanel } from '~/interfaces/terminal/components/FocusDebugPanel.js';
 import { Agent, CurrentTurnMetrics } from '~/agents/agent.js';
 import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types.js';
+import { BudgetStatus, BudgetRecommendations } from '~/token-management/types.js';
 import type { MessageQueueStats } from '~/agents/types.js';
 import { CommandRegistry } from '~/commands/registry.js';
 import { CommandExecutor } from '~/commands/executor.js';
@@ -66,7 +67,10 @@ export const useInterface = () => {
 interface TerminalInterfaceProps {
   agent: Agent;
   approvalCallback?: ApprovalCallback;
-  interfaceContext?: { showAlert: (alert: any) => void; clearAlert: () => void };
+  interfaceContext?: {
+    showAlert: (alert: { variant: 'info' | 'warning' | 'error' | 'success'; title: string; children?: React.ReactNode }) => void;
+    clearAlert: () => void;
+  };
 }
 
 interface Message {
@@ -76,10 +80,10 @@ interface Message {
 }
 
 // SIGINT Handler Component
-const SigintHandler: React.FC<{ agent: Agent; showAlert: (alert: any) => void }> = ({
-  agent,
-  showAlert,
-}) => {
+const SigintHandler: React.FC<{
+  agent: Agent;
+  showAlert: (alertData: { variant: 'info' | 'warning' | 'error' | 'success'; title: string; children?: React.ReactNode }) => void;
+}> = ({ agent, showAlert }) => {
   const [ctrlCCount, setCtrlCCount] = useState(0);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
   const app = useApp();
@@ -170,8 +174,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     });
     return processor;
   }, []);
-  const bottomSectionRef = useRef<any>(null);
-  const timelineContainerRef = useRef<any>(null);
+  const bottomSectionRef = useRef<DOMElement | null>(null);
+  const timelineContainerRef = useRef<DOMElement | null>(null);
   const [bottomSectionHeight, setBottomSectionHeight] = useState<number>(0);
   const [timelineContainerHeight, setTimelineContainerHeight] = useState<number>(0);
   const [, terminalHeight] = useStdoutDimensions();
@@ -386,7 +390,18 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     // Handle approval requests
-    const handleApprovalRequest = ({ toolName, input, isReadOnly, resolve }: any) => {
+    const handleApprovalRequest = ({
+      toolName,
+      input,
+      isReadOnly,
+      resolve,
+    }: {
+      toolName: string;
+      input: unknown;
+      isReadOnly: boolean;
+      requestId: string;
+      resolve: (decision: ApprovalDecision) => void;
+    }) => {
       setApprovalRequest({
         toolName,
         input,
@@ -442,7 +457,18 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     // Handle token usage updates - track the latest for accurate cumulative totals
-    const handleTokenUsageUpdate = ({ usage }: { usage: any }) => {
+    const handleTokenUsageUpdate = ({
+      usage,
+    }: {
+      usage: { 
+        promptTokens?: number; 
+        completionTokens?: number; 
+        totalTokens?: number; 
+        prompt_tokens?: number; 
+        completion_tokens?: number; 
+        total_tokens?: number; 
+      };
+    }) => {
       if (usage && typeof usage === 'object' && !tokenUpdateLockRef.current) {
         // Keep track of the most recent provider usage data
         // This includes system prompts and full context that turn metrics miss
@@ -483,7 +509,15 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     // Handle token budget warnings - these don't affect cumulative tracking
-    const handleTokenBudgetWarning = ({ usage }: { usage: any }) => {
+    const handleTokenBudgetWarning = ({
+      message,
+      usage,
+      recommendations,
+    }: {
+      message: string;
+      usage: BudgetStatus;
+      recommendations: BudgetRecommendations;
+    }) => {
       // Token budget warnings are just for display, don't need to track them
     };
 
@@ -655,7 +689,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     const classifyRetryError = (error: Error): string => {
       // Check error codes first (most reliable)
       if ('code' in error) {
-        const code = (error as any).code;
+        const code = (error as unknown as { code?: string }).code;
         switch (code) {
           case 'ECONNREFUSED':
           case 'ENOTFOUND':
@@ -671,7 +705,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
       // Check status codes
       if ('status' in error || 'statusCode' in error) {
-        const status = (error as any).status || (error as any).statusCode;
+        const errorWithStatus = error as unknown as { status?: number; statusCode?: number };
+        const status = errorWithStatus.status || errorWithStatus.statusCode;
         if (typeof status === 'number') {
           if (status === 429) return 'rate limit';
           if (status === 401 || status === 403) return 'auth error';
@@ -1264,7 +1299,7 @@ export class TerminalInterface implements ApprovalCallback {
     }
 
     this.isRunning = false;
-    await this.agent?.stop();
+    this.agent?.stop();
 
     // Properly unmount the Ink app
     if (this.inkInstance) {

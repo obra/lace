@@ -2,7 +2,7 @@
 // ABOUTME: Validates abort-first behavior, double Ctrl+C detection, and React state management
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '~/agents/agent.js';
+import { Agent, CurrentTurnMetrics } from '~/agents/agent.js';
 import { ToolExecutor } from '~/tools/executor.js';
 import { ThreadManager } from '~/threads/thread-manager.js';
 import { AIProvider } from '~/providers/base-provider.js';
@@ -171,7 +171,8 @@ describe('SIGINT Integration Tests', () => {
   describe('Turn metrics', () => {
     it('should provide turn metrics in turn_start event', async () => {
       // Arrange
-      let turnStartData: any = null;
+      let turnStartData: { turnId: string; userInput: string; metrics: CurrentTurnMetrics } | null =
+        null;
 
       agent.on('turn_start', (data) => {
         turnStartData = data;
@@ -182,16 +183,16 @@ describe('SIGINT Integration Tests', () => {
 
       // Assert
       expect(turnStartData).not.toBeNull();
-      expect(turnStartData.turnId).toMatch(/^turn_\d+_[a-z0-9]+$/);
-      expect(turnStartData.userInput).toBe('Test message');
-      expect(turnStartData.metrics).toBeDefined();
-      expect(turnStartData.metrics.startTime).toBeInstanceOf(Date);
-      expect(turnStartData.metrics.turnId).toBe(turnStartData.turnId);
+      expect(turnStartData!.turnId).toMatch(/^turn_\d+_[a-z0-9]+$/);
+      expect(turnStartData!.userInput).toBe('Test message');
+      expect(turnStartData!.metrics).toBeDefined();
+      expect(turnStartData!.metrics.startTime).toBeInstanceOf(Date);
+      expect(turnStartData!.metrics.turnId).toBe(turnStartData!.turnId);
     });
 
     it('should provide turn metrics in turn_complete event', async () => {
       // Arrange
-      let turnCompleteData: any = null;
+      let turnCompleteData: { turnId: string; metrics: CurrentTurnMetrics } | null = null;
 
       agent.on('turn_complete', (data) => {
         turnCompleteData = data;
@@ -202,14 +203,14 @@ describe('SIGINT Integration Tests', () => {
 
       // Assert
       expect(turnCompleteData).not.toBeNull();
-      expect(turnCompleteData.turnId).toMatch(/^turn_\d+_[a-z0-9]+$/);
-      expect(turnCompleteData.metrics).toBeDefined();
-      expect(turnCompleteData.metrics.elapsedMs).toBeGreaterThanOrEqual(0);
+      expect(turnCompleteData!.turnId).toMatch(/^turn_\d+_[a-z0-9]+$/);
+      expect(turnCompleteData!.metrics).toBeDefined();
+      expect(turnCompleteData!.metrics.elapsedMs).toBeGreaterThanOrEqual(0);
     });
 
     it('should provide turn metrics in turn_aborted event', async () => {
       // Arrange
-      let turnAbortedData: any = null;
+      let turnAbortedData: { turnId: string; metrics: CurrentTurnMetrics } | null = null;
 
       agent.on('turn_aborted', (data) => {
         turnAbortedData = data;
@@ -223,9 +224,9 @@ describe('SIGINT Integration Tests', () => {
 
       // Assert
       expect(turnAbortedData).not.toBeNull();
-      expect(turnAbortedData.turnId).toMatch(/^turn_\d+_[a-z0-9]+$/);
-      expect(turnAbortedData.metrics).toBeDefined();
-      expect(turnAbortedData.metrics.elapsedMs).toBeGreaterThanOrEqual(0);
+      expect(turnAbortedData!.turnId).toMatch(/^turn_\d+_[a-z0-9]+$/);
+      expect(turnAbortedData!.metrics).toBeDefined();
+      expect(turnAbortedData!.metrics.elapsedMs).toBeGreaterThanOrEqual(0);
     });
   });
 

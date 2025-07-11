@@ -39,7 +39,7 @@ interface Task {
 // Parse task from result content
 function parseTask(resultText: string): Task | null {
   try {
-    return JSON.parse(resultText);
+    return JSON.parse(resultText) as Task;
   } catch {
     return null;
   }

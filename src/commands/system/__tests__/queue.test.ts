@@ -211,7 +211,7 @@ describe('queueCommand', () => {
       // Test the filter function
       const calls = mockAgent.clearQueue.mock.calls;
       expect(calls).toHaveLength(1);
-      const filterFn = calls[0]![0];
+      const filterFn = calls[0][0];
       expect(filterFn!({ type: 'user' })).toBe(true);
       expect(filterFn!({ type: 'system' })).toBe(false);
       expect(filterFn!({ type: 'task_notification' })).toBe(false);

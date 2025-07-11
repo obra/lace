@@ -75,7 +75,7 @@ describe('Input Queue Handling Integration', () => {
   afterEach(async () => {
     if (agent) {
       agent.removeAllListeners();
-      await agent.stop();
+      agent.stop();
     }
   });
 

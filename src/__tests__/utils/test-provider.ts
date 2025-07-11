@@ -84,6 +84,6 @@ export class TestProvider extends AIProvider {
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     // For test provider, just return the same as non-streaming
-    return this.createResponse(_messages, _tools, signal);
+    return await this.createResponse(_messages, _tools, signal);
   }
 }

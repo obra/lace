@@ -11,7 +11,7 @@ import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 
 // Mock dependencies
 vi.mock('../contexts/TimelineItemContext.js', () => ({
-  TimelineItemProvider: ({ children }: any) => children,
+  TimelineItemProvider: ({ children }: { children: React.ReactNode }) => children,
   useTimelineItem: () => ({
     isExpanded: false,
     isSelected: false,
@@ -27,7 +27,15 @@ vi.mock('../contexts/TimelineItemContext.js', () => ({
 }));
 
 vi.mock('../ui/MarkdownDisplay.js', () => ({
-  MarkdownDisplay: ({ content, showIcon, dimmed }: any) =>
+  MarkdownDisplay: ({
+    content,
+    showIcon,
+    dimmed,
+  }: {
+    content: string;
+    showIcon?: boolean;
+    dimmed?: boolean;
+  }) =>
     React.createElement(
       'text',
       {},
@@ -36,7 +44,21 @@ vi.mock('../ui/MarkdownDisplay.js', () => ({
 }));
 
 vi.mock('../ui/TimelineEntry.js', () => ({
-  TimelineEntry: ({ children, label, summary, isExpanded, onExpandedChange, isFocused }: any) => {
+  TimelineEntry: ({
+    children,
+    label,
+    summary,
+    isExpanded,
+    onExpandedChange,
+    isFocused,
+  }: {
+    children: React.ReactNode;
+    label?: string;
+    summary?: string;
+    isExpanded?: boolean;
+    onExpandedChange?: (expanded: boolean) => void;
+    isFocused?: boolean;
+  }) => {
     return React.createElement(
       'collapsible',
       {

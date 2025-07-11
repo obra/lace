@@ -23,14 +23,14 @@ describe('CommandExecutor', () => {
         createThread: vi.fn(),
       },
       providerName: 'test-provider',
-    };
+    } as any;
 
     mockUI = {
       agent: mockAgent,
       displayMessage: vi.fn(),
       clearSession: vi.fn(),
       exit: vi.fn(),
-    };
+    } as UserInterface;
   });
 
   describe('command parsing', () => {

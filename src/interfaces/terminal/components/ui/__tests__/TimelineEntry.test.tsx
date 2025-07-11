@@ -4,7 +4,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'ink-testing-library';
-import { measureElement, Text, Box } from 'ink';
+import { measureElement, Text } from 'ink';
 import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
 import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 

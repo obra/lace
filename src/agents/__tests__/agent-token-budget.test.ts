@@ -38,15 +38,12 @@ class MockProvider extends AIProvider {
     this.mockResponse = response;
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return this.mockResponse;
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve(this.mockResponse);
   }
 
-  async createStreamingResponse(
-    _messages: ProviderMessage[],
-    _tools: Tool[]
-  ): Promise<ProviderResponse> {
-    return this.mockResponse;
+  createStreamingResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve(this.mockResponse);
   }
 }
 

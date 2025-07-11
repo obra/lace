@@ -8,6 +8,7 @@ import {
   initializeHARRecording,
   getHARRecorder,
   disableHARRecording,
+  HARFile,
 } from '~/utils/har-recorder.js';
 
 const TEST_HAR_FILE = '/tmp/test-har-recording.har';
@@ -73,7 +74,7 @@ describe('HARRecorder', () => {
 
       expect(existsSync(TEST_HAR_FILE)).toBe(true);
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as unknown;
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as HARFile;
       expect(content).toMatchObject({
         log: {
           version: '1.2',
@@ -169,9 +170,7 @@ describe('HARRecorder', () => {
       // Force flush for testing
       recorder.flush();
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as {
-        log: { entries: Array<{ request: any; response: any; time: number; comment?: string }> };
-      };
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as HARFile;
       const entry = content.log.entries[0];
 
       expect(entry.request).toMatchObject({
@@ -222,9 +221,7 @@ describe('HARRecorder', () => {
       // Force flush for testing
       recorder.flush();
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as {
-        log: { entries: Array<{ request: any; response: any; time: number; comment?: string }> };
-      };
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as HARFile;
       const entry = content.log.entries[0];
 
       expect(entry.request.queryString).toEqual([
@@ -260,9 +257,7 @@ describe('HARRecorder', () => {
       // Force flush for testing
       recorder.flush();
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as {
-        log: { entries: Array<{ request: any; response: any; time: number; comment?: string }> };
-      };
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as HARFile;
       const entry = content.log.entries[0];
 
       expect(entry.request).toMatchObject({
@@ -313,9 +308,7 @@ describe('HARRecorder', () => {
       // Force flush for testing
       recorder.flush();
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as {
-        log: { entries: Array<{ request: any; response: any; time: number; comment?: string }> };
-      };
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as HARFile;
       const entry = content.log.entries[0];
 
       expect(entry.request).toMatchObject({

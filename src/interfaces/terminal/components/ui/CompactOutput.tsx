@@ -78,7 +78,7 @@ export function CompactOutput({
   maxLines = 3,
   canExpand = true,
 }: CompactOutputProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, _setIsExpanded] = useState(false);
 
   if (!output) {
     return <Text color="gray">No output</Text>;

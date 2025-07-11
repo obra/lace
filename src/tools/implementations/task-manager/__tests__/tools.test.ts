@@ -11,11 +11,11 @@ import {
   TaskViewTool,
 } from '~/tools/implementations/task-manager/tools.js';
 import { ToolContext } from '~/tools/types.js';
-import { createThreadId, asThreadId, createNewAgentSpec } from '~/threads/types.js';
-import { useTempLaceDir, getTestDbPath } from '~/test-utils/temp-lace-dir.js';
+import { asThreadId, createNewAgentSpec } from '~/threads/types.js';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir.js';
 
 describe('Enhanced Task Manager Tools', () => {
-  const tempDirContext = useTempLaceDir();
+  const _tempDirContext = useTempLaceDir();
   let context: ToolContext;
 
   const parentThreadId = asThreadId('lace_20250703_parent');

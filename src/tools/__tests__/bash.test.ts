@@ -255,7 +255,7 @@ describe('BashTool', () => {
       const result = await bashTool.execute({ command: 'echo "test"' });
 
       expect(result.isError).toBe(false);
-      expect(() => JSON.parse(result.content[0].text!)).not.toThrow();
+      expect(() => JSON.parse(result.content[0].text!) as unknown).not.toThrow();
 
       const output = JSON.parse(result.content[0].text!) as {
         exitCode: number;
@@ -284,7 +284,7 @@ describe('BashTool', () => {
       expect(output.stdout).toBe('{"test": "value", "number": 42}\n');
 
       // The stdout content should also be valid JSON
-      const innerJson = JSON.parse(output.stdout.trim());
+      const innerJson = JSON.parse(output.stdout.trim()) as { test: string; number: number };
       expect(innerJson.test).toBe('value');
       expect(innerJson.number).toBe(42);
     });

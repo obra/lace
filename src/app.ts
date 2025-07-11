@@ -121,10 +121,7 @@ async function setupAgent(
   return agent;
 }
 
-async function handleSessionWithAgent(
-  agent: Agent,
-  continueMode?: boolean | string
-): Promise<string> {
+function handleSessionWithAgent(agent: Agent, continueMode?: boolean | string): string {
   let continueThreadId: string | undefined;
   if (continueMode) {
     if (typeof continueMode === 'string') {
@@ -161,7 +158,7 @@ export async function run(options: CLIOptions): Promise<void> {
   const agent = await setupAgent(options, tempThreadId, threadManager);
 
   // Use Agent to handle session resumption with automatic replay
-  await handleSessionWithAgent(agent, options.continue);
+  handleSessionWithAgent(agent, options.continue);
 
   if (options.prompt) {
     const nonInteractive = new NonInteractiveInterface(agent);

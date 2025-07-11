@@ -8,9 +8,14 @@ import globals from 'globals';
 
 export default [
   js.configs.recommended,
-  ...tseslint.configs.recommendedTypeChecked,
+  ...tseslint.configs.recommendedTypeChecked.map(config => ({
+    ...config,
+    files: ['**/*.ts', '**/*.tsx'],
+    ignores: ['dist/**/*'],
+  })),
   {
     files: ['**/*.ts', '**/*.tsx'],
+    ignores: ['dist/**/*'],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
@@ -31,7 +36,7 @@ export default [
     rules: {
       ...prettierConfig.rules,
       'prettier/prettier': 'error',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unsafe-assignment': 'error',
@@ -47,7 +52,8 @@ export default [
             message: 'Use ~ alias instead of relative parent imports'
           }
         ]
-      }]
+      }],
+      'no-var': 'error'
     },
   },
   {
@@ -58,7 +64,15 @@ export default [
   },
   {
     files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
-    ...tseslint.configs.disableTypeChecked,
+    ignores: ['dist/**/*'],
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: 'module',
+      globals: globals.node,
+    },
+    rules: {
+      'no-var': 'error'
+    },
   },
   {
     files: ['**/*.test.ts', '**/*.spec.ts'],
