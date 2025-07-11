@@ -10,7 +10,7 @@ import { estimateTokens } from '~/utils/token-estimation.js';
 import { convertToAnthropicFormat } from '~/providers/format-converters.js';
 import { getLaceDir } from '~/config/lace-dir.js';
 import { join } from 'path';
-import { loadEnvFile } from '~/config/env-loader.js';
+import { loadEnvFiles } from '~/config/env-loader.js';
 import { ToolExecutor } from '~/tools/executor.js';
 import { ProviderMessage } from '~/providers/base-provider.js';
 import { ThreadEvent } from '~/threads/types.js';
@@ -44,7 +44,7 @@ interface ThreadDebugInfo {
 
 async function debugThread(options: DebugOptions): Promise<ThreadDebugInfo> {
   // Load environment variables
-  loadEnvFile();
+  loadEnvFiles();
 
   // Initialize database and thread manager
   const laceDir = getLaceDir();

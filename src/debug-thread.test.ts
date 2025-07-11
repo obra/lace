@@ -7,7 +7,7 @@ import { ThreadEvent } from '~/threads/types.js';
 
 // Mock dependencies
 vi.mock('./config/env-loader.js', () => ({
-  loadEnvFile: vi.fn(),
+  loadEnvFiles: vi.fn(),
 }));
 
 vi.mock('./config/lace-dir.js', () => ({

@@ -262,7 +262,38 @@ ThreadProcessor caches processed events for performance.
 
 ## Configuration
 
-- **Environment**: ANTHROPIC_KEY, OPENAI_API_KEY, LACE_DIR
+### Environment Variables
+
+Environment variables are loaded from multiple `.env` files with the following priority (highest to lowest):
+
+1. `.env.{NODE_ENV}.local` - Environment-specific local overrides (in .gitignore)
+2. `.env.local` - Local overrides (in .gitignore)
+3. `.env.{NODE_ENV}` - Environment-specific defaults (committed to repo)
+4. `.env` - Base configuration (committed to repo)
+
+**Core Variables:**
+- **ANTHROPIC_KEY**: Required for Anthropic provider
+- **OPENAI_API_KEY**: Required for OpenAI provider
+- **LACE_DIR**: Configuration directory (default: `~/.lace`)
+- **NODE_ENV**: Environment mode (development, production, test)
+
+**Provider Configuration:**
+- **OPENAI_BASE_URL**: Custom OpenAI endpoint
+- **LMSTUDIO_BASE_URL**: LMStudio server URL (default: `http://localhost:1234`)
+- **OLLAMA_BASE_URL**: Ollama server URL (default: `http://localhost:11434`)
+
+**Logging:**
+- **LOG_LEVEL**: Logging level (debug, info, warn, error)
+- **LOG_FILE**: Optional log file path
+
+**Development Workflow:**
+- Copy `.env.example` to `.env` for base configuration
+- Create `.env.local` for personal API keys and local overrides
+- Use `.env.development.local` for development-specific local settings
+- All `.local` files are automatically ignored by git
+
+### Other Configuration
+
 - **User Instructions**: `~/.lace/instructions.md`
 - **System Prompts**: Template-based generation in `src/config/prompts/`
 - **Database**: SQLite storage in LACE_DIR with graceful degradation
