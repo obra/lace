@@ -231,7 +231,7 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
   });
 
   // Restore original methods
-  const originalUnmount = instance.unmount;
+  const originalUnmount = instance.unmount as () => void;
   instance.unmount = () => {
     process.stdout.isTTY = originalIsTTY;
     process.stderr.isTTY = originalStderrIsTTY;
@@ -244,12 +244,12 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
     } else {
       process.env.FORCE_COLOR = originalForceColor;
     }
-    return originalUnmount();
+    return (originalUnmount as () => void)();
   };
 
   return {
     rerender: instance.rerender,
-    unmount: () => act(() => instance.unmount()),
+    unmount: () => act(() => (instance as { unmount: () => void }).unmount()),
     cleanup: () =>
       act(() => {
         process.stdout.isTTY = originalIsTTY;
@@ -263,7 +263,7 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
         } else {
           process.env.FORCE_COLOR = originalForceColor;
         }
-        instance.cleanup();
+        (instance as { cleanup: () => void }).cleanup();
       }),
     stdout,
     stderr,

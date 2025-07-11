@@ -1307,7 +1307,7 @@ export class TerminalInterface implements ApprovalCallback {
   private formatInputParameters(input: Record<string, unknown>): void {
     for (const [key, value] of Object.entries(input)) {
       const formattedValue = this.formatParameterValue(value);
-      console.log(`  ${key}: ${formattedValue}`);
+      console.warn(`  ${key}: ${formattedValue}`);
     }
   }
 

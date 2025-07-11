@@ -11,7 +11,6 @@ import {
   useTimelineFocusEntry,
 } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
 import { canTimelineItemAcceptFocus } from '~/interfaces/terminal/components/timeline-item-focus.js';
-import { TimelineItemRef } from '~/interfaces/terminal/components/timeline-item-focus.js';
 import { logger } from '~/utils/logger.js';
 
 interface TimelineDisplayProps {
@@ -38,7 +37,7 @@ export default function TimelineDisplay({
       selectedItemIndex: number,
       input: string,
       key: any,
-      itemRefs?: React.MutableRefObject<Map<number, any>>
+      _itemRefs?: React.MutableRefObject<Map<number, any>>
     ) => {
       logger.debug('TimelineDisplay: handleItemInteraction called', {
         selectedItemIndex,

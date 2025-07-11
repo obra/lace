@@ -5,10 +5,30 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CommandRegistry } from '~/commands/registry.js';
 import { CommandExecutor } from '~/commands/executor.js';
 import type { UserInterface } from '~/commands/types.js';
+import type { Agent } from '~/agents/agent.js';
+
+type MockAgent = {
+  getCurrentThreadId: () => string;
+  generateThreadId: () => string;
+  createThread: () => void;
+  compact: (threadId: string) => void;
+  getThreadEvents: () => unknown[];
+  providerName: string;
+  toolExecutor: {
+    getAllTools: () => unknown[];
+  };
+  threadManager: {
+    getCurrentThreadId: () => string;
+    generateThreadId: () => string;
+    createThread: () => void;
+    compact: () => void;
+    getEvents: () => unknown[];
+  };
+};
 
 describe('Command System Integration', () => {
   let mockUI: UserInterface;
-  let mockAgent: any;
+  let mockAgent: MockAgent;
 
   beforeEach(() => {
     mockAgent = {
@@ -33,7 +53,7 @@ describe('Command System Integration', () => {
     };
 
     mockUI = {
-      agent: mockAgent,
+      agent: mockAgent as any,
       displayMessage: vi.fn(),
       clearSession: vi.fn(),
       exit: vi.fn(),

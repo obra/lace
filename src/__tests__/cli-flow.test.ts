@@ -160,7 +160,7 @@ describe('CLI Flow Tests', () => {
       eventNames: vi.fn(),
       once: vi.fn(),
       // Agent API methods
-      resumeOrCreateThread: vi.fn().mockResolvedValue({
+      resumeOrCreateThread: vi.fn().mockReturnValue({
         threadId: 'test-thread-123',
         isResumed: false,
         resumeError: undefined,
@@ -296,7 +296,7 @@ describe('CLI Flow Tests', () => {
       const mockAgentInstance = {
         ...vi.mocked(Agent).mock.results[0]?.value,
         toolExecutor: vi.mocked(new ToolExecutor()),
-        resumeOrCreateThread: vi.fn().mockResolvedValue({
+        resumeOrCreateThread: vi.fn().mockReturnValue({
           threadId: 'resumed-thread-456',
           isResumed: true,
           resumeError: undefined,
@@ -323,7 +323,7 @@ describe('CLI Flow Tests', () => {
       const mockAgentInstance = {
         ...vi.mocked(Agent).mock.results[0]?.value,
         toolExecutor: vi.mocked(new ToolExecutor()),
-        resumeOrCreateThread: vi.fn().mockResolvedValue({
+        resumeOrCreateThread: vi.fn().mockReturnValue({
           threadId: 'specific-thread-789',
           isResumed: true,
           resumeError: undefined,
@@ -349,7 +349,7 @@ describe('CLI Flow Tests', () => {
       const mockAgentInstance = {
         ...vi.mocked(Agent).mock.results[0]?.value,
         toolExecutor: vi.mocked(new ToolExecutor()),
-        resumeOrCreateThread: vi.fn().mockResolvedValue({
+        resumeOrCreateThread: vi.fn().mockReturnValue({
           threadId: 'new-thread-123',
           isResumed: false,
           resumeError: 'Mock resume error',

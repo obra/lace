@@ -15,13 +15,19 @@ import {
   VariableProviderManager,
 } from '~/config/variable-providers.js';
 
+// Mock interface for CommandRunner
+interface MockCommandRunner {
+  isGitRepository: ReturnType<typeof vi.fn>;
+  runCommand: ReturnType<typeof vi.fn>;
+}
+
 describe('Variable Providers', () => {
-  let mockCommandRunner: any;
+  let mockCommandRunner: MockCommandRunner;
 
   describe('SystemVariableProvider', () => {
     it('should provide system information', async () => {
       const provider = new SystemVariableProvider();
-      const variables = await provider.getVariables();
+      const variables = provider.getVariables();
 
       expect(variables).toHaveProperty('system');
       expect(variables.system).toHaveProperty('os');
@@ -42,7 +48,7 @@ describe('Variable Providers', () => {
       // This test verifies the provider can handle missing/invalid system info
       // Since we can't easily mock os module after import, we verify normal operation
       const provider = new SystemVariableProvider();
-      const variables = await provider.getVariables();
+      const variables = provider.getVariables();
 
       expect(variables).toHaveProperty('system');
       expect(variables.system).toHaveProperty('os');
@@ -68,7 +74,7 @@ describe('Variable Providers', () => {
         .mockReturnValueOnce('john@example.com'); // git config user.email
 
       const provider = new GitVariableProvider(mockCommandRunner);
-      const variables = await provider.getVariables();
+      const variables = provider.getVariables();
 
       expect(variables).toHaveProperty('git');
       expect(variables.git).toEqual({
@@ -98,7 +104,7 @@ describe('Variable Providers', () => {
         .mockReturnValueOnce('jane@example.com'); // git config user.email
 
       const provider = new GitVariableProvider(mockCommandRunner);
-      const variables = await provider.getVariables();
+      const variables = provider.getVariables();
 
       expect((variables.git as Record<string, unknown>).status).toBe('dirty');
       expect((variables.git as Record<string, unknown>).branch).toBe('feature-branch');
@@ -108,7 +114,7 @@ describe('Variable Providers', () => {
       mockCommandRunner.isGitRepository.mockReturnValue(false);
 
       const provider = new GitVariableProvider(mockCommandRunner);
-      const variables = await provider.getVariables();
+      const variables = provider.getVariables();
 
       expect(variables).toEqual({ git: {} });
       expect(mockCommandRunner.runCommand).not.toHaveBeenCalled();
@@ -129,7 +135,7 @@ describe('Variable Providers', () => {
         }); // git config user.email fails
 
       const provider = new GitVariableProvider(mockCommandRunner);
-      const variables = await provider.getVariables();
+      const variables = provider.getVariables();
 
       expect(variables.git).toEqual({
         status: 'clean',
@@ -162,7 +168,7 @@ describe('Variable Providers', () => {
       fs.writeFileSync(path.join(tempDir, 'src', 'index.js'), 'console.log("hello");');
 
       const provider = new ProjectVariableProvider();
-      const variables = await provider.getVariables();
+      const variables = provider.getVariables();
 
       expect(variables).toHaveProperty('project');
       expect(variables.project).toHaveProperty('cwd');
@@ -187,7 +193,7 @@ describe('Variable Providers', () => {
       fs.writeFileSync(path.join(tempDir, 'visible.txt'), 'visible file');
 
       const provider = new ProjectVariableProvider();
-      const variables = await provider.getVariables();
+      const variables = provider.getVariables();
 
       const tree = (variables.project as Record<string, unknown>).tree;
       expect(tree).not.toContain('.hidden');
@@ -206,7 +212,7 @@ describe('Variable Providers', () => {
       fs.writeFileSync(path.join(tempDir, 'shallow.txt'), 'shallow content');
 
       const provider = new ProjectVariableProvider();
-      const variables = await provider.getVariables();
+      const variables = provider.getVariables();
 
       const tree = (variables.project as Record<string, unknown>).tree;
       expect(tree).toContain('shallow.txt');
@@ -217,7 +223,7 @@ describe('Variable Providers', () => {
 
     it('should handle empty directory', async () => {
       const provider = new ProjectVariableProvider();
-      const variables = await provider.getVariables();
+      const variables = provider.getVariables();
 
       expect((variables.project as Record<string, unknown>).cwd).toContain(path.basename(tempDir)); // Handle /private prefix on macOS
       expect((variables.project as Record<string, unknown>).tree).toBe('');
@@ -233,7 +239,7 @@ describe('Variable Providers', () => {
 
       try {
         const provider = new ProjectVariableProvider();
-        const variables = await provider.getVariables();
+        const variables = provider.getVariables();
 
         expect((variables.project as Record<string, unknown>).cwd).toContain(
           path.basename(tempDir)
@@ -255,7 +261,7 @@ describe('Variable Providers', () => {
       ];
 
       const provider = new ToolVariableProvider(tools);
-      const variables = await provider.getVariables();
+      const variables = provider.getVariables();
 
       expect(variables).toHaveProperty('tools');
       expect(variables.tools).toHaveLength(3);
@@ -275,14 +281,14 @@ describe('Variable Providers', () => {
 
     it('should handle empty tools list', async () => {
       const provider = new ToolVariableProvider([]);
-      const variables = await provider.getVariables();
+      const variables = provider.getVariables();
 
       expect(variables).toEqual({ tools: [] });
     });
 
     it('should handle undefined tools list', async () => {
       const provider = new ToolVariableProvider();
-      const variables = await provider.getVariables();
+      const variables = provider.getVariables();
 
       expect(variables).toEqual({ tools: [] });
     });
@@ -291,7 +297,7 @@ describe('Variable Providers', () => {
   describe('ContextDisclaimerProvider', () => {
     it('should provide context disclaimer', async () => {
       const provider = new ContextDisclaimerProvider();
-      const variables = await provider.getVariables();
+      const variables = provider.getVariables();
 
       expect(variables).toHaveProperty('context');
       expect(variables.context).toHaveProperty('disclaimer');

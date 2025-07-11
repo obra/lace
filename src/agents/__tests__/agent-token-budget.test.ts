@@ -8,6 +8,7 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js'
 import { Tool } from '~/tools/tool.js';
 import { ToolExecutor } from '~/tools/executor.js';
 import { ThreadManager } from '~/threads/thread-manager.js';
+import { BudgetStatus, BudgetRecommendations } from '~/token-management/types.js';
 
 // Mock provider for testing token budget integration
 class MockProvider extends AIProvider {
@@ -101,7 +102,11 @@ describe('Agent Token Budget Integration', () => {
   });
 
   it('should emit warnings when approaching token limits', async () => {
-    const warningEvents: any[] = [];
+    const warningEvents: {
+      message: string;
+      usage: BudgetStatus;
+      recommendations: BudgetRecommendations;
+    }[] = [];
     agent.on('token_budget_warning', (data) => {
       warningEvents.push(data);
     });
@@ -150,7 +155,11 @@ describe('Agent Token Budget Integration', () => {
       },
     });
 
-    const warningEvents: any[] = [];
+    const warningEvents: {
+      message: string;
+      usage: BudgetStatus;
+      recommendations: BudgetRecommendations;
+    }[] = [];
     agent.on('token_budget_warning', (data) => {
       warningEvents.push(data);
     });

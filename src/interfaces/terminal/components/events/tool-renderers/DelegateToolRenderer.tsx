@@ -16,6 +16,7 @@ import { useInput } from 'ink';
 import { useLaceFocus, FocusRegions } from '~/interfaces/terminal/focus/index.js';
 import { useTimelineItemFocusEntry } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
 import { logger } from '~/utils/logger.js';
+import { ToolResult } from '~/tools/types.js';
 
 // Parse delegate result to extract structured data
 interface DelegateResult {
@@ -26,7 +27,7 @@ interface DelegateResult {
   error?: string;
 }
 
-function parseDelegateResult(result: any): DelegateResult | null {
+function parseDelegateResult(result: ToolResult): DelegateResult | null {
   if (!result?.content?.[0]?.text) {
     logger.debug('DelegateToolRenderer: No content in result');
     return null;
@@ -79,7 +80,7 @@ function parseDelegateResult(result: any): DelegateResult | null {
 
 export const DelegateToolRenderer = forwardRef<TimelineItemRef, ToolRendererProps>(
   ({ item }, ref) => {
-    const { isExpanded, isSelected } = useTimelineItem();
+    const { isSelected } = useTimelineItem();
 
     // Extract and validate data
     const args = item.call.arguments;
@@ -110,7 +111,7 @@ export const DelegateToolRenderer = forwardRef<TimelineItemRef, ToolRendererProp
     const delegateThreadId = delegateResult?.threadId || null;
     const focusId = delegateThreadId ? FocusRegions.delegate(delegateThreadId) : 'none';
     const { isFocused } = useLaceFocus(focusId, { autoFocus: false });
-    const [delegationExpanded, setDelegationExpanded] = useState(true);
+    const [delegationExpanded] = useState(true);
 
     // Handle keyboard input when focused
     useInput(

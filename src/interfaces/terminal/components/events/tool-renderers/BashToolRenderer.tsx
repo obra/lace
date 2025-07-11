@@ -31,7 +31,7 @@ function parseBashResult(result: ToolResult): BashOutput | null {
       return null;
     }
 
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(content) as unknown;
 
     // Validate the parsed structure
     if (typeof parsed !== 'object' || parsed === null) {
@@ -39,21 +39,32 @@ function parseBashResult(result: ToolResult): BashOutput | null {
       return null;
     }
 
-    if (
-      typeof parsed.stdout !== 'string' ||
-      typeof parsed.stderr !== 'string' ||
-      typeof parsed.exitCode !== 'number'
-    ) {
+    // Type guard to check if parsed is a bash output
+    function isBashOutput(obj: unknown): obj is BashOutput {
+      return (
+        typeof obj === 'object' &&
+        obj !== null &&
+        'stdout' in obj &&
+        'stderr' in obj &&
+        'exitCode' in obj &&
+        typeof (obj as Record<string, unknown>).stdout === 'string' &&
+        typeof (obj as Record<string, unknown>).stderr === 'string' &&
+        typeof (obj as Record<string, unknown>).exitCode === 'number'
+      );
+    }
+
+    if (!isBashOutput(parsed)) {
+      const objRecord = parsed as Record<string, unknown>;
       logger.warn('BashToolRenderer: Invalid bash result structure', {
-        hasStdout: typeof parsed.stdout,
-        hasStderr: typeof parsed.stderr,
-        hasExitCode: typeof parsed.exitCode,
+        hasStdout: typeof objRecord.stdout,
+        hasStderr: typeof objRecord.stderr,
+        hasExitCode: typeof objRecord.exitCode,
         parsed,
       });
       return null;
     }
 
-    return parsed as BashOutput;
+    return parsed;
   } catch (error) {
     logger.warn('BashToolRenderer: Failed to parse bash result JSON', {
       error: error instanceof Error ? error.message : String(error),
@@ -64,7 +75,7 @@ function parseBashResult(result: ToolResult): BashOutput | null {
 }
 
 export function BashToolRenderer({ item }: ToolRendererProps) {
-  const { isExpanded } = useTimelineItem();
+  useTimelineItem();
 
   // Extract and validate data
   const args = item.call.arguments;

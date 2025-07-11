@@ -1,7 +1,6 @@
 // ABOUTME: Integration tests for input handling with automatic message queueing
 // ABOUTME: Tests real Agent behavior with queueing when busy and processing when idle
 
-import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent.js';
 import { AIProvider } from '~/providers/base-provider.js';
@@ -47,7 +46,7 @@ describe('Input Queue Handling Integration', () => {
       registerAllAvailableTools: vi.fn(),
       getRegisteredTools: vi.fn().mockReturnValue([]),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
+    } as unknown as ToolExecutor;
     mockThreadManager = {
       addEvent: vi.fn(),
       getEvents: vi.fn().mockReturnValue([]),
@@ -60,7 +59,7 @@ describe('Input Queue Handling Integration', () => {
       needsCompaction: vi.fn().mockResolvedValue(false),
       createCompactedVersion: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
+    } as unknown as ThreadManager;
 
     agent = new Agent({
       provider: mockProvider,

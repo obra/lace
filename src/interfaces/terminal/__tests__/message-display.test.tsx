@@ -2,11 +2,8 @@
 // ABOUTME: Verifies message formatting, syntax highlighting, and collapsible content
 
 import React from 'react';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import {
-  renderInkComponent,
-  stripAnsi,
-} from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
+import { describe, it, expect } from 'vitest';
+import { renderInkComponent } from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
 import MessageDisplay from '~/interfaces/terminal/components/message-display.js';
 import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 

@@ -5,7 +5,6 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { marked } from 'marked';
 import TerminalRenderer from 'marked-terminal';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 
 interface MarkdownDisplayProps {
   content: string;
@@ -15,7 +14,7 @@ interface MarkdownDisplayProps {
 
 export function MarkdownDisplay({
   content,
-  showIcon = true,
+  showIcon: _showIcon = true,
   dimmed = false,
 }: MarkdownDisplayProps) {
   try {

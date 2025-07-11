@@ -47,15 +47,15 @@ function isJsonOutput(output: string): boolean {
 
 function getJsonPreview(output: string, maxLines: number): string {
   try {
-    const parsed = JSON.parse(output);
+    const parsed = JSON.parse(output) as unknown;
     if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
       // For objects, show first few keys
       const keys = Object.keys(parsed);
       const previewKeys = keys.slice(0, maxLines - 1); // Leave room for closing brace
-      const previewObj: any = {};
+      const previewObj: Record<string, unknown> = {};
 
       for (const key of previewKeys) {
-        previewObj[key] = parsed[key];
+        previewObj[key] = (parsed as Record<string, unknown>)[key];
       }
 
       // Add indicator if there are more keys

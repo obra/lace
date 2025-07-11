@@ -51,7 +51,7 @@ export const GenericToolRenderer = forwardRef<TimelineItemRef, ToolRendererProps
       []
     );
 
-    const { isExpanded } = useTimelineItem();
+    useTimelineItem();
 
     // Extract data directly
     const toolName = item.call.name;

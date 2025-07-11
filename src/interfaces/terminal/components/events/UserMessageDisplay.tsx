@@ -6,7 +6,6 @@ import { Box, Text } from 'ink';
 import { ThreadEvent } from '~/threads/types.js';
 import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
 import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 
 interface UserMessageDisplayProps {
   event: ThreadEvent;
@@ -77,7 +76,7 @@ export function UserMessageDisplay({
   const shouldAutoCollapse = lines.length > 8;
 
   // Get expansion state from context
-  const { isExpanded, onExpand, onCollapse } = useTimelineItem();
+  const { isExpanded, onExpand } = useTimelineItem();
 
   // For short messages, auto-expand on mount
   React.useEffect(() => {

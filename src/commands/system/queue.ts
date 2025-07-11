@@ -7,7 +7,7 @@ export const queueCommand: Command = {
   name: 'queue',
   description: 'View message queue or clear queued messages',
 
-  async execute(args: string, ui: UserInterface): Promise<void> {
+  execute(args: string, ui: UserInterface): void {
     const trimmedArgs = args.trim();
 
     if (trimmedArgs === 'clear') {

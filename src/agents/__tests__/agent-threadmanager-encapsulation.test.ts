@@ -1,7 +1,7 @@
 // ABOUTME: Tests for ThreadManager encapsulation within Agent
 // ABOUTME: Verifies that ThreadManager is properly encapsulated and not exposed publicly
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent.js';
 import { ThreadManager } from '~/threads/thread-manager.js';
 import { ToolExecutor } from '~/tools/executor.js';
@@ -36,7 +36,7 @@ describe('Agent ThreadManager Encapsulation', () => {
   });
 
   afterEach(async () => {
-    await threadManager.close();
+    threadManager.close();
     await rm(testDir, { recursive: true, force: true });
   });
 

@@ -9,7 +9,7 @@ export function createHelpCommand(registry: CommandRegistry): Command {
     name: 'help',
     description: 'Show available commands',
 
-    async execute(args: string, ui: UserInterface): Promise<void> {
+    execute(args: string, ui: UserInterface): void {
       const trimmedArgs = args.trim();
 
       if (trimmedArgs) {

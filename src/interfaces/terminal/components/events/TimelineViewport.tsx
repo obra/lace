@@ -1,8 +1,8 @@
 // ABOUTME: Viewport container component for timeline display with scrolling and navigation
 // ABOUTME: Manages viewport state and keyboard input, renders content and scroll indicators
 
-import React, { useRef, useEffect, useState } from 'react';
-import { Box, useInput, Text, useFocus } from 'ink';
+import React, { useRef } from 'react';
+import { Box, useInput, Text } from 'ink';
 import useStdoutDimensions from '~/utils/use-stdout-dimensions.js';
 import { Timeline } from '~/interfaces/timeline-types.js';
 import { useTimelineViewport } from '~/interfaces/terminal/components/events/hooks/useTimelineViewport.js';
@@ -52,7 +52,7 @@ export function TimelineViewport({
   children,
 }: TimelineViewportProps) {
   // Use Lace focus system with custom focus region or default
-  const { isFocused, takeFocus } = useLaceFocus(focusRegion || FocusRegions.timeline, {
+  const { isFocused } = useLaceFocus(focusRegion || FocusRegions.timeline, {
     autoFocus: false,
   });
   const [, terminalHeight] = useStdoutDimensions();

@@ -29,7 +29,7 @@ export interface Command {
   name: string;
   description: string;
   aliases?: string[];
-  execute(args: string, ui: UserInterface): Promise<void>;
+  execute(args: string, ui: UserInterface): Promise<void> | void;
 }
 
 /**

@@ -72,7 +72,7 @@ describe('FetchInterceptor', () => {
     it('should not enable interception if fetch is not available', () => {
       // Temporarily remove fetch
       const temp = globalThis.fetch;
-      delete (globalThis as any).fetch;
+      delete (globalThis as { fetch?: typeof fetch }).fetch;
 
       enableFetchInterception();
       expect(isFetchInterceptionEnabled()).toBe(false);

@@ -8,7 +8,6 @@ import { ThinkingAwareContent } from '~/interfaces/terminal/components/ui/Thinki
 import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
 import { parseThinkingBlocks } from '~/interfaces/terminal/components/events/utils/thinking-parser.js';
 import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 
 interface AgentMessageDisplayProps {
   event: ThreadEvent;
@@ -24,7 +23,7 @@ export function AgentMessageDisplay({ event, isStreaming, isFocused }: AgentMess
   const parsed = useMemo(() => parseThinkingBlocks(message), [message]);
 
   // Get expansion state from context
-  const { isExpanded, isSelected } = useTimelineItem();
+  const { isExpanded } = useTimelineItem();
 
   // Force expand when streaming to show the (thinking...) indicator
   const effectiveIsExpanded = isExpanded || (isStreaming ?? false);

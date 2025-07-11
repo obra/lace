@@ -92,9 +92,18 @@ export class FileReadTool extends Tool {
         linesReturned,
         fileSize: this.formatFileSize(content.length),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // Type guard for Node.js filesystem errors
+      const isNodeError = (err: unknown): err is { code: string; message: string } => {
+        return (
+          err instanceof Error &&
+          'code' in err &&
+          typeof (err as { code: unknown }).code === 'string'
+        );
+      };
+
       // Handle file not found with helpful suggestions
-      if (error.code === 'ENOENT') {
+      if (isNodeError(error) && error.code === 'ENOENT') {
         const suggestions = await findSimilarPaths(args.path);
         const suggestionText =
           suggestions.length > 0 ? `\n\nSimilar files: ${suggestions.join(', ')}` : '';
@@ -103,14 +112,14 @@ export class FileReadTool extends Tool {
       }
 
       // Handle permission errors
-      if (error.code === 'EACCES') {
+      if (isNodeError(error) && error.code === 'EACCES') {
         return this.createError(
           `Permission denied accessing file: ${args.path}. Check file permissions and try again.`
         );
       }
 
       // Handle other file system errors
-      if (error.code) {
+      if (isNodeError(error)) {
         return this.createError(
           `File system error (${error.code}): ${error.message}. Check the file path and try again.`
         );

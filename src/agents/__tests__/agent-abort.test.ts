@@ -232,10 +232,10 @@ describe('Agent Abort Functionality', () => {
       });
 
       // Mock to always throw AbortError
-      vi.spyOn(abortingProvider, 'createResponse').mockImplementation(async () => {
+      vi.spyOn(abortingProvider, 'createResponse').mockImplementation(() => {
         const error = new Error('Request aborted');
         error.name = 'AbortError';
-        throw error;
+        return Promise.reject(error);
       });
 
       const abortAgent = new Agent({

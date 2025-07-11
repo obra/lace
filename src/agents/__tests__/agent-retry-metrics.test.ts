@@ -106,8 +106,8 @@ describe('Agent Retry Metrics Tracking', () => {
     await agent.start();
   });
 
-  afterEach(async () => {
-    await agent.stop();
+  afterEach(() => {
+    agent.stop();
     vi.clearAllTimers();
   });
 

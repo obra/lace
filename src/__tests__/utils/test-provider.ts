@@ -35,19 +35,19 @@ export class TestProvider extends AIProvider {
     return false;
   }
 
-  async diagnose(): Promise<{ connected: boolean; models: string[]; error?: string }> {
+  diagnose(): Promise<{ connected: boolean; models: string[]; error?: string }> {
     if (this.shouldError) {
-      return {
+      return Promise.resolve({
         connected: false,
         models: [],
         error: 'Mock provider error',
-      };
+      });
     }
 
-    return {
+    return Promise.resolve({
       connected: true,
       models: ['test-model'],
-    };
+    });
   }
 
   async createResponse(

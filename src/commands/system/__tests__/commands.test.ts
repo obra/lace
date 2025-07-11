@@ -1,7 +1,7 @@
 // ABOUTME: Unit tests for all system commands (help, exit, clear, status, compact)
 // ABOUTME: Tests individual command functionality and UserInterface integration
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
 import { createHelpCommand } from '~/commands/system/help.js';
 import { exitCommand } from '~/commands/system/exit.js';
 import { clearCommand } from '~/commands/system/clear.js';
@@ -9,13 +9,28 @@ import { statusCommand } from '~/commands/system/status.js';
 import { compactCommand } from '~/commands/system/compact.js';
 import { queueCommand } from '~/commands/system/queue.js';
 import { CommandRegistry } from '~/commands/registry.js';
-import type { UserInterface } from '~/commands/types.js';
+import type { UserInterface, Command } from '~/commands/types.js';
+
+type MockAgent = {
+  getCurrentThreadId: MockedFunction<() => string | null>;
+  generateThreadId: MockedFunction<() => string>;
+  createThread: MockedFunction<() => void>;
+  compact: MockedFunction<(threadId: string) => void>;
+  getThreadEvents: MockedFunction<(threadId: string) => Array<{ type: string; data: string }>>;
+  providerName: string;
+  getQueueStats: MockedFunction<() => { queueLength: number; highPriorityCount: number }>;
+  getQueueContents: MockedFunction<() => unknown[]>;
+  clearQueue: MockedFunction<() => number>;
+  toolExecutor: {
+    getAllTools: MockedFunction<() => unknown[]>;
+  };
+};
 
 describe('System Commands', () => {
   let mockUI: UserInterface;
-  let mockAgent: any;
+  let mockAgent: MockAgent;
   let registry: CommandRegistry;
-  let helpCommand: any;
+  let helpCommand: Command;
 
   beforeEach(() => {
     registry = new CommandRegistry();
@@ -51,7 +66,7 @@ describe('System Commands', () => {
     };
 
     mockUI = {
-      agent: mockAgent,
+      agent: mockAgent as any,
       displayMessage: vi.fn(),
       clearSession: vi.fn(),
       exit: vi.fn(),

@@ -32,7 +32,7 @@ class MockRetryProvider extends AIProvider {
     type?: 'attempt' | 'exhausted';
   } | null = null;
 
-  async createResponse(
+  createResponse(
     _messages: ProviderMessage[],
     _tools: Tool[] = [],
     _signal?: AbortSignal
@@ -51,14 +51,15 @@ class MockRetryProvider extends AIProvider {
         });
       }
     }
-    return {
+    return Promise.resolve({
       content: 'Test response',
       toolCalls: [],
       stopReason: 'stop',
-    };
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+    });
   }
 
-  async createStreamingResponse(
+  createStreamingResponse(
     _messages: ProviderMessage[],
     _tools: Tool[] = [],
     _signal?: AbortSignal
@@ -77,11 +78,12 @@ class MockRetryProvider extends AIProvider {
         });
       }
     }
-    return {
+    return Promise.resolve({
       content: 'Test streaming response',
       toolCalls: [],
       stopReason: 'stop',
-    };
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+    });
   }
 
   // Method to setup retry events that will be emitted during next provider call
@@ -108,12 +110,14 @@ describe('Agent retry event forwarding', () => {
     mockProvider = new MockRetryProvider({});
 
     // Mock ToolExecutor
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     mockToolExecutor = {
       executeTool: vi.fn(),
       getApprovalDecision: vi.fn(),
     } as any;
 
     // Mock ThreadManager
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     mockThreadManager = {
       addEvent: vi.fn(),
       getEvents: vi.fn().mockReturnValue([]),

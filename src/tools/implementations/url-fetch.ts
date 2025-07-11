@@ -166,8 +166,8 @@ export class UrlFetchTool extends Tool {
     if (UrlFetchTool.cleanupRegistered) return;
 
     // Double-check locking pattern for thread safety
-    if ((globalThis as any)[UrlFetchTool.cleanupLock]) return;
-    (globalThis as any)[UrlFetchTool.cleanupLock] = true;
+    if ((globalThis as Record<string | symbol, unknown>)[UrlFetchTool.cleanupLock]) return;
+    (globalThis as Record<string | symbol, unknown>)[UrlFetchTool.cleanupLock] = true;
 
     UrlFetchTool.cleanupRegistered = true;
 
@@ -460,7 +460,7 @@ export class UrlFetchTool extends Tool {
     // Pretty-print JSON
     if (cleanType === 'application/json') {
       try {
-        const parsed = JSON.parse(text);
+        const parsed: unknown = JSON.parse(text);
         return JSON.stringify(parsed, null, 2);
       } catch {
         return text; // Fallback to raw text if parsing fails

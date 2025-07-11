@@ -18,7 +18,7 @@ interface FocusHistoryEntry {
 
 export function FocusDebugPanel({}: FocusDebugPanelProps) {
   // Get focus state from the context
-  const { currentFocus, getFocusStack, pushFocus, popFocus } = useLaceFocusContext();
+  const { currentFocus, getFocusStack } = useLaceFocusContext();
   const focusStack = getFocusStack();
   const [lastAction, setLastAction] = useState<string>('none');
   const [focusHistory, setFocusHistory] = useState<FocusHistoryEntry[]>([]);

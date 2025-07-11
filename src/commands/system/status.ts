@@ -7,7 +7,7 @@ export const statusCommand: Command = {
   name: 'status',
   description: 'Show current status',
 
-  async execute(args: string, ui: UserInterface): Promise<void> {
+  execute(args: string, ui: UserInterface): void {
     const threadId = ui.agent.getCurrentThreadId();
     const toolCount = ui.agent.toolExecutor.getAllTools().length;
     const providerName = ui.agent.providerName;

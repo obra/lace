@@ -22,12 +22,13 @@ class MockProvider extends AIProvider {
     return 'mock-model';
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return {
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve({
       content: 'mock response',
       usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
       toolCalls: [],
-    };
+      stopReason: 'end_turn',
+    });
   }
 }
 
@@ -39,10 +40,12 @@ describe('Agent getQueueContents', () => {
 
   beforeEach(async () => {
     mockProvider = new MockProvider();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     mockToolExecutor = {
       registerAllAvailableTools: vi.fn(),
       getRegisteredTools: vi.fn().mockReturnValue([]),
     } as any;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     mockThreadManager = {
       addEvent: vi.fn(),
       getEvents: vi.fn().mockReturnValue([]),
@@ -68,9 +71,9 @@ describe('Agent getQueueContents', () => {
     await agent.start();
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     if (agent) {
-      await agent.stop();
+      agent.stop();
     }
   });
 
@@ -110,12 +113,14 @@ describe('Agent getQueueContents', () => {
     const originalLength = contents1.length;
     // TypeScript should prevent this, but let's verify runtime behavior
     try {
-      (contents1 as any).push({ fake: 'message' });
+      // Use explicit type assertion to test runtime behavior
+      const mutableContents = contents1 as unknown as Array<{ fake: string }>;
+      mutableContents.push({ fake: 'message' });
       // If this works, it means we didn't return a proper readonly array
       // The internal queue should still be unchanged
       const newContents = agent.getQueueContents();
       expect(newContents).toHaveLength(originalLength);
-    } catch (error) {
+    } catch {
       // Expected - readonly arrays should prevent modification
     }
   });

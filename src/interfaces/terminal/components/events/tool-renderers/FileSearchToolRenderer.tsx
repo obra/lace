@@ -29,7 +29,7 @@ function extractMatchCount(output: string): string | null {
 }
 
 export function FileSearchToolRenderer({ item }: ToolRendererProps) {
-  const { isExpanded } = useTimelineItem();
+  useTimelineItem();
 
   // Extract data directly
   const { pattern, path } = item.call.arguments as { pattern: string; path: string };

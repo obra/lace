@@ -12,7 +12,11 @@ import { ThreadEvent, EventType, asThreadId } from '~/threads/types.js';
 import { logger } from '~/utils/logger.js';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler.js';
 import { TokenBudgetManager } from '~/token-management/token-budget-manager.js';
-import { TokenBudgetConfig } from '~/token-management/types.js';
+import {
+  TokenBudgetConfig,
+  BudgetStatus,
+  BudgetRecommendations,
+} from '~/token-management/types.js';
 import { loadPromptConfig } from '~/config/prompts.js';
 import { estimateTokens } from '~/utils/token-estimation.js';
 import { QueuedMessage, MessageQueueStats } from '~/agents/types.js';
@@ -56,10 +60,14 @@ export interface AgentEvents {
   tool_call_start: [{ toolName: string; input: Record<string, unknown>; callId: string }];
   tool_call_complete: [{ toolName: string; result: ToolResult; callId: string }];
   state_change: [{ from: AgentState; to: AgentState }];
-  error: [{ error: Error; context: object }];
+  error: [{ error: Error; context: Record<string, unknown> }];
   conversation_complete: [];
-  token_usage_update: [{ usage: object }];
-  token_budget_warning: [{ message: string; usage: object; recommendations: object }];
+  token_usage_update: [
+    { usage: { promptTokens: number; completionTokens: number; totalTokens: number } },
+  ];
+  token_budget_warning: [
+    { message: string; usage: BudgetStatus; recommendations: BudgetRecommendations },
+  ];
   // Turn tracking events
   turn_start: [{ turnId: string; userInput: string; metrics: CurrentTurnMetrics }];
   turn_progress: [{ metrics: CurrentTurnMetrics }];

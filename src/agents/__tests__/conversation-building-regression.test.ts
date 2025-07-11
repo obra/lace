@@ -7,8 +7,21 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { Agent } from '~/agents/agent.js';
 import { ThreadEvent } from '~/threads/types.js';
-import { ProviderMessage } from '~/providers/base-provider.js';
+import { ProviderMessage, AIProvider } from '~/providers/base-provider.js';
 import { convertToAnthropicFormat } from '~/providers/format-converters.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+
+// Type-safe helper for accessing private method
+type AgentWithPrivates = Agent & {
+  _buildConversationFromEvents: (events: ThreadEvent[]) => ProviderMessage[];
+};
+
+// Helper function for type-safe private method access
+function buildConversationFromEvents(agent: Agent, events: ThreadEvent[]): ProviderMessage[] {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  return (agent as any)._buildConversationFromEvents(events);
+}
 
 /**
  * Real thread event data from lace_20250705_2opxkw that caused the API failure:
@@ -33,12 +46,17 @@ let fullThreadEvents: ThreadEvent[] = [];
 
 try {
   const data = readFileSync(FULL_THREAD_DATA_PATH, 'utf8');
-  const rawEvents = JSON.parse(data);
+  const rawEvents = JSON.parse(data) as unknown[];
   // Convert timestamp strings to Date objects for TypeScript compatibility
-  fullThreadEvents = rawEvents.map((event: any) => ({
-    ...event,
-    timestamp: new Date(event.timestamp),
-  }));
+  fullThreadEvents = rawEvents.map((event: unknown) => {
+    if (typeof event === 'object' && event !== null && 'timestamp' in event) {
+      return {
+        ...event,
+        timestamp: new Date((event as { timestamp: string }).timestamp),
+      } as ThreadEvent;
+    }
+    return event as ThreadEvent;
+  });
 } catch {
   console.warn('Could not load full thread data, using sample data instead');
   // Fallback to sample data if full data not available
@@ -153,16 +171,19 @@ describe('Conversation Building Regression Tests', () => {
       }
 
       const mockAgent = new Agent({
-        provider: {} as any,
-        toolExecutor: {} as any,
-        threadManager: {} as any,
+        provider: {} as AIProvider,
+        toolExecutor: {} as ToolExecutor,
+        threadManager: {} as ThreadManager,
         threadId: 'test',
         tools: [],
       });
 
       // This should not throw an error
       expect(() => {
-        const conversation = (mockAgent as any)._buildConversationFromEvents(fullThreadEvents);
+        const conversation: ProviderMessage[] = buildConversationFromEvents(
+          mockAgent,
+          fullThreadEvents
+        );
         expect(conversation).toBeDefined();
         expect(Array.isArray(conversation)).toBe(true);
       }).not.toThrow();
@@ -175,14 +196,17 @@ describe('Conversation Building Regression Tests', () => {
       }
 
       const mockAgent = new Agent({
-        provider: {} as any,
-        toolExecutor: {} as any,
-        threadManager: {} as any,
+        provider: {} as AIProvider,
+        toolExecutor: {} as ToolExecutor,
+        threadManager: {} as ThreadManager,
         threadId: 'test',
         tools: [],
       });
 
-      const conversation = (mockAgent as any)._buildConversationFromEvents(fullThreadEvents);
+      const conversation: ProviderMessage[] = buildConversationFromEvents(
+        mockAgent,
+        fullThreadEvents
+      );
 
       // Collect all tool use IDs and tool result IDs
       const toolUseIds = new Set<string>();
@@ -223,14 +247,17 @@ describe('Conversation Building Regression Tests', () => {
       }
 
       const mockAgent = new Agent({
-        provider: {} as any,
-        toolExecutor: {} as any,
-        threadManager: {} as any,
+        provider: {} as AIProvider,
+        toolExecutor: {} as ToolExecutor,
+        threadManager: {} as ThreadManager,
         threadId: 'test',
         tools: [],
       });
 
-      const conversation = (mockAgent as any)._buildConversationFromEvents(fullThreadEvents);
+      const conversation: ProviderMessage[] = buildConversationFromEvents(
+        mockAgent,
+        fullThreadEvents
+      );
 
       // This should not throw - it should convert successfully
       expect(() => {
@@ -280,14 +307,17 @@ describe('Conversation Building Regression Tests', () => {
   describe('Sample Event Sequence Tests', () => {
     it('should properly pair tool calls with tool results', () => {
       const mockAgent = new Agent({
-        provider: {} as any,
-        toolExecutor: {} as any,
-        threadManager: {} as any,
+        provider: {} as AIProvider,
+        toolExecutor: {} as ToolExecutor,
+        threadManager: {} as ThreadManager,
         threadId: 'test',
         tools: [],
       });
 
-      const conversation = (mockAgent as any)._buildConversationFromEvents(sampleEventSequence);
+      const conversation: ProviderMessage[] = buildConversationFromEvents(
+        mockAgent,
+        sampleEventSequence
+      );
 
       // Verify the conversation structure
       expect(conversation).toBeDefined();
@@ -300,8 +330,8 @@ describe('Conversation Building Regression Tests', () => {
       );
 
       expect(assistantWithToolCall).toBeDefined();
-      expect(assistantWithToolCall.toolCalls).toHaveLength(1);
-      expect(assistantWithToolCall.toolCalls[0].id).toBe('toolu_012RDexnDVgu6QthBGZZ45RH');
+      expect(assistantWithToolCall!.toolCalls).toHaveLength(1);
+      expect(assistantWithToolCall!.toolCalls![0].id).toBe('toolu_012RDexnDVgu6QthBGZZ45RH');
 
       // Find the user message that should contain the tool result
       const userWithToolResult = conversation.find(
@@ -310,23 +340,26 @@ describe('Conversation Building Regression Tests', () => {
       );
 
       expect(userWithToolResult).toBeDefined();
-      expect(userWithToolResult.toolResults).toHaveLength(1);
-      expect(userWithToolResult.toolResults[0].id).toBe('toolu_012RDexnDVgu6QthBGZZ45RH');
+      expect(userWithToolResult!.toolResults).toHaveLength(1);
+      expect(userWithToolResult!.toolResults![0].id).toBe('toolu_012RDexnDVgu6QthBGZZ45RH');
 
       // Verify they reference the same tool_use_id
-      expect(assistantWithToolCall.toolCalls[0].id).toBe(userWithToolResult.toolResults[0].id);
+      expect(assistantWithToolCall!.toolCalls![0].id).toBe(userWithToolResult!.toolResults![0].id);
     });
 
     it('should not create orphaned tool results', () => {
       const mockAgent = new Agent({
-        provider: {} as any,
-        toolExecutor: {} as any,
-        threadManager: {} as any,
+        provider: {} as AIProvider,
+        toolExecutor: {} as ToolExecutor,
+        threadManager: {} as ThreadManager,
         threadId: 'test',
         tools: [],
       });
 
-      const conversation = (mockAgent as any)._buildConversationFromEvents(sampleEventSequence);
+      const conversation: ProviderMessage[] = buildConversationFromEvents(
+        mockAgent,
+        sampleEventSequence
+      );
 
       // Collect all tool_use_ids and tool_result_ids
       const toolUseIds = new Set<string>();
@@ -353,14 +386,17 @@ describe('Conversation Building Regression Tests', () => {
 
     it('should validate against Anthropic API format', () => {
       const mockAgent = new Agent({
-        provider: {} as any,
-        toolExecutor: {} as any,
-        threadManager: {} as any,
+        provider: {} as AIProvider,
+        toolExecutor: {} as ToolExecutor,
+        threadManager: {} as ThreadManager,
         threadId: 'test',
         tools: [],
       });
 
-      const conversation = (mockAgent as any)._buildConversationFromEvents(sampleEventSequence);
+      const conversation: ProviderMessage[] = buildConversationFromEvents(
+        mockAgent,
+        sampleEventSequence
+      );
 
       // Convert to Anthropic format to ensure it would pass API validation
       expect(() => {
@@ -389,16 +425,17 @@ describe('Conversation Building Regression Tests', () => {
       ];
 
       const mockAgent = new Agent({
-        provider: {} as any,
-        toolExecutor: {} as any,
-        threadManager: {} as any,
+        provider: {} as AIProvider,
+        toolExecutor: {} as ToolExecutor,
+        threadManager: {} as ThreadManager,
         threadId: 'test',
         tools: [],
       });
 
       // This should not throw an error, but should handle gracefully
       expect(() => {
-        const conversation = (mockAgent as any)._buildConversationFromEvents(
+        const conversation: ProviderMessage[] = buildConversationFromEvents(
+          mockAgent,
           eventsWithOrphanedCall
         );
         expect(conversation).toBeDefined();
@@ -413,16 +450,17 @@ describe('Conversation Building Regression Tests', () => {
       ];
 
       const mockAgent = new Agent({
-        provider: {} as any,
-        toolExecutor: {} as any,
-        threadManager: {} as any,
+        provider: {} as AIProvider,
+        toolExecutor: {} as ToolExecutor,
+        threadManager: {} as ThreadManager,
         threadId: 'test',
         tools: [],
       });
 
       // This currently fails - this is the bug we need to fix
       expect(() => {
-        const conversation = (mockAgent as any)._buildConversationFromEvents(
+        const conversation: ProviderMessage[] = buildConversationFromEvents(
+          mockAgent,
           eventsWithOrphanedResult
         );
 
@@ -457,15 +495,18 @@ describe('Conversation Building Regression Tests', () => {
       }
 
       const mockAgent = new Agent({
-        provider: {} as any,
-        toolExecutor: {} as any,
-        threadManager: {} as any,
+        provider: {} as AIProvider,
+        toolExecutor: {} as ToolExecutor,
+        threadManager: {} as ThreadManager,
         threadId: 'test',
         tools: [],
       });
 
       // Build conversation and convert to Anthropic format
-      const conversation = (mockAgent as any)._buildConversationFromEvents(fullThreadEvents);
+      const conversation: ProviderMessage[] = buildConversationFromEvents(
+        mockAgent,
+        fullThreadEvents
+      );
       const anthropicMessages = convertToAnthropicFormat(conversation);
 
       // This should pass - we should NOT get the API error

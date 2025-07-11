@@ -132,7 +132,7 @@ describe('App Initialization (run function)', () => {
         eventNames: vi.fn(),
         once: vi.fn(),
         // Agent API methods
-        resumeOrCreateThread: vi.fn().mockResolvedValue({
+        resumeOrCreateThread: vi.fn().mockReturnValue({
           threadId: 'new-thread-123',
           isResumed: false,
           resumeError: undefined,
@@ -251,7 +251,6 @@ describe('App Initialization (run function)', () => {
   it('should initialize ThreadManager and handle resumed session with ID', async () => {
     const { log } = withConsoleCapture();
     // Update the base Agent mock to return resumed session
-    const originalImplementation = vi.mocked(Agent).getMockImplementation();
     vi.mocked(Agent).mockImplementation(() => {
       const mockAgentInstance = {
         start: vi.fn(),
@@ -279,7 +278,7 @@ describe('App Initialization (run function)', () => {
         eventNames: vi.fn(),
         once: vi.fn(),
         // Agent API methods - override for this test
-        resumeOrCreateThread: vi.fn().mockResolvedValue({
+        resumeOrCreateThread: vi.fn().mockReturnValue({
           threadId: 'specific-thread-789',
           isResumed: true,
           resumeError: undefined,
@@ -303,14 +302,55 @@ describe('App Initialization (run function)', () => {
 
   it('should initialize ThreadManager and handle resume error', async () => {
     const { log } = withConsoleCapture();
-    vi.mocked(ThreadManager.prototype.resumeOrCreate).mockResolvedValue({
-      threadId: 'new-thread-123',
-      isResumed: false,
-      resumeError: 'Mock resume error',
+    
+    // Mock Agent constructor to return an instance with resume error
+    vi.mocked(Agent).mockImplementation(() => {
+      const mockAgentInstance = {
+        start: vi.fn(),
+        toolExecutor: vi.mocked(new ToolExecutor()),
+        // Add all required Agent properties/methods
+        _provider: {},
+        _toolExecutor: {},
+        _threadManager: {},
+        _threadId: 'test-thread',
+        sendMessage: vi.fn(),
+        abort: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        emit: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        removeAllListeners: vi.fn(),
+        setMaxListeners: vi.fn(),
+        getMaxListeners: vi.fn(),
+        listeners: vi.fn(),
+        rawListeners: vi.fn(),
+        listenerCount: vi.fn(),
+        prependListener: vi.fn(),
+        prependOnceListener: vi.fn(),
+        eventNames: vi.fn(),
+        once: vi.fn(),
+        // Agent API methods - with resume error
+        resumeOrCreateThread: vi.fn().mockReturnValue({
+          threadId: 'new-thread-123',
+          isResumed: false,
+          resumeError: 'Mock resume error',
+        }),
+        getLatestThreadId: vi.fn().mockResolvedValue('latest-thread-123'),
+        getCurrentThreadId: vi.fn().mockReturnValue('current-thread-123'),
+        generateThreadId: vi.fn().mockReturnValue('generated-thread-123'),
+        createThread: vi.fn(),
+        stop: vi.fn(),
+        replaySessionEvents: vi.fn(),
+        providerName: 'mock-provider',
+        state: 'idle',
+        threadId: 'test-thread',
+      };
+      return mockAgentInstance as any;
     });
+
     await run(mockCliOptions);
-    // With Agent mock, no resume error occurs by default
-    expect(log).toHaveBeenCalledWith('🆕 Starting conversation new-thread-123');
+    expect(log).toHaveBeenCalledWith('🆕 Starting new conversation new-thread-123');
   });
 
   it('should set up ToolExecutor and Agent', async () => {

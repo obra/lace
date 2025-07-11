@@ -14,7 +14,7 @@ import {
 } from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
 
 export function FileEditToolRenderer({ item }: ToolRendererProps) {
-  const { isExpanded } = useTimelineItem();
+  useTimelineItem();
 
   // Extract data directly
   const { file_path, old_text, new_text } = item.call.arguments as {

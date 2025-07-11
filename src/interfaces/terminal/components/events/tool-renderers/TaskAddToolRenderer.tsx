@@ -25,7 +25,7 @@ function extractTaskTitle(args: Record<string, unknown>): string {
 }
 
 export function TaskAddToolRenderer({ item }: ToolRendererProps) {
-  const { isExpanded } = useTimelineItem();
+  useTimelineItem();
 
   // Extract data from the tool call and result
   const args = item.call.arguments;

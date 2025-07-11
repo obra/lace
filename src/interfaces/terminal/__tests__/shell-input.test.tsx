@@ -21,7 +21,7 @@ vi.mock('../hooks/use-text-buffer.js', () => ({
 vi.mock('../components/text-renderer.js', async () => {
   const { Text } = await import('ink');
   return {
-    default: ({ lines, placeholder, isFocused }: any) => {
+    default: ({ lines, placeholder, _isFocused }: any) => {
       // Show content if there's actual text, otherwise show placeholder
       const hasContent = lines.length > 0 && lines[0] !== '';
       if (hasContent) {

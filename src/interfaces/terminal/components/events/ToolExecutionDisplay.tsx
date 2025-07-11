@@ -35,7 +35,7 @@ export function ToolExecutionDisplay({
   callEvent,
   resultEvent,
   isStreaming,
-  isFocused,
+  isFocused: _isFocused,
   isSelected,
   onToggle,
 }: ToolExecutionDisplayProps) {
@@ -44,7 +44,7 @@ export function ToolExecutionDisplay({
   // Use shared expansion state management
   const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
     isSelected || false,
-    (expanded) => onToggle?.()
+    (_expanded) => onToggle?.()
   );
 
   // Create handler that works with TimelineEntry interface

@@ -27,8 +27,8 @@ class MockProvider extends AIProvider {
     return 'mock-model';
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return this.mockResponse;
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve(this.mockResponse);
   }
 }
 
@@ -46,11 +46,11 @@ class MockTool extends Tool {
     super();
   }
 
-  async executeValidated(
+  executeValidated(
     _args: z.infer<typeof this.schema>,
     _context?: ToolContext
   ): Promise<ToolResult> {
-    return this.result;
+    return Promise.resolve(this.result);
   }
 }
 

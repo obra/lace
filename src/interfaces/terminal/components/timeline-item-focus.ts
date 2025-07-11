@@ -3,6 +3,7 @@
 
 import { TimelineItem } from '~/interfaces/timeline-types.js';
 import { FocusRegions } from '~/interfaces/terminal/focus/index.js';
+import { ToolResult } from '~/tools/types.js';
 
 /**
  * Interface for timeline items that can accept keyboard focus
@@ -76,18 +77,30 @@ export function getTimelineItemFocusId(item: TimelineItem): string | null {
 }
 
 /**
+ * Type guard to check if a value is a ToolResult
+ */
+function isToolResult(value: unknown): value is ToolResult {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    'isError' in value &&
+    typeof (value as ToolResult).isError === 'boolean'
+  );
+}
+
+/**
  * Check if a tool result contains valid delegate thread information
  *
  * @param result - The tool result to check
  * @returns true if this is a valid delegate result with thread data
  */
 export function isDelegateToolCallResult(result: unknown): boolean {
-  if (!result || (result as any).isError) {
+  if (!isToolResult(result) || result.isError) {
     return false;
   }
 
   // For delegate tool results, the thread ID is stored in metadata.threadId
-  const threadId = (result as any).metadata?.threadId;
+  const threadId = result.metadata?.threadId;
   return typeof threadId === 'string' && threadId.length > 0;
 }
 
@@ -102,7 +115,9 @@ export function extractDelegateThreadId(result: unknown): string | null {
     return null;
   }
 
-  return (result as any).metadata?.threadId || null;
+  // Since isDelegateToolCallResult ensures result is a ToolResult with valid metadata
+  const toolResult = result as ToolResult;
+  return (toolResult.metadata?.threadId as string) || null;
 }
 
 /**

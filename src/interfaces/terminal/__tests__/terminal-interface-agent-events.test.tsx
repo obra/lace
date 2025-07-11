@@ -8,8 +8,6 @@ import { Agent } from '~/agents/agent.js';
 import { ThreadManager } from '~/threads/thread-manager.js';
 import { ToolExecutor } from '~/tools/executor.js';
 import { TestProvider } from '~/__tests__/utils/test-provider.js';
-import { CommandRegistry } from '~/commands/registry.js';
-import { CommandExecutor } from '~/commands/executor.js';
 import { TerminalInterfaceComponent } from '~/interfaces/terminal/terminal-interface.js';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
@@ -19,8 +17,6 @@ describe('TerminalInterface Agent Events', () => {
   let agent: Agent;
   let threadManager: ThreadManager;
   let testDir: string;
-  let commandRegistry: CommandRegistry;
-  let commandExecutor: CommandExecutor;
 
   beforeEach(async () => {
     testDir = await mkdtemp(join(tmpdir(), 'lace-terminal-test-'));
@@ -45,9 +41,6 @@ describe('TerminalInterface Agent Events', () => {
     vi.spyOn(agent, 'getCurrentThreadId').mockReturnValue(threadId);
 
     await agent.start();
-
-    commandRegistry = new CommandRegistry();
-    commandExecutor = new CommandExecutor(commandRegistry);
   });
 
   afterEach(async () => {
@@ -61,7 +54,7 @@ describe('TerminalInterface Agent Events', () => {
       const onSpy = vi.spyOn(agent, 'on');
 
       // Act
-      const { rerender } = render(<TerminalInterfaceComponent agent={agent} />);
+      render(<TerminalInterfaceComponent agent={agent} />);
 
       // Wait for all effects to complete
       await new Promise((resolve) => setTimeout(resolve, 0));

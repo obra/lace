@@ -1,11 +1,10 @@
 // ABOUTME: Timeline content component for rendering timeline items list
 // ABOUTME: Manages item refs, positioning, and coordinates between viewport state and item rendering
 
-import React, { useRef, useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Box } from 'ink';
 import { Timeline, TimelineItem as TimelineItemType } from '~/interfaces/timeline-types.js';
 import { TimelineItem } from '~/interfaces/terminal/components/events/TimelineItem.js';
-import { TimelineItemRef } from '~/interfaces/terminal/components/timeline-item-focus.js';
 
 interface ViewportState {
   selectedItemIndex: number;

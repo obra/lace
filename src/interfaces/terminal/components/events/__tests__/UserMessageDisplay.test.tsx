@@ -2,7 +2,7 @@
 // ABOUTME: Verifies user messages auto-collapse for long content and show proper expansion controls
 
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
 import { UserMessageDisplay } from '~/interfaces/terminal/components/events/UserMessageDisplay.js';
 import { ThreadEvent } from '~/threads/types.js';

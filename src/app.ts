@@ -121,36 +121,6 @@ async function setupAgent(
   return agent;
 }
 
-async function handleSession(
-  threadManager: ThreadManager,
-  continueMode?: boolean | string
-): Promise<string> {
-  let continueThreadId: string | undefined;
-  if (continueMode) {
-    if (typeof continueMode === 'string') {
-      continueThreadId = continueMode;
-    } else {
-      logger.debug('Attempting to get latest thread ID');
-      continueThreadId = threadManager.getLatestThreadId() || undefined;
-      logger.debug(`Latest thread ID: ${continueThreadId}`);
-    }
-  }
-
-  const sessionInfo = threadManager.resumeOrCreate(continueThreadId);
-  const { threadId } = sessionInfo;
-
-  if (sessionInfo.isResumed) {
-    console.log(`📖 Continuing conversation ${threadId}`);
-  } else if (sessionInfo.resumeError) {
-    console.warn(`⚠️  ${sessionInfo.resumeError}`);
-    console.log(`🆕 Starting new conversation ${threadId}`);
-  } else {
-    console.log(`🆕 Starting conversation ${threadId}`);
-  }
-
-  return threadId;
-}
-
 async function handleSessionWithAgent(
   agent: Agent,
   continueMode?: boolean | string
@@ -165,7 +135,7 @@ async function handleSessionWithAgent(
     }
   }
 
-  const sessionInfo = await agent.resumeOrCreateThread(continueThreadId);
+  const sessionInfo = agent.resumeOrCreateThread(continueThreadId);
   const { threadId } = sessionInfo;
 
   if (sessionInfo.isResumed) {
@@ -191,7 +161,7 @@ export async function run(options: CLIOptions): Promise<void> {
   const agent = await setupAgent(options, tempThreadId, threadManager);
 
   // Use Agent to handle session resumption with automatic replay
-  const sessionThreadId = await handleSessionWithAgent(agent, options.continue);
+  await handleSessionWithAgent(agent, options.continue);
 
   if (options.prompt) {
     const nonInteractive = new NonInteractiveInterface(agent);

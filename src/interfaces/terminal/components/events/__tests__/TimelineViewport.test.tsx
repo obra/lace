@@ -54,7 +54,7 @@ describe('TimelineViewport', () => {
 
     const { lastFrame } = renderWithFocus(
       <TimelineViewport timeline={timeline}>
-        {({ timeline: tl, viewportState, itemRefs }) =>
+        {({ timeline: tl, viewportState: _viewportState, itemRefs: _itemRefs }) =>
           tl.items.map((item, index) => (
             <Text key={`${item.type}-${index}`}>
               {item.type === 'user_message' ? item.content : `Item ${index}`}

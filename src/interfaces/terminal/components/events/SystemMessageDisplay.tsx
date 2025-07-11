@@ -12,7 +12,11 @@ interface SystemMessageDisplayProps {
   isFocused?: boolean;
 }
 
-export function SystemMessageDisplay({ event, isStreaming, isFocused }: SystemMessageDisplayProps) {
+export function SystemMessageDisplay({
+  event,
+  isStreaming,
+  isFocused: _isFocused,
+}: SystemMessageDisplayProps) {
   const message = event.data as string;
 
   return (

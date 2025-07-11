@@ -39,7 +39,7 @@ describe('TerminalInterface Streaming Event Flow', () => {
   });
 
   afterEach(async () => {
-    await threadManager.close();
+    threadManager.close();
     await rm(testDir, { recursive: true, force: true });
   });
 

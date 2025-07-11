@@ -43,12 +43,21 @@ describe('Agent Queue End-to-End Scenarios', () => {
   beforeEach(async () => {
     longProvider = new LongOperationProvider(200); // 200ms delay
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     mockToolExecutor = {
       registerAllAvailableTools: vi.fn(),
-      getRegisteredTools: vi.fn().mockReturnValue([]),
+      getAllTools: vi.fn().mockReturnValue([]),
+      getTool: vi.fn().mockReturnValue(undefined),
+      setApprovalCallback: vi.fn(),
+      registerTool: vi.fn(),
+      registerTools: vi.fn(),
+      getAvailableToolNames: vi.fn().mockReturnValue([]),
+      getApprovalCallback: vi.fn().mockReturnValue(undefined),
+      executeTool: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
     } as any;
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     mockThreadManager = {
       addEvent: vi.fn(),
       getEvents: vi.fn().mockReturnValue([]),
@@ -74,10 +83,10 @@ describe('Agent Queue End-to-End Scenarios', () => {
     await agent.start();
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     if (agent) {
       agent.removeAllListeners();
-      await agent.stop();
+      agent.stop();
     }
   });
 
@@ -116,7 +125,7 @@ describe('Agent Queue End-to-End Scenarios', () => {
 
   describe('Scenario 2: Task notifications during busy periods', () => {
     it('should queue task notifications while agent is processing', async () => {
-      const queuedEvents: any[] = [];
+      const queuedEvents: { id: string; queueLength: number }[] = [];
       agent.on('message_queued', (data) => queuedEvents.push(data));
 
       // Start long operation
@@ -239,7 +248,7 @@ describe('Agent Queue End-to-End Scenarios', () => {
 
   describe('Queue event lifecycle', () => {
     it('should emit message_queued events when queueing', async () => {
-      const queuedEvents: any[] = [];
+      const queuedEvents: { id: string; queueLength: number }[] = [];
 
       // Track queued events
       agent.on('message_queued', (data) => queuedEvents.push(data));

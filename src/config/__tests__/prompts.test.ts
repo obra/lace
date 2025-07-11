@@ -233,7 +233,7 @@ Remember to be helpful and accurate.`;
       process.env.LACE_DIR = longPath;
 
       // This should either work or throw a meaningful error
-      await expect(async () => {
+      expect(async () => {
         const config = await loadPromptConfig();
         expect(config).toBeDefined();
       }).not.toThrow(/undefined/);

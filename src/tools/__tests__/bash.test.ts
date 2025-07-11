@@ -64,7 +64,11 @@ describe('BashTool', () => {
 
       expect(result.isError).toBe(false);
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.exitCode).toBe(0);
       expect(output.stdout).toBe('hello world\n');
       expect(output.stderr).toBe('');
@@ -75,7 +79,11 @@ describe('BashTool', () => {
 
       expect(result.isError).toBe(false);
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.exitCode).toBe(0);
       expect(output.stdout).toBe('');
       expect(output.stderr).toBe('');
@@ -90,7 +98,11 @@ describe('BashTool', () => {
       // Tool should succeed because it executed the command successfully
       expect(result.isError).toBe(false);
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.exitCode).toBe(1); // Command failed, but tool succeeded
       expect(output.stdout).toBe('');
     });
@@ -102,7 +114,11 @@ describe('BashTool', () => {
 
       expect(result.isError).toBe(false); // Tool executed successfully
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.exitCode).toBe(1); // grep found no matches
       expect(output.stdout).toBe(''); // No output because no matches
     });
@@ -115,7 +131,11 @@ describe('BashTool', () => {
 
       expect(result.isError).toBe(false); // Tool ran the "linter"
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.exitCode).toBe(1); // "Linter" found issues
       expect(output.stdout.trim()).toBe('1'); // wc output
     });
@@ -132,7 +152,11 @@ describe('BashTool', () => {
       expect(result.content[0].text).toContain('not found');
       expect(result.content[0].text).toContain('nonexistentcommand12345');
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.exitCode).toBe(127); // Command not found
       expect(output.stderr).toContain('not found');
     });
@@ -145,7 +169,11 @@ describe('BashTool', () => {
       // Based on observed behavior: command in sequence = tool success
       expect(result.isError).toBe(false);
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.stdout).toContain('before');
       expect(output.stdout).toContain('Exit code: 127');
       expect(output.stderr).toContain('not found');
@@ -159,7 +187,11 @@ describe('BashTool', () => {
 
       expect(result.isError).toBe(false); // Command executed (even though it failed)
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.exitCode).toBe(126);
       expect(output.stderr).toContain('permission issue');
     });
@@ -173,7 +205,11 @@ describe('BashTool', () => {
 
       expect(result.isError).toBe(false);
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.exitCode).toBe(0);
       expect(output.stdout).toBe('to stdout\n');
       expect(output.stderr).toBe('to stderr\n');
@@ -186,7 +222,11 @@ describe('BashTool', () => {
 
       expect(result.isError).toBe(false);
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.exitCode).toBe(0);
       expect(output.stdout.split('\n')).toHaveLength(101); // 100 lines + empty line
       expect(output.stdout).toContain('line 1');
@@ -200,7 +240,11 @@ describe('BashTool', () => {
 
       expect(result.isError).toBe(false);
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.exitCode).toBe(0);
       expect(output.stdout).toBe('Hello 🌍 World! Special: àáâãäå\n');
     });
@@ -213,7 +257,11 @@ describe('BashTool', () => {
       expect(result.isError).toBe(false);
       expect(() => JSON.parse(result.content[0].text!)).not.toThrow();
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output).toHaveProperty('stdout');
       expect(output).toHaveProperty('stderr');
       expect(output).toHaveProperty('exitCode');
@@ -228,7 +276,11 @@ describe('BashTool', () => {
 
       expect(result.isError).toBe(false);
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.stdout).toBe('{"test": "value", "number": 42}\n');
 
       // The stdout content should also be valid JSON
@@ -247,7 +299,11 @@ describe('BashTool', () => {
 
       expect(result.isError).toBe(false); // ✅ Tool completed (not ❌ Tool failed)
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.exitCode).toBe(1); // ESLint found issues
       expect(output.stdout).toContain('error Delete spaces');
     });
@@ -258,7 +314,11 @@ describe('BashTool', () => {
 
       expect(result.isError).toBe(false); // ✅ Tool completed
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.exitCode).toBe(1);
       expect(output.stdout).toBe('');
       expect(output.stderr).toBe('');
@@ -270,7 +330,11 @@ describe('BashTool', () => {
 
       expect(result.isError).toBe(false); // ✅ Tool completed
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.exitCode).toBe(0);
       expect(output.stdout).toBe('hello\n');
       expect(output.stderr).toBe('');
@@ -284,7 +348,11 @@ describe('BashTool', () => {
 
       expect(result.isError).toBe(false); // ✅ Tool completed
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.exitCode).toBe(1); // grep found no matches
       expect(output.stdout).toBe(''); // No output
     });
@@ -297,7 +365,11 @@ describe('BashTool', () => {
 
       expect(result.isError).toBe(false); // ✅ Tool completed (what I observed)
 
-      const output = JSON.parse(result.content[0].text!);
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
       expect(output.stdout).toContain('Testing');
       expect(output.stdout).toContain('After error');
       expect(output.stderr).toContain('not found');

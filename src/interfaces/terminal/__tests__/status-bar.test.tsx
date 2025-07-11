@@ -2,11 +2,8 @@
 // ABOUTME: Verifies status information display and token usage formatting
 
 import React from 'react';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import {
-  renderInkComponent,
-  stripAnsi,
-} from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
+import { describe, it, expect } from 'vitest';
+import { renderInkComponent } from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
 import StatusBar from '~/interfaces/terminal/components/status-bar.js';
 import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 import type { ProjectContext } from '~/interfaces/terminal/hooks/use-project-context.js';

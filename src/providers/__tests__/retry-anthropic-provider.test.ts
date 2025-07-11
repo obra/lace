@@ -102,7 +102,7 @@ describe('AnthropicProvider retry functionality', () => {
 
       expect(retryAttemptSpy).toHaveBeenCalledWith({
         attempt: 1,
-        delay: expect.any(Number),
+        delay: expect.any(Number) as number,
         error: expect.objectContaining({ status: 503 }),
       });
     });
@@ -141,7 +141,7 @@ describe('AnthropicProvider retry functionality', () => {
       expect(mockCreate).toHaveBeenCalledTimes(10);
       expect(exhaustedSpy).toHaveBeenCalledWith({
         attempts: 10,
-        lastError: expect.objectContaining({ code: 'ETIMEDOUT' }),
+        lastError: expect.objectContaining({ code: 'ETIMEDOUT' }) as Error,
       });
 
       // Restore fake timers
@@ -154,8 +154,8 @@ describe('AnthropicProvider retry functionality', () => {
       const messages: ProviderMessage[] = [{ role: 'user', content: 'Hello' }];
 
       // First call throws with network error, second call succeeds with stream
-      const networkError = new Error('Connection failed');
-      (networkError as any).code = 'ECONNRESET';
+      const networkError = new Error('Connection failed') as Error & { code: string };
+      networkError.code = 'ECONNRESET';
 
       // Create a proper stream mock for the successful retry
       const successfulStream = {

@@ -11,6 +11,9 @@ import { convertToAnthropicFormat } from '~/providers/format-converters.js';
 import { getLaceDir } from '~/config/lace-dir.js';
 import { join } from 'path';
 import { loadEnvFile } from '~/config/env-loader.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ProviderMessage } from '~/providers/base-provider.js';
+import { ThreadEvent } from '~/threads/types.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -70,21 +73,26 @@ async function debugThread(options: DebugOptions): Promise<ThreadDebugInfo> {
   // We'll create a minimal agent instance just to access this method
   const agent = new Agent({
     provider,
-    toolExecutor: undefined as any, // We don't need tools for debug
+    toolExecutor: undefined as unknown as ToolExecutor, // We don't need tools for debug
     threadManager,
     threadId: options.threadId,
     tools: [],
   });
 
   // Access the private method through reflection
-  const buildConversationFromEvents = (agent as any)._buildConversationFromEvents.bind(agent);
+  const agentWithPrivates = agent as unknown as {
+    _buildConversationFromEvents: (events: any[]) => any;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  const buildConversationFromEvents = agentWithPrivates._buildConversationFromEvents.bind(agent);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   const providerMessages = buildConversationFromEvents(thread.events);
 
   // Calculate token counts
   const tokenCounts = calculateTokenCounts(thread.events, providerMessages);
 
   // Convert to provider-specific format if needed
-  let conversation: any = providerMessages;
+  let conversation: ProviderMessage[] | unknown = providerMessages;
 
   if (options.provider === 'anthropic') {
     conversation = convertToAnthropicFormat(providerMessages);
@@ -105,7 +113,19 @@ async function debugThread(options: DebugOptions): Promise<ThreadDebugInfo> {
   };
 }
 
-function calculateTokenCounts(events: any[], providerMessages: any[]): any {
+function calculateTokenCounts(
+  events: ThreadEvent[],
+  providerMessages: ProviderMessage[]
+): {
+  estimated: number;
+  breakdown: {
+    userMessages: number;
+    agentMessages: number;
+    toolCalls: number;
+    toolResults: number;
+    systemPrompts: number;
+  };
+} {
   let userMessages = 0;
   let agentMessages = 0;
   let toolCalls = 0;
@@ -194,46 +214,52 @@ function formatAsText(debugInfo: ThreadDebugInfo): string {
       if (typeof msg.content === 'string') {
         lines.push(`  ${msg.content}`);
       } else if (Array.isArray(msg.content)) {
-        msg.content.forEach((block: any, blockIndex: number) => {
-          lines.push(`  Block ${blockIndex + 1} (${block.type}):`);
-          if (block.text) {
-            lines.push(`    ${block.text}`);
+        (msg.content as Array<any>).forEach(
+          (block, blockIndex: number) => {
+            lines.push(`  Block ${blockIndex + 1} (${block.type}):`);
+            if (block.text) {
+              lines.push(`    ${block.text}`);
+            }
+            if (block.tool_use_id) {
+              lines.push(`    Tool Use ID: ${block.tool_use_id}`);
+            }
+            if (block.name) {
+              lines.push(`    Tool Name: ${block.name}`);
+            }
+            if (block.input) {
+              lines.push(`    Tool Input: ${JSON.stringify(block.input, null, 2)}`);
+            }
           }
-          if (block.tool_use_id) {
-            lines.push(`    Tool Use ID: ${block.tool_use_id}`);
-          }
-          if (block.name) {
-            lines.push(`    Tool Name: ${block.name}`);
-          }
-          if (block.input) {
-            lines.push(`    Tool Input: ${JSON.stringify(block.input, null, 2)}`);
-          }
-        });
+        );
       }
 
       if (msg.toolCalls?.length > 0) {
         lines.push(`  Tool Calls: ${msg.toolCalls.length}`);
-        msg.toolCalls.forEach((call: any, callIndex: number) => {
-          lines.push(`    ${callIndex + 1}. ${call.name}:`);
-          lines.push(`       Input: ${JSON.stringify(call.input, null, 2)}`);
-        });
+        (msg.toolCalls as Array<{ name: string; input: any }>).forEach(
+          (call, callIndex: number) => {
+            lines.push(`    ${callIndex + 1}. ${call.name}:`);
+            lines.push(`       Input: ${JSON.stringify(call.input, null, 2)}`);
+          }
+        );
       }
 
       if (msg.toolResults?.length > 0) {
         lines.push(`  Tool Results: ${msg.toolResults.length}`);
-        msg.toolResults.forEach((result: any, resultIndex: number) => {
-          lines.push(`    ${resultIndex + 1}. ${result.id}:`);
-          if (result.content) {
-            result.content.forEach((contentBlock: any, contentIndex: number) => {
-              lines.push(
-                `       Content ${contentIndex + 1}: ${contentBlock.text || JSON.stringify(contentBlock)}`
-              );
-            });
+        (msg.toolResults as Array<{ id: string; content?: Array<{ text?: string }> }>).forEach(
+          (result, resultIndex: number) => {
+            lines.push(`    ${resultIndex + 1}. ${result.id}:`);
+            if (result.content) {
+              result.content.forEach((contentBlock: { text?: string }, contentIndex: number) => {
+                lines.push(
+                  `       Content ${contentIndex + 1}: ${contentBlock.text || JSON.stringify(contentBlock)}`
+                );
+              });
+            }
+            if ((result as any).isError) {
+              lines.push(`       Error: true`);
+            }
           }
-          if (result.isError) {
-            lines.push(`       Error: true`);
-          }
-        });
+        );
       }
 
       lines.push('');
@@ -283,7 +309,7 @@ async function main() {
   const options = program.opts();
 
   try {
-    const debugInfo = await debugThread(options);
+    const debugInfo = await debugThread(options as DebugOptions);
 
     let output: string;
     if (options.format === 'json') {
@@ -295,9 +321,9 @@ async function main() {
     if (options.output) {
       const fs = await import('fs');
       fs.writeFileSync(options.output, output);
-      console.log(`Debug output written to ${options.output}`);
+      console.warn(`Debug output written to ${options.output}`);
     } else {
-      console.log(output);
+      console.warn(output);
     }
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : error);

@@ -5,7 +5,6 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { renderInkComponent } from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
 import StatusBar from '~/interfaces/terminal/components/status-bar.js';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 
 // Mock modules
 vi.mock('../../../utils/logger.js', () => ({

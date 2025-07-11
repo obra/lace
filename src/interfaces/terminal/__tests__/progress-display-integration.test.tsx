@@ -105,7 +105,7 @@ describe('Progress Display Integration Tests', () => {
   describe('Real-time progress display', () => {
     it('should show progress updates with elapsed time and token counts', async () => {
       // Arrange
-      const { getByText } = render(<TerminalInterfaceComponent agent={agent} />);
+      render(<TerminalInterfaceComponent agent={agent} />);
 
       // Track progress events
       const progressEvents: Array<{ metrics: CurrentTurnMetrics }> = [];
@@ -238,8 +238,7 @@ describe('Progress Display Integration Tests', () => {
       // This is tested via mocked ShellInput above, but we can also test
       // the state management directly
 
-      const isInputDisabled = false;
-      const { rerender } = render(<TerminalInterfaceComponent agent={agent} />);
+      render(<TerminalInterfaceComponent agent={agent} />);
 
       // Monitor input state changes by tracking the component's internal state
       // This is more of an integration test to ensure the disabled prop is set correctly

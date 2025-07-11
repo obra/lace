@@ -196,7 +196,7 @@ describe('Turn State Integration Tests', () => {
           input: { param: 'value' },
           isReadOnly: false,
           requestId: 'test-request-2',
-          resolve: (decision: any) => {
+          resolve: (_decision: any) => {
             // Mock resolve
           },
         });
@@ -303,8 +303,21 @@ describe('Turn State Integration Tests', () => {
       // Act
       agent.emit('token_budget_warning', {
         message: 'Budget warning',
-        usage: { totalTokens: 1000 },
-        recommendations: {},
+        usage: {
+          totalUsed: 1000,
+          maxTokens: 2000,
+          availableTokens: 1000,
+          usagePercentage: 50,
+          warningTriggered: true,
+          effectiveLimit: 1800,
+          promptTokens: 600,
+          completionTokens: 400,
+        },
+        recommendations: {
+          shouldSummarize: false,
+          shouldPrune: false,
+          maxRequestSize: 1000,
+        },
       });
 
       // Assert

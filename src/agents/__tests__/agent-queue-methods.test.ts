@@ -23,12 +23,13 @@ class MockProvider extends AIProvider {
     return 'mock-model';
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return {
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve({
       content: 'mock response',
       usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
       toolCalls: [],
-    };
+      stopReason: 'end_turn',
+    });
   }
 }
 
@@ -40,11 +41,13 @@ describe('Agent Queue Methods', () => {
 
   beforeEach(() => {
     mockProvider = new MockProvider();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     mockToolExecutor = {
       registerAllAvailableTools: vi.fn(),
       getRegisteredTools: vi.fn().mockReturnValue([]),
       close: vi.fn().mockResolvedValue(undefined),
     } as any;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     mockThreadManager = {
       addEvent: vi.fn(),
       getEvents: vi.fn().mockReturnValue([]),
@@ -121,7 +124,6 @@ describe('Agent Queue Methods', () => {
     });
 
     it('should calculate oldest message age correctly', () => {
-      const startTime = Date.now();
       agent.queueMessage('old message');
 
       // Wait a bit to create age difference

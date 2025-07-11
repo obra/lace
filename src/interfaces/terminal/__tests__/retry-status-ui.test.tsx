@@ -10,7 +10,6 @@ import { ThreadManager } from '~/threads/thread-manager.js';
 import { AIProvider } from '~/providers/base-provider.js';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
 import { Tool } from '~/tools/tool.js';
-import { TerminalInterfaceComponent } from '~/interfaces/terminal/terminal-interface.js';
 import StatusBar from '~/interfaces/terminal/components/status-bar.js';
 
 // Mock provider that can emit retry events

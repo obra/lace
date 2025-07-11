@@ -2,6 +2,7 @@
 // ABOUTME: Validates reusable schema components work correctly
 
 import { describe, it, expect } from 'vitest';
+import { ZodError } from 'zod';
 import {
   NonEmptyString,
   FilePath,
@@ -29,8 +30,12 @@ describe('Common schema patterns', () => {
     it('provides helpful error message', () => {
       try {
         NonEmptyString.parse('');
-      } catch (error: any) {
-        expect(error.issues[0].message).toContain('Cannot be empty');
+      } catch (error: unknown) {
+        if (error instanceof ZodError) {
+          expect(error.issues[0].message).toContain('Cannot be empty');
+        } else {
+          throw error;
+        }
       }
     });
   });
@@ -83,14 +88,22 @@ describe('Common schema patterns', () => {
     it('provides helpful error messages', () => {
       try {
         LineNumber.parse(0);
-      } catch (error: any) {
-        expect(error.issues[0].message).toContain('Must be positive');
+      } catch (error: unknown) {
+        if (error instanceof ZodError) {
+          expect(error.issues[0].message).toContain('Must be positive');
+        } else {
+          throw error;
+        }
       }
 
       try {
         LineNumber.parse(1.5);
-      } catch (error: any) {
-        expect(error.issues[0].message).toContain('Must be an integer');
+      } catch (error: unknown) {
+        if (error instanceof ZodError) {
+          expect(error.issues[0].message).toContain('Must be an integer');
+        } else {
+          throw error;
+        }
       }
     });
   });
@@ -131,8 +144,12 @@ describe('Common schema patterns', () => {
     it('provides helpful error message', () => {
       try {
         FilePattern.parse('');
-      } catch (error: any) {
-        expect(error.issues[0].message).toContain('Pattern cannot be empty');
+      } catch (error: unknown) {
+        if (error instanceof ZodError) {
+          expect(error.issues[0].message).toContain('Pattern cannot be empty');
+        } else {
+          throw error;
+        }
       }
     });
   });

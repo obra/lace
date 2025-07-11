@@ -1,13 +1,9 @@
 // ABOUTME: Individual timeline item component with dynamic tool renderer discovery
 // ABOUTME: Handles all timeline item types with unified expansion behavior and automatic tool renderer selection
 
-import React, { Suspense } from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
-import {
-  Timeline,
-  TimelineItem as TimelineItemType,
-  EphemeralMessage,
-} from '~/interfaces/timeline-types.js';
+import { TimelineItem as TimelineItemType, EphemeralMessage } from '~/interfaces/timeline-types.js';
 import { EventType } from '~/threads/types.js';
 import { EventDisplay } from '~/interfaces/terminal/components/events/EventDisplay.js';
 import { GenericToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/GenericToolRenderer.js';
@@ -33,7 +29,11 @@ interface DynamicToolRendererProps {
   onToggle?: () => void;
 }
 
-function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRendererProps) {
+function DynamicToolRenderer({
+  item,
+  isSelected: _isSelected,
+  onToggle: _onToggle,
+}: DynamicToolRendererProps) {
   const [ToolRenderer, setToolRenderer] =
     React.useState<React.ComponentType<ToolRendererProps> | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);

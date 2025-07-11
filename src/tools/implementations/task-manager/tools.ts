@@ -6,13 +6,8 @@ import { Tool } from '~/tools/tool.js';
 import { NonEmptyString } from '~/tools/schemas/common.js';
 import type { ToolResult, ToolContext } from '~/tools/types.js';
 import { DatabasePersistence } from '~/persistence/database.js';
-import {
-  Task,
-  TaskNote,
-  TaskStatus,
-  TaskPriority,
-} from '~/tools/implementations/task-manager/types.js';
-import { isAssigneeId, AssigneeId, ThreadId } from '~/threads/types.js';
+import { Task, TaskNote } from '~/tools/implementations/task-manager/types.js';
+import { isAssigneeId, AssigneeId } from '~/threads/types.js';
 
 // Helper to generate task IDs
 function generateTaskId(): string {

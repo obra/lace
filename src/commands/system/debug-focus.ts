@@ -7,10 +7,12 @@ export const debugFocusCommand: Command = {
   name: 'debug-focus',
   description: 'Toggle focus debug panel visibility (default: off)',
 
-  async execute(args: string, ui: UserInterface): Promise<void> {
+  execute(args: string, ui: UserInterface): void {
     // Check if the UI supports focus debug panel toggling
     if ('toggleFocusDebugPanel' in ui && typeof ui.toggleFocusDebugPanel === 'function') {
-      const isVisible = (ui as any).toggleFocusDebugPanel();
+      const isVisible = (
+        ui as UserInterface & { toggleFocusDebugPanel(): boolean }
+      ).toggleFocusDebugPanel();
       ui.displayMessage(`Focus debug panel ${isVisible ? 'enabled' : 'disabled'}`);
     } else {
       ui.displayMessage('Focus debug panel not supported in this interface');

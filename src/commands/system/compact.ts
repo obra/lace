@@ -7,7 +7,7 @@ export const compactCommand: Command = {
   name: 'compact',
   description: 'Compress thread history to save tokens',
 
-  async execute(args: string, ui: UserInterface): Promise<void> {
+  execute(args: string, ui: UserInterface): void {
     const threadId = ui.agent.getCurrentThreadId();
     if (!threadId) {
       ui.displayMessage('❌ No active thread to compact');

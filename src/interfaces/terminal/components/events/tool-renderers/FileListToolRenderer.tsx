@@ -31,7 +31,7 @@ function countTreeElements(text: string): { files: number; dirs: number } {
 }
 
 export function FileListToolRenderer({ item }: ToolRendererProps) {
-  const { isExpanded } = useTimelineItem();
+  useTimelineItem();
 
   // Extract data directly
   const { path, recursive } = item.call.arguments as { path: string; recursive?: boolean };

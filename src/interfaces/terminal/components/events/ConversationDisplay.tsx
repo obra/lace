@@ -3,7 +3,7 @@
 
 import React, { useMemo } from 'react';
 import { Box } from 'ink';
-import { Timeline, EphemeralMessage } from '~/interfaces/timeline-types.js';
+import { EphemeralMessage } from '~/interfaces/timeline-types.js';
 import { useStreamingTimelineProcessor } from '~/interfaces/terminal/terminal-interface.js';
 import TimelineDisplay from '~/interfaces/terminal/components/events/TimelineDisplay.js';
 
@@ -32,10 +32,7 @@ export function ConversationDisplay({
   // Get current timeline state (O(1) operation)
   // Use timelineVersion to trigger updates when timeline changes
   const timeline = useMemo(() => {
-    const startTime = performance.now();
     const result = streamingProcessor.getTimeline();
-    const endTime = performance.now();
-    const renderTime = endTime - startTime;
 
     // Performance monitoring removed to eliminate render overhead
 
@@ -82,7 +79,7 @@ export function ConversationDisplay({
     };
 
     const endTime = performance.now();
-    const mergeTime = endTime - startTime;
+    endTime - startTime;
 
     // Performance monitoring removed to eliminate render overhead
 

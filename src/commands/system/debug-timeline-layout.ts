@@ -7,7 +7,7 @@ export const debugTimelineLayoutCommand: Command = {
   name: 'debug-timeline-layout',
   description: 'Toggle timeline layout debug panel visibility (default: off)',
 
-  async execute(args: string, ui: UserInterface): Promise<void> {
+  execute(args: string, ui: UserInterface): void {
     // Check if the UI supports timeline layout debug panel toggling
     if (
       'toggleTimelineLayoutDebugPanel' in ui &&

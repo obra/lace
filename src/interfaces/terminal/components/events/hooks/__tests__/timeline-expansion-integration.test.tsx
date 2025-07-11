@@ -31,9 +31,9 @@ describe('Timeline Expansion Architecture Integration', () => {
       const expansionEvents: string[] = [];
 
       function FunctionalTest() {
-        const emitExpand = useExpansionExpand();
-        const emitCollapse = useExpansionCollapse();
-        const [selectedItem, setSelectedItem] = useState('item1');
+        const _emitExpand = useExpansionExpand();
+        const _emitCollapse = useExpansionCollapse();
+        const [selectedItem, _setSelectedItem] = useState('item1');
 
         return (
           <Box flexDirection="column">
@@ -88,8 +88,8 @@ describe('Timeline Expansion Architecture Integration', () => {
 
   // Test component that simulates a timeline with expansion controls
   function MockTimeline({ children }: { children: React.ReactNode }) {
-    const emitExpand = useExpansionExpand();
-    const emitCollapse = useExpansionCollapse();
+    const _emitExpand = useExpansionExpand();
+    const _emitCollapse = useExpansionCollapse();
 
     return (
       <Box flexDirection="column">

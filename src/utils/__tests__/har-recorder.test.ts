@@ -73,7 +73,7 @@ describe('HARRecorder', () => {
 
       expect(existsSync(TEST_HAR_FILE)).toBe(true);
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as unknown;
       expect(content).toMatchObject({
         log: {
           version: '1.2',
@@ -169,7 +169,9 @@ describe('HARRecorder', () => {
       // Force flush for testing
       recorder.flush();
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as {
+        log: { entries: Array<{ request: any; response: any; time: number; comment?: string }> };
+      };
       const entry = content.log.entries[0];
 
       expect(entry.request).toMatchObject({
@@ -220,7 +222,9 @@ describe('HARRecorder', () => {
       // Force flush for testing
       recorder.flush();
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as {
+        log: { entries: Array<{ request: any; response: any; time: number; comment?: string }> };
+      };
       const entry = content.log.entries[0];
 
       expect(entry.request.queryString).toEqual([
@@ -256,7 +260,9 @@ describe('HARRecorder', () => {
       // Force flush for testing
       recorder.flush();
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as {
+        log: { entries: Array<{ request: any; response: any; time: number; comment?: string }> };
+      };
       const entry = content.log.entries[0];
 
       expect(entry.request).toMatchObject({
@@ -307,7 +313,9 @@ describe('HARRecorder', () => {
       // Force flush for testing
       recorder.flush();
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as {
+        log: { entries: Array<{ request: any; response: any; time: number; comment?: string }> };
+      };
       const entry = content.log.entries[0];
 
       expect(entry.request).toMatchObject({

@@ -36,7 +36,7 @@ describe('Agent Thread Events', () => {
   });
 
   afterEach(async () => {
-    await threadManager.close();
+    threadManager.close();
     await rm(testDir, { recursive: true, force: true });
   });
 
@@ -118,7 +118,7 @@ describe('Agent Thread Events', () => {
       agent.on('thread_event_added', eventSpy);
 
       // Act
-      await agent.replaySessionEvents();
+      agent.replaySessionEvents();
 
       // Assert
       expect(eventSpy).toHaveBeenCalledTimes(3);
@@ -158,14 +158,18 @@ describe('Agent Thread Events', () => {
       agent.on('thread_event_added', eventSpy);
 
       // Act
-      await agent.replaySessionEvents();
+      agent.replaySessionEvents();
 
       // Assert - Events should be emitted in chronological order
       expect(eventSpy).toHaveBeenCalledTimes(3);
       const calls = eventSpy.mock.calls.map((call) => call[0].event);
 
-      expect(calls[0].timestamp.getTime()).toBeLessThanOrEqual(calls[1].timestamp.getTime());
-      expect(calls[1].timestamp.getTime()).toBeLessThanOrEqual(calls[2].timestamp.getTime());
+      expect((calls[0].timestamp as Date).getTime()).toBeLessThanOrEqual(
+        (calls[1].timestamp as Date).getTime()
+      );
+      expect((calls[1].timestamp as Date).getTime()).toBeLessThanOrEqual(
+        (calls[2].timestamp as Date).getTime()
+      );
 
       expect(calls[0].id).toBe(event1.id);
       expect(calls[1].id).toBe(event2.id);
@@ -181,7 +185,7 @@ describe('Agent Thread Events', () => {
       agent.on('thread_event_added', eventSpy);
 
       // Act
-      await agent.replaySessionEvents();
+      agent.replaySessionEvents();
 
       // Assert
       expect(eventSpy).not.toHaveBeenCalled();
@@ -259,7 +263,7 @@ describe('Agent Thread Events', () => {
       agent.on('thread_event_added', eventSpy);
 
       // Act
-      const result = await agent.resumeOrCreateThread(existingThreadId);
+      const result = agent.resumeOrCreateThread(existingThreadId);
 
       // Assert
       expect(result.threadId).toBe(existingThreadId);
@@ -275,7 +279,7 @@ describe('Agent Thread Events', () => {
 
     it('should provide resumeOrCreateThread method that creates new thread when needed', async () => {
       // Act
-      const result = await agent.resumeOrCreateThread();
+      const result = agent.resumeOrCreateThread();
 
       // Assert
       expect(result.threadId).toBeDefined();

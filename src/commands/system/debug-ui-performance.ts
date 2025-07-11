@@ -7,7 +7,7 @@ export const debugUiPerformanceCommand: Command = {
   name: 'debug-ui-performance',
   description: 'Display timeline processing performance metrics',
 
-  async execute(args: string, ui: UserInterface): Promise<void> {
+  execute(args: string, ui: UserInterface): void {
     // Check if the UI supports performance metrics display
     if ('getPerformanceMetrics' in ui && typeof ui.getPerformanceMetrics === 'function') {
       const metrics = (

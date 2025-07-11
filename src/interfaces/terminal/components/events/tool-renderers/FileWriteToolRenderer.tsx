@@ -15,7 +15,7 @@ import {
 import { logger } from '~/utils/logger.js';
 
 export function FileWriteToolRenderer({ item }: ToolRendererProps) {
-  const { isExpanded } = useTimelineItem();
+  useTimelineItem();
 
   // Extract and validate data
   const args = item.call.arguments;

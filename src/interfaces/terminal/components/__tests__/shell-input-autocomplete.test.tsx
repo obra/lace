@@ -183,7 +183,7 @@ describe('ShellInput Autocomplete Integration', () => {
     });
 
     it('should complete partial text correctly', async () => {
-      const { lastFrame } = renderWithFocus(
+      renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="sr" autoFocus={true} />
       );
 
@@ -274,7 +274,7 @@ describe('ShellInput Autocomplete Integration', () => {
         mockScanner.getCompletions.mockResolvedValue(['src/app.ts', 'src/agent.ts']);
       }
 
-      const { lastFrame } = renderWithFocus(
+      renderWithFocus(
         <ShellInput
           onSubmit={mockOnSubmit}
           onChange={mockOnChange}

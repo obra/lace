@@ -227,7 +227,9 @@ describe('Turn Tracking Provider Integration Tests', () => {
       await agent.start();
 
       // Track token usage updates
-      const tokenUpdates: Array<{ usage: any }> = [];
+      const tokenUpdates: Array<{
+        usage: { promptTokens: number; completionTokens: number; totalTokens: number };
+      }> = [];
       agent.on('token_usage_update', ({ usage }) => tokenUpdates.push({ usage }));
 
       // Act
@@ -360,11 +362,11 @@ describe('Turn Tracking Provider Integration Tests', () => {
           text: z.string(),
         });
 
-        protected async executeValidated(
+        protected executeValidated(
           args: { text: string },
           _context?: ToolContext
         ): Promise<ToolResult> {
-          return this.createResult(`Processed: ${args.text}`);
+          return Promise.resolve(this.createResult(`Processed: ${args.text}`));
         }
       }
 
@@ -396,10 +398,10 @@ describe('Turn Tracking Provider Integration Tests', () => {
       const mockProvider = new MockIntegrationProvider(responses[0]);
 
       // Override createResponse to return different responses
-      mockProvider.createResponse = async () => {
+      mockProvider.createResponse = () => {
         const response = responses[responseIndex] || responses[responses.length - 1];
         responseIndex++;
-        return response;
+        return Promise.resolve(response);
       };
 
       const agent = new Agent({
@@ -507,7 +509,9 @@ describe('Turn Tracking Provider Integration Tests', () => {
 
       // Track progress and token updates
       const progressEvents: Array<{ metrics: CurrentTurnMetrics }> = [];
-      const tokenUpdates: Array<{ usage: any }> = [];
+      const tokenUpdates: Array<{
+        usage: { promptTokens: number; completionTokens: number; totalTokens: number };
+      }> = [];
 
       agent.on('turn_progress', ({ metrics }) => progressEvents.push({ metrics }));
       agent.on('token_usage_update', ({ usage }) => tokenUpdates.push({ usage }));
@@ -543,8 +547,8 @@ describe('Turn Tracking Provider Integration Tests', () => {
       });
 
       // Override to throw error
-      errorProvider.createResponse = async () => {
-        throw new Error('Simulated provider error');
+      errorProvider.createResponse = () => {
+        return Promise.reject(new Error('Simulated provider error'));
       };
 
       const agent = new Agent({

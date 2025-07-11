@@ -8,10 +8,7 @@ import {
   TimelineStatus,
 } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
 import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
-import {
-  limitLines,
-  type ToolRendererProps,
-} from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
+import { type ToolRendererProps } from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
 
 // Extract task ID from result content
 function extractTaskId(resultText: string): string | null {
@@ -25,7 +22,7 @@ function extractTaskIdFromArgs(args: Record<string, unknown>): string {
 }
 
 export function TaskCompleteToolRenderer({ item }: ToolRendererProps) {
-  const { isExpanded } = useTimelineItem();
+  useTimelineItem();
 
   // Extract data from the tool call and result
   const args = item.call.arguments;

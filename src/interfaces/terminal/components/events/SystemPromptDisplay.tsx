@@ -15,11 +15,15 @@ interface SystemPromptDisplayProps {
   // Selection and expansion state comes from context
 }
 
-export function SystemPromptDisplay({ event, isStreaming, isFocused }: SystemPromptDisplayProps) {
+export function SystemPromptDisplay({
+  event,
+  isStreaming: _isStreaming,
+  isFocused: _isFocused,
+}: SystemPromptDisplayProps) {
   const systemPrompt = event.data as string;
 
   // Get expansion state from context
-  const { isExpanded } = useTimelineItem();
+  useTimelineItem();
 
   return (
     <TimelineEntry

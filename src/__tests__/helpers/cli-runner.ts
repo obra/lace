@@ -99,7 +99,7 @@ export async function isLMStudioAvailable(): Promise<boolean> {
 export async function skipIfLMStudioUnavailable(): Promise<void> {
   const available = await isLMStudioAvailable();
   if (!available) {
-    console.log('LMStudio not available, skipping test');
+    console.warn('LMStudio not available, skipping test');
     return;
   }
 }

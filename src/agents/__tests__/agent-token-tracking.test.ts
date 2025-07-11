@@ -180,11 +180,11 @@ describe('Agent Token Tracking Integration', () => {
           test: z.string().optional(),
         });
 
-        protected async executeValidated(): Promise<ToolResult> {
-          return {
+        protected executeValidated(): Promise<ToolResult> {
+          return Promise.resolve({
             content: [{ type: 'text', text: 'Tool executed successfully' }],
             isError: false,
-          };
+          });
         }
       }
 
@@ -203,9 +203,9 @@ describe('Agent Token Tracking Integration', () => {
 
       // Setup provider to return different responses on subsequent calls
       let callCount = 0;
-      vi.spyOn(multiCallProvider, 'createResponse').mockImplementation(async () => {
+      vi.spyOn(multiCallProvider, 'createResponse').mockImplementation(() => {
         callCount++;
-        return callCount === 1 ? toolCallResponse : followUpResponse;
+        return Promise.resolve(callCount === 1 ? toolCallResponse : followUpResponse);
       });
 
       const completeEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
@@ -275,11 +275,11 @@ describe('Agent Token Tracking Integration', () => {
         description = 'Test tool';
         schema = z.object({});
 
-        protected async executeValidated(): Promise<ToolResult> {
-          return {
+        protected executeValidated(): Promise<ToolResult> {
+          return Promise.resolve({
             content: [{ type: 'text', text: 'Tool result' }],
             isError: false,
-          };
+          });
         }
       }
 
@@ -296,9 +296,9 @@ describe('Agent Token Tracking Integration', () => {
       await multiCallAgent.start();
 
       let callCount = 0;
-      vi.spyOn(multiCallProvider, 'createResponse').mockImplementation(async () => {
+      vi.spyOn(multiCallProvider, 'createResponse').mockImplementation(() => {
         callCount++;
-        return callCount === 1 ? toolCallResponse : followUpResponse;
+        return Promise.resolve(callCount === 1 ? toolCallResponse : followUpResponse);
       });
 
       const completeEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];

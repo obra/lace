@@ -32,7 +32,7 @@ export function CodeDisplay({ code, language = 'text', compact = false }: CodeDi
   let displayCode = code;
   if (language === 'json') {
     try {
-      const parsed = JSON.parse(code);
+      const parsed = JSON.parse(code) as unknown;
       displayCode = JSON.stringify(parsed, null, compact ? 0 : 2);
     } catch {
       // Keep original if not valid JSON

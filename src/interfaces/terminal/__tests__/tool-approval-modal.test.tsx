@@ -52,7 +52,7 @@ const simulateKeyPress = async (input: string, key: any = {}) => {
     capturedInputHandlers.forEach((handler) => {
       try {
         handler(input, key);
-      } catch (error) {
+      } catch {
         // Some handlers might throw if they're not for this component, ignore
       }
     });

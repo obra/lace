@@ -25,8 +25,8 @@ export function EventDisplay({
   event,
   isStreaming,
   isSelected,
-  focusedLine,
-  itemStartLine,
+  focusedLine: _focusedLine,
+  itemStartLine: _itemStartLine,
   onToggle,
 }: EventDisplayProps) {
   const componentMap = {

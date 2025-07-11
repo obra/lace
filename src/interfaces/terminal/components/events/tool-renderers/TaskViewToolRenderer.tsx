@@ -8,10 +8,7 @@ import {
   TimelineStatus,
 } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
 import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
-import {
-  limitLines,
-  type ToolRendererProps,
-} from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
+import { type ToolRendererProps } from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
 
 // Status icon mapping
 const STATUS_ICONS = {
@@ -77,7 +74,7 @@ function truncateText(text: string, maxLength: number = 80): string {
 }
 
 export function TaskViewToolRenderer({ item }: ToolRendererProps) {
-  const { isExpanded } = useTimelineItem();
+  useTimelineItem();
 
   // Extract data from the tool call and result
   const args = item.call.arguments;

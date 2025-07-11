@@ -1,8 +1,6 @@
 // ABOUTME: Tests for SIGINT handling and turn state integration in terminal interface
 // ABOUTME: Validates abort-first behavior, double Ctrl+C detection, and React state management
 
-import React from 'react';
-import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent.js';
 import { ToolExecutor } from '~/tools/executor.js';
