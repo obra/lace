@@ -1315,7 +1315,7 @@ export class TerminalInterface implements ApprovalCallback {
     if (this.inkInstance) {
       this.inkInstance.instance.unmount();
     }
-    
+
     // Keep async for potential future async cleanup operations
     await Promise.resolve();
   }

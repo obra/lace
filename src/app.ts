@@ -13,68 +13,19 @@ import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface.
 import { createGlobalPolicyCallback } from '~/tools/policy-wrapper.js';
 import { enableTrafficLogging } from '~/utils/traffic-logger.js';
 import { getEnvVar } from '~/config/env-loader.js';
+import { ProviderRegistry } from '~/providers/registry.js';
 
-// Provider creation mapping
-const providerInitializers: Record<
-  string,
-  (config: { apiKey?: string; model?: string }) => Promise<AIProvider>
-> = {
-  anthropic: async ({ apiKey, model }) => {
-    // Check for test mode to use mock provider
-    if (getEnvVar('LACE_TEST_MODE') === 'true') {
-      const { createMockProvider } = await import('./__tests__/utils/mock-provider.js');
-      return createMockProvider();
-    }
-
-    const { AnthropicProvider } = await import('./providers/anthropic-provider.js');
-    if (!apiKey) {
-      throw new Error('Anthropic API key is required');
-    }
-    return new AnthropicProvider({ apiKey, model });
-  },
-  openai: async ({ apiKey, model }) => {
-    const { OpenAIProvider } = await import('./providers/openai-provider.js');
-    if (!apiKey) {
-      throw new Error('OpenAI API key is required');
-    }
-    return new OpenAIProvider({ apiKey, model });
-  },
-  lmstudio: async ({ model }) => {
-    const { LMStudioProvider } = await import('./providers/lmstudio-provider.js');
-    return new LMStudioProvider({ model });
-  },
-  ollama: async ({ model }) => {
-    const { OllamaProvider } = await import('./providers/ollama-provider.js');
-    return new OllamaProvider({ model });
-  },
-};
-
-async function createProvider(providerType: string, model?: string): Promise<AIProvider> {
-  const initializer = providerInitializers[providerType];
-  if (!initializer) {
-    throw new Error(
-      `Unknown provider: ${providerType}. Available providers are: ${Object.keys(providerInitializers).join(', ')}`
-    );
-  }
-
-  let apiKey: string | undefined;
-  if (providerType === 'anthropic') {
-    apiKey = getEnvVar('ANTHROPIC_KEY');
-    if (!apiKey) {
-      console.error('Error: ANTHROPIC_KEY environment variable required for Anthropic provider');
+export async function createProvider(providerType: string, model?: string): Promise<AIProvider> {
+  try {
+    const registry = await ProviderRegistry.createWithAutoDiscovery();
+    return await registry.createProvider(providerType, { model });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('environment variable required')) {
+      console.error(`Error: ${error.message}`);
       process.exit(1);
     }
-  } else if (providerType === 'openai') {
-    apiKey = getEnvVar('OPENAI_API_KEY') || getEnvVar('OPENAI_KEY');
-    if (!apiKey) {
-      console.error(
-        'Error: OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider'
-      );
-      process.exit(1);
-    }
+    throw error;
   }
-
-  return initializer({ apiKey, model });
 }
 
 async function initializeServices(options: CLIOptions) {

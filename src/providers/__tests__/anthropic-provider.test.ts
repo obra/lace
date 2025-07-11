@@ -153,7 +153,8 @@ describe('AnthropicProvider', () => {
 
       await provider.createResponse(messages, []);
 
-      const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
+      const callArgs = mockCreateResponse.mock
+        .calls[0][0] as Anthropic.Messages.MessageCreateParams;
       expect(callArgs.messages).toEqual([
         { role: 'user', content: 'User message' },
         { role: 'assistant', content: 'Assistant message' },
@@ -327,7 +328,8 @@ describe('AnthropicProvider', () => {
 
       await customProvider.createResponse([{ role: 'user', content: 'Test' }], []);
 
-      const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
+      const callArgs = mockCreateResponse.mock
+        .calls[0][0] as Anthropic.Messages.MessageCreateParams;
       expect(callArgs.model).toBe('claude-3-opus-20240229');
     });
 
@@ -344,7 +346,8 @@ describe('AnthropicProvider', () => {
 
       await customProvider.createResponse([{ role: 'user', content: 'Test' }], []);
 
-      const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
+      const callArgs = mockCreateResponse.mock
+        .calls[0][0] as Anthropic.Messages.MessageCreateParams;
       expect(callArgs.max_tokens).toBe(2000);
     });
 
@@ -360,7 +363,8 @@ describe('AnthropicProvider', () => {
 
       await noSystemProvider.createResponse([{ role: 'user', content: 'Test' }], []);
 
-      const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
+      const callArgs = mockCreateResponse.mock
+        .calls[0][0] as Anthropic.Messages.MessageCreateParams;
       expect(callArgs.system).toBe('You are a helpful assistant.');
     });
   });

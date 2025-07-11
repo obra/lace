@@ -126,7 +126,9 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
         args: { operation: string; target: string; options?: any },
         _context?: ToolContext
       ): Promise<ToolResult> {
-        return await Promise.resolve(this.createResult(`Complex operation completed: ${JSON.stringify(args)}`));
+        return await Promise.resolve(
+          this.createResult(`Complex operation completed: ${JSON.stringify(args)}`)
+        );
       }
     }
 

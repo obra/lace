@@ -271,7 +271,9 @@ describe('FileScanner', () => {
       mockFs.readdirSync.mockImplementation((dirPath: PathLike) => {
         const pathStr = typeof dirPath === 'string' ? dirPath : dirPath.toString();
         if (pathStr.endsWith('src')) {
-          return [createMockDirent('app.ts', false)] as unknown as ReturnType<typeof fs.readdirSync>;
+          return [createMockDirent('app.ts', false)] as unknown as ReturnType<
+            typeof fs.readdirSync
+          >;
         }
         return [] as unknown as ReturnType<typeof fs.readdirSync>;
       });

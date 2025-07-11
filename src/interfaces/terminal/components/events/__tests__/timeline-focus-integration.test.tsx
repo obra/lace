@@ -50,7 +50,15 @@ vi.mock('../utils/timeline-utils.js', () => ({
       !(item as TimelineItem & { type: 'tool_execution' }).result!.isError
     ) {
       const toolExecution = item as TimelineItem & { type: 'tool_execution' };
-      return (toolExecution.result && 'metadata' in toolExecution.result && toolExecution.result.metadata && typeof toolExecution.result.metadata === 'object' && 'threadId' in toolExecution.result.metadata ? toolExecution.result.metadata.threadId as string : null) || null;
+      return (
+        (toolExecution.result &&
+        'metadata' in toolExecution.result &&
+        toolExecution.result.metadata &&
+        typeof toolExecution.result.metadata === 'object' &&
+        'threadId' in toolExecution.result.metadata
+          ? (toolExecution.result.metadata.threadId as string)
+          : null) || null
+      );
     }
     return null;
   },

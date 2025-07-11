@@ -8,12 +8,9 @@ import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types.js'
 import { ApprovalDecision } from '~/tools/approval-types.js';
 import { Agent } from '~/agents/agent.js';
 import { ToolExecutor } from '~/tools/executor.js';
-import { AnthropicProvider } from '~/providers/anthropic-provider.js';
-import { LMStudioProvider } from '~/providers/lmstudio-provider.js';
-import { OllamaProvider } from '~/providers/ollama-provider.js';
 import { AIProvider } from '~/providers/base-provider.js';
 import { TokenBudgetConfig } from '~/token-management/types.js';
-import { getEnvVar } from '~/config/env-loader.js';
+import { ProviderRegistry } from '~/providers/registry.js';
 import { logger } from '~/utils/logger.js';
 
 // Model format validation
@@ -223,28 +220,19 @@ Expected response format: ${expectedResponse}
 
 IMPORTANT: Once you have gathered enough information to provide the expected response, STOP using tools and give your final answer. Do not continue exploring or gathering more data indefinitely.`;
 
-    const config = {
-      model: modelName,
-      systemPrompt,
-      maxTokens: 4000,
-    };
-
-    switch (providerName.toLowerCase()) {
-      case 'anthropic': {
-        const apiKey = getEnvVar('ANTHROPIC_KEY');
-        if (!apiKey) {
-          throw new Error('ANTHROPIC_KEY environment variable required for Anthropic provider');
-        }
-        return new AnthropicProvider({ ...config, apiKey });
-      }
-      case 'lmstudio': {
-        return new LMStudioProvider(config);
-      }
-      case 'ollama': {
-        return new OllamaProvider(config);
-      }
-      default:
+    try {
+      const registry = await ProviderRegistry.createWithAutoDiscovery();
+      return await registry.createProvider(providerName, {
+        model: modelName,
+        systemPrompt,
+        maxTokens: 4000,
+      });
+    } catch (error) {
+      // Return null for unknown providers (will be handled by caller)
+      if (error instanceof Error && error.message.includes('Unknown provider')) {
         return null;
+      }
+      throw error;
     }
   }
 
