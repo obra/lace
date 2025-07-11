@@ -4,40 +4,44 @@
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect } from 'vitest';
-import { FileListToolRenderer } from './FileListToolRenderer.js';
-import { TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
-import { TimelineItemProvider } from '../contexts/TimelineItemContext.js';
+import { FileListToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/FileListToolRenderer.js';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
 
 const mockToolCall = {
   id: 'call-123',
   name: 'file-list',
   arguments: {
     path: '/home/user',
-    recursive: true
-  }
+    recursive: true,
+  },
 };
 
 const mockSuccessResult = {
-  content: [{
-    type: 'text' as const,
-    text: `Documents/
+  content: [
+    {
+      type: 'text' as const,
+      text: `Documents/
 report.pdf (2048 bytes)
 notes.txt (512 bytes)
 Projects/
   my-app/
     src/
     package.json (1024 bytes)
-    README.md (768 bytes)`
-  }],
-  isError: false
+    README.md (768 bytes)`,
+    },
+  ],
+  isError: false,
 };
 
 const mockEmptyResult = {
-  content: [{
-    type: 'text' as const,
-    text: 'No files found'
-  }],
-  isError: false
+  content: [
+    {
+      type: 'text' as const,
+      text: 'No files found',
+    },
+  ],
+  isError: false,
 };
 
 function renderWithProviders(component: React.ReactElement) {
@@ -45,7 +49,9 @@ function renderWithProviders(component: React.ReactElement) {
     <TimelineExpansionProvider>
       <TimelineItemProvider
         isSelected={false}
-        onToggle={() => {}}
+        onToggle={() => {
+          // Mock onToggle for test - no action needed
+        }}
       >
         {component}
       </TimelineItemProvider>
@@ -60,12 +66,10 @@ describe('FileListToolRenderer', () => {
       call: mockToolCall,
       result: mockSuccessResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <FileListToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<FileListToolRenderer item={item} />);
 
     // Should show tool name, path, and counts in header
     expect(lastFrame()).toContain('file-list: /home/user');
@@ -79,12 +83,10 @@ describe('FileListToolRenderer', () => {
       call: mockToolCall,
       result: mockEmptyResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <FileListToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<FileListToolRenderer item={item} />);
 
     expect(lastFrame()).toContain('file-list: /home/user');
     expect(lastFrame()).toContain('No files found');
@@ -96,12 +98,10 @@ describe('FileListToolRenderer', () => {
       call: mockToolCall,
       result: undefined,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <FileListToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<FileListToolRenderer item={item} />);
 
     expect(lastFrame()).toContain('file-list: /home/user');
     // Should not show counts when still running
@@ -113,8 +113,8 @@ describe('FileListToolRenderer', () => {
       id: 'call-123',
       name: 'file-list',
       arguments: {
-        path: '/home/user'
-      }
+        path: '/home/user',
+      },
     };
 
     const item = {
@@ -122,12 +122,10 @@ describe('FileListToolRenderer', () => {
       call,
       result: mockSuccessResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <FileListToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<FileListToolRenderer item={item} />);
 
     expect(lastFrame()).toContain('file-list: /home/user');
     expect(lastFrame()).not.toContain('(recursive)');

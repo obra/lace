@@ -3,10 +3,9 @@
 
 import React from 'react';
 import { Text } from 'ink';
-import { ThreadEvent } from '../../../../threads/types.js';
-import { TimelineEntry } from '../ui/TimelineEntry.js';
-import { UI_SYMBOLS } from '../../theme.js';
-import { useTimelineItem } from './contexts/TimelineItemContext.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 
 interface UserSystemPromptDisplayProps {
   event: ThreadEvent;
@@ -17,8 +16,8 @@ interface UserSystemPromptDisplayProps {
 
 export function UserSystemPromptDisplay({
   event,
-  isStreaming,
-  isFocused,
+  isStreaming: _isStreaming,
+  isFocused: _isFocused,
 }: UserSystemPromptDisplayProps) {
   const userInstructions = event.data as string;
 

@@ -2,20 +2,20 @@
 // ABOUTME: Eliminates prop drilling and simplifies timeline item components
 
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useTimelineItemExpansion } from '../hooks/useTimelineExpansionToggle.js';
+import { useTimelineItemExpansion } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
 
 interface TimelineItemContextValue {
   // Selection state
   isSelected: boolean;
-  
+
   // Expansion state and controls
   isExpanded: boolean;
   onExpand: () => void;
   onCollapse: () => void;
-  
+
   // Toggle callback (for external listeners)
   onToggle?: () => void;
-  
+
   // Focus state (for multi-line items)
   focusedLine?: number;
   itemStartLine?: number;
@@ -31,26 +31,28 @@ interface TimelineItemProviderProps {
   itemStartLine?: number;
 }
 
-export function TimelineItemProvider({ 
-  children, 
-  isSelected, 
+export function TimelineItemProvider({
+  children,
+  isSelected,
   onToggle,
   focusedLine,
   itemStartLine,
 }: TimelineItemProviderProps) {
   // Use the existing expansion hook
   const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected, onToggle);
-  
+
   return (
-    <TimelineItemContext.Provider value={{
-      isSelected,
-      isExpanded,
-      onExpand,
-      onCollapse,
-      onToggle,
-      focusedLine,
-      itemStartLine,
-    }}>
+    <TimelineItemContext.Provider
+      value={{
+        isSelected,
+        isExpanded,
+        onExpand,
+        onCollapse,
+        onToggle,
+        focusedLine,
+        itemStartLine,
+      }}
+    >
       {children}
     </TimelineItemContext.Provider>
   );

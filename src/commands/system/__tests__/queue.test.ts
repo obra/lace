@@ -1,19 +1,57 @@
 // ABOUTME: Tests for queue command functionality
 // ABOUTME: Tests queue display, clearing, and error handling
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { queueCommand } from '../queue.js';
-import type { UserInterface } from '../../types.js';
+import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
+import { queueCommand } from '~/commands/system/queue.js';
+import type { UserInterface } from '~/commands/types.js';
+
+type MockAgent = {
+  getQueueStats: MockedFunction<
+    () => { queueLength: number; highPriorityCount: number; oldestMessageAge?: number }
+  >;
+  getQueueContents: MockedFunction<() => unknown[]>;
+  clearQueue: MockedFunction<(filter?: (item: any) => boolean) => number>;
+  // Add minimal properties to satisfy Agent interface
+  providerName: string;
+  state: string;
+  threadId: string;
+  sendMessage: MockedFunction<(message: string) => Promise<void>>;
+  abort: MockedFunction<() => void>;
+  stop: MockedFunction<() => void>;
+  resumeOrCreateThread: MockedFunction<() => string>;
+  replaySessionEvents: MockedFunction<() => void>;
+  on: MockedFunction<(event: string, listener: (...args: unknown[]) => void) => void>;
+  off: MockedFunction<(event: string, listener: (...args: unknown[]) => void) => void>;
+  emit: MockedFunction<(event: string, ...args: unknown[]) => boolean>;
+};
+
+type MockUI = {
+  agent: MockAgent;
+  displayMessage: MockedFunction<(message: string) => void>;
+  clearSession: MockedFunction<() => void>;
+  exit: MockedFunction<() => void>;
+};
 
 describe('queueCommand', () => {
-  let mockUI: UserInterface;
-  let mockAgent: any;
+  let mockUI: MockUI;
+  let mockAgent: MockAgent;
 
   beforeEach(() => {
     mockAgent = {
       getQueueStats: vi.fn(),
       getQueueContents: vi.fn(),
       clearQueue: vi.fn(),
+      providerName: 'mock',
+      state: 'idle',
+      threadId: 'test-thread',
+      sendMessage: vi.fn(),
+      abort: vi.fn(),
+      stop: vi.fn(),
+      resumeOrCreateThread: vi.fn(),
+      replaySessionEvents: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+      emit: vi.fn(),
     };
 
     mockUI = {
@@ -39,7 +77,7 @@ describe('queueCommand', () => {
         highPriorityCount: 0,
       });
 
-      await queueCommand.execute('', mockUI);
+      await queueCommand.execute('', mockUI as unknown as UserInterface);
 
       expect(mockUI.displayMessage).toHaveBeenCalledWith('📬 Message queue is empty');
     });
@@ -68,9 +106,9 @@ describe('queueCommand', () => {
         },
       ]);
 
-      await queueCommand.execute('', mockUI);
+      await queueCommand.execute('', mockUI as unknown as UserInterface);
 
-      const call = (mockUI.displayMessage as any).mock.calls[0][0];
+      const call = mockUI.displayMessage.mock.calls[0][0];
       expect(call).toContain('📬 Message Queue (2 messages)');
       expect(call).toContain('Oldest: 5s ago');
       expect(call).toContain('1. [USER] First message');
@@ -109,9 +147,9 @@ describe('queueCommand', () => {
         },
       ]);
 
-      await queueCommand.execute('', mockUI);
+      await queueCommand.execute('', mockUI as unknown as UserInterface);
 
-      const call = (mockUI.displayMessage as any).mock.calls[0][0];
+      const call = mockUI.displayMessage.mock.calls[0][0];
       expect(call).toContain('High priority: 1');
       expect(call).toContain('[HIGH] Urgent message');
     });
@@ -133,9 +171,9 @@ describe('queueCommand', () => {
         },
       ]);
 
-      await queueCommand.execute('', mockUI);
+      await queueCommand.execute('', mockUI as unknown as UserInterface);
 
-      const call = (mockUI.displayMessage as any).mock.calls[0][0];
+      const call = mockUI.displayMessage.mock.calls[0][0];
       expect(call).toContain('1. [USER] ' + 'A'.repeat(47) + '...');
     });
 
@@ -154,9 +192,9 @@ describe('queueCommand', () => {
         },
       ]);
 
-      await queueCommand.execute('', mockUI);
+      await queueCommand.execute('', mockUI as unknown as UserInterface);
 
-      const call = (mockUI.displayMessage as any).mock.calls[0][0];
+      const call = mockUI.displayMessage.mock.calls[0][0];
       expect(call).toContain('📬 Message Queue (1 message)'); // singular
     });
   });
@@ -165,22 +203,24 @@ describe('queueCommand', () => {
     it('should clear user messages when clear argument provided', async () => {
       mockAgent.clearQueue.mockReturnValue(3);
 
-      await queueCommand.execute('clear', mockUI);
+      await queueCommand.execute('clear', mockUI as unknown as UserInterface);
 
       expect(mockAgent.clearQueue).toHaveBeenCalledWith(expect.any(Function));
       expect(mockUI.displayMessage).toHaveBeenCalledWith('📬 Cleared 3 user messages from queue');
 
       // Test the filter function
-      const filterFn = mockAgent.clearQueue.mock.calls[0][0];
-      expect(filterFn({ type: 'user' })).toBe(true);
-      expect(filterFn({ type: 'system' })).toBe(false);
-      expect(filterFn({ type: 'task_notification' })).toBe(false);
+      const calls = mockAgent.clearQueue.mock.calls;
+      expect(calls).toHaveLength(1);
+      const filterFn = calls[0][0];
+      expect(filterFn!({ type: 'user' })).toBe(true);
+      expect(filterFn!({ type: 'system' })).toBe(false);
+      expect(filterFn!({ type: 'task_notification' })).toBe(false);
     });
 
     it('should handle clearing zero messages', async () => {
       mockAgent.clearQueue.mockReturnValue(0);
 
-      await queueCommand.execute('clear', mockUI);
+      await queueCommand.execute('clear', mockUI as unknown as UserInterface);
 
       expect(mockUI.displayMessage).toHaveBeenCalledWith('📬 Cleared 0 user messages from queue');
     });
@@ -188,7 +228,7 @@ describe('queueCommand', () => {
     it('should handle singular message count in clear message', async () => {
       mockAgent.clearQueue.mockReturnValue(1);
 
-      await queueCommand.execute('clear', mockUI);
+      await queueCommand.execute('clear', mockUI as unknown as UserInterface);
 
       expect(mockUI.displayMessage).toHaveBeenCalledWith('📬 Cleared 1 user message from queue'); // singular
     });
@@ -196,7 +236,7 @@ describe('queueCommand', () => {
     it('should handle whitespace in clear argument', async () => {
       mockAgent.clearQueue.mockReturnValue(2);
 
-      await queueCommand.execute('  clear  ', mockUI);
+      await queueCommand.execute('  clear  ', mockUI as unknown as UserInterface);
 
       expect(mockAgent.clearQueue).toHaveBeenCalled();
       expect(mockUI.displayMessage).toHaveBeenCalledWith('📬 Cleared 2 user messages from queue');
@@ -205,7 +245,7 @@ describe('queueCommand', () => {
 
   describe('usage help', () => {
     it('should show usage help for invalid arguments', async () => {
-      await queueCommand.execute('invalid', mockUI);
+      await queueCommand.execute('invalid', mockUI as unknown as UserInterface);
 
       expect(mockUI.displayMessage).toHaveBeenCalledWith(
         'Usage: /queue [clear]\n  /queue      - Show queue contents\n  /queue clear - Clear user messages from queue'
@@ -213,7 +253,7 @@ describe('queueCommand', () => {
     });
 
     it('should show usage help for partial arguments', async () => {
-      await queueCommand.execute('cle', mockUI);
+      await queueCommand.execute('cle', mockUI as unknown as UserInterface);
 
       expect(mockUI.displayMessage).toHaveBeenCalledWith(
         'Usage: /queue [clear]\n  /queue      - Show queue contents\n  /queue clear - Clear user messages from queue'
@@ -238,9 +278,9 @@ describe('queueCommand', () => {
         },
       ]);
 
-      await queueCommand.execute('', mockUI);
+      await queueCommand.execute('', mockUI as unknown as UserInterface);
 
-      const call = (mockUI.displayMessage as any).mock.calls[0][0];
+      const call = mockUI.displayMessage.mock.calls[0][0];
       expect(call).toContain('📬 Message Queue (1 message)');
       expect(call).not.toContain('Oldest:');
     });
@@ -261,9 +301,9 @@ describe('queueCommand', () => {
         },
       ]);
 
-      await queueCommand.execute('', mockUI);
+      await queueCommand.execute('', mockUI as unknown as UserInterface);
 
-      const call = (mockUI.displayMessage as any).mock.calls[0][0];
+      const call = mockUI.displayMessage.mock.calls[0][0];
       expect(call).toContain('1. [USER] Message without metadata');
       expect(call).not.toContain('[HIGH]');
       // Should not contain source parentheses for this specific message

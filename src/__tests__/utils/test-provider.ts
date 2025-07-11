@@ -1,13 +1,9 @@
 // ABOUTME: Mock provider for testing that returns predictable responses
 // ABOUTME: Avoids expensive LLM calls during test execution
 
-import { AIProvider } from '../../providers/base-provider.js';
-import {
-  ProviderMessage,
-  ProviderResponse,
-  ProviderConfig,
-} from '../../providers/base-provider.js';
-import { Tool } from '../../tools/tool.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
 
 export interface TestProviderConfig extends ProviderConfig {
   mockResponse?: string;
@@ -39,19 +35,19 @@ export class TestProvider extends AIProvider {
     return false;
   }
 
-  async diagnose(): Promise<{ connected: boolean; models: string[]; error?: string }> {
+  diagnose(): Promise<{ connected: boolean; models: string[]; error?: string }> {
     if (this.shouldError) {
-      return {
+      return Promise.resolve({
         connected: false,
         models: [],
         error: 'Mock provider error',
-      };
+      });
     }
 
-    return {
+    return Promise.resolve({
       connected: true,
       models: ['test-model'],
-    };
+    });
   }
 
   async createResponse(
@@ -88,6 +84,6 @@ export class TestProvider extends AIProvider {
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     // For test provider, just return the same as non-streaming
-    return this.createResponse(_messages, _tools, signal);
+    return await this.createResponse(_messages, _tools, signal);
   }
 }

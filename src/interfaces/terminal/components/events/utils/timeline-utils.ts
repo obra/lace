@@ -1,7 +1,7 @@
 // ABOUTME: Timeline utility functions for delegation and timeline analysis
 // ABOUTME: Extracted from DelegationBox to be reusable across timeline components
 
-import { Timeline } from '../../../../timeline-types.js';
+import { Timeline } from '~/interfaces/timeline-types.js';
 
 /**
  * Check if a thread timeline is complete
@@ -37,6 +37,10 @@ export function extractTaskFromTimeline(timeline: Timeline): string {
 
   if (firstMessage && 'content' in firstMessage) {
     const content = firstMessage.content;
+    // Check if content is empty or just whitespace
+    if (!content || content.trim() === '') {
+      return 'Unknown Task';
+    }
     // Extract first sentence or first 50 characters
     const firstSentence = content.split('.')[0];
     return firstSentence.slice(0, 50) + (firstSentence.length > 50 ? '...' : '');

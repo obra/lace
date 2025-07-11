@@ -3,8 +3,8 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ThreadEvent } from '../../../../threads/types.js';
-import { UI_SYMBOLS } from '../../theme.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 
 interface SystemMessageDisplayProps {
   event: ThreadEvent;
@@ -12,7 +12,11 @@ interface SystemMessageDisplayProps {
   isFocused?: boolean;
 }
 
-export function SystemMessageDisplay({ event, isStreaming, isFocused }: SystemMessageDisplayProps) {
+export function SystemMessageDisplay({
+  event,
+  isStreaming,
+  isFocused: _isFocused,
+}: SystemMessageDisplayProps) {
   const message = event.data as string;
 
   return (

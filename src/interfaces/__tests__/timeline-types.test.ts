@@ -2,7 +2,7 @@
 // ABOUTME: Ensures timeline types can be imported from shared location
 
 import { describe, it, expect } from 'vitest';
-import { Timeline, TimelineItem, TimelineProcessor } from '../timeline-types.js';
+import { Timeline, TimelineItem, TimelineProcessor } from '~/interfaces/timeline-types.js';
 
 describe('Timeline Types', () => {
   it('should export Timeline interface', () => {
@@ -77,8 +77,12 @@ describe('Timeline Types', () => {
   it('should export TimelineProcessor interface', () => {
     // Test that TimelineProcessor interface has required methods
     const processor: TimelineProcessor = {
-      appendEvent: () => {},
-      loadEvents: () => {},
+      appendEvent: () => {
+        // Mock implementation for testing TimelineProcessor interface
+      },
+      loadEvents: () => {
+        // Mock implementation for testing TimelineProcessor interface
+      },
       getTimeline: () => ({
         items: [],
         metadata: {
@@ -87,7 +91,9 @@ describe('Timeline Types', () => {
           lastActivity: new Date(),
         },
       }),
-      reset: () => {},
+      reset: () => {
+        // Mock implementation for testing TimelineProcessor interface
+      },
     };
 
     expect(typeof processor.appendEvent).toBe('function');

@@ -2,7 +2,7 @@
 // ABOUTME: Validates URL fetching, content handling, and enhanced error reporting
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { UrlFetchTool } from '../implementations/url-fetch.js';
+import { UrlFetchTool } from '~/tools/implementations/url-fetch.js';
 
 describe('UrlFetchTool with schema validation', () => {
   let tool: UrlFetchTool;
@@ -208,7 +208,7 @@ describe('UrlFetchTool with schema validation', () => {
   });
 
   describe('Structured output with helpers', () => {
-    it('should use createResult for successful responses', async () => {
+    it('should use createResult for successful responses', () => {
       // Mock the fetch to test the output structure
       const mockBuffer = new TextEncoder().encode('test content').buffer;
       const result = tool['handleInlineContent'](

@@ -9,9 +9,15 @@ let consoleMocks: ReturnType<typeof vi.spyOn>[] = [];
 beforeEach(() => {
   // Suppress console output by default in all tests
   consoleMocks = [
-    vi.spyOn(console, 'log').mockImplementation(() => {}),
-    vi.spyOn(console, 'warn').mockImplementation(() => {}),
-    vi.spyOn(console, 'error').mockImplementation(() => {}),
+    vi.spyOn(console, 'log').mockImplementation(() => {
+      // Suppress console.log output in tests
+    }),
+    vi.spyOn(console, 'warn').mockImplementation(() => {
+      // Suppress console.warn output in tests
+    }),
+    vi.spyOn(console, 'error').mockImplementation(() => {
+      // Suppress console.error output in tests
+    }),
   ];
 });
 
@@ -27,9 +33,15 @@ export const withConsoleCapture = () => {
   consoleMocks.forEach((mock) => mock.mockRestore());
 
   // Create capturing spies instead of silent mocks
-  const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-  const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {
+    // Capture console.log calls for test verification
+  });
+  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+    // Capture console.warn calls for test verification
+  });
+  const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+    // Capture console.error calls for test verification
+  });
 
   return {
     log: logSpy,

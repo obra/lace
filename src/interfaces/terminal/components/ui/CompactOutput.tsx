@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
-import { CodeDisplay } from './CodeDisplay.js';
+import { CodeDisplay } from '~/interfaces/terminal/components/ui/CodeDisplay.js';
 
 interface CompactOutputProps {
   output: string;
@@ -47,15 +47,15 @@ function isJsonOutput(output: string): boolean {
 
 function getJsonPreview(output: string, maxLines: number): string {
   try {
-    const parsed = JSON.parse(output);
+    const parsed = JSON.parse(output) as unknown;
     if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
       // For objects, show first few keys
       const keys = Object.keys(parsed);
       const previewKeys = keys.slice(0, maxLines - 1); // Leave room for closing brace
-      const previewObj: any = {};
+      const previewObj: Record<string, unknown> = {};
 
       for (const key of previewKeys) {
-        previewObj[key] = parsed[key];
+        previewObj[key] = (parsed as Record<string, unknown>)[key];
       }
 
       // Add indicator if there are more keys
@@ -78,7 +78,7 @@ export function CompactOutput({
   maxLines = 3,
   canExpand = true,
 }: CompactOutputProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, _setIsExpanded] = useState(false);
 
   if (!output) {
     return <Text color="gray">No output</Text>;

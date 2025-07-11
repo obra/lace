@@ -2,8 +2,8 @@
 // ABOUTME: Prevents dynamic renderer failures from crashing the entire timeline
 
 import React, { Component, ReactNode } from 'react';
-import { GenericToolRenderer } from './tool-renderers/GenericToolRenderer.js';
-import { Timeline } from '../../../timeline-types.js';
+import { GenericToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/GenericToolRenderer.js';
+import { Timeline } from '~/interfaces/timeline-types.js';
 
 interface ToolRendererErrorBoundaryProps {
   children: ReactNode;
@@ -49,11 +49,7 @@ export class ToolRendererErrorBoundary extends Component<
         },
       };
 
-      return (
-        <GenericToolRenderer
-          item={errorItem}
-        />
-      );
+      return <GenericToolRenderer item={errorItem} />;
     }
 
     return this.props.children;

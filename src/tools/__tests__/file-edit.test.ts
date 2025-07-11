@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, rm, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { FileEditTool } from '../implementations/file-edit.js';
+import { FileEditTool } from '~/tools/implementations/file-edit.js';
 
 describe('FileEditTool with schema validation', () => {
   let tool: FileEditTool;
@@ -273,7 +273,7 @@ describe('FileEditTool with schema validation', () => {
       expect(result.content[0].text).toContain('File not found');
     });
 
-    it('should handle permission denied error', async () => {
+    it('should handle permission denied error', () => {
       // This would be difficult to test cross-platform reliably
       // Permission denied errors are handled in the implementation
       expect(tool.name).toBe('file_edit');

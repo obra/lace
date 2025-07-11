@@ -2,10 +2,10 @@
 // ABOUTME: Tests tool calling, context preservation, and edge cases with real model
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { LMStudioProvider } from '../lmstudio-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolResult, ToolContext } from '../../tools/types.js';
-import { checkProviderAvailability } from '../../__tests__/utils/provider-test-helpers.js';
+import { LMStudioProvider } from '~/providers/lmstudio-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolResult, ToolContext } from '~/tools/types.js';
+import { checkProviderAvailability } from '~/__tests__/utils/provider-test-helpers.js';
 import { z } from 'zod';
 
 // Mock tool for testing without side effects
@@ -21,7 +21,7 @@ class MockTool extends Tool {
     _args: { action: string; value?: string },
     _context?: ToolContext
   ): Promise<ToolResult> {
-    return this.createResult(`Mock executed: ${JSON.stringify(_args)}`);
+    return await Promise.resolve(this.createResult(`Mock executed: ${JSON.stringify(_args)}`));
   }
 }
 
@@ -37,7 +37,7 @@ class FailingTool extends Tool {
     _args: { message: string },
     _context?: ToolContext
   ): Promise<ToolResult> {
-    return this.createError('Simulated failure');
+    return await Promise.resolve(this.createError('Simulated failure'));
   }
 }
 
@@ -55,7 +55,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
   let mockTool: MockTool;
   let failingTool: FailingTool;
 
-  beforeAll(async () => {
+  beforeAll(() => {
     mockTool = new MockTool();
     failingTool = new FailingTool();
   });
@@ -126,7 +126,9 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
         args: { operation: string; target: string; options?: any },
         _context?: ToolContext
       ): Promise<ToolResult> {
-        return this.createResult(`Complex operation completed: ${JSON.stringify(args)}`);
+        return await Promise.resolve(
+          this.createResult(`Complex operation completed: ${JSON.stringify(args)}`)
+        );
       }
     }
 
@@ -243,7 +245,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
         args: { location: string },
         _context?: ToolContext
       ): Promise<ToolResult> {
-        return this.createResult(`Weather in ${args.location}: Sunny, 72°F`);
+        return await Promise.resolve(this.createResult(`Weather in ${args.location}: Sunny, 72°F`));
       }
     }
 

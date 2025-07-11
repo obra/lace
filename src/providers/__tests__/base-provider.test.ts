@@ -2,8 +2,8 @@
 // ABOUTME: Tests error classification, backoff calculation, and retry logic
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AIProvider, ProviderMessage, ProviderResponse } from '../base-provider.js';
-import { Tool } from '../../tools/tool.js';
+import { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
 
 // Mock implementation for testing
 class TestProvider extends AIProvider {
@@ -19,10 +19,10 @@ class TestProvider extends AIProvider {
     _tools: Tool[],
     _signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    return {
+    return await Promise.resolve({
       content: 'test response',
       toolCalls: [],
-    };
+    });
   }
 
   // Expose protected methods for testing
@@ -217,7 +217,9 @@ describe('AIProvider retry functionality', () => {
       const operation = vi.fn().mockRejectedValue({ code: 'ECONNREFUSED' });
 
       const promise = provider.withRetry(operation, { maxAttempts: 3 });
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       // Advance through all retries
       for (let i = 0; i < 3; i++) {
@@ -246,8 +248,8 @@ describe('AIProvider retry functionality', () => {
 
       expect(retryAttemptSpy).toHaveBeenCalledWith({
         attempt: 1,
-        delay: expect.any(Number),
-        error: expect.objectContaining({ code: 'ECONNREFUSED' }),
+        delay: expect.any(Number) as number,
+        error: expect.objectContaining({ code: 'ECONNREFUSED' }) as Record<string, unknown>,
       });
     });
 
@@ -279,7 +281,7 @@ describe('AIProvider retry functionality', () => {
       expect(exhaustedSpy).toHaveBeenCalledTimes(1);
       expect(exhaustedSpy).toHaveBeenCalledWith({
         attempts: 2,
-        lastError: expect.objectContaining({ code: 'ECONNREFUSED' }),
+        lastError: expect.objectContaining({ code: 'ECONNREFUSED' }) as Record<string, unknown>,
       });
 
       // Restore fake timers
@@ -306,11 +308,15 @@ describe('AIProvider retry functionality', () => {
       let callCount = 0;
       const operation = vi.fn().mockImplementation(() => {
         callCount++;
-        return Promise.reject({ code: 'ECONNREFUSED' });
+        const error = new Error('Connection refused');
+        (error as unknown as { code: string }).code = 'ECONNREFUSED';
+        return Promise.reject(error);
       });
 
       const promise = provider.withRetry(operation, { signal: abortController.signal });
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       // First attempt
       await vi.advanceTimersByTimeAsync(0);
@@ -331,11 +337,15 @@ describe('AIProvider retry functionality', () => {
         callCount++;
         if (callCount === 1) {
           // First call fails before streaming
-          return Promise.reject({ code: 'ECONNREFUSED' });
+          const error = new Error('Connection refused');
+          (error as unknown as { code: string }).code = 'ECONNREFUSED';
+          return Promise.reject(error);
         }
         // After first retry, streaming has started
         streamingStarted = true;
-        return Promise.reject({ code: 'ECONNREFUSED' });
+        const error = new Error('Connection refused');
+        (error as unknown as { code: string }).code = 'ECONNREFUSED';
+        return Promise.reject(error);
       });
 
       const promise = provider.withRetry(operation, {
@@ -343,7 +353,9 @@ describe('AIProvider retry functionality', () => {
         canRetry: () => !streamingStarted,
         maxAttempts: 3,
       });
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       // First attempt
       await vi.advanceTimersByTimeAsync(0);

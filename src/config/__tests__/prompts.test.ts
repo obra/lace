@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { loadPromptConfig, getUserInstructionsFilePath } from '../prompts.js';
+import { loadPromptConfig, getUserInstructionsFilePath } from '~/config/prompts.js';
 
 describe('Prompt Configuration', () => {
   let tempDir: string;
@@ -233,10 +233,13 @@ Remember to be helpful and accurate.`;
       process.env.LACE_DIR = longPath;
 
       // This should either work or throw a meaningful error
-      await expect(async () => {
+      try {
         const config = await loadPromptConfig();
         expect(config).toBeDefined();
-      }).not.toThrow(/undefined/);
+      } catch (error) {
+        // If it throws an error, it should not be undefined-related
+        expect(error).not.toMatch(/undefined/);
+      }
     });
   });
 });

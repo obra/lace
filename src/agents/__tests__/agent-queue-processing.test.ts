@@ -2,12 +2,18 @@
 // ABOUTME: Ensures messages are processed when agent returns to idle
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Agent } from '../agent.js';
-import { AIProvider } from '../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
+import { Agent } from '~/agents/agent.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+
+// Type helper for accessing private methods in tests
+type AgentWithPrivateMethods = Agent & {
+  _setState: (state: 'thinking' | 'idle' | 'streaming' | 'tool_execution') => void;
+  _processMessage: (...args: any[]) => Promise<void>;
+};
 
 // Mock provider for testing
 class MockProvider extends AIProvider {
@@ -23,12 +29,13 @@ class MockProvider extends AIProvider {
     return 'mock-model';
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return {
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve({
       content: 'mock response',
       usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
       toolCalls: [],
-    };
+      stopReason: 'end_turn',
+    });
   }
 }
 
@@ -40,11 +47,13 @@ describe('Agent Queue Processing', () => {
 
   beforeEach(() => {
     mockProvider = new MockProvider();
+
     mockToolExecutor = {
       registerAllAvailableTools: vi.fn(),
       getRegisteredTools: vi.fn().mockReturnValue([]),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
+    } as unknown as ToolExecutor;
+
     mockThreadManager = {
       addEvent: vi.fn(),
       getEvents: vi.fn().mockReturnValue([]),
@@ -57,7 +66,7 @@ describe('Agent Queue Processing', () => {
       needsCompaction: vi.fn().mockResolvedValue(false),
       createCompactedVersion: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
+    } as unknown as ThreadManager;
 
     agent = new Agent({
       provider: mockProvider,
@@ -78,8 +87,13 @@ describe('Agent Queue Processing', () => {
       expect(stats.queueLength).toBe(1);
 
       // Mock _processMessage to track calls
-      const processMessageSpy = vi.spyOn(agent as any, '_processMessage');
-      processMessageSpy.mockImplementation(async () => {});
+      const processMessageSpy = vi.spyOn(
+        agent as unknown as AgentWithPrivateMethods,
+        '_processMessage'
+      );
+      processMessageSpy.mockImplementation(async () => {
+        // Mock implementation for testing - prevents actual message processing
+      });
 
       // Process queue should be called when state becomes idle
       await agent.processQueuedMessages();
@@ -98,10 +112,13 @@ describe('Agent Queue Processing', () => {
       agent.queueMessage('normal 2');
 
       const processedMessages: string[] = [];
-      const processMessageSpy = vi.spyOn(agent as any, '_processMessage');
-      processMessageSpy.mockImplementation(async (...args: any[]) => {
+      const processMessageSpy = vi.spyOn(
+        agent as unknown as AgentWithPrivateMethods,
+        '_processMessage'
+      );
+      processMessageSpy.mockImplementation((...args: any[]) => {
         processedMessages.push(args[0] as string);
-        return;
+        return Promise.resolve();
       });
 
       await agent.processQueuedMessages();
@@ -132,11 +149,15 @@ describe('Agent Queue Processing', () => {
       agent.queueMessage('message 1');
       agent.queueMessage('message 2');
 
-      const processMessageSpy = vi.spyOn(agent as any, '_processMessage');
-      processMessageSpy.mockImplementation(async (content) => {
+      const processMessageSpy = vi.spyOn(
+        agent as unknown as AgentWithPrivateMethods,
+        '_processMessage'
+      );
+      processMessageSpy.mockImplementation((content) => {
         if (content === 'message 1') {
-          throw new Error('Processing failed');
+          return Promise.reject(new Error('Processing failed'));
         }
+        return Promise.resolve();
       });
 
       // Should not throw and should continue processing
@@ -161,8 +182,13 @@ describe('Agent Queue Processing', () => {
         processingCompleteEvents.push(data);
       });
 
-      const processMessageSpy = vi.spyOn(agent as any, '_processMessage');
-      processMessageSpy.mockImplementation(async () => {});
+      const processMessageSpy = vi.spyOn(
+        agent as unknown as AgentWithPrivateMethods,
+        '_processMessage'
+      );
+      processMessageSpy.mockImplementation(async () => {
+        // Mock implementation for testing - prevents actual message processing
+      });
 
       await agent.processQueuedMessages();
 
@@ -176,10 +202,14 @@ describe('Agent Queue Processing', () => {
       agent.queueMessage('test message');
 
       const processQueueSpy = vi.spyOn(agent, 'processQueuedMessages');
-      processQueueSpy.mockImplementation(async () => {});
+      processQueueSpy.mockImplementation(async () => {
+        // Mock implementation for testing - prevents actual queue processing
+      });
 
       // First set to non-idle state, then to idle to trigger the transition
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       (agent as any)._setState('thinking');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       (agent as any)._setState('idle');
 
       expect(processQueueSpy).toHaveBeenCalled();
@@ -189,14 +219,19 @@ describe('Agent Queue Processing', () => {
       agent.queueMessage('test message');
 
       const processQueueSpy = vi.spyOn(agent, 'processQueuedMessages');
-      processQueueSpy.mockImplementation(async () => {});
+      processQueueSpy.mockImplementation(async () => {
+        // Mock implementation for testing - prevents actual queue processing
+      });
 
       // Reset call count
       processQueueSpy.mockClear();
 
       // Simulate state changes to non-idle states
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       (agent as any)._setState('thinking');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       (agent as any)._setState('streaming');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       (agent as any)._setState('tool_execution');
 
       expect(processQueueSpy).not.toHaveBeenCalled();

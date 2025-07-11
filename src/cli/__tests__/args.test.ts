@@ -111,7 +111,9 @@ describe('CLI Arguments (Commander-based)', () => {
     });
 
     it('should parse --list-tools flag', async () => {
-      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock console.log to suppress output during test
+      });
 
       // --list-tools triggers exit after listing tools
       await expect(() => parseArgs(['--list-tools'])).rejects.toThrow('process.exit called');

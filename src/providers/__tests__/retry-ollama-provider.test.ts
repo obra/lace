@@ -1,9 +1,9 @@
 // ABOUTME: Tests for retry functionality in OllamaProvider
 // ABOUTME: Verifies retry logic works correctly with Ollama SDK
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { OllamaProvider } from '../ollama-provider.js';
-import { ProviderMessage } from '../base-provider.js';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
+import { OllamaProvider } from '~/providers/ollama-provider.js';
+import { ProviderMessage } from '~/providers/base-provider.js';
 
 // Create mock functions that we'll reference
 const mockChat = vi.fn();
@@ -21,7 +21,7 @@ vi.mock('ollama', () => {
 
 describe('OllamaProvider retry functionality', () => {
   let provider: OllamaProvider;
-  let mockDiagnose: any;
+  let mockDiagnose: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -36,12 +36,18 @@ describe('OllamaProvider retry functionality', () => {
     });
 
     // Mock the diagnose method to control connectivity
-    mockDiagnose = vi.spyOn(provider, 'diagnose');
+    mockDiagnose = vi.spyOn(provider, 'diagnose') as Mock;
 
     // Add error handlers to prevent unhandled errors in tests
-    provider.on('error', () => {});
-    provider.on('retry_attempt', () => {});
-    provider.on('retry_exhausted', () => {});
+    provider.on('error', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
+    provider.on('retry_attempt', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
+    provider.on('retry_exhausted', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
   });
 
   afterEach(() => {
@@ -68,7 +74,9 @@ describe('OllamaProvider retry functionality', () => {
       });
 
       const promise = provider.createResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       // Wait for first attempt
       await vi.advanceTimersByTimeAsync(0);
@@ -101,18 +109,22 @@ describe('OllamaProvider retry functionality', () => {
       provider.on('retry_attempt', retryAttemptSpy);
 
       const promise = provider.createResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       await vi.advanceTimersByTimeAsync(0);
       await vi.advanceTimersByTimeAsync(1100);
 
       await promise;
 
-      expect(retryAttemptSpy).toHaveBeenCalledWith({
-        attempt: 1,
-        delay: expect.any(Number),
-        error: expect.objectContaining({ status: 503 }),
-      });
+      expect(retryAttemptSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attempt: 1,
+          delay: expect.any(Number) as number,
+          error: expect.objectContaining({ status: 503 }) as object,
+        })
+      );
     });
 
     it('should not retry on authentication errors', async () => {
@@ -147,10 +159,12 @@ describe('OllamaProvider retry functionality', () => {
       });
 
       expect(mockDiagnose).toHaveBeenCalledTimes(10);
-      expect(exhaustedSpy).toHaveBeenCalledWith({
-        attempts: 10,
-        lastError: expect.objectContaining({ code: 'ETIMEDOUT' }),
-      });
+      expect(exhaustedSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attempts: 10,
+          lastError: expect.objectContaining({ code: 'ETIMEDOUT' }) as object,
+        })
+      );
 
       // Restore fake timers
       vi.useFakeTimers();
@@ -167,7 +181,7 @@ describe('OllamaProvider retry functionality', () => {
         .mockResolvedValueOnce({ connected: true, models: ['qwen3:32b'] });
 
       // Mock successful streaming response
-      const successStream = (async function* () {
+      const successStream = (function* () {
         yield {
           message: {
             content: 'Hello ',
@@ -205,7 +219,7 @@ describe('OllamaProvider retry functionality', () => {
       mockDiagnose.mockResolvedValue({ connected: true, models: ['qwen3:32b'] });
 
       // Create a stream that starts then fails
-      const stream = (async function* () {
+      const stream = (function* () {
         yield {
           message: {
             content: 'Hello',

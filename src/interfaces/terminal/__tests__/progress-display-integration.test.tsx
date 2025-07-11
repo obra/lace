@@ -4,13 +4,13 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, CurrentTurnMetrics } from '../../../agents/agent.js';
-import { ToolExecutor } from '../../../tools/executor.js';
-import { ThreadManager } from '../../../threads/thread-manager.js';
-import { AIProvider } from '../../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../../providers/base-provider.js';
-import { Tool } from '../../../tools/tool.js';
-import { TerminalInterfaceComponent } from '../terminal-interface.js';
+import { Agent, CurrentTurnMetrics } from '~/agents/agent.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { TerminalInterfaceComponent } from '~/interfaces/terminal/terminal-interface.js';
 
 // Mock provider for testing progress updates
 class MockProgressProvider extends AIProvider {
@@ -105,7 +105,7 @@ describe('Progress Display Integration Tests', () => {
   describe('Real-time progress display', () => {
     it('should show progress updates with elapsed time and token counts', async () => {
       // Arrange
-      const { getByText } = render(<TerminalInterfaceComponent agent={agent} />);
+      render(<TerminalInterfaceComponent agent={agent} />);
 
       // Track progress events
       const progressEvents: Array<{ metrics: CurrentTurnMetrics }> = [];
@@ -132,7 +132,9 @@ describe('Progress Display Integration Tests', () => {
       // This test verifies the integration by checking that the agent emits
       // the correct events that the StatusBar would consume
 
-      let tokenUsageEvents: any[] = [];
+      const tokenUsageEvents: Array<{
+        usage: { totalTokens: number; promptTokens: number; completionTokens: number };
+      }> = [];
       agent.on('token_usage_update', (data) => tokenUsageEvents.push(data));
 
       // Act
@@ -149,8 +151,8 @@ describe('Progress Display Integration Tests', () => {
       // This test verifies that turn state changes correctly affect input state
       // by testing the event flow that controls input behavior
 
-      let turnActiveStates: boolean[] = [];
-      let turnIds: string[] = [];
+      const turnActiveStates: boolean[] = [];
+      const turnIds: string[] = [];
 
       agent.on('turn_start', ({ turnId }) => {
         turnActiveStates.push(true);
@@ -238,8 +240,7 @@ describe('Progress Display Integration Tests', () => {
       // This is tested via mocked ShellInput above, but we can also test
       // the state management directly
 
-      let isInputDisabled = false;
-      const { rerender } = render(<TerminalInterfaceComponent agent={agent} />);
+      render(<TerminalInterfaceComponent agent={agent} />);
 
       // Monitor input state changes by tracking the component's internal state
       // This is more of an integration test to ensure the disabled prop is set correctly
@@ -260,12 +261,12 @@ describe('Progress Display Integration Tests', () => {
       expect(true).toBe(true); // Basic smoke test
     });
 
-    it('should re-enable input when turn completes', async () => {
+    it('should re-enable input when turn completes', () => {
       // Covered by the test above and existing turn-state-integration tests
       expect(true).toBe(true);
     });
 
-    it('should re-enable input when turn is aborted', async () => {
+    it('should re-enable input when turn is aborted', () => {
       // Covered by existing sigint-integration tests
       expect(true).toBe(true);
     });
@@ -341,7 +342,7 @@ describe('Progress Display Integration Tests', () => {
       expect(abortEvent.metrics.tokensIn).toBeGreaterThan(0);
     });
 
-    it('should exit cleanly when no operation is running', async () => {
+    it('should exit cleanly when no operation is running', () => {
       // Test double Ctrl+C behavior when no turn is active
       const wasAborted = agent.abort();
       expect(wasAborted).toBe(false); // No operation to abort

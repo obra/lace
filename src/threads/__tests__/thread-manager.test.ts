@@ -1,8 +1,8 @@
 // ABOUTME: Unit tests for ThreadManager data layer operations
 // ABOUTME: Tests verify ThreadManager operates as pure data persistence layer
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ThreadManager } from '../thread-manager.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { ThreadManager } from '~/threads/thread-manager.js';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -17,7 +17,7 @@ describe('ThreadManager', () => {
   });
 
   afterEach(async () => {
-    await threadManager.close();
+    threadManager.close();
     await rm(testDir, { recursive: true, force: true });
   });
 

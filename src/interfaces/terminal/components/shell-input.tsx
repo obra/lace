@@ -3,12 +3,12 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { useTextBuffer } from '../hooks/use-text-buffer.js';
-import TextRenderer from './text-renderer.js';
-import FileAutocomplete from './file-autocomplete.js';
-import { FocusRegions, useLaceFocus } from '../focus/index.js';
-import { UI_BACKGROUNDS } from '../theme.js';
-import { logger } from '../../../utils/logger.js';
+import { useTextBuffer } from '~/interfaces/terminal/hooks/use-text-buffer.js';
+import TextRenderer from '~/interfaces/terminal/components/text-renderer.js';
+import FileAutocomplete from '~/interfaces/terminal/components/file-autocomplete.js';
+import { FocusRegions, useLaceFocus } from '~/interfaces/terminal/focus/index.js';
+import { UI_BACKGROUNDS } from '~/interfaces/terminal/theme.js';
+import { logger } from '~/utils/logger.js';
 
 // Keyboard shortcut system - list-based approach
 type KeyboardShortcut = string[]; // e.g., ['ctrl', 'a'] or ['meta', 'shift', 'z']
@@ -26,7 +26,11 @@ const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcut | KeyboardShortcut[]> 
   ],
 };
 
-const matchesShortcut = (input: string, key: any, shortcut: KeyboardShortcut): boolean => {
+const matchesShortcut = (
+  input: string,
+  key: Record<string, boolean | undefined>,
+  shortcut: KeyboardShortcut
+): boolean => {
   // Last element is the key, everything else are modifiers
   const keyChar = shortcut[shortcut.length - 1];
   const modifiers = shortcut.slice(0, -1);
@@ -53,7 +57,11 @@ const matchesShortcut = (input: string, key: any, shortcut: KeyboardShortcut): b
   return true;
 };
 
-const matchesAction = (input: string, key: any, action: string): boolean => {
+const matchesAction = (
+  input: string,
+  key: Record<string, boolean | undefined>,
+  action: string
+): boolean => {
   const shortcuts = KEYBOARD_SHORTCUTS[action];
   if (Array.isArray(shortcuts) && Array.isArray(shortcuts[0])) {
     // Multiple shortcuts (KeyboardShortcut[])
@@ -76,21 +84,21 @@ interface ShellInputProps {
 const ShellInput: React.FC<ShellInputProps> = ({
   value = '',
   placeholder = 'Type your message...',
-  autoFocus = false,
+  autoFocus: _autoFocus = false,
   disabled = false,
   onSubmit,
   onChange,
 }) => {
   // Use Lace focus system
-  const { isFocused, takeFocus } = useLaceFocus(FocusRegions.shell);
+  const { isFocused, takeFocus: _takeFocus } = useLaceFocus(FocusRegions.shell);
   const actualIsFocused = isFocused && !disabled;
-  
+
   // No auto-focus logic needed - provider handles initial focus
   const [bufferState, bufferOps] = useTextBuffer(value);
 
   // Autocomplete state
   const [autocompleteVisible, setAutocompleteVisible] = useState(false);
-  const [autocompleteQuery, setAutocompleteQuery] = useState('');
+  const [_autocompleteQuery, setAutocompleteQuery] = useState('');
   const [autocompleteSelectedIndex, setAutocompleteSelectedIndex] = useState(0);
   const [autocompleteItems, setAutocompleteItems] = useState<string[]>([]);
   const [autocompleteOriginalItems, setAutocompleteOriginalItems] = useState<string[]>([]);
@@ -200,17 +208,17 @@ const ShellInput: React.FC<ShellInputProps> = ({
         if (beforeCursor.startsWith('./')) {
           // Relative path from current directory
           const relativePath = beforeCursor.slice(2);
-          completions = await scanner.getCompletions(relativePath);
+          completions = scanner.getCompletions(relativePath);
           completions = completions.map((item) => `./${item}`);
         } else {
           // Standard path completion (works for paths with "/", empty string, and prefix matching)
-          completions = await scanner.getCompletions(beforeCursor);
+          completions = scanner.getCompletions(beforeCursor);
         }
       }
 
       setAutocompleteItems(completions);
       setAutocompleteOriginalItems(completions);
-    } catch (error) {
+    } catch (_error) {
       setAutocompleteItems([]);
       setAutocompleteOriginalItems([]);
     }
@@ -307,7 +315,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
           // Don't trigger autocomplete if we're in completely empty content or just whitespace
           // Allow autocomplete if there's text before cursor OR if the line has any content
           if (beforeCursor.trim().length > 0 || trimmedLine.length > 0) {
-            showAutocomplete();
+            void showAutocomplete();
           }
         }
         // If autocomplete is visible, it will handle Tab itself
@@ -488,7 +496,14 @@ const ShellInput: React.FC<ShellInputProps> = ({
   }, [autocompleteVisible, autocompleteItems, autocompleteSelectedIndex, getCurrentWord]);
 
   return (
-    <Box flexDirection="column" backgroundColor={UI_BACKGROUNDS.SHELL_INPUT} width="100%" margin={1} padding={1} marginRight={2}>
+    <Box
+      flexDirection="column"
+      backgroundColor={UI_BACKGROUNDS.SHELL_INPUT}
+      width="100%"
+      margin={1}
+      padding={1}
+      marginRight={2}
+    >
       <Box>
         <Text color="cyan">&gt; </Text>
         <Box flexDirection="column" flexGrow={1}>

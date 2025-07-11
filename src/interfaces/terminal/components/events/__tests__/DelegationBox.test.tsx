@@ -2,27 +2,29 @@
 // ABOUTME: Verifies timeline analysis functions for delegation and thread processing
 
 import { describe, it, expect } from 'vitest';
-import { Timeline } from '../../../../timeline-types.js';
+import { Timeline, TimelineItem } from '~/interfaces/timeline-types.js';
 import {
   isThreadComplete,
   extractTaskFromTimeline,
   calculateDuration,
   extractDelegateThreadId,
-} from '../utils/timeline-utils.js';
+} from '~/interfaces/terminal/components/events/utils/timeline-utils.js';
 
 // Create test data
-function createTestTimeline(items: any[] = []): Timeline {
+function createTestTimeline(items: TimelineItem[] = []): Timeline {
   return {
     items,
     metadata: {
       eventCount: items.length,
-      messageCount: items.filter(item => item.type === 'user_message' || item.type === 'agent_message').length,
+      messageCount: items.filter(
+        (item) => item.type === 'user_message' || item.type === 'agent_message'
+      ).length,
       lastActivity: new Date(),
     },
   };
 }
 
-function createTestToolExecutionItem(metadata?: { threadId?: string }) {
+function createTestToolExecutionItem(metadata?: { threadId?: unknown }) {
   return {
     result: {
       metadata,
@@ -159,13 +161,16 @@ describe('Timeline Utility Functions', () => {
       const timeline = createTestTimeline([
         {
           type: 'agent_message',
-          content: 'This is a very long task description that should be truncated because it exceeds the maximum length of fifty characters.',
+          content:
+            'This is a very long task description that should be truncated because it exceeds the maximum length of fifty characters.',
           timestamp: new Date('2024-01-01T10:00:00Z'),
           id: 'msg-1',
         },
       ]);
 
-      expect(extractTaskFromTimeline(timeline)).toBe('This is a very long task description that should b...');
+      expect(extractTaskFromTimeline(timeline)).toBe(
+        'This is a very long task description that should b...'
+      );
     });
 
     it('should return "Unknown Task" when no messages found', () => {
@@ -185,6 +190,7 @@ describe('Timeline Utility Functions', () => {
       const timeline = createTestTimeline([
         {
           type: 'agent_message',
+          content: '',
           timestamp: new Date('2024-01-01T10:00:00Z'),
           id: 'msg-1',
         },
@@ -280,12 +286,12 @@ describe('Timeline Utility Functions', () => {
     });
 
     it('should return null when threadId is not a string', () => {
-      const item = createTestToolExecutionItem({ threadId: 123 as any });
+      const item = createTestToolExecutionItem({ threadId: 123 });
       expect(extractDelegateThreadId(item)).toBe(null);
     });
 
     it('should return null when threadId is null', () => {
-      const item = createTestToolExecutionItem({ threadId: null as any });
+      const item = createTestToolExecutionItem({ threadId: null });
       expect(extractDelegateThreadId(item)).toBe(null);
     });
   });

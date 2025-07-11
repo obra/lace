@@ -2,19 +2,20 @@
 // ABOUTME: Tests the core application setup, provider creation, and session handling logic.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { run } from './app.js';
-import { CLIOptions } from './cli/args.js';
-import { Agent } from './agents/agent.js';
-import { ThreadManager } from './threads/thread-manager.js';
-import { ToolExecutor } from './tools/executor.js';
-import { getEnvVar } from './config/env-loader.js';
-import { enableTrafficLogging } from './utils/traffic-logger.js';
-import { logger } from './utils/logger.js';
-import { NonInteractiveInterface } from './interfaces/non-interactive-interface.js';
-import { TerminalInterface } from './interfaces/terminal/terminal-interface.js';
-import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
-import { OllamaProvider } from './providers/ollama-provider.js';
-import { withConsoleCapture } from './__tests__/setup/console-capture.js';
+import { run } from '~/app.js';
+import { CLIOptions } from '~/cli/args.js';
+import { Agent } from '~/agents/agent.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { Tool } from '~/tools/tool.js';
+import { getEnvVar } from '~/config/env-loader.js';
+import { enableTrafficLogging } from '~/utils/traffic-logger.js';
+import { logger } from '~/utils/logger.js';
+import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface.js';
+import { TerminalInterface } from '~/interfaces/terminal/terminal-interface.js';
+import { createGlobalPolicyCallback } from '~/tools/policy-wrapper.js';
+import { OllamaProvider } from '~/providers/ollama-provider.js';
+import { withConsoleCapture } from '~/__tests__/setup/console-capture.js';
 
 // Mock external dependencies at the module level
 vi.mock('./agents/agent.js');
@@ -132,7 +133,7 @@ describe('App Initialization (run function)', () => {
         eventNames: vi.fn(),
         once: vi.fn(),
         // Agent API methods
-        resumeOrCreateThread: vi.fn().mockResolvedValue({
+        resumeOrCreateThread: vi.fn().mockReturnValue({
           threadId: 'new-thread-123',
           isResumed: false,
           resumeError: undefined,
@@ -146,10 +147,12 @@ describe('App Initialization (run function)', () => {
       };
       // Mock the prototype methods that are accessed
       Object.setPrototypeOf(mockAgentInstance, Agent.prototype);
-      return mockAgentInstance as any;
+      return mockAgentInstance as unknown as Agent;
     });
 
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never); // Mock process.exit
+    vi.spyOn(process, 'exit').mockImplementation((() => {
+      // Mock process.exit to prevent actual exit during tests
+    }) as never);
 
     // Mock TerminalInterface.prototype.startInteractive
     vi.mocked(TerminalInterface.prototype.startInteractive).mockResolvedValue(undefined);
@@ -213,7 +216,9 @@ describe('App Initialization (run function)', () => {
       return undefined;
     });
     const options = { ...mockCliOptions, provider: 'anthropic' };
-    await expect(run(options)).rejects.toThrow('Anthropic API key is required');
+    await expect(run(options)).rejects.toThrow(
+      'ANTHROPIC_KEY environment variable required for Anthropic provider'
+    );
   });
 
   it('should exit if OpenAI API key is missing', async () => {
@@ -222,13 +227,15 @@ describe('App Initialization (run function)', () => {
       return undefined;
     });
     const options = { ...mockCliOptions, provider: 'openai' };
-    await expect(run(options)).rejects.toThrow('OpenAI API key is required');
+    await expect(run(options)).rejects.toThrow(
+      'OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider'
+    );
   });
 
   it('should throw error for unknown provider', async () => {
     const options = { ...mockCliOptions, provider: 'unknown-provider' };
     await expect(run(options)).rejects.toThrow(
-      'Unknown provider: unknown-provider. Available providers are: anthropic, openai, lmstudio, ollama'
+      'Unknown provider: unknown-provider. Available providers: '
     );
   });
 
@@ -251,7 +258,6 @@ describe('App Initialization (run function)', () => {
   it('should initialize ThreadManager and handle resumed session with ID', async () => {
     const { log } = withConsoleCapture();
     // Update the base Agent mock to return resumed session
-    const originalImplementation = vi.mocked(Agent).getMockImplementation();
     vi.mocked(Agent).mockImplementation(() => {
       const mockAgentInstance = {
         start: vi.fn(),
@@ -279,7 +285,7 @@ describe('App Initialization (run function)', () => {
         eventNames: vi.fn(),
         once: vi.fn(),
         // Agent API methods - override for this test
-        resumeOrCreateThread: vi.fn().mockResolvedValue({
+        resumeOrCreateThread: vi.fn().mockReturnValue({
           threadId: 'specific-thread-789',
           isResumed: true,
           resumeError: undefined,
@@ -292,7 +298,7 @@ describe('App Initialization (run function)', () => {
         getThreadEvents: vi.fn().mockReturnValue([]),
       };
       Object.setPrototypeOf(mockAgentInstance, Agent.prototype);
-      return mockAgentInstance as any;
+      return mockAgentInstance as unknown as Agent;
     });
 
     const options = { ...mockCliOptions, continue: 'specific-thread-789' };
@@ -303,14 +309,55 @@ describe('App Initialization (run function)', () => {
 
   it('should initialize ThreadManager and handle resume error', async () => {
     const { log } = withConsoleCapture();
-    vi.mocked(ThreadManager.prototype.resumeOrCreate).mockResolvedValue({
-      threadId: 'new-thread-123',
-      isResumed: false,
-      resumeError: 'Mock resume error',
+
+    // Mock Agent constructor to return an instance with resume error
+    vi.mocked(Agent).mockImplementation(() => {
+      const mockAgentInstance = {
+        start: vi.fn(),
+        toolExecutor: vi.mocked(new ToolExecutor()),
+        // Add all required Agent properties/methods
+        _provider: {},
+        _toolExecutor: {},
+        _threadManager: {},
+        _threadId: 'test-thread',
+        sendMessage: vi.fn(),
+        abort: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        emit: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        removeAllListeners: vi.fn(),
+        setMaxListeners: vi.fn(),
+        getMaxListeners: vi.fn(),
+        listeners: vi.fn(),
+        rawListeners: vi.fn(),
+        listenerCount: vi.fn(),
+        prependListener: vi.fn(),
+        prependOnceListener: vi.fn(),
+        eventNames: vi.fn(),
+        once: vi.fn(),
+        // Agent API methods - with resume error
+        resumeOrCreateThread: vi.fn().mockReturnValue({
+          threadId: 'new-thread-123',
+          isResumed: false,
+          resumeError: 'Mock resume error',
+        }),
+        getLatestThreadId: vi.fn().mockResolvedValue('latest-thread-123'),
+        getCurrentThreadId: vi.fn().mockReturnValue('current-thread-123'),
+        generateThreadId: vi.fn().mockReturnValue('generated-thread-123'),
+        createThread: vi.fn(),
+        stop: vi.fn(),
+        replaySessionEvents: vi.fn(),
+        providerName: 'mock-provider',
+        state: 'idle',
+        threadId: 'test-thread',
+      };
+      return mockAgentInstance as unknown as Agent;
     });
+
     await run(mockCliOptions);
-    // With Agent mock, no resume error occurs by default
-    expect(log).toHaveBeenCalledWith('🆕 Starting conversation new-thread-123');
+    expect(log).toHaveBeenCalledWith('🆕 Starting new conversation new-thread-123');
   });
 
   it('should set up ToolExecutor and Agent', async () => {
@@ -319,13 +366,19 @@ describe('App Initialization (run function)', () => {
     expect(vi.mocked(ToolExecutor.prototype.registerAllAvailableTools)).toHaveBeenCalledTimes(1);
     expect(Agent).toHaveBeenCalledTimes(1);
     // Just verify the Agent constructor gets called with the right structure
-    const agentCallArgs = vi.mocked(Agent).mock.calls[0][0];
+    const agentCallArgs = vi.mocked(Agent).mock.calls[0][0] as unknown as {
+      provider: object;
+      toolExecutor: object;
+      threadManager: object;
+      threadId: string;
+      tools: unknown[];
+    };
     expect(agentCallArgs).toMatchObject({
-      provider: expect.any(Object),
-      toolExecutor: expect.any(Object),
-      threadManager: expect.any(Object),
-      threadId: expect.any(String),
-      tools: expect.any(Array),
+      provider: expect.any(Object) as unknown,
+      toolExecutor: expect.any(Object) as unknown,
+      threadManager: expect.any(Object) as unknown,
+      threadId: expect.any(String) as unknown,
+      tools: expect.any(Array) as unknown,
     });
   });
 
@@ -339,9 +392,12 @@ describe('App Initialization (run function)', () => {
       executeValidated: vi.fn(),
       createResult: vi.fn(),
       createErrorResult: vi.fn(),
+      createError: vi.fn(),
+      _makeResult: vi.fn(),
+      formatValidationError: vi.fn(),
       setDependencies: vi.fn(),
     };
-    vi.mocked(ToolExecutor.prototype.getTool).mockReturnValue(mockDelegateTool as any);
+    vi.mocked(ToolExecutor.prototype.getTool).mockReturnValue(mockDelegateTool as unknown as Tool);
     await run(mockCliOptions);
     expect(mockDelegateTool.setDependencies).toHaveBeenCalledWith(
       expect.any(Agent),
@@ -375,7 +431,7 @@ describe('App Initialization (run function)', () => {
       mockCliOptions,
       expect.any(ToolExecutor) // Agent's toolExecutor
     );
-    const agentInstance = vi.mocked(Agent).mock.results[0].value;
+    const agentInstance = vi.mocked(Agent).mock.results[0].value as Agent;
     expect(agentInstance.toolExecutor.setApprovalCallback).toHaveBeenCalledWith(mockPolicyCallback);
   });
 });

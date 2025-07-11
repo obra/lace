@@ -3,10 +3,8 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { marked } from 'marked';
+import { marked, Renderer } from 'marked';
 import TerminalRenderer from 'marked-terminal';
-import { UI_SYMBOLS } from '../../theme.js';
-
 
 interface MarkdownDisplayProps {
   content: string;
@@ -16,13 +14,13 @@ interface MarkdownDisplayProps {
 
 export function MarkdownDisplay({
   content,
-  showIcon = true,
+  showIcon: _showIcon = true,
   dimmed = false,
 }: MarkdownDisplayProps) {
   try {
     // Configure marked with terminal renderer for ANSI formatting
     marked.setOptions({
-      renderer: new TerminalRenderer() as any,
+      renderer: new TerminalRenderer() as unknown as Renderer,
     });
 
     // Parse markdown to terminal-formatted text with ANSI colors
@@ -41,10 +39,10 @@ export function MarkdownDisplay({
         </Text>
       </Box>
     );
-  } catch (error) {
+  } catch (_error) {
     // Fallback to plain text if markdown parsing fails
     const trimmedContent = content.trim();
-    
+
     return (
       <Box flexDirection="column">
         <Text color={dimmed ? 'dim' : 'white'} wrap="wrap">

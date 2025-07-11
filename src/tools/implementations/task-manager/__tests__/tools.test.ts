@@ -9,27 +9,27 @@ import {
   TaskUpdateTool,
   TaskAddNoteTool,
   TaskViewTool,
-} from '../tools.js';
-import { ToolContext } from '../../../types.js';
-import { createThreadId, asThreadId, createNewAgentSpec } from '../../../../threads/types.js';
-import { useTempLaceDir, getTestDbPath } from '../../../../test-utils/temp-lace-dir.js';
+} from '~/tools/implementations/task-manager/tools.js';
+import { ToolContext } from '~/tools/types.js';
+import { asThreadId, createNewAgentSpec } from '~/threads/types.js';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir.js';
 
 describe('Enhanced Task Manager Tools', () => {
-  const tempDirContext = useTempLaceDir();
+  const _tempDirContext = useTempLaceDir();
   let context: ToolContext;
 
   const parentThreadId = asThreadId('lace_20250703_parent');
   const agent1ThreadId = asThreadId('lace_20250703_parent.1');
   const agent2ThreadId = asThreadId('lace_20250703_parent.2');
 
-  beforeEach(async () => {
+  beforeEach(() => {
     context = {
       threadId: agent1ThreadId,
       parentThreadId: parentThreadId,
     };
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     vi.clearAllMocks();
   });
 
@@ -290,7 +290,7 @@ describe('Enhanced Task Manager Tools', () => {
       const result = await tool.execute(
         {
           taskId,
-          status: 'invalid' as any,
+          status: 'invalid' as 'pending' | 'in_progress' | 'completed',
         },
         context
       );

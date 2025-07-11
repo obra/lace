@@ -2,12 +2,12 @@
 // ABOUTME: Tests complex queueing behavior, priority handling, and error recovery
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '../agent.js';
-import { AIProvider } from '../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
+import { Agent } from '~/agents/agent.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
 
 // Mock provider with configurable delay for testing long operations
 class LongOperationProvider extends AIProvider {
@@ -45,9 +45,16 @@ describe('Agent Queue End-to-End Scenarios', () => {
 
     mockToolExecutor = {
       registerAllAvailableTools: vi.fn(),
-      getRegisteredTools: vi.fn().mockReturnValue([]),
+      getAllTools: vi.fn().mockReturnValue([]),
+      getTool: vi.fn().mockReturnValue(undefined),
+      setApprovalCallback: vi.fn(),
+      registerTool: vi.fn(),
+      registerTools: vi.fn(),
+      getAvailableToolNames: vi.fn().mockReturnValue([]),
+      getApprovalCallback: vi.fn().mockReturnValue(undefined),
+      executeTool: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
+    } as unknown as ToolExecutor;
 
     mockThreadManager = {
       addEvent: vi.fn(),
@@ -61,7 +68,7 @@ describe('Agent Queue End-to-End Scenarios', () => {
       needsCompaction: vi.fn().mockResolvedValue(false),
       createCompactedVersion: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
+    } as unknown as ThreadManager;
 
     agent = new Agent({
       provider: longProvider,
@@ -74,10 +81,10 @@ describe('Agent Queue End-to-End Scenarios', () => {
     await agent.start();
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     if (agent) {
       agent.removeAllListeners();
-      await agent.stop();
+      agent.stop();
     }
   });
 
@@ -116,7 +123,7 @@ describe('Agent Queue End-to-End Scenarios', () => {
 
   describe('Scenario 2: Task notifications during busy periods', () => {
     it('should queue task notifications while agent is processing', async () => {
-      const queuedEvents: any[] = [];
+      const queuedEvents: { id: string; queueLength: number }[] = [];
       agent.on('message_queued', (data) => queuedEvents.push(data));
 
       // Start long operation
@@ -220,7 +227,7 @@ describe('Agent Queue End-to-End Scenarios', () => {
       }
 
       // Verify all queued
-      let stats = agent.getQueueStats();
+      const stats = agent.getQueueStats();
       expect(stats.queueLength).toBe(messageCount);
 
       // Complete the busy operation
@@ -239,7 +246,7 @@ describe('Agent Queue End-to-End Scenarios', () => {
 
   describe('Queue event lifecycle', () => {
     it('should emit message_queued events when queueing', async () => {
-      const queuedEvents: any[] = [];
+      const queuedEvents: { id: string; queueLength: number }[] = [];
 
       // Track queued events
       agent.on('message_queued', (data) => queuedEvents.push(data));

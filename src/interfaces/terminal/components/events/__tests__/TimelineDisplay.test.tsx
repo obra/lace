@@ -4,9 +4,9 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
-import TimelineDisplay from '../TimelineDisplay.js';
-import { Timeline, TimelineItem } from '../../../../timeline-types.js';
-import { LaceFocusProvider } from '../../../focus/focus-provider.js';
+import TimelineDisplay from '~/interfaces/terminal/components/events/TimelineDisplay.js';
+import { Timeline, TimelineItem } from '~/interfaces/timeline-types.js';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
 
 // Mock expansion hooks
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
@@ -37,17 +37,16 @@ vi.mock('../../../../../utils/logger.js', () => ({
 
 vi.mock('../../terminal-interface.js', () => ({
   useStreamingTimelineProcessor: () => ({
-    getTimeline: () => ({ items: [], metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() } }),
+    getTimeline: () => ({
+      items: [],
+      metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
+    }),
   }),
 }));
 
 // Helper to render with focus provider (available to all tests)
 const renderWithFocus = (component: React.ReactElement) => {
-  return render(
-    <LaceFocusProvider>
-      {component}
-    </LaceFocusProvider>
-  );
+  return render(<LaceFocusProvider>{component}</LaceFocusProvider>);
 };
 
 describe('TimelineDisplay Viewport Behavior', () => {
@@ -83,7 +82,9 @@ describe('TimelineDisplay Viewport Behavior', () => {
 
   it('should show scroll indicators when content exceeds viewport', () => {
     const timeline = createMockTimeline(20); // More items than viewport can show
-    const { lastFrame } = renderWithFocus(<TimelineDisplay timeline={timeline} bottomSectionHeight={5} />);
+    const { lastFrame } = renderWithFocus(
+      <TimelineDisplay timeline={timeline} bottomSectionHeight={5} />
+    );
 
     // Should show content but we can't easily test scroll indicators in unit tests
     // due to measurement complexity - this is better tested in integration tests

@@ -4,17 +4,13 @@
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
-import FileAutocomplete from '../file-autocomplete.js';
-import { LaceFocusProvider } from '../../focus/focus-provider.js';
+import FileAutocomplete from '~/interfaces/terminal/components/file-autocomplete.js';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
 
 describe('FileAutocomplete', () => {
   // Helper to render with focus provider
   const renderWithFocus = (component: React.ReactElement) => {
-    return render(
-      <LaceFocusProvider>
-        {component}
-      </LaceFocusProvider>
-    );
+    return render(<LaceFocusProvider>{component}</LaceFocusProvider>);
   };
   describe('visibility', () => {
     it('should render nothing when not visible', () => {

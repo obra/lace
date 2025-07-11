@@ -2,12 +2,18 @@
 // ABOUTME: Ensures sendMessage can queue messages when agent is busy
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Agent } from '../agent.js';
-import { AIProvider } from '../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
+import { Agent } from '~/agents/agent.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+
+// Type helper for accessing private methods in tests
+type AgentWithPrivateMethods = {
+  _setState: (state: 'thinking' | 'idle' | 'streaming' | 'tool_execution') => void;
+  _processMessage: (...args: any[]) => Promise<void>;
+};
 
 // Mock provider for testing
 class MockProvider extends AIProvider {
@@ -23,12 +29,12 @@ class MockProvider extends AIProvider {
     return 'mock-model';
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return {
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve({
       content: 'mock response',
       usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
       toolCalls: [],
-    };
+    });
   }
 }
 
@@ -40,11 +46,13 @@ describe('Agent sendMessage Queue Option', () => {
 
   beforeEach(async () => {
     mockProvider = new MockProvider();
+
     mockToolExecutor = {
       registerAllAvailableTools: vi.fn(),
       getRegisteredTools: vi.fn().mockReturnValue([]),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
+    } as unknown as ToolExecutor;
+
     mockThreadManager = {
       addEvent: vi.fn(),
       getEvents: vi.fn().mockReturnValue([]),
@@ -57,7 +65,7 @@ describe('Agent sendMessage Queue Option', () => {
       needsCompaction: vi.fn().mockResolvedValue(false),
       createCompactedVersion: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
+    } as unknown as ThreadManager;
 
     agent = new Agent({
       provider: mockProvider,
@@ -95,8 +103,9 @@ describe('Agent sendMessage Queue Option', () => {
       let processedImmediately = false;
 
       // Mock to track immediate processing
-      vi.spyOn(agent, 'sendMessage').mockImplementation(async () => {
+      vi.spyOn(agent, 'sendMessage').mockImplementation(() => {
         processedImmediately = true;
+        return Promise.resolve();
       });
 
       await agent.sendMessage('test message', { queue: true });
@@ -108,7 +117,7 @@ describe('Agent sendMessage Queue Option', () => {
   describe('when agent is busy', () => {
     beforeEach(() => {
       // Set agent to busy state
-      (agent as any)._setState('thinking');
+      (agent as unknown as AgentWithPrivateMethods)._setState('thinking');
     });
 
     it('should throw error when no queue option provided', async () => {
@@ -138,7 +147,7 @@ describe('Agent sendMessage Queue Option', () => {
     });
 
     it('should emit message_queued event', async () => {
-      const queuedEvents: any[] = [];
+      const queuedEvents: { id: string; queueLength: number }[] = [];
       agent.on('message_queued', (data) => queuedEvents.push(data));
 
       await agent.sendMessage('test message', { queue: true });
@@ -162,7 +171,7 @@ describe('Agent sendMessage Queue Option', () => {
   describe('queue processing on idle return', () => {
     it('should process queued messages when agent becomes idle', async () => {
       // Set agent to busy
-      (agent as any)._setState('thinking');
+      (agent as unknown as AgentWithPrivateMethods)._setState('thinking');
 
       // Queue messages
       await agent.sendMessage('message 1', { queue: true });
@@ -171,13 +180,15 @@ describe('Agent sendMessage Queue Option', () => {
       const processedMessages: string[] = [];
 
       // Mock _processMessage instead since that's what gets called during queue processing
-      vi.spyOn(agent as any, '_processMessage').mockImplementation(async (...args: any[]) => {
-        processedMessages.push(args[0] as string);
-        return;
-      });
+      vi.spyOn(agent as unknown as AgentWithPrivateMethods, '_processMessage').mockImplementation(
+        (...args: any[]) => {
+          processedMessages.push(args[0] as string);
+          return Promise.resolve();
+        }
+      );
 
       // Return to idle
-      (agent as any)._setState('idle');
+      (agent as unknown as AgentWithPrivateMethods)._setState('idle');
 
       // Allow async processing
       await new Promise((resolve) => setTimeout(resolve, 1));

@@ -2,13 +2,16 @@
 // ABOUTME: Renders timeline content with item interaction handling, viewport managed by TimelineViewport
 
 import React, { useCallback } from 'react';
-import { Timeline } from '../../../timeline-types.js';
-import { TimelineViewport } from './TimelineViewport.js';
-import { TimelineContent } from './TimelineContent.js';
-import { useExpansionExpand, useExpansionCollapse, useTimelineFocusEntry } from './hooks/useTimelineExpansionToggle.js';
-import { canTimelineItemAcceptFocus } from '../timeline-item-focus.js';
-import { TimelineItemRef } from '../timeline-item-focus.js';
-import { logger } from '../../../../utils/logger.js';
+import { Timeline } from '~/interfaces/timeline-types.js';
+import { TimelineViewport } from '~/interfaces/terminal/components/events/TimelineViewport.js';
+import { TimelineContent } from '~/interfaces/terminal/components/events/TimelineContent.js';
+import {
+  useExpansionExpand,
+  useExpansionCollapse,
+  useTimelineFocusEntry,
+} from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
+import { canTimelineItemAcceptFocus } from '~/interfaces/terminal/components/timeline-item-focus.js';
+import { logger } from '~/utils/logger.js';
 
 interface TimelineDisplayProps {
   timeline: Timeline;
@@ -30,19 +33,31 @@ export default function TimelineDisplay({
 
   // Handle item-specific interactions
   const handleItemInteraction = useCallback(
-    (selectedItemIndex: number, input: string, key: any, itemRefs?: React.MutableRefObject<Map<number, any>>) => {
+    (
+      selectedItemIndex: number,
+      input: string,
+      key: {
+        leftArrow?: boolean;
+        rightArrow?: boolean;
+        return?: boolean;
+        [key: string]: boolean | undefined;
+      },
+      _itemRefs?: React.MutableRefObject<Map<number, unknown>>
+    ) => {
       logger.debug('TimelineDisplay: handleItemInteraction called', {
         selectedItemIndex,
-        key: Object.keys(key).filter(k => (key as any)[k]).join('+'),
+        key: Object.keys(key)
+          .filter((k) => key[k as keyof typeof key])
+          .join('+'),
         focusRegion,
       });
-      
+
       if (key.leftArrow) {
         // Left arrow collapses the selected item
         logger.debug('TimelineDisplay: Emitting collapse event', { focusRegion });
         emitCollapse();
       } else if (key.rightArrow) {
-        // Right arrow expands the selected item  
+        // Right arrow expands the selected item
         logger.debug('TimelineDisplay: Emitting expand event', { focusRegion });
         emitExpand();
       } else if (key.return) {
@@ -50,21 +65,24 @@ export default function TimelineDisplay({
         const selectedItem = timeline.items[selectedItemIndex];
         logger.debug('TimelineDisplay: Return key pressed', {
           selectedItemIndex,
-          selectedItem: selectedItem ? { type: selectedItem.type, timestamp: selectedItem.timestamp } : null,
+          selectedItem: selectedItem
+            ? { type: selectedItem.type, timestamp: selectedItem.timestamp }
+            : null,
           canAcceptFocus: selectedItem ? canTimelineItemAcceptFocus(selectedItem) : false,
         });
-        
+
         if (selectedItem && canTimelineItemAcceptFocus(selectedItem)) {
           // Focus implies expansion - expand the item before entering focus mode
           logger.debug('TimelineDisplay: Emitting expand and focus entry events', {
             selectedItemIndex,
             selectedItemType: selectedItem.type,
-            selectedItemCallName: (selectedItem as any).call?.name,
+            selectedItemCallName:
+              selectedItem.type === 'tool_execution' ? selectedItem.call.name : undefined,
           });
-          
+
           // First expand the item (focus implies expansion)
           emitExpand();
-          
+
           // Then emit focus entry event to the selected timeline item
           emitFocusEntry();
         } else {

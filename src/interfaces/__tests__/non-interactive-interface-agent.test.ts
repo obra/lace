@@ -2,11 +2,11 @@
 // ABOUTME: Tests verify non-interactive interface uses Agent API instead of direct ThreadManager access
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '../../agents/agent.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { TestProvider } from '../../__tests__/utils/test-provider.js';
-import { NonInteractiveInterface } from '../non-interactive-interface.js';
+import { Agent } from '~/agents/agent.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { TestProvider } from '~/__tests__/utils/test-provider.js';
+import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface.js';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -38,7 +38,7 @@ describe('NonInteractiveInterface Agent API Usage', () => {
   });
 
   afterEach(async () => {
-    await threadManager.close();
+    threadManager.close();
     await rm(testDir, { recursive: true, force: true });
   });
 

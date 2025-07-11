@@ -7,9 +7,9 @@ import { unlinkSync } from 'fs';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import TurndownService from 'turndown';
-import { Tool } from '../tool.js';
-import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
-import { logger } from '../../utils/logger.js';
+import { Tool } from '~/tools/tool.js';
+import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types.js';
+import { logger } from '~/utils/logger.js';
 
 // Constants for configuration and validation
 const INLINE_CONTENT_LIMIT = 32 * 1024; // 32KB
@@ -166,8 +166,8 @@ export class UrlFetchTool extends Tool {
     if (UrlFetchTool.cleanupRegistered) return;
 
     // Double-check locking pattern for thread safety
-    if ((globalThis as any)[UrlFetchTool.cleanupLock]) return;
-    (globalThis as any)[UrlFetchTool.cleanupLock] = true;
+    if ((globalThis as Record<string | symbol, unknown>)[UrlFetchTool.cleanupLock]) return;
+    (globalThis as Record<string | symbol, unknown>)[UrlFetchTool.cleanupLock] = true;
 
     UrlFetchTool.cleanupRegistered = true;
 
@@ -366,7 +366,7 @@ export class UrlFetchTool extends Tool {
         }
 
         // Determine error type based on error details
-        let errorType: 'network' | 'timeout' = 'network';
+        const errorType: 'network' | 'timeout' = 'network';
         let errorCode: string | undefined;
 
         if ('code' in error) {
@@ -460,7 +460,7 @@ export class UrlFetchTool extends Tool {
     // Pretty-print JSON
     if (cleanType === 'application/json') {
       try {
-        const parsed = JSON.parse(text);
+        const parsed: unknown = JSON.parse(text);
         return JSON.stringify(parsed, null, 2);
       } catch {
         return text; // Fallback to raw text if parsing fails

@@ -2,8 +2,8 @@
 // ABOUTME: Tests command registration, alias resolution, and auto-discovery patterns
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CommandRegistry } from '../registry.js';
-import type { Command } from '../types.js';
+import { CommandRegistry } from '~/commands/registry.js';
+import type { Command } from '~/commands/types.js';
 
 describe('CommandRegistry', () => {
   let registry: CommandRegistry;
@@ -17,7 +17,10 @@ describe('CommandRegistry', () => {
       const testCommand: Command = {
         name: 'test',
         description: 'Test command',
-        async execute() {},
+        // Empty implementation for testing registry functionality
+        async execute() {
+          // Mock implementation - no action needed for registry tests
+        },
       };
 
       registry.register(testCommand);
@@ -36,7 +39,10 @@ describe('CommandRegistry', () => {
         name: 'test',
         description: 'Test command',
         aliases: ['t', 'testing'],
-        async execute() {},
+        // Empty implementation for testing registry functionality
+        async execute() {
+          // Mock implementation - no action needed for registry tests
+        },
       };
 
       registry.register(testCommand);
@@ -50,7 +56,10 @@ describe('CommandRegistry', () => {
       const testCommand: Command = {
         name: 'simple',
         description: 'Simple command',
-        async execute() {},
+        // Empty implementation for testing registry functionality
+        async execute() {
+          // Mock implementation - no action needed for registry tests
+        },
       };
 
       registry.register(testCommand);
@@ -68,13 +77,19 @@ describe('CommandRegistry', () => {
       const command1: Command = {
         name: 'cmd1',
         description: 'Command 1',
-        async execute() {},
+        // Empty implementation for testing registry functionality
+        async execute() {
+          // Mock implementation - no action needed for registry tests
+        },
       };
 
       const command2: Command = {
         name: 'cmd2',
         description: 'Command 2',
-        async execute() {},
+        // Empty implementation for testing registry functionality
+        async execute() {
+          // Mock implementation - no action needed for registry tests
+        },
       };
 
       registry.register(command1);
@@ -91,7 +106,10 @@ describe('CommandRegistry', () => {
         name: 'test',
         description: 'Test command',
         aliases: ['t'],
-        async execute() {},
+        // Empty implementation for testing registry functionality
+        async execute() {
+          // Mock implementation - no action needed for registry tests
+        },
       };
 
       registry.register(command);
@@ -124,13 +142,19 @@ describe('CommandRegistry', () => {
       const command1: Command = {
         name: 'test',
         description: 'First test command',
-        async execute() {},
+        // Empty implementation for testing registry functionality
+        async execute() {
+          // Mock implementation - no action needed for registry tests
+        },
       };
 
       const command2: Command = {
         name: 'test',
         description: 'Second test command',
-        async execute() {},
+        // Empty implementation for testing registry functionality
+        async execute() {
+          // Mock implementation - no action needed for registry tests
+        },
       };
 
       registry.register(command1);
@@ -144,14 +168,20 @@ describe('CommandRegistry', () => {
         name: 'test1',
         description: 'Test command 1',
         aliases: ['t'],
-        async execute() {},
+        // Empty implementation for testing registry functionality
+        async execute() {
+          // Mock implementation - no action needed for registry tests
+        },
       };
 
       const command2: Command = {
         name: 'test2',
         description: 'Test command 2',
         aliases: ['t'], // Same alias
-        async execute() {},
+        // Empty implementation for testing registry functionality
+        async execute() {
+          // Mock implementation - no action needed for registry tests
+        },
       };
 
       registry.register(command1);
@@ -166,7 +196,10 @@ describe('CommandRegistry', () => {
         name: 'test',
         description: 'Test command',
         aliases: [],
-        async execute() {},
+        // Empty implementation for testing registry functionality
+        async execute() {
+          // Mock implementation - no action needed for registry tests
+        },
       };
 
       registry.register(command);

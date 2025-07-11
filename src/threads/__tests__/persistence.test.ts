@@ -6,9 +6,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import Database from 'better-sqlite3';
-import { DatabasePersistence } from '../../persistence/database.js';
-import { ThreadManager } from '../thread-manager.js';
-import { Thread, ThreadEvent, EventType } from '../types.js';
+import { DatabasePersistence } from '~/persistence/database.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { Thread, ThreadEvent, EventType } from '~/threads/types.js';
 
 describe('DatabasePersistence (Thread Features)', () => {
   let tempDbPath: string;
@@ -93,7 +93,7 @@ describe('DatabasePersistence (Thread Features)', () => {
   });
 
   describe('thread operations', () => {
-    it('should save and load a thread', async () => {
+    it('should save and load a thread', () => {
       const thread: Thread = {
         id: 'test_thread_123',
         createdAt: new Date('2025-01-01T10:00:00Z'),
@@ -101,8 +101,8 @@ describe('DatabasePersistence (Thread Features)', () => {
         events: [],
       };
 
-      await persistence.saveThread(thread);
-      const loaded = await persistence.loadThread('test_thread_123');
+      persistence.saveThread(thread);
+      const loaded = persistence.loadThread('test_thread_123');
 
       expect(loaded).not.toBeNull();
       expect(loaded!.id).toBe('test_thread_123');
@@ -111,12 +111,12 @@ describe('DatabasePersistence (Thread Features)', () => {
       expect(loaded!.events).toEqual([]);
     });
 
-    it('should return null for non-existent thread', async () => {
-      const loaded = await persistence.loadThread('non_existent');
+    it('should return null for non-existent thread', () => {
+      const loaded = persistence.loadThread('non_existent');
       expect(loaded).toBeNull();
     });
 
-    it('should update existing thread on save', async () => {
+    it('should update existing thread on save', () => {
       const thread: Thread = {
         id: 'test_thread_123',
         createdAt: new Date('2025-01-01T10:00:00Z'),
@@ -124,26 +124,26 @@ describe('DatabasePersistence (Thread Features)', () => {
         events: [],
       };
 
-      await persistence.saveThread(thread);
+      persistence.saveThread(thread);
 
       // Update and save again
       thread.updatedAt = new Date('2025-01-01T11:00:00Z');
-      await persistence.saveThread(thread);
+      persistence.saveThread(thread);
 
-      const loaded = await persistence.loadThread('test_thread_123');
+      const loaded = persistence.loadThread('test_thread_123');
       expect(loaded!.updatedAt).toEqual(new Date('2025-01-01T11:00:00Z'));
     });
   });
 
   describe('event operations', () => {
-    it('should save and load events', async () => {
+    it('should save and load events', () => {
       const thread: Thread = {
         id: 'test_thread_123',
         createdAt: new Date(),
         updatedAt: new Date(),
         events: [],
       };
-      await persistence.saveThread(thread);
+      persistence.saveThread(thread);
 
       const event: ThreadEvent = {
         id: 'evt_123',
@@ -153,8 +153,8 @@ describe('DatabasePersistence (Thread Features)', () => {
         data: 'Hello world',
       };
 
-      await persistence.saveEvent(event);
-      const events = await persistence.loadEvents('test_thread_123');
+      persistence.saveEvent(event);
+      const events = persistence.loadEvents('test_thread_123');
 
       expect(events).toHaveLength(1);
       expect(events[0].id).toBe('evt_123');
@@ -163,14 +163,14 @@ describe('DatabasePersistence (Thread Features)', () => {
       expect(events[0].timestamp).toEqual(new Date('2025-01-01T10:00:00Z'));
     });
 
-    it('should load events in chronological order', async () => {
+    it('should load events in chronological order', () => {
       const thread: Thread = {
         id: 'test_thread_123',
         createdAt: new Date(),
         updatedAt: new Date(),
         events: [],
       };
-      await persistence.saveThread(thread);
+      persistence.saveThread(thread);
 
       const events = [
         {
@@ -198,10 +198,10 @@ describe('DatabasePersistence (Thread Features)', () => {
 
       // Save events out of order
       for (const event of events) {
-        await persistence.saveEvent(event);
+        persistence.saveEvent(event);
       }
 
-      const loaded = await persistence.loadEvents('test_thread_123');
+      const loaded = persistence.loadEvents('test_thread_123');
 
       expect(loaded).toHaveLength(3);
       expect(loaded[0].id).toBe('evt_1'); // First chronologically
@@ -209,14 +209,14 @@ describe('DatabasePersistence (Thread Features)', () => {
       expect(loaded[2].id).toBe('evt_3'); // Third chronologically
     });
 
-    it('should handle complex event data', async () => {
+    it('should handle complex event data', () => {
       const thread: Thread = {
         id: 'test_thread_123',
         createdAt: new Date(),
         updatedAt: new Date(),
         events: [],
       };
-      await persistence.saveThread(thread);
+      persistence.saveThread(thread);
 
       const complexData = {
         id: 'call_123',
@@ -238,21 +238,21 @@ describe('DatabasePersistence (Thread Features)', () => {
         data: complexData,
       };
 
-      await persistence.saveEvent(event);
-      const events = await persistence.loadEvents('test_thread_123');
+      persistence.saveEvent(event);
+      const events = persistence.loadEvents('test_thread_123');
 
       expect(events).toHaveLength(1);
       expect(events[0].data).toEqual(complexData);
     });
 
-    it('should update thread timestamp when saving event', async () => {
+    it('should update thread timestamp when saving event', () => {
       const thread: Thread = {
         id: 'test_thread_123',
         createdAt: new Date('2025-01-01T10:00:00Z'),
         updatedAt: new Date('2025-01-01T10:00:00Z'),
         events: [],
       };
-      await persistence.saveThread(thread);
+      persistence.saveThread(thread);
 
       const event: ThreadEvent = {
         id: 'evt_123',
@@ -263,15 +263,15 @@ describe('DatabasePersistence (Thread Features)', () => {
       };
 
       const saveTime = new Date();
-      await persistence.saveEvent(event);
+      persistence.saveEvent(event);
 
-      const loaded = await persistence.loadThread('test_thread_123');
+      const loaded = persistence.loadThread('test_thread_123');
       expect(loaded!.updatedAt.getTime()).toBeGreaterThanOrEqual(saveTime.getTime() - 1000);
     });
   });
 
   describe('thread discovery', () => {
-    it('should return latest thread ID', async () => {
+    it('should return latest thread ID', () => {
       const threads = [
         {
           id: 'thread_old',
@@ -294,21 +294,21 @@ describe('DatabasePersistence (Thread Features)', () => {
       ];
 
       for (const thread of threads) {
-        await persistence.saveThread(thread);
+        persistence.saveThread(thread);
       }
 
-      const latestId = await persistence.getLatestThreadId();
+      const latestId = persistence.getLatestThreadId();
       expect(latestId).toBe('thread_latest');
     });
 
-    it('should return null when no threads exist', async () => {
-      const latestId = await persistence.getLatestThreadId();
+    it('should return null when no threads exist', () => {
+      const latestId = persistence.getLatestThreadId();
       expect(latestId).toBeNull();
     });
   });
 
   describe('error handling', () => {
-    it('should handle invalid JSON in event data gracefully', async () => {
+    it('should handle invalid JSON in event data gracefully', () => {
       // Manually insert malformed JSON
       const db = new Database(tempDbPath);
       db.prepare(
@@ -332,12 +332,12 @@ describe('DatabasePersistence (Thread Features)', () => {
   });
 
   describe('version management', () => {
-    it('should return null for non-versioned threads', async () => {
-      const currentVersion = await persistence.getCurrentVersion('non_existent');
+    it('should return null for non-versioned threads', () => {
+      const currentVersion = persistence.getCurrentVersion('non_existent');
       expect(currentVersion).toBeNull();
     });
 
-    it('should create and retrieve thread versions', async () => {
+    it('should create and retrieve thread versions', () => {
       const canonicalId = 'thread_canonical_123';
       const versionId = 'thread_version_456';
       const reason = 'Created shadow for compaction';
@@ -349,15 +349,15 @@ describe('DatabasePersistence (Thread Features)', () => {
         updatedAt: new Date(),
         events: [],
       };
-      await persistence.saveThread(versionThread);
+      persistence.saveThread(versionThread);
 
-      await persistence.createVersion(canonicalId, versionId, reason);
-      const currentVersion = await persistence.getCurrentVersion(canonicalId);
+      persistence.createVersion(canonicalId, versionId, reason);
+      const currentVersion = persistence.getCurrentVersion(canonicalId);
 
       expect(currentVersion).toBe(versionId);
     });
 
-    it('should update existing version', async () => {
+    it('should update existing version', () => {
       const canonicalId = 'thread_canonical_123';
       const firstVersionId = 'thread_version_456';
       const secondVersionId = 'thread_version_789';
@@ -375,13 +375,13 @@ describe('DatabasePersistence (Thread Features)', () => {
         updatedAt: new Date(),
         events: [],
       };
-      await persistence.saveThread(firstThread);
-      await persistence.saveThread(secondThread);
+      persistence.saveThread(firstThread);
+      persistence.saveThread(secondThread);
 
-      await persistence.createVersion(canonicalId, firstVersionId, 'First version');
-      await persistence.createVersion(canonicalId, secondVersionId, 'Second version');
+      persistence.createVersion(canonicalId, firstVersionId, 'First version');
+      persistence.createVersion(canonicalId, secondVersionId, 'Second version');
 
-      const currentVersion = await persistence.getCurrentVersion(canonicalId);
+      const currentVersion = persistence.getCurrentVersion(canonicalId);
       expect(currentVersion).toBe(secondVersionId);
     });
 
@@ -403,15 +403,15 @@ describe('DatabasePersistence (Thread Features)', () => {
         updatedAt: new Date(),
         events: [],
       };
-      await persistence.saveThread(firstThread);
-      await persistence.saveThread(secondThread);
+      persistence.saveThread(firstThread);
+      persistence.saveThread(secondThread);
 
-      await persistence.createVersion(canonicalId, firstVersionId, 'First version');
+      persistence.createVersion(canonicalId, firstVersionId, 'First version');
       // Small delay to ensure different timestamps
       await new Promise((resolve) => setTimeout(resolve, 10));
-      await persistence.createVersion(canonicalId, secondVersionId, 'Second version');
+      persistence.createVersion(canonicalId, secondVersionId, 'Second version');
 
-      const history = await persistence.getVersionHistory(canonicalId);
+      const history = persistence.getVersionHistory(canonicalId);
       expect(history).toHaveLength(2);
       expect(history[0].versionId).toBe(secondVersionId); // Most recent first
       expect(history[0].reason).toBe('Second version');
@@ -419,7 +419,7 @@ describe('DatabasePersistence (Thread Features)', () => {
       expect(history[1].reason).toBe('First version');
     });
 
-    it('should load current version when accessing canonical ID', async () => {
+    it('should load current version when accessing canonical ID', () => {
       // Create a thread
       const originalThread: Thread = {
         id: 'thread_version_456',
@@ -427,29 +427,29 @@ describe('DatabasePersistence (Thread Features)', () => {
         updatedAt: new Date('2025-01-01T10:30:00Z'),
         events: [],
       };
-      await persistence.saveThread(originalThread);
+      persistence.saveThread(originalThread);
 
       // Create version mapping
       const canonicalId = 'thread_canonical_123';
-      await persistence.createVersion(canonicalId, 'thread_version_456', 'Shadow creation');
+      persistence.createVersion(canonicalId, 'thread_version_456', 'Shadow creation');
 
       // Load using canonical ID should return the version
-      const loaded = await persistence.loadThread(canonicalId);
+      const loaded = persistence.loadThread(canonicalId);
       expect(loaded).not.toBeNull();
       expect(loaded!.id).toBe('thread_version_456');
       expect(loaded!.createdAt).toEqual(originalThread.createdAt);
     });
 
-    it('should load normally for non-versioned threads', async () => {
+    it('should load normally for non-versioned threads', () => {
       const thread: Thread = {
         id: 'normal_thread_123',
         createdAt: new Date('2025-01-01T10:00:00Z'),
         updatedAt: new Date('2025-01-01T10:30:00Z'),
         events: [],
       };
-      await persistence.saveThread(thread);
+      persistence.saveThread(thread);
 
-      const loaded = await persistence.loadThread('normal_thread_123');
+      const loaded = persistence.loadThread('normal_thread_123');
       expect(loaded).not.toBeNull();
       expect(loaded!.id).toBe('normal_thread_123');
     });
@@ -465,8 +465,8 @@ describe('Enhanced ThreadManager', () => {
     threadManager = new ThreadManager(tempDbPath);
   });
 
-  afterEach(async () => {
-    await threadManager.close();
+  afterEach(() => {
+    threadManager.close();
     if (fs.existsSync(tempDbPath)) {
       fs.unlinkSync(tempDbPath);
     }
@@ -517,50 +517,50 @@ describe('Enhanced ThreadManager', () => {
   });
 
   describe('persistence integration', () => {
-    it('should save events to database immediately', async () => {
+    it('should save events to database immediately', () => {
       threadManager.createThread('test_123');
       threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
 
       // Create new manager to verify persistence (events saved immediately)
-      await threadManager.close();
+      threadManager.close();
       const newManager = new ThreadManager(tempDbPath);
 
-      const loadedThread = await newManager.loadThread('test_123');
+      const loadedThread = newManager.loadThread('test_123');
       expect(loadedThread.events).toHaveLength(1);
       expect(loadedThread.events[0].data).toBe('Hello');
 
-      await newManager.close();
+      newManager.close();
     });
 
-    it('should load thread from database', async () => {
+    it('should load thread from database', () => {
       // Create and save thread with first manager
       threadManager.createThread('test_123');
       threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
       threadManager.addEvent('test_123', 'AGENT_MESSAGE', 'Hi');
-      await threadManager.saveCurrentThread();
-      await threadManager.close();
+      threadManager.saveCurrentThread();
+      threadManager.close();
 
       // Load with new manager
       const newManager = new ThreadManager(tempDbPath);
-      const thread = await newManager.loadThread('test_123');
+      const thread = newManager.loadThread('test_123');
 
       expect(thread.id).toBe('test_123');
       expect(thread.events).toHaveLength(2);
       expect(thread.events[0].data).toBe('Hello');
       expect(thread.events[1].data).toBe('Hi');
 
-      await newManager.close();
+      newManager.close();
     });
 
-    it('should set current thread from database', async () => {
+    it('should set current thread from database', () => {
       // Create and save thread
       threadManager.createThread('test_123');
       threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
-      await threadManager.saveCurrentThread();
+      threadManager.saveCurrentThread();
 
       // Create new thread and switch to database thread
       threadManager.createThread('test_456');
-      await threadManager.setCurrentThread('test_123');
+      threadManager.setCurrentThread('test_123');
 
       expect(threadManager.getCurrentThreadId()).toBe('test_123');
 
@@ -571,16 +571,16 @@ describe('Enhanced ThreadManager', () => {
 
     it('should get latest thread ID', async () => {
       threadManager.createThread('test_old');
-      await threadManager.saveCurrentThread();
+      threadManager.saveCurrentThread();
 
       // Wait a moment to ensure different timestamps
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       threadManager.createThread('test_new');
       threadManager.addEvent('test_new', 'USER_MESSAGE', 'Latest');
-      await threadManager.saveCurrentThread();
+      threadManager.saveCurrentThread();
 
-      const latestId = await threadManager.getLatestThreadId();
+      const latestId = threadManager.getLatestThreadId();
       expect(latestId).toBe('test_new');
     });
   });
@@ -610,12 +610,12 @@ describe('Enhanced ThreadManager', () => {
   });
 
   describe('thread compaction', () => {
-    it('should create compacted thread and update version mapping', async () => {
+    it('should create compacted thread and update version mapping', () => {
       const originalThreadId = 'lace_20250101_abc123';
       threadManager.createThread(originalThreadId);
       threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'Original message');
 
-      const compactedThreadId = await threadManager.createShadowThread('Compaction needed');
+      const compactedThreadId = threadManager.createShadowThread('Compaction needed');
 
       expect(compactedThreadId).not.toBe(originalThreadId);
       expect(compactedThreadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
@@ -629,12 +629,12 @@ describe('Enhanced ThreadManager', () => {
       expect(compactedEvents[0].data).toBe('Original message');
     });
 
-    it('should maintain canonical ID mapping', async () => {
+    it('should maintain canonical ID mapping', () => {
       const originalThreadId = 'lace_20250101_abc123';
       threadManager.createThread(originalThreadId);
 
-      const compactedThreadId = await threadManager.createShadowThread('First compaction');
-      const secondCompactedThreadId = await threadManager.createShadowThread('Second compaction');
+      const compactedThreadId = threadManager.createShadowThread('First compaction');
+      const secondCompactedThreadId = threadManager.createShadowThread('Second compaction');
 
       // All should resolve to the same canonical ID
       expect(threadManager.getCanonicalId(originalThreadId)).toBe(originalThreadId);
@@ -648,7 +648,7 @@ describe('Enhanced ThreadManager', () => {
       );
     });
 
-    it('should compact events when creating compacted thread', async () => {
+    it('should compact events when creating compacted thread', () => {
       const originalThreadId = 'lace_20250101_abc123';
       threadManager.createThread(originalThreadId);
 
@@ -657,7 +657,7 @@ describe('Enhanced ThreadManager', () => {
         threadManager.addEvent(originalThreadId, 'USER_MESSAGE', `Message ${i}`);
       }
 
-      const compactedThreadId = await threadManager.createShadowThread('Test compaction');
+      const compactedThreadId = threadManager.createShadowThread('Test compaction');
       const compactedEvents = threadManager.getEvents(compactedThreadId);
 
       // Should have all user messages preserved since we now preserve all user/agent messages
@@ -720,36 +720,40 @@ describe('Session Management', () => {
   });
 
   describe('ThreadManager session management', () => {
-    it('should start new session by default', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
+    it('should start new session by default', () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock console.log to suppress output during test
+      });
 
       const threadManager = new ThreadManager(tempDbPath);
-      const sessionInfo = await threadManager.resumeOrCreate();
+      const sessionInfo = threadManager.resumeOrCreate();
       const { threadId } = sessionInfo;
 
       expect(threadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
       expect(threadManager.getCurrentThreadId()).toBe(threadId);
       expect(sessionInfo.isResumed).toBe(false);
 
-      await threadManager.close();
+      threadManager.close();
       vi.restoreAllMocks();
     });
 
-    it('should continue latest session', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
+    it('should continue latest session', () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock console.log to suppress output during test
+      });
 
       // Create a session first
       const firstManager = new ThreadManager(tempDbPath);
-      const firstSessionInfo = await firstManager.resumeOrCreate();
+      const firstSessionInfo = firstManager.resumeOrCreate();
       const { threadId: firstId } = firstSessionInfo;
       firstManager.addEvent(firstId, 'USER_MESSAGE', 'First session');
-      await firstManager.saveCurrentThread();
-      await firstManager.close();
+      firstManager.saveCurrentThread();
+      firstManager.close();
 
       // Continue session
       const secondManager = new ThreadManager(tempDbPath);
-      const latestThreadId = await secondManager.getLatestThreadId();
-      const sessionInfo = await secondManager.resumeOrCreate(latestThreadId || undefined);
+      const latestThreadId = secondManager.getLatestThreadId();
+      const sessionInfo = secondManager.resumeOrCreate(latestThreadId || undefined);
       const { threadId } = sessionInfo;
 
       expect(threadId).toBe(firstId);
@@ -757,48 +761,54 @@ describe('Session Management', () => {
       expect(secondManager.getEvents(threadId)).toHaveLength(1);
       expect(secondManager.getEvents(threadId)[0].data).toBe('First session');
 
-      await secondManager.close();
+      secondManager.close();
       vi.restoreAllMocks();
     });
 
-    it('should continue specific session by ID', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
+    it('should continue specific session by ID', () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock console.log to suppress output during test
+      });
 
       // Create multiple sessions
       const manager1 = new ThreadManager(tempDbPath);
-      const sessionInfo1 = await manager1.resumeOrCreate();
+      const sessionInfo1 = manager1.resumeOrCreate();
       const { threadId: id1 } = sessionInfo1;
       manager1.addEvent(id1, 'USER_MESSAGE', 'First session');
-      await manager1.saveCurrentThread();
-      await manager1.close();
+      manager1.saveCurrentThread();
+      manager1.close();
 
       const manager2 = new ThreadManager(tempDbPath);
-      const sessionInfo2 = await manager2.resumeOrCreate();
+      const sessionInfo2 = manager2.resumeOrCreate();
       const { threadId: id2 } = sessionInfo2;
       manager2.addEvent(id2, 'USER_MESSAGE', 'Second session');
-      await manager2.saveCurrentThread();
-      await manager2.close();
+      manager2.saveCurrentThread();
+      manager2.close();
 
       // Continue first session specifically
       const manager3 = new ThreadManager(tempDbPath);
-      const sessionInfo3 = await manager3.resumeOrCreate(id1);
+      const sessionInfo3 = manager3.resumeOrCreate(id1);
       const { threadId } = sessionInfo3;
 
       expect(threadId).toBe(id1);
       expect(sessionInfo3.isResumed).toBe(true);
       expect(manager3.getEvents(threadId)[0].data).toBe('First session');
 
-      await manager3.close();
+      manager3.close();
       vi.restoreAllMocks();
     });
 
-    it('should start new session if continue fails', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('should start new session if continue fails', () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock console.log to suppress output during test
+      });
+      vi.spyOn(console, 'warn').mockImplementation(() => {
+        // Mock console.warn to suppress output during test
+      });
 
       // Try to continue non-existent session
       const threadManager = new ThreadManager(tempDbPath);
-      const sessionInfo = await threadManager.resumeOrCreate('lace_invalid_id');
+      const sessionInfo = threadManager.resumeOrCreate('lace_invalid_id');
       const { threadId } = sessionInfo;
 
       expect(threadId).not.toBe('lace_invalid_id');
@@ -806,27 +816,27 @@ describe('Session Management', () => {
       expect(sessionInfo.isResumed).toBe(false);
       expect(sessionInfo.resumeError).toContain('Could not resume lace_invalid_id');
 
-      await threadManager.close();
+      threadManager.close();
       vi.restoreAllMocks();
     });
   });
 
   describe('ThreadManager shutdown', () => {
-    it('should save current session on shutdown', async () => {
+    it('should save current session on shutdown', () => {
       const threadManager = new ThreadManager(tempDbPath);
-      const sessionInfo = await threadManager.resumeOrCreate();
+      const sessionInfo = threadManager.resumeOrCreate();
       const { threadId } = sessionInfo;
       threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test message');
 
-      await threadManager.close();
+      threadManager.close();
 
       // Verify session was saved
       const newManager = new ThreadManager(tempDbPath);
-      const loadedThread = await newManager.loadThread(threadId);
+      const loadedThread = newManager.loadThread(threadId);
       expect(loadedThread.events).toHaveLength(1);
       expect(loadedThread.events[0].data).toBe('Test message');
 
-      await newManager.close();
+      newManager.close();
       vi.restoreAllMocks();
     });
   });
@@ -845,7 +855,7 @@ describe('Integration Tests', () => {
     }
   });
 
-  it('should handle complete conversation workflow', async () => {
+  it('should handle complete conversation workflow', () => {
     // Start session
     const threadManager = new ThreadManager(tempDbPath);
     const threadId = `lace_${Date.now()}_test`;
@@ -866,11 +876,11 @@ describe('Integration Tests', () => {
     });
     threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Here are the files in your directory');
 
-    await threadManager.close();
+    threadManager.close();
 
     // Resume session
     const newManager = new ThreadManager(tempDbPath);
-    const resumedThread = await newManager.loadThread(threadId);
+    const resumedThread = newManager.loadThread(threadId);
 
     // Verify full conversation was preserved
     expect(resumedThread.events).toHaveLength(5);
@@ -881,17 +891,17 @@ describe('Integration Tests', () => {
     expect(resumedThread.events[4].type).toBe('AGENT_MESSAGE');
 
     // Continue conversation
-    await newManager.setCurrentThread(threadId);
+    newManager.setCurrentThread(threadId);
     newManager.addEvent(threadId, 'USER_MESSAGE', "What's in file1.txt?");
 
     const finalEvents = newManager.getEvents(threadId);
     expect(finalEvents).toHaveLength(6);
     expect(finalEvents[5].data).toBe("What's in file1.txt?");
 
-    await newManager.close();
+    newManager.close();
   });
 
-  it('should handle multiple concurrent sessions', async () => {
+  it('should handle multiple concurrent sessions', () => {
     const manager1 = new ThreadManager(tempDbPath);
     const manager2 = new ThreadManager(tempDbPath);
 
@@ -906,8 +916,8 @@ describe('Integration Tests', () => {
     manager1.addEvent(thread1, 'USER_MESSAGE', 'Session 1 message');
     manager2.addEvent(thread2, 'USER_MESSAGE', 'Session 2 message');
 
-    await manager1.saveCurrentThread();
-    await manager2.saveCurrentThread();
+    manager1.saveCurrentThread();
+    manager2.saveCurrentThread();
 
     // Verify isolation
     const events1 = manager1.getEvents(thread1);
@@ -918,11 +928,11 @@ describe('Integration Tests', () => {
     expect(events1[0].data).toBe('Session 1 message');
     expect(events2[0].data).toBe('Session 2 message');
 
-    await manager1.close();
-    await manager2.close();
+    manager1.close();
+    manager2.close();
   });
 
-  it('should handle large conversations efficiently', { timeout: 10000 }, async () => {
+  it('should handle large conversations efficiently', { timeout: 10000 }, () => {
     const threadManager = new ThreadManager(tempDbPath);
     const threadId = 'lace_large_test';
     threadManager.createThread(threadId);
@@ -934,7 +944,7 @@ describe('Integration Tests', () => {
       threadManager.addEvent(threadId, type, `Message ${i}`);
     }
 
-    await threadManager.saveCurrentThread();
+    threadManager.saveCurrentThread();
 
     // Verify all events preserved
     const events = threadManager.getEvents(threadId);
@@ -944,12 +954,12 @@ describe('Integration Tests', () => {
 
     // Test loading performance
     const startTime = Date.now();
-    await threadManager.setCurrentThread(threadId);
+    threadManager.setCurrentThread(threadId);
     const loadTime = Date.now() - startTime;
 
     // Should load reasonably quickly (adjust threshold as needed)
     expect(loadTime).toBeLessThan(1000); // 1 second
 
-    await threadManager.close();
+    threadManager.close();
   });
 });

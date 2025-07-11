@@ -7,7 +7,7 @@ import { act } from '@testing-library/react';
 import tty from 'node:tty';
 import { expect } from 'vitest';
 import React from 'react';
-import { LaceFocusProvider } from '../../focus/focus-provider.js';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
 
 /**
  * Strips ANSI escape codes from text for content testing
@@ -141,9 +141,15 @@ class EnhancedStdout extends EventEmitter {
   };
 
   // Add methods that Ink might call
-  public cursorTo = () => {};
-  public clearLine = () => {};
-  public moveCursor = () => {};
+  public cursorTo = () => {
+    // Mock implementation for test stdout - no cursor movement needed
+  };
+  public clearLine = () => {
+    // Mock implementation for test stdout - no line clearing needed
+  };
+  public moveCursor = () => {
+    // Mock implementation for test stdout - no cursor movement needed
+  };
 }
 
 class EnhancedStderr extends EventEmitter {
@@ -184,7 +190,7 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
   // Force TTY mode and color support to enable cursor rendering in tests
   const originalIsTTY = process.stdout.isTTY;
   const originalStderrIsTTY = process.stderr.isTTY;
-  const originalWrite = process.stdout.write;
+  const originalWrite = process.stdout.write.bind(process.stdout);
   const originalForceColor = process.env.FORCE_COLOR;
   const originalIsatty = tty.isatty;
   const originalColumns = process.stdout.columns;
@@ -204,26 +210,20 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
 
   // Intercept actual stdout writes to capture ANSI codes
   const capturedWrites: string[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  process.stdout.write = function (chunk: any) {
+  process.stdout.write = function (chunk: unknown) {
     if (typeof chunk === 'string') {
       capturedWrites.push(chunk);
       stdout.write(chunk);
     }
     return true;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any;
+  } as typeof process.stdout.write;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let instance: any;
+  let instance: { unmount: () => void; rerender: (tree: React.ReactElement) => void } | undefined;
   act(() => {
     instance = inkRender(tree, {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      stdout: process.stdout as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      stderr: stderr as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      stdin: stdin as any,
+      stdout: process.stdout as unknown as NodeJS.WriteStream,
+      stderr: stderr as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
       debug: true,
       exitOnCtrlC: false,
       patchConsole: false,
@@ -231,7 +231,8 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
   });
 
   // Restore original methods
-  const originalUnmount = instance.unmount;
+  if (!instance) throw new Error('Instance not initialized');
+  const originalUnmount = instance.unmount as () => void;
   instance.unmount = () => {
     process.stdout.isTTY = originalIsTTY;
     process.stderr.isTTY = originalStderrIsTTY;
@@ -244,12 +245,12 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
     } else {
       process.env.FORCE_COLOR = originalForceColor;
     }
-    return originalUnmount();
+    return (originalUnmount as () => void)();
   };
 
   return {
     rerender: instance.rerender,
-    unmount: () => act(() => instance.unmount()),
+    unmount: () => act(() => instance!.unmount()),
     cleanup: () =>
       act(() => {
         process.stdout.isTTY = originalIsTTY;
@@ -263,7 +264,7 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
         } else {
           process.env.FORCE_COLOR = originalForceColor;
         }
-        instance.cleanup();
+        instance!.unmount();
       }),
     stdout,
     stderr,
@@ -273,7 +274,7 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
       if (capturedWrites.length === 0) return undefined;
 
       // Start with the last frame
-      let result = capturedWrites[capturedWrites.length - 1] || '';
+      const result = capturedWrites[capturedWrites.length - 1] || '';
 
       // If the last frame is only ANSI codes (no visible content),
       // look backwards and coalesce with frames that have content

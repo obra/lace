@@ -2,8 +2,8 @@
 // ABOUTME: Verifies retry logic works correctly with OpenAI SDK
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { OpenAIProvider } from '../openai-provider.js';
-import { ProviderMessage } from '../base-provider.js';
+import { OpenAIProvider } from '~/providers/openai-provider.js';
+import { ProviderMessage } from '~/providers/base-provider.js';
 
 // Create mock function that we'll reference
 const mockCreate = vi.fn();
@@ -36,9 +36,15 @@ describe('OpenAIProvider retry functionality', () => {
     });
 
     // Add error handlers to prevent unhandled errors in tests
-    provider.on('error', () => {});
-    provider.on('retry_attempt', () => {});
-    provider.on('retry_exhausted', () => {});
+    provider.on('error', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
+    provider.on('retry_attempt', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
+    provider.on('retry_exhausted', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
   });
 
   afterEach(() => {
@@ -61,7 +67,9 @@ describe('OpenAIProvider retry functionality', () => {
       });
 
       const promise = provider.createResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       // Wait for first attempt
       await vi.advanceTimersByTimeAsync(0);
@@ -95,18 +103,22 @@ describe('OpenAIProvider retry functionality', () => {
       provider.on('retry_attempt', retryAttemptSpy);
 
       const promise = provider.createResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       await vi.advanceTimersByTimeAsync(0);
       await vi.advanceTimersByTimeAsync(1100);
 
       await promise;
 
-      expect(retryAttemptSpy).toHaveBeenCalledWith({
-        attempt: 1,
-        delay: expect.any(Number),
-        error: expect.objectContaining({ status: 503 }),
-      });
+      expect(retryAttemptSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attempt: 1,
+          delay: expect.any(Number) as number,
+          error: expect.objectContaining({ status: 503 }) as object,
+        })
+      );
     });
 
     it('should not retry on authentication errors', async () => {
@@ -141,10 +153,12 @@ describe('OpenAIProvider retry functionality', () => {
       });
 
       expect(mockCreate).toHaveBeenCalledTimes(10);
-      expect(exhaustedSpy).toHaveBeenCalledWith({
-        attempts: 10,
-        lastError: expect.objectContaining({ code: 'ETIMEDOUT' }),
-      });
+      expect(exhaustedSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attempts: 10,
+          lastError: expect.objectContaining({ code: 'ETIMEDOUT' }) as object,
+        })
+      );
 
       // Restore fake timers
       vi.useFakeTimers();
@@ -157,10 +171,10 @@ describe('OpenAIProvider retry functionality', () => {
 
       // Mock the first call to create() to throw immediately (before stream is created)
       const networkError = new Error('Connection failed');
-      (networkError as any).code = 'ECONNRESET';
+      (networkError as Error & { code: string }).code = 'ECONNRESET';
 
       // Create a successful stream for the retry
-      const successStream = (async function* () {
+      const successStream = (function* () {
         yield {
           choices: [
             {
@@ -200,7 +214,7 @@ describe('OpenAIProvider retry functionality', () => {
       const messages: ProviderMessage[] = [{ role: 'user', content: 'Hello' }];
 
       // Create a stream that starts then fails
-      const stream = (async function* () {
+      const stream = (function* () {
         yield {
           choices: [
             {
@@ -210,7 +224,9 @@ describe('OpenAIProvider retry functionality', () => {
           ],
         };
         // Then fail
-        throw { code: 'ECONNRESET' };
+        const error = new Error('ECONNRESET');
+        (error as Error & { code: string }).code = 'ECONNRESET';
+        throw error;
       })();
 
       mockCreate.mockReturnValue(stream);

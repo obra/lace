@@ -5,9 +5,9 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import { Text } from 'ink';
-import { TimelineViewport } from '../TimelineViewport.js';
-import { Timeline } from '../../../../timeline-types.js';
-import { LaceFocusProvider } from '../../../focus/focus-provider.js';
+import { TimelineViewport } from '~/interfaces/terminal/components/events/TimelineViewport.js';
+import { Timeline } from '~/interfaces/timeline-types.js';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
 
 // Mock external dependencies that aren't core to the component logic
 vi.mock('../../../../../utils/use-stdout-dimensions.js', () => ({
@@ -26,11 +26,7 @@ vi.mock('../../../../../utils/logger.js', () => ({
 describe('TimelineViewport', () => {
   // Helper to render with focus provider
   const renderWithFocus = (component: React.ReactElement) => {
-    return render(
-      <LaceFocusProvider>
-        {component}
-      </LaceFocusProvider>
-    );
+    return render(<LaceFocusProvider>{component}</LaceFocusProvider>);
   };
 
   const createMockTimeline = (itemCount: number): Timeline => {
@@ -58,7 +54,7 @@ describe('TimelineViewport', () => {
 
     const { lastFrame } = renderWithFocus(
       <TimelineViewport timeline={timeline}>
-        {({ timeline: tl, viewportState, itemRefs }) =>
+        {({ timeline: tl, viewportState: _viewportState, itemRefs: _itemRefs }) =>
           tl.items.map((item, index) => (
             <Text key={`${item.type}-${index}`}>
               {item.type === 'user_message' ? item.content : `Item ${index}`}
@@ -77,7 +73,14 @@ describe('TimelineViewport', () => {
 
   it('should provide viewport state to children', () => {
     const timeline = createMockTimeline(2);
-    let capturedState: any = null;
+    let capturedState: {
+      selectedLine: number;
+      lineScrollOffset: number;
+      itemPositions: number[];
+      totalContentHeight: number;
+      selectedItemIndex: number;
+      measurementTrigger: number;
+    } | null = null;
 
     renderWithFocus(
       <TimelineViewport timeline={timeline}>
@@ -90,16 +93,18 @@ describe('TimelineViewport', () => {
 
     // Should provide viewport state
     expect(capturedState).toBeDefined();
-    expect(capturedState.selectedLine).toBeDefined();
-    expect(capturedState.lineScrollOffset).toBeDefined();
-    expect(capturedState.itemPositions).toBeDefined();
-    expect(capturedState.totalContentHeight).toBeDefined();
-    expect(capturedState.selectedItemIndex).toBeDefined();
+    expect(capturedState!.selectedLine).toBeDefined();
+    expect(capturedState!.lineScrollOffset).toBeDefined();
+    expect(capturedState!.itemPositions).toBeDefined();
+    expect(capturedState!.totalContentHeight).toBeDefined();
+    expect(capturedState!.selectedItemIndex).toBeDefined();
   });
 
   it('should provide viewport actions to children', () => {
     const timeline = createMockTimeline(2);
-    let capturedActions: any = null;
+    let capturedActions: {
+      triggerRemeasurement: () => void;
+    } | null = null;
 
     renderWithFocus(
       <TimelineViewport timeline={timeline}>
@@ -112,12 +117,12 @@ describe('TimelineViewport', () => {
 
     // Should provide viewport actions
     expect(capturedActions).toBeDefined();
-    expect(capturedActions.triggerRemeasurement).toBeTypeOf('function');
+    expect(capturedActions!.triggerRemeasurement).toBeTypeOf('function');
   });
 
   it('should provide itemRefs to children', () => {
     const timeline = createMockTimeline(2);
-    let capturedRefs: any = null;
+    let capturedRefs: React.MutableRefObject<Map<number, unknown>> | null = null;
 
     renderWithFocus(
       <TimelineViewport timeline={timeline}>
@@ -130,19 +135,17 @@ describe('TimelineViewport', () => {
 
     // Should provide item refs
     expect(capturedRefs).toBeDefined();
-    expect(capturedRefs.current).toBeInstanceOf(Map);
+    expect(capturedRefs!.current).toBeInstanceOf(Map);
   });
 
   it('should render cursor overlay when focused', () => {
     const timeline = createMockTimeline(1);
 
     const { lastFrame } = renderWithFocus(
-      <TimelineViewport timeline={timeline}>
-        {() => <Text>Content</Text>}
-      </TimelineViewport>
+      <TimelineViewport timeline={timeline}>{() => <Text>Content</Text>}</TimelineViewport>
     );
 
-    // Should contain cursor indicator when focused  
+    // Should contain cursor indicator when focused
     // Note: cursor only shows when component is actually focused via Ink's focus system
     // In tests, we'll just check that the content renders without error
     expect(lastFrame()).toContain('Content');
@@ -173,9 +176,7 @@ describe('TimelineViewport', () => {
     const timeline = createMockTimeline(1);
 
     const { lastFrame } = renderWithFocus(
-      <TimelineViewport timeline={timeline}>
-        {() => <Text>Focused content</Text>}
-      </TimelineViewport>
+      <TimelineViewport timeline={timeline}>{() => <Text>Focused content</Text>}</TimelineViewport>
     );
 
     // Should render without crashing with focus props

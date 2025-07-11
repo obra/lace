@@ -4,17 +4,27 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render as renderInkComponent } from 'ink-testing-library';
-import ShellInput from '../shell-input.js';
-import { LaceFocusProvider } from '../../focus/focus-provider.js';
+import ShellInput from '~/interfaces/terminal/components/shell-input.js';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
 
 // Capture the useInput handler for direct testing
-let capturedInputHandler: ((input: string, key: any) => void) | null = null;
+interface KeyInfo {
+  escape?: boolean;
+  return?: boolean;
+  tab?: boolean;
+  upArrow?: boolean;
+  downArrow?: boolean;
+  leftArrow?: boolean;
+  rightArrow?: boolean;
+}
+
+let capturedInputHandler: ((input: string, key: KeyInfo) => void) | null = null;
 
 vi.mock('ink', async () => {
   const actual = await vi.importActual('ink');
   return {
     ...actual,
-    useInput: (handler: (input: string, key: any) => void) => {
+    useInput: (handler: (input: string, key: KeyInfo) => void) => {
       capturedInputHandler = handler;
     },
   };
@@ -23,16 +33,14 @@ vi.mock('ink', async () => {
 // Mock the FileScanner module
 vi.mock('../../utils/file-scanner.js', () => ({
   FileScanner: vi.fn().mockImplementation(() => ({
-    getCompletions: vi.fn().mockResolvedValue(['src/', 'package.json', 'README.md']),
+    getCompletions: vi.fn().mockReturnValue(['src/', 'package.json', 'README.md']),
   })),
 }));
 
 describe('ShellInput Autocomplete Integration', () => {
   // Helper to render with focus provider
   const renderWithFocus = (component: React.ReactElement) => {
-    return renderInkComponent(
-      React.createElement(LaceFocusProvider, { children: component })
-    );
+    return renderInkComponent(React.createElement(LaceFocusProvider, { children: component }));
   };
 
   let mockOnSubmit: ReturnType<typeof vi.fn>;
@@ -185,7 +193,7 @@ describe('ShellInput Autocomplete Integration', () => {
     });
 
     it('should complete partial text correctly', async () => {
-      const { lastFrame } = renderWithFocus(
+      renderWithFocus(
         <ShellInput onSubmit={mockOnSubmit} onChange={mockOnChange} value="sr" autoFocus={true} />
       );
 
@@ -266,17 +274,19 @@ describe('ShellInput Autocomplete Integration', () => {
   describe('word boundary detection', () => {
     it('should detect current word correctly', async () => {
       const { FileScanner } = await import('../../utils/file-scanner.js');
-      const mockScanner = vi.mocked(FileScanner).mock.instances[0] as any;
+      const mockScanner = vi.mocked(FileScanner).mock.instances[0] as unknown as {
+        getCompletions: ReturnType<typeof vi.fn>;
+      };
 
       if (mockScanner?.getCompletions) {
         // Clear previous calls
         mockScanner.getCompletions.mockClear();
 
         // Mock specific completions for partial path
-        mockScanner.getCompletions.mockResolvedValue(['src/app.ts', 'src/agent.ts']);
+        mockScanner.getCompletions.mockReturnValue(['src/app.ts', 'src/agent.ts']);
       }
 
-      const { lastFrame } = renderWithFocus(
+      renderWithFocus(
         <ShellInput
           onSubmit={mockOnSubmit}
           onChange={mockOnChange}
@@ -373,10 +383,14 @@ describe('ShellInput Autocomplete Integration', () => {
     it('should handle autocomplete loading errors gracefully', async () => {
       // Mock FileScanner to throw an error
       const { FileScanner } = await import('../../utils/file-scanner.js');
-      const mockScanner = vi.mocked(FileScanner).mock.instances[0] as any;
+      const mockScanner = vi.mocked(FileScanner).mock.instances[0] as unknown as {
+        getCompletions: ReturnType<typeof vi.fn>;
+      };
 
       if (mockScanner?.getCompletions) {
-        mockScanner.getCompletions.mockRejectedValue(new Error('File system error'));
+        mockScanner.getCompletions.mockImplementation(() => {
+          throw new Error('File system error');
+        });
       }
 
       const { lastFrame } = renderWithFocus(

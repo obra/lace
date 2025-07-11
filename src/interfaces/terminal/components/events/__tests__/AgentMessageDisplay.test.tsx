@@ -4,14 +4,14 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
-import { AgentMessageDisplay } from '../AgentMessageDisplay.js';
-import { ThreadEvent } from '../../../../../threads/types.js';
-import { TimelineItemProvider } from '../contexts/TimelineItemContext.js';
-import { UI_SYMBOLS } from '../../../theme.js';
+import { AgentMessageDisplay } from '~/interfaces/terminal/components/events/AgentMessageDisplay.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 
 // Mock dependencies
 vi.mock('../contexts/TimelineItemContext.js', () => ({
-  TimelineItemProvider: ({ children }: any) => children,
+  TimelineItemProvider: ({ children }: { children: React.ReactNode }) => children,
   useTimelineItem: () => ({
     isExpanded: false,
     isSelected: false,
@@ -27,7 +27,15 @@ vi.mock('../contexts/TimelineItemContext.js', () => ({
 }));
 
 vi.mock('../ui/MarkdownDisplay.js', () => ({
-  MarkdownDisplay: ({ content, showIcon, dimmed }: any) =>
+  MarkdownDisplay: ({
+    content,
+    showIcon,
+    dimmed,
+  }: {
+    content: string;
+    showIcon?: boolean;
+    dimmed?: boolean;
+  }) =>
     React.createElement(
       'text',
       {},
@@ -43,7 +51,14 @@ vi.mock('../ui/TimelineEntry.js', () => ({
     isExpanded,
     onExpandedChange,
     isFocused,
-  }: any) => {
+  }: {
+    children: React.ReactNode;
+    label?: string;
+    summary?: string;
+    isExpanded?: boolean;
+    onExpandedChange?: (expanded: boolean) => void;
+    isFocused?: boolean;
+  }) => {
     return React.createElement(
       'collapsible',
       {
@@ -59,7 +74,6 @@ vi.mock('../ui/TimelineEntry.js', () => ({
 }));
 
 describe('AgentMessageDisplay - Enhanced with Thinking', () => {
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -77,7 +91,12 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       const event = createEvent('<think>Some thinking</think>Regular content');
 
       const { lastFrame } = render(
-        <TimelineItemProvider isSelected={false} onToggle={() => {}}>
+        <TimelineItemProvider
+          isSelected={false}
+          onToggle={() => {
+            // Mock onToggle for test - no action needed
+          }}
+        >
           <AgentMessageDisplay event={event} isFocused={true} />
         </TimelineItemProvider>
       );
@@ -91,7 +110,12 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       const event = createEvent('Just regular content');
 
       const { lastFrame } = render(
-        <TimelineItemProvider isSelected={false} onToggle={() => {}}>
+        <TimelineItemProvider
+          isSelected={false}
+          onToggle={() => {
+            // Mock onToggle for test - no action needed
+          }}
+        >
           <AgentMessageDisplay event={event} isFocused={true} />
         </TimelineItemProvider>
       );
@@ -109,7 +133,12 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       );
 
       const { lastFrame } = render(
-        <TimelineItemProvider isSelected={false} onToggle={() => {}}>
+        <TimelineItemProvider
+          isSelected={false}
+          onToggle={() => {
+            // Mock onToggle for test - no action needed
+          }}
+        >
           <AgentMessageDisplay event={event} isFocused={true} />
         </TimelineItemProvider>
       );
@@ -125,7 +154,12 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       );
 
       const { lastFrame } = render(
-        <TimelineItemProvider isSelected={false} onToggle={() => {}}>
+        <TimelineItemProvider
+          isSelected={false}
+          onToggle={() => {
+            // Mock onToggle for test - no action needed
+          }}
+        >
           <AgentMessageDisplay event={event} isFocused={true} />
         </TimelineItemProvider>
       );
@@ -141,7 +175,12 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       const event = createEvent('<think>Only thinking content here</think>');
 
       const { lastFrame } = render(
-        <TimelineItemProvider isSelected={false} onToggle={() => {}}>
+        <TimelineItemProvider
+          isSelected={false}
+          onToggle={() => {
+            // Mock onToggle for test - no action needed
+          }}
+        >
           <AgentMessageDisplay event={event} isFocused={true} />
         </TimelineItemProvider>
       );
@@ -157,7 +196,12 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       const event = createEvent('<think>Some thinking</think>Here is the response');
 
       const { lastFrame } = render(
-        <TimelineItemProvider isSelected={false} onToggle={() => {}}>
+        <TimelineItemProvider
+          isSelected={false}
+          onToggle={() => {
+            // Mock onToggle for test - no action needed
+          }}
+        >
           <AgentMessageDisplay event={event} isFocused={true} />
         </TimelineItemProvider>
       );
@@ -175,7 +219,12 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       const event = createEvent('<think>Thinking</think>Content');
 
       const { lastFrame } = render(
-        <TimelineItemProvider isSelected={false} onToggle={() => {}}>
+        <TimelineItemProvider
+          isSelected={false}
+          onToggle={() => {
+            // Mock onToggle for test - no action needed
+          }}
+        >
           <AgentMessageDisplay event={event} isFocused={true} />
         </TimelineItemProvider>
       );
@@ -190,7 +239,12 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       const event = createEvent('<think>Thinking</think>Content');
 
       render(
-        <TimelineItemProvider isSelected={false} onToggle={() => {}}>
+        <TimelineItemProvider
+          isSelected={false}
+          onToggle={() => {
+            // Mock onToggle for test - no action needed
+          }}
+        >
           <AgentMessageDisplay event={event} isFocused={true} />
         </TimelineItemProvider>
       );
@@ -204,11 +258,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       const event = createEvent('Partial response...');
 
       const { lastFrame } = render(
-        <AgentMessageDisplay
-          event={event}
-          isStreaming={true}
-          isFocused={true}
-                  />
+        <AgentMessageDisplay event={event} isStreaming={true} isFocused={true} />
       );
 
       expect(lastFrame()).toContain('(thinking...)');
@@ -220,7 +270,12 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       const event = createEvent('');
 
       const { lastFrame } = render(
-        <TimelineItemProvider isSelected={false} onToggle={() => {}}>
+        <TimelineItemProvider
+          isSelected={false}
+          onToggle={() => {
+            // Mock onToggle for test - no action needed
+          }}
+        >
           <AgentMessageDisplay event={event} isFocused={true} />
         </TimelineItemProvider>
       );

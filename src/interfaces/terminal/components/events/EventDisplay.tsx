@@ -3,14 +3,14 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ThreadEvent } from '../../../../threads/types.js';
-import { ToolCallDisplay } from './ToolCallDisplay.js';
-import { ToolResultDisplay } from './ToolResultDisplay.js';
-import { UserMessageDisplay } from './UserMessageDisplay.js';
-import { AgentMessageDisplay } from './AgentMessageDisplay.js';
-import { SystemMessageDisplay } from './SystemMessageDisplay.js';
-import { SystemPromptDisplay } from './SystemPromptDisplay.js';
-import { UserSystemPromptDisplay } from './UserSystemPromptDisplay.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { ToolCallDisplay } from '~/interfaces/terminal/components/events/ToolCallDisplay.js';
+import { ToolResultDisplay } from '~/interfaces/terminal/components/events/ToolResultDisplay.js';
+import { UserMessageDisplay } from '~/interfaces/terminal/components/events/UserMessageDisplay.js';
+import { AgentMessageDisplay } from '~/interfaces/terminal/components/events/AgentMessageDisplay.js';
+import { SystemMessageDisplay } from '~/interfaces/terminal/components/events/SystemMessageDisplay.js';
+import { SystemPromptDisplay } from '~/interfaces/terminal/components/events/SystemPromptDisplay.js';
+import { UserSystemPromptDisplay } from '~/interfaces/terminal/components/events/UserSystemPromptDisplay.js';
 
 interface EventDisplayProps {
   event: ThreadEvent;
@@ -25,8 +25,8 @@ export function EventDisplay({
   event,
   isStreaming,
   isSelected,
-  focusedLine,
-  itemStartLine,
+  focusedLine: _focusedLine,
+  itemStartLine: _itemStartLine,
   onToggle,
 }: EventDisplayProps) {
   const componentMap = {

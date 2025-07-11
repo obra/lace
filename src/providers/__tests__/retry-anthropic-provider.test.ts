@@ -2,8 +2,8 @@
 // ABOUTME: Verifies retry logic works correctly with Anthropic SDK
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AnthropicProvider } from '../anthropic-provider.js';
-import { ProviderMessage } from '../base-provider.js';
+import { AnthropicProvider } from '~/providers/anthropic-provider.js';
+import { ProviderMessage } from '~/providers/base-provider.js';
 
 // Create mock functions that we'll reference
 const mockCreate = vi.fn();
@@ -42,9 +42,15 @@ describe('AnthropicProvider retry functionality', () => {
     });
 
     // Add error handler to prevent unhandled errors in tests
-    provider.on('error', () => {});
-    provider.on('retry_attempt', () => {});
-    provider.on('retry_exhausted', () => {});
+    provider.on('error', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
+    provider.on('retry_attempt', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
+    provider.on('retry_exhausted', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
   });
 
   afterEach(() => {
@@ -63,7 +69,9 @@ describe('AnthropicProvider retry functionality', () => {
       });
 
       const promise = provider.createResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       // Wait for first attempt
       await vi.advanceTimersByTimeAsync(0);
@@ -93,7 +101,9 @@ describe('AnthropicProvider retry functionality', () => {
       provider.on('retry_attempt', retryAttemptSpy);
 
       const promise = provider.createResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       await vi.advanceTimersByTimeAsync(0);
       await vi.advanceTimersByTimeAsync(1100);
@@ -102,8 +112,10 @@ describe('AnthropicProvider retry functionality', () => {
 
       expect(retryAttemptSpy).toHaveBeenCalledWith({
         attempt: 1,
-        delay: expect.any(Number),
-        error: expect.objectContaining({ status: 503 }),
+
+        delay: expect.any(Number) as number,
+
+        error: expect.objectContaining({ status: 503 }) as Record<string, unknown>,
       });
     });
 
@@ -141,7 +153,7 @@ describe('AnthropicProvider retry functionality', () => {
       expect(mockCreate).toHaveBeenCalledTimes(10);
       expect(exhaustedSpy).toHaveBeenCalledWith({
         attempts: 10,
-        lastError: expect.objectContaining({ code: 'ETIMEDOUT' }),
+        lastError: expect.objectContaining({ code: 'ETIMEDOUT' }) as Error,
       });
 
       // Restore fake timers
@@ -154,12 +166,12 @@ describe('AnthropicProvider retry functionality', () => {
       const messages: ProviderMessage[] = [{ role: 'user', content: 'Hello' }];
 
       // First call throws with network error, second call succeeds with stream
-      const networkError = new Error('Connection failed');
-      (networkError as any).code = 'ECONNRESET';
+      const networkError = new Error('Connection failed') as Error & { code: string };
+      networkError.code = 'ECONNRESET';
 
       // Create a proper stream mock for the successful retry
       const successfulStream = {
-        on: vi.fn((event, handler) => {
+        on: vi.fn((event: string, handler: (text: string) => void) => {
           if (event === 'text') {
             // Simulate some text events synchronously for testing
             handler('Hello ');
@@ -183,7 +195,9 @@ describe('AnthropicProvider retry functionality', () => {
         .mockImplementationOnce(() => successfulStream);
 
       const promise = provider.createStreamingResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection during retry
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      }); // during retry
 
       // Wait for first attempt to fail
       await vi.advanceTimersByTimeAsync(0);
@@ -201,20 +215,22 @@ describe('AnthropicProvider retry functionality', () => {
     it('should not retry after streaming has started', async () => {
       const messages: ProviderMessage[] = [{ role: 'user', content: 'Hello' }];
 
-      let textHandlers: ((text: string) => void)[] = [];
+      const textHandlers: ((text: string) => void)[] = [];
 
       // Create a stream that starts then fails
       const stream = {
-        on: vi.fn((event, handler) => {
+        on: vi.fn((event: string, handler: (text: string) => void) => {
           if (event === 'text') {
-            textHandlers.push(handler);
+            textHandlers.push(handler as (text: string) => void);
           }
         }),
-        finalMessage: vi.fn().mockImplementation(async () => {
+        finalMessage: vi.fn().mockImplementation(() => {
           // Emit some text first
           textHandlers.forEach((handler) => handler('Hello'));
           // Then fail
-          throw { code: 'ECONNRESET' };
+          const error = new Error('ECONNRESET');
+          (error as Error & { code: string }).code = 'ECONNRESET';
+          throw error;
         }),
       };
 

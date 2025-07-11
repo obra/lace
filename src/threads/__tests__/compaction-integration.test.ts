@@ -5,12 +5,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { Agent } from '../../agents/agent.js';
-import { ThreadManager } from '../thread-manager.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { AIProvider, ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { SummarizeStrategy } from '../compaction/summarize-strategy.js';
+import { Agent } from '~/agents/agent.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy.js';
 
 // Mock provider for testing
 class MockProvider extends AIProvider {
@@ -47,8 +47,8 @@ class MockProvider extends AIProvider {
     };
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return this.mockResponse;
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve(this.mockResponse);
   }
 }
 
@@ -86,9 +86,9 @@ describe('Compaction Integration', () => {
     await agent.start();
   });
 
-  afterEach(async () => {
-    await agent?.stop();
-    await threadManager?.close();
+  afterEach(() => {
+    agent?.stop();
+    threadManager?.close();
     if (fs.existsSync(tempDbPath)) {
       fs.unlinkSync(tempDbPath);
     }
@@ -120,7 +120,7 @@ describe('Compaction Integration', () => {
 
     // Trigger compaction manually using simplified approach
     expect(await threadManager.needsCompaction()).toBe(true);
-    const newThreadId = await threadManager.createCompactedVersion('Test compaction');
+    const newThreadId = threadManager.createCompactedVersion('Test compaction');
     expect(newThreadId).toBeDefined();
 
     // Check if compaction occurred - Agent threadId should remain stable (canonical ID)
@@ -174,7 +174,7 @@ describe('Compaction Integration', () => {
 
     // Trigger compaction using simplified approach
     if (await threadManager.needsCompaction()) {
-      await threadManager.createCompactedVersion('Test compaction for conversation');
+      threadManager.createCompactedVersion('Test compaction for conversation');
     }
 
     // Verify compaction occurred - Agent threadId should remain stable

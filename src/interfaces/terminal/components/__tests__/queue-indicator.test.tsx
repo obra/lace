@@ -3,9 +3,12 @@
 
 import React from 'react';
 import { describe, it, expect } from 'vitest';
-import { renderInkComponent, stripAnsi } from '../../__tests__/helpers/ink-test-utils.js';
-import { QueueIndicator } from '../queue-indicator.js';
-import type { MessageQueueStats } from '../../../../agents/types.js';
+import {
+  renderInkComponent,
+  stripAnsi,
+} from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
+import { QueueIndicator } from '~/interfaces/terminal/components/queue-indicator.js';
+import type { MessageQueueStats } from '~/agents/types.js';
 
 describe('QueueIndicator', () => {
   it('should not render when queue is empty', () => {
@@ -15,7 +18,7 @@ describe('QueueIndicator', () => {
     };
 
     const { lastFrame } = renderInkComponent(<QueueIndicator stats={emptyStats} />);
-    
+
     const frame = stripAnsi(lastFrame() || '');
     expect(frame).toBe('');
   });
@@ -28,7 +31,7 @@ describe('QueueIndicator', () => {
     };
 
     const { lastFrame } = renderInkComponent(<QueueIndicator stats={stats} />);
-    
+
     const frame = lastFrame();
     expect(frame).toContain('📬 3 queued');
   });
@@ -41,7 +44,7 @@ describe('QueueIndicator', () => {
     };
 
     const { lastFrame } = renderInkComponent(<QueueIndicator stats={stats} />);
-    
+
     const frame = lastFrame();
     expect(frame).toContain('📬 5 queued');
     expect(frame).toContain('(2 high)');
@@ -55,7 +58,7 @@ describe('QueueIndicator', () => {
     };
 
     const { lastFrame } = renderInkComponent(<QueueIndicator stats={stats} />);
-    
+
     const frame = lastFrame();
     expect(frame).toContain('📬 2 queued');
     expect(frame).toContain('(2 high)');
@@ -69,7 +72,7 @@ describe('QueueIndicator', () => {
     };
 
     const { lastFrame } = renderInkComponent(<QueueIndicator stats={stats} />);
-    
+
     const frame = lastFrame();
     expect(frame).toContain('📬 4 queued');
     expect(frame).not.toContain('high');
@@ -82,7 +85,7 @@ describe('QueueIndicator', () => {
     };
 
     const { lastFrame } = renderInkComponent(<QueueIndicator stats={stats} />);
-    
+
     const frame = lastFrame();
     expect(frame).toContain('📬 1 queued');
     expect(frame).toContain('(1 high)');
@@ -95,7 +98,7 @@ describe('QueueIndicator', () => {
     };
 
     const { lastFrame } = renderInkComponent(<QueueIndicator stats={stats} />);
-    
+
     // Check that the component renders (yellow color will be in ANSI codes)
     const frame = lastFrame();
     expect(frame).toContain('📬 2 queued');

@@ -11,8 +11,8 @@ import { OllamaProvider } from '~/providers/ollama-provider.js';
 vi.mock('../cli/interface.js', () => ({
   CLIInterface: class MockCLIInterface {
     constructor(
-      public agent: any,
-      public threadManager: any
+      public _agent: any,
+      public _threadManager: any
     ) {}
     handleSinglePrompt(_prompt: string) {
       return;

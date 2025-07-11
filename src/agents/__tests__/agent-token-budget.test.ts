@@ -2,12 +2,13 @@
 // ABOUTME: Verifies token budget tracking, warnings, and request blocking work correctly
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Agent, AgentConfig } from '../agent.js';
-import { AIProvider } from '../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
+import { Agent, AgentConfig } from '~/agents/agent.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { BudgetStatus, BudgetRecommendations } from '~/token-management/types.js';
 
 // Mock provider for testing token budget integration
 class MockProvider extends AIProvider {
@@ -37,15 +38,12 @@ class MockProvider extends AIProvider {
     this.mockResponse = response;
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return this.mockResponse;
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve(this.mockResponse);
   }
 
-  async createStreamingResponse(
-    _messages: ProviderMessage[],
-    _tools: Tool[]
-  ): Promise<ProviderResponse> {
-    return this.mockResponse;
+  createStreamingResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve(this.mockResponse);
   }
 }
 
@@ -101,7 +99,11 @@ describe('Agent Token Budget Integration', () => {
   });
 
   it('should emit warnings when approaching token limits', async () => {
-    const warningEvents: any[] = [];
+    const warningEvents: {
+      message: string;
+      usage: BudgetStatus;
+      recommendations: BudgetRecommendations;
+    }[] = [];
     agent.on('token_budget_warning', (data) => {
       warningEvents.push(data);
     });
@@ -150,7 +152,11 @@ describe('Agent Token Budget Integration', () => {
       },
     });
 
-    const warningEvents: any[] = [];
+    const warningEvents: {
+      message: string;
+      usage: BudgetStatus;
+      recommendations: BudgetRecommendations;
+    }[] = [];
     agent.on('token_budget_warning', (data) => {
       warningEvents.push(data);
     });

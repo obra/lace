@@ -8,9 +8,9 @@ import {
   isDelegateToolCallResult,
   extractDelegateThreadId,
   isDelegateToolExecution,
-} from './timeline-item-focus.js';
-import { TimelineItem } from '../../timeline-types.js';
-import { FocusRegions } from '../focus/index.js';
+} from '~/interfaces/terminal/components/timeline-item-focus.js';
+import { TimelineItem } from '~/interfaces/timeline-types.js';
+import { FocusRegions } from '~/interfaces/terminal/focus/index.js';
 
 describe('timeline-item-focus', () => {
   // Helper to create mock timeline items

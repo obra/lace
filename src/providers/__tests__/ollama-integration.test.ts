@@ -2,10 +2,10 @@
 // ABOUTME: Tests basic functionality and tool calling with local Ollama server
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { OllamaProvider } from '../ollama-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolContext, ToolResult } from '../../tools/types.js';
-import { checkProviderAvailability } from '../../__tests__/utils/provider-test-helpers.js';
+import { OllamaProvider } from '~/providers/ollama-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolContext, ToolResult } from '~/tools/types.js';
+import { checkProviderAvailability } from '~/__tests__/utils/provider-test-helpers.js';
 import { z } from 'zod';
 
 // Mock tool for testing without side effects
@@ -17,11 +17,11 @@ class MockTool extends Tool {
     value: z.string().describe('Value to use').optional(),
   });
 
-  protected async executeValidated(
+  protected executeValidated(
     args: { action: string; value?: string },
     _context?: ToolContext
   ): Promise<ToolResult> {
-    return this.createResult(`Mock executed: ${JSON.stringify(args)}`);
+    return Promise.resolve(this.createResult(`Mock executed: ${JSON.stringify(args)}`));
   }
 }
 
@@ -38,7 +38,7 @@ const conditionalDescribe = isOllamaAvailable ? describe.sequential : describe.s
 conditionalDescribe('Ollama Provider Integration Tests', () => {
   let mockTool: MockTool;
 
-  beforeAll(async () => {
+  beforeAll(() => {
     mockTool = new MockTool();
   }, 60000);
 
@@ -84,7 +84,7 @@ conditionalDescribe('Ollama Provider Integration Tests', () => {
   }, 30000);
 
   it('should handle multi-turn conversation', async () => {
-    let messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
+    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
       { role: 'user', content: 'What is 5 + 3?' },
     ];
 

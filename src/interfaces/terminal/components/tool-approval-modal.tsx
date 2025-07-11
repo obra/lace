@@ -3,8 +3,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { ApprovalDecision } from '../../../tools/approval-types.js';
-import { ModalWrapper, useLaceFocus, FocusRegions } from '../focus/index.js';
+import { ApprovalDecision } from '~/tools/approval-types.js';
+import { ModalWrapper, useLaceFocus, FocusRegions } from '~/interfaces/terminal/focus/index.js';
 
 export interface ToolApprovalModalProps {
   toolName: string;
@@ -31,34 +31,37 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
     }
   }, [isVisible]);
 
-  useInput((inputChar, key) => {
-    if (!isVisible || !isFocused) return;
+  useInput(
+    (inputChar, key) => {
+      if (!isVisible || !isFocused) return;
 
-    if (key.upArrow || inputChar === 'k') {
-      setSelectedOption((prev) => Math.max(0, prev - 1));
-    } else if (key.downArrow || inputChar === 'j') {
-      setSelectedOption((prev) => Math.min(2, prev + 1));
-    } else if (key.return) {
-      // Execute selected option
-      switch (selectedOption) {
-        case 0:
-          onDecision(ApprovalDecision.ALLOW_ONCE);
-          break;
-        case 1:
-          onDecision(ApprovalDecision.ALLOW_SESSION);
-          break;
-        case 2:
-          onDecision(ApprovalDecision.DENY);
-          break;
+      if (key.upArrow || inputChar === 'k') {
+        setSelectedOption((prev) => Math.max(0, prev - 1));
+      } else if (key.downArrow || inputChar === 'j') {
+        setSelectedOption((prev) => Math.min(2, prev + 1));
+      } else if (key.return) {
+        // Execute selected option
+        switch (selectedOption) {
+          case 0:
+            onDecision(ApprovalDecision.ALLOW_ONCE);
+            break;
+          case 1:
+            onDecision(ApprovalDecision.ALLOW_SESSION);
+            break;
+          case 2:
+            onDecision(ApprovalDecision.DENY);
+            break;
+        }
+      } else if (inputChar === 'y' || inputChar === 'a') {
+        onDecision(ApprovalDecision.ALLOW_ONCE);
+      } else if (inputChar === 's') {
+        onDecision(ApprovalDecision.ALLOW_SESSION);
+      } else if (inputChar === 'n' || inputChar === 'd') {
+        onDecision(ApprovalDecision.DENY);
       }
-    } else if (inputChar === 'y' || inputChar === 'a') {
-      onDecision(ApprovalDecision.ALLOW_ONCE);
-    } else if (inputChar === 's') {
-      onDecision(ApprovalDecision.ALLOW_SESSION);
-    } else if (inputChar === 'n' || inputChar === 'd') {
-      onDecision(ApprovalDecision.DENY);
-    }
-  }, { isActive: isVisible && isFocused });
+    },
+    { isActive: isVisible && isFocused }
+  );
 
   // ModalWrapper handles visibility, so we just render the content
 
@@ -90,33 +93,55 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
         return (
           <Box flexDirection="column">
             <Text color="white">{preview}...</Text>
-            <Text color="dim" italic>({value.length} chars, {lineCount} lines - truncated for display)</Text>
+            <Text color="dim" italic>
+              ({value.length} chars, {lineCount} lines - truncated for display)
+            </Text>
           </Box>
         );
       }
-      return <Text bold color="white">{value}</Text>;
+      return (
+        <Text bold color="white">
+          {value}
+        </Text>
+      );
     } else if (Array.isArray(value)) {
       return (
         <Box flexDirection="column">
           {value.slice(0, 5).map((item, idx) => (
-            <Text key={idx} color="white">• {String(item)}</Text>
+            <Text key={idx} color="white">
+              • {String(item)}
+            </Text>
           ))}
           {value.length > 5 && (
-            <Text color="dim" italic>...and {value.length - 5} more items</Text>
+            <Text color="dim" italic>
+              ...and {value.length - 5} more items
+            </Text>
           )}
         </Box>
       );
     } else if (typeof value === 'boolean') {
-      return <Text bold color={value ? 'green' : 'red'}>{String(value)}</Text>;
+      return (
+        <Text bold color={value ? 'green' : 'red'}>
+          {String(value)}
+        </Text>
+      );
     } else if (typeof value === 'number') {
-      return <Text bold color="cyan">{String(value)}</Text>;
+      return (
+        <Text bold color="cyan">
+          {String(value)}
+        </Text>
+      );
     } else {
-      return <Text bold color="white">{String(value)}</Text>;
+      return (
+        <Text bold color="white">
+          {String(value)}
+        </Text>
+      );
     }
   };
 
   // Determine risk level and colors
-  const riskLevel = isReadOnly ? 'low' : 'high';
+  const _riskLevel = isReadOnly ? 'low' : 'high';
   const riskColor = isReadOnly ? 'green' : 'red';
   const riskLabel = isReadOnly ? 'READ-ONLY' : '⚠️POSSIBLY DESTRUCTIVE';
 
@@ -127,25 +152,25 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
   ];
 
   return (
-    <ModalWrapper
-      focusId={FocusRegions.modal('approval')}
-      isOpen={isVisible}
-    >
-      <Box 
-        flexDirection="column" 
-        borderStyle="single" 
-        borderColor="yellow" 
+    <ModalWrapper focusId={FocusRegions.modal('approval')} isOpen={isVisible}>
+      <Box
+        flexDirection="column"
+        borderStyle="single"
+        borderColor="yellow"
         paddingX={2}
         paddingY={1}
         width="100%"
       >
         {/* Header with tool name and risk indicator */}
         <Box justifyContent="space-between">
-          <Text bold color="yellow">Approve tool use: {toolName}</Text>
-          <Text bold color={riskColor}>{riskLabel}</Text>
+          <Text bold color="yellow">
+            Approve tool use: {toolName}
+          </Text>
+          <Text bold color={riskColor}>
+            {riskLabel}
+          </Text>
         </Box>
-        
-        
+
         {/* Parameters section */}
         {input !== null && input !== undefined && (
           <Box flexDirection="column">
@@ -155,7 +180,7 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
             </Box>
           </Box>
         )}
-        
+
         <Text> </Text>
 
         {/* Action selection */}
@@ -168,7 +193,8 @@ const ToolApprovalModal: React.FC<ToolApprovalModalProps> = ({
                 backgroundColor={selectedOption === index ? 'white' : undefined}
                 bold={selectedOption === index}
               >
-                {selectedOption === index ? '▶ ' : '  '}{option.key}) {option.label}
+                {selectedOption === index ? '▶ ' : '  '}
+                {option.key}) {option.label}
               </Text>
             </Box>
           ))}

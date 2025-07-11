@@ -2,13 +2,15 @@
 // ABOUTME: Tests CLI option policies apply correctly regardless of interface type
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGlobalPolicyCallback } from '../policy-wrapper.js';
-import { ApprovalCallback, ApprovalDecision } from '../approval-types.js';
-import { ToolExecutor } from '../executor.js';
-import { CLIOptions } from '../../cli/args.js';
-import { BashTool } from '../implementations/bash.js';
-import { FileReadTool } from '../implementations/file-read.js';
-import { FileWriteTool } from '../implementations/file-write.js';
+import { createGlobalPolicyCallback } from '~/tools/policy-wrapper.js';
+import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { CLIOptions } from '~/cli/args.js';
+import { BashTool } from '~/tools/implementations/bash.js';
+import { FileReadTool } from '~/tools/implementations/file-read.js';
+import { FileWriteTool } from '~/tools/implementations/file-write.js';
+import { Tool } from '~/tools/tool.js';
+import { z } from 'zod';
 
 // Mock interface callback for testing
 class MockInterfaceCallback implements ApprovalCallback {
@@ -19,13 +21,13 @@ class MockInterfaceCallback implements ApprovalCallback {
     this.responses.set(toolName, decision);
   }
 
-  async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
+  requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
     this.callLog.push({ toolName, input });
     const response = this.responses.get(toolName);
     if (!response) {
       throw new Error(`No mock response set for tool: ${toolName}`);
     }
-    return response;
+    return Promise.resolve(response);
   }
 
   reset(): void {
@@ -67,15 +69,22 @@ describe('Global Policy Wrapper', () => {
   describe('policy precedence', () => {
     it('should auto-approve safe internal tools', async () => {
       // Create a mock tool with safeInternal annotation
-      const mockSafeTool = {
-        name: 'safe_tool',
-        annotations: { safeInternal: true },
-        description: 'A safe internal tool',
-        schema: {},
-        execute: async () => ({ content: [{ type: 'text', text: 'success' }], isError: false }),
-      };
+      class MockSafeTool extends Tool {
+        name = 'safe_tool';
+        annotations = { safeInternal: true };
+        description = 'A safe internal tool';
+        schema = z.object({});
 
-      toolExecutor.registerTool('safe_tool', mockSafeTool as any);
+        protected executeValidated() {
+          return Promise.resolve({
+            content: [{ type: 'text' as const, text: 'success' }],
+            isError: false,
+          });
+        }
+      }
+
+      const mockSafeTool = new MockSafeTool();
+      toolExecutor.registerTool('safe_tool', mockSafeTool);
 
       const options = baseCLIOptions; // No special policies
       const policyCallback = createGlobalPolicyCallback(mockInterface, options, toolExecutor);

@@ -1,7 +1,7 @@
 // ABOUTME: Type definitions for enhanced task management with multi-agent support
 // ABOUTME: Defines Task, TaskNote interfaces with thread-based assignment capabilities
 
-import { ThreadId, AssigneeId } from '../../../threads/types.js';
+import { ThreadId, AssigneeId } from '~/threads/types.js';
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked';
 export type TaskPriority = 'high' | 'medium' | 'low';

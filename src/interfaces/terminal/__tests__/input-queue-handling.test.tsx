@@ -1,14 +1,13 @@
 // ABOUTME: Integration tests for input handling with automatic message queueing
 // ABOUTME: Tests real Agent behavior with queueing when busy and processing when idle
 
-import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '../../../agents/agent.js';
-import { AIProvider } from '../../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../../providers/base-provider.js';
-import { Tool } from '../../../tools/tool.js';
-import { ToolExecutor } from '../../../tools/executor.js';
-import { ThreadManager } from '../../../threads/thread-manager.js';
+import { Agent } from '~/agents/agent.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
 
 // Mock provider for testing
 class MockProvider extends AIProvider {
@@ -26,7 +25,7 @@ class MockProvider extends AIProvider {
 
   async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
     // Simulate slow response to keep agent busy
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 300));
     return {
       content: 'mock response',
       usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
@@ -40,14 +39,14 @@ describe('Input Queue Handling Integration', () => {
   let mockProvider: MockProvider;
   let mockToolExecutor: ToolExecutor;
   let mockThreadManager: ThreadManager;
-  
+
   beforeEach(async () => {
     mockProvider = new MockProvider();
     mockToolExecutor = {
       registerAllAvailableTools: vi.fn(),
       getRegisteredTools: vi.fn().mockReturnValue([]),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
+    } as unknown as ToolExecutor;
     mockThreadManager = {
       addEvent: vi.fn(),
       getEvents: vi.fn().mockReturnValue([]),
@@ -60,8 +59,8 @@ describe('Input Queue Handling Integration', () => {
       needsCompaction: vi.fn().mockResolvedValue(false),
       createCompactedVersion: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
-    
+    } as unknown as ThreadManager;
+
     agent = new Agent({
       provider: mockProvider,
       toolExecutor: mockToolExecutor,
@@ -69,14 +68,14 @@ describe('Input Queue Handling Integration', () => {
       threadId: 'test-thread',
       tools: [],
     });
-    
+
     await agent.start();
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     if (agent) {
       agent.removeAllListeners();
-      await agent.stop();
+      agent.stop();
     }
   });
 
@@ -84,7 +83,7 @@ describe('Input Queue Handling Integration', () => {
     it('should process message immediately when agent is idle', async () => {
       // Agent starts idle, should process immediately
       await agent.sendMessage('test message');
-      
+
       // Verify queue remains empty
       const stats = agent.getQueueStats();
       expect(stats.queueLength).toBe(0);
@@ -93,23 +92,23 @@ describe('Input Queue Handling Integration', () => {
     it('should queue message automatically when agent is busy', async () => {
       // Start a message to make agent busy
       const firstMessagePromise = agent.sendMessage('first message');
-      
+
       // Wait a bit to ensure agent enters busy state
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       // While agent is processing, try to send another message with queue option
       await agent.sendMessage('second message', { queue: true });
-      
+
       // Verify message was queued
       const stats = agent.getQueueStats();
       expect(stats.queueLength).toBe(1);
-      
+
       // Wait for first message to complete
       await firstMessagePromise;
-      
+
       // Wait a bit for queue processing
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
       // Verify queue was processed
       const finalStats = agent.getQueueStats();
       expect(finalStats.queueLength).toBe(0);
@@ -118,13 +117,13 @@ describe('Input Queue Handling Integration', () => {
     it('should throw error when trying to send without queue option while busy', async () => {
       // Start a message to make agent busy
       const firstMessagePromise = agent.sendMessage('first message');
-      
+
       // Wait a bit to ensure agent enters busy state
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       // Try to send another message without queue option
       await expect(agent.sendMessage('second message')).rejects.toThrow('cannot accept messages');
-      
+
       // Clean up
       await firstMessagePromise;
     });
@@ -132,23 +131,23 @@ describe('Input Queue Handling Integration', () => {
     it('should handle multiple queued messages in order', async () => {
       // Start a message to make agent busy
       const firstMessagePromise = agent.sendMessage('first message');
-      
+
       // Wait a bit to ensure agent enters busy state
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       // Queue multiple messages
       await agent.sendMessage('queued message 1', { queue: true });
       await agent.sendMessage('queued message 2', { queue: true });
       await agent.sendMessage('queued message 3', { queue: true });
-      
+
       // Verify all messages were queued
       const stats = agent.getQueueStats();
       expect(stats.queueLength).toBe(3);
-      
+
       // Wait for processing to complete
       await firstMessagePromise;
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Allow time for queue processing
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // Allow time for queue processing
+
       // Verify queue was processed (may have one item still processing)
       const finalStats = agent.getQueueStats();
       expect(finalStats.queueLength).toBeLessThanOrEqual(1);
@@ -157,22 +156,22 @@ describe('Input Queue Handling Integration', () => {
     it('should handle priority messages correctly', async () => {
       // Start a message to make agent busy
       const firstMessagePromise = agent.sendMessage('first message');
-      
+
       // Wait a bit to ensure agent enters busy state
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       // Queue normal and high priority messages
       await agent.sendMessage('normal message', { queue: true });
-      await agent.sendMessage('high priority message', { 
-        queue: true, 
-        metadata: { priority: 'high' } 
+      await agent.sendMessage('high priority message', {
+        queue: true,
+        metadata: { priority: 'high' },
       });
-      
+
       // Verify queue stats show high priority message
       const stats = agent.getQueueStats();
       expect(stats.queueLength).toBe(2);
       expect(stats.highPriorityCount).toBe(1);
-      
+
       // Clean up
       await firstMessagePromise;
     });
@@ -180,23 +179,25 @@ describe('Input Queue Handling Integration', () => {
 
   describe('message_queued events', () => {
     it('should emit message_queued event when queueing', async () => {
-      const queuedEvents: any[] = [];
-      agent.on('message_queued', (data) => queuedEvents.push(data));
-      
+      const queuedEvents: { queueLength: number; id: string }[] = [];
+      agent.on('message_queued', (data: { queueLength: number; id: string }) =>
+        queuedEvents.push(data)
+      );
+
       // Start a message to make agent busy
       const firstMessagePromise = agent.sendMessage('first message');
-      
+
       // Wait a bit to ensure agent enters busy state
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       // Queue a message
       await agent.sendMessage('queued message', { queue: true });
-      
+
       // Verify event was emitted
       expect(queuedEvents).toHaveLength(1);
-      expect(queuedEvents[0].queueLength).toBe(1);
-      expect(queuedEvents[0].id).toBeTruthy();
-      
+      expect(queuedEvents[0]?.queueLength).toBe(1);
+      expect(queuedEvents[0]?.id).toBeTruthy();
+
       // Clean up
       await firstMessagePromise;
     });

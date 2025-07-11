@@ -10,28 +10,28 @@ import React, {
   useContext,
   useRef,
 } from 'react';
-import { Box, Text, render, useApp, useFocusManager, useInput, measureElement } from 'ink';
+import { Box, useApp, useInput, measureElement, DOMElement } from 'ink';
 import { Alert } from '@inkjs/ui';
-import useStdoutDimensions from '../../utils/use-stdout-dimensions.js';
-import ShellInput from './components/shell-input.js';
-import ToolApprovalModal from './components/tool-approval-modal.js';
-import { ConversationDisplay } from './components/events/ConversationDisplay.js';
-import { TimelineExpansionProvider } from './components/events/hooks/useTimelineExpansionToggle.js';
+import useStdoutDimensions from '~/utils/use-stdout-dimensions.js';
+import ShellInput from '~/interfaces/terminal/components/shell-input.js';
+import ToolApprovalModal from '~/interfaces/terminal/components/tool-approval-modal.js';
+import { ConversationDisplay } from '~/interfaces/terminal/components/events/ConversationDisplay.js';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
 import { withFullScreen } from 'fullscreen-ink';
-import StatusBar from './components/status-bar.js';
-import { FocusDebugPanel } from './components/FocusDebugPanel.js';
-import { Agent, CurrentTurnMetrics } from '../../agents/agent.js';
-import { ApprovalCallback, ApprovalDecision } from '../../tools/approval-types.js';
-import type { MessageQueueStats } from '../../agents/types.js';
-import { CommandRegistry } from '../../commands/registry.js';
-import { CommandExecutor } from '../../commands/executor.js';
-import type { UserInterface } from '../../commands/types.js';
-import { ThreadEvent } from '../../threads/types.js';
-import { StreamingTimelineProcessor } from '../streaming-timeline-processor.js';
-import { LaceFocusProvider } from './focus/index.js';
-import { useProjectContext } from './hooks/use-project-context.js';
-import { logger } from '../../utils/logger.js';
-
+import StatusBar from '~/interfaces/terminal/components/status-bar.js';
+import { FocusDebugPanel } from '~/interfaces/terminal/components/FocusDebugPanel.js';
+import { Agent, CurrentTurnMetrics } from '~/agents/agent.js';
+import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types.js';
+import { BudgetStatus, BudgetRecommendations } from '~/token-management/types.js';
+import type { MessageQueueStats } from '~/agents/types.js';
+import { CommandRegistry } from '~/commands/registry.js';
+import { CommandExecutor } from '~/commands/executor.js';
+import type { UserInterface } from '~/commands/types.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { StreamingTimelineProcessor } from '~/interfaces/streaming-timeline-processor.js';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/index.js';
+import { useProjectContext } from '~/interfaces/terminal/hooks/use-project-context.js';
+import { logger } from '~/utils/logger.js';
 
 // StreamingTimelineProcessor context for O(1) timeline processing
 const StreamingTimelineProcessorContext = createContext<StreamingTimelineProcessor | null>(null);
@@ -39,11 +39,12 @@ const StreamingTimelineProcessorContext = createContext<StreamingTimelineProcess
 export const useStreamingTimelineProcessor = (): StreamingTimelineProcessor => {
   const processor = useContext(StreamingTimelineProcessorContext);
   if (!processor) {
-    throw new Error('useStreamingTimelineProcessor must be used within StreamingTimelineProcessorContext.Provider');
+    throw new Error(
+      'useStreamingTimelineProcessor must be used within StreamingTimelineProcessorContext.Provider'
+    );
   }
   return processor;
 };
-
 
 // Interface context for SIGINT communication
 const InterfaceContext = createContext<{
@@ -66,7 +67,14 @@ export const useInterface = () => {
 interface TerminalInterfaceProps {
   agent: Agent;
   approvalCallback?: ApprovalCallback;
-  interfaceContext?: { showAlert: (alert: any) => void; clearAlert: () => void };
+  interfaceContext?: {
+    showAlert: (alert: {
+      variant: 'info' | 'warning' | 'error' | 'success';
+      title: string;
+      children?: React.ReactNode;
+    }) => void;
+    clearAlert: () => void;
+  };
 }
 
 interface Message {
@@ -76,10 +84,14 @@ interface Message {
 }
 
 // SIGINT Handler Component
-const SigintHandler: React.FC<{ agent: Agent; showAlert: (alert: any) => void }> = ({
-  agent,
-  showAlert,
-}) => {
+const SigintHandler: React.FC<{
+  agent: Agent;
+  showAlert: (alertData: {
+    variant: 'info' | 'warning' | 'error' | 'success';
+    title: string;
+    children?: React.ReactNode;
+  }) => void;
+}> = ({ agent, showAlert }) => {
   const [ctrlCCount, setCtrlCCount] = useState(0);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
   const app = useApp();
@@ -153,8 +165,8 @@ const SigintHandler: React.FC<{ agent: Agent; showAlert: (alert: any) => void }>
 
 export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   agent,
-  approvalCallback,
-  interfaceContext,
+  approvalCallback: _approvalCallback,
+  interfaceContext: _interfaceContext,
 }) => {
   // Create StreamingTimelineProcessor for O(1) timeline processing
   const streamingTimelineProcessor = useMemo(() => {
@@ -170,11 +182,11 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     });
     return processor;
   }, []);
-  const bottomSectionRef = useRef<any>(null);
-  const timelineContainerRef = useRef<any>(null);
+  const bottomSectionRef = useRef<DOMElement | null>(null);
+  const timelineContainerRef = useRef<DOMElement | null>(null);
   const [bottomSectionHeight, setBottomSectionHeight] = useState<number>(0);
-  const [timelineContainerHeight, setTimelineContainerHeight] = useState<number>(0);
-  const [, terminalHeight] = useStdoutDimensions();
+  const [_timelineContainerHeight, setTimelineContainerHeight] = useState<number>(0);
+  const [, _terminalHeight] = useStdoutDimensions();
   // Remove events array - StreamingTimelineProcessor manages timeline state
   // Track timeline version for React updates
   const [timelineVersion, setTimelineVersion] = useState(0);
@@ -185,17 +197,17 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   const [commandExecutor, setCommandExecutor] = useState<CommandExecutor | null>(null);
   // Cumulative session token tracking with context awareness
   const [cumulativeTokens, setCumulativeTokens] = useState<{
-    promptTokens: number;      // Current context size (latest value)
-    completionTokens: number;   // Total completion tokens generated
-    totalTokens: number;        // Actual total tokens used (not double-counted)
-    contextGrowth: number;      // How much the context has grown since start
-    lastPromptTokens: number;   // Previous turn's prompt tokens for delta calculation
-  }>({ 
-    promptTokens: 0, 
-    completionTokens: 0, 
+    promptTokens: number; // Current context size (latest value)
+    completionTokens: number; // Total completion tokens generated
+    totalTokens: number; // Actual total tokens used (not double-counted)
+    contextGrowth: number; // How much the context has grown since start
+    lastPromptTokens: number; // Previous turn's prompt tokens for delta calculation
+  }>({
+    promptTokens: 0,
+    completionTokens: 0,
     totalTokens: 0,
     contextGrowth: 0,
-    lastPromptTokens: 0
+    lastPromptTokens: 0,
   });
 
   // Track the final token usage from provider for accurate cumulative totals
@@ -214,7 +226,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
   // Turn tracking state
   const [isTurnActive, setIsTurnActive] = useState(false);
-  const [currentTurnId, setCurrentTurnId] = useState<string | null>(null);
+  const [_currentTurnId, setCurrentTurnId] = useState<string | null>(null);
   const [currentTurnMetrics, setCurrentTurnMetrics] = useState<CurrentTurnMetrics | null>(null);
 
   // Retry status state
@@ -238,7 +250,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   } | null>(null);
 
   // Delegation tracking state
-  const [isDelegating, setIsDelegating] = useState(false);
+  const [_isDelegating, setIsDelegating] = useState(false);
 
   // Focus debug panel state
   const [isFocusDebugVisible, setIsFocusDebugVisible] = useState(false);
@@ -258,7 +270,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   // Refresh project context when processing completes (tools may have changed git status)
   useEffect(() => {
     if (!isProcessing) {
-      refreshContext();
+      void refreshContext();
     }
   }, [isProcessing, refreshContext]);
 
@@ -269,7 +281,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     isReadOnly: boolean;
     resolve: (decision: ApprovalDecision) => void;
   } | null>(null);
-
 
   // Interface context functions
   const showAlert = useCallback(
@@ -289,7 +300,6 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     setAlert(null);
   }, []);
 
-
   // Add an ephemeral message
   const addMessage = useCallback((message: Message) => {
     setEphemeralMessages((prev) => [...prev, message]);
@@ -304,7 +314,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         const historicalEvents = agent.getThreadEvents(currentThreadId);
         streamingTimelineProcessor.reset();
         streamingTimelineProcessor.loadEvents(historicalEvents);
-        
+
         logger.debug('StreamingTimelineProcessor loaded historical events', {
           threadId: currentThreadId,
           eventCount: historicalEvents.length,
@@ -320,20 +330,21 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         timestamp: new Date(),
       });
     }
+    // Keep async for potential future async operations
+    await Promise.resolve();
   }, [agent, streamingTimelineProcessor, addMessage]);
-
 
   // Initialize token counts for resumed conversations
   useEffect(() => {
     const threadId = agent.getCurrentThreadId();
     if (threadId) {
       const events = agent.getThreadEvents(threadId);
-      
+
       // If we have existing events, estimate the current context size
       if (events.length > 0) {
         // Simple estimation based on event content with error handling
         let estimatedTokens = 0;
-        events.forEach(event => {
+        events.forEach((event) => {
           try {
             if (typeof event.data === 'string') {
               estimatedTokens += Math.ceil(event.data.length / 4);
@@ -344,23 +355,23 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             }
           } catch (error) {
             // Skip events that can't be stringified
-            logger.debug('Failed to estimate tokens for event', { 
-              eventType: event.type, 
-              error: error instanceof Error ? error.message : String(error) 
+            logger.debug('Failed to estimate tokens for event', {
+              eventType: event.type,
+              error: error instanceof Error ? error.message : String(error),
             });
           }
         });
-        
+
         // Initialize cumulative tokens for resumed conversation
-        setCumulativeTokens(prev => {
+        setCumulativeTokens((prev) => {
           // Only initialize if we haven't tracked anything yet
           if (prev.totalTokens === 0 && estimatedTokens > 0) {
             return {
               promptTokens: estimatedTokens,
-              completionTokens: 0,  // We don't know past completions
-              totalTokens: estimatedTokens,  // Conservative estimate
-              contextGrowth: 0,  // Reset growth tracking
-              lastPromptTokens: estimatedTokens,  // Set baseline for deltas
+              completionTokens: 0, // We don't know past completions
+              totalTokens: estimatedTokens, // Conservative estimate
+              contextGrowth: 0, // Reset growth tracking
+              lastPromptTokens: estimatedTokens, // Set baseline for deltas
             };
           }
           return prev;
@@ -389,7 +400,18 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     // Handle approval requests
-    const handleApprovalRequest = ({ toolName, input, isReadOnly, resolve }: any) => {
+    const handleApprovalRequest = ({
+      toolName,
+      input,
+      isReadOnly,
+      resolve,
+    }: {
+      toolName: string;
+      input: unknown;
+      isReadOnly: boolean;
+      requestId: string;
+      resolve: (decision: ApprovalDecision) => void;
+    }) => {
       setApprovalRequest({
         toolName,
         input,
@@ -404,40 +426,40 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     // Handle agent response complete
-    const handleResponseComplete = ({ content }: { content: string }) => {
+    const handleResponseComplete = ({ content: _content }: { content: string }) => {
       // Clear streaming content - the final response will be in ThreadEvents
       setStreamingContent('');
       setIsProcessing(false);
-      
+
       // Clear retry status and countdown timer on successful response
       if (retryCountdownRef.current) {
         clearInterval(retryCountdownRef.current);
         retryCountdownRef.current = null;
       }
       setRetryStatus(null);
-      
+
       // No need to sync events - streaming processor handles them automatically
     };
 
     // Handle tool execution events to show delegation boxes immediately
-    const handleToolCallStart = ({ toolName }: { toolName: string }) => {
+    const handleToolCallStart = ({ toolName: _toolName }: { toolName: string }) => {
       // No need to sync events - streaming processor handles them automatically via thread_event_added
       // Delegation boxes will appear when the TOOL_CALL event flows through
     };
 
-    const handleToolCallComplete = ({ toolName }: { toolName: string }) => {
+    const handleToolCallComplete = ({ toolName: _toolName }: { toolName: string }) => {
       // No need to sync events - streaming processor handles them automatically via thread_event_added
     };
 
     // Handle delegation lifecycle events
-    const handleDelegationStart = ({ toolName }: { toolName: string }) => {
+    const _handleDelegationStart = ({ toolName }: { toolName: string }) => {
       if (toolName === 'delegate') {
         setIsDelegating(true);
         // No need to sync events - streaming processor handles them automatically
       }
     };
 
-    const handleDelegationEnd = ({ toolName }: { toolName: string }) => {
+    const _handleDelegationEnd = ({ toolName }: { toolName: string }) => {
       if (toolName === 'delegate') {
         setIsDelegating(false);
         // No need to sync events - streaming processor handles them automatically
@@ -445,7 +467,18 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     // Handle token usage updates - track the latest for accurate cumulative totals
-    const handleTokenUsageUpdate = ({ usage }: { usage: any }) => {
+    const handleTokenUsageUpdate = ({
+      usage,
+    }: {
+      usage: {
+        promptTokens?: number;
+        completionTokens?: number;
+        totalTokens?: number;
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+      };
+    }) => {
       if (usage && typeof usage === 'object' && !tokenUpdateLockRef.current) {
         // Keep track of the most recent provider usage data
         // This includes system prompts and full context that turn metrics miss
@@ -473,7 +506,10 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
           // Debounce subsequent updates (streaming completion tokens)
           tokenUpdateDebounceRef.current = setTimeout(() => {
             // Only update if we have meaningful token counts and not locked
-            if ((newUsage.promptTokens > 0 || newUsage.totalTokens > 0) && !tokenUpdateLockRef.current) {
+            if (
+              (newUsage.promptTokens > 0 || newUsage.totalTokens > 0) &&
+              !tokenUpdateLockRef.current
+            ) {
               lastProviderUsageRef.current = newUsage;
             }
             tokenUpdateDebounceRef.current = null;
@@ -483,7 +519,15 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     // Handle token budget warnings - these don't affect cumulative tracking
-    const handleTokenBudgetWarning = ({ usage }: { usage: any }) => {
+    const handleTokenBudgetWarning = ({
+      message: _message,
+      usage: _usage,
+      recommendations: _recommendations,
+    }: {
+      message: string;
+      usage: BudgetStatus;
+      recommendations: BudgetRecommendations;
+    }) => {
       // Token budget warnings are just for display, don't need to track them
     };
 
@@ -523,7 +567,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     const handleTurnComplete = ({
-      turnId,
+      turnId: _turnId,
       metrics,
     }: {
       turnId: string;
@@ -554,23 +598,28 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
           // This ensures resumed conversations (which have totalTokens > 0 from init)
           // are not treated as first turns.
           const isFirstTurnEver = prev.lastPromptTokens === 0 && prev.totalTokens === 0;
-          
+
           try {
             // Calculate the delta in prompt tokens (context growth)
             const promptDelta = providerUsage.promptTokens - prev.lastPromptTokens;
             const contextGrowth = isFirstTurnEver
-              ? providerUsage.promptTokens  // First turn ever includes system prompt
-              : promptDelta > 0 
-                ? promptDelta               // Normal growth
-                : 0;                        // Handle negative deltas (shouldn't happen)
+              ? providerUsage.promptTokens // First turn ever includes system prompt
+              : promptDelta > 0
+                ? promptDelta // Normal growth
+                : 0; // Handle negative deltas (shouldn't happen)
 
             // Validate calculations
             const newCompletionTokens = prev.completionTokens + providerUsage.completionTokens;
-            const newTotalTokens = prev.totalTokens + contextGrowth + providerUsage.completionTokens;
-            
+            const newTotalTokens =
+              prev.totalTokens + contextGrowth + providerUsage.completionTokens;
+
             // Sanity checks
-            if (!Number.isFinite(newCompletionTokens) || !Number.isFinite(newTotalTokens) ||
-                newCompletionTokens < 0 || newTotalTokens < 0) {
+            if (
+              !Number.isFinite(newCompletionTokens) ||
+              !Number.isFinite(newTotalTokens) ||
+              newCompletionTokens < 0 ||
+              newTotalTokens < 0
+            ) {
               logger.error('Invalid token calculation', {
                 prev,
                 providerUsage,
@@ -582,11 +631,11 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
             }
 
             return {
-              promptTokens: providerUsage.promptTokens,  // Current context size
-              completionTokens: newCompletionTokens,  // Total outputs
-              totalTokens: newTotalTokens,  // Actual usage
-              contextGrowth: prev.contextGrowth + contextGrowth,  // Total context growth
-              lastPromptTokens: providerUsage.promptTokens,  // For next turn's delta
+              promptTokens: providerUsage.promptTokens, // Current context size
+              completionTokens: newCompletionTokens, // Total outputs
+              totalTokens: newTotalTokens, // Actual usage
+              contextGrowth: prev.contextGrowth + contextGrowth, // Total context growth
+              lastPromptTokens: providerUsage.promptTokens, // For next turn's delta
             };
           } catch (error) {
             logger.error('Error calculating token usage', {
@@ -610,13 +659,13 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       const contextWarning = contextSize > 150000 ? ' ⚠️ Large context' : '';
       addMessage({
         type: 'system',
-        content: `Turn completed in ${Math.floor(metrics.elapsedMs / 1000)}s (↑${metrics.tokensIn} ↓${metrics.tokensOut} tokens, context: ${Math.floor(contextSize/1000)}k${contextWarning})`,
+        content: `Turn completed in ${Math.floor(metrics.elapsedMs / 1000)}s (↑${metrics.tokensIn} ↓${metrics.tokensOut} tokens, context: ${Math.floor(contextSize / 1000)}k${contextWarning})`,
         timestamp: new Date(),
       });
     };
 
     const handleTurnAborted = ({
-      turnId,
+      turnId: _turnId,
       metrics,
     }: {
       turnId: string;
@@ -650,7 +699,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     const classifyRetryError = (error: Error): string => {
       // Check error codes first (most reliable)
       if ('code' in error) {
-        const code = (error as any).code;
+        const code = (error as unknown as { code?: string }).code;
         switch (code) {
           case 'ECONNREFUSED':
           case 'ENOTFOUND':
@@ -666,7 +715,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
       // Check status codes
       if ('status' in error || 'statusCode' in error) {
-        const status = (error as any).status || (error as any).statusCode;
+        const errorWithStatus = error as unknown as { status?: number; statusCode?: number };
+        const status = errorWithStatus.status || errorWithStatus.statusCode;
         if (typeof status === 'number') {
           if (status === 429) return 'rate limit';
           if (status === 401 || status === 403) return 'auth error';
@@ -694,11 +744,23 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         return 'timeout';
       } else if (message.includes('rate limit') || message.includes('too many requests')) {
         return 'rate limit';
-      } else if (message.includes('server error') || message.includes('internal server') || message.includes('service unavailable')) {
+      } else if (
+        message.includes('server error') ||
+        message.includes('internal server') ||
+        message.includes('service unavailable')
+      ) {
         return 'server error';
-      } else if (message.includes('unauthorized') || message.includes('forbidden') || message.includes('authentication')) {
+      } else if (
+        message.includes('unauthorized') ||
+        message.includes('forbidden') ||
+        message.includes('authentication')
+      ) {
         return 'auth error';
-      } else if (message.includes('connection') || message.includes('network') || message.includes('connect')) {
+      } else if (
+        message.includes('connection') ||
+        message.includes('network') ||
+        message.includes('connect')
+      ) {
         return 'connection error';
       }
 
@@ -706,7 +768,15 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     // Handle retry events
-    const handleRetryAttempt = ({ attempt, delay, error }: { attempt: number; delay: number; error: Error }) => {
+    const handleRetryAttempt = ({
+      attempt,
+      delay,
+      error,
+    }: {
+      attempt: number;
+      delay: number;
+      error: Error;
+    }) => {
       const errorType = classifyRetryError(error);
 
       const newRetryStatus = {
@@ -728,7 +798,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       // Start countdown timer for real-time updates (only if delay > 1s)
       if (delay > 1000) {
         retryCountdownRef.current = setInterval(() => {
-          setRetryStatus(prev => {
+          setRetryStatus((prev) => {
             if (!prev || !prev.isRetrying) {
               if (retryCountdownRef.current) {
                 clearInterval(retryCountdownRef.current);
@@ -753,16 +823,22 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       }
     };
 
-    const handleRetryExhausted = ({ attempts, lastError }: { attempts: number; lastError: Error }) => {
+    const handleRetryExhausted = ({
+      attempts,
+      lastError,
+    }: {
+      attempts: number;
+      lastError: Error;
+    }) => {
       // Clear countdown timer
       if (retryCountdownRef.current) {
         clearInterval(retryCountdownRef.current);
         retryCountdownRef.current = null;
       }
-      
+
       // Clear retry status when exhausted
       setRetryStatus(null);
-      
+
       // Add system message about retry exhaustion
       addMessage({
         type: 'system',
@@ -809,13 +885,13 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       // Retry events cleanup
       agent.off('retry_attempt', handleRetryAttempt);
       agent.off('retry_exhausted', handleRetryExhausted);
-      
+
       // Clear any pending debounced updates
       if (tokenUpdateDebounceRef.current) {
         clearTimeout(tokenUpdateDebounceRef.current);
         tokenUpdateDebounceRef.current = null;
       }
-      
+
       // Clear retry countdown timer
       if (retryCountdownRef.current) {
         clearInterval(retryCountdownRef.current);
@@ -826,18 +902,12 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
   // Listen to Agent events for pure streaming updates (O(1) per event)
   useEffect(() => {
-    const handleEventAdded = ({
-      event,
-      threadId,
-    }: {
-      event: ThreadEvent;
-      threadId: string;
-    }) => {
+    const handleEventAdded = ({ event, threadId }: { event: ThreadEvent; threadId: string }) => {
       const currentThreadId = agent.getCurrentThreadId();
       if (threadId === currentThreadId) {
         // Stream event directly to processor (O(1) operation)
         streamingTimelineProcessor.appendEvent(event);
-        
+
         logger.debug('StreamingTimelineProcessor appended event', {
           eventType: event.type,
           eventId: event.id,
@@ -921,12 +991,12 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
       },
 
       toggleFocusDebugPanel(): boolean {
-        setIsFocusDebugVisible(prev => !prev);
+        setIsFocusDebugVisible((prev) => !prev);
         return !isFocusDebugVisible;
       },
 
       toggleTimelineLayoutDebugPanel(): boolean {
-        setIsTimelineLayoutDebugVisible(prev => !prev);
+        setIsTimelineLayoutDebugVisible((prev) => !prev);
         return !isTimelineLayoutDebugVisible;
       },
 
@@ -934,7 +1004,14 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         return streamingTimelineProcessor.getPerformanceSummary();
       },
     }),
-    [agent, app, addMessage, isFocusDebugVisible, isTimelineLayoutDebugVisible, streamingTimelineProcessor]
+    [
+      agent,
+      app,
+      addMessage,
+      isFocusDebugVisible,
+      isTimelineLayoutDebugVisible,
+      streamingTimelineProcessor,
+    ]
   );
 
   // Handle slash commands using new command system
@@ -969,7 +1046,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         });
         return;
       }
-      
+
       // If agent is busy, automatically queue the message
       if (isTurnActive) {
         try {
@@ -1033,13 +1110,13 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         });
       }
     };
-    initCommands();
+    void initCommands();
   }, [addMessage]);
 
   // Initialize agent on mount
   useEffect(() => {
     // Initialize streaming session (loads historical events into StreamingTimelineProcessor)
-    initializeStreamingSession();
+    void initializeStreamingSession();
 
     addMessage({
       type: 'system',
@@ -1048,11 +1125,11 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     });
 
     // Start agent asynchronously
-    agent.start().catch((error) => {
+    agent.start().catch((error: unknown) => {
       console.error('Failed to start agent:', error);
       addMessage({
         type: 'system',
-        content: `❌ Failed to start agent: ${error.message}`,
+        content: `❌ Failed to start agent: ${error instanceof Error ? error.message : String(error)}`,
         timestamp: new Date(),
       });
     });
@@ -1074,123 +1151,124 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     }
   }, [ephemeralMessages.length, currentInput]); // Re-measure when ephemeral content or input changes
 
-
   return (
     <LaceFocusProvider>
       <StreamingTimelineProcessorContext.Provider value={streamingTimelineProcessor}>
-          <InterfaceContext.Provider value={{ showAlert, clearAlert }}>
-        {/* SIGINT Handler */}
-        <SigintHandler agent={agent} showAlert={showAlert} />
+        <InterfaceContext.Provider value={{ showAlert, clearAlert }}>
+          {/* SIGINT Handler */}
+          <SigintHandler agent={agent} showAlert={showAlert} />
 
-        <Box flexDirection="column" height="100%">
-          {/* Alert overlay */}
-          {alert && (
-            <Box position="absolute" paddingTop={1} paddingLeft={1} paddingRight={1}>
-              <Alert variant={alert.variant} title={alert.title}>
-                {alert.children}
-              </Alert>
-            </Box>
-          )}
+          <Box flexDirection="column" height="100%">
+            {/* Alert overlay */}
+            {alert && (
+              <Box position="absolute" paddingTop={1} paddingLeft={1} paddingRight={1}>
+                <Alert variant={alert.variant} title={alert.title}>
+                  {alert.children}
+                </Alert>
+              </Box>
+            )}
 
-          {/* Timeline - takes remaining space */}
-          <Box flexGrow={1} ref={timelineContainerRef}>
-            {/* 
+            {/* Timeline - takes remaining space */}
+            <Box flexGrow={1} ref={timelineContainerRef}>
+              {/* 
               TimelineExpansionProvider creates an isolated expansion event system for this conversation.
               - Timeline-level controls (keyboard shortcuts) can emit expand/collapse events
               - Only the currently selected timeline item will respond to these events
               - Each conversation has its own provider, so multiple conversations don't interfere
               - See hooks/useTimelineExpansionToggle.tsx for architecture details
             */}
-            <TimelineExpansionProvider>
-              <ConversationDisplay
-              ephemeralMessages={[
-                ...ephemeralMessages,
-                // Add streaming content as ephemeral message
-                ...(streamingContent
-                  ? [
-                      {
-                        type: 'assistant' as const,
-                        content: streamingContent,
-                        timestamp: new Date(),
-                      },
-                    ]
-                  : []),
-                // Add processing indicator as ephemeral message
-                ...(isProcessing && !streamingContent
-                  ? [
-                      {
-                        type: 'system' as const,
-                        content: '💭 Thinking...',
-                        timestamp: new Date(),
-                      },
-                    ]
-                  : []),
-              ]}
-              bottomSectionHeight={bottomSectionHeight}
-              isTimelineLayoutDebugVisible={isTimelineLayoutDebugVisible}
-              timelineVersion={timelineVersion}
-            />
-            </TimelineExpansionProvider>
-          </Box>
-
-
-          {/* Bottom section - debug panel, status bar, input anchored to bottom */}
-          <Box flexDirection="column" flexShrink={0} ref={bottomSectionRef}>
-            {/* Focus debug panel - takes natural height, only shown when enabled */}
-            {isFocusDebugVisible && <FocusDebugPanel />}
-            
-            {/* Status bar - takes natural height */}
-            <StatusBar
-              providerName={agent.providerName || 'unknown'}
-              modelName={agent.provider?.modelName || undefined}
-              threadId={agent.getCurrentThreadId() || undefined}
-              cumulativeTokens={cumulativeTokens}
-              isProcessing={isProcessing}
-              messageCount={streamingTimelineProcessor.getTimeline().metadata.eventCount + ephemeralMessages.length}
-              isTurnActive={isTurnActive}
-              turnMetrics={currentTurnMetrics}
-              projectContext={projectContext}
-              contextWindow={agent.provider?.contextWindow}
-              retryStatus={retryStatus}
-              queueStats={queueStats}
-            />
-
-            {/* Input area or modal - takes natural height */}
-            <Box>
-              {approvalRequest ? (
-                <ToolApprovalModal
-                  toolName={approvalRequest.toolName}
-                  input={approvalRequest.input}
-                  isReadOnly={approvalRequest.isReadOnly}
-                  onDecision={handleApprovalDecision}
-                  isVisible={true}
+              <TimelineExpansionProvider>
+                <ConversationDisplay
+                  ephemeralMessages={[
+                    ...ephemeralMessages,
+                    // Add streaming content as ephemeral message
+                    ...(streamingContent
+                      ? [
+                          {
+                            type: 'assistant' as const,
+                            content: streamingContent,
+                            timestamp: new Date(),
+                          },
+                        ]
+                      : []),
+                    // Add processing indicator as ephemeral message
+                    ...(isProcessing && !streamingContent
+                      ? [
+                          {
+                            type: 'system' as const,
+                            content: '💭 Thinking...',
+                            timestamp: new Date(),
+                          },
+                        ]
+                      : []),
+                  ]}
+                  bottomSectionHeight={bottomSectionHeight}
+                  isTimelineLayoutDebugVisible={isTimelineLayoutDebugVisible}
+                  timelineVersion={timelineVersion}
                 />
-              ) : (
-                <ShellInput
-                  value={currentInput}
-                  placeholder={
-                    isTurnActive && currentTurnMetrics
-                      ? (() => {
-                          const elapsedSeconds = Math.floor(currentTurnMetrics.elapsedMs / 1000);
-                          const duration =
-                            elapsedSeconds >= 60
-                              ? `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s`
-                              : `${elapsedSeconds}s`;
-                          return `Processing... ⏱️ ${duration} | Press Ctrl+C to abort`;
-                        })()
-                      : 'Type your message...'
-                  }
-                  onSubmit={handleSubmit}
-                  onChange={setCurrentInput}
-                  autoFocus={false}
-                  disabled={false} // Allow typing during processing, submission is controlled in handleSubmit
-                />
-              )}
+              </TimelineExpansionProvider>
+            </Box>
+
+            {/* Bottom section - debug panel, status bar, input anchored to bottom */}
+            <Box flexDirection="column" flexShrink={0} ref={bottomSectionRef}>
+              {/* Focus debug panel - takes natural height, only shown when enabled */}
+              {isFocusDebugVisible && <FocusDebugPanel />}
+
+              {/* Status bar - takes natural height */}
+              <StatusBar
+                providerName={agent.providerName || 'unknown'}
+                modelName={agent.provider?.modelName || undefined}
+                threadId={agent.getCurrentThreadId() || undefined}
+                cumulativeTokens={cumulativeTokens}
+                isProcessing={isProcessing}
+                messageCount={
+                  streamingTimelineProcessor.getTimeline().metadata.eventCount +
+                  ephemeralMessages.length
+                }
+                isTurnActive={isTurnActive}
+                turnMetrics={currentTurnMetrics}
+                projectContext={projectContext}
+                contextWindow={agent.provider?.contextWindow}
+                retryStatus={retryStatus}
+                queueStats={queueStats}
+              />
+
+              {/* Input area or modal - takes natural height */}
+              <Box>
+                {approvalRequest ? (
+                  <ToolApprovalModal
+                    toolName={approvalRequest.toolName}
+                    input={approvalRequest.input}
+                    isReadOnly={approvalRequest.isReadOnly}
+                    onDecision={handleApprovalDecision}
+                    isVisible={true}
+                  />
+                ) : (
+                  <ShellInput
+                    value={currentInput}
+                    placeholder={
+                      isTurnActive && currentTurnMetrics
+                        ? (() => {
+                            const elapsedSeconds = Math.floor(currentTurnMetrics.elapsedMs / 1000);
+                            const duration =
+                              elapsedSeconds >= 60
+                                ? `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s`
+                                : `${elapsedSeconds}s`;
+                            return `Processing... ⏱️ ${duration} | Press Ctrl+C to abort`;
+                          })()
+                        : 'Type your message...'
+                    }
+                    onSubmit={(value) => void handleSubmit(value)}
+                    onChange={setCurrentInput}
+                    autoFocus={false}
+                    disabled={false} // Allow typing during processing, submission is controlled in handleSubmit
+                  />
+                )}
+              </Box>
             </Box>
           </Box>
-        </Box>
-          </InterfaceContext.Provider>
-        </StreamingTimelineProcessorContext.Provider>
+        </InterfaceContext.Provider>
+      </StreamingTimelineProcessorContext.Provider>
     </LaceFocusProvider>
   );
 };
@@ -1214,10 +1292,13 @@ export class TerminalInterface implements ApprovalCallback {
     this.isRunning = true;
 
     // Render the Ink app with custom Ctrl+C handling
-    this.inkInstance = withFullScreen(<TerminalInterfaceComponent agent={this.agent} approvalCallback={this} />, {
-      exitOnCtrlC: false, // Disable Ink's default Ctrl+C exit behavior
-    });
-    
+    this.inkInstance = withFullScreen(
+      <TerminalInterfaceComponent agent={this.agent} approvalCallback={this} />,
+      {
+        exitOnCtrlC: false, // Disable Ink's default Ctrl+C exit behavior
+      }
+    );
+
     await this.inkInstance.start();
     await this.inkInstance.waitUntilExit();
   }
@@ -1228,12 +1309,15 @@ export class TerminalInterface implements ApprovalCallback {
     }
 
     this.isRunning = false;
-    await this.agent?.stop();
-    
+    this.agent?.stop();
+
     // Properly unmount the Ink app
     if (this.inkInstance) {
       this.inkInstance.instance.unmount();
     }
+
+    // Keep async for potential future async cleanup operations
+    await Promise.resolve();
   }
 
   async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
@@ -1271,7 +1355,7 @@ export class TerminalInterface implements ApprovalCallback {
   private formatInputParameters(input: Record<string, unknown>): void {
     for (const [key, value] of Object.entries(input)) {
       const formattedValue = this.formatParameterValue(value);
-      console.log(`  ${key}: ${formattedValue}`);
+      console.warn(`  ${key}: ${formattedValue}`);
     }
   }
 

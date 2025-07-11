@@ -2,19 +2,24 @@
 // ABOUTME: Verifies user messages auto-collapse for long content and show proper expansion controls
 
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
-import { UserMessageDisplay } from '../UserMessageDisplay.js';
-import { ThreadEvent } from '../../../../../threads/types.js';
-import { UI_SYMBOLS } from '../../../theme.js';
-import { TimelineItemProvider } from '../contexts/TimelineItemContext.js';
-import { TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
+import { UserMessageDisplay } from '~/interfaces/terminal/components/events/UserMessageDisplay.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
 
 // Helper to render with provider
 const renderWithProvider = (element: React.ReactElement, isSelected = false) => {
   return render(
     <TimelineExpansionProvider>
-      <TimelineItemProvider isSelected={isSelected} onToggle={() => {}}>
+      <TimelineItemProvider
+        isSelected={isSelected}
+        onToggle={() => {
+          // Mock onToggle for test - no action needed
+        }}
+      >
         {element}
       </TimelineItemProvider>
     </TimelineExpansionProvider>
@@ -42,7 +47,10 @@ describe('UserMessageDisplay', () => {
     });
 
     it('should auto-collapse long user messages and show ellipsis', () => {
-      const longMessage = Array.from({ length: 10 }, (_, i) => `Line ${i + 1}: This is line content`).join('\n');
+      const longMessage = Array.from(
+        { length: 10 },
+        (_, i) => `Line ${i + 1}: This is line content`
+      ).join('\n');
       const event = createUserMessageEvent(longMessage);
 
       const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} />);
@@ -118,7 +126,9 @@ Line 4: Final line`;
     it('should render with normal colors when focused', () => {
       const event = createUserMessageEvent('Focused message');
 
-      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} isFocused={true} />);
+      const { lastFrame } = renderWithProvider(
+        <UserMessageDisplay event={event} isFocused={true} />
+      );
 
       expect(lastFrame()).toContain('Focused message');
     });
@@ -126,7 +136,9 @@ Line 4: Final line`;
     it('should render with dimmed colors when not focused', () => {
       const event = createUserMessageEvent('Unfocused message');
 
-      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} isFocused={false} />);
+      const { lastFrame } = renderWithProvider(
+        <UserMessageDisplay event={event} isFocused={false} />
+      );
 
       expect(lastFrame()).toContain('Unfocused message');
     });
@@ -136,7 +148,9 @@ Line 4: Final line`;
     it('should show typing indicator when streaming', () => {
       const event = createUserMessageEvent('Streaming message');
 
-      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} isStreaming={true} />);
+      const { lastFrame } = renderWithProvider(
+        <UserMessageDisplay event={event} isStreaming={true} />
+      );
 
       const frame = lastFrame();
       expect(frame).toContain('Streaming message');
@@ -146,7 +160,9 @@ Line 4: Final line`;
     it('should not show typing indicator when not streaming', () => {
       const event = createUserMessageEvent('Complete message');
 
-      const { lastFrame } = renderWithProvider(<UserMessageDisplay event={event} isStreaming={false} />);
+      const { lastFrame } = renderWithProvider(
+        <UserMessageDisplay event={event} isStreaming={false} />
+      );
 
       const frame = lastFrame();
       expect(frame).toContain('Complete message');

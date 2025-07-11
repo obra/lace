@@ -4,11 +4,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React from 'react';
 import { render } from 'ink-testing-library';
-import { Agent } from '../../../agents/agent.js';
-import { ThreadManager } from '../../../threads/thread-manager.js';
-import { ToolExecutor } from '../../../tools/executor.js';
-import { TestProvider } from '../../../__tests__/utils/test-provider.js';
-import { TerminalInterfaceComponent } from '../terminal-interface.js';
+import { Agent } from '~/agents/agent.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { TestProvider } from '~/__tests__/utils/test-provider.js';
+import { TerminalInterfaceComponent } from '~/interfaces/terminal/terminal-interface.js';
+import { ThreadEvent } from '~/threads/types.js';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -21,12 +22,12 @@ describe('TerminalInterface Streaming Event Flow', () => {
   beforeEach(async () => {
     testDir = await mkdtemp(join(tmpdir(), 'lace-terminal-streaming-test-'));
     threadManager = new ThreadManager(join(testDir, 'test.db'));
-    
+
     const provider = new TestProvider();
     const toolExecutor = new ToolExecutor();
     const threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
-    
+
     agent = new Agent({
       provider,
       toolExecutor,
@@ -34,12 +35,12 @@ describe('TerminalInterface Streaming Event Flow', () => {
       threadId,
       tools: [],
     });
-    
+
     await agent.start();
   });
 
   afterEach(async () => {
-    await threadManager.close();
+    threadManager.close();
     await rm(testDir, { recursive: true, force: true });
   });
 
@@ -53,26 +54,30 @@ describe('TerminalInterface Streaming Event Flow', () => {
       render(<TerminalInterfaceComponent agent={agent} />);
 
       // Wait for initialization
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Simulate agent event
       await agent.sendMessage('Test message');
 
       // Verify agent emitted events
       expect(threadEventAddedSpy).toHaveBeenCalled();
-      
+
       // Agent might emit system prompt first, then user message
       const calls = threadEventAddedSpy.mock.calls;
-      const userMessageCall = calls.find(call => call[0].event.type === 'USER_MESSAGE');
+      const userMessageCall = calls.find((call) => {
+        const eventData = call[0] as { event: ThreadEvent };
+        return eventData?.event?.type === 'USER_MESSAGE';
+      });
       expect(userMessageCall).toBeDefined();
-      expect(userMessageCall![0].event.data).toBe('Test message');
+      const eventData = userMessageCall![0] as { event: ThreadEvent };
+      expect(eventData.event.data).toBe('Test message');
     });
 
     it('should handle session initialization without events array', () => {
       // This test verifies that terminal interface can initialize
       // without depending on events array state
       const { unmount } = render(<TerminalInterfaceComponent agent={agent} />);
-      
+
       // Should not throw and should complete initialization
       expect(() => unmount()).not.toThrow();
     });
@@ -83,16 +88,19 @@ describe('TerminalInterface Streaming Event Flow', () => {
       // Mock StreamingTimelineProcessor to spy on its methods
       const mockAppendEvent = vi.fn();
       const mockLoadEvents = vi.fn();
-      
+
       // Mock the useStreamingTimelineProcessor hook
-      vi.doMock('../terminal-interface.js', () => {
-        const original = vi.importActual('../terminal-interface.js');
+      vi.doMock('../terminal-interface.js', async () => {
+        const original = await vi.importActual('../terminal-interface.js');
         return {
           ...original,
           useStreamingTimelineProcessor: () => ({
             appendEvent: mockAppendEvent,
             loadEvents: mockLoadEvents,
-            getTimeline: () => ({ items: [], metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() } }),
+            getTimeline: () => ({
+              items: [],
+              metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
+            }),
             reset: vi.fn(),
             getMetrics: vi.fn(),
           }),
@@ -105,7 +113,7 @@ describe('TerminalInterface Streaming Event Flow', () => {
       await agent.sendMessage('Hello');
 
       // Wait for event processing
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Verify events flow to streaming processor
       // Note: This is more of an integration test to verify the flow works
@@ -141,7 +149,7 @@ describe('TerminalInterface Streaming Event Flow', () => {
   describe('Performance Characteristics', () => {
     it('should not trigger React state updates on every agent event', async () => {
       let renderCount = 0;
-      
+
       // Create a component that counts renders
       const TestWrapper = () => {
         renderCount++;
@@ -157,7 +165,7 @@ describe('TerminalInterface Streaming Event Flow', () => {
       await agent.sendMessage('Message 3');
 
       // Wait for any async updates
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Render count should not increase excessively
       // With pure streaming, we should have minimal React re-renders

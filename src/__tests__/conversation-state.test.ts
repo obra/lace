@@ -6,6 +6,7 @@ import { Agent } from '~/agents/agent.js';
 import { ThreadManager } from '~/threads/thread-manager.js';
 import { ToolExecutor } from '~/tools/executor.js';
 import { AIProvider, ProviderResponse } from '~/providers/base-provider.js';
+import { logger } from '~/utils/logger.js';
 
 // Mock provider that returns predictable responses for stable testing
 class MockConversationProvider extends AIProvider {
@@ -181,7 +182,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
     let previousMessageCount = 0;
 
     for (let i = 0; i < turns.length; i++) {
-      if (process.env.VITEST_VERBOSE) console.log(`\nTurn ${i + 1}: "${turns[i]}"`);
+      if (process.env.VITEST_VERBOSE) logger.debug(`Turn ${i + 1}: "${turns[i]}"`);
 
       await agent.sendMessage(turns[i]);
 
@@ -189,7 +190,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
       const conversation = agent.buildThreadMessages();
 
       if (process.env.VITEST_VERBOSE) {
-        console.log(
+        logger.debug(
           `Turn ${i + 1} - Message count: ${conversation.length}, Event count: ${events.length}`
         );
       }
@@ -261,7 +262,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
     agent.on('state_change', ({ from, to }) => {
       events.push(`state:${from}->${to}`);
       stateChanges.push({ from, to });
-      if (process.env.VITEST_VERBOSE) console.log(`State change: ${from} -> ${to}`);
+      if (process.env.VITEST_VERBOSE) logger.debug(`State change: ${from} -> ${to}`);
     });
 
     // Initial state should be idle
@@ -269,7 +270,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
 
     await agent.sendMessage('List the files in the current directory');
 
-    if (process.env.VITEST_VERBOSE) console.log('Events emitted:', events);
+    if (process.env.VITEST_VERBOSE) logger.debug('Events emitted:', events);
 
     // Should have basic conversation flow events
     expect(events).toContain('thinking_start');
@@ -277,7 +278,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
 
     // Should have state transitions
     const stateSequence = stateChanges.map((sc) => `${sc.from}->${sc.to}`);
-    if (process.env.VITEST_VERBOSE) console.log('State sequence:', stateSequence);
+    if (process.env.VITEST_VERBOSE) logger.debug('State sequence:', stateSequence);
 
     expect(stateSequence).toContain('idle->thinking');
     // With streaming, flow goes: thinking->streaming->tool_execution

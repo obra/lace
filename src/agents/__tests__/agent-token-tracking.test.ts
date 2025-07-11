@@ -3,13 +3,13 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { z } from 'zod';
-import { Agent, AgentConfig, CurrentTurnMetrics } from '../agent.js';
-import { AIProvider } from '../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolResult } from '../../tools/types.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
+import { Agent, AgentConfig, CurrentTurnMetrics } from '~/agents/agent.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolResult } from '~/tools/types.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
 
 // Mock provider with configurable token usage
 class MockTokenProvider extends AIProvider {
@@ -55,10 +55,10 @@ class MockTokenProvider extends AIProvider {
         this.emit('token_usage_update', {
           usage: {
             promptTokens: this.mockResponse.usage!.promptTokens,
-            completionTokens: Math.floor(this.mockResponse.usage!.completionTokens! / 2),
+            completionTokens: Math.floor(this.mockResponse.usage!.completionTokens / 2),
             totalTokens:
-              this.mockResponse.usage!.promptTokens! +
-              Math.floor(this.mockResponse.usage!.completionTokens! / 2),
+              this.mockResponse.usage!.promptTokens +
+              Math.floor(this.mockResponse.usage!.completionTokens / 2),
           },
         });
       }, 10);
@@ -180,11 +180,11 @@ describe('Agent Token Tracking Integration', () => {
           test: z.string().optional(),
         });
 
-        protected async executeValidated(): Promise<ToolResult> {
-          return {
+        protected executeValidated(): Promise<ToolResult> {
+          return Promise.resolve({
             content: [{ type: 'text', text: 'Tool executed successfully' }],
             isError: false,
-          };
+          });
         }
       }
 
@@ -203,9 +203,9 @@ describe('Agent Token Tracking Integration', () => {
 
       // Setup provider to return different responses on subsequent calls
       let callCount = 0;
-      vi.spyOn(multiCallProvider, 'createResponse').mockImplementation(async () => {
+      vi.spyOn(multiCallProvider, 'createResponse').mockImplementation(() => {
         callCount++;
-        return callCount === 1 ? toolCallResponse : followUpResponse;
+        return Promise.resolve(callCount === 1 ? toolCallResponse : followUpResponse);
       });
 
       const completeEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
@@ -275,11 +275,11 @@ describe('Agent Token Tracking Integration', () => {
         description = 'Test tool';
         schema = z.object({});
 
-        protected async executeValidated(): Promise<ToolResult> {
-          return {
+        protected executeValidated(): Promise<ToolResult> {
+          return Promise.resolve({
             content: [{ type: 'text', text: 'Tool result' }],
             isError: false,
-          };
+          });
         }
       }
 
@@ -296,9 +296,9 @@ describe('Agent Token Tracking Integration', () => {
       await multiCallAgent.start();
 
       let callCount = 0;
-      vi.spyOn(multiCallProvider, 'createResponse').mockImplementation(async () => {
+      vi.spyOn(multiCallProvider, 'createResponse').mockImplementation(() => {
         callCount++;
-        return callCount === 1 ? toolCallResponse : followUpResponse;
+        return Promise.resolve(callCount === 1 ? toolCallResponse : followUpResponse);
       });
 
       const completeEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];

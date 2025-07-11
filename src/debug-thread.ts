@@ -3,16 +3,17 @@
 // ABOUTME: Outputs thread data in JSON or readable format with provider-specific conversation structure
 
 import { Command } from 'commander';
-import { ThreadManager } from './threads/thread-manager.js';
-import { Agent } from './agents/agent.js';
-import { ProviderRegistry } from './providers/registry.js';
-import { estimateTokens } from './utils/token-estimation.js';
-import { convertToAnthropicFormat } from './providers/format-converters.js';
-import { getLaceDir } from './config/lace-dir.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { Agent } from '~/agents/agent.js';
+import { ProviderRegistry } from '~/providers/registry.js';
+import { estimateTokens } from '~/utils/token-estimation.js';
+import { convertToAnthropicFormat } from '~/providers/format-converters.js';
+import { getLaceDir } from '~/config/lace-dir.js';
 import { join } from 'path';
-import { loadEnvFile } from './config/env-loader.js';
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { loadEnvFile } from '~/config/env-loader.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ProviderMessage } from '~/providers/base-provider.js';
+import { ThreadEvent } from '~/threads/types.js';
 
 interface DebugOptions {
   threadId: string;
@@ -37,8 +38,8 @@ interface ThreadDebugInfo {
       systemPrompts: number;
     };
   };
-  conversation: any;
-  rawEvents: any[];
+  conversation: unknown;
+  rawEvents: unknown[];
 }
 
 async function debugThread(options: DebugOptions): Promise<ThreadDebugInfo> {
@@ -70,21 +71,26 @@ async function debugThread(options: DebugOptions): Promise<ThreadDebugInfo> {
   // We'll create a minimal agent instance just to access this method
   const agent = new Agent({
     provider,
-    toolExecutor: undefined as any, // We don't need tools for debug
+    toolExecutor: undefined as unknown as ToolExecutor, // We don't need tools for debug
     threadManager,
     threadId: options.threadId,
     tools: [],
   });
 
   // Access the private method through reflection
-  const buildConversationFromEvents = (agent as any)._buildConversationFromEvents.bind(agent);
-  const providerMessages = buildConversationFromEvents(thread.events);
+  const agentWithPrivates = agent as unknown as {
+    _buildConversationFromEvents: (events: unknown[]) => unknown;
+  };
+
+  const buildConversationFromEvents = agentWithPrivates._buildConversationFromEvents.bind(agent);
+
+  const providerMessages = buildConversationFromEvents(thread.events) as ProviderMessage[];
 
   // Calculate token counts
   const tokenCounts = calculateTokenCounts(thread.events, providerMessages);
 
   // Convert to provider-specific format if needed
-  let conversation: any = providerMessages;
+  let conversation: unknown = providerMessages;
 
   if (options.provider === 'anthropic') {
     conversation = convertToAnthropicFormat(providerMessages);
@@ -105,7 +111,19 @@ async function debugThread(options: DebugOptions): Promise<ThreadDebugInfo> {
   };
 }
 
-function calculateTokenCounts(events: any[], providerMessages: any[]): any {
+function calculateTokenCounts(
+  events: ThreadEvent[],
+  providerMessages: ProviderMessage[]
+): {
+  estimated: number;
+  breakdown: {
+    userMessages: number;
+    agentMessages: number;
+    toolCalls: number;
+    toolResults: number;
+    systemPrompts: number;
+  };
+} {
   let userMessages = 0;
   let agentMessages = 0;
   let toolCalls = 0;
@@ -188,49 +206,61 @@ function formatAsText(debugInfo: ThreadDebugInfo): string {
   lines.push(`${'='.repeat(40)}`);
 
   if (Array.isArray(debugInfo.conversation)) {
-    debugInfo.conversation.forEach((msg, index) => {
-      lines.push(`Message ${index + 1} (${msg.role}):`);
+    (debugInfo.conversation as Array<Record<string, unknown>>).forEach((msg, index) => {
+      lines.push(`Message ${index + 1} (${(msg as { role: string }).role}):`);
 
       if (typeof msg.content === 'string') {
         lines.push(`  ${msg.content}`);
       } else if (Array.isArray(msg.content)) {
-        msg.content.forEach((block: any, blockIndex: number) => {
-          lines.push(`  Block ${blockIndex + 1} (${block.type}):`);
-          if (block.text) {
-            lines.push(`    ${block.text}`);
+        (msg.content as Array<Record<string, unknown>>).forEach((block, blockIndex: number) => {
+          lines.push(`  Block ${blockIndex + 1} (${(block as { type: string }).type}):`);
+          if ((block as { text?: string }).text) {
+            lines.push(`    ${(block as { text: string }).text}`);
           }
-          if (block.tool_use_id) {
-            lines.push(`    Tool Use ID: ${block.tool_use_id}`);
+          if ((block as { tool_use_id?: string }).tool_use_id) {
+            lines.push(`    Tool Use ID: ${(block as { tool_use_id: string }).tool_use_id}`);
           }
-          if (block.name) {
-            lines.push(`    Tool Name: ${block.name}`);
+          if ((block as { name?: string }).name) {
+            lines.push(`    Tool Name: ${(block as { name: string }).name}`);
           }
-          if (block.input) {
-            lines.push(`    Tool Input: ${JSON.stringify(block.input, null, 2)}`);
+          if ((block as { input?: unknown }).input) {
+            lines.push(
+              `    Tool Input: ${JSON.stringify((block as { input: unknown }).input, null, 2)}`
+            );
           }
         });
       }
 
-      if (msg.toolCalls?.length > 0) {
-        lines.push(`  Tool Calls: ${msg.toolCalls.length}`);
-        msg.toolCalls.forEach((call: any, callIndex: number) => {
-          lines.push(`    ${callIndex + 1}. ${call.name}:`);
-          lines.push(`       Input: ${JSON.stringify(call.input, null, 2)}`);
-        });
+      if (
+        (msg as { toolCalls?: unknown[] }).toolCalls?.length &&
+        (msg as { toolCalls: unknown[] }).toolCalls.length > 0
+      ) {
+        lines.push(`  Tool Calls: ${(msg as { toolCalls: unknown[] }).toolCalls.length}`);
+        (msg as { toolCalls: Array<{ name: string; input: unknown }> }).toolCalls.forEach(
+          (call, callIndex: number) => {
+            lines.push(`    ${callIndex + 1}. ${call.name}:`);
+            lines.push(`       Input: ${JSON.stringify(call.input, null, 2)}`);
+          }
+        );
       }
 
-      if (msg.toolResults?.length > 0) {
-        lines.push(`  Tool Results: ${msg.toolResults.length}`);
-        msg.toolResults.forEach((result: any, resultIndex: number) => {
+      if (
+        (msg as { toolResults?: unknown[] }).toolResults?.length &&
+        (msg as { toolResults: unknown[] }).toolResults.length > 0
+      ) {
+        lines.push(`  Tool Results: ${(msg as { toolResults: unknown[] }).toolResults.length}`);
+        (
+          msg as { toolResults: Array<{ id: string; content?: Array<{ text?: string }> }> }
+        ).toolResults.forEach((result, resultIndex: number) => {
           lines.push(`    ${resultIndex + 1}. ${result.id}:`);
           if (result.content) {
-            result.content.forEach((contentBlock: any, contentIndex: number) => {
+            result.content.forEach((contentBlock: { text?: string }, contentIndex: number) => {
               lines.push(
                 `       Content ${contentIndex + 1}: ${contentBlock.text || JSON.stringify(contentBlock)}`
               );
             });
           }
-          if (result.isError) {
+          if ((result as { isError?: boolean }).isError) {
             lines.push(`       Error: true`);
           }
         });
@@ -243,11 +273,13 @@ function formatAsText(debugInfo: ThreadDebugInfo): string {
   lines.push(`Raw Events:`);
   lines.push(`${'='.repeat(40)}`);
   debugInfo.rawEvents.forEach((event, index) => {
-    lines.push(`Event ${index + 1}: ${event.type} (${event.timestamp})`);
-    if (typeof event.data === 'string') {
-      lines.push(`  ${event.data}`);
+    lines.push(
+      `Event ${index + 1}: ${(event as { type: string; timestamp: string }).type} (${(event as { type: string; timestamp: string }).timestamp})`
+    );
+    if (typeof (event as { data: unknown }).data === 'string') {
+      lines.push(`  ${(event as { data: string }).data}`);
     } else {
-      lines.push(`  ${JSON.stringify(event.data, null, 2)}`);
+      lines.push(`  ${JSON.stringify((event as { data: unknown }).data, null, 2)}`);
     }
     lines.push('');
   });
@@ -280,10 +312,10 @@ async function main() {
 
   program.parse();
 
-  const options = program.opts() as DebugOptions;
+  const options = program.opts();
 
   try {
-    const debugInfo = await debugThread(options);
+    const debugInfo = await debugThread(options as DebugOptions);
 
     let output: string;
     if (options.format === 'json') {
@@ -294,10 +326,10 @@ async function main() {
 
     if (options.output) {
       const fs = await import('fs');
-      fs.writeFileSync(options.output, output);
-      console.log(`Debug output written to ${options.output}`);
+      fs.writeFileSync(options.output as string, output);
+      console.warn(`Debug output written to ${options.output}`);
     } else {
-      console.log(output);
+      console.warn(output);
     }
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : error);
@@ -306,5 +338,5 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
+  void main();
 }

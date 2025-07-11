@@ -2,7 +2,7 @@
 // ABOUTME: Verifies basic functionality and configuration
 
 import { describe, it, expect } from 'vitest';
-import { OllamaProvider } from '../ollama-provider.js';
+import { OllamaProvider } from '~/providers/ollama-provider.js';
 
 describe('OllamaProvider', () => {
   it('should have correct provider name', () => {

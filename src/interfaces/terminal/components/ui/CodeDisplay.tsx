@@ -32,7 +32,7 @@ export function CodeDisplay({ code, language = 'text', compact = false }: CodeDi
   let displayCode = code;
   if (language === 'json') {
     try {
-      const parsed = JSON.parse(code);
+      const parsed = JSON.parse(code) as unknown;
       displayCode = JSON.stringify(parsed, null, compact ? 0 : 2);
     } catch {
       // Keep original if not valid JSON
@@ -47,7 +47,7 @@ export function CodeDisplay({ code, language = 'text', compact = false }: CodeDi
   try {
     const highlighted = hljs.highlight(displayCode, { language });
     return renderHighlightedCode(highlighted.value);
-  } catch (error) {
+  } catch (_error) {
     // Fallback to plain text if language not supported or highlighting fails
     return <Text color="white">{displayCode}</Text>;
   }
@@ -71,7 +71,7 @@ function renderHighlightedCode(highlightedHtml: string): React.ReactElement {
 
 function parseHighlightedLine(line: string): React.ReactNode {
   // Decode HTML entities first
-  let decodedLine = line
+  const decodedLine = line
     .replace(/&quot;/g, '"')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')

@@ -1,9 +1,9 @@
 // ABOUTME: Tests for retry functionality in LMStudioProvider
 // ABOUTME: Verifies retry logic works correctly with LMStudio SDK
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { LMStudioProvider } from '../lmstudio-provider.js';
-import { ProviderMessage } from '../base-provider.js';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
+import { LMStudioProvider } from '~/providers/lmstudio-provider.js';
+import { ProviderMessage } from '~/providers/base-provider.js';
 
 // Create mock functions that we'll reference
 const mockListLoaded = vi.fn();
@@ -23,7 +23,7 @@ vi.mock('@lmstudio/sdk', () => {
 
 describe('LMStudioProvider retry functionality', () => {
   let provider: LMStudioProvider;
-  let mockDiagnose: any;
+  let mockDiagnose: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -38,12 +38,18 @@ describe('LMStudioProvider retry functionality', () => {
     });
 
     // Mock the diagnose method to control connectivity
-    mockDiagnose = vi.spyOn(provider, 'diagnose');
+    mockDiagnose = vi.spyOn(provider, 'diagnose') as Mock;
 
     // Add error handlers to prevent unhandled errors in tests
-    provider.on('error', () => {});
-    provider.on('retry_attempt', () => {});
-    provider.on('retry_exhausted', () => {});
+    provider.on('error', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
+    provider.on('retry_attempt', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
+    provider.on('retry_exhausted', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
   });
 
   afterEach(() => {
@@ -62,7 +68,7 @@ describe('LMStudioProvider retry functionality', () => {
       // Mock successful model load
       const mockModel = {
         port: {
-          createChannel: vi.fn((type, config, onMessage) => {
+          createChannel: vi.fn((type: string, config: unknown, onMessage: (msg: any) => void) => {
             // Execute immediately with fake timers to avoid timeout
             onMessage({
               type: 'fragment',
@@ -88,7 +94,9 @@ describe('LMStudioProvider retry functionality', () => {
       mockLoad.mockResolvedValue(mockModel);
 
       const promise = provider.createResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       // Wait for first attempt
       await vi.advanceTimersByTimeAsync(0);
@@ -112,7 +120,7 @@ describe('LMStudioProvider retry functionality', () => {
 
       const mockModel = {
         port: {
-          createChannel: vi.fn((type, config, onMessage) => {
+          createChannel: vi.fn((type: string, config: unknown, onMessage: (msg: any) => void) => {
             // Execute immediately with fake timers to avoid timeout
             onMessage({
               type: 'fragment',
@@ -146,11 +154,13 @@ describe('LMStudioProvider retry functionality', () => {
 
       await promise;
 
-      expect(retryAttemptSpy).toHaveBeenCalledWith({
-        attempt: 1,
-        delay: expect.any(Number),
-        error: expect.objectContaining({ status: 503 }),
-      });
+      expect(retryAttemptSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attempt: 1,
+          delay: expect.any(Number) as number,
+          error: expect.objectContaining({ status: 503 }) as object,
+        })
+      );
     });
 
     it('should not retry on authentication errors', async () => {
@@ -185,10 +195,12 @@ describe('LMStudioProvider retry functionality', () => {
       });
 
       expect(mockDiagnose).toHaveBeenCalledTimes(10);
-      expect(exhaustedSpy).toHaveBeenCalledWith({
-        attempts: 10,
-        lastError: expect.objectContaining({ code: 'ETIMEDOUT' }),
-      });
+      expect(exhaustedSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attempts: 10,
+          lastError: expect.objectContaining({ code: 'ETIMEDOUT' }) as object,
+        })
+      );
 
       // Restore fake timers
       vi.useFakeTimers();
@@ -206,7 +218,7 @@ describe('LMStudioProvider retry functionality', () => {
 
       const mockModel = {
         port: {
-          createChannel: vi.fn((type, config, onMessage) => {
+          createChannel: vi.fn((type: string, config: unknown, onMessage: (msg: any) => void) => {
             // Execute immediately with fake timers to avoid timeout
             onMessage({
               type: 'fragment',
@@ -228,7 +240,9 @@ describe('LMStudioProvider retry functionality', () => {
       mockLoad.mockResolvedValue(mockModel);
 
       const promise = provider.createStreamingResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection during retry
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      }); // during retry
 
       // Wait for first attempt to fail
       await vi.advanceTimersByTimeAsync(0);
@@ -251,7 +265,7 @@ describe('LMStudioProvider retry functionality', () => {
 
       const mockModel = {
         port: {
-          createChannel: vi.fn((type, config, onMessage) => {
+          createChannel: vi.fn((type: string, config: unknown, onMessage: (msg: any) => void) => {
             // Start streaming immediately (sync), then fail
             onMessage({
               type: 'fragment',

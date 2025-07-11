@@ -2,8 +2,8 @@
 // ABOUTME: Ensures errors from sendMessage don't bypass the conversationComplete promise
 
 import { describe, it, expect, vi } from 'vitest';
-import { NonInteractiveInterface } from '../non-interactive-interface.js';
-import { Agent } from '../../agents/agent.js';
+import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface.js';
+import { Agent } from '~/agents/agent.js';
 import { EventEmitter } from 'events';
 
 describe('NonInteractiveInterface Race Condition', () => {

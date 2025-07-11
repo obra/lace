@@ -4,13 +4,13 @@
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TaskAddToolRenderer } from './TaskAddToolRenderer.js';
-import { TimelineItemProvider } from '../contexts/TimelineItemContext.js';
-import { ToolRendererProps } from './components/shared.js';
+import { TaskAddToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/TaskAddToolRenderer.js';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { ToolRendererProps } from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
 
 // Mock the expansion toggle hooks
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
-  TimelineExpansionProvider: ({ children }: any) => children,
+  TimelineExpansionProvider: ({ children }: { children: React.ReactNode }) => children,
   useTimelineItemExpansion: () => ({
     isExpanded: false,
     onExpand: vi.fn(),
@@ -20,11 +20,7 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
 
 const createMockProvider = () => {
   return ({ children }: { children: React.ReactNode }) => (
-    <TimelineItemProvider
-      isSelected={false}
-    >
-      {children}
-    </TimelineItemProvider>
+    <TimelineItemProvider isSelected={false}>{children}</TimelineItemProvider>
   );
 };
 
@@ -36,12 +32,14 @@ describe('TaskAddToolRenderer', () => {
   });
 
   const mockSuccessResult = {
-    content: [{
-      type: 'text' as const,
-      text: 'Created task task_20250705_b9qers: Test task management suite'
-    }],
+    content: [
+      {
+        type: 'text' as const,
+        text: 'Created task task_20250705_b9qers: Test task management suite',
+      },
+    ],
     isError: false,
-    id: 'test-call-id'
+    id: 'test-call-id',
   };
 
   const mockSuccessItem: ToolRendererProps['item'] = {
@@ -51,15 +49,17 @@ describe('TaskAddToolRenderer', () => {
       name: 'task_add',
       arguments: {
         title: 'Test task management suite',
-        prompt: 'Systematically test all task management tools including add, list, update, complete, view, and add_note functions to verify they work correctly after the recent upgrade',
-        description: 'Testing the upgraded task management system to ensure all features work properly',
+        prompt:
+          'Systematically test all task management tools including add, list, update, complete, view, and add_note functions to verify they work correctly after the recent upgrade',
+        description:
+          'Testing the upgraded task management system to ensure all features work properly',
         priority: 'high',
-        assignedTo: 'new:anthropic/claude-3-5-sonnet'
-      }
+        assignedTo: 'new:anthropic/claude-3-5-sonnet',
+      },
     },
     result: mockSuccessResult,
     timestamp: new Date('2025-07-05T16:06:43.912Z'),
-    callId: 'test-call-id'
+    callId: 'test-call-id',
   };
 
   it('should render task creation success with detailed view', () => {
@@ -70,10 +70,10 @@ describe('TaskAddToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     // Should show success status
     expect(output).toContain('✔  task_add:');
-    
+
     // Should show task creation details
     expect(output).toContain('Created task "Test task management suite"');
     expect(output).toContain('→ task_20250705_b9qers [high priority]');
@@ -89,18 +89,20 @@ describe('TaskAddToolRenderer', () => {
         arguments: {
           title: 'Simple task',
           prompt: 'Just a simple task with minimal fields',
-          priority: 'medium'
+          priority: 'medium',
           // No assignedTo or description
-        }
+        },
       },
       result: {
-        content: [{
-          type: 'text' as const,
-          text: 'Created task task_20250705_simple: Simple task'
-        }],
+        content: [
+          {
+            type: 'text' as const,
+            text: 'Created task task_20250705_simple: Simple task',
+          },
+        ],
         isError: false,
-        id: 'test-call-id'
-      }
+        id: 'test-call-id',
+      },
     };
 
     const { lastFrame } = render(
@@ -110,7 +112,7 @@ describe('TaskAddToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('✔  task_add:');
     expect(output).toContain('Created task "Simple task"');
     expect(output).toContain('→ task_20250705_simple [medium priority]');
@@ -123,13 +125,15 @@ describe('TaskAddToolRenderer', () => {
     const errorItem: ToolRendererProps['item'] = {
       ...mockSuccessItem,
       result: {
-        content: [{
-          type: 'text' as const,
-          text: 'Failed to create task: Invalid assignee format'
-        }],
+        content: [
+          {
+            type: 'text' as const,
+            text: 'Failed to create task: Invalid assignee format',
+          },
+        ],
         isError: true,
-        id: 'test-call-id'
-      }
+        id: 'test-call-id',
+      },
     };
 
     const { lastFrame } = render(
@@ -139,7 +143,7 @@ describe('TaskAddToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('✘ task_add:');
     expect(output).toContain('Failed to create task: Invalid assignee format');
   });
@@ -147,7 +151,7 @@ describe('TaskAddToolRenderer', () => {
   it('should render pending state while running', () => {
     const pendingItem: ToolRendererProps['item'] = {
       ...mockSuccessItem,
-      result: undefined // No result means still running
+      result: undefined, // No result means still running
     };
 
     const { lastFrame } = render(
@@ -157,7 +161,7 @@ describe('TaskAddToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('⧖ task_add:');
     expect(output).toContain('Creating task "Test task management suite"');
   });

@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { act } from '@testing-library/react';
-import { useTextBuffer } from '../hooks/use-text-buffer.js';
+import { useTextBuffer } from '~/interfaces/terminal/hooks/use-text-buffer.js';
 
 describe('useTextBuffer Text Wrapping and Cursor Positioning', () => {
   describe('cursor positioning with long lines', () => {

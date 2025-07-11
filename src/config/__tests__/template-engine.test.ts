@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { TemplateEngine } from '../template-engine.js';
+import { TemplateEngine } from '~/config/template-engine.js';
 
 describe('TemplateEngine', () => {
   let tempDir: string;

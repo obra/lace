@@ -3,8 +3,8 @@
 
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
-import { MarkdownDisplay } from './ui/MarkdownDisplay.js';
-import { UI_SYMBOLS } from '../theme.js';
+import { MarkdownDisplay } from '~/interfaces/terminal/components/ui/MarkdownDisplay.js';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 
 interface Message {
   type: 'user' | 'assistant' | 'system' | 'tool' | 'thinking';
@@ -23,7 +23,7 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({
   isStreaming = false,
   showCursor = false,
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, _setIsCollapsed] = useState(false);
 
   // Parse code blocks and apply syntax highlighting
   const parseContent = (content: string) => {

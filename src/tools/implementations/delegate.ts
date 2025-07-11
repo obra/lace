@@ -2,20 +2,16 @@
 // ABOUTME: Enables efficient token usage by delegating to cheaper models with enhanced parameter validation
 
 import { z } from 'zod';
-import { Tool } from '../tool.js';
-import { NonEmptyString } from '../schemas/common.js';
-import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
-import { ApprovalDecision } from '../approval-types.js';
-import { Agent } from '../../agents/agent.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
-import { ToolExecutor } from '../executor.js';
-import { AnthropicProvider } from '../../providers/anthropic-provider.js';
-import { LMStudioProvider } from '../../providers/lmstudio-provider.js';
-import { OllamaProvider } from '../../providers/ollama-provider.js';
-import { AIProvider } from '../../providers/base-provider.js';
-import { TokenBudgetConfig } from '../../token-management/types.js';
-import { getEnvVar } from '../../config/env-loader.js';
-import { logger } from '../../utils/logger.js';
+import { Tool } from '~/tools/tool.js';
+import { NonEmptyString } from '~/tools/schemas/common.js';
+import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types.js';
+import { ApprovalDecision } from '~/tools/approval-types.js';
+import { Agent } from '~/agents/agent.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { TokenBudgetConfig } from '~/token-management/types.js';
+import { ProviderRegistry } from '~/providers/registry.js';
+import { logger } from '~/utils/logger.js';
 
 // Model format validation
 const ModelFormat = z.string().refine(
@@ -111,9 +107,6 @@ Examples:
       const toolExecutor = this.createRestrictedToolExecutor();
 
       // Note: Delegation metadata is now shown in the delegation box UI
-
-      // Get all tools for the subagent
-      const availableTools = toolExecutor.getAllTools();
 
       // Configure token budget for subagent (more conservative than parent)
       const tokenBudget: TokenBudgetConfig = {
@@ -227,28 +220,19 @@ Expected response format: ${expectedResponse}
 
 IMPORTANT: Once you have gathered enough information to provide the expected response, STOP using tools and give your final answer. Do not continue exploring or gathering more data indefinitely.`;
 
-    const config = {
-      model: modelName,
-      systemPrompt,
-      maxTokens: 4000,
-    };
-
-    switch (providerName.toLowerCase()) {
-      case 'anthropic': {
-        const apiKey = getEnvVar('ANTHROPIC_KEY');
-        if (!apiKey) {
-          throw new Error('ANTHROPIC_KEY environment variable required for Anthropic provider');
-        }
-        return new AnthropicProvider({ ...config, apiKey });
-      }
-      case 'lmstudio': {
-        return new LMStudioProvider(config);
-      }
-      case 'ollama': {
-        return new OllamaProvider(config);
-      }
-      default:
+    try {
+      const registry = await ProviderRegistry.createWithAutoDiscovery();
+      return await registry.createProvider(providerName, {
+        model: modelName,
+        systemPrompt,
+        maxTokens: 4000,
+      });
+    } catch (error) {
+      // Return null for unknown providers (will be handled by caller)
+      if (error instanceof Error && error.message.includes('Unknown provider')) {
         return null;
+      }
+      throw error;
     }
   }
 
@@ -276,7 +260,7 @@ IMPORTANT: Once you have gathered enough information to provide the expected res
       // SAFE DEFAULT: If no approval callback, deny all tools
       childExecutor.setApprovalCallback({
         async requestApproval() {
-          return ApprovalDecision.DENY;
+          return await Promise.resolve(ApprovalDecision.DENY);
         },
       });
     }

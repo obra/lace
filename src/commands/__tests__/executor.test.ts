@@ -2,15 +2,16 @@
 // ABOUTME: Tests command parsing, error handling, and UserInterface integration
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { CommandExecutor } from '../executor.js';
-import { CommandRegistry } from '../registry.js';
-import type { Command, UserInterface } from '../types.js';
+import { CommandExecutor } from '~/commands/executor.js';
+import { CommandRegistry } from '~/commands/registry.js';
+import type { Command, UserInterface } from '~/commands/types.js';
+import type { Agent } from '~/agents/agent.js';
 
 describe('CommandExecutor', () => {
   let registry: CommandRegistry;
   let executor: CommandExecutor;
   let mockUI: UserInterface;
-  let mockAgent: any;
+  let mockAgent: Partial<Agent>;
 
   beforeEach(() => {
     registry = new CommandRegistry();
@@ -23,14 +24,14 @@ describe('CommandExecutor', () => {
         createThread: vi.fn(),
       },
       providerName: 'test-provider',
-    };
+    } as Partial<Agent>;
 
     mockUI = {
-      agent: mockAgent,
+      agent: mockAgent as Agent,
       displayMessage: vi.fn(),
       clearSession: vi.fn(),
       exit: vi.fn(),
-    };
+    } as UserInterface;
   });
 
   describe('command parsing', () => {

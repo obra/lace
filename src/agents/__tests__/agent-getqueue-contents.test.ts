@@ -2,12 +2,12 @@
 // ABOUTME: Verifies queue contents retrieval with proper isolation
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '../agent.js';
-import { AIProvider } from '../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
+import { Agent } from '~/agents/agent.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
 
 class MockProvider extends AIProvider {
   constructor() {
@@ -22,12 +22,13 @@ class MockProvider extends AIProvider {
     return 'mock-model';
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return {
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve({
       content: 'mock response',
       usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
       toolCalls: [],
-    };
+      stopReason: 'end_turn',
+    });
   }
 }
 
@@ -39,10 +40,12 @@ describe('Agent getQueueContents', () => {
 
   beforeEach(async () => {
     mockProvider = new MockProvider();
+
     mockToolExecutor = {
       registerAllAvailableTools: vi.fn(),
       getRegisteredTools: vi.fn().mockReturnValue([]),
-    } as any;
+    } as unknown as ToolExecutor;
+
     mockThreadManager = {
       addEvent: vi.fn(),
       getEvents: vi.fn().mockReturnValue([]),
@@ -55,7 +58,7 @@ describe('Agent getQueueContents', () => {
       needsCompaction: vi.fn().mockResolvedValue(false),
       createCompactedVersion: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
+    } as unknown as ThreadManager;
 
     agent = new Agent({
       provider: mockProvider,
@@ -68,9 +71,9 @@ describe('Agent getQueueContents', () => {
     await agent.start();
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     if (agent) {
-      await agent.stop();
+      agent.stop();
     }
   });
 
@@ -110,12 +113,14 @@ describe('Agent getQueueContents', () => {
     const originalLength = contents1.length;
     // TypeScript should prevent this, but let's verify runtime behavior
     try {
-      (contents1 as any).push({ fake: 'message' });
+      // Use explicit type assertion to test runtime behavior
+      const mutableContents = contents1 as unknown as Array<{ fake: string }>;
+      mutableContents.push({ fake: 'message' });
       // If this works, it means we didn't return a proper readonly array
       // The internal queue should still be unchanged
       const newContents = agent.getQueueContents();
       expect(newContents).toHaveLength(originalLength);
-    } catch (error) {
+    } catch {
       // Expected - readonly arrays should prevent modification
     }
   });

@@ -2,11 +2,11 @@
 // ABOUTME: Verifies that retry events from providers are properly forwarded to Agent listeners
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '../agent.js';
-import { AIProvider, ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
-import { Tool } from '../../tools/tool.js';
+import { Agent } from '~/agents/agent.js';
+import { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { Tool } from '~/tools/tool.js';
 
 // Mock provider that can emit retry events
 class MockRetryProvider extends AIProvider {
@@ -32,7 +32,7 @@ class MockRetryProvider extends AIProvider {
     type?: 'attempt' | 'exhausted';
   } | null = null;
 
-  async createResponse(
+  createResponse(
     _messages: ProviderMessage[],
     _tools: Tool[] = [],
     _signal?: AbortSignal
@@ -51,14 +51,15 @@ class MockRetryProvider extends AIProvider {
         });
       }
     }
-    return {
+    return Promise.resolve({
       content: 'Test response',
       toolCalls: [],
       stopReason: 'stop',
-    };
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+    });
   }
 
-  async createStreamingResponse(
+  createStreamingResponse(
     _messages: ProviderMessage[],
     _tools: Tool[] = [],
     _signal?: AbortSignal
@@ -77,11 +78,12 @@ class MockRetryProvider extends AIProvider {
         });
       }
     }
-    return {
+    return Promise.resolve({
       content: 'Test streaming response',
       toolCalls: [],
       stopReason: 'stop',
-    };
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+    });
   }
 
   // Method to setup retry events that will be emitted during next provider call
@@ -108,12 +110,14 @@ describe('Agent retry event forwarding', () => {
     mockProvider = new MockRetryProvider({});
 
     // Mock ToolExecutor
+
     mockToolExecutor = {
       executeTool: vi.fn(),
       getApprovalDecision: vi.fn(),
-    } as any;
+    } as unknown as ToolExecutor;
 
     // Mock ThreadManager
+
     mockThreadManager = {
       addEvent: vi.fn(),
       getEvents: vi.fn().mockReturnValue([]),
@@ -121,7 +125,7 @@ describe('Agent retry event forwarding', () => {
       getCurrentThreadId: vi.fn().mockReturnValue(threadId),
       needsCompaction: vi.fn().mockResolvedValue(false),
       close: vi.fn(),
-    } as any;
+    } as unknown as ThreadManager;
 
     agent = new Agent({
       provider: mockProvider,
@@ -134,8 +138,8 @@ describe('Agent retry event forwarding', () => {
     await agent.start();
   });
 
-  afterEach(async () => {
-    await agent.stop();
+  afterEach(() => {
+    agent.stop();
   });
 
   describe('retry_attempt event forwarding', () => {

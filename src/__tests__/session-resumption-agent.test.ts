@@ -9,6 +9,7 @@ import { TestProvider } from '~/__tests__/utils/test-provider.js';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { logger } from '~/utils/logger.js';
 
 // Mock the app's handleSession function with Agent API usage
 function handleSessionWithAgent(agent: Agent, continueMode?: boolean | string): string {
@@ -26,12 +27,12 @@ function handleSessionWithAgent(agent: Agent, continueMode?: boolean | string): 
   const { threadId } = sessionInfo;
 
   if (sessionInfo.isResumed) {
-    console.log(`📖 Continuing conversation ${threadId}`);
+    logger.debug(`Continuing conversation ${threadId}`);
   } else if (sessionInfo.resumeError) {
-    console.warn(`⚠️  ${sessionInfo.resumeError}`);
-    console.log(`🆕 Starting new conversation ${threadId}`);
+    logger.debug(`Resume error: ${sessionInfo.resumeError}`);
+    logger.debug(`Starting new conversation ${threadId}`);
   } else {
-    console.log(`🆕 Starting conversation ${threadId}`);
+    logger.debug(`Starting conversation ${threadId}`);
   }
 
   return threadId;

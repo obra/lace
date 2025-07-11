@@ -4,13 +4,13 @@
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TaskListToolRenderer } from './TaskListToolRenderer.js';
-import { TimelineItemProvider } from '../contexts/TimelineItemContext.js';
-import { ToolRendererProps } from './components/shared.js';
+import { TaskListToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/TaskListToolRenderer.js';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { ToolRendererProps } from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
 
 // Mock the expansion toggle hooks
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
-  TimelineExpansionProvider: ({ children }: any) => children,
+  TimelineExpansionProvider: ({ children }: { children: React.ReactNode }) => children,
   useTimelineItemExpansion: () => ({
     isExpanded: false,
     onExpand: vi.fn(),
@@ -20,11 +20,7 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
 
 const createMockProvider = () => {
   return ({ children }: { children: React.ReactNode }) => (
-    <TimelineItemProvider
-      isSelected={false}
-    >
-      {children}
-    </TimelineItemProvider>
+    <TimelineItemProvider isSelected={false}>{children}</TimelineItemProvider>
   );
 };
 
@@ -36,34 +32,36 @@ describe('TaskListToolRenderer', () => {
   });
 
   const mockTaskListResult = {
-    content: [{
-      type: 'text' as const,
-      text: JSON.stringify([
-        {
-          id: 'task_20250705_b9qers',
-          title: 'Test task management suite',
-          status: 'pending',
-          priority: 'high',
-          assignedTo: 'current'
-        },
-        {
-          id: 'task_20250705_wpd92m',
-          title: 'Create sample bug fix task',
-          status: 'in_progress',
-          priority: 'medium',
-          assignedTo: 'thread-456'
-        },
-        {
-          id: 'task_20250705_xyz123',
-          title: 'Blocked dependency task',
-          status: 'blocked',
-          priority: 'low',
-          assignedTo: 'current'
-        }
-      ])
-    }],
+    content: [
+      {
+        type: 'text' as const,
+        text: JSON.stringify([
+          {
+            id: 'task_20250705_b9qers',
+            title: 'Test task management suite',
+            status: 'pending',
+            priority: 'high',
+            assignedTo: 'current',
+          },
+          {
+            id: 'task_20250705_wpd92m',
+            title: 'Create sample bug fix task',
+            status: 'in_progress',
+            priority: 'medium',
+            assignedTo: 'thread-456',
+          },
+          {
+            id: 'task_20250705_xyz123',
+            title: 'Blocked dependency task',
+            status: 'blocked',
+            priority: 'low',
+            assignedTo: 'current',
+          },
+        ]),
+      },
+    ],
     isError: false,
-    id: 'test-call-id'
+    id: 'test-call-id',
   };
 
   const mockSuccessItem: ToolRendererProps['item'] = {
@@ -73,12 +71,12 @@ describe('TaskListToolRenderer', () => {
       name: 'task_list',
       arguments: {
         filter: 'thread',
-        includeCompleted: false
-      }
+        includeCompleted: false,
+      },
     },
     result: mockTaskListResult,
     timestamp: new Date('2025-07-05T16:06:43.912Z'),
-    callId: 'test-call-id'
+    callId: 'test-call-id',
   };
 
   it('should render task list with status icons and details', () => {
@@ -89,11 +87,11 @@ describe('TaskListToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     // Should show success status and count
     expect(output).toContain('✔  task_list:');
     expect(output).toContain('3 tasks found (filter: thread)');
-    
+
     // Should show each task with appropriate status icon
     expect(output).toContain('○ task_20250705_b9qers [high] Test task management suite');
     expect(output).toContain('◐ task_20250705_wpd92m [medium] Create sample bug fix task');
@@ -104,13 +102,15 @@ describe('TaskListToolRenderer', () => {
     const emptyItem: ToolRendererProps['item'] = {
       ...mockSuccessItem,
       result: {
-        content: [{
-          type: 'text' as const,
-          text: JSON.stringify([])
-        }],
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify([]),
+          },
+        ],
         isError: false,
-        id: 'test-call-id'
-      }
+        id: 'test-call-id',
+      },
     };
 
     const { lastFrame } = render(
@@ -120,7 +120,7 @@ describe('TaskListToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('✔  task_list:');
     expect(output).toContain('0 tasks found (filter: thread)');
   });
@@ -129,21 +129,23 @@ describe('TaskListToolRenderer', () => {
     const singleTaskItem: ToolRendererProps['item'] = {
       ...mockSuccessItem,
       result: {
-        content: [{
-          type: 'text' as const,
-          text: JSON.stringify([
-            {
-              id: 'task_20250705_single',
-              title: 'Single task',
-              status: 'completed',
-              priority: 'medium',
-              assignedTo: 'current'
-            }
-          ])
-        }],
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify([
+              {
+                id: 'task_20250705_single',
+                title: 'Single task',
+                status: 'completed',
+                priority: 'medium',
+                assignedTo: 'current',
+              },
+            ]),
+          },
+        ],
         isError: false,
-        id: 'test-call-id'
-      }
+        id: 'test-call-id',
+      },
     };
 
     const { lastFrame } = render(
@@ -153,7 +155,7 @@ describe('TaskListToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('1 task found (filter: thread)');
     expect(output).toContain('✓ task_20250705_single [medium] Single task');
   });
@@ -162,13 +164,15 @@ describe('TaskListToolRenderer', () => {
     const errorItem: ToolRendererProps['item'] = {
       ...mockSuccessItem,
       result: {
-        content: [{
-          type: 'text' as const,
-          text: 'Failed to fetch tasks: Database connection error'
-        }],
+        content: [
+          {
+            type: 'text' as const,
+            text: 'Failed to fetch tasks: Database connection error',
+          },
+        ],
         isError: true,
-        id: 'test-call-id'
-      }
+        id: 'test-call-id',
+      },
     };
 
     const { lastFrame } = render(
@@ -178,7 +182,7 @@ describe('TaskListToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('✘ task_list:');
     expect(output).toContain('Failed to fetch tasks: Database connection error');
   });
@@ -186,7 +190,7 @@ describe('TaskListToolRenderer', () => {
   it('should render pending state', () => {
     const pendingItem: ToolRendererProps['item'] = {
       ...mockSuccessItem,
-      result: undefined // No result means still running
+      result: undefined, // No result means still running
     };
 
     const { lastFrame } = render(
@@ -196,7 +200,7 @@ describe('TaskListToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('⧖ task_list:');
     expect(output).toContain('Fetching tasks...');
   });

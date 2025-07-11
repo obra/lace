@@ -2,12 +2,12 @@
 // ABOUTME: Validates that abort mechanism works correctly with providers and events
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, AgentConfig, CurrentTurnMetrics } from '../agent.js';
-import { AIProvider } from '../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
+import { Agent, AgentConfig, CurrentTurnMetrics } from '~/agents/agent.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
 
 // Mock provider for testing that can simulate abort behavior
 class MockAbortableProvider extends AIProvider {
@@ -232,10 +232,10 @@ describe('Agent Abort Functionality', () => {
       });
 
       // Mock to always throw AbortError
-      vi.spyOn(abortingProvider, 'createResponse').mockImplementation(async () => {
+      vi.spyOn(abortingProvider, 'createResponse').mockImplementation(() => {
         const error = new Error('Request aborted');
         error.name = 'AbortError';
-        throw error;
+        return Promise.reject(error);
       });
 
       const abortAgent = new Agent({

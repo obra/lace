@@ -1,15 +1,15 @@
 // ABOUTME: Help command that shows available commands and their descriptions
 // ABOUTME: Dynamically generates help from registered commands in the registry
 
-import type { Command, UserInterface } from '../types.js';
-import type { CommandRegistry } from '../registry.js';
+import type { Command, UserInterface } from '~/commands/types.js';
+import type { CommandRegistry } from '~/commands/registry.js';
 
 export function createHelpCommand(registry: CommandRegistry): Command {
   return {
     name: 'help',
     description: 'Show available commands',
 
-    async execute(args: string, ui: UserInterface): Promise<void> {
+    execute(args: string, ui: UserInterface): void {
       const trimmedArgs = args.trim();
 
       if (trimmedArgs) {

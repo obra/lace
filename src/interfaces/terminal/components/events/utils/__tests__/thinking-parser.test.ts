@@ -2,7 +2,10 @@
 // ABOUTME: Verifies extraction, word counting, and content transformation logic
 
 import { describe, it, expect } from 'vitest';
-import { parseThinkingBlocks, countWords } from '../thinking-parser.js';
+import {
+  parseThinkingBlocks,
+  countWords,
+} from '~/interfaces/terminal/components/events/utils/thinking-parser.js';
 
 describe('thinking-parser utilities', () => {
   describe('countWords', () => {

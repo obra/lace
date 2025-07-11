@@ -190,38 +190,41 @@ export function useProjectContext(): UseProjectContextResult {
     }
 
     // Debounce rapid refresh calls
-    refreshTimeoutRef.current = setTimeout(async () => {
-      setIsRefreshing(true);
+    return new Promise<void>((resolve) => {
+      refreshTimeoutRef.current = setTimeout(() => {
+        setIsRefreshing(true);
 
-      try {
-        const cwd = process.cwd();
-        const displayPath = formatDisplayPath(cwd);
-        const gitInfo = getGitInfo();
+        try {
+          const cwd = process.cwd();
+          const displayPath = formatDisplayPath(cwd);
+          const gitInfo = getGitInfo();
 
-        setContext({
-          cwd,
-          displayPath,
-          isGitRepo: gitInfo.isGitRepo,
-          gitStatus: gitInfo.gitStatus,
-          error: gitInfo.error,
-        });
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        setContext((prev) => ({
-          ...prev,
-          error: `Context refresh failed: ${errorMessage}`,
-        }));
-      } finally {
-        setIsRefreshing(false);
-      }
-    }, 500); // 500ms debounce
+          setContext({
+            cwd,
+            displayPath,
+            isGitRepo: gitInfo.isGitRepo,
+            gitStatus: gitInfo.gitStatus,
+            error: gitInfo.error,
+          });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          setContext((prev) => ({
+            ...prev,
+            error: `Context refresh failed: ${errorMessage}`,
+          }));
+        } finally {
+          setIsRefreshing(false);
+          resolve();
+        }
+      }, 500); // 500ms debounce
+    });
   }, []);
 
   // Initialize context on mount (only if different from initial)
   useEffect(() => {
     const currentCwd = process.cwd();
     if (currentCwd !== context.cwd) {
-      refreshContext();
+      void refreshContext();
     }
   }, []); // Empty deps - only run once on mount
 

@@ -2,7 +2,7 @@
 // ABOUTME: Verifies that CLI can work with dynamically discovered providers instead of hardcoded lists
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ProviderRegistry } from '../../providers/registry.js';
+import { ProviderRegistry } from '~/providers/registry.js';
 
 describe('CLI Auto-Discovery Integration', () => {
   beforeEach(() => {

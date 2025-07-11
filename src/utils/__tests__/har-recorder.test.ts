@@ -8,7 +8,8 @@ import {
   initializeHARRecording,
   getHARRecorder,
   disableHARRecording,
-} from '../har-recorder.js';
+  HARFile,
+} from '~/utils/har-recorder.js';
 
 const TEST_HAR_FILE = '/tmp/test-har-recording.har';
 const TEST_HAR_DIR = '/tmp/har-test-dir';
@@ -73,7 +74,7 @@ describe('HARRecorder', () => {
 
       expect(existsSync(TEST_HAR_FILE)).toBe(true);
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as HARFile;
       expect(content).toMatchObject({
         log: {
           version: '1.2',
@@ -86,13 +87,13 @@ describe('HARRecorder', () => {
               request: expect.objectContaining({
                 method: 'GET',
                 url: 'https://test.com',
-              }),
+              }) as object,
               response: expect.objectContaining({
                 status: 200,
                 statusText: 'OK',
-              }),
+              }) as object,
             }),
-          ]),
+          ]) as unknown[],
         },
       });
     });
@@ -169,7 +170,7 @@ describe('HARRecorder', () => {
       // Force flush for testing
       recorder.flush();
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as HARFile;
       const entry = content.log.entries[0];
 
       expect(entry.request).toMatchObject({
@@ -178,7 +179,7 @@ describe('HARRecorder', () => {
         headers: expect.arrayContaining([
           { name: 'authorization', value: 'Bearer token123' },
           { name: 'content-type', value: 'application/json' },
-        ]),
+        ]) as unknown[],
         postData: {
           mimeType: 'application/json',
           text: '{"query": "test"}',
@@ -191,7 +192,7 @@ describe('HARRecorder', () => {
         headers: expect.arrayContaining([
           { name: 'content-type', value: 'application/json' },
           { name: 'x-custom-header', value: 'test-value' },
-        ]),
+        ]) as unknown[],
         content: {
           mimeType: 'application/json',
           text: '{"result": "success"}',
@@ -220,7 +221,7 @@ describe('HARRecorder', () => {
       // Force flush for testing
       recorder.flush();
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as HARFile;
       const entry = content.log.entries[0];
 
       expect(entry.request.queryString).toEqual([
@@ -231,7 +232,7 @@ describe('HARRecorder', () => {
   });
 
   describe('recordHTTPRequest', () => {
-    it('should record HTTP request with all details', async () => {
+    it('should record HTTP request with all details', () => {
       const recorder = new HARRecorder(TEST_HAR_FILE);
 
       recorder.recordHTTPRequest(
@@ -256,7 +257,7 @@ describe('HARRecorder', () => {
       // Force flush for testing
       recorder.flush();
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as HARFile;
       const entry = content.log.entries[0];
 
       expect(entry.request).toMatchObject({
@@ -307,7 +308,7 @@ describe('HARRecorder', () => {
       // Force flush for testing
       recorder.flush();
 
-      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8'));
+      const content = JSON.parse(readFileSync(TEST_HAR_FILE, 'utf8')) as HARFile;
       const entry = content.log.entries[0];
 
       expect(entry.request).toMatchObject({
@@ -316,7 +317,7 @@ describe('HARRecorder', () => {
         headers: expect.arrayContaining([
           { name: 'Upgrade', value: 'websocket' },
           { name: 'Connection', value: 'Upgrade' },
-        ]),
+        ]) as unknown[],
       });
 
       expect(entry.response).toMatchObject({

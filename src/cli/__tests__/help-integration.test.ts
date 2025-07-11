@@ -27,7 +27,10 @@ describe('Help Integration', () => {
       expect(stdout).not.toContain('use --help for full list');
     } catch (error) {
       // If the command fails, at least check stderr for provider info
-      const stderr = (error as any).stderr || '';
+      const stderr =
+        error && typeof error === 'object' && 'stderr' in error
+          ? (error as { stderr: string }).stderr
+          : '';
       expect(stderr).toContain('anthropic');
     }
   }, 15000); // Increase timeout to 15 seconds

@@ -5,18 +5,14 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { Text } from 'ink';
-import { Timeline, TimelineItem } from '../../../../timeline-types.js';
-import { TimelineContent } from '../TimelineContent.js';
-import { LaceFocusProvider } from '../../../focus/focus-provider.js';
+import { Timeline, TimelineItem } from '~/interfaces/timeline-types.js';
+import { TimelineContent } from '~/interfaces/terminal/components/events/TimelineContent.js';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
 
 // Mock TimelineItem component
 vi.mock('../TimelineItem.js', () => ({
-  TimelineItem: ({ item, isSelected }: any) =>
-    React.createElement(
-      Text,
-      {},
-      `TLI:${item.type}:${isSelected ? 'FOCUS' : 'UNFOCUS'}:timeline`
-    ),
+  TimelineItem: ({ item, isSelected }: { item: TimelineItem; isSelected: boolean }) =>
+    React.createElement(Text, {}, `TLI:${item.type}:${isSelected ? 'FOCUS' : 'UNFOCUS'}:timeline`),
 }));
 
 vi.mock('../../../../../utils/logger.js', () => ({
@@ -31,11 +27,7 @@ vi.mock('../../../../../utils/logger.js', () => ({
 describe('TimelineContent Component', () => {
   // Helper to render with focus provider
   const renderWithFocus = (component: React.ReactElement) => {
-    return render(
-      <LaceFocusProvider>
-        {component}
-      </LaceFocusProvider>
-    );
+    return render(<LaceFocusProvider>{component}</LaceFocusProvider>);
   };
   const mockTriggerRemeasurement = vi.fn();
   let mockItemRefs: React.MutableRefObject<Map<number, unknown>> = { current: new Map() };
@@ -85,7 +77,9 @@ describe('TimelineContent Component', () => {
     it('should render all timeline items', () => {
       const timeline = createMockTimeline(3);
 
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
+      const { lastFrame } = renderWithFocus(
+        <TimelineContent timeline={timeline} {...getDefaultProps()} />
+      );
 
       const frame = lastFrame();
       expect(frame).toContain('TLI:user_message:FOCUS:timeline'); // First item focused
@@ -95,7 +89,9 @@ describe('TimelineContent Component', () => {
     it('should handle empty timeline', () => {
       const timeline = createMockTimeline(0);
 
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
+      const { lastFrame } = renderWithFocus(
+        <TimelineContent timeline={timeline} {...getDefaultProps()} />
+      );
 
       expect(lastFrame()).toBe('');
     });
@@ -103,7 +99,9 @@ describe('TimelineContent Component', () => {
     it('should render single item timeline', () => {
       const timeline = createMockTimeline(1);
 
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
+      const { lastFrame } = renderWithFocus(
+        <TimelineContent timeline={timeline} {...getDefaultProps()} />
+      );
 
       expect(lastFrame()).toContain('TLI:user_message:FOCUS:timeline');
     });
@@ -245,7 +243,9 @@ describe('TimelineContent Component', () => {
       const timeline = createMockTimeline(1);
       // These props are passed through but don't affect our mock output
       // This test verifies the props are accepted without errors
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
+      const { lastFrame } = renderWithFocus(
+        <TimelineContent timeline={timeline} {...getDefaultProps()} />
+      );
 
       expect(lastFrame()).toContain('TLI:user_message');
     });
@@ -296,7 +296,9 @@ describe('TimelineContent Component', () => {
         },
       };
 
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
+      const { lastFrame } = renderWithFocus(
+        <TimelineContent timeline={timeline} {...getDefaultProps()} />
+      );
 
       const frame = lastFrame();
       expect(frame).toContain('TLI:user_message:FOCUS'); // First item focused
@@ -311,7 +313,9 @@ describe('TimelineContent Component', () => {
 
       // This is tested implicitly - if keys weren't unique, React would warn
       // The test passing without warnings indicates proper key generation
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
+      const { lastFrame } = renderWithFocus(
+        <TimelineContent timeline={timeline} {...getDefaultProps()} />
+      );
 
       expect(lastFrame()).toContain('TLI:user_message');
     });
@@ -331,7 +335,9 @@ describe('TimelineContent Component', () => {
     it('should handle component without errors', () => {
       const timeline = createMockTimeline(1);
 
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
+      const { lastFrame } = renderWithFocus(
+        <TimelineContent timeline={timeline} {...getDefaultProps()} />
+      );
 
       expect(lastFrame()).toContain('TLI:user_message');
     });
@@ -339,7 +345,9 @@ describe('TimelineContent Component', () => {
     it('should handle empty expand state maps', () => {
       const timeline = createMockTimeline(1);
 
-      const { lastFrame } = renderWithFocus(<TimelineContent timeline={timeline} {...getDefaultProps()} />);
+      const { lastFrame } = renderWithFocus(
+        <TimelineContent timeline={timeline} {...getDefaultProps()} />
+      );
 
       expect(lastFrame()).toContain('TLI:user_message');
     });

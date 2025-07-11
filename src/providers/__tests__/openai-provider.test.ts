@@ -2,10 +2,11 @@
 // ABOUTME: Tests streaming vs non-streaming responses, configuration, and error handling
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { OpenAIProvider } from '../openai-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolResult, ToolContext } from '../../tools/types.js';
+import { OpenAIProvider } from '~/providers/openai-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolResult, ToolContext } from '~/tools/types.js';
 import { z } from 'zod';
+import { StreamingEvents } from '~/providers/types.js';
 
 // Mock the OpenAI SDK
 const mockCreate = vi.fn();
@@ -53,7 +54,7 @@ describe('OpenAIProvider', () => {
         args: { action: string },
         _context?: ToolContext
       ): Promise<ToolResult> {
-        return this.createResult(`Executed action: ${args.action}`);
+        return await Promise.resolve(this.createResult(`Executed action: ${args.action}`));
       }
     }
 
@@ -107,7 +108,12 @@ describe('OpenAIProvider', () => {
       expect(response.toolCalls).toEqual([]);
       expect(mockCreate).toHaveBeenCalled();
 
-      const callArgs = mockCreate.mock.calls[0][0];
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        model: string;
+        max_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
       expect(callArgs.model).toBe('gpt-4o-mini');
       expect(callArgs.max_tokens).toBe(4000);
       expect(callArgs.messages[0]).toEqual({ role: 'system', content: 'Test system prompt' });
@@ -168,7 +174,12 @@ describe('OpenAIProvider', () => {
 
       await provider.createResponse(messages, []);
 
-      const callArgs = mockCreate.mock.calls[0][0];
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        model: string;
+        max_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
       expect(callArgs.messages[0]).toEqual({ role: 'system', content: 'Override system message' });
       expect(callArgs.messages[1]).toEqual({ role: 'user', content: 'User message' });
       expect(callArgs.messages[2]).toEqual({ role: 'assistant', content: 'Assistant message' });
@@ -208,7 +219,10 @@ describe('OpenAIProvider', () => {
   });
 
   describe('streaming responses', () => {
-    let mockStream: any;
+    interface MockStream {
+      [Symbol.asyncIterator]: ReturnType<typeof vi.fn>;
+    }
+    let mockStream: MockStream;
 
     beforeEach(() => {
       mockStream = {
@@ -250,7 +264,7 @@ describe('OpenAIProvider', () => {
         {
           async *[Symbol.asyncIterator]() {
             for (const chunk of chunks) {
-              yield chunk;
+              yield await Promise.resolve(chunk);
             }
           },
         }[Symbol.asyncIterator]()
@@ -271,7 +285,7 @@ describe('OpenAIProvider', () => {
 
     it('should emit token events during streaming', async () => {
       const tokenEvents: string[] = [];
-      provider.on('token', ({ token }) => {
+      provider.on('token', ({ token }: { token: string }) => {
         tokenEvents.push(token);
       });
 
@@ -304,7 +318,7 @@ describe('OpenAIProvider', () => {
         {
           async *[Symbol.asyncIterator]() {
             for (const chunk of chunks) {
-              yield chunk;
+              yield await Promise.resolve(chunk);
             }
           },
         }[Symbol.asyncIterator]()
@@ -317,8 +331,8 @@ describe('OpenAIProvider', () => {
     });
 
     it('should emit complete event when streaming finishes', async () => {
-      const completeEvents: any[] = [];
-      provider.on('complete', (data) => {
+      const completeEvents: StreamingEvents['complete'][] = [];
+      provider.on('complete', (data: StreamingEvents['complete']) => {
         completeEvents.push(data);
       });
 
@@ -337,7 +351,7 @@ describe('OpenAIProvider', () => {
         {
           async *[Symbol.asyncIterator]() {
             for (const chunk of chunks) {
-              yield chunk;
+              yield await Promise.resolve(chunk);
             }
           },
         }[Symbol.asyncIterator]()
@@ -351,15 +365,15 @@ describe('OpenAIProvider', () => {
     });
 
     it('should handle streaming errors', async () => {
-      const errorEvents: any[] = [];
-      provider.on('error', ({ error }) => {
+      const errorEvents: Error[] = [];
+      provider.on('error', ({ error }: StreamingEvents['error']) => {
         errorEvents.push(error);
       });
 
       const streamError = new Error('Stream failed');
       mockStream[Symbol.asyncIterator].mockReturnValue(
         {
-          async *[Symbol.asyncIterator]() {
+          *[Symbol.asyncIterator]() {
             // Yield a valid chunk to satisfy ESLint, but immediately throw after
             yield { choices: [{ delta: {} }] };
             throw streamError;
@@ -419,7 +433,7 @@ describe('OpenAIProvider', () => {
         {
           async *[Symbol.asyncIterator]() {
             for (const chunk of chunks) {
-              yield chunk;
+              yield await Promise.resolve(chunk);
             }
           },
         }[Symbol.asyncIterator]()
@@ -458,7 +472,12 @@ describe('OpenAIProvider', () => {
 
       await customProvider.createResponse([{ role: 'user', content: 'Test' }], []);
 
-      const callArgs = mockCreate.mock.calls[0][0];
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        model: string;
+        max_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
       expect(callArgs.model).toBe('gpt-4o');
     });
 
@@ -480,7 +499,12 @@ describe('OpenAIProvider', () => {
 
       await customProvider.createResponse([{ role: 'user', content: 'Test' }], []);
 
-      const callArgs = mockCreate.mock.calls[0][0];
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        model: string;
+        max_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
       expect(callArgs.max_tokens).toBe(2000);
     });
 
@@ -501,7 +525,12 @@ describe('OpenAIProvider', () => {
 
       await noSystemProvider.createResponse([{ role: 'user', content: 'Test' }], []);
 
-      const callArgs = mockCreate.mock.calls[0][0];
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        model: string;
+        max_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
       expect(callArgs.messages[0]).toEqual({
         role: 'system',
         content: 'You are a helpful assistant.',

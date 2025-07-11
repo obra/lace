@@ -6,8 +6,12 @@ import {
   enableFetchInterception,
   disableFetchInterception,
   isFetchInterceptionEnabled,
-} from '../fetch-interceptor.js';
-import { initializeHARRecording, disableHARRecording, getHARRecorder } from '../har-recorder.js';
+} from '~/utils/fetch-interceptor.js';
+import {
+  initializeHARRecording,
+  disableHARRecording,
+  getHARRecorder,
+} from '~/utils/har-recorder.js';
 import { existsSync, unlinkSync } from 'fs';
 
 const TEST_HAR_FILE = '/tmp/test-fetch-recording.har';
@@ -68,7 +72,7 @@ describe('FetchInterceptor', () => {
     it('should not enable interception if fetch is not available', () => {
       // Temporarily remove fetch
       const temp = globalThis.fetch;
-      delete (globalThis as any).fetch;
+      delete (globalThis as { fetch?: typeof fetch }).fetch;
 
       enableFetchInterception();
       expect(isFetchInterceptionEnabled()).toBe(false);
@@ -199,7 +203,7 @@ describe('FetchInterceptor', () => {
       expect(endTime3).toBe(1234567890250);
     });
 
-    it('should restore original fetch when disabled', async () => {
+    it('should restore original fetch when disabled', () => {
       const originalFunc = globalThis.fetch;
 
       enableFetchInterception();

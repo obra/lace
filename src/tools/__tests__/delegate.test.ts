@@ -2,11 +2,12 @@
 // ABOUTME: Validates subagent creation, execution, and tool approval flow
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { DelegateTool } from '../implementations/delegate.js';
-import { Agent } from '../../agents/agent.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
-import { ToolExecutor } from '../executor.js';
-import { AnthropicProvider } from '../../providers/anthropic-provider.js';
+import { DelegateTool } from '~/tools/implementations/delegate.js';
+import { Agent } from '~/agents/agent.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { AnthropicProvider } from '~/providers/anthropic-provider.js';
+import type { AIProvider } from '~/providers/base-provider.js';
 
 // Note: Tool approval is not yet implemented in lace
 // When it is, subagent tool calls should use the same approval flow
@@ -21,8 +22,11 @@ vi.mock('../../agents/agent.js');
 
 describe('DelegateTool', () => {
   let tool: DelegateTool;
-  let mockAgent: any;
-  let mockProvider: any;
+  let mockAgent: Partial<Agent>;
+  let mockProvider: {
+    providerName: string;
+    createResponse: ReturnType<typeof vi.fn>;
+  };
   let mockThreadManager: ThreadManager;
   let mockToolExecutor: ToolExecutor;
 
@@ -52,16 +56,20 @@ describe('DelegateTool', () => {
     };
 
     // Mock the provider constructor
-    vi.mocked(AnthropicProvider).mockImplementation(() => mockProvider);
+    vi.mocked(AnthropicProvider).mockImplementation(
+      () => mockProvider as unknown as AnthropicProvider
+    );
 
     // Create mock subagent
     const mockSubagent = {
       start: vi.fn(),
       sendMessage: vi.fn(),
+      removeAllListeners: vi.fn(),
       on: vi.fn(),
       once: vi.fn(),
-      removeAllListeners: vi.fn(),
     };
+    mockSubagent.on.mockReturnValue(mockSubagent);
+    mockSubagent.once.mockReturnValue(mockSubagent);
 
     // Mock Agent behavior
     mockAgent = {
@@ -70,15 +78,18 @@ describe('DelegateTool', () => {
       on: vi.fn(),
       once: vi.fn(),
       removeAllListeners: vi.fn(),
-      createDelegateAgent: vi.fn().mockReturnValue(mockSubagent),
+      createDelegateAgent: vi.fn(
+        (_toolExecutor: unknown, _provider: unknown, _tokenBudget: unknown) =>
+          mockSubagent as unknown as Agent
+      ),
     };
 
-    vi.mocked(Agent).mockImplementation(() => mockAgent);
+    vi.mocked(Agent).mockImplementation(() => mockAgent as Agent);
 
     // Create tool instance - it will get dependencies injected when needed
     tool = new DelegateTool();
     // Inject dependencies for testing
-    tool.setDependencies(mockAgent, mockToolExecutor);
+    tool.setDependencies(mockAgent as Agent, mockToolExecutor);
   });
 
   afterEach(() => {
@@ -95,25 +106,37 @@ describe('DelegateTool', () => {
 
   it('should delegate a simple task with default model', async () => {
     // Get the mock subagent that will be returned by createDelegateAgent
-    const mockSubagent = mockAgent.createDelegateAgent();
+    const mockSubagent = mockAgent.createDelegateAgent!(
+      mockToolExecutor,
+      mockProvider as unknown as AIProvider,
+      {
+        maxTokens: 1000,
+        warningThreshold: 0.8,
+        reserveTokens: 100,
+      }
+    );
 
     // Setup subagent event handling for 'on' listeners
-    mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      if (event === 'agent_response_complete') {
-        // Simulate immediate response
-        setTimeout(() => handler({ content: 'Analysis complete: 3 tests failed' }), 0);
+    (mockSubagent.on as ReturnType<typeof vi.fn>).mockImplementation(
+      (event: string, handler: (...args: any[]) => void) => {
+        if (event === 'agent_response_complete') {
+          // Simulate immediate response
+          setTimeout(() => handler({ content: 'Analysis complete: 3 tests failed' }), 0);
+        }
+        return mockSubagent;
       }
-      return mockSubagent;
-    });
+    );
 
     // Setup subagent event handling for 'once' listeners
-    mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      if (event === 'conversation_complete') {
-        // Fire conversation complete after response
-        setTimeout(() => handler(), 10);
+    (mockSubagent.once as ReturnType<typeof vi.fn>).mockImplementation(
+      (event: string, handler: (...args: any[]) => void) => {
+        if (event === 'conversation_complete') {
+          // Fire conversation complete after response
+          setTimeout(() => handler(), 10);
+        }
+        return mockSubagent;
       }
-      return mockSubagent;
-    });
+    );
 
     const result = await tool.execute({
       title: 'Analyze test failures',
@@ -137,21 +160,33 @@ describe('DelegateTool', () => {
   });
 
   it('should handle custom provider:model format', async () => {
-    const mockSubagent = mockAgent.createDelegateAgent();
-
-    mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      if (event === 'agent_response_complete') {
-        setTimeout(() => handler({ content: 'Custom model response' }), 0);
+    const mockSubagent = mockAgent.createDelegateAgent!(
+      mockToolExecutor,
+      mockProvider as unknown as AIProvider,
+      {
+        maxTokens: 1000,
+        warningThreshold: 0.8,
+        reserveTokens: 100,
       }
-      return mockSubagent;
-    });
+    );
 
-    mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      if (event === 'conversation_complete') {
-        setTimeout(() => handler(), 10);
+    (mockSubagent.on as ReturnType<typeof vi.fn>).mockImplementation(
+      (event: string, handler: (...args: any[]) => void) => {
+        if (event === 'agent_response_complete') {
+          setTimeout(() => handler({ content: 'Custom model response' }), 0);
+        }
+        return mockSubagent;
       }
-      return mockSubagent;
-    });
+    );
+
+    (mockSubagent.once as ReturnType<typeof vi.fn>).mockImplementation(
+      (event: string, handler: (...args: any[]) => void) => {
+        if (event === 'conversation_complete') {
+          setTimeout(() => handler(), 10);
+        }
+        return mockSubagent;
+      }
+    );
 
     const result = await tool.execute({
       title: 'Search logs',
@@ -170,21 +205,33 @@ describe('DelegateTool', () => {
 
   it('should create delegate thread and execute subagent', async () => {
     // Mock subagent behavior
-    const mockSubagent = mockAgent.createDelegateAgent();
-
-    mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      if (event === 'agent_response_complete') {
-        setTimeout(() => handler({ content: 'Directory listed successfully' }), 10);
+    const mockSubagent = mockAgent.createDelegateAgent!(
+      mockToolExecutor,
+      mockProvider as unknown as AIProvider,
+      {
+        maxTokens: 1000,
+        warningThreshold: 0.8,
+        reserveTokens: 100,
       }
-      return mockSubagent;
-    });
+    );
 
-    mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      if (event === 'conversation_complete') {
-        setTimeout(() => handler(), 20);
+    (mockSubagent.on as ReturnType<typeof vi.fn>).mockImplementation(
+      (event: string, handler: (...args: any[]) => void) => {
+        if (event === 'agent_response_complete') {
+          setTimeout(() => handler({ content: 'Directory listed successfully' }), 10);
+        }
+        return mockSubagent;
       }
-      return mockSubagent;
-    });
+    );
+
+    (mockSubagent.once as ReturnType<typeof vi.fn>).mockImplementation(
+      (event: string, handler: (...args: any[]) => void) => {
+        if (event === 'conversation_complete') {
+          setTimeout(() => handler(), 20);
+        }
+        return mockSubagent;
+      }
+    );
 
     const result = await tool.execute({
       title: 'List files',
@@ -204,14 +251,24 @@ describe('DelegateTool', () => {
   });
 
   it('should handle subagent errors gracefully', async () => {
-    const mockSubagent = mockAgent.createDelegateAgent();
-
-    mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      if (event === 'error') {
-        setTimeout(() => handler({ error: new Error('Subagent failed') }), 0);
+    const mockSubagent = mockAgent.createDelegateAgent!(
+      mockToolExecutor,
+      mockProvider as unknown as AIProvider,
+      {
+        maxTokens: 1000,
+        warningThreshold: 0.8,
+        reserveTokens: 100,
       }
-      return mockSubagent;
-    });
+    );
+
+    (mockSubagent.once as ReturnType<typeof vi.fn>).mockImplementation(
+      (event: string, handler: (...args: any[]) => void) => {
+        if (event === 'error') {
+          setTimeout(() => handler({ error: new Error('Subagent failed') }), 0);
+        }
+        return mockSubagent;
+      }
+    );
 
     const result = await tool.execute({
       title: 'Failing task',
@@ -228,8 +285,8 @@ describe('DelegateTool', () => {
 
     // Create a custom tool instance with short default timeout
     const quickTimeoutTool = new DelegateTool();
-    quickTimeoutTool.setDependencies(mockAgent, mockToolExecutor);
-    (quickTimeoutTool as any).defaultTimeout = 100; // 100ms default timeout
+    quickTimeoutTool.setDependencies(mockAgent as Agent, mockToolExecutor);
+    (quickTimeoutTool as any as { defaultTimeout: number }).defaultTimeout = 100; // 100ms default timeout
 
     const result = await quickTimeoutTool.execute({
       title: 'Slow task',
@@ -242,21 +299,33 @@ describe('DelegateTool', () => {
   });
 
   it('should format the subagent system prompt correctly', async () => {
-    const mockSubagent = mockAgent.createDelegateAgent();
-
-    mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      if (event === 'agent_response_complete') {
-        setTimeout(() => handler({ content: 'Done' }), 0);
+    const mockSubagent = mockAgent.createDelegateAgent!(
+      mockToolExecutor,
+      mockProvider as unknown as AIProvider,
+      {
+        maxTokens: 1000,
+        warningThreshold: 0.8,
+        reserveTokens: 100,
       }
-      return mockSubagent;
-    });
+    );
 
-    mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      if (event === 'conversation_complete') {
-        setTimeout(() => handler(), 10);
+    (mockSubagent.on as ReturnType<typeof vi.fn>).mockImplementation(
+      (event: string, handler: (...args: any[]) => void) => {
+        if (event === 'agent_response_complete') {
+          setTimeout(() => handler({ content: 'Done' }), 0);
+        }
+        return mockSubagent;
       }
-      return mockSubagent;
-    });
+    );
+
+    (mockSubagent.once as ReturnType<typeof vi.fn>).mockImplementation(
+      (event: string, handler: (...args: any[]) => void) => {
+        if (event === 'conversation_complete') {
+          setTimeout(() => handler(), 10);
+        }
+        return mockSubagent;
+      }
+    );
 
     await tool.execute({
       title: 'Format test',
@@ -269,7 +338,7 @@ describe('DelegateTool', () => {
       expect.objectContaining({
         systemPrompt: expect.stringMatching(
           /focused task assistant.*Expected response format: JSON object with \{result: string\}/s
-        ),
+        ) as string,
       })
     );
   });
@@ -287,23 +356,35 @@ describe('DelegateTool', () => {
   });
 
   it('should collect all subagent responses', async () => {
-    const mockSubagent = mockAgent.createDelegateAgent();
-
-    mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      if (event === 'agent_response_complete') {
-        // Simulate multiple responses
-        setTimeout(() => handler({ content: 'First response' }), 0);
-        setTimeout(() => handler({ content: 'Second response' }), 10);
+    const mockSubagent = mockAgent.createDelegateAgent!(
+      mockToolExecutor,
+      mockProvider as unknown as AIProvider,
+      {
+        maxTokens: 1000,
+        warningThreshold: 0.8,
+        reserveTokens: 100,
       }
-      return mockSubagent;
-    });
+    );
 
-    mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      if (event === 'conversation_complete') {
-        setTimeout(() => handler(), 20);
+    (mockSubagent.on as ReturnType<typeof vi.fn>).mockImplementation(
+      (event: string, handler: (...args: any[]) => void) => {
+        if (event === 'agent_response_complete') {
+          // Simulate multiple responses
+          setTimeout(() => handler({ content: 'First response' }), 0);
+          setTimeout(() => handler({ content: 'Second response' }), 10);
+        }
+        return mockSubagent;
       }
-      return mockSubagent;
-    });
+    );
+
+    (mockSubagent.once as ReturnType<typeof vi.fn>).mockImplementation(
+      (event: string, handler: (...args: any[]) => void) => {
+        if (event === 'conversation_complete') {
+          setTimeout(() => handler(), 20);
+        }
+        return mockSubagent;
+      }
+    );
 
     const result = await tool.execute({
       title: 'Multi-response task',
@@ -317,21 +398,33 @@ describe('DelegateTool', () => {
   });
 
   it('should include delegate thread ID in result metadata', async () => {
-    const mockSubagent = mockAgent.createDelegateAgent();
-
-    mockSubagent.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      if (event === 'agent_response_complete') {
-        setTimeout(() => handler({ content: 'Delegation complete' }), 0);
+    const mockSubagent = mockAgent.createDelegateAgent!(
+      mockToolExecutor,
+      mockProvider as unknown as AIProvider,
+      {
+        maxTokens: 1000,
+        warningThreshold: 0.8,
+        reserveTokens: 100,
       }
-      return mockSubagent;
-    });
+    );
 
-    mockSubagent.once.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      if (event === 'conversation_complete') {
-        setTimeout(() => handler(), 10);
+    (mockSubagent.on as ReturnType<typeof vi.fn>).mockImplementation(
+      (event: string, handler: (...args: any[]) => void) => {
+        if (event === 'agent_response_complete') {
+          setTimeout(() => handler({ content: 'Delegation complete' }), 0);
+        }
+        return mockSubagent;
       }
-      return mockSubagent;
-    });
+    );
+
+    (mockSubagent.once as ReturnType<typeof vi.fn>).mockImplementation(
+      (event: string, handler: (...args: any[]) => void) => {
+        if (event === 'conversation_complete') {
+          setTimeout(() => handler(), 10);
+        }
+        return mockSubagent;
+      }
+    );
 
     const result = await tool.execute({
       title: 'Test metadata',

@@ -1,20 +1,34 @@
 // ABOUTME: Viewport container component for timeline display with scrolling and navigation
 // ABOUTME: Manages viewport state and keyboard input, renders content and scroll indicators
 
-import React, { useRef, useEffect, useState } from 'react';
-import { Box, useInput, Text, useFocus } from 'ink';
-import useStdoutDimensions from '../../../../utils/use-stdout-dimensions.js';
-import { Timeline } from '../../../timeline-types.js';
-import { useTimelineViewport } from './hooks/useTimelineViewport.js';
-import { logger } from '../../../../utils/logger.js';
-import { FocusRegions, useLaceFocus, useLaceFocusContext } from '../../focus/index.js';
-import { RenderDebugPanel } from '../debug/RenderDebugPanel.js';
+import React, { useRef } from 'react';
+import { Box, useInput, Text, DOMElement } from 'ink';
+import useStdoutDimensions from '~/utils/use-stdout-dimensions.js';
+import { Timeline } from '~/interfaces/timeline-types.js';
+import { useTimelineViewport } from '~/interfaces/terminal/components/events/hooks/useTimelineViewport.js';
+import { logger } from '~/utils/logger.js';
+import {
+  FocusRegions,
+  useLaceFocus,
+  useLaceFocusContext,
+} from '~/interfaces/terminal/focus/index.js';
+import { RenderDebugPanel } from '~/interfaces/terminal/components/debug/RenderDebugPanel.js';
 
 interface TimelineViewportProps {
   timeline: Timeline;
   bottomSectionHeight?: number;
   focusRegion?: string; // Optional focus region ID, defaults to FocusRegions.timeline
-  onItemInteraction?: (selectedItemIndex: number, input: string, key: any, itemRefs?: React.MutableRefObject<Map<number, any>>) => void;
+  onItemInteraction?: (
+    selectedItemIndex: number,
+    input: string,
+    key: {
+      leftArrow?: boolean;
+      rightArrow?: boolean;
+      return?: boolean;
+      [key: string]: boolean | undefined;
+    },
+    itemRefs?: React.MutableRefObject<Map<number, unknown>>
+  ) => void;
   isTimelineLayoutDebugVisible?: boolean;
   children: (props: {
     timeline: Timeline;
@@ -29,7 +43,7 @@ interface TimelineViewportProps {
     viewportActions: {
       triggerRemeasurement: () => void;
     };
-    itemRefs: React.MutableRefObject<Map<number, any>>;
+    itemRefs: React.MutableRefObject<Map<number, unknown>>;
     viewportLines: number;
   }) => React.ReactNode;
 }
@@ -43,12 +57,13 @@ export function TimelineViewport({
   children,
 }: TimelineViewportProps) {
   // Use Lace focus system with custom focus region or default
-  const { isFocused, takeFocus } = useLaceFocus(focusRegion || FocusRegions.timeline, { autoFocus: false });
+  const { isFocused } = useLaceFocus(focusRegion || FocusRegions.timeline, {
+    autoFocus: false,
+  });
   const [, terminalHeight] = useStdoutDimensions();
 
-
   // Item refs for measurement
-  const itemRefs = useRef<Map<number, any>>(new Map());
+  const itemRefs = useRef<Map<number, unknown>>(new Map());
 
   // Calculate viewport height
   const viewportLines = bottomSectionHeight
@@ -64,8 +79,8 @@ export function TimelineViewport({
   });
 
   // Measure scroll indicator heights
-  const topIndicatorRef = useRef<any>(null);
-  const bottomIndicatorRef = useRef<any>(null);
+  const topIndicatorRef = useRef<DOMElement | null>(null);
+  const bottomIndicatorRef = useRef<DOMElement | null>(null);
 
   // Calculate scroll indicator visibility
   const hasMoreAbove = viewport.lineScrollOffset > 0;
@@ -75,7 +90,7 @@ export function TimelineViewport({
 
   // Get focus context to check for delegate focus
   const { currentFocus } = useLaceFocusContext();
-  
+
   // Handle keyboard navigation
   useInput(
     (input, key) => {
@@ -91,7 +106,7 @@ export function TimelineViewport({
       // Don't handle keys if focus is in a delegate context and this is the main timeline
       const isMainTimeline = (focusRegion || FocusRegions.timeline) === FocusRegions.timeline;
       const isInDelegateContext = currentFocus.startsWith('delegate-');
-      
+
       logger.debug('TimelineViewport: Key handling decision', {
         currentFocus,
         focusRegion: focusRegion || FocusRegions.timeline,
@@ -99,12 +114,11 @@ export function TimelineViewport({
         isInDelegateContext,
         willIgnore: isMainTimeline && isInDelegateContext,
       });
-      
+
       if (isMainTimeline && isInDelegateContext) {
         logger.debug('TimelineViewport: Ignoring key in main timeline while in delegate context');
         return; // Let delegate timeline handle all keys
       }
-
 
       // No escape handling - provider handles global escape to pop focus stack
 
@@ -126,7 +140,9 @@ export function TimelineViewport({
           currentFocus,
           focusRegion: focusRegion || FocusRegions.timeline,
           selectedItemIndex: viewport.selectedItemIndex,
-          key: Object.keys(key).filter(k => (key as any)[k]).join('+'),
+          key: Object.keys(key)
+            .filter((k) => (key as Record<string, unknown>)[k])
+            .join('+'),
           hasCallback: !!onItemInteraction,
         });
         if (onItemInteraction) {
@@ -169,17 +185,17 @@ export function TimelineViewport({
         </Box>
 
         {/* Cursor overlay */}
- 	{ isFocused && 
-        <Box
-          position="absolute"
-          flexDirection="column"
-          marginTop={-viewport.lineScrollOffset + viewport.selectedLine}
-        >
-          <Text backgroundColor="white" color="black">
-            {'>'}
-          </Text>
-        </Box>
-	}
+        {isFocused && (
+          <Box
+            position="absolute"
+            flexDirection="column"
+            marginTop={-viewport.lineScrollOffset + viewport.selectedLine}
+          >
+            <Text backgroundColor="white" color="black">
+              {'>'}
+            </Text>
+          </Box>
+        )}
       </Box>
 
       {/* Scroll indicator - more content below */}
@@ -201,7 +217,9 @@ export function TimelineViewport({
           selectedItemIndex: viewport.selectedItemIndex,
           measurementTrigger: viewport.measurementTrigger,
         }}
-        onClose={() => {}}
+        onClose={() => {
+          // No-op: debug panel visibility is controlled by parent component
+        }}
       />
     </Box>
   );

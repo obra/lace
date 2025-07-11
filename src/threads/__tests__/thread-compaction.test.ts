@@ -2,7 +2,8 @@
 // ABOUTME: Verifies tool result truncation and system message generation
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ThreadManager } from '../thread-manager.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { ToolResult } from '~/tools/types.js';
 
 describe('Thread Compaction', () => {
   let threadManager: ThreadManager;
@@ -28,10 +29,11 @@ describe('Thread Compaction', () => {
 
     const events = threadManager.getEvents(threadId);
     const toolResultEvent = events.find((e) => e.type === 'TOOL_RESULT');
-    const toolResult = toolResultEvent?.data as any;
+    const toolResult = toolResultEvent?.data as ToolResult;
+    if (!toolResult) throw new Error('No tool result found');
 
     expect(toolResult.content[0].text).toContain('... [truncated 100 more words of tool output]');
-    expect(toolResult.content[0].text.split(' ').length).toBeLessThanOrEqual(210); // ~200 words + truncation message
+    expect(toolResult.content?.[0]?.text?.split(' ').length).toBeLessThanOrEqual(210); // ~200 words + truncation message
   });
 
   it('should leave short tool results unchanged', () => {
@@ -47,7 +49,7 @@ describe('Thread Compaction', () => {
 
     const events = threadManager.getEvents(threadId);
     const toolResultEvent = events.find((e) => e.type === 'TOOL_RESULT');
-    const toolResult = toolResultEvent?.data as any;
+    const toolResult = toolResultEvent?.data as ToolResult;
 
     expect(toolResult.content[0].text).toBe(shortOutput); // Unchanged
   });

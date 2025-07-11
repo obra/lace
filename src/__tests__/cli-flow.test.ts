@@ -160,7 +160,7 @@ describe('CLI Flow Tests', () => {
       eventNames: vi.fn(),
       once: vi.fn(),
       // Agent API methods
-      resumeOrCreateThread: vi.fn().mockResolvedValue({
+      resumeOrCreateThread: vi.fn().mockReturnValue({
         threadId: 'test-thread-123',
         isResumed: false,
         resumeError: undefined,
@@ -193,7 +193,9 @@ describe('CLI Flow Tests', () => {
     });
 
     // Console output is automatically suppressed by global setup
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+    vi.spyOn(process, 'exit').mockImplementation((() => {
+      // Mock implementation - prevent actual process exit during tests
+    }) as never);
   });
 
   afterEach(() => {
@@ -253,7 +255,9 @@ describe('CLI Flow Tests', () => {
         return undefined;
       });
 
-      await expect(run(mockCliOptions)).rejects.toThrow('Anthropic API key is required');
+      await expect(run(mockCliOptions)).rejects.toThrow(
+        'ANTHROPIC_KEY environment variable required for Anthropic provider'
+      );
     });
 
     it('should throw error for missing OpenAI API key', async () => {
@@ -264,7 +268,9 @@ describe('CLI Flow Tests', () => {
       });
       const options = { ...mockCliOptions, provider: 'openai' };
 
-      await expect(run(options)).rejects.toThrow('OpenAI API key is required');
+      await expect(run(options)).rejects.toThrow(
+        'OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider'
+      );
     });
 
     it('should throw error for unknown provider', async () => {
@@ -296,7 +302,7 @@ describe('CLI Flow Tests', () => {
       const mockAgentInstance = {
         ...vi.mocked(Agent).mock.results[0]?.value,
         toolExecutor: vi.mocked(new ToolExecutor()),
-        resumeOrCreateThread: vi.fn().mockResolvedValue({
+        resumeOrCreateThread: vi.fn().mockReturnValue({
           threadId: 'resumed-thread-456',
           isResumed: true,
           resumeError: undefined,
@@ -323,7 +329,7 @@ describe('CLI Flow Tests', () => {
       const mockAgentInstance = {
         ...vi.mocked(Agent).mock.results[0]?.value,
         toolExecutor: vi.mocked(new ToolExecutor()),
-        resumeOrCreateThread: vi.fn().mockResolvedValue({
+        resumeOrCreateThread: vi.fn().mockReturnValue({
           threadId: 'specific-thread-789',
           isResumed: true,
           resumeError: undefined,
@@ -349,7 +355,7 @@ describe('CLI Flow Tests', () => {
       const mockAgentInstance = {
         ...vi.mocked(Agent).mock.results[0]?.value,
         toolExecutor: vi.mocked(new ToolExecutor()),
-        resumeOrCreateThread: vi.fn().mockResolvedValue({
+        resumeOrCreateThread: vi.fn().mockReturnValue({
           threadId: 'new-thread-123',
           isResumed: false,
           resumeError: 'Mock resume error',
@@ -431,11 +437,11 @@ describe('CLI Flow Tests', () => {
       await run(mockCliOptions);
 
       expect(Agent).toHaveBeenCalledWith({
-        provider: expect.anything(), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
-        toolExecutor: expect.anything(), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
-        threadManager: expect.anything(), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
-        threadId: expect.any(String), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
-        tools: expect.anything(), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+        provider: expect.anything() as unknown,
+        toolExecutor: expect.anything() as unknown,
+        threadManager: expect.anything() as unknown,
+        threadId: expect.any(String) as string,
+        tools: expect.anything() as unknown,
       });
     });
 

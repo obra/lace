@@ -3,7 +3,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useProjectContext } from '../use-project-context.js';
+import { useProjectContext } from '~/interfaces/terminal/hooks/use-project-context.js';
 import { execSync } from 'child_process';
 import * as os from 'os';
 import * as path from 'path';

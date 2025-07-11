@@ -4,8 +4,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { FileFindTool } from '../implementations/file-find.js';
-import { createTestTempDir } from './temp-utils.js';
+import { FileFindTool } from '~/tools/implementations/file-find.js';
+import { createTestTempDir } from '~/tools/__tests__/temp-utils.js';
 
 describe('FileFindTool with schema validation', () => {
   let tool: FileFindTool;
@@ -393,13 +393,13 @@ describe('FileFindTool with schema validation', () => {
   });
 
   describe('Error handling scenarios', () => {
-    it('should handle permission errors gracefully', async () => {
+    it('should handle permission errors gracefully', () => {
       // This test would need a way to simulate permission errors
       // For now, just verify the structure exists
       expect(tool.validatePath).toBeDefined();
     });
 
-    it('should provide actionable error for file system issues', async () => {
+    it('should provide actionable error for file system issues', () => {
       // This test would need a way to simulate file system errors
       // For now, just verify the tool handles errors gracefully
       expect(tool.name).toBe('file_find');

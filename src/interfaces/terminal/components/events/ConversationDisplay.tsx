@@ -3,9 +3,9 @@
 
 import React, { useMemo } from 'react';
 import { Box } from 'ink';
-import { Timeline, EphemeralMessage } from '../../../timeline-types.js';
-import { useStreamingTimelineProcessor } from '../../terminal-interface.js';
-import TimelineDisplay from './TimelineDisplay.js';
+import { EphemeralMessage } from '~/interfaces/timeline-types.js';
+import { useStreamingTimelineProcessor } from '~/interfaces/terminal/terminal-interface.js';
+import TimelineDisplay from '~/interfaces/terminal/components/events/TimelineDisplay.js';
 
 interface Message {
   type: 'user' | 'assistant' | 'system' | 'tool';
@@ -32,33 +32,28 @@ export function ConversationDisplay({
   // Get current timeline state (O(1) operation)
   // Use timelineVersion to trigger updates when timeline changes
   const timeline = useMemo(() => {
-    const startTime = performance.now();
     const result = streamingProcessor.getTimeline();
-    const endTime = performance.now();
-    const renderTime = endTime - startTime;
-    
+
     // Performance monitoring removed to eliminate render overhead
-    
+
     return result;
   }, [streamingProcessor, timelineVersion]);
 
   // Convert ephemeral messages to EphemeralMessage format and merge into timeline
   const finalTimeline = useMemo(() => {
-    const startTime = performance.now();
-    
     if (ephemeralMessages.length === 0) {
       return timeline;
     }
 
     // Convert Message[] to EphemeralMessage[] format
-    const ephemeralItems: EphemeralMessage[] = ephemeralMessages.map(msg => ({
+    const ephemeralItems: EphemeralMessage[] = ephemeralMessages.map((msg) => ({
       type: msg.type,
       content: msg.content,
       timestamp: msg.timestamp,
     }));
 
     // Create ephemeral timeline items
-    const ephemeralTimelineItems = ephemeralItems.map(msg => ({
+    const ephemeralTimelineItems = ephemeralItems.map((msg) => ({
       type: 'ephemeral_message' as const,
       messageType: msg.type,
       content: msg.content,
@@ -74,17 +69,15 @@ export function ConversationDisplay({
       items: allItems,
       metadata: {
         ...timeline.metadata,
-        lastActivity: allItems.length > 0 
-          ? new Date(Math.max(...allItems.map(item => item.timestamp.getTime())))
-          : timeline.metadata.lastActivity,
+        lastActivity:
+          allItems.length > 0
+            ? new Date(Math.max(...allItems.map((item) => item.timestamp.getTime())))
+            : timeline.metadata.lastActivity,
       },
     };
-    
-    const endTime = performance.now();
-    const mergeTime = endTime - startTime;
-    
+
     // Performance monitoring removed to eliminate render overhead
-    
+
     return result;
   }, [timeline, ephemeralMessages]);
 

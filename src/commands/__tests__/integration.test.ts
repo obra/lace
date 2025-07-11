@@ -2,13 +2,32 @@
 // ABOUTME: Tests the full flow from registry creation to command execution
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { CommandRegistry } from '../registry.js';
-import { CommandExecutor } from '../executor.js';
-import type { UserInterface } from '../types.js';
+import { CommandRegistry } from '~/commands/registry.js';
+import { CommandExecutor } from '~/commands/executor.js';
+import type { UserInterface } from '~/commands/types.js';
+
+type MockAgent = {
+  getCurrentThreadId: () => string;
+  generateThreadId: () => string;
+  createThread: () => void;
+  compact: (threadId: string) => void;
+  getThreadEvents: () => unknown[];
+  providerName: string;
+  toolExecutor: {
+    getAllTools: () => unknown[];
+  };
+  threadManager: {
+    getCurrentThreadId: () => string;
+    generateThreadId: () => string;
+    createThread: () => void;
+    compact: () => void;
+    getEvents: () => unknown[];
+  };
+};
 
 describe('Command System Integration', () => {
   let mockUI: UserInterface;
-  let mockAgent: any;
+  let mockAgent: MockAgent;
 
   beforeEach(() => {
     mockAgent = {
@@ -30,14 +49,14 @@ describe('Command System Integration', () => {
         compact: vi.fn(),
         getEvents: vi.fn().mockReturnValue([]),
       },
-    };
+    } as MockAgent;
 
     mockUI = {
-      agent: mockAgent,
+      agent: mockAgent as unknown,
       displayMessage: vi.fn(),
       clearSession: vi.fn(),
       exit: vi.fn(),
-    };
+    } as unknown as UserInterface;
   });
 
   describe('auto-discovery and execution', () => {

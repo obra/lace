@@ -4,7 +4,8 @@
 import { glob } from 'glob';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { AIProvider, ProviderResponse } from '~/providers/base-provider.js';
+import { AIProvider, ProviderResponse, ProviderConfig } from '~/providers/base-provider.js';
+import { getEnvVar } from '~/config/env-loader.js';
 
 export class ProviderRegistry {
   private _providers = new Map<string, AIProvider>();
@@ -23,6 +24,47 @@ export class ProviderRegistry {
 
   getProviderNames(): string[] {
     return Array.from(this._providers.keys());
+  }
+
+  async createProvider(providerName: string, config: ProviderConfig = {}): Promise<AIProvider> {
+    // Use dynamic imports with environment variable handling
+    switch (providerName.toLowerCase()) {
+      case 'anthropic': {
+        const { AnthropicProvider } = await import('./anthropic-provider.js');
+        const apiKey = (config.apiKey as string) || getEnvVar('ANTHROPIC_KEY');
+        if (!apiKey) {
+          throw new Error('ANTHROPIC_KEY environment variable required for Anthropic provider');
+        }
+        return new AnthropicProvider({ ...config, apiKey });
+      }
+      case 'openai': {
+        const { OpenAIProvider } = await import('./openai-provider.js');
+        const apiKey =
+          (config.apiKey as string) || getEnvVar('OPENAI_API_KEY') || getEnvVar('OPENAI_KEY');
+        if (!apiKey) {
+          throw new Error(
+            'OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider'
+          );
+        }
+        return new OpenAIProvider({ ...config, apiKey });
+      }
+      case 'lmstudio': {
+        const { LMStudioProvider } = await import('./lmstudio-provider.js');
+        return new LMStudioProvider(config);
+      }
+      case 'ollama': {
+        const { OllamaProvider } = await import('./ollama-provider.js');
+        return new OllamaProvider(config);
+      }
+      case 'test-provider': {
+        const { createMockProvider } = await import('../__tests__/utils/mock-provider.js');
+        return createMockProvider();
+      }
+      default:
+        throw new Error(
+          `Unknown provider: ${providerName}. Available providers: ${this.getProviderNames().join(', ')}`
+        );
+    }
   }
 
   static async createWithAutoDiscovery(): Promise<ProviderRegistry> {

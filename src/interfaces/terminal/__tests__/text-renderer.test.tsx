@@ -3,8 +3,11 @@
 
 import { describe, it, expect } from 'vitest';
 import React from 'react';
-import { renderInkComponent, stripAnsi } from './helpers/ink-test-utils.js';
-import TextRenderer from '../components/text-renderer.js';
+import {
+  renderInkComponent,
+  stripAnsi,
+} from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
+import TextRenderer from '~/interfaces/terminal/components/text-renderer.js';
 
 describe('TextRenderer Component', () => {
   const defaultProps = {

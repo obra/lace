@@ -1,8 +1,8 @@
 // ABOUTME: Dynamic tool renderer discovery utility using naming conventions
 // ABOUTME: Maps tool names to specific renderer components or returns null for GenericToolRenderer fallback
 
-import React from 'react';
-import { logger } from '../../../../../utils/logger.js';
+import React, { ComponentType } from 'react';
+import { logger } from '~/utils/logger.js';
 
 // Module-level cache to avoid repeated dynamic imports
 const rendererCache = new Map<string, React.ComponentType<unknown> | null>();
@@ -43,34 +43,38 @@ export async function getToolRenderer(
     });
 
     // Attempt dynamic import
-    const module = await import(fileName);
+    const module = (await import(fileName)) as Record<string, unknown>;
     const moduleKeys = Object.keys(module);
 
     logger.debug('Tool renderer module loaded', {
       toolName,
       moduleKeys,
-      hasDefault: !!module.default,
+      hasDefault: !!(module as { default?: unknown }).default,
       hasNamedExport: !!module[componentName],
     });
 
     // Return the default export or named export matching component name
-    const renderer = module.default || module[componentName] || null;
+    const renderer = (module as { default?: unknown }).default || module[componentName] || null;
 
     // Cache the result (including null for not found)
-    rendererCache.set(toolName, renderer);
+    rendererCache.set(toolName, renderer as ComponentType<unknown> | null);
 
     logger.info('Tool renderer discovery result', {
       toolName,
       found: !!renderer,
-      rendererName: renderer?.name,
-      usedExport: module.default ? 'default' : module[componentName] ? 'named' : 'none',
+      rendererName: (renderer as { name?: string } | null)?.name,
+      usedExport: (module as { default?: unknown }).default
+        ? 'default'
+        : module[componentName]
+          ? 'named'
+          : 'none',
     });
 
-    return renderer;
-  } catch (error: any) {
+    return renderer as ComponentType<unknown> | null;
+  } catch (error: unknown) {
     logger.debug('Tool renderer discovery failed', {
       toolName,
-      error: error?.message,
+      error: (error as Error)?.message,
       fallback: 'GenericToolRenderer',
     });
     // Cache the null result to avoid repeated failed imports

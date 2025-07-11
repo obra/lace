@@ -5,6 +5,7 @@ import { glob } from 'glob';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import type { Command } from '~/commands/types.js';
+import { logger } from '~/utils/logger.js';
 
 /**
  * Check if an export is a valid Command
@@ -102,10 +103,10 @@ export class CommandRegistry {
           }
         }
       } catch (error) {
-        console.warn(
-          `Warning: Failed to load command from ${file}:`,
-          error instanceof Error ? error.message : String(error)
-        );
+        logger.warn('Failed to load command from file', {
+          file,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -115,10 +116,9 @@ export class CommandRegistry {
         const helpCommand = helpCommandFactory(registry);
         registry.register(helpCommand);
       } catch (error) {
-        console.warn(
-          `Warning: Failed to create help command:`,
-          error instanceof Error ? error.message : String(error)
-        );
+        logger.warn('Failed to create help command', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 

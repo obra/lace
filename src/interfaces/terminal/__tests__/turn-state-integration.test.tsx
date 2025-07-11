@@ -2,13 +2,13 @@
 // ABOUTME: Validates turn state management responds correctly to Agent lifecycle events
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '../../../agents/agent.js';
-import { ToolExecutor } from '../../../tools/executor.js';
-import { ThreadManager } from '../../../threads/thread-manager.js';
-import { AIProvider } from '../../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../../providers/base-provider.js';
-import { Tool } from '../../../tools/tool.js';
-import { TerminalInterface } from '../terminal-interface.js';
+import { Agent } from '~/agents/agent.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { TerminalInterface } from '~/interfaces/terminal/terminal-interface.js';
 
 // Mock provider for testing
 class MockProvider extends AIProvider {
@@ -161,7 +161,7 @@ describe('Turn State Integration Tests', () => {
   });
 
   describe('Approval system integration', () => {
-    it('should handle approval requests correctly', async () => {
+    it('should handle approval requests correctly', () => {
       // Arrange
       let approvalRequested = false;
 
@@ -182,7 +182,7 @@ describe('Turn State Integration Tests', () => {
       expect(approvalRequested).toBe(true);
     });
 
-    it('should provide approval callback interface', async () => {
+    it('should provide approval callback interface', () => {
       // Act
       const approvalPromise = terminalInterface.requestApproval('test_tool', { param: 'value' });
 
@@ -196,7 +196,7 @@ describe('Turn State Integration Tests', () => {
           input: { param: 'value' },
           isReadOnly: false,
           requestId: 'test-request-2',
-          resolve: (decision: any) => {
+          resolve: (_decision: unknown) => {
             // Mock resolve
           },
         });
@@ -205,7 +205,7 @@ describe('Turn State Integration Tests', () => {
   });
 
   describe('Error handling', () => {
-    it('should handle agent errors gracefully', async () => {
+    it('should handle agent errors gracefully', () => {
       // Arrange
       let errorCaught = false;
 
@@ -271,7 +271,7 @@ describe('Turn State Integration Tests', () => {
   });
 
   describe('Token usage tracking', () => {
-    it('should handle token usage updates', async () => {
+    it('should handle token usage updates', () => {
       // Arrange
       let tokenUsageReceived = false;
 
@@ -292,7 +292,7 @@ describe('Turn State Integration Tests', () => {
       expect(tokenUsageReceived).toBe(true);
     });
 
-    it('should handle token budget warnings', async () => {
+    it('should handle token budget warnings', () => {
       // Arrange
       let budgetWarningReceived = false;
 
@@ -303,8 +303,21 @@ describe('Turn State Integration Tests', () => {
       // Act
       agent.emit('token_budget_warning', {
         message: 'Budget warning',
-        usage: { totalTokens: 1000 },
-        recommendations: {},
+        usage: {
+          totalUsed: 1000,
+          maxTokens: 2000,
+          availableTokens: 1000,
+          usagePercentage: 50,
+          warningTriggered: true,
+          effectiveLimit: 1800,
+          promptTokens: 600,
+          completionTokens: 400,
+        },
+        recommendations: {
+          shouldSummarize: false,
+          shouldPrune: false,
+          maxRequestSize: 1000,
+        },
       });
 
       // Assert

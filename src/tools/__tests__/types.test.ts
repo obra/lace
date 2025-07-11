@@ -3,14 +3,14 @@
 
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { Tool } from '../tool.js';
+import { Tool } from '~/tools/tool.js';
 import {
   ToolResult,
   ToolAnnotations,
   createToolResult,
   createSuccessResult,
   createErrorResult,
-} from '../types.js';
+} from '~/tools/types.js';
 
 // Test tool class for testing annotations and schema generation
 class TestTool extends Tool {
@@ -28,10 +28,10 @@ class TestTool extends Tool {
   };
 
   protected async executeValidated(): Promise<ToolResult> {
-    return {
+    return await Promise.resolve({
       content: [{ type: 'text', text: 'test' }],
       isError: false,
-    };
+    });
   }
 }
 
@@ -44,10 +44,10 @@ class SimpleTool extends Tool {
   });
 
   protected async executeValidated(): Promise<ToolResult> {
-    return {
+    return await Promise.resolve({
       content: [{ type: 'text', text: 'simple' }],
       isError: false,
-    };
+    });
   }
 }
 

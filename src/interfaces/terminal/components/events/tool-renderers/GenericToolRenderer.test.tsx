@@ -4,33 +4,37 @@
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect } from 'vitest';
-import { GenericToolRenderer } from './GenericToolRenderer.js';
-import { TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
-import { TimelineItemProvider } from '../contexts/TimelineItemContext.js';
+import { GenericToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/GenericToolRenderer.js';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
 
 const mockUnknownToolCall = {
   id: 'call-123',
   name: 'unknown-tool',
   arguments: {
     parameter: 'test-value',
-    config: { setting: true }
-  }
+    config: { setting: true },
+  },
 };
 
 const mockSuccessResult = {
-  content: [{
-    type: 'text' as const,
-    text: 'Tool executed successfully\nOutput data\nMore results'
-  }],
-  isError: false
+  content: [
+    {
+      type: 'text' as const,
+      text: 'Tool executed successfully\nOutput data\nMore results',
+    },
+  ],
+  isError: false,
 };
 
 const mockErrorResult = {
-  content: [{
-    type: 'text' as const,
-    text: 'Tool execution failed'
-  }],
-  isError: true
+  content: [
+    {
+      type: 'text' as const,
+      text: 'Tool execution failed',
+    },
+  ],
+  isError: true,
 };
 
 function renderWithProviders(component: React.ReactElement) {
@@ -38,7 +42,9 @@ function renderWithProviders(component: React.ReactElement) {
     <TimelineExpansionProvider>
       <TimelineItemProvider
         isSelected={false}
-        onToggle={() => {}}
+        onToggle={() => {
+          // Mock onToggle for test - no action needed
+        }}
       >
         {component}
       </TimelineItemProvider>
@@ -53,14 +59,12 @@ describe('GenericToolRenderer', () => {
       call: mockUnknownToolCall,
       result: mockSuccessResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <GenericToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<GenericToolRenderer item={item} />);
 
-    // Should show tool name in new TimelineEntry format  
+    // Should show tool name in new TimelineEntry format
     expect(lastFrame()).toContain('unknown-tool: test-value [GENERIC]');
   });
 
@@ -70,12 +74,10 @@ describe('GenericToolRenderer', () => {
       call: mockUnknownToolCall,
       result: mockErrorResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <GenericToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<GenericToolRenderer item={item} />);
 
     expect(lastFrame()).toContain('unknown-tool: test-value');
     expect(lastFrame()).toContain('[GENERIC]');
@@ -87,12 +89,10 @@ describe('GenericToolRenderer', () => {
       call: mockUnknownToolCall,
       result: undefined,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <GenericToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<GenericToolRenderer item={item} />);
 
     expect(lastFrame()).toContain('unknown-tool: test-value');
     expect(lastFrame()).toContain('[GENERIC]');
@@ -104,8 +104,8 @@ describe('GenericToolRenderer', () => {
       name: 'bash',
       arguments: {
         command: 'ls -la',
-        description: 'List files'
-      }
+        description: 'List files',
+      },
     };
 
     const item = {
@@ -113,12 +113,10 @@ describe('GenericToolRenderer', () => {
       call: bashCall,
       result: mockSuccessResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <GenericToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<GenericToolRenderer item={item} />);
 
     expect(lastFrame()).toContain('bash: $ ls -la');
     expect(lastFrame()).toContain('[GENERIC]');
@@ -130,8 +128,8 @@ describe('GenericToolRenderer', () => {
       name: 'file-write',
       arguments: {
         file_path: '/home/user/test.txt',
-        content: 'Hello world'
-      }
+        content: 'Hello world',
+      },
     };
 
     const item = {
@@ -139,12 +137,10 @@ describe('GenericToolRenderer', () => {
       call: fileCall,
       result: mockSuccessResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <GenericToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<GenericToolRenderer item={item} />);
 
     expect(lastFrame()).toContain('file-write: /home/user/test.txt');
     expect(lastFrame()).toContain('[GENERIC]');

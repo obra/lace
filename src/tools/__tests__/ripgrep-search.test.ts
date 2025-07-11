@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, mkdir, rm } from 'fs/promises';
 import { join } from 'path';
-import { RipgrepSearchTool } from '../implementations/ripgrep-search.js';
+import { RipgrepSearchTool } from '~/tools/implementations/ripgrep-search.js';
 
 describe('RipgrepSearchTool with schema validation', () => {
   let tool: RipgrepSearchTool;
@@ -442,7 +442,7 @@ describe('RipgrepSearchTool with schema validation', () => {
       expect(result.content[0].text).toContain('Validation failed');
     });
 
-    it('should provide helpful error for ripgrep not found', async () => {
+    it('should provide helpful error for ripgrep not found', () => {
       // This would need to mock exec to simulate ripgrep not being installed
       // For now, just verify the tool structure exists
       expect(tool.name).toBe('ripgrep_search');
