@@ -3,19 +3,19 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import useStdoutDimensions from '../../../utils/use-stdout-dimensions.js';
-import { CurrentTurnMetrics } from '../../../agents/agent.js';
-import { UI_SYMBOLS } from '../theme.js';
-import type { ProjectContext } from '../hooks/use-project-context.js';
-import type { MessageQueueStats } from '../../../agents/types.js';
-import { QueueIndicator } from './queue-indicator.js';
+import useStdoutDimensions from '~/utils/use-stdout-dimensions.js';
+import { CurrentTurnMetrics } from '~/agents/agent.js';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
+import type { ProjectContext } from '~/interfaces/terminal/hooks/use-project-context.js';
+import type { MessageQueueStats } from '~/agents/types.js';
+import { QueueIndicator } from '~/interfaces/terminal/components/queue-indicator.js';
 
 interface CumulativeTokens {
-  promptTokens: number;      // Current context size
-  completionTokens: number;   // Total completion tokens
-  totalTokens: number;        // Actual total tokens used
-  contextGrowth?: number;     // How much context has grown
-  lastPromptTokens?: number;  // For delta calculation
+  promptTokens: number; // Current context size
+  completionTokens: number; // Total completion tokens
+  totalTokens: number; // Actual total tokens used
+  contextGrowth?: number; // How much context has grown
+  lastPromptTokens?: number; // For delta calculation
 }
 
 interface RetryStatus {
@@ -37,7 +37,7 @@ interface StatusBarProps {
   isTurnActive?: boolean;
   turnMetrics?: CurrentTurnMetrics | null;
   projectContext?: ProjectContext;
-  contextWindow?: number;  // Provider's context window limit
+  contextWindow?: number; // Provider's context window limit
   retryStatus?: RetryStatus | null;
   queueStats?: MessageQueueStats;
 }
@@ -70,7 +70,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
     };
 
     let contextDisplay = `${UI_SYMBOLS.TOKEN_IN}${formatCount(tokens.promptTokens)}`;
-    
+
     // Add context percentage if we know the limit
     if (contextLimit && contextLimit > 0) {
       const percentage = Math.floor((tokens.promptTokens / contextLimit) * 100);
@@ -125,15 +125,15 @@ const StatusBar: React.FC<StatusBarProps> = ({
     const remainingSeconds = Math.ceil(remainingMs / 1000);
 
     let statusText = `${UI_SYMBOLS.RETRY} Retry ${retry.attempt}/${retry.maxAttempts}`;
-    
+
     if (remainingSeconds > 0) {
       statusText += ` in ${remainingSeconds}s...`;
     } else {
       statusText += '...';
     }
-    
+
     statusText += ` (${retry.errorType})`;
-    
+
     return statusText;
   };
 
@@ -146,11 +146,11 @@ const StatusBar: React.FC<StatusBarProps> = ({
 
     // Right content: git information
     let rightContent = '';
-    
+
     if (context.isGitRepo && context.gitStatus) {
       const { gitStatus } = context;
       const rightParts: string[] = [];
-      
+
       // Add branch name if available
       if (gitStatus.branch) {
         rightParts.push(`${UI_SYMBOLS.GIT_BRANCH} ${gitStatus.branch}`);
@@ -159,9 +159,11 @@ const StatusBar: React.FC<StatusBarProps> = ({
       // Add git status counts (only non-zero)
       const statusParts: string[] = [];
       if (gitStatus.staged > 0) statusParts.push(`${gitStatus.staged}${UI_SYMBOLS.GIT_STAGED}`);
-      if (gitStatus.modified > 0) statusParts.push(`${gitStatus.modified}${UI_SYMBOLS.GIT_MODIFIED}`);
+      if (gitStatus.modified > 0)
+        statusParts.push(`${gitStatus.modified}${UI_SYMBOLS.GIT_MODIFIED}`);
       if (gitStatus.deleted > 0) statusParts.push(`${gitStatus.deleted}${UI_SYMBOLS.GIT_DELETED}`);
-      if (gitStatus.untracked > 0) statusParts.push(`${gitStatus.untracked}${UI_SYMBOLS.GIT_UNTRACKED}`);
+      if (gitStatus.untracked > 0)
+        statusParts.push(`${gitStatus.untracked}${UI_SYMBOLS.GIT_UNTRACKED}`);
 
       if (statusParts.length > 0) {
         rightParts.push(statusParts.join(' '));
@@ -185,7 +187,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   // Right content shows turn progress when active, otherwise session info with cumulative tokens
   let rightContent: string;
   const retryStatusText = formatRetryStatus(retryStatus);
-  
+
   if (retryStatusText) {
     // When retrying, show retry status prominently
     if (isTurnActive && turnMetrics) {
@@ -204,19 +206,19 @@ const StatusBar: React.FC<StatusBarProps> = ({
 
   if (projectContextData) {
     // Two-row layout with project context
-    
+
     // Row 1: Original status bar
     const row1TotalLength = leftContent.length + rightContent.length;
     const availableSpace = currentWidth - 3; // Account for leading/trailing spaces + terminal wrapping buffer
-    
+
     let row1LeftContent = leftContent;
     let row1RightContent = rightContent;
-    
+
     // If content is too long, truncate to fit
     if (row1TotalLength > availableSpace) {
       const leftPriority = Math.floor(availableSpace * 0.6); // Give 60% to left content
       const rightPriority = availableSpace - leftPriority;
-      
+
       if (leftContent.length > leftPriority) {
         row1LeftContent = leftContent.substring(0, leftPriority - 3) + '...';
       }
@@ -224,7 +226,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
         row1RightContent = '...' + rightContent.substring(rightContent.length - rightPriority + 3);
       }
     }
-    
+
     const row1ActualLength = row1LeftContent.length + row1RightContent.length;
     const row1Padding = Math.max(0, availableSpace - row1ActualLength);
     const row1PaddingStr = ' '.repeat(row1Padding);
@@ -233,20 +235,21 @@ const StatusBar: React.FC<StatusBarProps> = ({
     let row2LeftContent = projectContextData.leftContent;
     let row2RightContent = projectContextData.rightContent;
     const row2TotalLength = row2LeftContent.length + row2RightContent.length;
-    
+
     // If content is too long, truncate to fit
     if (row2TotalLength > availableSpace) {
       const leftPriority = Math.floor(availableSpace * 0.7); // Give 70% to path (left content)
       const rightPriority = availableSpace - leftPriority;
-      
+
       if (row2LeftContent.length > leftPriority) {
         row2LeftContent = row2LeftContent.substring(0, leftPriority - 3) + '...';
       }
       if (row2RightContent.length > rightPriority) {
-        row2RightContent = '...' + row2RightContent.substring(row2RightContent.length - rightPriority + 3);
+        row2RightContent =
+          '...' + row2RightContent.substring(row2RightContent.length - rightPriority + 3);
       }
     }
-    
+
     const row2ActualLength = row2LeftContent.length + row2RightContent.length;
     const row2Padding = Math.max(0, availableSpace - row2ActualLength);
     const row2PaddingStr = ' '.repeat(row2Padding);
@@ -266,15 +269,15 @@ const StatusBar: React.FC<StatusBarProps> = ({
     // Single-row layout (original behavior)
     const totalContentLength = leftContent.length + rightContent.length;
     const availableSpace = currentWidth - 3; // Account for leading/trailing spaces + terminal wrapping buffer
-    
+
     let finalLeftContent = leftContent;
     let finalRightContent = rightContent;
-    
+
     // If content is too long, truncate to fit
     if (totalContentLength > availableSpace) {
       const leftPriority = Math.floor(availableSpace * 0.6); // Give 60% to left content
       const rightPriority = availableSpace - leftPriority;
-      
+
       if (leftContent.length > leftPriority) {
         finalLeftContent = leftContent.substring(0, leftPriority - 3) + '...';
       }
@@ -282,7 +285,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
         finalRightContent = '...' + rightContent.substring(rightContent.length - rightPriority + 3);
       }
     }
-    
+
     const finalContentLength = finalLeftContent.length + finalRightContent.length;
     const paddingNeeded = Math.max(0, availableSpace - finalContentLength);
     const padding = ' '.repeat(paddingNeeded);

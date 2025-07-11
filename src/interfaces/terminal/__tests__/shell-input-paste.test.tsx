@@ -6,9 +6,9 @@ import { render } from '@testing-library/react';
 import { renderHook } from '@testing-library/react';
 import { act } from '@testing-library/react';
 import React from 'react';
-import ShellInput from '../components/shell-input.js';
-import { useTextBuffer } from '../hooks/use-text-buffer.js';
-import { LaceFocusProvider } from '../focus/focus-provider.js';
+import ShellInput from '~/interfaces/terminal/components/shell-input.js';
+import { useTextBuffer } from '~/interfaces/terminal/hooks/use-text-buffer.js';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
 
 // Mock clipboardy for Node.js clipboard access
 const mockReadSync = vi.fn();
@@ -26,11 +26,7 @@ const originalPlatform = process.platform;
 describe('ShellInput Paste Functionality', () => {
   // Helper to render with focus provider
   const renderWithFocus = (component: React.ReactElement) => {
-    return render(
-      <LaceFocusProvider>
-        {component}
-      </LaceFocusProvider>
-    );
+    return render(<LaceFocusProvider>{component}</LaceFocusProvider>);
   };
   beforeEach(() => {
     // Reset mocks

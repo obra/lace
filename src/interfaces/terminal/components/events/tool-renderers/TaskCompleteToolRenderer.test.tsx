@@ -4,9 +4,9 @@
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TaskCompleteToolRenderer } from './TaskCompleteToolRenderer.js';
-import { TimelineItemProvider } from '../contexts/TimelineItemContext.js';
-import { ToolRendererProps } from './components/shared.js';
+import { TaskCompleteToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/TaskCompleteToolRenderer.js';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { ToolRendererProps } from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
 
 // Mock the expansion toggle hooks
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
@@ -20,11 +20,7 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
 
 const createMockProvider = () => {
   return ({ children }: { children: React.ReactNode }) => (
-    <TimelineItemProvider
-      isSelected={false}
-    >
-      {children}
-    </TimelineItemProvider>
+    <TimelineItemProvider isSelected={false}>{children}</TimelineItemProvider>
   );
 };
 
@@ -36,12 +32,14 @@ describe('TaskCompleteToolRenderer', () => {
   });
 
   const mockSuccessResult = {
-    content: [{
-      type: 'text' as const,
-      text: 'Completed task task_20250705_b9qers'
-    }],
+    content: [
+      {
+        type: 'text' as const,
+        text: 'Completed task task_20250705_b9qers',
+      },
+    ],
     isError: false,
-    id: 'test-call-id'
+    id: 'test-call-id',
   };
 
   const mockSuccessItem: ToolRendererProps['item'] = {
@@ -50,12 +48,12 @@ describe('TaskCompleteToolRenderer', () => {
       id: 'test-call-id',
       name: 'task_complete',
       arguments: {
-        id: 'task_20250705_b9qers'
-      }
+        id: 'task_20250705_b9qers',
+      },
     },
     result: mockSuccessResult,
     timestamp: new Date('2025-07-05T16:06:43.912Z'),
-    callId: 'test-call-id'
+    callId: 'test-call-id',
   };
 
   it('should render task completion success', () => {
@@ -66,7 +64,7 @@ describe('TaskCompleteToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     // Should show success status
     expect(output).toContain('✔  task_complete:');
     expect(output).toContain('task_20250705_b9qers completed');
@@ -78,17 +76,19 @@ describe('TaskCompleteToolRenderer', () => {
       call: {
         ...mockSuccessItem.call,
         arguments: {
-          id: 'task_20250705_xyz789'
-        }
+          id: 'task_20250705_xyz789',
+        },
       },
       result: {
-        content: [{
-          type: 'text' as const,
-          text: 'Completed task task_20250705_xyz789'
-        }],
+        content: [
+          {
+            type: 'text' as const,
+            text: 'Completed task task_20250705_xyz789',
+          },
+        ],
         isError: false,
-        id: 'test-call-id'
-      }
+        id: 'test-call-id',
+      },
     };
 
     const { lastFrame } = render(
@@ -98,7 +98,7 @@ describe('TaskCompleteToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('task_20250705_xyz789 completed');
   });
 
@@ -106,13 +106,15 @@ describe('TaskCompleteToolRenderer', () => {
     const alreadyCompletedItem: ToolRendererProps['item'] = {
       ...mockSuccessItem,
       result: {
-        content: [{
-          type: 'text' as const,
-          text: 'Task is already completed'
-        }],
+        content: [
+          {
+            type: 'text' as const,
+            text: 'Task is already completed',
+          },
+        ],
         isError: true,
-        id: 'test-call-id'
-      }
+        id: 'test-call-id',
+      },
     };
 
     const { lastFrame } = render(
@@ -122,7 +124,7 @@ describe('TaskCompleteToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('✘ task_complete:');
     expect(output).toContain('Task is already completed');
   });
@@ -131,13 +133,15 @@ describe('TaskCompleteToolRenderer', () => {
     const nonExistentItem: ToolRendererProps['item'] = {
       ...mockSuccessItem,
       result: {
-        content: [{
-          type: 'text' as const,
-          text: 'Task not found: task_invalid_id'
-        }],
+        content: [
+          {
+            type: 'text' as const,
+            text: 'Task not found: task_invalid_id',
+          },
+        ],
         isError: true,
-        id: 'test-call-id'
-      }
+        id: 'test-call-id',
+      },
     };
 
     const { lastFrame } = render(
@@ -147,7 +151,7 @@ describe('TaskCompleteToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('✘ task_complete:');
     expect(output).toContain('Task not found: task_invalid_id');
   });
@@ -155,7 +159,7 @@ describe('TaskCompleteToolRenderer', () => {
   it('should render pending state', () => {
     const pendingItem: ToolRendererProps['item'] = {
       ...mockSuccessItem,
-      result: undefined // No result means still running
+      result: undefined, // No result means still running
     };
 
     const { lastFrame } = render(
@@ -165,7 +169,7 @@ describe('TaskCompleteToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('⧖ task_complete:');
     expect(output).toContain('Completing task task_20250705_b9qers...');
   });

@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import type { MessageQueueStats } from '../../../agents/types.js';
+import type { MessageQueueStats } from '~/agents/types.js';
 
 interface QueueIndicatorProps {
   stats: MessageQueueStats;
@@ -15,14 +15,13 @@ export const QueueIndicator: React.FC<QueueIndicatorProps> = ({ stats }) => {
   }
 
   const baseText = `📬 ${stats.queueLength} queued`;
-  const highPriorityText = stats.highPriorityCount > 0 
-    ? ` (${stats.highPriorityCount} high)`
-    : '';
+  const highPriorityText = stats.highPriorityCount > 0 ? ` (${stats.highPriorityCount} high)` : '';
 
   return (
     <Box>
       <Text color="yellow">
-        {baseText}{highPriorityText}
+        {baseText}
+        {highPriorityText}
       </Text>
     </Box>
   );

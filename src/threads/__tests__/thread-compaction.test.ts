@@ -2,7 +2,7 @@
 // ABOUTME: Verifies tool result truncation and system message generation
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ThreadManager } from '../thread-manager.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
 
 describe('Thread Compaction', () => {
   let threadManager: ThreadManager;

@@ -2,12 +2,12 @@
 // ABOUTME: Tests complex queueing behavior, priority handling, and error recovery
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '../agent.js';
-import { AIProvider } from '../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
+import { Agent } from '~/agents/agent.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
 
 // Mock provider with configurable delay for testing long operations
 class LongOperationProvider extends AIProvider {
@@ -220,7 +220,7 @@ describe('Agent Queue End-to-End Scenarios', () => {
       }
 
       // Verify all queued
-      let stats = agent.getQueueStats();
+      const stats = agent.getQueueStats();
       expect(stats.queueLength).toBe(messageCount);
 
       // Complete the busy operation

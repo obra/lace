@@ -2,7 +2,7 @@
 // ABOUTME: Handles lines, cursor position, and text manipulation without UI concerns
 
 import { useState, useCallback } from 'react';
-import { logger } from '../../../utils/logger.js';
+import { logger } from '~/utils/logger.js';
 
 /**
  * Represents the current state of the text buffer.

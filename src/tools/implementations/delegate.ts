@@ -2,20 +2,20 @@
 // ABOUTME: Enables efficient token usage by delegating to cheaper models with enhanced parameter validation
 
 import { z } from 'zod';
-import { Tool } from '../tool.js';
-import { NonEmptyString } from '../schemas/common.js';
-import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
-import { ApprovalDecision } from '../approval-types.js';
-import { Agent } from '../../agents/agent.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
-import { ToolExecutor } from '../executor.js';
-import { AnthropicProvider } from '../../providers/anthropic-provider.js';
-import { LMStudioProvider } from '../../providers/lmstudio-provider.js';
-import { OllamaProvider } from '../../providers/ollama-provider.js';
-import { AIProvider } from '../../providers/base-provider.js';
-import { TokenBudgetConfig } from '../../token-management/types.js';
-import { getEnvVar } from '../../config/env-loader.js';
-import { logger } from '../../utils/logger.js';
+import { Tool } from '~/tools/tool.js';
+import { NonEmptyString } from '~/tools/schemas/common.js';
+import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types.js';
+import { ApprovalDecision } from '~/tools/approval-types.js';
+import { Agent } from '~/agents/agent.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { AnthropicProvider } from '~/providers/anthropic-provider.js';
+import { LMStudioProvider } from '~/providers/lmstudio-provider.js';
+import { OllamaProvider } from '~/providers/ollama-provider.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { TokenBudgetConfig } from '~/token-management/types.js';
+import { getEnvVar } from '~/config/env-loader.js';
+import { logger } from '~/utils/logger.js';
 
 // Model format validation
 const ModelFormat = z.string().refine(

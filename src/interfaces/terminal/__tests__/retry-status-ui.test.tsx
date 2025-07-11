@@ -4,14 +4,14 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, CurrentTurnMetrics } from '../../../agents/agent.js';
-import { ToolExecutor } from '../../../tools/executor.js';
-import { ThreadManager } from '../../../threads/thread-manager.js';
-import { AIProvider } from '../../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../../providers/base-provider.js';
-import { Tool } from '../../../tools/tool.js';
-import { TerminalInterfaceComponent } from '../terminal-interface.js';
-import StatusBar from '../components/status-bar.js';
+import { Agent, CurrentTurnMetrics } from '~/agents/agent.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { TerminalInterfaceComponent } from '~/interfaces/terminal/terminal-interface.js';
+import StatusBar from '~/interfaces/terminal/components/status-bar.js';
 
 // Mock provider that can emit retry events
 class MockRetryUIProvider extends AIProvider {
@@ -61,10 +61,10 @@ describe('Retry Status UI Integration', () => {
 
   beforeEach(async () => {
     vi.useFakeTimers();
-    
+
     threadId = 'test-thread-id';
     mockProvider = new MockRetryUIProvider({});
-    
+
     // Mock ToolExecutor
     mockToolExecutor = {
       executeTool: vi.fn(),
@@ -224,7 +224,10 @@ describe('Retry Status UI Integration', () => {
             errorType = 'server error';
           } else if (error.message.includes('auth') || error.message.includes('401')) {
             errorType = 'auth error';
-          } else if (error.message.includes('connection') || error.message.includes('ECONNREFUSED')) {
+          } else if (
+            error.message.includes('connection') ||
+            error.message.includes('ECONNREFUSED')
+          ) {
             errorType = 'connection error';
           }
           return errorType;

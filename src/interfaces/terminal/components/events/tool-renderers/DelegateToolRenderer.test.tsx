@@ -4,10 +4,10 @@
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect, vi } from 'vitest';
-import { DelegateToolRenderer } from './DelegateToolRenderer.js';
-import { TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
-import { TimelineItemProvider } from '../contexts/TimelineItemContext.js';
-import { LaceFocusProvider } from '../../../focus/focus-provider.js';
+import { DelegateToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/DelegateToolRenderer.js';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
 
 // Mock the logger to avoid console output
 vi.mock('../../../../../utils/logger.js', () => ({
@@ -42,54 +42,57 @@ const mockDelegateCall = {
   id: 'call-123',
   name: 'delegate',
   arguments: {
-    task: 'Help me write unit tests'
-  }
+    task: 'Help me write unit tests',
+  },
 };
 
 const mockSuccessResult = {
-  content: [{
-    type: 'text' as const,
-    text: JSON.stringify({
-      threadId: 'thread-456',
-      status: 'completed',
-      summary: 'Successfully created unit tests for the project',
-      totalTokens: 1500
-    })
-  }],
-  isError: false
+  content: [
+    {
+      type: 'text' as const,
+      text: JSON.stringify({
+        threadId: 'thread-456',
+        status: 'completed',
+        summary: 'Successfully created unit tests for the project',
+        totalTokens: 1500,
+      }),
+    },
+  ],
+  isError: false,
 };
 
 const mockActiveResult = {
-  content: [{
-    type: 'text' as const,
-    text: JSON.stringify({
-      threadId: 'thread-789',
-      status: 'active',
-      summary: 'Working on test creation...'
-    })
-  }],
-  isError: false
+  content: [
+    {
+      type: 'text' as const,
+      text: JSON.stringify({
+        threadId: 'thread-789',
+        status: 'active',
+        summary: 'Working on test creation...',
+      }),
+    },
+  ],
+  isError: false,
 };
 
 const mockErrorResult = {
-  content: [{
-    type: 'text' as const,
-    text: JSON.stringify({
-      status: 'error',
-      error: 'Failed to create delegation thread'
-    })
-  }],
-  isError: true
+  content: [
+    {
+      type: 'text' as const,
+      text: JSON.stringify({
+        status: 'error',
+        error: 'Failed to create delegation thread',
+      }),
+    },
+  ],
+  isError: true,
 };
 
 function renderWithProviders(component: React.ReactElement) {
   return render(
     <LaceFocusProvider>
       <TimelineExpansionProvider>
-        <TimelineItemProvider
-          isSelected={false}
-          onToggle={() => {}}
-        >
+        <TimelineItemProvider isSelected={false} onToggle={() => {}}>
           {component}
         </TimelineItemProvider>
       </TimelineExpansionProvider>
@@ -104,12 +107,10 @@ describe('DelegateToolRenderer', () => {
       call: mockDelegateCall,
       result: mockSuccessResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <DelegateToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<DelegateToolRenderer item={item} />);
 
     // Should show tool name, task, and delegation indicator in header
     expect(lastFrame()).toContain('delegate: "Help me write unit tests" [DELEGATE]');
@@ -122,12 +123,10 @@ describe('DelegateToolRenderer', () => {
       call: mockDelegateCall,
       result: mockActiveResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <DelegateToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<DelegateToolRenderer item={item} />);
 
     expect(lastFrame()).toContain('delegate: "Help me write unit tests" [DELEGATE]');
     expect(lastFrame()).toContain('Thread: thread-789');
@@ -140,12 +139,10 @@ describe('DelegateToolRenderer', () => {
       call: mockDelegateCall,
       result: mockErrorResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <DelegateToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<DelegateToolRenderer item={item} />);
 
     expect(lastFrame()).toContain('delegate: "Help me write unit tests" [DELEGATE]');
     expect(lastFrame()).toContain('Failed to create delegation thread');
@@ -157,12 +154,10 @@ describe('DelegateToolRenderer', () => {
       call: mockDelegateCall,
       result: undefined,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <DelegateToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<DelegateToolRenderer item={item} />);
 
     expect(lastFrame()).toContain('delegate: "Help me write unit tests" [DELEGATE]');
     // Should not show thread info when still running
@@ -174,8 +169,8 @@ describe('DelegateToolRenderer', () => {
       id: 'call-123',
       name: 'delegate',
       arguments: {
-        prompt: 'Refactor this code please'
-      }
+        prompt: 'Refactor this code please',
+      },
     };
 
     const item = {
@@ -183,12 +178,10 @@ describe('DelegateToolRenderer', () => {
       call,
       result: mockSuccessResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <DelegateToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<DelegateToolRenderer item={item} />);
 
     expect(lastFrame()).toContain('delegate: "Refactor this code please" [DELEGATE]');
   });

@@ -9,10 +9,10 @@ import {
   TaskUpdateTool,
   TaskAddNoteTool,
   TaskViewTool,
-} from '../tools.js';
-import { ToolContext } from '../../../types.js';
-import { createThreadId, asThreadId, createNewAgentSpec } from '../../../../threads/types.js';
-import { useTempLaceDir, getTestDbPath } from '../../../../test-utils/temp-lace-dir.js';
+} from '~/tools/implementations/task-manager/tools.js';
+import { ToolContext } from '~/tools/types.js';
+import { createThreadId, asThreadId, createNewAgentSpec } from '~/threads/types.js';
+import { useTempLaceDir, getTestDbPath } from '~/test-utils/temp-lace-dir.js';
 
 describe('Enhanced Task Manager Tools', () => {
   const tempDirContext = useTempLaceDir();

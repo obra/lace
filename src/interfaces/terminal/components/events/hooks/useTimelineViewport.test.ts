@@ -4,14 +4,14 @@
 import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Timeline } from '../../../../timeline-types.js';
+import { Timeline } from '~/interfaces/timeline-types.js';
 
 // Mock Ink's measureElement function before importing the hook
 vi.mock('ink', () => ({
   measureElement: vi.fn(),
 }));
 
-import { useTimelineViewport } from './useTimelineViewport.js';
+import { useTimelineViewport } from '~/interfaces/terminal/components/events/hooks/useTimelineViewport.js';
 import { measureElement } from 'ink';
 
 const mockMeasureElement = vi.mocked(measureElement);

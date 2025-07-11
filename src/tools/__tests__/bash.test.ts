@@ -2,7 +2,7 @@
 // ABOUTME: Tests command execution, error handling, and success/failure distinction
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { BashTool } from '../implementations/bash.js';
+import { BashTool } from '~/tools/implementations/bash.js';
 
 describe('BashTool', () => {
   let bashTool: BashTool;

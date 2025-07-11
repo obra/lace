@@ -4,12 +4,12 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
-import { EventDisplay } from '../EventDisplay.js';
-import { ThreadEvent } from '../../../../../threads/types.js';
-import { ToolCall, ToolResult } from '../../../../../tools/types.js';
-import { UI_SYMBOLS } from '../../../theme.js';
-import { TimelineItemProvider } from '../contexts/TimelineItemContext.js';
-import { TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
+import { EventDisplay } from '~/interfaces/terminal/components/events/EventDisplay.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { ToolCall, ToolResult } from '~/tools/types.js';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
 
 // Mock expansion hook
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
@@ -25,10 +25,7 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
 function renderWithProviders(component: React.ReactElement) {
   return render(
     <TimelineExpansionProvider>
-      <TimelineItemProvider
-        isSelected={false}
-        onToggle={() => {}}
-      >
+      <TimelineItemProvider isSelected={false} onToggle={() => {}}>
         {component}
       </TimelineItemProvider>
     </TimelineExpansionProvider>

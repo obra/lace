@@ -7,7 +7,7 @@ import { act } from '@testing-library/react';
 import tty from 'node:tty';
 import { expect } from 'vitest';
 import React from 'react';
-import { LaceFocusProvider } from '../../focus/focus-provider.js';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
 
 /**
  * Strips ANSI escape codes from text for content testing
@@ -273,7 +273,7 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
       if (capturedWrites.length === 0) return undefined;
 
       // Start with the last frame
-      let result = capturedWrites[capturedWrites.length - 1] || '';
+      const result = capturedWrites[capturedWrites.length - 1] || '';
 
       // If the last frame is only ANSI codes (no visible content),
       // look backwards and coalesce with frames that have content

@@ -4,9 +4,9 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { z } from 'zod';
-import { Tool } from '../tool.js';
-import { NonEmptyString } from '../schemas/common.js';
-import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
+import { Tool } from '~/tools/tool.js';
+import { NonEmptyString } from '~/tools/schemas/common.js';
+import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types.js';
 
 const execAsync = promisify(exec);
 

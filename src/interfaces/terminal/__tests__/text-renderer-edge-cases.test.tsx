@@ -4,7 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import React from 'react';
-import TextRenderer from '../components/text-renderer.js';
+import TextRenderer from '~/interfaces/terminal/components/text-renderer.js';
 
 describe('TextRenderer Edge Cases and Robust Rendering', () => {
   describe('enhanced rendering behavior', () => {

@@ -4,10 +4,10 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
-import { AgentMessageDisplay } from '../AgentMessageDisplay.js';
-import { ThreadEvent } from '../../../../../threads/types.js';
-import { TimelineItemProvider } from '../contexts/TimelineItemContext.js';
-import { UI_SYMBOLS } from '../../../theme.js';
+import { AgentMessageDisplay } from '~/interfaces/terminal/components/events/AgentMessageDisplay.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 
 // Mock dependencies
 vi.mock('../contexts/TimelineItemContext.js', () => ({
@@ -36,14 +36,7 @@ vi.mock('../ui/MarkdownDisplay.js', () => ({
 }));
 
 vi.mock('../ui/TimelineEntry.js', () => ({
-  TimelineEntry: ({
-    children,
-    label,
-    summary,
-    isExpanded,
-    onExpandedChange,
-    isFocused,
-  }: any) => {
+  TimelineEntry: ({ children, label, summary, isExpanded, onExpandedChange, isFocused }: any) => {
     return React.createElement(
       'collapsible',
       {
@@ -59,7 +52,6 @@ vi.mock('../ui/TimelineEntry.js', () => ({
 }));
 
 describe('AgentMessageDisplay - Enhanced with Thinking', () => {
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -204,11 +196,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       const event = createEvent('Partial response...');
 
       const { lastFrame } = render(
-        <AgentMessageDisplay
-          event={event}
-          isStreaming={true}
-          isFocused={true}
-                  />
+        <AgentMessageDisplay event={event} isStreaming={true} isFocused={true} />
       );
 
       expect(lastFrame()).toContain('(thinking...)');

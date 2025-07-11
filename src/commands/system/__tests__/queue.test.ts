@@ -2,8 +2,8 @@
 // ABOUTME: Tests queue display, clearing, and error handling
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { queueCommand } from '../queue.js';
-import type { UserInterface } from '../../types.js';
+import { queueCommand } from '~/commands/system/queue.js';
+import type { UserInterface } from '~/commands/types.js';
 
 describe('queueCommand', () => {
   let mockUI: UserInterface;

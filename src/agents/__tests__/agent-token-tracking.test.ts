@@ -3,13 +3,13 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { z } from 'zod';
-import { Agent, AgentConfig, CurrentTurnMetrics } from '../agent.js';
-import { AIProvider } from '../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolResult } from '../../tools/types.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
+import { Agent, AgentConfig, CurrentTurnMetrics } from '~/agents/agent.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolResult } from '~/tools/types.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
 
 // Mock provider with configurable token usage
 class MockTokenProvider extends AIProvider {
@@ -55,10 +55,10 @@ class MockTokenProvider extends AIProvider {
         this.emit('token_usage_update', {
           usage: {
             promptTokens: this.mockResponse.usage!.promptTokens,
-            completionTokens: Math.floor(this.mockResponse.usage!.completionTokens! / 2),
+            completionTokens: Math.floor(this.mockResponse.usage!.completionTokens / 2),
             totalTokens:
-              this.mockResponse.usage!.promptTokens! +
-              Math.floor(this.mockResponse.usage!.completionTokens! / 2),
+              this.mockResponse.usage!.promptTokens +
+              Math.floor(this.mockResponse.usage!.completionTokens / 2),
           },
         });
       }, 10);

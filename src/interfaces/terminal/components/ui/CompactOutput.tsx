@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
-import { CodeDisplay } from './CodeDisplay.js';
+import { CodeDisplay } from '~/interfaces/terminal/components/ui/CodeDisplay.js';
 
 interface CompactOutputProps {
   output: string;

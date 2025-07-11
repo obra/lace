@@ -3,12 +3,12 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ThreadEvent } from '../../../../threads/types.js';
-import { ToolCall } from '../../../../tools/types.js';
-import { TimelineEntry } from '../ui/TimelineEntry.js';
-import { CodeDisplay } from '../ui/CodeDisplay.js';
-import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
-import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { ToolCall } from '~/tools/types.js';
+import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
+import { CodeDisplay } from '~/interfaces/terminal/components/ui/CodeDisplay.js';
+import { UI_SYMBOLS, UI_COLORS } from '~/interfaces/terminal/theme.js';
+import { useTimelineItemExpansion } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
 
 interface ToolCallDisplayProps {
   event: ThreadEvent;
@@ -29,7 +29,10 @@ export function ToolCallDisplay({
   const { name: toolName, arguments: input, id: callId } = toolCallData;
 
   // Use shared expansion state management
-  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected || false, (expanded) => onToggle?.());
+  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
+    isSelected || false,
+    (expanded) => onToggle?.()
+  );
 
   // Create handler that works with TimelineEntry interface
   const handleExpandedChange = (expanded: boolean) => {

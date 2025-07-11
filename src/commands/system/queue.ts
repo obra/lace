@@ -1,7 +1,7 @@
 // ABOUTME: Queue management commands for viewing and clearing message queue
 // ABOUTME: Provides /queue (show) and /queue clear functionality
 
-import type { Command, UserInterface } from '../types.js';
+import type { Command, UserInterface } from '~/commands/types.js';
 
 export const queueCommand: Command = {
   name: 'queue',

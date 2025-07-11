@@ -4,8 +4,8 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render as renderInkComponent } from 'ink-testing-library';
-import ShellInput from '../shell-input.js';
-import { LaceFocusProvider } from '../../focus/focus-provider.js';
+import ShellInput from '~/interfaces/terminal/components/shell-input.js';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
 
 // Capture the useInput handler for direct testing
 let capturedInputHandler: ((input: string, key: any) => void) | null = null;
@@ -30,9 +30,7 @@ vi.mock('../../utils/file-scanner.js', () => ({
 describe('ShellInput Autocomplete Integration', () => {
   // Helper to render with focus provider
   const renderWithFocus = (component: React.ReactElement) => {
-    return renderInkComponent(
-      React.createElement(LaceFocusProvider, { children: component })
-    );
+    return renderInkComponent(React.createElement(LaceFocusProvider, { children: component }));
   };
 
   let mockOnSubmit: ReturnType<typeof vi.fn>;

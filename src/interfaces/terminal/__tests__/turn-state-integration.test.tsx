@@ -2,13 +2,13 @@
 // ABOUTME: Validates turn state management responds correctly to Agent lifecycle events
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '../../../agents/agent.js';
-import { ToolExecutor } from '../../../tools/executor.js';
-import { ThreadManager } from '../../../threads/thread-manager.js';
-import { AIProvider } from '../../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../../providers/base-provider.js';
-import { Tool } from '../../../tools/tool.js';
-import { TerminalInterface } from '../terminal-interface.js';
+import { Agent } from '~/agents/agent.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { TerminalInterface } from '~/interfaces/terminal/terminal-interface.js';
 
 // Mock provider for testing
 class MockProvider extends AIProvider {

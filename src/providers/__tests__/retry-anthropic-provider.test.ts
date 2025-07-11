@@ -2,8 +2,8 @@
 // ABOUTME: Verifies retry logic works correctly with Anthropic SDK
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AnthropicProvider } from '../anthropic-provider.js';
-import { ProviderMessage } from '../base-provider.js';
+import { AnthropicProvider } from '~/providers/anthropic-provider.js';
+import { ProviderMessage } from '~/providers/base-provider.js';
 
 // Create mock functions that we'll reference
 const mockCreate = vi.fn();
@@ -201,7 +201,7 @@ describe('AnthropicProvider retry functionality', () => {
     it('should not retry after streaming has started', async () => {
       const messages: ProviderMessage[] = [{ role: 'user', content: 'Hello' }];
 
-      let textHandlers: ((text: string) => void)[] = [];
+      const textHandlers: ((text: string) => void)[] = [];
 
       // Create a stream that starts then fails
       const stream = {

@@ -3,8 +3,8 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { measureElement, DOMElement } from 'ink';
-import { Timeline } from '../../../../timeline-types.js';
-import { logger } from '../../../../../utils/logger.js';
+import { Timeline } from '~/interfaces/timeline-types.js';
+import { logger } from '~/utils/logger.js';
 
 export interface ViewportState {
   selectedLine: number;

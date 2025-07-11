@@ -1,7 +1,7 @@
 // ABOUTME: Status command that shows current session information
 // ABOUTME: Displays thread ID, tool count, and provider info
 
-import type { Command, UserInterface } from '../types.js';
+import type { Command, UserInterface } from '~/commands/types.js';
 
 export const statusCommand: Command = {
   name: 'status',

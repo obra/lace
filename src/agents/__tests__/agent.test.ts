@@ -2,13 +2,13 @@
 // ABOUTME: Tests conversation processing, tool execution, state management, and event emissions
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, AgentConfig } from '../agent.js';
-import { AIProvider } from '../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { ToolCall, ToolResult, ToolContext } from '../../tools/types.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
+import { Agent, AgentConfig } from '~/agents/agent.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { ToolCall, ToolResult, ToolContext } from '~/tools/types.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
 
 // Mock provider for testing
 class MockProvider extends AIProvider {

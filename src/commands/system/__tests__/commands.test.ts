@@ -2,14 +2,14 @@
 // ABOUTME: Tests individual command functionality and UserInterface integration
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createHelpCommand } from '../help.js';
-import { exitCommand } from '../exit.js';
-import { clearCommand } from '../clear.js';
-import { statusCommand } from '../status.js';
-import { compactCommand } from '../compact.js';
-import { queueCommand } from '../queue.js';
-import { CommandRegistry } from '../../registry.js';
-import type { UserInterface } from '../../types.js';
+import { createHelpCommand } from '~/commands/system/help.js';
+import { exitCommand } from '~/commands/system/exit.js';
+import { clearCommand } from '~/commands/system/clear.js';
+import { statusCommand } from '~/commands/system/status.js';
+import { compactCommand } from '~/commands/system/compact.js';
+import { queueCommand } from '~/commands/system/queue.js';
+import { CommandRegistry } from '~/commands/registry.js';
+import type { UserInterface } from '~/commands/types.js';
 
 describe('System Commands', () => {
   let mockUI: UserInterface;

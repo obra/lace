@@ -4,48 +4,49 @@
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect } from 'vitest';
-import { FileSearchToolRenderer } from './FileSearchToolRenderer.js';
-import { TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
-import { TimelineItemProvider } from '../contexts/TimelineItemContext.js';
+import { FileSearchToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/FileSearchToolRenderer.js';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
 
 const mockToolCall = {
   id: 'call-123',
   name: 'ripgrep-search',
   arguments: {
     pattern: 'function',
-    path: '/home/user/project'
-  }
+    path: '/home/user/project',
+  },
 };
 
 const mockSuccessResult = {
-  content: [{
-    type: 'text' as const,
-    text: `Found 3 matches in 2 files:
+  content: [
+    {
+      type: 'text' as const,
+      text: `Found 3 matches in 2 files:
 src/utils.ts:
 10:  function helper() {
 15:  function another() {
 
 src/main.ts:
-5:   function main() {`
-  }],
-  isError: false
+5:   function main() {`,
+    },
+  ],
+  isError: false,
 };
 
 const mockEmptyResult = {
-  content: [{
-    type: 'text' as const,
-    text: 'No matches found'
-  }],
-  isError: false
+  content: [
+    {
+      type: 'text' as const,
+      text: 'No matches found',
+    },
+  ],
+  isError: false,
 };
 
 function renderWithProviders(component: React.ReactElement) {
   return render(
     <TimelineExpansionProvider>
-      <TimelineItemProvider
-        isSelected={false}
-        onToggle={() => {}}
-      >
+      <TimelineItemProvider isSelected={false} onToggle={() => {}}>
         {component}
       </TimelineItemProvider>
     </TimelineExpansionProvider>
@@ -59,12 +60,10 @@ describe('FileSearchToolRenderer', () => {
       call: mockToolCall,
       result: mockSuccessResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <FileSearchToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<FileSearchToolRenderer item={item} />);
 
     // Should show tool name, pattern, path, and match count in header
     expect(lastFrame()).toContain('ripgrep-search: "function"');
@@ -78,12 +77,10 @@ describe('FileSearchToolRenderer', () => {
       call: mockToolCall,
       result: mockEmptyResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <FileSearchToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<FileSearchToolRenderer item={item} />);
 
     expect(lastFrame()).toContain('ripgrep-search: "function"');
     expect(lastFrame()).toContain('No matches found');
@@ -95,12 +92,10 @@ describe('FileSearchToolRenderer', () => {
       call: mockToolCall,
       result: undefined,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <FileSearchToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<FileSearchToolRenderer item={item} />);
 
     expect(lastFrame()).toContain('ripgrep-search: "function"');
     // Should not show match counts when still running
@@ -113,18 +108,20 @@ describe('FileSearchToolRenderer', () => {
       name: 'ripgrep-search',
       arguments: {
         pattern: 'class\\s+\\w+',
-        path: '/home/user'
-      }
+        path: '/home/user',
+      },
     };
 
     const result = {
-      content: [{
-        type: 'text' as const,
-        text: `Found 1 match in 1 file:
+      content: [
+        {
+          type: 'text' as const,
+          text: `Found 1 match in 1 file:
 src/app.ts:
-5:  class MyApp {`
-      }],
-      isError: false
+5:  class MyApp {`,
+        },
+      ],
+      isError: false,
     };
 
     const item = {
@@ -132,12 +129,10 @@ src/app.ts:
       call,
       result,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <FileSearchToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<FileSearchToolRenderer item={item} />);
 
     expect(lastFrame()).toContain('ripgrep-search: "class\\s+\\w+"');
     expect(lastFrame()).toContain('1 match in 1 file');

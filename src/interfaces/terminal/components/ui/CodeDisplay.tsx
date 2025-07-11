@@ -71,7 +71,7 @@ function renderHighlightedCode(highlightedHtml: string): React.ReactElement {
 
 function parseHighlightedLine(line: string): React.ReactNode {
   // Decode HTML entities first
-  let decodedLine = line
+  const decodedLine = line
     .replace(/&quot;/g, '"')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')

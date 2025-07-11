@@ -2,10 +2,10 @@
 // ABOUTME: Tests verify Agent emits thread_event_added after ThreadManager operations
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '../agent.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { TestProvider } from '../../__tests__/utils/test-provider.js';
+import { Agent } from '~/agents/agent.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { TestProvider } from '~/__tests__/utils/test-provider.js';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';

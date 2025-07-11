@@ -2,12 +2,12 @@
 // ABOUTME: Tests how each provider converts enhanced ProviderMessage to their native format
 
 import { describe, it, expect } from 'vitest';
-import { ProviderMessage } from '../base-provider.js';
+import { ProviderMessage } from '~/providers/base-provider.js';
 import {
   convertToAnthropicFormat,
   convertToOpenAIFormat,
   convertToTextOnlyFormat,
-} from '../format-converters.js';
+} from '~/providers/format-converters.js';
 
 describe('Provider-Specific Format Conversion', () => {
   const enhancedMessages: ProviderMessage[] = [

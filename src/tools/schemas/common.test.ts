@@ -2,7 +2,13 @@
 // ABOUTME: Validates reusable schema components work correctly
 
 import { describe, it, expect } from 'vitest';
-import { NonEmptyString, FilePath, LineNumber, MaxResults, FilePattern } from './common.js';
+import {
+  NonEmptyString,
+  FilePath,
+  LineNumber,
+  MaxResults,
+  FilePattern,
+} from '~/tools/schemas/common.js';
 
 describe('Common schema patterns', () => {
   describe('NonEmptyString', () => {

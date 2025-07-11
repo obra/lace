@@ -8,7 +8,7 @@ import {
   initializeHARRecording,
   getHARRecorder,
   disableHARRecording,
-} from '../har-recorder.js';
+} from '~/utils/har-recorder.js';
 
 const TEST_HAR_FILE = '/tmp/test-har-recording.har';
 const TEST_HAR_DIR = '/tmp/har-test-dir';

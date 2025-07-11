@@ -3,16 +3,22 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { TimelineEntry, TimelineStatus } from '../../ui/TimelineEntry.js';
-import { useTimelineItem } from '../contexts/TimelineItemContext.js';
-import { limitLines, type ToolRendererProps } from './components/shared.js';
+import {
+  TimelineEntry,
+  TimelineStatus,
+} from '~/interfaces/terminal/components/ui/TimelineEntry.js';
+import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import {
+  limitLines,
+  type ToolRendererProps,
+} from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
 
 // Status icon mapping
 const STATUS_ICONS = {
   pending: '○',
   in_progress: '◐',
   completed: '✓',
-  blocked: '⊗'
+  blocked: '⊗',
 } as const;
 
 interface TaskNote {
@@ -57,7 +63,7 @@ function formatTimestamp(timestamp: string): string {
       year: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
     });
   } catch {
     return timestamp;
@@ -72,20 +78,20 @@ function truncateText(text: string, maxLength: number = 80): string {
 
 export function TaskViewToolRenderer({ item }: ToolRendererProps) {
   const { isExpanded } = useTimelineItem();
-  
+
   // Extract data from the tool call and result
-  const args = item.call.arguments as Record<string, unknown>;
+  const args = item.call.arguments;
   const taskId = extractTaskId(args);
-  
+
   const resultText = item.result?.content?.[0]?.text || '';
   const hasError = item.result?.isError;
   const isRunning = !item.result;
-  
+
   const task = item.result && !hasError ? parseTask(resultText) : null;
-  
+
   // Determine status
   const status: TimelineStatus = isRunning ? 'pending' : hasError ? 'error' : 'success';
-  
+
   // Build header based on state
   const header = (() => {
     if (isRunning) {
@@ -96,7 +102,7 @@ export function TaskViewToolRenderer({ item }: ToolRendererProps) {
         </Box>
       );
     }
-    
+
     if (hasError) {
       return (
         <Box>
@@ -105,7 +111,7 @@ export function TaskViewToolRenderer({ item }: ToolRendererProps) {
         </Box>
       );
     }
-    
+
     // Success case
     return (
       <Box>
@@ -114,54 +120,56 @@ export function TaskViewToolRenderer({ item }: ToolRendererProps) {
       </Box>
     );
   })();
-  
+
   // Build detailed task content for success case
-  const taskContent = !isRunning && !hasError && task ? (
-    <Box flexDirection="column">
-      {/* Title, priority, and status line */}
-      <Box>
-        <Text>{task.title} [{task.priority}] </Text>
-        <Text color="gray">{STATUS_ICONS[task.status]} {task.status}</Text>
-      </Box>
-      
-      {/* Description if present */}
-      {task.description && (
+  const taskContent =
+    !isRunning && !hasError && task ? (
+      <Box flexDirection="column">
+        {/* Title, priority, and status line */}
+        <Box>
+          <Text>
+            {task.title} [{task.priority}]{' '}
+          </Text>
+          <Text color="gray">
+            {STATUS_ICONS[task.status]} {task.status}
+          </Text>
+        </Box>
+
+        {/* Description if present */}
+        {task.description && (
+          <Box marginTop={1}>
+            <Text>Description: {task.description}</Text>
+          </Box>
+        )}
+
+        {/* Prompt */}
         <Box marginTop={1}>
-          <Text>Description: {task.description}</Text>
+          <Text>Prompt: {truncateText(task.prompt)}</Text>
         </Box>
-      )}
-      
-      {/* Prompt */}
-      <Box marginTop={1}>
-        <Text>Prompt: {truncateText(task.prompt)}</Text>
+
+        {/* Notes if present */}
+        {task.notes && task.notes.length > 0 && (
+          <Box flexDirection="column" marginTop={1}>
+            <Text>Notes ({task.notes.length}):</Text>
+            {task.notes.map((note) => (
+              <Box key={note.id} flexDirection="column" marginLeft={2}>
+                <Box>
+                  <Text color="gray">
+                    • [{note.authorId}] {formatTimestamp(note.timestamp)}
+                  </Text>
+                </Box>
+                <Box marginLeft={2}>
+                  <Text>{note.content}</Text>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        )}
       </Box>
-      
-      {/* Notes if present */}
-      {task.notes && task.notes.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text>Notes ({task.notes.length}):</Text>
-          {task.notes.map((note) => (
-            <Box key={note.id} flexDirection="column" marginLeft={2}>
-              <Box>
-                <Text color="gray">• [{note.authorId}] {formatTimestamp(note.timestamp)}</Text>
-              </Box>
-              <Box marginLeft={2}>
-                <Text>{note.content}</Text>
-              </Box>
-            </Box>
-          ))}
-        </Box>
-      )}
-    </Box>
-  ) : null;
+    ) : null;
 
   return (
-    <TimelineEntry
-      label={header}
-      summary={taskContent}
-      status={status}
-      isExpandable={false}
-    >
+    <TimelineEntry label={header} summary={taskContent} status={status} isExpandable={false}>
       {taskContent}
     </TimelineEntry>
   );

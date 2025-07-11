@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { FileScanner } from '../file-scanner.js';
+import { FileScanner } from '~/interfaces/terminal/utils/file-scanner.js';
 
 // Mock fs module
 vi.mock('fs');

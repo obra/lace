@@ -3,9 +3,9 @@
 
 import React, { useRef, useCallback, useMemo } from 'react';
 import { Box } from 'ink';
-import { Timeline, TimelineItem as TimelineItemType } from '../../../timeline-types.js';
-import { TimelineItem } from './TimelineItem.js';
-import { TimelineItemRef } from '../timeline-item-focus.js';
+import { Timeline, TimelineItem as TimelineItemType } from '~/interfaces/timeline-types.js';
+import { TimelineItem } from '~/interfaces/terminal/components/events/TimelineItem.js';
+import { TimelineItemRef } from '~/interfaces/terminal/components/timeline-item-focus.js';
 
 interface ViewportState {
   selectedItemIndex: number;
@@ -56,16 +56,16 @@ export function TimelineContent({
   const itemsToRender = useMemo(() => {
     const buffer = 5;
     const maxItems = viewportLines + buffer;
-    
+
     if (timeline.items.length <= maxItems) {
       return timeline.items.map((item, index) => ({ item, originalIndex: index }));
     }
-    
+
     // Only render the most recent items
     const startIndex = timeline.items.length - maxItems;
-    return timeline.items.slice(startIndex).map((item, index) => ({ 
-      item, 
-      originalIndex: startIndex + index 
+    return timeline.items.slice(startIndex).map((item, index) => ({
+      item,
+      originalIndex: startIndex + index,
     }));
   }, [timeline.items, viewportLines]);
 

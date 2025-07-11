@@ -1,12 +1,12 @@
 // ABOUTME: Enhanced summarization compaction strategy with intelligent event preservation
 // ABOUTME: Groups old conversation segments, preserves important events, and creates detailed summaries
 
-import { Thread, ThreadEvent } from '../types.js';
-import { CompactionStrategy, CompactionConfig } from './types.js';
-import { logger } from '../../utils/logger.js';
-import { AIProvider, ProviderMessage } from '../../providers/base-provider.js';
-import { estimateTokens } from '../../utils/token-estimation.js';
-import { ToolResult } from '../../tools/types.js';
+import { Thread, ThreadEvent } from '~/threads/types.js';
+import { CompactionStrategy, CompactionConfig } from '~/threads/compaction/types.js';
+import { logger } from '~/utils/logger.js';
+import { AIProvider, ProviderMessage } from '~/providers/base-provider.js';
+import { estimateTokens } from '~/utils/token-estimation.js';
+import { ToolResult } from '~/tools/types.js';
 
 export class SummarizeStrategy implements CompactionStrategy {
   private config: CompactionConfig;
@@ -280,7 +280,7 @@ export class SummarizeStrategy implements CompactionStrategy {
 
     // Handle ToolResult data with ContentBlock[]
     if (typeof event.data === 'object' && event.data && 'content' in event.data) {
-      const toolResult = event.data as ToolResult;
+      const toolResult = event.data;
       const contentBlocks = toolResult.content;
 
       if (!Array.isArray(contentBlocks) || contentBlocks.length === 0) {
@@ -348,7 +348,7 @@ export class SummarizeStrategy implements CompactionStrategy {
         if (typeof event.data === 'string') {
           content = event.data;
         } else if (typeof event.data === 'object' && event.data && 'content' in event.data) {
-          const toolResult = event.data as ToolResult;
+          const toolResult = event.data;
           // Extract text from ContentBlock[]
           content = toolResult.content
             .filter((block) => block.type === 'text' && block.text)

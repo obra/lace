@@ -2,13 +2,13 @@
 // ABOUTME: Tests complete turn lifecycle, abort functionality, and performance with real providers
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, CurrentTurnMetrics } from '../agent.js';
-import { ToolExecutor } from '../../tools/executor.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
-import { AIProvider } from '../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../providers/base-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolResult, ToolContext } from '../../tools/types.js';
+import { Agent, CurrentTurnMetrics } from '~/agents/agent.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolResult, ToolContext } from '~/tools/types.js';
 import { z } from 'zod';
 
 // Mock provider for controlled testing

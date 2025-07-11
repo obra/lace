@@ -4,9 +4,9 @@
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TaskUpdateToolRenderer } from './TaskUpdateToolRenderer.js';
-import { TimelineItemProvider } from '../contexts/TimelineItemContext.js';
-import { ToolRendererProps } from './components/shared.js';
+import { TaskUpdateToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/TaskUpdateToolRenderer.js';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { ToolRendererProps } from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
 
 // Mock the expansion toggle hooks
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
@@ -20,11 +20,7 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
 
 const createMockProvider = () => {
   return ({ children }: { children: React.ReactNode }) => (
-    <TimelineItemProvider
-      isSelected={false}
-    >
-      {children}
-    </TimelineItemProvider>
+    <TimelineItemProvider isSelected={false}>{children}</TimelineItemProvider>
   );
 };
 
@@ -36,12 +32,14 @@ describe('TaskUpdateToolRenderer', () => {
   });
 
   const mockSuccessResult = {
-    content: [{
-      type: 'text' as const,
-      text: 'Updated task "Create sample bug fix task"'
-    }],
+    content: [
+      {
+        type: 'text' as const,
+        text: 'Updated task "Create sample bug fix task"',
+      },
+    ],
     isError: false,
-    id: 'test-call-id'
+    id: 'test-call-id',
   };
 
   const mockSuccessItem: ToolRendererProps['item'] = {
@@ -53,12 +51,12 @@ describe('TaskUpdateToolRenderer', () => {
         taskId: 'task_20250705_wpd92m',
         status: 'in_progress',
         priority: 'high',
-        description: 'Updated task description'
-      }
+        description: 'Updated task description',
+      },
     },
     result: mockSuccessResult,
     timestamp: new Date('2025-07-05T16:06:43.912Z'),
-    callId: 'test-call-id'
+    callId: 'test-call-id',
   };
 
   it('should render task update with multiple changes', () => {
@@ -69,11 +67,11 @@ describe('TaskUpdateToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     // Should show success status
     expect(output).toContain('✔  task_update:');
     expect(output).toContain('Updated task "Create sample bug fix task"');
-    
+
     // Should show changes
     expect(output).toContain('• Status changed: pending → in_progress');
     expect(output).toContain('• Priority changed: medium → high');
@@ -87,9 +85,9 @@ describe('TaskUpdateToolRenderer', () => {
         ...mockSuccessItem.call,
         arguments: {
           taskId: 'task_20250705_wpd92m',
-          status: 'completed'
-        }
-      }
+          status: 'completed',
+        },
+      },
     };
 
     const { lastFrame } = render(
@@ -99,7 +97,7 @@ describe('TaskUpdateToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('✔  task_update:');
     expect(output).toContain('Updated task "Create sample bug fix task"');
     expect(output).toContain('• Status changed: pending → completed');
@@ -115,9 +113,9 @@ describe('TaskUpdateToolRenderer', () => {
         ...mockSuccessItem.call,
         arguments: {
           taskId: 'task_20250705_wpd92m',
-          assignTo: 'new:anthropic/claude-3-5-sonnet'
-        }
-      }
+          assignTo: 'new:anthropic/claude-3-5-sonnet',
+        },
+      },
     };
 
     const { lastFrame } = render(
@@ -127,7 +125,7 @@ describe('TaskUpdateToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('• Assigned to: new:anthropic/claude-3-5-sonnet');
   });
 
@@ -138,9 +136,9 @@ describe('TaskUpdateToolRenderer', () => {
         ...mockSuccessItem.call,
         arguments: {
           taskId: 'task_20250705_wpd92m',
-          prompt: 'New updated prompt for the task'
-        }
-      }
+          prompt: 'New updated prompt for the task',
+        },
+      },
     };
 
     const { lastFrame } = render(
@@ -150,7 +148,7 @@ describe('TaskUpdateToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('• Prompt updated');
   });
 
@@ -158,13 +156,15 @@ describe('TaskUpdateToolRenderer', () => {
     const errorItem: ToolRendererProps['item'] = {
       ...mockSuccessItem,
       result: {
-        content: [{
-          type: 'text' as const,
-          text: 'Task not found: task_invalid_id'
-        }],
+        content: [
+          {
+            type: 'text' as const,
+            text: 'Task not found: task_invalid_id',
+          },
+        ],
         isError: true,
-        id: 'test-call-id'
-      }
+        id: 'test-call-id',
+      },
     };
 
     const { lastFrame } = render(
@@ -174,7 +174,7 @@ describe('TaskUpdateToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('✘ task_update:');
     expect(output).toContain('Task not found: task_invalid_id');
   });
@@ -182,7 +182,7 @@ describe('TaskUpdateToolRenderer', () => {
   it('should render pending state', () => {
     const pendingItem: ToolRendererProps['item'] = {
       ...mockSuccessItem,
-      result: undefined // No result means still running
+      result: undefined, // No result means still running
     };
 
     const { lastFrame } = render(
@@ -192,7 +192,7 @@ describe('TaskUpdateToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('⧖ task_update:');
     expect(output).toContain('Updating task task_20250705_wpd92m...');
   });

@@ -12,7 +12,7 @@ import {
   createNewAgentSpec,
   AssigneeId,
   isAssigneeId,
-} from '../types.js';
+} from '~/threads/types.js';
 
 describe('ThreadId types', () => {
   describe('isThreadId', () => {

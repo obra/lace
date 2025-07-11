@@ -2,9 +2,9 @@
 // ABOUTME: Tests streaming vs non-streaming responses, configuration, and error handling
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AnthropicProvider } from '../anthropic-provider.js';
-import { Tool } from '../../tools/tool.js';
-import { ToolResult, ToolContext } from '../../tools/types.js';
+import { AnthropicProvider } from '~/providers/anthropic-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { ToolResult, ToolContext } from '~/tools/types.js';
 import { z } from 'zod';
 
 // Mock the Anthropic SDK

@@ -3,14 +3,14 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { TimelineEntry } from '../ui/TimelineEntry.js';
-import { ThreadEvent } from '../../../../threads/types.js';
-import { ToolCall, ToolResult } from '../../../../tools/types.js';
-import { CompactOutput } from '../ui/CompactOutput.js';
-import { CodeDisplay } from '../ui/CodeDisplay.js';
-import { UI_SYMBOLS, UI_COLORS } from '../../theme.js';
-import { useTimelineItemExpansion } from './hooks/useTimelineExpansionToggle.js';
-import { type TimelineStatus } from '../ui/TimelineEntry.js';
+import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { ToolCall, ToolResult } from '~/tools/types.js';
+import { CompactOutput } from '~/interfaces/terminal/components/ui/CompactOutput.js';
+import { CodeDisplay } from '~/interfaces/terminal/components/ui/CodeDisplay.js';
+import { UI_SYMBOLS, UI_COLORS } from '~/interfaces/terminal/theme.js';
+import { useTimelineItemExpansion } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
+import { type TimelineStatus } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
 
 interface ToolExecutionDisplayProps {
   callEvent: ThreadEvent;
@@ -42,7 +42,10 @@ export function ToolExecutionDisplay({
   const toolCallData = callEvent.data as ToolCall;
 
   // Use shared expansion state management
-  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected || false, (expanded) => onToggle?.());
+  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
+    isSelected || false,
+    (expanded) => onToggle?.()
+  );
 
   // Create handler that works with TimelineEntry interface
   const handleExpandedChange = (expanded: boolean) => {
@@ -62,7 +65,13 @@ export function ToolExecutionDisplay({
   );
   const output = firstTextBlock?.text;
   const error = toolResultData?.isError ? output : undefined;
-  const markerStatus: TimelineStatus = isStreaming ? 'pending' : success ? 'success' : toolResultData ? 'error' : 'none';
+  const markerStatus: TimelineStatus = isStreaming
+    ? 'pending'
+    : success
+      ? 'success'
+      : toolResultData
+        ? 'error'
+        : 'none';
 
   // Determine tool command for compact header
   const getToolCommand = (toolName: string, input: Record<string, unknown>): string => {

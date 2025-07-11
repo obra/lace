@@ -3,9 +3,15 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { TimelineEntry, TimelineStatus } from '../../ui/TimelineEntry.js';
-import { useTimelineItem } from '../contexts/TimelineItemContext.js';
-import { limitLines, type ToolRendererProps } from './components/shared.js';
+import {
+  TimelineEntry,
+  TimelineStatus,
+} from '~/interfaces/terminal/components/ui/TimelineEntry.js';
+import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import {
+  limitLines,
+  type ToolRendererProps,
+} from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
 
 // Extract task ID from result content
 function extractTaskId(resultText: string): string | null {
@@ -31,29 +37,27 @@ function truncateNote(note: string, maxLength: number = 100): string {
 
 // Escape special characters for display
 function escapeNote(note: string): string {
-  return note
-    .replace(/\n/g, '\\n')
-    .replace(/\t/g, '\\t')
-    .replace(/\r/g, '\\r');
+  return note.replace(/\n/g, '\\n').replace(/\t/g, '\\t').replace(/\r/g, '\\r');
 }
 
 export function TaskAddNoteToolRenderer({ item }: ToolRendererProps) {
   const { isExpanded } = useTimelineItem();
-  
+
   // Extract data from the tool call and result
-  const args = item.call.arguments as Record<string, unknown>;
+  const args = item.call.arguments;
   const taskIdFromArgs = extractTaskIdFromArgs(args);
   const noteContent = extractNoteContent(args);
-  
+
   const resultText = item.result?.content?.[0]?.text || '';
   const hasError = item.result?.isError;
   const isRunning = !item.result;
-  
-  const taskId = item.result && !hasError ? (extractTaskId(resultText) || taskIdFromArgs) : taskIdFromArgs;
-  
+
+  const taskId =
+    item.result && !hasError ? extractTaskId(resultText) || taskIdFromArgs : taskIdFromArgs;
+
   // Determine status
   const status: TimelineStatus = isRunning ? 'pending' : hasError ? 'error' : 'success';
-  
+
   // Build header based on state
   const header = (() => {
     if (isRunning) {
@@ -64,7 +68,7 @@ export function TaskAddNoteToolRenderer({ item }: ToolRendererProps) {
         </Box>
       );
     }
-    
+
     if (hasError) {
       return (
         <Box>
@@ -73,7 +77,7 @@ export function TaskAddNoteToolRenderer({ item }: ToolRendererProps) {
         </Box>
       );
     }
-    
+
     // Success case
     return (
       <Box>
@@ -82,22 +86,18 @@ export function TaskAddNoteToolRenderer({ item }: ToolRendererProps) {
       </Box>
     );
   })();
-  
+
   // Build note preview content for success case
-  const notePreviewContent = !isRunning && !hasError && noteContent ? (
-    <Box>
-      <Text color="cyan">💬 </Text>
-      <Text>"{escapeNote(truncateNote(noteContent))}"</Text>
-    </Box>
-  ) : null;
+  const notePreviewContent =
+    !isRunning && !hasError && noteContent ? (
+      <Box>
+        <Text color="cyan">💬 </Text>
+        <Text>"{escapeNote(truncateNote(noteContent))}"</Text>
+      </Box>
+    ) : null;
 
   return (
-    <TimelineEntry
-      label={header}
-      summary={notePreviewContent}
-      status={status}
-      isExpandable={false}
-    >
+    <TimelineEntry label={header} summary={notePreviewContent} status={status} isExpandable={false}>
       {notePreviewContent}
     </TimelineEntry>
   );

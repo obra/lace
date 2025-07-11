@@ -7,16 +7,16 @@ import {
   Timeline,
   TimelineItem as TimelineItemType,
   EphemeralMessage,
-} from '../../../timeline-types.js';
-import { EventType } from '../../../../threads/types.js';
-import { EventDisplay } from './EventDisplay.js';
-import { GenericToolRenderer } from './tool-renderers/GenericToolRenderer.js';
-import { getToolRenderer } from './tool-renderers/getToolRenderer.js';
-import { ToolRendererErrorBoundary } from './ToolRendererErrorBoundary.js';
-import MessageDisplay from '../message-display.js';
-import { logger } from '../../../../utils/logger.js';
-import { ToolRendererProps } from './tool-renderers/components/shared.js';
-import { TimelineItemProvider } from './contexts/TimelineItemContext.js';
+} from '~/interfaces/timeline-types.js';
+import { EventType } from '~/threads/types.js';
+import { EventDisplay } from '~/interfaces/terminal/components/events/EventDisplay.js';
+import { GenericToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/GenericToolRenderer.js';
+import { getToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/getToolRenderer.js';
+import { ToolRendererErrorBoundary } from '~/interfaces/terminal/components/events/ToolRendererErrorBoundary.js';
+import MessageDisplay from '~/interfaces/terminal/components/message-display.js';
+import { logger } from '~/utils/logger.js';
+import { ToolRendererProps } from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
 
 interface TimelineItemProps {
   item: TimelineItemType;
@@ -34,7 +34,8 @@ interface DynamicToolRendererProps {
 }
 
 function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRendererProps) {
-  const [ToolRenderer, setToolRenderer] = React.useState<React.ComponentType<ToolRendererProps> | null>(null);
+  const [ToolRenderer, setToolRenderer] =
+    React.useState<React.ComponentType<ToolRendererProps> | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -54,19 +55,11 @@ function DynamicToolRenderer({ item, isSelected, onToggle }: DynamicToolRenderer
 
   // For cached renderers, this will only show briefly on first render
   if (isLoading) {
-    return (
-      <GenericToolRenderer
-        item={item}
-      />
-    );
+    return <GenericToolRenderer item={item} />;
   }
 
   const RendererComponent = ToolRenderer || GenericToolRenderer;
-  return (
-    <RendererComponent
-      item={item}
-    />
-  );
+  return <RendererComponent item={item} />;
 }
 
 export function TimelineItem({
@@ -157,16 +150,8 @@ export function TimelineItem({
           focusedLine={selectedLine}
           itemStartLine={itemStartLine}
         >
-          <ToolRendererErrorBoundary
-            item={item}
-            isSelected={isSelected}
-            onToggle={onToggle}
-          >
-            <DynamicToolRenderer
-              item={item}
-              isSelected={isSelected}
-              onToggle={onToggle}
-            />
+          <ToolRendererErrorBoundary item={item} isSelected={isSelected} onToggle={onToggle}>
+            <DynamicToolRenderer item={item} isSelected={isSelected} onToggle={onToggle} />
           </ToolRendererErrorBoundary>
         </TimelineItemProvider>
       );
@@ -199,7 +184,7 @@ export function TimelineItem({
           </TimelineItemProvider>
         );
       }
-      
+
       // For other ephemeral messages, use the original MessageDisplay
       return (
         <MessageDisplay

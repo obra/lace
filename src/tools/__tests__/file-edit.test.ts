@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, rm, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { FileEditTool } from '../implementations/file-edit.js';
+import { FileEditTool } from '~/tools/implementations/file-edit.js';
 
 describe('FileEditTool with schema validation', () => {
   let tool: FileEditTool;

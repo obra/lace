@@ -3,12 +3,12 @@
 
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
-import { ThreadEvent } from '../../../../threads/types.js';
-import { ThinkingAwareContent } from '../ui/ThinkingAwareContent.js';
-import { TimelineEntry } from '../ui/TimelineEntry.js';
-import { parseThinkingBlocks } from './utils/thinking-parser.js';
-import { useTimelineItem } from './contexts/TimelineItemContext.js';
-import { UI_SYMBOLS } from '../../theme.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { ThinkingAwareContent } from '~/interfaces/terminal/components/ui/ThinkingAwareContent.js';
+import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
+import { parseThinkingBlocks } from '~/interfaces/terminal/components/events/utils/thinking-parser.js';
+import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 
 interface AgentMessageDisplayProps {
   event: ThreadEvent;
@@ -17,11 +17,7 @@ interface AgentMessageDisplayProps {
   // Selection and expansion state comes from context
 }
 
-export function AgentMessageDisplay({
-  event,
-  isStreaming,
-  isFocused,
-}: AgentMessageDisplayProps) {
+export function AgentMessageDisplay({ event, isStreaming, isFocused }: AgentMessageDisplayProps) {
   const message = event.data as string;
 
   // Parse thinking blocks from message content
@@ -29,7 +25,7 @@ export function AgentMessageDisplay({
 
   // Get expansion state from context
   const { isExpanded, isSelected } = useTimelineItem();
-  
+
   // Force expand when streaming to show the (thinking...) indicator
   const effectiveIsExpanded = isExpanded || (isStreaming ?? false);
 
@@ -39,15 +35,14 @@ export function AgentMessageDisplay({
   // Determine whether to show thinking content or summary
   const showThinking = effectiveIsExpanded;
 
-
   return (
     <TimelineEntry
       summary={
         effectiveIsExpanded ? null : (
-          <ThinkingAwareContent 
-            content={message} 
-            showThinking={false} 
-            showIcon={true} 
+          <ThinkingAwareContent
+            content={message}
+            showThinking={false}
+            showIcon={true}
             dimmed={!isFocused}
           />
         )
@@ -59,10 +54,10 @@ export function AgentMessageDisplay({
       isStreaming={isStreaming}
     >
       <Box flexDirection="column">
-        <ThinkingAwareContent 
-          content={message} 
-          showThinking={showThinking} 
-          showIcon={true} 
+        <ThinkingAwareContent
+          content={message}
+          showThinking={showThinking}
+          showIcon={true}
           dimmed={!isFocused}
         />
         {isStreaming && (

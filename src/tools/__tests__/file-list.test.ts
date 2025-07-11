@@ -4,8 +4,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { FileListTool } from '../implementations/file-list.js';
-import { createTestTempDir } from './temp-utils.js';
+import { FileListTool } from '~/tools/implementations/file-list.js';
+import { createTestTempDir } from '~/tools/__tests__/temp-utils.js';
 
 describe('FileListTool with schema validation', () => {
   let tool: FileListTool;

@@ -3,10 +3,10 @@
 
 import React from 'react';
 import { Text } from 'ink';
-import { ThreadEvent } from '../../../../threads/types.js';
-import { TimelineEntry } from '../ui/TimelineEntry.js';
-import { UI_SYMBOLS } from '../../theme.js';
-import { useTimelineItem } from './contexts/TimelineItemContext.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
+import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
 
 interface SystemPromptDisplayProps {
   event: ThreadEvent;
@@ -15,11 +15,7 @@ interface SystemPromptDisplayProps {
   // Selection and expansion state comes from context
 }
 
-export function SystemPromptDisplay({
-  event,
-  isStreaming,
-  isFocused,
-}: SystemPromptDisplayProps) {
+export function SystemPromptDisplay({ event, isStreaming, isFocused }: SystemPromptDisplayProps) {
   const systemPrompt = event.data as string;
 
   // Get expansion state from context

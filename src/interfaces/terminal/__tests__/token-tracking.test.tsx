@@ -3,9 +3,9 @@
 
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { renderInkComponent } from './helpers/ink-test-utils.js';
-import StatusBar from '../components/status-bar.js';
-import { UI_SYMBOLS } from '../theme.js';
+import { renderInkComponent } from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
+import StatusBar from '~/interfaces/terminal/components/status-bar.js';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 
 // Mock modules
 vi.mock('../../../utils/logger.js', () => ({
@@ -167,14 +167,14 @@ describe('Token Accumulation Logic', () => {
     // Turn 1: promptTokens=1000 (includes system prompt)
     // Turn 2: promptTokens=1500 (includes turn 1 + system)
     // Turn 3: promptTokens=2200 (includes turn 1+2 + system)
-    
+
     // Current incorrect logic would show:
     // Total = 1000 + 1500 + 2200 = 4700
-    
+
     // Correct logic should show:
     // Total = 2200 + (200 + 300 + 250) = 2950
     // Where 2200 is final context, and sum is completion tokens
-    
+
     const testCases = [
       {
         turn: 1,

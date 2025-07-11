@@ -2,9 +2,9 @@
 // ABOUTME: Tests the full flow from registry creation to command execution
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { CommandRegistry } from '../registry.js';
-import { CommandExecutor } from '../executor.js';
-import type { UserInterface } from '../types.js';
+import { CommandRegistry } from '~/commands/registry.js';
+import { CommandExecutor } from '~/commands/executor.js';
+import type { UserInterface } from '~/commands/types.js';
 
 describe('Command System Integration', () => {
   let mockUI: UserInterface;

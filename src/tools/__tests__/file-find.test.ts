@@ -4,8 +4,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { FileFindTool } from '../implementations/file-find.js';
-import { createTestTempDir } from './temp-utils.js';
+import { FileFindTool } from '~/tools/implementations/file-find.js';
+import { createTestTempDir } from '~/tools/__tests__/temp-utils.js';
 
 describe('FileFindTool with schema validation', () => {
   let tool: FileFindTool;

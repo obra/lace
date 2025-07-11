@@ -2,8 +2,8 @@
 // ABOUTME: Ensures proactive token budget management prevents max_tokens exhaustion scenarios
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { TokenBudgetManager } from '../token-budget-manager.js';
-import { ProviderResponse } from '../../providers/base-provider.js';
+import { TokenBudgetManager } from '~/token-management/token-budget-manager.js';
+import { ProviderResponse } from '~/providers/base-provider.js';
 
 describe('TokenBudgetManager', () => {
   let budgetManager: TokenBudgetManager;

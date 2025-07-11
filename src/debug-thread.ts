@@ -3,14 +3,14 @@
 // ABOUTME: Outputs thread data in JSON or readable format with provider-specific conversation structure
 
 import { Command } from 'commander';
-import { ThreadManager } from './threads/thread-manager.js';
-import { Agent } from './agents/agent.js';
-import { ProviderRegistry } from './providers/registry.js';
-import { estimateTokens } from './utils/token-estimation.js';
-import { convertToAnthropicFormat } from './providers/format-converters.js';
-import { getLaceDir } from './config/lace-dir.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { Agent } from '~/agents/agent.js';
+import { ProviderRegistry } from '~/providers/registry.js';
+import { estimateTokens } from '~/utils/token-estimation.js';
+import { convertToAnthropicFormat } from '~/providers/format-converters.js';
+import { getLaceDir } from '~/config/lace-dir.js';
 import { join } from 'path';
-import { loadEnvFile } from './config/env-loader.js';
+import { loadEnvFile } from '~/config/env-loader.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -280,7 +280,7 @@ async function main() {
 
   program.parse();
 
-  const options = program.opts() as DebugOptions;
+  const options = program.opts();
 
   try {
     const debugInfo = await debugThread(options);

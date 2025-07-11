@@ -4,19 +4,15 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
-import { TimelineItem } from '../TimelineItem.js';
-import { TimelineItem as TimelineItemType } from '../../../../timeline-types.js';
+import { TimelineItem } from '~/interfaces/terminal/components/events/TimelineItem.js';
+import { TimelineItem as TimelineItemType } from '~/interfaces/timeline-types.js';
 import { Text } from 'ink';
-import { TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
 
 // Mock dependencies
 vi.mock('../EventDisplay.js', () => ({
   EventDisplay: ({ event }: any) => {
-    return React.createElement(
-      Text,
-      {},
-      `EventDisplay:${event.type}`
-    );
+    return React.createElement(Text, {}, `EventDisplay:${event.type}`);
   },
 }));
 
@@ -36,12 +32,7 @@ vi.mock('../tool-renderers/getToolRenderer.js', () => ({
 }));
 
 vi.mock('../../message-display.js', () => ({
-  default: ({ message }: any) =>
-    React.createElement(
-      Text,
-      {},
-      `MessageDisplay:${message.type}`
-    ),
+  default: ({ message }: any) => React.createElement(Text, {}, `MessageDisplay:${message.type}`),
 }));
 
 vi.mock('../../../../../utils/logger.js', () => ({
@@ -69,11 +60,7 @@ describe('TimelineItem Component', () => {
 
   // Helper to render with TimelineExpansionProvider
   const renderWithProvider = (component: React.ReactElement) => {
-    return render(
-      <TimelineExpansionProvider>
-        {component}
-      </TimelineExpansionProvider>
-    );
+    return render(<TimelineExpansionProvider>{component}</TimelineExpansionProvider>);
   };
 
   describe('user_message items', () => {

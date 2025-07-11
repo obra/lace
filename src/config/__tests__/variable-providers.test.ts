@@ -13,7 +13,7 @@ import {
   ToolVariableProvider,
   ContextDisclaimerProvider,
   VariableProviderManager,
-} from '../variable-providers.js';
+} from '~/config/variable-providers.js';
 
 describe('Variable Providers', () => {
   let mockCommandRunner: any;

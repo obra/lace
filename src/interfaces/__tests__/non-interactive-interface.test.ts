@@ -59,7 +59,7 @@ describe('NonInteractiveInterface', () => {
       expect(log).toHaveBeenCalledWith(expect.stringContaining('using mock-provider provider'));
       expect(agentStartSpy).toHaveBeenCalled();
       // agent.sendMessage is already a spy from beforeEach setup
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       expect(agent.sendMessage).toHaveBeenCalledWith('Test prompt');
     });
 
@@ -86,7 +86,7 @@ describe('NonInteractiveInterface', () => {
       await nonInteractiveWithoutTools.executePrompt('Test prompt');
 
       expect(agentStartSpy).toHaveBeenCalled();
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       expect(agent.sendMessage).toHaveBeenCalledWith('Test prompt');
     });
   });

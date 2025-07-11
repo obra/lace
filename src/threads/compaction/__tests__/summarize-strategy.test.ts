@@ -2,8 +2,8 @@
 // ABOUTME: Tests compaction logic, token estimation, and event preservation
 
 import { describe, it, expect } from 'vitest';
-import { SummarizeStrategy } from '../summarize-strategy.js';
-import { Thread, ThreadEvent, EventType } from '../../types.js';
+import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy.js';
+import { Thread, ThreadEvent, EventType } from '~/threads/types.js';
 
 describe('SummarizeStrategy', () => {
   const createThread = (events: ThreadEvent[]): Thread => ({

@@ -3,12 +3,12 @@
 
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TimelineContent } from './TimelineContent.js';
-import { Timeline } from '../../../timeline-types.js';
+import { TimelineContent } from '~/interfaces/terminal/components/events/TimelineContent.js';
+import { Timeline } from '~/interfaces/timeline-types.js';
 
 // Mock TimelineItem since we're testing ref management, not item rendering
 vi.mock('./TimelineItem.js', () => ({
-  TimelineItem: () => null
+  TimelineItem: () => null,
 }));
 
 describe('TimelineContent itemRefs management', () => {
@@ -27,7 +27,7 @@ describe('TimelineContent itemRefs management', () => {
           timestamp: new Date(),
         },
         {
-          type: 'agent_message', 
+          type: 'agent_message',
           id: 'msg2',
           content: 'Test response 1',
           timestamp: new Date(),
@@ -51,13 +51,15 @@ describe('TimelineContent itemRefs management', () => {
   });
 
   it('should have ref callback function for each timeline item', () => {
-    const component = <TimelineContent
-      timeline={timeline}
-      viewportState={viewportState}
-      viewportActions={viewportActions}
-      itemRefs={itemRefs}
-      viewportLines={20}
-    />;
+    const component = (
+      <TimelineContent
+        timeline={timeline}
+        viewportState={viewportState}
+        viewportActions={viewportActions}
+        itemRefs={itemRefs}
+        viewportLines={20}
+      />
+    );
 
     // Component should be a React Fragment with mapped items
     expect(component).toBeDefined();
@@ -92,18 +94,20 @@ describe('TimelineContent itemRefs management', () => {
           messageType: 'system',
           content: 'Ephemeral message',
           timestamp: new Date(),
-        }
+        },
       ],
       metadata: { eventCount: 3, messageCount: 3, lastActivity: new Date() },
     };
 
-    const component = <TimelineContent
-      timeline={timelineWithDifferentTypes}
-      viewportState={viewportState}
-      viewportActions={viewportActions}
-      itemRefs={itemRefs}
-      viewportLines={20}
-    />;
+    const component = (
+      <TimelineContent
+        timeline={timelineWithDifferentTypes}
+        viewportState={viewportState}
+        viewportActions={viewportActions}
+        itemRefs={itemRefs}
+        viewportLines={20}
+      />
+    );
 
     expect(React.isValidElement(component)).toBe(true);
   });
@@ -114,13 +118,15 @@ describe('TimelineContent itemRefs management', () => {
       triggerRemeasurement: mockTriggerRemeasurement,
     };
 
-    const component = <TimelineContent
-      timeline={timeline}
-      viewportState={viewportState}
-      viewportActions={viewportActionsWithMock}
-      itemRefs={itemRefs}
-      viewportLines={20}
-    />;
+    const component = (
+      <TimelineContent
+        timeline={timeline}
+        viewportState={viewportState}
+        viewportActions={viewportActionsWithMock}
+        itemRefs={itemRefs}
+        viewportLines={20}
+      />
+    );
 
     expect(React.isValidElement(component)).toBe(true);
     // The onToggle prop should be passed as triggerRemeasurement
@@ -128,15 +134,20 @@ describe('TimelineContent itemRefs management', () => {
   });
 
   it('should handle empty timeline correctly', () => {
-    const emptyTimeline = { items: [], metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() } };
+    const emptyTimeline = {
+      items: [],
+      metadata: { eventCount: 0, messageCount: 0, lastActivity: new Date() },
+    };
 
-    const component = <TimelineContent
-      timeline={emptyTimeline}
-      viewportState={{ ...viewportState, itemPositions: [] }}
-      viewportActions={viewportActions}
-      itemRefs={itemRefs}
-      viewportLines={20}
-    />;
+    const component = (
+      <TimelineContent
+        timeline={emptyTimeline}
+        viewportState={{ ...viewportState, itemPositions: [] }}
+        viewportActions={viewportActions}
+        itemRefs={itemRefs}
+        viewportLines={20}
+      />
+    );
 
     expect(React.isValidElement(component)).toBe(true);
   });

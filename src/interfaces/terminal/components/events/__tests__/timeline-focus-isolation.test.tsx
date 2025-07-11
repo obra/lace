@@ -5,11 +5,11 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { Box } from 'ink';
-import TimelineDisplay from '../TimelineDisplay.js';
-import { Timeline } from '../../../../timeline-types.js';
-import { LaceFocusProvider } from '../../../focus/focus-provider.js';
-import { TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.js';
-import { FocusRegions } from '../../../focus/focus-regions.js';
+import TimelineDisplay from '~/interfaces/terminal/components/events/TimelineDisplay.js';
+import { Timeline } from '~/interfaces/timeline-types.js';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
+import { FocusRegions } from '~/interfaces/terminal/focus/focus-regions.js';
 
 // Mock the timeline viewport hook to track focus calls
 const mockNavigateUp = vi.fn();
@@ -39,7 +39,9 @@ vi.mock('../../../focus/index.js', () => ({
   ...vi.importActual('../../../focus/index.js'),
   useLaceFocus: (id: string) => ({
     isFocused: mockFocusState[id] || false,
-    takeFocus: () => { mockFocusState[id] = true; },
+    takeFocus: () => {
+      mockFocusState[id] = true;
+    },
     isInFocusPath: false,
   }),
   useLaceFocusContext: () => ({
@@ -83,7 +85,7 @@ describe('Timeline Focus Isolation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Clear focus state
-    Object.keys(mockFocusState).forEach(key => {
+    Object.keys(mockFocusState).forEach((key) => {
       delete mockFocusState[key];
     });
   });
@@ -116,10 +118,10 @@ describe('Timeline Focus Isolation', () => {
             <Box flexDirection="column">
               {/* Main timeline - uses default focus region */}
               <TimelineDisplay timeline={mainTimeline} />
-              
+
               {/* Delegate timeline - uses delegate-specific focus region */}
-              <TimelineDisplay 
-                timeline={delegateTimeline} 
+              <TimelineDisplay
+                timeline={delegateTimeline}
                 focusRegion={FocusRegions.delegate(delegateThreadId)}
               />
             </Box>
@@ -129,10 +131,10 @@ describe('Timeline Focus Isolation', () => {
     }
 
     const { lastFrame } = render(<TestComponent />);
-    
+
     // Verify both timelines render
     expect(lastFrame()).toContain('Test message');
-    
+
     // Main timeline should use 'timeline' focus region
     // Delegate timeline should use 'delegate-delegate-thread-123' focus region
     // This is verified by the fact that we can pass different focus regions
@@ -149,8 +151,8 @@ describe('Timeline Focus Isolation', () => {
           <TimelineExpansionProvider>
             <Box flexDirection="column">
               <TimelineDisplay timeline={mainTimeline} />
-              <TimelineDisplay 
-                timeline={delegateTimeline} 
+              <TimelineDisplay
+                timeline={delegateTimeline}
                 focusRegion={FocusRegions.delegate(delegateThreadId)}
               />
             </Box>
@@ -167,14 +169,14 @@ describe('Timeline Focus Isolation', () => {
 
     // Focus main timeline
     mockFocusState[FocusRegions.timeline] = true;
-    
+
     // Delegate timeline should not be focused
     expect(mockFocusState[FocusRegions.delegate(delegateThreadId)]).toBeFalsy();
 
     // Focus delegate timeline
     mockFocusState[FocusRegions.delegate(delegateThreadId)] = true;
     mockFocusState[FocusRegions.timeline] = false;
-    
+
     // Main timeline should not be focused
     expect(mockFocusState[FocusRegions.timeline]).toBeFalsy();
   });
@@ -190,8 +192,8 @@ describe('Timeline Focus Isolation', () => {
           <TimelineExpansionProvider>
             <Box flexDirection="column">
               <TimelineDisplay timeline={mainTimeline} />
-              <TimelineDisplay 
-                timeline={delegateTimeline} 
+              <TimelineDisplay
+                timeline={delegateTimeline}
                 focusRegion={FocusRegions.delegate(delegateThreadId)}
               />
             </Box>
@@ -217,7 +219,7 @@ describe('Timeline Focus Isolation', () => {
     const timeline1 = createMockTimeline();
     const timeline2 = createMockTimeline();
     const timeline3 = createMockTimeline();
-    
+
     const delegate1ThreadId = 'delegate-1';
     const delegate2ThreadId = 'delegate-2';
 
@@ -228,14 +230,14 @@ describe('Timeline Focus Isolation', () => {
             <Box flexDirection="column">
               {/* Main timeline */}
               <TimelineDisplay timeline={timeline1} />
-              
+
               {/* Two delegate timelines with different IDs */}
-              <TimelineDisplay 
-                timeline={timeline2} 
+              <TimelineDisplay
+                timeline={timeline2}
                 focusRegion={FocusRegions.delegate(delegate1ThreadId)}
               />
-              <TimelineDisplay 
-                timeline={timeline3} 
+              <TimelineDisplay
+                timeline={timeline3}
                 focusRegion={FocusRegions.delegate(delegate2ThreadId)}
               />
             </Box>

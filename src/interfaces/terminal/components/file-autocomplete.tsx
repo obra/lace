@@ -3,7 +3,11 @@
 
 import React, { useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { useLaceFocus, FocusRegions, useLaceFocusContext } from '../focus/index.js';
+import {
+  useLaceFocus,
+  FocusRegions,
+  useLaceFocusContext,
+} from '~/interfaces/terminal/focus/index.js';
 
 interface FileAutocompleteProps {
   items: string[];

@@ -8,10 +8,10 @@ import {
   TaskUpdateTool,
   TaskAddNoteTool,
   TaskViewTool,
-} from '../tools.js';
-import { ToolContext } from '../../../types.js';
-import { asThreadId, createNewAgentSpec } from '../../../../threads/types.js';
-import { useTempLaceDir, getTestDbPath } from '../../../../test-utils/temp-lace-dir.js';
+} from '~/tools/implementations/task-manager/tools.js';
+import { ToolContext } from '~/tools/types.js';
+import { asThreadId, createNewAgentSpec } from '~/threads/types.js';
+import { useTempLaceDir, getTestDbPath } from '~/test-utils/temp-lace-dir.js';
 
 describe('Multi-Agent Task Manager Integration', () => {
   const tempDirContext = useTempLaceDir();

@@ -3,12 +3,12 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { useTextBuffer } from '../hooks/use-text-buffer.js';
-import TextRenderer from './text-renderer.js';
-import FileAutocomplete from './file-autocomplete.js';
-import { FocusRegions, useLaceFocus } from '../focus/index.js';
-import { UI_BACKGROUNDS } from '../theme.js';
-import { logger } from '../../../utils/logger.js';
+import { useTextBuffer } from '~/interfaces/terminal/hooks/use-text-buffer.js';
+import TextRenderer from '~/interfaces/terminal/components/text-renderer.js';
+import FileAutocomplete from '~/interfaces/terminal/components/file-autocomplete.js';
+import { FocusRegions, useLaceFocus } from '~/interfaces/terminal/focus/index.js';
+import { UI_BACKGROUNDS } from '~/interfaces/terminal/theme.js';
+import { logger } from '~/utils/logger.js';
 
 // Keyboard shortcut system - list-based approach
 type KeyboardShortcut = string[]; // e.g., ['ctrl', 'a'] or ['meta', 'shift', 'z']
@@ -84,7 +84,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
   // Use Lace focus system
   const { isFocused, takeFocus } = useLaceFocus(FocusRegions.shell);
   const actualIsFocused = isFocused && !disabled;
-  
+
   // No auto-focus logic needed - provider handles initial focus
   const [bufferState, bufferOps] = useTextBuffer(value);
 
@@ -488,7 +488,14 @@ const ShellInput: React.FC<ShellInputProps> = ({
   }, [autocompleteVisible, autocompleteItems, autocompleteSelectedIndex, getCurrentWord]);
 
   return (
-    <Box flexDirection="column" backgroundColor={UI_BACKGROUNDS.SHELL_INPUT} width="100%" margin={1} padding={1} marginRight={2}>
+    <Box
+      flexDirection="column"
+      backgroundColor={UI_BACKGROUNDS.SHELL_INPUT}
+      width="100%"
+      margin={1}
+      padding={1}
+      marginRight={2}
+    >
       <Box>
         <Text color="cyan">&gt; </Text>
         <Box flexDirection="column" flexGrow={1}>

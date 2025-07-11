@@ -3,8 +3,8 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { parseThinkingBlocks } from '../events/utils/thinking-parser.js';
-import { MarkdownDisplay } from './MarkdownDisplay.js';
+import { parseThinkingBlocks } from '~/interfaces/terminal/components/events/utils/thinking-parser.js';
+import { MarkdownDisplay } from '~/interfaces/terminal/components/ui/MarkdownDisplay.js';
 
 interface ContentPart {
   type: 'text' | 'thinking';
@@ -23,13 +23,13 @@ interface ThinkingAwareContentProps {
  */
 function parseContentParts(content: string): ContentPart[] {
   const parts: ContentPart[] = [];
-  let remaining = content;
-  
+  const remaining = content;
+
   // Handle complete thinking blocks
   const completeThinkingRegex = /<think>([\s\S]*?)<\/think>/g;
   let lastIndex = 0;
   let match;
-  
+
   while ((match = completeThinkingRegex.exec(content)) !== null) {
     // Add text before this thinking block
     if (match.index > lastIndex) {
@@ -38,12 +38,12 @@ function parseContentParts(content: string): ContentPart[] {
         parts.push({ type: 'text', content: textBefore });
       }
     }
-    
+
     // Add the thinking block
     parts.push({ type: 'thinking', content: match[1] });
     lastIndex = match.index + match[0].length;
   }
-  
+
   // Handle unclosed thinking block (streaming case)
   const unclosedMatch = content.substring(lastIndex).match(/<think>([\s\S]*)$/);
   if (unclosedMatch) {
@@ -52,7 +52,7 @@ function parseContentParts(content: string): ContentPart[] {
     if (textBefore) {
       parts.push({ type: 'text', content: textBefore });
     }
-    
+
     // Add the unclosed thinking
     parts.push({ type: 'thinking', content: unclosedMatch[1] });
   } else {
@@ -62,7 +62,7 @@ function parseContentParts(content: string): ContentPart[] {
       parts.push({ type: 'text', content: remainingText });
     }
   }
-  
+
   return parts;
 }
 
@@ -81,49 +81,47 @@ export function ThinkingAwareContent({
   dimmed = false,
 }: ThinkingAwareContentProps) {
   const { hasThinking } = parseThinkingBlocks(content);
-  
+
   // If no thinking blocks, render normally
   if (!hasThinking) {
     return <MarkdownDisplay content={content} showIcon={showIcon} dimmed={dimmed} />;
   }
-  
+
   const parts = parseContentParts(content);
-  
-  const renderedParts = parts.map((part, index) => {
-    if (part.type === 'thinking') {
-      if (showThinking) {
-        // Show thinking content in italics (skip empty content)
-        const trimmedContent = part.content.trim();
-        return trimmedContent ? (
-          <Text key={index} italic dimColor={dimmed}>
-            {trimmedContent}
-          </Text>
-        ) : null;
+
+  const renderedParts = parts
+    .map((part, index) => {
+      if (part.type === 'thinking') {
+        if (showThinking) {
+          // Show thinking content in italics (skip empty content)
+          const trimmedContent = part.content.trim();
+          return trimmedContent ? (
+            <Text key={index} italic dimColor={dimmed}>
+              {trimmedContent}
+            </Text>
+          ) : null;
+        } else {
+          // Show summary marker (skip empty thinking blocks)
+          const wordCount = countWords(part.content);
+          return wordCount > 0 ? (
+            <Text key={index} italic dimColor={dimmed}>
+              thought for {wordCount} word{wordCount === 1 ? '' : 's'}
+            </Text>
+          ) : null;
+        }
       } else {
-        // Show summary marker (skip empty thinking blocks)
-        const wordCount = countWords(part.content);
-        return wordCount > 0 ? (
-          <Text key={index} italic dimColor={dimmed}>
-            thought for {wordCount} word{wordCount === 1 ? '' : 's'}
-          </Text>
+        // Regular text content - render with markdown if it has content
+        return part.content.trim() ? (
+          <MarkdownDisplay
+            key={index}
+            content={part.content}
+            showIcon={index === 0 ? showIcon : false}
+            dimmed={dimmed}
+          />
         ) : null;
       }
-    } else {
-      // Regular text content - render with markdown if it has content
-      return part.content.trim() ? (
-        <MarkdownDisplay 
-          key={index} 
-          content={part.content} 
-          showIcon={index === 0 ? showIcon : false} 
-          dimmed={dimmed} 
-        />
-      ) : null;
-    }
-  }).filter(Boolean); // Remove null elements
+    })
+    .filter(Boolean); // Remove null elements
 
-  return (
-    <Box flexDirection="column">
-      {renderedParts}
-    </Box>
-  );
+  return <Box flexDirection="column">{renderedParts}</Box>;
 }

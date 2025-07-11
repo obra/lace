@@ -2,9 +2,9 @@
 // ABOUTME: Tests command parsing, error handling, and UserInterface integration
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { CommandExecutor } from '../executor.js';
-import { CommandRegistry } from '../registry.js';
-import type { Command, UserInterface } from '../types.js';
+import { CommandExecutor } from '~/commands/executor.js';
+import { CommandRegistry } from '~/commands/registry.js';
+import type { Command, UserInterface } from '~/commands/types.js';
 
 describe('CommandExecutor', () => {
   let registry: CommandRegistry;

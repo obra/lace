@@ -1,7 +1,7 @@
 // ABOUTME: Debug focus command to toggle focus debug panel visibility
 // ABOUTME: Shows/hides the focus debug panel that displays focus stack and state
 
-import type { Command, UserInterface } from '../types.js';
+import type { Command, UserInterface } from '~/commands/types.js';
 
 export const debugFocusCommand: Command = {
   name: 'debug-focus',

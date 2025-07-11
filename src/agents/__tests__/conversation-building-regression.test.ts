@@ -5,10 +5,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { Agent } from '../agent.js';
-import { ThreadEvent } from '../../threads/types.js';
-import { ProviderMessage } from '../../providers/base-provider.js';
-import { convertToAnthropicFormat } from '../../providers/format-converters.js';
+import { Agent } from '~/agents/agent.js';
+import { ThreadEvent } from '~/threads/types.js';
+import { ProviderMessage } from '~/providers/base-provider.js';
+import { convertToAnthropicFormat } from '~/providers/format-converters.js';
 
 /**
  * Real thread event data from lace_20250705_2opxkw that caused the API failure:

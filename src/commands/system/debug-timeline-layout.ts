@@ -1,7 +1,7 @@
 // ABOUTME: Debug timeline layout command to toggle timeline layout debug panel visibility
 // ABOUTME: Shows/hides the timeline layout debug panel that displays viewport state and item measurements
 
-import type { Command, UserInterface } from '../types.js';
+import type { Command, UserInterface } from '~/commands/types.js';
 
 export const debugTimelineLayoutCommand: Command = {
   name: 'debug-timeline-layout',

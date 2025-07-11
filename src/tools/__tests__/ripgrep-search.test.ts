@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, mkdir, rm } from 'fs/promises';
 import { join } from 'path';
-import { RipgrepSearchTool } from '../implementations/ripgrep-search.js';
+import { RipgrepSearchTool } from '~/tools/implementations/ripgrep-search.js';
 
 describe('RipgrepSearchTool with schema validation', () => {
   let tool: RipgrepSearchTool;

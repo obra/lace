@@ -3,9 +3,12 @@
 
 import React from 'react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { renderInkComponent, stripAnsi } from './helpers/ink-test-utils.js';
-import MessageDisplay from '../components/message-display.js';
-import { UI_SYMBOLS } from '../theme.js';
+import {
+  renderInkComponent,
+  stripAnsi,
+} from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
+import MessageDisplay from '~/interfaces/terminal/components/message-display.js';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
 
 describe('MessageDisplay', () => {
   const mockMessage = {

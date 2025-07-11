@@ -2,19 +2,19 @@
 // ABOUTME: Tests the core application setup, provider creation, and session handling logic.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { run } from './app.js';
-import { CLIOptions } from './cli/args.js';
-import { Agent } from './agents/agent.js';
-import { ThreadManager } from './threads/thread-manager.js';
-import { ToolExecutor } from './tools/executor.js';
-import { getEnvVar } from './config/env-loader.js';
-import { enableTrafficLogging } from './utils/traffic-logger.js';
-import { logger } from './utils/logger.js';
-import { NonInteractiveInterface } from './interfaces/non-interactive-interface.js';
-import { TerminalInterface } from './interfaces/terminal/terminal-interface.js';
-import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
-import { OllamaProvider } from './providers/ollama-provider.js';
-import { withConsoleCapture } from './__tests__/setup/console-capture.js';
+import { run } from '~/app.js';
+import { CLIOptions } from '~/cli/args.js';
+import { Agent } from '~/agents/agent.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { getEnvVar } from '~/config/env-loader.js';
+import { enableTrafficLogging } from '~/utils/traffic-logger.js';
+import { logger } from '~/utils/logger.js';
+import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface.js';
+import { TerminalInterface } from '~/interfaces/terminal/terminal-interface.js';
+import { createGlobalPolicyCallback } from '~/tools/policy-wrapper.js';
+import { OllamaProvider } from '~/providers/ollama-provider.js';
+import { withConsoleCapture } from '~/__tests__/setup/console-capture.js';
 
 // Mock external dependencies at the module level
 vi.mock('./agents/agent.js');

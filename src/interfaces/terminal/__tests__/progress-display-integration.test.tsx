@@ -4,13 +4,13 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, CurrentTurnMetrics } from '../../../agents/agent.js';
-import { ToolExecutor } from '../../../tools/executor.js';
-import { ThreadManager } from '../../../threads/thread-manager.js';
-import { AIProvider } from '../../../providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '../../../providers/base-provider.js';
-import { Tool } from '../../../tools/tool.js';
-import { TerminalInterfaceComponent } from '../terminal-interface.js';
+import { Agent, CurrentTurnMetrics } from '~/agents/agent.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
+import { Tool } from '~/tools/tool.js';
+import { TerminalInterfaceComponent } from '~/interfaces/terminal/terminal-interface.js';
 
 // Mock provider for testing progress updates
 class MockProgressProvider extends AIProvider {
@@ -132,7 +132,7 @@ describe('Progress Display Integration Tests', () => {
       // This test verifies the integration by checking that the agent emits
       // the correct events that the StatusBar would consume
 
-      let tokenUsageEvents: any[] = [];
+      const tokenUsageEvents: any[] = [];
       agent.on('token_usage_update', (data) => tokenUsageEvents.push(data));
 
       // Act
@@ -149,8 +149,8 @@ describe('Progress Display Integration Tests', () => {
       // This test verifies that turn state changes correctly affect input state
       // by testing the event flow that controls input behavior
 
-      let turnActiveStates: boolean[] = [];
-      let turnIds: string[] = [];
+      const turnActiveStates: boolean[] = [];
+      const turnIds: string[] = [];
 
       agent.on('turn_start', ({ turnId }) => {
         turnActiveStates.push(true);
@@ -238,7 +238,7 @@ describe('Progress Display Integration Tests', () => {
       // This is tested via mocked ShellInput above, but we can also test
       // the state management directly
 
-      let isInputDisabled = false;
+      const isInputDisabled = false;
       const { rerender } = render(<TerminalInterfaceComponent agent={agent} />);
 
       // Monitor input state changes by tracking the component's internal state
