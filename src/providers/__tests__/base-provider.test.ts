@@ -249,7 +249,7 @@ describe('AIProvider retry functionality', () => {
       expect(retryAttemptSpy).toHaveBeenCalledWith({
         attempt: 1,
         delay: expect.any(Number) as number,
-        error: expect.objectContaining({ message: 'ECONNREFUSED' }) as Record<string, unknown>,
+        error: expect.objectContaining({ code: 'ECONNREFUSED' }) as Record<string, unknown>,
       });
     });
 
@@ -281,7 +281,7 @@ describe('AIProvider retry functionality', () => {
       expect(exhaustedSpy).toHaveBeenCalledTimes(1);
       expect(exhaustedSpy).toHaveBeenCalledWith({
         attempts: 2,
-        lastError: expect.objectContaining({ message: 'ECONNREFUSED' }) as Record<string, unknown>,
+        lastError: expect.objectContaining({ code: 'ECONNREFUSED' }) as Record<string, unknown>,
       });
 
       // Restore fake timers
@@ -308,7 +308,7 @@ describe('AIProvider retry functionality', () => {
       let callCount = 0;
       const operation = vi.fn().mockImplementation(() => {
         callCount++;
-        return Promise.reject(new Error('ECONNREFUSED'));
+        return Promise.reject({ code: 'ECONNREFUSED' });
       });
 
       const promise = provider.withRetry(operation, { signal: abortController.signal });
@@ -335,11 +335,11 @@ describe('AIProvider retry functionality', () => {
         callCount++;
         if (callCount === 1) {
           // First call fails before streaming
-          return Promise.reject(new Error('ECONNREFUSED'));
+          return Promise.reject({ code: 'ECONNREFUSED' });
         }
         // After first retry, streaming has started
         streamingStarted = true;
-        return Promise.reject(new Error('ECONNREFUSED'));
+        return Promise.reject({ code: 'ECONNREFUSED' });
       });
 
       const promise = provider.withRetry(operation, {

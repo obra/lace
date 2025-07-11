@@ -255,7 +255,9 @@ describe('CLI Flow Tests', () => {
         return undefined;
       });
 
-      await expect(run(mockCliOptions)).rejects.toThrow('Anthropic API key is required');
+      await expect(run(mockCliOptions)).rejects.toThrow(
+        'ANTHROPIC_KEY environment variable required for Anthropic provider'
+      );
     });
 
     it('should throw error for missing OpenAI API key', async () => {
@@ -266,7 +268,9 @@ describe('CLI Flow Tests', () => {
       });
       const options = { ...mockCliOptions, provider: 'openai' };
 
-      await expect(run(options)).rejects.toThrow('OpenAI API key is required');
+      await expect(run(options)).rejects.toThrow(
+        'OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider'
+      );
     });
 
     it('should throw error for unknown provider', async () => {

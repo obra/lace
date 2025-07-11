@@ -33,7 +33,7 @@ vi.mock('ink', async () => {
 // Mock the FileScanner module
 vi.mock('../../utils/file-scanner.js', () => ({
   FileScanner: vi.fn().mockImplementation(() => ({
-    getCompletions: vi.fn().mockResolvedValue(['src/', 'package.json', 'README.md']),
+    getCompletions: vi.fn().mockReturnValue(['src/', 'package.json', 'README.md']),
   })),
 }));
 
@@ -283,7 +283,7 @@ describe('ShellInput Autocomplete Integration', () => {
         mockScanner.getCompletions.mockClear();
 
         // Mock specific completions for partial path
-        mockScanner.getCompletions.mockResolvedValue(['src/app.ts', 'src/agent.ts']);
+        mockScanner.getCompletions.mockReturnValue(['src/app.ts', 'src/agent.ts']);
       }
 
       renderWithFocus(
@@ -388,7 +388,9 @@ describe('ShellInput Autocomplete Integration', () => {
       };
 
       if (mockScanner?.getCompletions) {
-        mockScanner.getCompletions.mockRejectedValue(new Error('File system error'));
+        mockScanner.getCompletions.mockImplementation(() => {
+          throw new Error('File system error');
+        });
       }
 
       const { lastFrame } = renderWithFocus(

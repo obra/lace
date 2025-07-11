@@ -216,7 +216,9 @@ describe('App Initialization (run function)', () => {
       return undefined;
     });
     const options = { ...mockCliOptions, provider: 'anthropic' };
-    await expect(run(options)).rejects.toThrow('Anthropic API key is required');
+    await expect(run(options)).rejects.toThrow(
+      'ANTHROPIC_KEY environment variable required for Anthropic provider'
+    );
   });
 
   it('should exit if OpenAI API key is missing', async () => {
@@ -225,13 +227,15 @@ describe('App Initialization (run function)', () => {
       return undefined;
     });
     const options = { ...mockCliOptions, provider: 'openai' };
-    await expect(run(options)).rejects.toThrow('OpenAI API key is required');
+    await expect(run(options)).rejects.toThrow(
+      'OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider'
+    );
   });
 
   it('should throw error for unknown provider', async () => {
     const options = { ...mockCliOptions, provider: 'unknown-provider' };
     await expect(run(options)).rejects.toThrow(
-      'Unknown provider: unknown-provider. Available providers are: anthropic, openai, lmstudio, ollama'
+      'Unknown provider: unknown-provider. Available providers: '
     );
   });
 

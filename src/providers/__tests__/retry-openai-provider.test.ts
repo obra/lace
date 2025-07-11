@@ -224,7 +224,9 @@ describe('OpenAIProvider retry functionality', () => {
           ],
         };
         // Then fail
-        throw new Error('ECONNRESET');
+        const error = new Error('ECONNRESET');
+        (error as Error & { code: string }).code = 'ECONNRESET';
+        throw error;
       })();
 
       mockCreate.mockReturnValue(stream);

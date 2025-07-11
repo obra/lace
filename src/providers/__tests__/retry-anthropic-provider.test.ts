@@ -228,7 +228,9 @@ describe('AnthropicProvider retry functionality', () => {
           // Emit some text first
           textHandlers.forEach((handler) => handler('Hello'));
           // Then fail
-          throw new Error('ECONNRESET');
+          const error = new Error('ECONNRESET');
+          (error as Error & { code: string }).code = 'ECONNRESET';
+          throw error;
         }),
       };
 
