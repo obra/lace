@@ -115,8 +115,8 @@ describe('OpenAIProvider retry functionality', () => {
       expect(retryAttemptSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           attempt: 1,
-          delay: expect.any(Number),
-          error: expect.objectContaining({ status: 503 }),
+          delay: expect.any(Number) as number,
+          error: expect.objectContaining({ status: 503 }) as object,
         })
       );
     });
@@ -156,7 +156,7 @@ describe('OpenAIProvider retry functionality', () => {
       expect(exhaustedSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           attempts: 10,
-          lastError: expect.objectContaining({ code: 'ETIMEDOUT' }),
+          lastError: expect.objectContaining({ code: 'ETIMEDOUT' }) as object,
         })
       );
 
@@ -174,7 +174,7 @@ describe('OpenAIProvider retry functionality', () => {
       (networkError as Error & { code: string }).code = 'ECONNRESET';
 
       // Create a successful stream for the retry
-      const successStream = (async function* () {
+      const successStream = (function* () {
         yield {
           choices: [
             {
@@ -214,7 +214,7 @@ describe('OpenAIProvider retry functionality', () => {
       const messages: ProviderMessage[] = [{ role: 'user', content: 'Hello' }];
 
       // Create a stream that starts then fails
-      const stream = (async function* () {
+      const stream = (function* () {
         yield {
           choices: [
             {
@@ -224,7 +224,7 @@ describe('OpenAIProvider retry functionality', () => {
           ],
         };
         // Then fail
-        throw { code: 'ECONNRESET' };
+        throw new Error('ECONNRESET');
       })();
 
       mockCreate.mockReturnValue(stream);

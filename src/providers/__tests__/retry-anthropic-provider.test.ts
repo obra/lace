@@ -114,8 +114,8 @@ describe('AnthropicProvider retry functionality', () => {
         attempt: 1,
 
         delay: expect.any(Number) as number,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        error: expect.objectContaining({ status: 503 }),
+
+        error: expect.objectContaining({ status: 503 }) as Record<string, unknown>,
       });
     });
 
@@ -219,16 +219,16 @@ describe('AnthropicProvider retry functionality', () => {
 
       // Create a stream that starts then fails
       const stream = {
-        on: vi.fn((event, handler) => {
+        on: vi.fn((event: string, handler: (text: string) => void) => {
           if (event === 'text') {
-            textHandlers.push(handler);
+            textHandlers.push(handler as (text: string) => void);
           }
         }),
-        finalMessage: vi.fn().mockImplementation(async () => {
+        finalMessage: vi.fn().mockImplementation(() => {
           // Emit some text first
           textHandlers.forEach((handler) => handler('Hello'));
           // Then fail
-          throw { code: 'ECONNRESET' };
+          throw new Error('ECONNRESET');
         }),
       };
 

@@ -71,7 +71,7 @@ export async function getToolRenderer(
     });
 
     return renderer as ComponentType<unknown> | null;
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.debug('Tool renderer discovery failed', {
       toolName,
       error: (error as Error)?.message,

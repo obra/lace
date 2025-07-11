@@ -285,7 +285,7 @@ describe('OpenAIProvider', () => {
 
     it('should emit token events during streaming', async () => {
       const tokenEvents: string[] = [];
-      provider.on('token', ({ token }) => {
+      provider.on('token', ({ token }: { token: string }) => {
         tokenEvents.push(token);
       });
 
@@ -373,7 +373,7 @@ describe('OpenAIProvider', () => {
       const streamError = new Error('Stream failed');
       mockStream[Symbol.asyncIterator].mockReturnValue(
         {
-          async *[Symbol.asyncIterator]() {
+          *[Symbol.asyncIterator]() {
             // Yield a valid chunk to satisfy ESLint, but immediately throw after
             yield { choices: [{ delta: {} }] };
             throw streamError;

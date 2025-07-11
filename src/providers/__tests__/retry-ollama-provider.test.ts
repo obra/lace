@@ -121,8 +121,8 @@ describe('OllamaProvider retry functionality', () => {
       expect(retryAttemptSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           attempt: 1,
-          delay: expect.any(Number),
-          error: expect.objectContaining({ status: 503 }),
+          delay: expect.any(Number) as number,
+          error: expect.objectContaining({ status: 503 }) as object,
         })
       );
     });
@@ -162,7 +162,7 @@ describe('OllamaProvider retry functionality', () => {
       expect(exhaustedSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           attempts: 10,
-          lastError: expect.objectContaining({ code: 'ETIMEDOUT' }),
+          lastError: expect.objectContaining({ code: 'ETIMEDOUT' }) as object,
         })
       );
 
@@ -181,7 +181,7 @@ describe('OllamaProvider retry functionality', () => {
         .mockResolvedValueOnce({ connected: true, models: ['qwen3:32b'] });
 
       // Mock successful streaming response
-      const successStream = (async function* () {
+      const successStream = (function* () {
         yield {
           message: {
             content: 'Hello ',
@@ -219,7 +219,7 @@ describe('OllamaProvider retry functionality', () => {
       mockDiagnose.mockResolvedValue({ connected: true, models: ['qwen3:32b'] });
 
       // Create a stream that starts then fails
-      const stream = (async function* () {
+      const stream = (function* () {
         yield {
           message: {
             content: 'Hello',

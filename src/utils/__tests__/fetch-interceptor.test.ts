@@ -203,7 +203,7 @@ describe('FetchInterceptor', () => {
       expect(endTime3).toBe(1234567890250);
     });
 
-    it('should restore original fetch when disabled', async () => {
+    it('should restore original fetch when disabled', () => {
       const originalFunc = globalThis.fetch;
 
       enableFetchInterception();

@@ -41,8 +41,6 @@ export function ConversationDisplay({
 
   // Convert ephemeral messages to EphemeralMessage format and merge into timeline
   const finalTimeline = useMemo(() => {
-    const startTime = performance.now();
-
     if (ephemeralMessages.length === 0) {
       return timeline;
     }
@@ -77,9 +75,6 @@ export function ConversationDisplay({
             : timeline.metadata.lastActivity,
       },
     };
-
-    const endTime = performance.now();
-    const processingTime = endTime - startTime;
 
     // Performance monitoring removed to eliminate render overhead
 

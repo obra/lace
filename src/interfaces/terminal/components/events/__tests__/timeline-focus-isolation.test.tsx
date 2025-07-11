@@ -35,27 +35,30 @@ vi.mock('../hooks/useTimelineViewport.js', () => ({
 // Mock focus system to control which timeline is focused
 const mockFocusState: Record<string, boolean> = {};
 
-vi.mock('../../../focus/index.js', () => ({
-  ...vi.importActual('../../../focus/index.js'),
-  useLaceFocus: (id: string) => ({
-    isFocused: mockFocusState[id] || false,
-    takeFocus: () => {
-      mockFocusState[id] = true;
+vi.mock('../../../focus/index.js', async () => {
+  const actual = await vi.importActual('../../../focus/index.js');
+  return {
+    ...actual,
+    useLaceFocus: (id: string) => ({
+      isFocused: mockFocusState[id] || false,
+      takeFocus: () => {
+        mockFocusState[id] = true;
+      },
+      isInFocusPath: false,
+    }),
+    useLaceFocusContext: () => ({
+      currentFocus: 'timeline',
+      pushFocus: vi.fn(),
+      popFocus: vi.fn(),
+      getFocusStack: () => ['shell-input', 'timeline'],
+      isFocusActive: (id: string) => id === 'timeline',
+    }),
+    FocusRegions: {
+      timeline: 'timeline',
+      delegate: (threadId: string) => `delegate-${threadId}`,
     },
-    isInFocusPath: false,
-  }),
-  useLaceFocusContext: () => ({
-    currentFocus: 'timeline',
-    pushFocus: vi.fn(),
-    popFocus: vi.fn(),
-    getFocusStack: () => ['shell-input', 'timeline'],
-    isFocusActive: (id: string) => id === 'timeline',
-  }),
-  FocusRegions: {
-    timeline: 'timeline',
-    delegate: (threadId: string) => `delegate-${threadId}`,
-  },
-}));
+  };
+});
 
 // Mock other dependencies
 vi.mock('../../../../utils/use-stdout-dimensions.js', () => ({

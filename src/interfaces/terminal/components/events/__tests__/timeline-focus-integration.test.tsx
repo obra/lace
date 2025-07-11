@@ -183,7 +183,7 @@ describe('Timeline Entry Focus E2E Tests', () => {
 
   // Real integration tests for Return/Escape key behavior
   describe('Timeline Return Key Integration', () => {
-    it('should trigger focus entry when Return pressed on delegate item', async () => {
+    it('should trigger focus entry when Return pressed on delegate item', () => {
       const timeline = createTimelineWithDelegate();
 
       function TestTimelineWithInput() {
@@ -288,7 +288,7 @@ describe('Timeline Entry Focus E2E Tests', () => {
       expect(output).toContain('delegate'); // From TimelineDisplay rendering delegate item
     });
 
-    it('should verify focus operations are integrated in the system', async () => {
+    it('should verify focus operations are integrated in the system', () => {
       const timeline = createTimelineWithDelegate();
       const delegateItem = timeline.items[1];
       const focusId = getTimelineItemFocusId(delegateItem);

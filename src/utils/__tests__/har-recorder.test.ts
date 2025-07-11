@@ -87,11 +87,11 @@ describe('HARRecorder', () => {
               request: expect.objectContaining({
                 method: 'GET',
                 url: 'https://test.com',
-              }),
+              }) as object,
               response: expect.objectContaining({
                 status: 200,
                 statusText: 'OK',
-              }),
+              }) as object,
             }),
           ]) as unknown[],
         },
@@ -232,7 +232,7 @@ describe('HARRecorder', () => {
   });
 
   describe('recordHTTPRequest', () => {
-    it('should record HTTP request with all details', async () => {
+    it('should record HTTP request with all details', () => {
       const recorder = new HARRecorder(TEST_HAR_FILE);
 
       recorder.recordHTTPRequest(

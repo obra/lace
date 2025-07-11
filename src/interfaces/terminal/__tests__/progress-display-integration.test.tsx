@@ -261,12 +261,12 @@ describe('Progress Display Integration Tests', () => {
       expect(true).toBe(true); // Basic smoke test
     });
 
-    it('should re-enable input when turn completes', async () => {
+    it('should re-enable input when turn completes', () => {
       // Covered by the test above and existing turn-state-integration tests
       expect(true).toBe(true);
     });
 
-    it('should re-enable input when turn is aborted', async () => {
+    it('should re-enable input when turn is aborted', () => {
       // Covered by existing sigint-integration tests
       expect(true).toBe(true);
     });
@@ -342,7 +342,7 @@ describe('Progress Display Integration Tests', () => {
       expect(abortEvent.metrics.tokensIn).toBeGreaterThan(0);
     });
 
-    it('should exit cleanly when no operation is running', async () => {
+    it('should exit cleanly when no operation is running', () => {
       // Test double Ctrl+C behavior when no turn is active
       const wasAborted = agent.abort();
       expect(wasAborted).toBe(false); // No operation to abort

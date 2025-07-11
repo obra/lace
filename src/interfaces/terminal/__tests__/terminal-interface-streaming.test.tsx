@@ -90,8 +90,8 @@ describe('TerminalInterface Streaming Event Flow', () => {
       const mockLoadEvents = vi.fn();
 
       // Mock the useStreamingTimelineProcessor hook
-      vi.doMock('../terminal-interface.js', () => {
-        const original = vi.importActual('../terminal-interface.js');
+      vi.doMock('../terminal-interface.js', async () => {
+        const original = await vi.importActual('../terminal-interface.js');
         return {
           ...original,
           useStreamingTimelineProcessor: () => ({

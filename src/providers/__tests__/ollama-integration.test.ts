@@ -17,11 +17,11 @@ class MockTool extends Tool {
     value: z.string().describe('Value to use').optional(),
   });
 
-  protected async executeValidated(
+  protected executeValidated(
     args: { action: string; value?: string },
     _context?: ToolContext
   ): Promise<ToolResult> {
-    return this.createResult(`Mock executed: ${JSON.stringify(args)}`);
+    return Promise.resolve(this.createResult(`Mock executed: ${JSON.stringify(args)}`));
   }
 }
 
@@ -38,7 +38,7 @@ const conditionalDescribe = isOllamaAvailable ? describe.sequential : describe.s
 conditionalDescribe('Ollama Provider Integration Tests', () => {
   let mockTool: MockTool;
 
-  beforeAll(async () => {
+  beforeAll(() => {
     mockTool = new MockTool();
   }, 60000);
 

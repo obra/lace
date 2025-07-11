@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, CurrentTurnMetrics } from '~/agents/agent.js';
 import { ToolExecutor } from '~/tools/executor.js';
 import { ThreadManager } from '~/threads/thread-manager.js';
+import { ThreadEvent } from '~/threads/types.js';
 import { AIProvider } from '~/providers/base-provider.js';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
 import { Tool } from '~/tools/tool.js';
@@ -26,28 +27,28 @@ class MockRetryUIProvider extends AIProvider {
     return true;
   }
 
-  async createResponse(
+  createResponse(
     _messages: ProviderMessage[],
     _tools: Tool[] = [],
     _signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    return {
+    return Promise.resolve({
       content: 'Test response',
       toolCalls: [],
       stopReason: 'stop',
-    };
+    });
   }
 
-  async createStreamingResponse(
+  createStreamingResponse(
     _messages: ProviderMessage[],
     _tools: Tool[] = [],
     _signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    return {
+    return Promise.resolve({
       content: 'Test streaming response',
       toolCalls: [],
       stopReason: 'stop',
-    };
+    });
   }
 }
 
@@ -67,21 +68,39 @@ describe('Retry Status UI Integration', () => {
     // Mock ToolExecutor
     mockToolExecutor = {
       executeTool: vi.fn(),
-      getApprovalDecision: vi.fn(),
-    } as any;
+      registerTool: vi.fn(),
+      registerTools: vi.fn(),
+      setApprovalCallback: vi.fn(),
+      getTool: vi.fn(),
+      getAvailableToolNames: vi.fn(),
+      getAllTools: vi.fn(),
+      getApprovalCallback: vi.fn(),
+      registerAllAvailableTools: vi.fn(),
+    } as unknown as ToolExecutor;
 
     // Mock ThreadManager
     mockThreadManager = {
-      addEvent: vi.fn(),
+      addEvent: vi.fn().mockReturnValue({} as ThreadEvent),
       getEvents: vi.fn().mockReturnValue([]),
       getMainAndDelegateEvents: vi.fn().mockReturnValue([]),
       getCanonicalId: vi.fn().mockReturnValue(threadId),
       getCurrentThreadId: vi.fn().mockReturnValue(threadId),
       needsCompaction: vi.fn().mockResolvedValue(false),
       close: vi.fn(),
-      on: vi.fn(),
-      off: vi.fn(),
-    } as any;
+      generateThreadId: vi.fn(),
+      generateDelegateThreadId: vi.fn(),
+      resumeOrCreate: vi.fn(),
+      createThread: vi.fn(),
+      createDelegateThread: vi.fn(),
+      switchToThread: vi.fn(),
+      getThread: vi.fn(),
+      hasThread: vi.fn(),
+      compactToolResults: vi.fn(),
+      getDelegateThreadsFor: vi.fn(),
+      createCompactedVersion: vi.fn(),
+      cleanupOldShadows: vi.fn(),
+      autoCompactIfNeeded: vi.fn(),
+    } as unknown as ThreadManager;
 
     agent = new Agent({
       provider: mockProvider,
@@ -94,7 +113,7 @@ describe('Retry Status UI Integration', () => {
     await agent.start();
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     agent.stop();
     vi.useRealTimers();
   });

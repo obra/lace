@@ -41,13 +41,13 @@ describe('Agent Queue Methods', () => {
 
   beforeEach(() => {
     mockProvider = new MockProvider();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
     mockToolExecutor = {
       registerAllAvailableTools: vi.fn(),
       getRegisteredTools: vi.fn().mockReturnValue([]),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    } as unknown as ToolExecutor;
+
     mockThreadManager = {
       addEvent: vi.fn(),
       getEvents: vi.fn().mockReturnValue([]),
@@ -60,7 +60,7 @@ describe('Agent Queue Methods', () => {
       needsCompaction: vi.fn().mockResolvedValue(false),
       createCompactedVersion: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
+    } as unknown as ThreadManager;
 
     agent = new Agent({
       provider: mockProvider,

@@ -110,14 +110,14 @@ describe('Agent retry event forwarding', () => {
     mockProvider = new MockRetryProvider({});
 
     // Mock ToolExecutor
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
     mockToolExecutor = {
       executeTool: vi.fn(),
       getApprovalDecision: vi.fn(),
-    } as any;
+    } as unknown as ToolExecutor;
 
     // Mock ThreadManager
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
     mockThreadManager = {
       addEvent: vi.fn(),
       getEvents: vi.fn().mockReturnValue([]),
@@ -125,7 +125,7 @@ describe('Agent retry event forwarding', () => {
       getCurrentThreadId: vi.fn().mockReturnValue(threadId),
       needsCompaction: vi.fn().mockResolvedValue(false),
       close: vi.fn(),
-    } as any;
+    } as unknown as ThreadManager;
 
     agent = new Agent({
       provider: mockProvider,

@@ -270,7 +270,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   // Refresh project context when processing completes (tools may have changed git status)
   useEffect(() => {
     if (!isProcessing) {
-      refreshContext();
+      void refreshContext();
     }
   }, [isProcessing, refreshContext]);
 
@@ -1110,13 +1110,13 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         });
       }
     };
-    initCommands();
+    void initCommands();
   }, [addMessage]);
 
   // Initialize agent on mount
   useEffect(() => {
     // Initialize streaming session (loads historical events into StreamingTimelineProcessor)
-    initializeStreamingSession();
+    void initializeStreamingSession();
 
     addMessage({
       type: 'system',
@@ -1258,7 +1258,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
                           })()
                         : 'Type your message...'
                     }
-                    onSubmit={handleSubmit}
+                    onSubmit={(value) => void handleSubmit(value)}
                     onChange={setCurrentInput}
                     autoFocus={false}
                     disabled={false} // Allow typing during processing, submission is controlled in handleSubmit

@@ -128,9 +128,9 @@ describe('ToolApprovalModal', () => {
         />
       );
 
-      simulateKeyPress('y');
-      simulateKeyPress('s');
-      simulateKeyPress('n');
+      void simulateKeyPress('y');
+      void simulateKeyPress('s');
+      void simulateKeyPress('n');
 
       expect(mockOnDecision).not.toHaveBeenCalled();
     });
@@ -322,7 +322,7 @@ describe('ToolApprovalModal', () => {
         />
       );
 
-      simulateKeyPress('y');
+      void simulateKeyPress('y');
 
       expect(mockOnDecision).not.toHaveBeenCalled();
     });

@@ -43,7 +43,6 @@ describe('Agent Queue End-to-End Scenarios', () => {
   beforeEach(async () => {
     longProvider = new LongOperationProvider(200); // 200ms delay
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     mockToolExecutor = {
       registerAllAvailableTools: vi.fn(),
       getAllTools: vi.fn().mockReturnValue([]),
@@ -55,9 +54,8 @@ describe('Agent Queue End-to-End Scenarios', () => {
       getApprovalCallback: vi.fn().mockReturnValue(undefined),
       executeTool: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
+    } as unknown as ToolExecutor;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     mockThreadManager = {
       addEvent: vi.fn(),
       getEvents: vi.fn().mockReturnValue([]),
@@ -70,7 +68,7 @@ describe('Agent Queue End-to-End Scenarios', () => {
       needsCompaction: vi.fn().mockResolvedValue(false),
       createCompactedVersion: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
-    } as any;
+    } as unknown as ThreadManager;
 
     agent = new Agent({
       provider: longProvider,

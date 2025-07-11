@@ -433,11 +433,11 @@ describe('CLI Flow Tests', () => {
       await run(mockCliOptions);
 
       expect(Agent).toHaveBeenCalledWith({
-        provider: expect.anything(), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
-        toolExecutor: expect.anything(), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
-        threadManager: expect.anything(), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
-        threadId: expect.any(String), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
-        tools: expect.anything(), // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+        provider: expect.anything() as unknown,
+        toolExecutor: expect.anything() as unknown,
+        threadManager: expect.anything() as unknown,
+        threadId: expect.any(String) as string,
+        tools: expect.anything() as unknown,
       });
     });
 

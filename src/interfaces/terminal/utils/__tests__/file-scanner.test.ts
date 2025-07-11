@@ -41,7 +41,7 @@ describe('FileScanner', () => {
   });
 
   describe('basic file scanning', () => {
-    it('should return files and directories from current directory', async () => {
+    it('should return files and directories from current directory', () => {
       // Mock fs.existsSync to return false for .gitignore
       mockFs.existsSync.mockReturnValue(false);
 
@@ -52,7 +52,7 @@ describe('FileScanner', () => {
         createMockDirent('README.md', false),
       ] as any);
 
-      const completions = await scanner.getCompletions();
+      const completions = scanner.getCompletions();
 
       expect(completions).toEqual(['src/', 'package.json', 'README.md'] as string[]);
       expect(mockFs.readdirSync).toHaveBeenCalledWith(path.resolve(testWorkingDir, '.'), {
@@ -60,7 +60,7 @@ describe('FileScanner', () => {
       });
     });
 
-    it('should prioritize directories over files', async () => {
+    it('should prioritize directories over files', () => {
       mockFs.existsSync.mockReturnValue(false);
       mockFs.readdirSync.mockReturnValue([
         createMockDirent('app.ts', false),
@@ -69,7 +69,7 @@ describe('FileScanner', () => {
         createMockDirent('index.ts', false),
       ] as any);
 
-      const completions = await scanner.getCompletions();
+      const completions = scanner.getCompletions();
 
       // Directories should come first
       expect(completions.slice(0, 2)).toEqual(['dist/', 'src/'] as string[]);
@@ -88,14 +88,14 @@ describe('FileScanner', () => {
       ] as any);
     });
 
-    it('should filter by prefix match', async () => {
-      const completions = await scanner.getCompletions('s');
+    it('should filter by prefix match', () => {
+      const completions = scanner.getCompletions('s');
 
       expect(completions).toEqual(['scripts/', 'src/', 'server.ts'] as string[]);
     });
 
-    it('should prioritize exact prefix matches', async () => {
-      const completions = await scanner.getCompletions('src');
+    it('should prioritize exact prefix matches', () => {
+      const completions = scanner.getCompletions('src');
 
       // src/ should come before scripts/ because it's an exact prefix match
       expect(completions[0]).toBe('src/');
@@ -146,7 +146,7 @@ describe('FileScanner', () => {
   });
 
   describe('.gitignore support', () => {
-    it('should respect .gitignore patterns', async () => {
+    it('should respect .gitignore patterns', () => {
       // Mock .gitignore exists and has content
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue('node_modules\n*.log\n# comment line\n\n.env');
@@ -160,7 +160,7 @@ describe('FileScanner', () => {
         createMockDirent('.env', false),
       ] as any);
 
-      const completions = await scanner.getCompletions();
+      const completions = scanner.getCompletions();
 
       // Should exclude gitignored files/directories
       expect(completions).toContain('src/');
@@ -171,27 +171,27 @@ describe('FileScanner', () => {
       expect(completions).not.toContain('.env');
     });
 
-    it('should handle missing .gitignore gracefully', async () => {
+    it('should handle missing .gitignore gracefully', () => {
       mockFs.existsSync.mockReturnValue(false);
       mockFs.readdirSync.mockReturnValue([
         createMockDirent('src', true),
         createMockDirent('node_modules', true),
       ] as any);
 
-      const completions = await scanner.getCompletions();
+      const completions = scanner.getCompletions();
 
       // Should still exclude common patterns even without .gitignore
       expect(completions).toEqual(['src/'] as string[]);
       expect(completions).not.toContain('node_modules/');
     });
 
-    it('should load and parse gitignore patterns', async () => {
+    it('should load and parse gitignore patterns', () => {
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue('*.tmp\ntest-*\n# comment\n\n');
 
       mockFs.readdirSync.mockReturnValue([createMockDirent('app.ts', false)] as any);
 
-      const completions = await scanner.getCompletions();
+      const completions = scanner.getCompletions();
 
       // Should successfully complete without errors when gitignore exists
       expect(completions).toContain('app.ts');
@@ -205,18 +205,18 @@ describe('FileScanner', () => {
       mockFs.readdirSync.mockReturnValue([createMockDirent('src', true)] as any);
     });
 
-    it('should cache results and reuse them', async () => {
-      await scanner.getCompletions();
-      await scanner.getCompletions();
+    it('should cache results and reuse them', () => {
+      scanner.getCompletions();
+      scanner.getCompletions();
 
       // Should only call readdirSync once due to caching
       expect(mockFs.readdirSync).toHaveBeenCalledTimes(1);
     });
 
-    it('should clear cache when requested', async () => {
-      await scanner.getCompletions();
+    it('should clear cache when requested', () => {
+      scanner.getCompletions();
       scanner.clearCache();
-      await scanner.getCompletions();
+      scanner.getCompletions();
 
       // Should call readdirSync twice after cache clear
       expect(mockFs.readdirSync).toHaveBeenCalledTimes(2);
@@ -231,18 +231,18 @@ describe('FileScanner', () => {
   });
 
   describe('error handling', () => {
-    it('should handle permission errors gracefully', async () => {
+    it('should handle permission errors gracefully', () => {
       mockFs.existsSync.mockReturnValue(false);
       mockFs.readdirSync.mockImplementation(() => {
         throw new Error('EACCES: permission denied');
       });
 
-      const completions = await scanner.getCompletions();
+      const completions = scanner.getCompletions();
 
       expect(completions).toEqual([] as string[]);
     });
 
-    it('should handle .gitignore read errors', async () => {
+    it('should handle .gitignore read errors', () => {
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockImplementation(() => {
         throw new Error('EACCES: permission denied');
@@ -250,17 +250,17 @@ describe('FileScanner', () => {
       mockFs.readdirSync.mockReturnValue([createMockDirent('src', true)] as any);
 
       // Should not throw and still return results
-      const completions = await scanner.getCompletions();
+      const completions = scanner.getCompletions();
       expect(completions).toEqual(['src/'] as string[]);
     });
   });
 
   describe('path normalization', () => {
-    it('should handle empty partial paths', async () => {
+    it('should handle empty partial paths', () => {
       mockFs.existsSync.mockReturnValue(false);
       mockFs.readdirSync.mockReturnValue([createMockDirent('file.ts', false)] as any);
 
-      const completions = await scanner.getCompletions('');
+      const completions = scanner.getCompletions('');
 
       // Should return files when no partial path provided
       expect(completions).toContain('file.ts');

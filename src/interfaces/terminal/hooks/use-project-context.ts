@@ -224,7 +224,7 @@ export function useProjectContext(): UseProjectContextResult {
   useEffect(() => {
     const currentCwd = process.cwd();
     if (currentCwd !== context.cwd) {
-      refreshContext();
+      void refreshContext();
     }
   }, []); // Empty deps - only run once on mount
 

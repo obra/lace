@@ -14,20 +14,39 @@ import {
 } from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
 import { TimelineItemRef } from '~/interfaces/terminal/components/timeline-item-focus.js';
 
+// Safely convert unknown value to string
+function safeStringify(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  // For objects, use JSON.stringify for better representation
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '[object Object]';
+  }
+}
+
 // Extract primary info from tool arguments
 function getPrimaryInfo(toolName: string, args: Record<string, unknown>): string {
   // Special handling for known tools
   switch (toolName) {
     case 'bash':
-      return `$ ${args.command || ''}`;
+      return `$ ${safeStringify(args.command)}`;
     case 'file-write':
     case 'file-read':
     case 'file-edit':
-      return (args.path || args.file_path || '') as string;
+      return safeStringify(args.path || args.file_path || '');
     case 'ripgrep-search':
-      return `"${args.pattern || ''}" in ${args.path || 'current directory'}`;
+      return `"${safeStringify(args.pattern)}" in ${safeStringify(args.path) || 'current directory'}`;
     case 'delegate':
-      return `"${args.task || args.prompt || 'Unknown task'}"`;
+      return `"${safeStringify(args.task || args.prompt || 'Unknown task')}"`;
     default: {
       // For unknown tools, use the first argument value if it's short
       const firstValue = Object.values(args)[0];

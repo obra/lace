@@ -15,8 +15,6 @@ import { ToolExecutor } from '~/tools/executor.js';
 import { ProviderMessage } from '~/providers/base-provider.js';
 import { ThreadEvent } from '~/threads/types.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 interface DebugOptions {
   threadId: string;
   provider: string;
@@ -40,8 +38,8 @@ interface ThreadDebugInfo {
       systemPrompts: number;
     };
   };
-  conversation: any;
-  rawEvents: any[];
+  conversation: unknown;
+  rawEvents: unknown[];
 }
 
 async function debugThread(options: DebugOptions): Promise<ThreadDebugInfo> {
@@ -81,7 +79,7 @@ async function debugThread(options: DebugOptions): Promise<ThreadDebugInfo> {
 
   // Access the private method through reflection
   const agentWithPrivates = agent as unknown as {
-    _buildConversationFromEvents: (events: any[]) => any;
+    _buildConversationFromEvents: (events: unknown[]) => unknown;
   };
 
   const buildConversationFromEvents = agentWithPrivates._buildConversationFromEvents.bind(agent);

@@ -208,11 +208,11 @@ const ShellInput: React.FC<ShellInputProps> = ({
         if (beforeCursor.startsWith('./')) {
           // Relative path from current directory
           const relativePath = beforeCursor.slice(2);
-          completions = await scanner.getCompletions(relativePath);
+          completions = scanner.getCompletions(relativePath);
           completions = completions.map((item) => `./${item}`);
         } else {
           // Standard path completion (works for paths with "/", empty string, and prefix matching)
-          completions = await scanner.getCompletions(beforeCursor);
+          completions = scanner.getCompletions(beforeCursor);
         }
       }
 
@@ -315,7 +315,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
           // Don't trigger autocomplete if we're in completely empty content or just whitespace
           // Allow autocomplete if there's text before cursor OR if the line has any content
           if (beforeCursor.trim().length > 0 || trimmedLine.length > 0) {
-            showAutocomplete();
+            void showAutocomplete();
           }
         }
         // If autocomplete is visible, it will handle Tab itself

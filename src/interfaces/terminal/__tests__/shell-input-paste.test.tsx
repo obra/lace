@@ -56,7 +56,7 @@ describe('ShellInput Paste Functionality', () => {
       act(() => {
         const [, ops] = result.current;
         // This will be the paste method we'll implement
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       // Wait for async clipboard operation
@@ -81,7 +81,7 @@ describe('ShellInput Paste Functionality', () => {
 
       act(() => {
         const [, ops] = result.current;
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       await act(async () => {
@@ -105,7 +105,7 @@ describe('ShellInput Paste Functionality', () => {
 
       act(() => {
         const [, ops] = result.current;
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       await act(async () => {
@@ -131,7 +131,7 @@ describe('ShellInput Paste Functionality', () => {
 
       act(() => {
         const [, ops] = result.current;
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       await act(async () => {
@@ -156,7 +156,7 @@ describe('ShellInput Paste Functionality', () => {
 
       act(() => {
         const [, ops] = result.current;
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       await act(async () => {
@@ -181,7 +181,7 @@ describe('ShellInput Paste Functionality', () => {
 
       act(() => {
         const [, ops] = result.current;
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       await act(async () => {
@@ -208,7 +208,7 @@ describe('ShellInput Paste Functionality', () => {
 
       act(() => {
         const [, ops] = result.current;
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       await act(async () => {
@@ -227,7 +227,7 @@ describe('ShellInput Paste Functionality', () => {
 
       act(() => {
         const [, ops] = result.current;
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       await act(async () => {
@@ -251,7 +251,7 @@ describe('ShellInput Paste Functionality', () => {
 
       act(() => {
         const [, ops] = result.current;
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       await act(async () => {
@@ -273,7 +273,7 @@ describe('ShellInput Paste Functionality', () => {
 
       act(() => {
         const [, ops] = result.current;
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       await act(async () => {
@@ -298,7 +298,7 @@ describe('ShellInput Paste Functionality', () => {
 
       act(() => {
         const [, ops] = result.current;
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       await act(async () => {
@@ -317,7 +317,7 @@ describe('ShellInput Paste Functionality', () => {
 
       act(() => {
         const [, ops] = result.current;
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       await act(async () => {
@@ -362,7 +362,7 @@ describe('ShellInput Paste Functionality', () => {
       act(() => {
         const [, ops] = result.current;
         ops.setCursorPosition(1, 5); // End of "Short"
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       await act(async () => {
@@ -390,7 +390,7 @@ describe('ShellInput Paste Functionality', () => {
       act(() => {
         const [, ops] = result.current;
         ops.moveCursor('end');
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       await act(async () => {
@@ -410,7 +410,7 @@ describe('ShellInput Paste Functionality', () => {
       act(() => {
         const [, ops] = result.current;
         ops.setCursorPosition(1, 1); // After "B"
-        ops.pasteFromClipboard();
+        void ops.pasteFromClipboard();
       });
 
       await act(async () => {

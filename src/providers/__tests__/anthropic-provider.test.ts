@@ -222,7 +222,7 @@ describe('AnthropicProvider', () => {
 
     it('should emit token events during streaming', async () => {
       const tokenEvents: string[] = [];
-      provider.on('token', ({ token }) => {
+      provider.on('token', ({ token }: { token: string }) => {
         tokenEvents.push(token);
       });
 

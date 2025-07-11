@@ -47,8 +47,8 @@ class MockProvider extends AIProvider {
     };
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return this.mockResponse;
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve(this.mockResponse);
   }
 }
 
@@ -86,7 +86,7 @@ describe('Compaction Integration', () => {
     await agent.start();
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     agent?.stop();
     threadManager?.close();
     if (fs.existsSync(tempDbPath)) {

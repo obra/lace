@@ -157,8 +157,8 @@ describe('LMStudioProvider retry functionality', () => {
       expect(retryAttemptSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           attempt: 1,
-          delay: expect.any(Number),
-          error: expect.objectContaining({ status: 503 }),
+          delay: expect.any(Number) as number,
+          error: expect.objectContaining({ status: 503 }) as object,
         })
       );
     });
@@ -198,7 +198,7 @@ describe('LMStudioProvider retry functionality', () => {
       expect(exhaustedSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           attempts: 10,
-          lastError: expect.objectContaining({ code: 'ETIMEDOUT' }),
+          lastError: expect.objectContaining({ code: 'ETIMEDOUT' }) as object,
         })
       );
 
