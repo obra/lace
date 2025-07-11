@@ -21,6 +21,9 @@ build/
 *.swo
 *~
 
+# Next.js
+.next/
+
 # OS generated files
 .DS_Store
 .DS_Store?

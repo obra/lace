@@ -1,0 +1,1402 @@
+<!-- DaisyUI + Tailwind CSS -->
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<!-- FontAwesome Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<!-- Alpine.js -->
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<!-- Lace AI Development Environment - Mobile First -->
+<div x-data="laceApp()" class="flex h-screen bg-base-200 text-base-content font-sans overflow-hidden" :data-theme="currentTheme">
+  
+  <!-- Mobile Navigation Overlay -->
+  <div x-show="showMobileNav" 
+       x-transition:enter="transition ease-out duration-300"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-200"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       class="fixed inset-0 bg-black/50 z-40 lg:hidden"
+       @click="showMobileNav = false"></div>
+
+  <!-- Mobile Sidebar -->
+  <div x-show="showMobileNav"
+       x-transition:enter="transition ease-out duration-300 transform"
+       x-transition:enter-start="-translate-x-full"
+       x-transition:enter-end="translate-x-0"
+       x-transition:leave="transition ease-in duration-200 transform"
+       x-transition:leave-start="translate-x-0"
+       x-transition:leave-end="-translate-x-full"
+       class="fixed left-0 top-0 h-full w-80 bg-base-100 border-r border-base-300 z-50 lg:hidden overflow-y-auto">
+    
+    <!-- Mobile Header -->
+    <div class="sticky top-0 bg-base-100 border-b border-base-300 p-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-gradient-to-br from-teal-600 to-teal-700 rounded-lg flex items-center justify-center overflow-hidden relative">
+          <!-- Brocade Pattern -->
+          <div class="absolute inset-0 opacity-20">
+            <div class="absolute inset-0" style="background-image: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px), repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)"></div>
+          </div>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <div class="w-5 h-5 border-2 border-white/30 rounded transform rotate-45"></div>
+            <div class="absolute w-3 h-3 border border-white/20 rounded transform rotate-45"></div>
+          </div>
+        </div>
+        <h1 class="font-semibold text-base-content">Lace</h1>
+      </div>
+      <button @click="showMobileNav = false" class="p-2 hover:bg-base-200 rounded-lg">
+        <i class="fas fa-times w-6 h-6"></i>
+      </button>
+    </div>
+
+    <!-- Mobile Navigation Content -->
+    <div class="p-4 space-y-6">
+      <!-- Project Quick Switcher -->
+      <div>
+        <label class="text-sm font-medium text-base-content/70 mb-2 block">Project</label>
+        <select class="select select-bordered w-full" x-model="currentProject" @change="switchProject($event.target.value)">
+          <template x-for="project in projects" :key="project.id">
+            <option :value="project" x-text="project.name"></option>
+          </template>
+        </select>
+      </div>
+
+      <!-- Timeline Quick Switcher -->
+      <div>
+        <label class="text-sm font-medium text-base-content/70 mb-2 block">Timeline</label>
+        <select class="select select-bordered w-full" x-model="currentTimeline" @change="switchTimeline($event.target.value)">
+          <template x-for="timeline in [currentTimeline, ...timelines]" :key="timeline.id">
+            <option :value="timeline" x-text="`${timeline.name} (${timeline.agent})`"></option>
+          </template>
+        </select>
+      </div>
+
+      <!-- Quick Actions -->
+      <div>
+        <label class="text-sm font-medium text-base-content/70 mb-2 block">Quick Actions</label>
+        <div class="grid grid-cols-2 gap-2">
+          <button @click="triggerTool('file-find')" class="btn btn-sm btn-outline">
+            <i class="fas fa-search w-4 h-4 mr-1"></i>
+            Find
+          </button>
+          <button @click="triggerTool('bash')" class="btn btn-sm btn-outline">
+            <i class="fas fa-terminal w-4 h-4 mr-1"></i>
+            Run
+          </button>
+          <button @click="openTaskBoard()" class="btn btn-sm btn-outline">
+            <i class="fas fa-tasks w-4 h-4 mr-1"></i>
+            Tasks
+          </button>
+          <button @click="openFileManager()" class="btn btn-sm btn-outline">
+            <i class="fas fa-folder w-4 h-4 mr-1"></i>
+            Files
+          </button>
+        </div>
+      </div>
+
+      <!-- Active Tasks Preview -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-sm font-medium text-base-content/70">Active Tasks</label>
+          <span class="badge badge-sm bg-teal-500 text-white border-0" x-text="activeTasks.length"></span>
+        </div>
+        <div class="space-y-2">
+          <template x-for="task in activeTasks.slice(0, 3)" :key="task.id">
+            <div class="p-3 bg-base-200 rounded-lg border border-base-300" @click="openTaskDetail(task)">
+              <h4 class="text-sm font-medium truncate" x-text="task.title"></h4>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-xs px-1.5 py-0.5 rounded" 
+                      :class="task.priority === 'high' ? 'bg-red-900/20 text-red-600 dark:bg-red-900/30 dark:text-red-400' : task.priority === 'medium' ? 'bg-yellow-900/20 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-base-content/10 text-base-content/60'"
+                      x-text="task.priority"></span>
+                <span class="text-xs text-base-content/50" x-text="task.assignee"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Theme Selector -->
+      <div>
+        <label class="text-sm font-medium text-base-content/70 mb-2 block">Theme</label>
+        <div class="grid grid-cols-3 gap-2">
+          <template x-for="theme in availableThemes.slice(0, 6)" :key="theme.name">
+            <button @click="setTheme(theme.name)"
+                    class="relative p-3 rounded-lg border-2 transition-all"
+                    :class="currentTheme === theme.name ? 'border-primary' : 'border-base-300'">
+              <div class="w-full h-6 rounded flex overflow-hidden">
+                <div class="flex-1" :style="`background-color: ${theme.colors.primary}`"></div>
+                <div class="flex-1" :style="`background-color: ${theme.colors.secondary}`"></div>
+                <div class="flex-1" :style="`background-color: ${theme.colors.accent}`"></div>
+              </div>
+              <span class="text-xs text-center block mt-1 capitalize" x-text="theme.name"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Desktop Sidebar -->
+  <div class="hidden lg:flex bg-base-100 border-r border-base-300 flex-col relative transition-all duration-300"
+       :style="showDesktopSidebar ? `width: ${sidebarWidth}px` : 'width: 64px'">
+    
+    <!-- Collapsed state - Logo strip -->
+    <div x-show="!showDesktopSidebar" class="flex flex-col items-center py-4 space-y-6">
+      <div class="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center shadow-lg">
+        <span class="text-primary-content font-bold text-lg">L</span>
+      </div>
+      
+      <!-- Collapsed quick actions -->
+      <div class="flex flex-col gap-4">
+        <button @click="triggerTool('file-find')" class="p-2 hover:bg-base-200 rounded-lg transition-colors" title="Find Files">
+          <i class="fas fa-search w-5 h-5 text-base-content/60"></i>
+        </button>
+        <button @click="triggerTool('bash')" class="p-2 hover:bg-base-200 rounded-lg transition-colors" title="Terminal">
+          <i class="fas fa-terminal w-5 h-5 text-base-content/60"></i>
+        </button>
+        <button @click="openTaskBoard()" class="p-2 hover:bg-base-200 rounded-lg transition-colors" title="Tasks">
+          <i class="fas fa-tasks w-5 h-5 text-base-content/60"></i>
+        </button>
+        <button @click="openFileManager()" class="p-2 hover:bg-base-200 rounded-lg transition-colors" title="Files">
+          <i class="fas fa-folder w-5 h-5 text-base-content/60"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Expanded state content -->
+    <div x-show="showDesktopSidebar" class="flex flex-col h-full">
+      <!-- Desktop Header -->
+      <div class="p-4 border-b border-base-300">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-gradient-to-br from-teal-600 to-teal-700 rounded-lg flex items-center justify-center shadow-lg overflow-hidden relative">
+              <!-- Brocade Pattern -->
+              <div class="absolute inset-0 opacity-20">
+                <div class="absolute inset-0" style="background-image: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px), repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)"></div>
+              </div>
+              <div class="absolute inset-0 flex items-center justify-center">
+                <div class="w-5 h-5 border-2 border-white/30 rounded transform rotate-45"></div>
+                <div class="absolute w-3 h-3 border border-white/20 rounded transform rotate-45"></div>
+              </div>
+            </div>
+            <h1 class="font-semibold text-base-content">Lace</h1>
+          </div>
+        </div>
+      </div>
+
+      <!-- Project Selector -->
+      <div class="p-4 border-b border-base-300">
+        <div class="dropdown w-full">
+          <div tabindex="0" role="button" class="btn btn-ghost justify-between w-full">
+            <div class="flex items-center gap-2">
+              <i class="fas fa-folder-open w-4 h-4 text-teal-600"></i>
+              <span x-text="currentProject.name" class="truncate"></span>
+            </div>
+            <i class="fas fa-chevron-down w-4 h-4"></i>
+          </div>
+          <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-full">
+            <template x-for="project in projects" :key="project.id">
+              <li><a @click="switchProject(project)" x-text="project.name"></a></li>
+            </template>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Desktop Navigation Content -->
+      <div class="flex-1 overflow-y-auto">
+        
+        <!-- Conversations Section -->
+        <div class="p-4">
+          <button @click="conversationsExpanded = !conversationsExpanded" 
+                  class="flex items-center justify-between w-full text-left p-3 hover:bg-base-200 rounded-lg transition-colors">
+            <span class="text-sm font-medium text-base-content">Agent Chats</span>
+            <i class="fas fa-chevron-right w-4 h-4 transition-transform text-base-content/60" 
+               :class="conversationsExpanded ? 'rotate-90' : ''"></i>
+          </button>
+          
+          <div x-show="conversationsExpanded" x-collapse class="mt-2 space-y-1">
+            <div class="p-3 bg-teal-500/10 border border-teal-500/30 rounded-lg text-sm">
+              <div class="flex items-center gap-2">
+                <div class="w-2 h-2 bg-teal-500 rounded-full"></div>
+                <span x-text="currentTimeline.name"></span>
+                <span class="ml-auto text-xs px-1.5 py-0.5 rounded"
+                      :class="currentTimeline.agent === 'Claude' ? 'bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : currentTimeline.agent === 'Gemini' ? 'bg-blue-900/20 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-base-content/10 text-base-content/60'"
+                      x-text="currentTimeline.agent"></span>
+              </div>
+            </div>
+            <template x-for="timeline in timelines" :key="timeline.id">
+              <button @click="switchTimeline(timeline)" 
+                      class="w-full text-left p-3 hover:bg-base-200 rounded-lg text-sm text-base-content/80 transition-colors">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <i class="fas fa-comments w-4 h-4 text-base-content/40"></i>
+                    <span x-text="timeline.name" class="truncate"></span>
+                  </div>
+                  <span class="text-xs px-1.5 py-0.5 rounded"
+                        :class="timeline.agent === 'Claude' ? 'bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : timeline.agent === 'GPT-4' ? 'bg-green-900/20 text-green-600 dark:bg-green-900/30 dark:text-green-400' : timeline.agent === 'Gemini' ? 'bg-blue-900/20 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-base-content/10 text-base-content/60'"
+                        x-text="timeline.agent"></span>
+                </div>
+              </button>
+            </template>
+            <button @click="newTimeline()" 
+                    class="w-full p-3 border border-base-300 rounded-lg text-sm text-center hover:bg-base-200 transition-colors">
+              <div class="flex items-center justify-center gap-2">
+                <i class="fas fa-plus w-4 h-4"></i>
+                New Timeline
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Task Management UI -->
+        <div class="p-4 border-t border-base-300">
+          <button @click="tasksExpanded = !tasksExpanded" 
+                  class="flex items-center justify-between w-full text-left p-3 hover:bg-base-200 rounded-lg transition-colors">
+            <span class="text-sm font-medium text-base-content">Tasks</span>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-sm bg-teal-500 text-white border-0" x-text="activeTasks.length"></span>
+              <i class="fas fa-chevron-right w-4 h-4 transition-transform text-base-content/60" 
+                 :class="tasksExpanded ? 'rotate-90' : ''"></i>
+            </div>
+          </button>
+          
+          <div x-show="tasksExpanded" x-collapse class="mt-2 space-y-2">
+            <template x-for="task in activeTasks.slice(0, 3)" :key="task.id">
+              <div class="task-card p-3 bg-base-200 rounded-lg border border-base-300 hover:shadow-sm transition-all cursor-pointer"
+                   @click="openTaskDetail(task)">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="flex-1 min-w-0">
+                    <h4 class="text-sm font-medium text-base-content truncate" x-text="task.title"></h4>
+                    <p class="text-xs text-base-content/60 mt-1" x-text="task.description"></p>
+                    <div class="flex items-center gap-2 mt-2">
+                      <span class="text-xs px-1.5 py-0.5 rounded" 
+                            :class="task.priority === 'high' ? 'bg-red-900/20 text-red-600 dark:bg-red-900/30 dark:text-red-400' : task.priority === 'medium' ? 'bg-yellow-900/20 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-base-content/10 text-base-content/60'"
+                            x-text="task.priority"></span>
+                      <span class="text-xs text-base-content/50" x-text="task.assignee"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <button class="w-full p-2 text-xs text-base-content/60 hover:text-base-content hover:bg-base-200 rounded transition-colors">
+              View All Tasks
+            </button>
+          </div>
+        </div>
+
+        <!-- File Browser -->
+        <div class="p-4 border-t border-base-300">
+          <button @click="filesExpanded = !filesExpanded" 
+                  class="flex items-center justify-between w-full text-left p-3 hover:bg-base-200 rounded-lg transition-colors">
+            <span class="text-sm font-medium text-base-content">Files</span>
+            <i class="fas fa-chevron-right w-4 h-4 transition-transform text-base-content/60" 
+               :class="filesExpanded ? 'rotate-90' : ''"></i>
+          </button>
+          
+          <div x-show="filesExpanded" x-collapse class="mt-2 space-y-1 max-h-64 overflow-y-auto">
+            <template x-for="file in recentFiles" :key="file.path">
+              <button class="w-full text-left p-3 hover:bg-base-200 rounded-lg text-sm text-base-content/80 flex items-center transition-colors group"
+                      @click="openFile(file)">
+                <i class="fas fa-file-code w-4 h-4 mr-2 text-base-content/40 group-hover:text-teal-600"></i>
+                <div class="flex-1 min-w-0">
+                  <div x-text="file.name" class="truncate"></div>
+                  <div x-text="file.path" class="text-xs text-base-content/50 truncate"></div>
+                </div>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Settings -->
+        <div class="p-4 border-t border-base-300">
+          <button @click="settingsExpanded = !settingsExpanded" 
+                  class="flex items-center justify-between w-full text-left p-3 hover:bg-base-200 rounded-lg transition-colors">
+            <span class="text-sm font-medium text-base-content">Settings</span>
+            <i class="fas fa-chevron-right w-4 h-4 transition-transform text-base-content/60" 
+               :class="settingsExpanded ? 'rotate-90' : ''"></i>
+          </button>
+          
+          <div x-show="settingsExpanded" x-collapse class="mt-2 space-y-4">
+            <!-- Theme Selector -->
+            <div class="p-4 bg-base-200 rounded-lg space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-base-content">Theme</span>
+                <span class="text-xs text-base-content/60 capitalize" x-text="currentTheme"></span>
+              </div>
+              
+              <!-- Theme Grid -->
+              <div class="grid grid-cols-3 gap-2">
+                <template x-for="theme in availableThemes.slice(0, 9)" :key="theme.name">
+                  <button @click="setTheme(theme.name)"
+                          class="relative p-2 rounded-lg border-2 transition-all hover:scale-105"
+                          :class="currentTheme === theme.name ? 'border-primary' : 'border-base-300 hover:border-base-content/20'">
+                    <div class="flex flex-col items-center gap-1">
+                      <div class="w-8 h-5 rounded flex overflow-hidden border border-base-content/10">
+                        <div class="flex-1" :style="`background-color: ${theme.colors.primary}`"></div>
+                        <div class="flex-1" :style="`background-color: ${theme.colors.secondary}`"></div>
+                        <div class="flex-1" :style="`background-color: ${theme.colors.accent}`"></div>
+                      </div>
+                      <span class="text-xs text-base-content/80 capitalize" x-text="theme.name"></span>
+                    </div>
+                    <div x-show="currentTheme === theme.name" 
+                         class="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full flex items-center justify-center">
+                      <i class="fas fa-check w-2 h-2 text-primary-content"></i>
+                    </div>
+                  </button>
+                </template>
+              </div>
+
+              <!-- Rules File -->
+              <div class="pt-2 border-t border-base-300">
+                <button @click="openRulesFile()" class="w-full p-2 text-sm text-center border border-base-300 rounded hover:bg-base-300 transition-colors">
+                  <div class="flex items-center justify-center gap-2">
+                    <i class="fas fa-cog w-4 h-4"></i>
+                    Edit Rules
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Account Section -->
+      <div class="mt-auto border-t border-base-300 p-4">
+        <div class="dropdown dropdown-top w-full">
+          <div tabindex="0" role="button" class="flex items-center gap-3 p-3 hover:bg-base-200 rounded-lg transition-colors cursor-pointer w-full">
+            <div class="relative flex-shrink-0">
+              <div class="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center ring-2 ring-base-300 shadow-md">
+                <span class="text-white font-bold text-lg">JD</span>
+              </div>
+              <div class="absolute -bottom-1 -right-1 w-3 h-3 bg-teal-500 rounded-full border-2 border-base-100"></div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-sm text-base-content truncate">John Developer</div>
+              <div class="flex items-center gap-1">
+                <i class="fas fa-crown w-3 h-3 text-yellow-600"></i>
+                <span class="text-xs text-base-content/60">Pro Plan</span>
+              </div>
+            </div>
+            <i class="fas fa-chevron-up w-4 h-4 text-base-content/40"></i>
+          </div>
+          <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-full mb-2 border border-base-300">
+            <li class="menu-title">
+              <span class="text-xs uppercase text-base-content/50">Account</span>
+            </li>
+            <li><a class="flex items-center gap-3">
+              <i class="fas fa-user w-4 h-4"></i>
+              <span>Profile</span>
+            </a></li>
+            <li><a class="flex items-center gap-3">
+              <i class="fas fa-cog w-4 h-4"></i>
+              <span>Account Settings</span>
+            </a></li>
+            <li><a class="flex items-center gap-3">
+              <i class="fas fa-credit-card w-4 h-4"></i>
+              <span>Billing</span>
+              <span class="text-xs px-1.5 py-0.5 rounded bg-yellow-900/20 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400 ml-auto">Pro</span>
+            </a></li>
+            <li class="border-t border-base-300 mt-2 pt-2">
+              <a class="text-base-content hover:bg-base-200 flex items-center gap-3">
+                <i class="fas fa-sign-out-alt w-4 h-4"></i>
+                <span>Sign Out</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+        
+        <!-- Usage Stats -->
+        <div class="mt-3 px-3">
+          <div class="flex items-center justify-between text-xs text-base-content/60 mb-1">
+            <span>API Usage</span>
+            <span>847 / 1,000</span>
+          </div>
+          <div class="w-full bg-base-300 rounded-full h-2 overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-teal-500 to-teal-600 rounded-full transition-all duration-300" 
+                 style="width: 84.7%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toggle Button -->
+    <button @click="showDesktopSidebar = !showDesktopSidebar"
+            class="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-md z-10 group">
+      <svg class="w-3 h-3 text-base-content/60 group-hover:text-base-content transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+              :d="showDesktopSidebar ? 'M15 19l-7-7 7-7' : 'M9 5l7 7-7 7'"></path>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="flex-1 flex flex-col min-w-0">
+    
+    <!-- Mobile-First Top Bar -->
+    <div class="bg-base-100 border-b border-base-300 sticky top-0 z-30">
+      <!-- Mobile Header -->
+      <div class="flex items-center justify-between p-4 lg:px-6">
+        <div class="flex items-center gap-3">
+          <button @click="showMobileNav = true" class="p-2 hover:bg-base-200 rounded-lg lg:hidden">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+          <div class="flex items-center gap-2">
+            <h1 class="font-semibold text-base-content truncate" x-text="currentTimeline.name"></h1>
+            <span class="text-xs px-1.5 py-0.5 rounded hidden sm:inline-flex"
+                  :class="currentTimeline.agent === 'Claude' ? 'bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : currentTimeline.agent === 'Gemini' ? 'bg-blue-900/20 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-base-content/10 text-base-content/60'"
+                  x-text="currentTimeline.agent"></span>
+          </div>
+        </div>
+        
+        <!-- Mobile Actions -->
+        <div class="flex items-center gap-2">
+          <button @click="showQuickActions = !showQuickActions" class="btn btn-ghost btn-sm lg:hidden">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+            </svg>
+          </button>
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 bg-teal-500 rounded-full animate-pulse"></div>
+            <span class="text-sm text-base-content/60 hidden sm:inline">Connected</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile Quick Actions Bar -->
+      <div x-show="showQuickActions" 
+           x-transition:enter="transition ease-out duration-200"
+           x-transition:enter-start="opacity-0 -translate-y-2"
+           x-transition:enter-end="opacity-100 translate-y-0"
+           class="border-t border-base-300 p-4 lg:hidden">
+        <div class="flex gap-2 overflow-x-auto pb-2">
+          <button @click="triggerTool('file-find')" class="btn btn-sm btn-outline flex-shrink-0">
+            <i class="fas fa-search w-4 h-4"></i>
+            Find Files
+          </button>
+          <button @click="triggerTool('bash')" class="btn btn-sm btn-outline flex-shrink-0">
+            <i class="fas fa-terminal w-4 h-4"></i>
+            Terminal
+          </button>
+          <button @click="openTaskBoard()" class="btn btn-sm btn-outline flex-shrink-0">
+            <i class="fas fa-tasks w-4 h-4"></i>
+            Tasks
+          </button>
+          <button @click="openFileManager()" class="btn btn-sm btn-outline flex-shrink-0">
+            <i class="fas fa-folder w-4 h-4"></i>
+            Files
+          </button>
+          <button @click="showQuickActions = false; startVoiceInput()" class="btn btn-sm btn-outline flex-shrink-0 lg:hidden">
+            <i class="fas fa-microphone w-4 h-4"></i>
+            Voice
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeline Container (Mobile Optimized) -->
+    <div class="flex-1 overflow-y-auto overscroll-behavior-contain" 
+         x-ref="timelineContainer">
+      <div class="p-4 space-y-4 pb-32">
+        <template x-for="entry in timelineEntries" :key="entry.id">
+          <div class="timeline-entry">
+            <!-- Admin Messages -->
+            <div x-show="entry.type === 'admin'" class="flex justify-center">
+              <div class="bg-base-200 border border-base-300 rounded-full px-4 py-2 text-sm text-base-content/70">
+                <div class="flex items-center gap-2">
+                  <i class="fas fa-info-circle w-4 h-4 text-info"></i>
+                  <span x-text="entry.content"></span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Human Messages - Left aligned Slack style -->
+            <div x-show="entry.type === 'human'" class="flex gap-3">
+              <div class="flex-shrink-0">
+                <div class="w-8 h-8 rounded-md bg-teal-600 text-white flex items-center justify-center text-sm font-medium">
+                  <i class="fas fa-user text-xs"></i>
+                </div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline gap-2 mb-1">
+                  <span class="font-medium text-sm text-base-content">You</span>
+                  <span class="text-xs text-base-content/50" x-text="formatTime(entry.timestamp)"></span>
+                </div>
+                <div class="text-sm leading-relaxed text-base-content" x-text="entry.content"></div>
+              </div>
+            </div>
+
+            <!-- AI Messages - Left aligned Slack style -->
+            <div x-show="entry.type === 'ai'" class="flex gap-3">
+              <div class="flex-shrink-0">
+                <div class="w-8 h-8 rounded-md flex items-center justify-center text-sm font-medium"
+                     :class="entry.agent === 'Claude' ? 'bg-orange-500 text-white' : entry.agent === 'GPT-4' ? 'bg-green-600 text-white' : entry.agent === 'Gemini' ? 'bg-blue-600 text-white' : 'bg-gray-600 text-white'">
+                  <i class="fas fa-robot text-xs"></i>
+                </div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline gap-2 mb-1">
+                  <span class="font-medium text-sm text-base-content" x-text="entry.agent || currentTimeline.agent"></span>
+                  <span class="text-xs text-base-content/50" x-text="formatTime(entry.timestamp)"></span>
+                  <span class="text-xs px-1.5 py-0.5 rounded"
+                        :class="entry.agent === 'Claude' ? 'bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : entry.agent === 'GPT-4' ? 'bg-green-900/20 text-green-600 dark:bg-green-900/30 dark:text-green-400' : entry.agent === 'Gemini' ? 'bg-blue-900/20 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-base-content/10 text-base-content/60'">
+                    <span x-text="entry.agent || currentTimeline.agent"></span>
+                  </span>
+                </div>
+                <div class="text-sm leading-relaxed text-base-content" x-html="renderMessage(entry.content)"></div>
+              </div>
+            </div>
+
+            <!-- External Tool Integration - Google Drive, etc -->
+            <div x-show="entry.type === 'integration'" class="flex gap-3">
+              <div class="flex-shrink-0">
+                <div class="w-8 h-8 rounded-md flex items-center justify-center text-sm"
+                     :class="{
+                       'bg-blue-500 text-white': entry.tool === 'Google Drive',
+                       'bg-green-500 text-white': entry.tool === 'Google Sheets',
+                       'bg-red-500 text-white': entry.tool === 'Google Docs',
+                       'bg-purple-500 text-white': entry.tool === 'Slack',
+                       'bg-gray-600 text-white': !['Google Drive', 'Google Sheets', 'Google Docs', 'Slack'].includes(entry.tool)
+                     }">
+                  <i class="text-xs" 
+                     :class="{
+                       'fab fa-google-drive': entry.tool === 'Google Drive',
+                       'fas fa-table': entry.tool === 'Google Sheets',
+                       'fas fa-file-alt': entry.tool === 'Google Docs',
+                       'fab fa-slack': entry.tool === 'Slack',
+                       'fas fa-plug': !['Google Drive', 'Google Sheets', 'Google Docs', 'Slack'].includes(entry.tool)
+                     }"></i>
+                </div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-medium text-sm text-base-content" x-text="entry.tool"></span>
+                  <span class="text-xs text-base-content/50" x-text="formatTime(entry.timestamp)"></span>
+                </div>
+                <div class="mt-2 p-3 bg-base-200 rounded-lg border border-base-300">
+                  <div class="flex items-start gap-3">
+                    <i class="mt-0.5 text-base-content/60"
+                       :class="{
+                         'fas fa-file-spreadsheet': entry.action === 'created' && entry.tool === 'Google Sheets',
+                         'fas fa-folder-plus': entry.action === 'created' && entry.tool === 'Google Drive',
+                         'fas fa-share': entry.action === 'shared',
+                         'fas fa-edit': entry.action === 'updated',
+                         'fas fa-check-circle text-green-600': entry.action === 'completed'
+                       }"></i>
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium text-sm text-base-content" x-text="entry.title"></div>
+                      <div class="text-xs text-base-content/70 mt-1" x-text="entry.description"></div>
+                      <div x-show="entry.link" class="mt-2">
+                        <a :href="entry.link" target="_blank" 
+                           class="inline-flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700">
+                          <i class="fas fa-external-link-alt"></i>
+                          <span>Open in <span x-text="entry.tool"></span></span>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Carousel Entry -->
+            <div x-show="entry.type === 'carousel'" class="flex gap-3">
+              <div class="flex-shrink-0">
+                <div class="w-8 h-8 rounded-md bg-teal-100 text-teal-700 flex items-center justify-center text-sm">
+                  <i class="fas fa-images text-xs"></i>
+                </div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline gap-2 mb-2">
+                  <span class="font-medium text-sm text-base-content">System</span>
+                  <span class="text-xs text-base-content/50" x-text="formatTime(entry.timestamp)"></span>
+                </div>
+                <div class="bg-base-100 border border-base-300 rounded-lg p-4 shadow-sm">
+                  <h3 class="font-semibold text-base-content mb-3" x-text="entry.title"></h3>
+                  
+                  <!-- Carousel Container -->
+                  <div class="relative">
+                    <div class="carousel carousel-center max-w-full space-x-4 bg-base-200 rounded-box p-4">
+                      <template x-for="(item, index) in entry.items" :key="index">
+                        <div class="carousel-item">
+                          <div class="card bg-base-100 w-80 shadow-sm border border-base-300">
+                            <div class="card-body p-4">
+                              <div class="flex items-start justify-between">
+                                <h4 class="card-title text-sm" x-text="item.title"></h4>
+                                <div class="badge badge-sm" 
+                                     :class="{
+                                       'badge-success': item.type === 'feature',
+                                       'badge-error': item.type === 'bugfix', 
+                                       'badge-warning': item.type === 'refactor',
+                                       'badge-ghost': item.type === 'maintenance'
+                                     }"
+                                     x-text="item.type"></div>
+                              </div>
+                              <p class="text-xs text-base-content/70 mt-2" x-text="item.description"></p>
+                              
+                              <!-- Impact Level -->
+                              <div class="flex items-center justify-between mt-3">
+                                <div class="flex items-center gap-2">
+                                  <span class="text-xs text-base-content/50">Impact:</span>
+                                  <div class="flex gap-1">
+                                    <template x-for="i in 3" :key="i">
+                                      <div class="w-2 h-2 rounded-full"
+                                           :class="{
+                                             'bg-error': item.impact === 'high' && i <= 3,
+                                             'bg-warning': item.impact === 'medium' && i <= 2,
+                                             'bg-success': item.impact === 'low' && i <= 1,
+                                             'bg-base-300': (item.impact === 'high' && i > 3) || (item.impact === 'medium' && i > 2) || (item.impact === 'low' && i > 1)
+                                           }"></div>
+                                    </template>
+                                  </div>
+                                </div>
+                                <span class="text-xs font-mono text-base-content/50" x-text="item.commit"></span>
+                              </div>
+                              
+                              <!-- Files -->
+                              <div class="mt-3">
+                                <span class="text-xs text-base-content/50 block mb-1">Files:</span>
+                                <template x-for="file in item.files.slice(0, 2)" :key="file">
+                                  <div class="text-xs bg-base-200 px-2 py-1 rounded mb-1 font-mono" x-text="file"></div>
+                                </template>
+                                <div x-show="item.files.length > 2" class="text-xs text-base-content/50">
+                                  +<span x-text="item.files.length - 2"></span> more files
+                                </div>
+                              </div>
+                              
+                              <div class="card-actions justify-end mt-3">
+                                <button class="btn btn-xs btn-outline">
+                                  <i class="fas fa-external-link-alt mr-1"></i>
+                                  View
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                    
+                    <!-- Carousel Navigation -->
+                    <div class="flex justify-center mt-3">
+                      <div class="flex gap-2">
+                        <template x-for="(item, index) in entry.items" :key="index">
+                          <div class="w-2 h-2 rounded-full bg-base-content/30"></div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Tool Call Cards - Left aligned -->
+            <div x-show="entry.type === 'tool'" class="flex gap-3">
+              <div class="flex-shrink-0">
+                <div class="w-8 h-8 rounded-md bg-teal-100 text-teal-700 flex items-center justify-center text-sm">
+                  <i class="fas fa-terminal text-xs"></i>
+                </div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline gap-2 mb-1">
+                  <span class="font-medium text-sm text-base-content">Tool</span>
+                  <span class="text-xs text-base-content/50" x-text="formatTime(entry.timestamp)"></span>
+                  <span class="text-xs px-1.5 py-0.5 rounded bg-base-content/10 text-base-content/60" x-text="entry.tool"></span>
+                </div>
+                <div class="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300">
+                  <div class="text-base-content/80 mb-2">$ <span x-text="entry.content"></span></div>
+                  <div class="text-base-content/60 text-xs whitespace-pre-wrap" x-text="entry.result"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+        
+        <!-- Typing Indicator -->
+        <div x-show="isTyping" class="flex gap-3 lg:gap-4">
+          <div class="flex-shrink-0">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium"
+                 :class="currentTimeline.agent === 'Claude' ? 'bg-orange-500 text-white' : currentTimeline.agent === 'GPT-4' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white'">
+              <i class="fas fa-robot"></i>
+            </div>
+          </div>
+          <div class="bg-base-100 border border-base-300 rounded-2xl px-4 py-3">
+            <div class="flex gap-1">
+              <div class="w-2 h-2 rounded-full animate-bounce"
+                   :class="currentTimeline.agent === 'Claude' ? 'bg-orange-500' : currentTimeline.agent === 'GPT-4' ? 'bg-green-600' : 'bg-blue-600'"></div>
+              <div class="w-2 h-2 rounded-full animate-bounce"
+                   :class="currentTimeline.agent === 'Claude' ? 'bg-orange-500' : currentTimeline.agent === 'GPT-4' ? 'bg-green-600' : 'bg-blue-600'"
+                   style="animation-delay: 0.1s"></div>
+              <div class="w-2 h-2 rounded-full animate-bounce"
+                   :class="currentTimeline.agent === 'Claude' ? 'bg-orange-500' : currentTimeline.agent === 'GPT-4' ? 'bg-green-600' : 'bg-blue-600'"
+                   style="animation-delay: 0.2s"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile-First Input Area (Fixed Bottom) -->
+    <div class="fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 p-4 lg:relative lg:bottom-auto">
+      <!-- Mobile Status Bar -->
+      <div class="flex items-center justify-between text-xs text-base-content/60 mb-3 lg:hidden">
+        <span x-text="`${timelineEntries.length} entries`"></span>
+        <span x-show="isToolRunning" class="flex items-center gap-1">
+          <div class="w-2 h-2 bg-teal-500 rounded-full animate-pulse"></div>
+          Tool running...
+        </span>
+        <span x-text="getCurrentTime()"></span>
+      </div>
+
+      <form @submit.prevent="sendMessage" class="relative">
+        <div class="flex gap-3 items-end">
+          <!-- Voice Input (Mobile Only - Free Feature) -->
+          <button type="button" 
+                  @click="startVoiceInput()" 
+                  :class="isListening ? 'text-teal-600 bg-teal-100 animate-pulse' : 'text-base-content/60 hover:text-teal-600 hover:bg-base-200'"
+                  class="p-3 rounded-full transition-colors lg:hidden">
+            <i class="fas fa-microphone w-5 h-5"></i>
+          </button>
+
+          <!-- Message Input -->
+          <div class="flex-1 relative">
+            <textarea x-model="prompt"
+                     @keydown.enter.prevent="handleEnter($event)"
+                     @input="adjustTextareaHeight"
+                     x-ref="messageInput"
+                     class="w-full bg-base-200 border border-base-300 rounded-2xl px-4 py-3 pr-12 resize-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-base-content placeholder-base-content/60 text-base"
+                     :placeholder="isListening ? 'Listening...' : 'Message the agent...'"
+                     rows="1"
+                     style="min-height: 44px; max-height: 120px;"></textarea>
+            
+            <!-- Send Button -->
+            <button type="submit" 
+                    :disabled="!prompt.trim() || isTyping"
+                    class="absolute right-2 bottom-2 p-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+              <i class="fas fa-paper-plane w-5 h-5"></i>
+            </button>
+          </div>
+
+          <!-- Attachment Button (Mobile) -->
+          <button type="button" class="p-3 text-base-content/60 hover:text-teal-600 hover:bg-base-200 rounded-full transition-colors lg:hidden">
+            <i class="fas fa-paperclip w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Voice Status Indicator (Mobile) -->
+        <div x-show="isListening" 
+             x-transition
+             class="flex items-center justify-center gap-2 mt-2 text-teal-600 text-sm lg:hidden">
+          <div class="flex gap-1">
+            <div class="w-1 bg-teal-600 rounded-full animate-pulse" style="height: 12px"></div>
+            <div class="w-1 bg-teal-600 rounded-full animate-pulse" style="height: 16px; animation-delay: 0.1s"></div>
+            <div class="w-1 bg-teal-600 rounded-full animate-pulse" style="height: 20px; animation-delay: 0.2s"></div>
+            <div class="w-1 bg-teal-600 rounded-full animate-pulse" style="height: 16px; animation-delay: 0.3s"></div>
+            <div class="w-1 bg-teal-600 rounded-full animate-pulse" style="height: 12px; animation-delay: 0.4s"></div>
+          </div>
+          <span>Tap to stop</span>
+        </div>
+      </form>
+
+      <!-- Safe area padding for mobile -->
+      <div class="h-safe-bottom lg:hidden"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function laceApp() {
+    return {
+      // Mobile-first UI state
+      showMobileNav: false,
+      showDesktopSidebar: true, // Desktop sidebar visible by default
+      showQuickActions: false,
+      sidebarWidth: 350,
+      isTyping: false,
+      isToolRunning: false,
+      isListening: false,
+      voiceSupported: 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window,
+
+      // Sidebar sections expanded state
+      conversationsExpanded: true,
+      tasksExpanded: true,
+      filesExpanded: false,
+      settingsExpanded: false,
+
+      // Theme & Settings
+      currentTheme: 'dark',
+      availableThemes: [
+        { name: 'light', colors: { primary: '#570DF8', secondary: '#F000B8', accent: '#37CDBE' } },
+        { name: 'dark', colors: { primary: '#661AE6', secondary: '#D926AA', accent: '#1FB2A5' } },
+        { name: 'cupcake', colors: { primary: '#65C3C8', secondary: '#EF9FBC', accent: '#EEAF3A' } },
+        { name: 'corporate', colors: { primary: '#4B6BFB', secondary: '#7C3AED', accent: '#37CDBE' } },
+        { name: 'synthwave', colors: { primary: '#E779C1', secondary: '#58C7F3', accent: '#F7CC50' } },
+        { name: 'cyberpunk', colors: { primary: '#FF7598', secondary: '#75D1F0', accent: '#C07F00' } },
+        { name: 'business', colors: { primary: '#1C4E80', secondary: '#7C909A', accent: '#EA6947' } },
+        { name: 'emerald', colors: { primary: '#66CC8A', secondary: '#377CFB', accent: '#F68067' } },
+        { name: 'lofi', colors: { primary: '#808080', secondary: '#4D4D4D', accent: '#1A1A1A' } }
+      ],
+
+      // Core data (same as before)
+      currentProject: { id: 1, name: 'AI Research', path: '/projects/ai-research' },
+      projects: [
+        { id: 1, name: 'AI Research', path: '/projects/ai-research' },
+        { id: 2, name: 'Web App', path: '/projects/webapp' },
+        { id: 3, name: 'Data Pipeline', path: '/projects/data-pipeline' }
+      ],
+
+      currentTimeline: { id: 1, name: 'Main Dev', agent: 'Claude' },
+      timelines: [
+        { id: 2, name: 'Code Review', agent: 'Claude' },
+        { id: 3, name: 'Research', agent: 'Gemini' },
+        { id: 4, name: 'Testing', agent: 'Claude' },
+        { id: 5, name: 'Data Analysis', agent: 'GPT-4' }
+      ],
+
+      // Recent files
+      recentFiles: [
+        { name: 'app.py', path: '/src/app.py' },
+        { name: 'config.yaml', path: '/config/config.yaml' },
+        { name: 'README.md', path: '/README.md' },
+        { name: 'test_models.py', path: '/tests/test_models.py' }
+      ],
+
+      // Timeline entries with carousel example
+      nextEntryId: 9,
+      timelineEntries: [
+        { 
+          id: 1, 
+          type: 'admin', 
+          content: 'Timeline started',
+          timestamp: new Date(Date.now() - 3600000)
+        },
+        {
+          id: 2,
+          type: 'human',
+          content: 'Help me analyze the recent code changes',
+          timestamp: new Date(Date.now() - 1800000)
+        },
+        {
+          id: 3,
+          type: 'ai',
+          content: 'I\'ll analyze the codebase changes for you. Let me examine the recent commits.',
+          agent: 'Claude',
+          timestamp: new Date(Date.now() - 1790000)
+        },
+        {
+          id: 4,
+          type: 'tool',
+          tool: 'bash',
+          content: 'git log --oneline -5',
+          result: 'abc1234 Add new AI model integration\ndef5678 Fix authentication bug\n9gh0123 Update dependencies\nijk4567 Refactor API endpoints\nlmn8910 Add unit tests',
+          timestamp: new Date(Date.now() - 1780000)
+        },
+        {
+          id: 5,
+          type: 'carousel',
+          title: 'Recent Changes Overview',
+          items: [
+            {
+              title: 'AI Model Integration',
+              description: 'Added support for GPT-4 and Claude integration',
+              type: 'feature',
+              impact: 'high',
+              files: ['src/models/ai.py', 'config/models.yaml'],
+              commit: 'abc1234'
+            },
+            {
+              title: 'Authentication Fix',
+              description: 'Resolved session timeout issues in production',
+              type: 'bugfix',
+              impact: 'medium',
+              files: ['src/auth/sessions.py', 'middleware/auth.py'],
+              commit: 'def5678'
+            },
+            {
+              title: 'Dependency Updates',
+              description: 'Updated to latest versions for security patches',
+              type: 'maintenance',
+              impact: 'low',
+              files: ['requirements.txt', 'package.json'],
+              commit: '9gh0123'
+            },
+            {
+              title: 'API Refactor',
+              description: 'Restructured endpoints for better performance',
+              type: 'refactor',
+              impact: 'high',
+              files: ['src/api/routes.py', 'src/api/handlers.py'],
+              commit: 'ijk4567'
+            }
+          ],
+          timestamp: new Date(Date.now() - 1770000)
+        },
+        {
+          id: 6,
+          type: 'ai',
+          content: 'Based on the analysis, I can see significant changes including AI model integration and authentication fixes. The carousel above shows the key changes with their impact levels.',
+          agent: 'Claude',
+          timestamp: new Date(Date.now() - 1760000)
+        },
+        {
+          id: 7,
+          type: 'human',
+          content: 'Can you create a spreadsheet to track these changes and their impact on our customers?',
+          timestamp: new Date(Date.now() - 1000000)
+        },
+        {
+          id: 8,
+          type: 'integration',
+          tool: 'Google Sheets',
+          action: 'created',
+          title: 'July 2025 Customer Impact Analysis',
+          description: 'Created spreadsheet with 4 sheets: Feature Impact, Bug Fixes, Customer Segments, and Rollout Timeline. Added formulas to calculate risk scores and automated formatting.',
+          link: 'https://docs.google.com/spreadsheets/d/1234567890',
+          timestamp: new Date(Date.now() - 990000)
+        }
+      ],
+
+      activeTasks: [
+        { id: 1, title: 'AI Model Integration', description: 'Integrate latest language model', priority: 'high', assignee: 'Claude' },
+        { id: 2, title: 'Auth Bug Fix', description: 'Fix login timeout', priority: 'medium', assignee: 'Human' },
+        { id: 3, title: 'Update Docs', description: 'API documentation', priority: 'low', assignee: 'Claude' }
+      ],
+
+      prompt: '',
+
+      // Initialize with mobile considerations
+      init() {
+        this.$nextTick(() => {
+          this.scrollToBottom();
+          // Focus input only on larger screens to avoid keyboard popup on mobile load
+          if (window.innerWidth >= 768) {
+            this.$refs.messageInput?.focus();
+          }
+        });
+        
+        // Handle mobile viewport changes
+        window.addEventListener('resize', () => {
+          if (window.innerWidth < 1024) {
+            this.showMobileNav = false;
+            // Keep desktop sidebar state for when returning to desktop
+          } else {
+            // On desktop, ensure sidebar is visible by default unless explicitly hidden
+            if (this.showDesktopSidebar === undefined) {
+              this.showDesktopSidebar = true;
+            }
+          }
+        });
+
+        // Handle mobile keyboard appearance
+        window.addEventListener('visualViewport' in window ? 'visualViewportChange' : 'resize', () => {
+          // Scroll to bottom when mobile keyboard appears/disappears
+          setTimeout(() => this.scrollToBottom(), 100);
+        });
+        
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+          // Cmd/Ctrl + K - Focus search
+          if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            this.$refs.messageInput?.focus();
+          }
+          
+          // Cmd/Ctrl + / - Toggle sidebar
+          if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+            e.preventDefault();
+            this.showDesktopSidebar = !this.showDesktopSidebar;
+          }
+          
+          // Cmd/Ctrl + N - New timeline
+          if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+            e.preventDefault();
+            this.newTimeline();
+          }
+        });
+      },
+
+      // Sidebar resize functionality
+      startResize(event) {
+        const startX = event.pageX;
+        const startWidth = this.sidebarWidth;
+        
+        const doDrag = (e) => {
+          const newWidth = startWidth + e.pageX - startX;
+          this.sidebarWidth = Math.max(280, Math.min(500, newWidth));
+        };
+        
+        const stopDrag = () => {
+          document.removeEventListener('mousemove', doDrag);
+          document.removeEventListener('mouseup', stopDrag);
+        };
+        
+        document.addEventListener('mousemove', doDrag);
+        document.addEventListener('mouseup', stopDrag);
+      },
+
+      // Message rendering (mobile optimized)
+      renderMessage(content) {
+        content = content.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+          return `<div class="bg-base-300 border border-base-content/20 rounded-lg p-3 my-2 overflow-x-auto">
+            <div class="text-xs text-base-content/60 mb-2">${lang || 'code'}</div>
+            <pre class="text-accent text-sm"><code>${this.escapeHtml(code.trim())}</code></pre>
+          </div>`;
+        });
+
+        content = content.replace(/`([^`]+)`/g, '<code class="bg-base-300 px-2 py-1 rounded text-accent text-sm">$1</code>');
+        content = content.replace(/\n/g, '<br>');
+
+        return content;
+      },
+
+      // Mobile actions (updated to be consistent)
+      openFile(file) {
+        console.log('Opening file:', file.path);
+        this.addSystemMessage(`Opened file: ${file.name}`);
+      },
+
+      openRulesFile() {
+        console.log('Opening rules file...');
+        this.addSystemMessage('Rules configuration opened');
+      },
+
+      newTimeline() {
+        console.log('Creating new timeline...');
+        const newTimelineId = Math.max(...this.timelines.map(t => t.id)) + 1;
+        const newTimeline = {
+          id: newTimelineId,
+          name: `Timeline ${newTimelineId}`,
+          agent: 'Claude'
+        };
+        this.timelines.push(newTimeline);
+        this.currentTimeline = newTimeline;
+        this.addSystemMessage(`New timeline created: ${newTimeline.name}`);
+      },
+
+      // Project/Timeline management
+      switchProject(project) {
+        this.currentProject = project;
+        this.showMobileNav = false;
+      },
+
+      switchTimeline(timeline) {
+        this.currentTimeline = timeline;
+        this.showMobileNav = false;
+      },
+
+      // Tool management and actions
+      showCommandPalette() {
+        // In a real app, this would open a command palette modal
+        console.log('Opening command palette...');
+        // For now, let's focus the search input
+        this.$refs.messageInput?.focus();
+        this.addSystemMessage('Command palette opened (Cmd+K)');
+      },
+
+      openTerminal() {
+        this.isToolRunning = true;
+        this.showQuickActions = false;
+        this.showMobileNav = false;
+        
+        const terminalEntry = {
+          id: this.nextEntryId++,
+          type: 'tool',
+          tool: 'Terminal',
+          content: 'Opening terminal...',
+          result: '$ Welcome to Lace Terminal\n$ Type your commands here',
+          timestamp: new Date()
+        };
+        
+        this.timelineEntries.push(terminalEntry);
+        this.isToolRunning = false;
+        this.scrollToBottom();
+      },
+
+      openTaskBoard() {
+        // In real app: open full-screen task board
+        this.showMobileNav = false;
+        console.log('Opening task board...');
+        this.addSystemMessage(`Task Board: ${this.activeTasks.length} active tasks`);
+      },
+
+      openFileManager() {
+        // In real app: open file manager
+        this.showMobileNav = false;
+        console.log('Opening file manager...');
+        this.addSystemMessage('File Manager opened');
+      },
+
+      showTimelinesMenu() {
+        // In a real app, this would show a quick switcher
+        console.log('Showing timelines menu...');
+        this.addSystemMessage(`${this.timelines.length + 1} timelines available`);
+      },
+
+      toggleTheme() {
+        // Cycle through themes
+        const themes = this.availableThemes.map(t => t.name);
+        const currentIndex = themes.indexOf(this.currentTheme);
+        const nextIndex = (currentIndex + 1) % themes.length;
+        this.currentTheme = themes[nextIndex];
+        this.addSystemMessage(`Theme changed to ${this.currentTheme}`);
+      },
+
+      openProfile() {
+        console.log('Opening profile...');
+        this.addSystemMessage('Profile page opened');
+      },
+
+      openSettings() {
+        console.log('Opening settings...');
+        this.addSystemMessage('Settings page opened');
+      },
+
+      openBilling() {
+        console.log('Opening billing...');
+        this.addSystemMessage('Billing page opened - Pro Plan active');
+      },
+
+      signOut() {
+        console.log('Signing out...');
+        this.addSystemMessage('Signing out... Goodbye!');
+      },
+
+      // Helper to add system messages
+      addSystemMessage(message) {
+        const adminEntry = {
+          id: this.nextEntryId++,
+          type: 'admin',
+          content: message,
+          timestamp: new Date()
+        };
+        this.timelineEntries.push(adminEntry);
+        this.scrollToBottom();
+      },
+
+      // Tool management
+      triggerTool(toolName) {
+        this.isToolRunning = true;
+        this.showQuickActions = false;
+        this.showMobileNav = false;
+        
+        setTimeout(() => {
+          const toolEntry = {
+            id: this.nextEntryId++,
+            type: 'tool',
+            tool: toolName,
+            content: `${toolName} executed`,
+            result: `${toolName} completed successfully`,
+            timestamp: new Date()
+          };
+          
+          this.timelineEntries.push(toolEntry);
+          this.isToolRunning = false;
+          this.scrollToBottom();
+        }, 1500);
+      },
+
+      // Voice input (mobile exclusive feature)
+      startVoiceInput() {
+        if (!this.voiceSupported) {
+          alert('Voice input not supported in this browser');
+          return;
+        }
+
+        if (this.isListening) {
+          this.stopVoiceInput();
+          return;
+        }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        this.recognition = new SpeechRecognition();
+        
+        this.recognition.continuous = false;
+        this.recognition.interimResults = false;
+        this.recognition.lang = 'en-US';
+
+        this.recognition.onstart = () => {
+          this.isListening = true;
+        };
+
+        this.recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          this.prompt = transcript;
+          this.adjustTextareaHeight();
+          this.isListening = false;
+        };
+
+        this.recognition.onerror = () => {
+          this.isListening = false;
+        };
+
+        this.recognition.onend = () => {
+          this.isListening = false;
+        };
+
+        this.recognition.start();
+      },
+
+      stopVoiceInput() {
+        if (this.recognition) {
+          this.recognition.stop();
+        }
+        this.isListening = false;
+      },
+
+      // Message handling (mobile optimized)
+      async sendMessage() {
+        if (!this.prompt.trim() || this.isTyping) return;
+
+        const humanEntry = {
+          id: this.nextEntryId++,
+          type: 'human',
+          content: this.prompt.trim(),
+          timestamp: new Date()
+        };
+
+        this.timelineEntries.push(humanEntry);
+        const userPrompt = this.prompt;
+        this.prompt = '';
+        this.adjustTextareaHeight();
+        this.scrollToBottom();
+
+        // Blur input on mobile to hide keyboard
+        if (window.innerWidth < 768) {
+          this.$refs.messageInput?.blur();
+        }
+
+        this.isTyping = true;
+        await this.delay(1000);
+
+        const aiEntry = {
+          id: this.nextEntryId++,
+          type: 'ai',
+          content: `I'll help you with "${userPrompt}". Let me analyze that and provide assistance.`,
+          agent: this.currentTimeline.agent,
+          timestamp: new Date()
+        };
+
+        this.timelineEntries.push(aiEntry);
+        this.isTyping = false;
+        this.scrollToBottom();
+      },
+
+      handleEnter(event) {
+        if (!event.shiftKey && window.innerWidth >= 768) {
+          // Only auto-send on desktop, require button tap on mobile
+          this.sendMessage();
+        }
+      },
+
+      adjustTextareaHeight() {
+        const textarea = this.$refs.messageInput;
+        if (textarea) {
+          textarea.style.height = 'auto';
+          textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+        }
+      },
+
+      openTaskDetail(task) {
+        console.log('Opening task:', task.title);
+        this.showMobileNav = false;
+      },
+
+      setTheme(themeName) {
+        this.currentTheme = themeName;
+      },
+
+      // Utilities
+      scrollToBottom() {
+        this.$nextTick(() => {
+          const container = this.$refs.timelineContainer;
+          if (container) {
+            container.scrollTop = container.scrollHeight;
+          }
+        });
+      },
+
+      formatTime(timestamp) {
+        return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      },
+
+      getCurrentTime() {
+        return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      },
+
+      escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      },
+
+      delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+    }
+  }
+</script>
+
+<style>
+  /* Mobile-specific improvements */
+  @supports (padding: max(0px)) {
+    .h-safe-bottom {
+      height: max(16px, env(safe-area-inset-bottom));
+    }
+  }
+  
+  /* Smooth scrolling for mobile */
+  .overscroll-behavior-contain {
+    overscroll-behavior: contain;
+  }
+  
+  /* Better mobile text selection */
+  .timeline-entry {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  
+  /* Prevent zoom on input focus (iOS) */
+  input, textarea, select {
+    font-size: 16px;
+  }
+  
+  @media (min-width: 1024px) {
+    input, textarea, select {
+      font-size: 14px;
+    }
+  }
+  
+  /* Dropdown animation fix */
+  [x-collapse] {
+    overflow: hidden;
+    transition: height 0.3s ease;
+  }
+  
+  /* Sidebar toggle button enhancement */
+  .sidebar-toggle {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Smooth sidebar transitions */
+  .sidebar-content {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Avatar ring effect */
+  .avatar-ring {
+    box-shadow: 0 0 0 2px var(--b3), 0 0 0 4px var(--p);
+  }
+  
+  /* Progress bar animation */
+  .progress-fill {
+    transition: width 0.6s ease;
+  }
+  
+  /* Collapsed sidebar icon hover effects */
+  .collapsed-icon:hover {
+    transform: scale(1.1);
+    transition: transform 0.2s ease;
+  }
+</style>

@@ -18,7 +18,7 @@ const TEST_HAR_FILE = '/tmp/test-cli-har.har';
 describe('HAR Integration', () => {
   beforeEach(() => {
     // Set test environment
-    process.env.NODE_ENV = 'test';
+    Object.assign(process.env, { NODE_ENV: 'test' });
 
     if (existsSync(TEST_HAR_FILE)) {
       unlinkSync(TEST_HAR_FILE);
