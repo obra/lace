@@ -7,6 +7,7 @@ import { CLIOptions } from '~/cli/args.js';
 import { Agent } from '~/agents/agent.js';
 import { ThreadManager } from '~/threads/thread-manager.js';
 import { ToolExecutor } from '~/tools/executor.js';
+import { Tool } from '~/tools/tool.js';
 import { getEnvVar } from '~/config/env-loader.js';
 import { enableTrafficLogging } from '~/utils/traffic-logger.js';
 import { logger } from '~/utils/logger.js';
@@ -359,7 +360,13 @@ describe('App Initialization (run function)', () => {
     expect(vi.mocked(ToolExecutor.prototype.registerAllAvailableTools)).toHaveBeenCalledTimes(1);
     expect(Agent).toHaveBeenCalledTimes(1);
     // Just verify the Agent constructor gets called with the right structure
-    const agentCallArgs = vi.mocked(Agent).mock.calls[0][0] as any;
+    const agentCallArgs = vi.mocked(Agent).mock.calls[0][0] as unknown as {
+      provider: object;
+      toolExecutor: object;
+      threadManager: object;
+      threadId: string;
+      tools: unknown[];
+    };
     expect(agentCallArgs).toMatchObject({
       provider: expect.any(Object),
       toolExecutor: expect.any(Object),
@@ -379,9 +386,12 @@ describe('App Initialization (run function)', () => {
       executeValidated: vi.fn(),
       createResult: vi.fn(),
       createErrorResult: vi.fn(),
+      createError: vi.fn(),
+      _makeResult: vi.fn(),
+      formatValidationError: vi.fn(),
       setDependencies: vi.fn(),
     };
-    vi.mocked(ToolExecutor.prototype.getTool).mockReturnValue(mockDelegateTool as any);
+    vi.mocked(ToolExecutor.prototype.getTool).mockReturnValue(mockDelegateTool as unknown as Tool);
     await run(mockCliOptions);
     expect(mockDelegateTool.setDependencies).toHaveBeenCalledWith(
       expect.any(Agent),

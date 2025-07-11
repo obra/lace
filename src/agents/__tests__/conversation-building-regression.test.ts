@@ -511,7 +511,7 @@ describe('Conversation Building Regression Tests', () => {
 
               const hasMatchingToolUse = Array.isArray(prevMessage.content)
                 ? prevMessage.content.some(
-                    (c: any) => c.type === 'tool_use' && c.id === content.tool_use_id
+                    (c: unknown) => (c as { type?: string; id?: string }).type === 'tool_use' && (c as { type?: string; id?: string }).id === content.tool_use_id
                   )
                 : false;
 
