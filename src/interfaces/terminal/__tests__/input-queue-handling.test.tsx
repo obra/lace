@@ -72,7 +72,7 @@ describe('Input Queue Handling Integration', () => {
     await agent.start();
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     if (agent) {
       agent.removeAllListeners();
       agent.stop();
@@ -179,8 +179,10 @@ describe('Input Queue Handling Integration', () => {
 
   describe('message_queued events', () => {
     it('should emit message_queued event when queueing', async () => {
-      const queuedEvents: any[] = [];
-      agent.on('message_queued', (data) => queuedEvents.push(data));
+      const queuedEvents: { queueLength: number; id: string }[] = [];
+      agent.on('message_queued', (data: { queueLength: number; id: string }) =>
+        queuedEvents.push(data)
+      );
 
       // Start a message to make agent busy
       const firstMessagePromise = agent.sendMessage('first message');
@@ -193,8 +195,8 @@ describe('Input Queue Handling Integration', () => {
 
       // Verify event was emitted
       expect(queuedEvents).toHaveLength(1);
-      expect(queuedEvents[0].queueLength).toBe(1);
-      expect(queuedEvents[0].id).toBeTruthy();
+      expect(queuedEvents[0]?.queueLength).toBe(1);
+      expect(queuedEvents[0]?.id).toBeTruthy();
 
       // Clean up
       await firstMessagePromise;

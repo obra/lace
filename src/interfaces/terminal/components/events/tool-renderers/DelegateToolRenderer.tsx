@@ -38,7 +38,7 @@ function parseDelegateResult(result: ToolResult): DelegateResult | null {
 
     // Try to parse as JSON first
     if (text.trim().startsWith('{')) {
-      const parsed = JSON.parse(text);
+      const parsed: unknown = JSON.parse(text);
 
       // Validate structure
       if (typeof parsed !== 'object' || parsed === null) {
@@ -46,25 +46,28 @@ function parseDelegateResult(result: ToolResult): DelegateResult | null {
         return { error: text };
       }
 
+      // Now we know parsed is an object, create a typed reference
+      const obj = parsed as Record<string, unknown>;
+
       // Validate optional fields have correct types if present
-      if (parsed.threadId !== undefined && typeof parsed.threadId !== 'string') {
-        logger.warn('DelegateToolRenderer: Invalid threadId type', { threadId: parsed.threadId });
+      if (obj.threadId !== undefined && typeof obj.threadId !== 'string') {
+        logger.warn('DelegateToolRenderer: Invalid threadId type', { threadId: obj.threadId });
       }
 
       if (
-        parsed.status !== undefined &&
-        !['active', 'completed', 'error'].includes(parsed.status)
+        obj.status !== undefined &&
+        !['active', 'completed', 'error'].includes(obj.status as string)
       ) {
-        logger.warn('DelegateToolRenderer: Invalid status value', { status: parsed.status });
+        logger.warn('DelegateToolRenderer: Invalid status value', { status: obj.status });
       }
 
-      if (parsed.totalTokens !== undefined && typeof parsed.totalTokens !== 'number') {
+      if (obj.totalTokens !== undefined && typeof obj.totalTokens !== 'number') {
         logger.warn('DelegateToolRenderer: Invalid totalTokens type', {
-          totalTokens: parsed.totalTokens,
+          totalTokens: obj.totalTokens,
         });
       }
 
-      return parsed as DelegateResult;
+      return obj as DelegateResult;
     }
 
     // Otherwise return as error text

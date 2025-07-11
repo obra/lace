@@ -44,10 +44,10 @@ function DynamicToolRenderer({
         setToolRenderer(() => renderer as React.ComponentType<ToolRendererProps>);
         setIsLoading(false);
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         logger.error('DynamicToolRenderer: Failed to load renderer', {
           toolName: item.call.name,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         });
         setIsLoading(false);
       });

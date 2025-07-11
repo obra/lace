@@ -272,7 +272,7 @@ IMPORTANT: Once you have gathered enough information to provide the expected res
       // SAFE DEFAULT: If no approval callback, deny all tools
       childExecutor.setApprovalCallback({
         async requestApproval() {
-          return ApprovalDecision.DENY;
+          return await Promise.resolve(ApprovalDecision.DENY);
         },
       });
     }

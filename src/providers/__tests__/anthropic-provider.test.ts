@@ -6,6 +6,8 @@ import { AnthropicProvider } from '~/providers/anthropic-provider.js';
 import { Tool } from '~/tools/tool.js';
 import { ToolResult, ToolContext } from '~/tools/types.js';
 import { z } from 'zod';
+import type Anthropic from '@anthropic-ai/sdk';
+import { StreamingEvents } from '~/providers/types.js';
 
 // Mock the Anthropic SDK
 const mockCreateResponse = vi.fn();
@@ -53,7 +55,7 @@ describe('AnthropicProvider', () => {
         args: { action: string },
         _context?: ToolContext
       ): Promise<ToolResult> {
-        return this.createResult(`Executed action: ${args.action}`);
+        return await Promise.resolve(this.createResult(`Executed action: ${args.action}`));
       }
     }
 
@@ -151,7 +153,7 @@ describe('AnthropicProvider', () => {
 
       await provider.createResponse(messages, []);
 
-      const callArgs = mockCreateResponse.mock.calls[0][0];
+      const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
       expect(callArgs.messages).toEqual([
         { role: 'user', content: 'User message' },
         { role: 'assistant', content: 'Assistant message' },
@@ -247,8 +249,8 @@ describe('AnthropicProvider', () => {
     });
 
     it('should emit complete event when streaming finishes', async () => {
-      const completeEvents: any[] = [];
-      provider.on('complete', (data) => {
+      const completeEvents: StreamingEvents['complete'][] = [];
+      provider.on('complete', (data: StreamingEvents['complete']) => {
         completeEvents.push(data);
       });
 
@@ -266,8 +268,8 @@ describe('AnthropicProvider', () => {
     });
 
     it('should handle streaming errors', async () => {
-      const errorEvents: any[] = [];
-      provider.on('error', ({ error }) => {
+      const errorEvents: Error[] = [];
+      provider.on('error', ({ error }: StreamingEvents['error']) => {
         errorEvents.push(error);
       });
 
@@ -325,7 +327,7 @@ describe('AnthropicProvider', () => {
 
       await customProvider.createResponse([{ role: 'user', content: 'Test' }], []);
 
-      const callArgs = mockCreateResponse.mock.calls[0][0];
+      const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
       expect(callArgs.model).toBe('claude-3-opus-20240229');
     });
 
@@ -342,7 +344,7 @@ describe('AnthropicProvider', () => {
 
       await customProvider.createResponse([{ role: 'user', content: 'Test' }], []);
 
-      const callArgs = mockCreateResponse.mock.calls[0][0];
+      const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
       expect(callArgs.max_tokens).toBe(2000);
     });
 
@@ -358,7 +360,7 @@ describe('AnthropicProvider', () => {
 
       await noSystemProvider.createResponse([{ role: 'user', content: 'Test' }], []);
 
-      const callArgs = mockCreateResponse.mock.calls[0][0];
+      const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
       expect(callArgs.system).toBe('You are a helpful assistant.');
     });
   });

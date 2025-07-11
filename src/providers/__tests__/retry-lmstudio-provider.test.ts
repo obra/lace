@@ -1,7 +1,7 @@
 // ABOUTME: Tests for retry functionality in LMStudioProvider
 // ABOUTME: Verifies retry logic works correctly with LMStudio SDK
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { LMStudioProvider } from '~/providers/lmstudio-provider.js';
 import { ProviderMessage } from '~/providers/base-provider.js';
 
@@ -38,7 +38,7 @@ describe('LMStudioProvider retry functionality', () => {
     });
 
     // Mock the diagnose method to control connectivity
-    mockDiagnose = vi.spyOn(provider, 'diagnose') as any;
+    mockDiagnose = vi.spyOn(provider, 'diagnose') as Mock;
 
     // Add error handlers to prevent unhandled errors in tests
     provider.on('error', () => {
@@ -154,11 +154,13 @@ describe('LMStudioProvider retry functionality', () => {
 
       await promise;
 
-      expect(retryAttemptSpy).toHaveBeenCalledWith({
-        attempt: 1,
-        delay: expect.any(Number),
-        error: expect.objectContaining({ status: 503 }),
-      });
+      expect(retryAttemptSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attempt: 1,
+          delay: expect.any(Number),
+          error: expect.objectContaining({ status: 503 }),
+        })
+      );
     });
 
     it('should not retry on authentication errors', async () => {
@@ -193,10 +195,12 @@ describe('LMStudioProvider retry functionality', () => {
       });
 
       expect(mockDiagnose).toHaveBeenCalledTimes(10);
-      expect(exhaustedSpy).toHaveBeenCalledWith({
-        attempts: 10,
-        lastError: expect.objectContaining({ code: 'ETIMEDOUT' }),
-      });
+      expect(exhaustedSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attempts: 10,
+          lastError: expect.objectContaining({ code: 'ETIMEDOUT' }),
+        })
+      );
 
       // Restore fake timers
       vi.useFakeTimers();

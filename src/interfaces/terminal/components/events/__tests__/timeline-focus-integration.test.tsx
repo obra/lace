@@ -13,6 +13,7 @@ import {
   canTimelineItemAcceptFocus,
   getTimelineItemFocusId,
 } from '~/interfaces/terminal/components/timeline-item-focus.js';
+import { TimelineItem } from '~/interfaces/timeline-types.js';
 
 // Mock dependencies to create focused integration test environment
 vi.mock('../../../terminal-interface.js', () => ({
@@ -30,15 +31,26 @@ vi.mock('../../../../../../utils/token-estimation.js', () => ({
 }));
 
 vi.mock('../utils/timeline-utils.js', () => ({
-  extractDelegateThreadId: (item: any) => {
+  extractDelegateThreadId: (item: unknown) => {
     // Extract from successful delegate results using metadata
     if (
-      item.type === 'tool_execution' &&
-      item.call.name === 'delegate' &&
-      item.result &&
-      !item.result.isError
+      item &&
+      typeof item === 'object' &&
+      'type' in item &&
+      (item as TimelineItem).type === 'tool_execution' &&
+      'call' in item &&
+      (item as TimelineItem & { type: 'tool_execution' }).call &&
+      typeof (item as TimelineItem & { type: 'tool_execution' }).call === 'object' &&
+      'name' in (item as TimelineItem & { type: 'tool_execution' }).call &&
+      (item as TimelineItem & { type: 'tool_execution' }).call.name === 'delegate' &&
+      'result' in item &&
+      (item as TimelineItem & { type: 'tool_execution' }).result &&
+      typeof (item as TimelineItem & { type: 'tool_execution' }).result === 'object' &&
+      'isError' in (item as TimelineItem & { type: 'tool_execution' }).result! &&
+      !(item as TimelineItem & { type: 'tool_execution' }).result!.isError
     ) {
-      return (item.result.metadata?.threadId as string) || null;
+      const toolExecution = item as TimelineItem & { type: 'tool_execution' };
+      return (toolExecution.result && 'metadata' in toolExecution.result && toolExecution.result.metadata && typeof toolExecution.result.metadata === 'object' && 'threadId' in toolExecution.result.metadata ? toolExecution.result.metadata.threadId as string : null) || null;
     }
     return null;
   },

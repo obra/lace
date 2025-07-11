@@ -161,7 +161,7 @@ describe('Turn State Integration Tests', () => {
   });
 
   describe('Approval system integration', () => {
-    it('should handle approval requests correctly', async () => {
+    it('should handle approval requests correctly', () => {
       // Arrange
       let approvalRequested = false;
 
@@ -182,7 +182,7 @@ describe('Turn State Integration Tests', () => {
       expect(approvalRequested).toBe(true);
     });
 
-    it('should provide approval callback interface', async () => {
+    it('should provide approval callback interface', () => {
       // Act
       const approvalPromise = terminalInterface.requestApproval('test_tool', { param: 'value' });
 
@@ -196,7 +196,7 @@ describe('Turn State Integration Tests', () => {
           input: { param: 'value' },
           isReadOnly: false,
           requestId: 'test-request-2',
-          resolve: (_decision: any) => {
+          resolve: (_decision: unknown) => {
             // Mock resolve
           },
         });
@@ -205,7 +205,7 @@ describe('Turn State Integration Tests', () => {
   });
 
   describe('Error handling', () => {
-    it('should handle agent errors gracefully', async () => {
+    it('should handle agent errors gracefully', () => {
       // Arrange
       let errorCaught = false;
 
@@ -271,7 +271,7 @@ describe('Turn State Integration Tests', () => {
   });
 
   describe('Token usage tracking', () => {
-    it('should handle token usage updates', async () => {
+    it('should handle token usage updates', () => {
       // Arrange
       let tokenUsageReceived = false;
 
@@ -292,7 +292,7 @@ describe('Turn State Integration Tests', () => {
       expect(tokenUsageReceived).toBe(true);
     });
 
-    it('should handle token budget warnings', async () => {
+    it('should handle token budget warnings', () => {
       // Arrange
       let budgetWarningReceived = false;
 

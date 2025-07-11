@@ -93,7 +93,7 @@ describe('DatabasePersistence (Thread Features)', () => {
   });
 
   describe('thread operations', () => {
-    it('should save and load a thread', async () => {
+    it('should save and load a thread', () => {
       const thread: Thread = {
         id: 'test_thread_123',
         createdAt: new Date('2025-01-01T10:00:00Z'),
@@ -111,12 +111,12 @@ describe('DatabasePersistence (Thread Features)', () => {
       expect(loaded!.events).toEqual([]);
     });
 
-    it('should return null for non-existent thread', async () => {
+    it('should return null for non-existent thread', () => {
       const loaded = persistence.loadThread('non_existent');
       expect(loaded).toBeNull();
     });
 
-    it('should update existing thread on save', async () => {
+    it('should update existing thread on save', () => {
       const thread: Thread = {
         id: 'test_thread_123',
         createdAt: new Date('2025-01-01T10:00:00Z'),
@@ -136,7 +136,7 @@ describe('DatabasePersistence (Thread Features)', () => {
   });
 
   describe('event operations', () => {
-    it('should save and load events', async () => {
+    it('should save and load events', () => {
       const thread: Thread = {
         id: 'test_thread_123',
         createdAt: new Date(),
@@ -163,7 +163,7 @@ describe('DatabasePersistence (Thread Features)', () => {
       expect(events[0].timestamp).toEqual(new Date('2025-01-01T10:00:00Z'));
     });
 
-    it('should load events in chronological order', async () => {
+    it('should load events in chronological order', () => {
       const thread: Thread = {
         id: 'test_thread_123',
         createdAt: new Date(),
@@ -209,7 +209,7 @@ describe('DatabasePersistence (Thread Features)', () => {
       expect(loaded[2].id).toBe('evt_3'); // Third chronologically
     });
 
-    it('should handle complex event data', async () => {
+    it('should handle complex event data', () => {
       const thread: Thread = {
         id: 'test_thread_123',
         createdAt: new Date(),
@@ -245,7 +245,7 @@ describe('DatabasePersistence (Thread Features)', () => {
       expect(events[0].data).toEqual(complexData);
     });
 
-    it('should update thread timestamp when saving event', async () => {
+    it('should update thread timestamp when saving event', () => {
       const thread: Thread = {
         id: 'test_thread_123',
         createdAt: new Date('2025-01-01T10:00:00Z'),
@@ -271,7 +271,7 @@ describe('DatabasePersistence (Thread Features)', () => {
   });
 
   describe('thread discovery', () => {
-    it('should return latest thread ID', async () => {
+    it('should return latest thread ID', () => {
       const threads = [
         {
           id: 'thread_old',
@@ -301,14 +301,14 @@ describe('DatabasePersistence (Thread Features)', () => {
       expect(latestId).toBe('thread_latest');
     });
 
-    it('should return null when no threads exist', async () => {
+    it('should return null when no threads exist', () => {
       const latestId = persistence.getLatestThreadId();
       expect(latestId).toBeNull();
     });
   });
 
   describe('error handling', () => {
-    it('should handle invalid JSON in event data gracefully', async () => {
+    it('should handle invalid JSON in event data gracefully', () => {
       // Manually insert malformed JSON
       const db = new Database(tempDbPath);
       db.prepare(
@@ -332,12 +332,12 @@ describe('DatabasePersistence (Thread Features)', () => {
   });
 
   describe('version management', () => {
-    it('should return null for non-versioned threads', async () => {
+    it('should return null for non-versioned threads', () => {
       const currentVersion = persistence.getCurrentVersion('non_existent');
       expect(currentVersion).toBeNull();
     });
 
-    it('should create and retrieve thread versions', async () => {
+    it('should create and retrieve thread versions', () => {
       const canonicalId = 'thread_canonical_123';
       const versionId = 'thread_version_456';
       const reason = 'Created shadow for compaction';
@@ -357,7 +357,7 @@ describe('DatabasePersistence (Thread Features)', () => {
       expect(currentVersion).toBe(versionId);
     });
 
-    it('should update existing version', async () => {
+    it('should update existing version', () => {
       const canonicalId = 'thread_canonical_123';
       const firstVersionId = 'thread_version_456';
       const secondVersionId = 'thread_version_789';
@@ -419,7 +419,7 @@ describe('DatabasePersistence (Thread Features)', () => {
       expect(history[1].reason).toBe('First version');
     });
 
-    it('should load current version when accessing canonical ID', async () => {
+    it('should load current version when accessing canonical ID', () => {
       // Create a thread
       const originalThread: Thread = {
         id: 'thread_version_456',
@@ -440,7 +440,7 @@ describe('DatabasePersistence (Thread Features)', () => {
       expect(loaded!.createdAt).toEqual(originalThread.createdAt);
     });
 
-    it('should load normally for non-versioned threads', async () => {
+    it('should load normally for non-versioned threads', () => {
       const thread: Thread = {
         id: 'normal_thread_123',
         createdAt: new Date('2025-01-01T10:00:00Z'),
@@ -465,7 +465,7 @@ describe('Enhanced ThreadManager', () => {
     threadManager = new ThreadManager(tempDbPath);
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     threadManager.close();
     if (fs.existsSync(tempDbPath)) {
       fs.unlinkSync(tempDbPath);
@@ -517,7 +517,7 @@ describe('Enhanced ThreadManager', () => {
   });
 
   describe('persistence integration', () => {
-    it('should save events to database immediately', async () => {
+    it('should save events to database immediately', () => {
       threadManager.createThread('test_123');
       threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
 
@@ -532,7 +532,7 @@ describe('Enhanced ThreadManager', () => {
       newManager.close();
     });
 
-    it('should load thread from database', async () => {
+    it('should load thread from database', () => {
       // Create and save thread with first manager
       threadManager.createThread('test_123');
       threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
@@ -552,7 +552,7 @@ describe('Enhanced ThreadManager', () => {
       newManager.close();
     });
 
-    it('should set current thread from database', async () => {
+    it('should set current thread from database', () => {
       // Create and save thread
       threadManager.createThread('test_123');
       threadManager.addEvent('test_123', 'USER_MESSAGE', 'Hello');
@@ -610,7 +610,7 @@ describe('Enhanced ThreadManager', () => {
   });
 
   describe('thread compaction', () => {
-    it('should create compacted thread and update version mapping', async () => {
+    it('should create compacted thread and update version mapping', () => {
       const originalThreadId = 'lace_20250101_abc123';
       threadManager.createThread(originalThreadId);
       threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'Original message');
@@ -629,7 +629,7 @@ describe('Enhanced ThreadManager', () => {
       expect(compactedEvents[0].data).toBe('Original message');
     });
 
-    it('should maintain canonical ID mapping', async () => {
+    it('should maintain canonical ID mapping', () => {
       const originalThreadId = 'lace_20250101_abc123';
       threadManager.createThread(originalThreadId);
 
@@ -648,7 +648,7 @@ describe('Enhanced ThreadManager', () => {
       );
     });
 
-    it('should compact events when creating compacted thread', async () => {
+    it('should compact events when creating compacted thread', () => {
       const originalThreadId = 'lace_20250101_abc123';
       threadManager.createThread(originalThreadId);
 
@@ -720,7 +720,7 @@ describe('Session Management', () => {
   });
 
   describe('ThreadManager session management', () => {
-    it('should start new session by default', async () => {
+    it('should start new session by default', () => {
       vi.spyOn(console, 'log').mockImplementation(() => {
         // Mock console.log to suppress output during test
       });
@@ -737,7 +737,7 @@ describe('Session Management', () => {
       vi.restoreAllMocks();
     });
 
-    it('should continue latest session', async () => {
+    it('should continue latest session', () => {
       vi.spyOn(console, 'log').mockImplementation(() => {
         // Mock console.log to suppress output during test
       });
@@ -765,7 +765,7 @@ describe('Session Management', () => {
       vi.restoreAllMocks();
     });
 
-    it('should continue specific session by ID', async () => {
+    it('should continue specific session by ID', () => {
       vi.spyOn(console, 'log').mockImplementation(() => {
         // Mock console.log to suppress output during test
       });
@@ -798,7 +798,7 @@ describe('Session Management', () => {
       vi.restoreAllMocks();
     });
 
-    it('should start new session if continue fails', async () => {
+    it('should start new session if continue fails', () => {
       vi.spyOn(console, 'log').mockImplementation(() => {
         // Mock console.log to suppress output during test
       });
@@ -822,7 +822,7 @@ describe('Session Management', () => {
   });
 
   describe('ThreadManager shutdown', () => {
-    it('should save current session on shutdown', async () => {
+    it('should save current session on shutdown', () => {
       const threadManager = new ThreadManager(tempDbPath);
       const sessionInfo = threadManager.resumeOrCreate();
       const { threadId } = sessionInfo;
@@ -855,7 +855,7 @@ describe('Integration Tests', () => {
     }
   });
 
-  it('should handle complete conversation workflow', async () => {
+  it('should handle complete conversation workflow', () => {
     // Start session
     const threadManager = new ThreadManager(tempDbPath);
     const threadId = `lace_${Date.now()}_test`;
@@ -901,7 +901,7 @@ describe('Integration Tests', () => {
     newManager.close();
   });
 
-  it('should handle multiple concurrent sessions', async () => {
+  it('should handle multiple concurrent sessions', () => {
     const manager1 = new ThreadManager(tempDbPath);
     const manager2 = new ThreadManager(tempDbPath);
 
@@ -932,7 +932,7 @@ describe('Integration Tests', () => {
     manager2.close();
   });
 
-  it('should handle large conversations efficiently', { timeout: 10000 }, async () => {
+  it('should handle large conversations efficiently', { timeout: 10000 }, () => {
     const threadManager = new ThreadManager(tempDbPath);
     const threadId = 'lace_large_test';
     threadManager.createThread(threadId);

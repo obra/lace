@@ -290,7 +290,7 @@ describe('Enhanced Task Manager Tools', () => {
       const result = await tool.execute(
         {
           taskId,
-          status: 'invalid' as any,
+          status: 'invalid' as 'pending' | 'in_progress' | 'completed',
         },
         context
       );

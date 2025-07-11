@@ -6,6 +6,7 @@ import { OpenAIProvider } from '~/providers/openai-provider.js';
 import { Tool } from '~/tools/tool.js';
 import { ToolResult, ToolContext } from '~/tools/types.js';
 import { z } from 'zod';
+import { StreamingEvents } from '~/providers/types.js';
 
 // Mock the OpenAI SDK
 const mockCreate = vi.fn();
@@ -53,7 +54,7 @@ describe('OpenAIProvider', () => {
         args: { action: string },
         _context?: ToolContext
       ): Promise<ToolResult> {
-        return this.createResult(`Executed action: ${args.action}`);
+        return await Promise.resolve(this.createResult(`Executed action: ${args.action}`));
       }
     }
 
@@ -263,7 +264,7 @@ describe('OpenAIProvider', () => {
         {
           async *[Symbol.asyncIterator]() {
             for (const chunk of chunks) {
-              yield chunk;
+              yield await Promise.resolve(chunk);
             }
           },
         }[Symbol.asyncIterator]()
@@ -317,7 +318,7 @@ describe('OpenAIProvider', () => {
         {
           async *[Symbol.asyncIterator]() {
             for (const chunk of chunks) {
-              yield chunk;
+              yield await Promise.resolve(chunk);
             }
           },
         }[Symbol.asyncIterator]()
@@ -330,8 +331,8 @@ describe('OpenAIProvider', () => {
     });
 
     it('should emit complete event when streaming finishes', async () => {
-      const completeEvents: any[] = [];
-      provider.on('complete', (data) => {
+      const completeEvents: StreamingEvents['complete'][] = [];
+      provider.on('complete', (data: StreamingEvents['complete']) => {
         completeEvents.push(data);
       });
 
@@ -350,7 +351,7 @@ describe('OpenAIProvider', () => {
         {
           async *[Symbol.asyncIterator]() {
             for (const chunk of chunks) {
-              yield chunk;
+              yield await Promise.resolve(chunk);
             }
           },
         }[Symbol.asyncIterator]()
@@ -364,8 +365,8 @@ describe('OpenAIProvider', () => {
     });
 
     it('should handle streaming errors', async () => {
-      const errorEvents: any[] = [];
-      provider.on('error', ({ error }) => {
+      const errorEvents: Error[] = [];
+      provider.on('error', ({ error }: StreamingEvents['error']) => {
         errorEvents.push(error);
       });
 
@@ -432,7 +433,7 @@ describe('OpenAIProvider', () => {
         {
           async *[Symbol.asyncIterator]() {
             for (const chunk of chunks) {
-              yield chunk;
+              yield await Promise.resolve(chunk);
             }
           },
         }[Symbol.asyncIterator]()

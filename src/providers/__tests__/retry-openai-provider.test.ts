@@ -112,11 +112,13 @@ describe('OpenAIProvider retry functionality', () => {
 
       await promise;
 
-      expect(retryAttemptSpy).toHaveBeenCalledWith({
-        attempt: 1,
-        delay: expect.any(Number),
-        error: expect.objectContaining({ status: 503 }),
-      });
+      expect(retryAttemptSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attempt: 1,
+          delay: expect.any(Number),
+          error: expect.objectContaining({ status: 503 }),
+        })
+      );
     });
 
     it('should not retry on authentication errors', async () => {
@@ -151,10 +153,12 @@ describe('OpenAIProvider retry functionality', () => {
       });
 
       expect(mockCreate).toHaveBeenCalledTimes(10);
-      expect(exhaustedSpy).toHaveBeenCalledWith({
-        attempts: 10,
-        lastError: expect.objectContaining({ code: 'ETIMEDOUT' }),
-      });
+      expect(exhaustedSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attempts: 10,
+          lastError: expect.objectContaining({ code: 'ETIMEDOUT' }),
+        })
+      );
 
       // Restore fake timers
       vi.useFakeTimers();

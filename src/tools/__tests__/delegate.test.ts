@@ -84,7 +84,7 @@ describe('DelegateTool', () => {
       ),
     };
 
-    vi.mocked(Agent).mockImplementation(() => mockAgent as any);
+    vi.mocked(Agent).mockImplementation(() => mockAgent as Agent);
 
     // Create tool instance - it will get dependencies injected when needed
     tool = new DelegateTool();
@@ -338,7 +338,7 @@ describe('DelegateTool', () => {
       expect.objectContaining({
         systemPrompt: expect.stringMatching(
           /focused task assistant.*Expected response format: JSON object with \{result: string\}/s
-        ),
+        ) as string,
       })
     );
   });

@@ -7,6 +7,7 @@ import { useLaceFocusContext } from '~/interfaces/terminal/focus/focus-provider.
 
 interface FocusDebugPanelProps {
   // Add any additional debug info props here
+  enabled?: boolean;
 }
 
 interface FocusHistoryEntry {
@@ -16,7 +17,7 @@ interface FocusHistoryEntry {
   stackDepth: number;
 }
 
-export function FocusDebugPanel({}: FocusDebugPanelProps) {
+export function FocusDebugPanel({ enabled = true }: FocusDebugPanelProps) {
   // Get focus state from the context
   const { currentFocus, getFocusStack } = useLaceFocusContext();
   const focusStack = getFocusStack();

@@ -330,6 +330,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
         timestamp: new Date(),
       });
     }
+    // Keep async for potential future async operations
+    await Promise.resolve();
   }, [agent, streamingTimelineProcessor, addMessage]);
 
   // Initialize token counts for resumed conversations
@@ -1123,11 +1125,11 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     });
 
     // Start agent asynchronously
-    agent.start().catch((error) => {
+    agent.start().catch((error: unknown) => {
       console.error('Failed to start agent:', error);
       addMessage({
         type: 'system',
-        content: `❌ Failed to start agent: ${error.message}`,
+        content: `❌ Failed to start agent: ${error instanceof Error ? error.message : String(error)}`,
         timestamp: new Date(),
       });
     });
@@ -1313,6 +1315,9 @@ export class TerminalInterface implements ApprovalCallback {
     if (this.inkInstance) {
       this.inkInstance.instance.unmount();
     }
+    
+    // Keep async for potential future async cleanup operations
+    await Promise.resolve();
   }
 
   async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {

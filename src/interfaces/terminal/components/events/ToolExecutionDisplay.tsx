@@ -85,16 +85,17 @@ export function ToolExecutionDisplay({
       case 'file-edit':
         return (input.file_path as string) || '';
       case 'ripgrep-search':
-        return `"${input.pattern}"` || '';
+        return `"${String(input.pattern)}"`;
       case 'delegate':
-        return `"${input.task}"` || '';
-      default:
+        return `"${String(input.task)}"`;
+      default: {
         // For other tools, show first parameter value
         const firstValue = Object.values(input)[0];
         if (typeof firstValue === 'string' && firstValue.length < 50) {
           return firstValue;
         }
         return '';
+      }
     }
   };
 

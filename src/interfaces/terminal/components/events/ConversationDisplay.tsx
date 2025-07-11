@@ -79,7 +79,7 @@ export function ConversationDisplay({
     };
 
     const endTime = performance.now();
-    endTime - startTime;
+    const processingTime = endTime - startTime;
 
     // Performance monitoring removed to eliminate render overhead
 

@@ -28,10 +28,10 @@ class TestTool extends Tool {
   };
 
   protected async executeValidated(): Promise<ToolResult> {
-    return {
+    return await Promise.resolve({
       content: [{ type: 'text', text: 'test' }],
       isError: false,
-    };
+    });
   }
 }
 
@@ -44,10 +44,10 @@ class SimpleTool extends Tool {
   });
 
   protected async executeValidated(): Promise<ToolResult> {
-    return {
+    return await Promise.resolve({
       content: [{ type: 'text', text: 'simple' }],
       isError: false,
-    };
+    });
   }
 }
 

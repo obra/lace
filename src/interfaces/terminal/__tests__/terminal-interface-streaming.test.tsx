@@ -9,6 +9,7 @@ import { ThreadManager } from '~/threads/thread-manager.js';
 import { ToolExecutor } from '~/tools/executor.js';
 import { TestProvider } from '~/__tests__/utils/test-provider.js';
 import { TerminalInterfaceComponent } from '~/interfaces/terminal/terminal-interface.js';
+import { ThreadEvent } from '~/threads/types.js';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -63,9 +64,13 @@ describe('TerminalInterface Streaming Event Flow', () => {
 
       // Agent might emit system prompt first, then user message
       const calls = threadEventAddedSpy.mock.calls;
-      const userMessageCall = calls.find((call) => call[0].event.type === 'USER_MESSAGE');
+      const userMessageCall = calls.find((call) => {
+        const eventData = call[0] as { event: ThreadEvent };
+        return eventData?.event?.type === 'USER_MESSAGE';
+      });
       expect(userMessageCall).toBeDefined();
-      expect(userMessageCall![0].event.data).toBe('Test message');
+      const eventData = userMessageCall![0] as { event: ThreadEvent };
+      expect(eventData.event.data).toBe('Test message');
     });
 
     it('should handle session initialization without events array', () => {

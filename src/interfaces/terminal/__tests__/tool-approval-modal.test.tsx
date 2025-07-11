@@ -364,7 +364,7 @@ describe('ToolApprovalModal', () => {
       // The keyboard functionality is thoroughly tested in the main keyboard tests
     });
 
-    it('handles undefined input parameters', async () => {
+    it('handles undefined input parameters', () => {
       // For this test, let's just verify rendering works with undefined input
       const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
@@ -383,7 +383,7 @@ describe('ToolApprovalModal', () => {
   });
 
   describe('risk level behavior', () => {
-    it('handles read-only tools', async () => {
+    it('handles read-only tools', () => {
       // Test that read-only tools render with correct risk indicator
       const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal
@@ -401,7 +401,7 @@ describe('ToolApprovalModal', () => {
       expect(lastFrame()).toContain('READ-ONLY');
     });
 
-    it('handles destructive tools', async () => {
+    it('handles destructive tools', () => {
       // Test that destructive tools render with correct risk indicator
       const { lastFrame } = renderInkComponentWithFocus(
         <ToolApprovalModal

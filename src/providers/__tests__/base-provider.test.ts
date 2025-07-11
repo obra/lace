@@ -19,10 +19,10 @@ class TestProvider extends AIProvider {
     _tools: Tool[],
     _signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    return {
+    return await Promise.resolve({
       content: 'test response',
       toolCalls: [],
-    };
+    });
   }
 
   // Expose protected methods for testing

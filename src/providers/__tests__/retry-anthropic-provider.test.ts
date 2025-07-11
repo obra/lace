@@ -112,7 +112,9 @@ describe('AnthropicProvider retry functionality', () => {
 
       expect(retryAttemptSpy).toHaveBeenCalledWith({
         attempt: 1,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         delay: expect.any(Number) as number,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         error: expect.objectContaining({ status: 503 }),
       });
     });

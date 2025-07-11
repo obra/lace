@@ -93,7 +93,7 @@ describe('HARRecorder', () => {
                 statusText: 'OK',
               }),
             }),
-          ]),
+          ]) as unknown[],
         },
       });
     });
@@ -179,7 +179,7 @@ describe('HARRecorder', () => {
         headers: expect.arrayContaining([
           { name: 'authorization', value: 'Bearer token123' },
           { name: 'content-type', value: 'application/json' },
-        ]),
+        ]) as unknown[],
         postData: {
           mimeType: 'application/json',
           text: '{"query": "test"}',
@@ -192,7 +192,7 @@ describe('HARRecorder', () => {
         headers: expect.arrayContaining([
           { name: 'content-type', value: 'application/json' },
           { name: 'x-custom-header', value: 'test-value' },
-        ]),
+        ]) as unknown[],
         content: {
           mimeType: 'application/json',
           text: '{"result": "success"}',
@@ -317,7 +317,7 @@ describe('HARRecorder', () => {
         headers: expect.arrayContaining([
           { name: 'Upgrade', value: 'websocket' },
           { name: 'Connection', value: 'Upgrade' },
-        ]),
+        ]) as unknown[],
       });
 
       expect(entry.response).toMatchObject({

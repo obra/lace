@@ -85,7 +85,7 @@ describe('LMStudioProvider', () => {
           _args: { input: string },
           _context?: ToolContext
         ): Promise<ToolResult> {
-          return this.createResult('test result');
+          return await Promise.resolve(this.createResult('test result'));
         }
       }
 

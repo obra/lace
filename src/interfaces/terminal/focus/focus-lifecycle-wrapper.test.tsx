@@ -115,7 +115,7 @@ describe('FocusLifecycleWrapper', () => {
       expect(onFocusActivated).toHaveBeenCalledTimes(1);
     });
 
-    it.skip('calls onFocusRestored when focus is popped successfully', async () => {
+    it.skip('calls onFocusRestored when focus is popped successfully', () => {
       const onFocusRestored = vi.fn();
       mockPopFocus.mockReturnValue(true); // Simulate successful focus restoration
 

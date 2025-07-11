@@ -208,7 +208,7 @@ describe('UrlFetchTool with schema validation', () => {
   });
 
   describe('Structured output with helpers', () => {
-    it('should use createResult for successful responses', async () => {
+    it('should use createResult for successful responses', () => {
       // Mock the fetch to test the output structure
       const mockBuffer = new TextEncoder().encode('test content').buffer;
       const result = tool['handleInlineContent'](

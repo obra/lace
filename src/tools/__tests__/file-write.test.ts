@@ -268,13 +268,13 @@ describe('FileWriteTool with schema validation', () => {
   });
 
   describe('Error handling scenarios', () => {
-    it('should provide actionable error for permission denied', async () => {
+    it('should provide actionable error for permission denied', () => {
       // This test would need a way to simulate permission errors
       // For now, just verify the structure exists
       expect(tool.validatePath).toBeDefined();
     });
 
-    it('should provide actionable error for disk space issues', async () => {
+    it('should provide actionable error for disk space issues', () => {
       // This test would need a way to simulate disk space errors
       // For now, just verify the tool handles errors gracefully
       expect(tool.name).toBe('file_write');

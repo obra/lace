@@ -103,7 +103,7 @@ describe('FileScanner', () => {
   });
 
   describe('nested path completion', () => {
-    it('should complete within subdirectories', async () => {
+    it('should complete within subdirectories', () => {
       mockFs.existsSync.mockReturnValue(false);
 
       // Mock different calls to readdirSync
@@ -114,17 +114,17 @@ describe('FileScanner', () => {
             createMockDirent('components', true),
             createMockDirent('utils', true),
             createMockDirent('app.ts', false),
-          ] as any;
+          ] as unknown as ReturnType<typeof fs.readdirSync>;
         }
-        return [] as any;
+        return [] as unknown as ReturnType<typeof fs.readdirSync>;
       });
 
-      const completions = await scanner.getCompletions('src/');
+      const completions = scanner.getCompletions('src/');
 
       expect(completions).toEqual(['src/components/', 'src/utils/', 'src/app.ts'] as string[]);
     });
 
-    it('should match nested paths with partial filename', async () => {
+    it('should match nested paths with partial filename', () => {
       mockFs.existsSync.mockReturnValue(false);
 
       mockFs.readdirSync.mockImplementation((dirPath: PathLike) => {
@@ -134,12 +134,12 @@ describe('FileScanner', () => {
             createMockDirent('app.ts', false),
             createMockDirent('agent.ts', false),
             createMockDirent('utils', true),
-          ] as any;
+          ] as unknown as ReturnType<typeof fs.readdirSync>;
         }
-        return [] as any;
+        return [] as unknown as ReturnType<typeof fs.readdirSync>;
       });
 
-      const completions = await scanner.getCompletions('src/a');
+      const completions = scanner.getCompletions('src/a');
 
       expect(completions).toEqual(['src/agent.ts', 'src/app.ts'] as string[]);
     });
@@ -266,17 +266,17 @@ describe('FileScanner', () => {
       expect(completions).toContain('file.ts');
     });
 
-    it('should handle paths with trailing slashes', async () => {
+    it('should handle paths with trailing slashes', () => {
       mockFs.existsSync.mockReturnValue(false);
       mockFs.readdirSync.mockImplementation((dirPath: PathLike) => {
         const pathStr = typeof dirPath === 'string' ? dirPath : dirPath.toString();
         if (pathStr.endsWith('src')) {
-          return [createMockDirent('app.ts', false)] as any;
+          return [createMockDirent('app.ts', false)] as unknown as ReturnType<typeof fs.readdirSync>;
         }
-        return [] as any;
+        return [] as unknown as ReturnType<typeof fs.readdirSync>;
       });
 
-      const completions = await scanner.getCompletions('src/');
+      const completions = scanner.getCompletions('src/');
 
       expect(completions).toEqual(['src/app.ts'] as string[]);
     });

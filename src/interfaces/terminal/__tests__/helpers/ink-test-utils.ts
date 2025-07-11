@@ -210,25 +210,20 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
 
   // Intercept actual stdout writes to capture ANSI codes
   const capturedWrites: string[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  process.stdout.write = function (chunk: any) {
+  process.stdout.write = function (chunk: unknown) {
     if (typeof chunk === 'string') {
       capturedWrites.push(chunk);
       stdout.write(chunk);
     }
     return true;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any;
+  } as typeof process.stdout.write;
 
   let instance: { unmount: () => void; rerender: (tree: React.ReactElement) => void } | undefined;
   act(() => {
     instance = inkRender(tree, {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      stdout: process.stdout as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      stderr: stderr as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      stdin: stdin as any,
+      stdout: process.stdout as unknown as NodeJS.WriteStream,
+      stderr: stderr as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
       debug: true,
       exitOnCtrlC: false,
       patchConsole: false,
