@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { marked } from 'marked';
+import { marked, Renderer } from 'marked';
 import TerminalRenderer from 'marked-terminal';
 
 interface MarkdownDisplayProps {
@@ -20,7 +20,7 @@ export function MarkdownDisplay({
   try {
     // Configure marked with terminal renderer for ANSI formatting
     marked.setOptions({
-      renderer: new TerminalRenderer() as any,
+      renderer: new TerminalRenderer() as unknown as Renderer,
     });
 
     // Parse markdown to terminal-formatted text with ANSI colors
