@@ -308,7 +308,9 @@ describe('AIProvider retry functionality', () => {
       let callCount = 0;
       const operation = vi.fn().mockImplementation(() => {
         callCount++;
-        return Promise.reject({ code: 'ECONNREFUSED' });
+        const error = new Error('Connection refused');
+        (error as unknown as { code: string }).code = 'ECONNREFUSED';
+        return Promise.reject(error);
       });
 
       const promise = provider.withRetry(operation, { signal: abortController.signal });
@@ -335,11 +337,15 @@ describe('AIProvider retry functionality', () => {
         callCount++;
         if (callCount === 1) {
           // First call fails before streaming
-          return Promise.reject({ code: 'ECONNREFUSED' });
+          const error = new Error('Connection refused');
+          (error as unknown as { code: string }).code = 'ECONNREFUSED';
+          return Promise.reject(error);
         }
         // After first retry, streaming has started
         streamingStarted = true;
-        return Promise.reject({ code: 'ECONNREFUSED' });
+        const error = new Error('Connection refused');
+        (error as unknown as { code: string }).code = 'ECONNREFUSED';
+        return Promise.reject(error);
       });
 
       const promise = provider.withRetry(operation, {
