@@ -217,7 +217,9 @@ describe('AIProvider retry functionality', () => {
       const operation = vi.fn().mockRejectedValue({ code: 'ECONNREFUSED' });
 
       const promise = provider.withRetry(operation, { maxAttempts: 3 });
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       // Advance through all retries
       for (let i = 0; i < 3; i++) {
@@ -310,7 +312,9 @@ describe('AIProvider retry functionality', () => {
       });
 
       const promise = provider.withRetry(operation, { signal: abortController.signal });
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       // First attempt
       await vi.advanceTimersByTimeAsync(0);
@@ -343,7 +347,9 @@ describe('AIProvider retry functionality', () => {
         canRetry: () => !streamingStarted,
         maxAttempts: 3,
       });
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       // First attempt
       await vi.advanceTimersByTimeAsync(0);

@@ -51,7 +51,9 @@ describe('NonInteractiveInterface', () => {
 
   describe('executePrompt', () => {
     it('should execute single prompt and exit gracefully', async () => {
-      const agentStartSpy = vi.spyOn(agent, 'start').mockImplementation(async () => {});
+      const agentStartSpy = vi.spyOn(agent, 'start').mockImplementation(async () => {
+        // Mock implementation for testing - prevents actual agent start
+      });
       const { log } = withConsoleCapture();
 
       await nonInteractive.executePrompt('Test prompt');
@@ -65,13 +67,17 @@ describe('NonInteractiveInterface', () => {
 
     it('should handle errors during prompt execution', async () => {
       vi.spyOn(agent, 'sendMessage').mockRejectedValue(new Error('Test error'));
-      vi.spyOn(agent, 'start').mockImplementation(async () => {});
+      vi.spyOn(agent, 'start').mockImplementation(async () => {
+        // Mock implementation for testing - prevents actual agent start
+      });
 
       await expect(nonInteractive.executePrompt('Test prompt')).rejects.toThrow('Test error');
     });
 
     it('should display provider information', async () => {
-      vi.spyOn(agent, 'start').mockImplementation(async () => {});
+      vi.spyOn(agent, 'start').mockImplementation(async () => {
+        // Mock implementation for testing - prevents actual agent start
+      });
       const { log } = withConsoleCapture();
 
       await nonInteractive.executePrompt('Test prompt');
@@ -81,7 +87,9 @@ describe('NonInteractiveInterface', () => {
 
     it('should work without tool executor', async () => {
       const nonInteractiveWithoutTools = new NonInteractiveInterface(agent);
-      const agentStartSpy = vi.spyOn(agent, 'start').mockImplementation(async () => {});
+      const agentStartSpy = vi.spyOn(agent, 'start').mockImplementation(async () => {
+        // Mock implementation for testing - prevents actual agent start
+      });
 
       await nonInteractiveWithoutTools.executePrompt('Test prompt');
 

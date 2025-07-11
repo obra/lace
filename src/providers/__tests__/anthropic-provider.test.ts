@@ -161,7 +161,11 @@ describe('AnthropicProvider', () => {
   });
 
   describe('streaming responses', () => {
-    let mockStream: any;
+    interface MockStream {
+      on: ReturnType<typeof vi.fn>;
+      finalMessage: ReturnType<typeof vi.fn>;
+    }
+    let mockStream: MockStream;
 
     beforeEach(() => {
       mockStream = {
@@ -184,7 +188,9 @@ describe('AnthropicProvider', () => {
       const responsePromise = provider.createStreamingResponse(messages, [mockTool]);
 
       // Simulate the streaming events
-      const textCallback = mockStream.on.mock.calls.find((call: any) => call[0] === 'text')[1];
+      const textCallback = mockStream.on.mock.calls.find(
+        (call: unknown[]) => call[0] === 'text'
+      )?.[1] as (text: string) => void;
       textCallback('Hello ');
       textCallback('world!');
 
@@ -228,7 +234,9 @@ describe('AnthropicProvider', () => {
       const responsePromise = provider.createStreamingResponse(messages, []);
 
       // Simulate token events
-      const textCallback = mockStream.on.mock.calls.find((call: any) => call[0] === 'text')[1];
+      const textCallback = mockStream.on.mock.calls.find(
+        (call: unknown[]) => call[0] === 'text'
+      )?.[1] as (text: string) => void;
       textCallback('Token ');
       textCallback('stream ');
       textCallback('test');

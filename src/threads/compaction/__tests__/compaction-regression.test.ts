@@ -13,11 +13,14 @@ const __dirname = dirname(__filename);
 
 // Load the same real failing thread data used in conversation building tests
 const threadDataPath = join(__dirname, '../../../agents/__tests__/data/full_thread_events.json');
-const rawThreadEventsData = JSON.parse(readFileSync(threadDataPath, 'utf8'));
+const rawThreadEventsData = JSON.parse(readFileSync(threadDataPath, 'utf8')) as Array<{
+  timestamp: string;
+  [key: string]: unknown;
+}>;
 
 // Convert timestamp strings to Date objects for TypeScript compatibility
 const threadEventsData = rawThreadEventsData.map(
-  (event: any) =>
+  (event: { timestamp: string; [key: string]: unknown }) =>
     ({
       ...event,
       timestamp: new Date(event.timestamp),
@@ -25,14 +28,20 @@ const threadEventsData = rawThreadEventsData.map(
 );
 
 describe('Compaction Regression Tests', () => {
-  let strategy: SummarizeStrategy;
+  interface SummarizeStrategyWithPrivate {
+    isImportantEvent(event: ThreadEvent): boolean;
+    buildConversationFromEvents(events: ThreadEvent[]): unknown;
+    fallbackTokenEstimation(events: ThreadEvent[]): number;
+    compact(events: ThreadEvent[]): ThreadEvent[];
+  }
+  let strategy: SummarizeStrategyWithPrivate;
 
   beforeEach(() => {
     strategy = new SummarizeStrategy({
       maxTokens: 8000,
       preserveRecentEvents: 10,
       preserveTaskEvents: true,
-    });
+    }) as unknown as SummarizeStrategyWithPrivate;
   });
 
   describe('tool call/result pairing preservation', () => {
@@ -42,7 +51,7 @@ describe('Compaction Regression Tests', () => {
 
       for (const event of toolCallEvents) {
         // Access private method for testing
-        const isImportant = (strategy as any).isImportantEvent(event);
+        const isImportant = strategy.isImportantEvent(event);
         expect(isImportant).toBe(true);
       }
     });
@@ -55,7 +64,7 @@ describe('Compaction Regression Tests', () => {
 
       for (const event of toolResultEvents) {
         // Access private method for testing
-        const isImportant = (strategy as any).isImportantEvent(event);
+        const isImportant = strategy.isImportantEvent(event);
         expect(isImportant).toBe(true);
       }
     });
@@ -63,8 +72,8 @@ describe('Compaction Regression Tests', () => {
     it('should maintain tool call/result atomic pairing after compaction', () => {
       const compactedEvents = strategy.compact(threadEventsData);
 
-      const toolCalls = compactedEvents.filter((e) => e.type === 'TOOL_CALL');
-      const toolResults = compactedEvents.filter((e) => e.type === 'TOOL_RESULT');
+      const toolCalls = compactedEvents.filter((e: ThreadEvent) => e.type === 'TOOL_CALL');
+      const toolResults = compactedEvents.filter((e: ThreadEvent) => e.type === 'TOOL_RESULT');
 
       // Should have same number of tool calls and results
       expect(toolCalls.length).toBe(toolResults.length);
@@ -72,7 +81,7 @@ describe('Compaction Regression Tests', () => {
       // Each tool call should have a corresponding result
       const toolCallIds = new Set(
         toolCalls
-          .map((tc) => {
+          .map((tc: ThreadEvent) => {
             if (typeof tc.data === 'object' && tc.data && 'id' in tc.data) {
               return (tc.data as { id: string }).id;
             }
@@ -83,7 +92,7 @@ describe('Compaction Regression Tests', () => {
 
       const toolResultIds = new Set(
         toolResults
-          .map((tr) => {
+          .map((tr: ThreadEvent) => {
             if (typeof tr.data === 'object' && tr.data && 'id' in tr.data) {
               return (tr.data as { id: string }).id;
             }
@@ -98,14 +107,14 @@ describe('Compaction Regression Tests', () => {
 
     it('should truncate long TOOL_RESULT content to save space', () => {
       const compactedEvents = strategy.compact(threadEventsData);
-      const toolResults = compactedEvents.filter((e) => e.type === 'TOOL_RESULT');
+      const toolResults = compactedEvents.filter((e: ThreadEvent) => e.type === 'TOOL_RESULT');
 
       for (const result of toolResults) {
         if (typeof result.data === 'string') {
           // If content was long, it should be truncated
           if (result.data.includes('[results truncated to save space.]')) {
             const lines = result.data.split('\n');
-            const truncationIndex = lines.findIndex((line) =>
+            const truncationIndex = lines.findIndex((line: string) =>
               line.includes('[results truncated to save space.]')
             );
 
@@ -122,7 +131,7 @@ describe('Compaction Regression Tests', () => {
           // If content was long, it should be truncated
           if (textContent.includes('[results truncated to save space.]')) {
             const lines = textContent.split('\n');
-            const truncationIndex = lines.findIndex((line) =>
+            const truncationIndex = lines.findIndex((line: string) =>
               line.includes('[results truncated to save space.]')
             );
 
@@ -148,7 +157,7 @@ describe('Compaction Regression Tests', () => {
       const compactedEvents = strategy.compact(threadEventsData);
 
       // Access private method for testing
-      const conversation = (strategy as any).buildConversationFromEvents(compactedEvents);
+      const conversation = strategy.buildConversationFromEvents(compactedEvents);
 
       // Should not crash when processing tool events
       expect(conversation).toBeDefined();
@@ -157,15 +166,15 @@ describe('Compaction Regression Tests', () => {
 
     it('should preserve tool structure while compacting other content', () => {
       const compactedEvents = strategy.compact(threadEventsData);
-      const compactedTokens = (strategy as any).fallbackTokenEstimation(compactedEvents);
+      const compactedTokens = strategy.fallbackTokenEstimation(compactedEvents);
 
       // With tool preservation, tokens may not reduce significantly (this is expected behavior)
       // The key is that we preserve critical structure for API compatibility
       expect(compactedTokens).toBeGreaterThan(0);
 
       // Should preserve critical structure for API compatibility
-      const toolCalls = compactedEvents.filter((e) => e.type === 'TOOL_CALL');
-      const toolResults = compactedEvents.filter((e) => e.type === 'TOOL_RESULT');
+      const toolCalls = compactedEvents.filter((e: ThreadEvent) => e.type === 'TOOL_CALL');
+      const toolResults = compactedEvents.filter((e: ThreadEvent) => e.type === 'TOOL_RESULT');
 
       expect(toolCalls.length).toBeGreaterThan(0);
       expect(toolResults.length).toBeGreaterThan(0);

@@ -22,14 +22,14 @@ describe('Enhanced Task Manager Tools', () => {
   const agent1ThreadId = asThreadId('lace_20250703_parent.1');
   const agent2ThreadId = asThreadId('lace_20250703_parent.2');
 
-  beforeEach(async () => {
+  beforeEach(() => {
     context = {
       threadId: agent1ThreadId,
       parentThreadId: parentThreadId,
     };
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     vi.clearAllMocks();
   });
 

@@ -107,7 +107,7 @@ export function TimelineEntry({
   const isSelected = isSelectedProp ?? context?.isSelected ?? false;
   const isExpanded = isExpandedProp ?? context?.isExpanded ?? false;
   const onToggle = onToggleProp ?? context?.onToggle;
-  const onExpandedChange =
+  const _onExpandedChange =
     onExpandedChangeProp ??
     (context
       ? (expanded: boolean) => {

@@ -150,7 +150,9 @@ describe('App Initialization (run function)', () => {
       return mockAgentInstance as unknown as Agent;
     });
 
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never); // Mock process.exit
+    vi.spyOn(process, 'exit').mockImplementation((() => {
+      // Mock process.exit to prevent actual exit during tests
+    }) as never);
 
     // Mock TerminalInterface.prototype.startInteractive
     vi.mocked(TerminalInterface.prototype.startInteractive).mockResolvedValue(undefined);
@@ -368,11 +370,11 @@ describe('App Initialization (run function)', () => {
       tools: unknown[];
     };
     expect(agentCallArgs).toMatchObject({
-      provider: expect.any(Object),
-      toolExecutor: expect.any(Object),
-      threadManager: expect.any(Object),
-      threadId: expect.any(String),
-      tools: expect.any(Array),
+      provider: expect.any(Object) as unknown,
+      toolExecutor: expect.any(Object) as unknown,
+      threadManager: expect.any(Object) as unknown,
+      threadId: expect.any(String) as unknown,
+      tools: expect.any(Array) as unknown,
     });
   });
 

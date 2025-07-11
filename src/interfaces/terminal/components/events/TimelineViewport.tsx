@@ -217,7 +217,9 @@ export function TimelineViewport({
           selectedItemIndex: viewport.selectedItemIndex,
           measurementTrigger: viewport.measurementTrigger,
         }}
-        onClose={() => {}}
+        onClose={() => {
+          // No-op: debug panel visibility is controlled by parent component
+        }}
       />
     </Box>
   );

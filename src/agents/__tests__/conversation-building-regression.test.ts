@@ -14,7 +14,11 @@ import { ThreadManager } from '~/threads/thread-manager.js';
 
 // Helper function for type-safe private method access
 function buildConversationFromEvents(agent: Agent, events: ThreadEvent[]): ProviderMessage[] {
-  return (agent as unknown as { _buildConversationFromEvents: (events: ThreadEvent[]) => ProviderMessage[] })._buildConversationFromEvents(events);
+  return (
+    agent as unknown as {
+      _buildConversationFromEvents: (events: ThreadEvent[]) => ProviderMessage[];
+    }
+  )._buildConversationFromEvents(events);
 }
 
 /**
@@ -511,7 +515,9 @@ describe('Conversation Building Regression Tests', () => {
 
               const hasMatchingToolUse = Array.isArray(prevMessage.content)
                 ? prevMessage.content.some(
-                    (c: unknown) => (c as { type?: string; id?: string }).type === 'tool_use' && (c as { type?: string; id?: string }).id === content.tool_use_id
+                    (c: unknown) =>
+                      (c as { type?: string; id?: string }).type === 'tool_use' &&
+                      (c as { type?: string; id?: string }).id === content.tool_use_id
                   )
                 : false;
 

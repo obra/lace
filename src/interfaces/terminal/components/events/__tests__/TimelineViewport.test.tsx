@@ -73,7 +73,14 @@ describe('TimelineViewport', () => {
 
   it('should provide viewport state to children', () => {
     const timeline = createMockTimeline(2);
-    let capturedState: any = null;
+    let capturedState: {
+      selectedLine: number;
+      lineScrollOffset: number;
+      itemPositions: number[];
+      totalContentHeight: number;
+      selectedItemIndex: number;
+      measurementTrigger: number;
+    } | null = null;
 
     renderWithFocus(
       <TimelineViewport timeline={timeline}>
@@ -86,16 +93,18 @@ describe('TimelineViewport', () => {
 
     // Should provide viewport state
     expect(capturedState).toBeDefined();
-    expect(capturedState.selectedLine).toBeDefined();
-    expect(capturedState.lineScrollOffset).toBeDefined();
-    expect(capturedState.itemPositions).toBeDefined();
-    expect(capturedState.totalContentHeight).toBeDefined();
-    expect(capturedState.selectedItemIndex).toBeDefined();
+    expect(capturedState!.selectedLine).toBeDefined();
+    expect(capturedState!.lineScrollOffset).toBeDefined();
+    expect(capturedState!.itemPositions).toBeDefined();
+    expect(capturedState!.totalContentHeight).toBeDefined();
+    expect(capturedState!.selectedItemIndex).toBeDefined();
   });
 
   it('should provide viewport actions to children', () => {
     const timeline = createMockTimeline(2);
-    let capturedActions: any = null;
+    let capturedActions: {
+      triggerRemeasurement: () => void;
+    } | null = null;
 
     renderWithFocus(
       <TimelineViewport timeline={timeline}>
@@ -108,12 +117,12 @@ describe('TimelineViewport', () => {
 
     // Should provide viewport actions
     expect(capturedActions).toBeDefined();
-    expect(capturedActions.triggerRemeasurement).toBeTypeOf('function');
+    expect(capturedActions!.triggerRemeasurement).toBeTypeOf('function');
   });
 
   it('should provide itemRefs to children', () => {
     const timeline = createMockTimeline(2);
-    let capturedRefs: any = null;
+    let capturedRefs: React.MutableRefObject<Map<number, unknown>> | null = null;
 
     renderWithFocus(
       <TimelineViewport timeline={timeline}>
@@ -126,7 +135,7 @@ describe('TimelineViewport', () => {
 
     // Should provide item refs
     expect(capturedRefs).toBeDefined();
-    expect(capturedRefs.current).toBeInstanceOf(Map);
+    expect(capturedRefs!.current).toBeInstanceOf(Map);
   });
 
   it('should render cursor overlay when focused', () => {

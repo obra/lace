@@ -11,7 +11,7 @@ import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js
 
 // Mock TimelineItem component
 vi.mock('../TimelineItem.js', () => ({
-  TimelineItem: ({ item, isSelected }: any) =>
+  TimelineItem: ({ item, isSelected }: { item: TimelineItem; isSelected: boolean }) =>
     React.createElement(Text, {}, `TLI:${item.type}:${isSelected ? 'FOCUS' : 'UNFOCUS'}:timeline`),
 }));
 

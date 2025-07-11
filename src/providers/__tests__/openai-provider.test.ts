@@ -218,7 +218,10 @@ describe('OpenAIProvider', () => {
   });
 
   describe('streaming responses', () => {
-    let mockStream: any;
+    interface MockStream {
+      [Symbol.asyncIterator]: ReturnType<typeof vi.fn>;
+    }
+    let mockStream: MockStream;
 
     beforeEach(() => {
       mockStream = {

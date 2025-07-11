@@ -10,7 +10,7 @@ import React, {
   useContext,
   useRef,
 } from 'react';
-import { Box, Text, render, useApp, useFocusManager, useInput, measureElement, DOMElement } from 'ink';
+import { Box, useApp, useInput, measureElement, DOMElement } from 'ink';
 import { Alert } from '@inkjs/ui';
 import useStdoutDimensions from '~/utils/use-stdout-dimensions.js';
 import ShellInput from '~/interfaces/terminal/components/shell-input.js';
@@ -68,7 +68,11 @@ interface TerminalInterfaceProps {
   agent: Agent;
   approvalCallback?: ApprovalCallback;
   interfaceContext?: {
-    showAlert: (alert: { variant: 'info' | 'warning' | 'error' | 'success'; title: string; children?: React.ReactNode }) => void;
+    showAlert: (alert: {
+      variant: 'info' | 'warning' | 'error' | 'success';
+      title: string;
+      children?: React.ReactNode;
+    }) => void;
     clearAlert: () => void;
   };
 }
@@ -82,7 +86,11 @@ interface Message {
 // SIGINT Handler Component
 const SigintHandler: React.FC<{
   agent: Agent;
-  showAlert: (alertData: { variant: 'info' | 'warning' | 'error' | 'success'; title: string; children?: React.ReactNode }) => void;
+  showAlert: (alertData: {
+    variant: 'info' | 'warning' | 'error' | 'success';
+    title: string;
+    children?: React.ReactNode;
+  }) => void;
 }> = ({ agent, showAlert }) => {
   const [ctrlCCount, setCtrlCCount] = useState(0);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -157,8 +165,8 @@ const SigintHandler: React.FC<{
 
 export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   agent,
-  approvalCallback,
-  interfaceContext,
+  approvalCallback: _approvalCallback,
+  interfaceContext: _interfaceContext,
 }) => {
   // Create StreamingTimelineProcessor for O(1) timeline processing
   const streamingTimelineProcessor = useMemo(() => {
@@ -177,8 +185,8 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   const bottomSectionRef = useRef<DOMElement | null>(null);
   const timelineContainerRef = useRef<DOMElement | null>(null);
   const [bottomSectionHeight, setBottomSectionHeight] = useState<number>(0);
-  const [timelineContainerHeight, setTimelineContainerHeight] = useState<number>(0);
-  const [, terminalHeight] = useStdoutDimensions();
+  const [_timelineContainerHeight, setTimelineContainerHeight] = useState<number>(0);
+  const [, _terminalHeight] = useStdoutDimensions();
   // Remove events array - StreamingTimelineProcessor manages timeline state
   // Track timeline version for React updates
   const [timelineVersion, setTimelineVersion] = useState(0);
@@ -218,7 +226,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
   // Turn tracking state
   const [isTurnActive, setIsTurnActive] = useState(false);
-  const [currentTurnId, setCurrentTurnId] = useState<string | null>(null);
+  const [_currentTurnId, setCurrentTurnId] = useState<string | null>(null);
   const [currentTurnMetrics, setCurrentTurnMetrics] = useState<CurrentTurnMetrics | null>(null);
 
   // Retry status state
@@ -242,7 +250,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
   } | null>(null);
 
   // Delegation tracking state
-  const [isDelegating, setIsDelegating] = useState(false);
+  const [_isDelegating, setIsDelegating] = useState(false);
 
   // Focus debug panel state
   const [isFocusDebugVisible, setIsFocusDebugVisible] = useState(false);
@@ -416,7 +424,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     // Handle agent response complete
-    const handleResponseComplete = ({ content }: { content: string }) => {
+    const handleResponseComplete = ({ content: _content }: { content: string }) => {
       // Clear streaming content - the final response will be in ThreadEvents
       setStreamingContent('');
       setIsProcessing(false);
@@ -432,24 +440,24 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     // Handle tool execution events to show delegation boxes immediately
-    const handleToolCallStart = ({ toolName }: { toolName: string }) => {
+    const handleToolCallStart = ({ toolName: _toolName }: { toolName: string }) => {
       // No need to sync events - streaming processor handles them automatically via thread_event_added
       // Delegation boxes will appear when the TOOL_CALL event flows through
     };
 
-    const handleToolCallComplete = ({ toolName }: { toolName: string }) => {
+    const handleToolCallComplete = ({ toolName: _toolName }: { toolName: string }) => {
       // No need to sync events - streaming processor handles them automatically via thread_event_added
     };
 
     // Handle delegation lifecycle events
-    const handleDelegationStart = ({ toolName }: { toolName: string }) => {
+    const _handleDelegationStart = ({ toolName }: { toolName: string }) => {
       if (toolName === 'delegate') {
         setIsDelegating(true);
         // No need to sync events - streaming processor handles them automatically
       }
     };
 
-    const handleDelegationEnd = ({ toolName }: { toolName: string }) => {
+    const _handleDelegationEnd = ({ toolName }: { toolName: string }) => {
       if (toolName === 'delegate') {
         setIsDelegating(false);
         // No need to sync events - streaming processor handles them automatically
@@ -460,13 +468,13 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     const handleTokenUsageUpdate = ({
       usage,
     }: {
-      usage: { 
-        promptTokens?: number; 
-        completionTokens?: number; 
-        totalTokens?: number; 
-        prompt_tokens?: number; 
-        completion_tokens?: number; 
-        total_tokens?: number; 
+      usage: {
+        promptTokens?: number;
+        completionTokens?: number;
+        totalTokens?: number;
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
       };
     }) => {
       if (usage && typeof usage === 'object' && !tokenUpdateLockRef.current) {
@@ -510,9 +518,9 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
 
     // Handle token budget warnings - these don't affect cumulative tracking
     const handleTokenBudgetWarning = ({
-      message,
-      usage,
-      recommendations,
+      message: _message,
+      usage: _usage,
+      recommendations: _recommendations,
     }: {
       message: string;
       usage: BudgetStatus;
@@ -557,7 +565,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     const handleTurnComplete = ({
-      turnId,
+      turnId: _turnId,
       metrics,
     }: {
       turnId: string;
@@ -655,7 +663,7 @@ export const TerminalInterfaceComponent: React.FC<TerminalInterfaceProps> = ({
     };
 
     const handleTurnAborted = ({
-      turnId,
+      turnId: _turnId,
       metrics,
     }: {
       turnId: string;

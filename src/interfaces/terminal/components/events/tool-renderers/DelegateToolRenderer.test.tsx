@@ -12,9 +12,15 @@ import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js
 // Mock the logger to avoid console output
 vi.mock('../../../../../utils/logger.js', () => ({
   logger: {
-    debug: () => {},
-    error: () => {},
-    warn: () => {},
+    debug: () => {
+      // Mock logger debug method
+    },
+    error: () => {
+      // Mock logger error method
+    },
+    warn: () => {
+      // Mock logger warn method
+    },
   },
 }));
 
@@ -92,7 +98,12 @@ function renderWithProviders(component: React.ReactElement) {
   return render(
     <LaceFocusProvider>
       <TimelineExpansionProvider>
-        <TimelineItemProvider isSelected={false} onToggle={() => {}}>
+        <TimelineItemProvider
+          isSelected={false}
+          onToggle={() => {
+            // Mock onToggle for test - no action needed
+          }}
+        >
           {component}
         </TimelineItemProvider>
       </TimelineExpansionProvider>

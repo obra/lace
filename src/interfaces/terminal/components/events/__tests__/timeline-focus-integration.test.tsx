@@ -38,7 +38,7 @@ vi.mock('../utils/timeline-utils.js', () => ({
       item.result &&
       !item.result.isError
     ) {
-      return item.result.metadata?.threadId || null;
+      return (item.result.metadata?.threadId as string) || null;
     }
     return null;
   },
@@ -73,7 +73,7 @@ vi.mock('../../../focus/index.js', () => ({
   FocusRegions: {
     delegate: (threadId: string) => `delegate-${threadId}`,
   },
-  FocusLifecycleWrapper: ({ children }: any) => children,
+  FocusLifecycleWrapper: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 describe('Timeline Entry Focus E2E Tests', () => {
@@ -167,7 +167,10 @@ describe('Timeline Entry Focus E2E Tests', () => {
       const timeline = createTimelineWithDelegate();
 
       function TestTimelineWithInput() {
-        const timelineRef = useRef<any>(null);
+        interface TimelineDisplayRef {
+          enterTimelineItem?: (index: number) => void;
+        }
+        const timelineRef = useRef<TimelineDisplayRef | null>(null);
 
         // Simulate Return key press on selected delegate item
         React.useEffect(() => {

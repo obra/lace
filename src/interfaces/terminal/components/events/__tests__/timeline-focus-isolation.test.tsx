@@ -78,7 +78,7 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
     onExpand: vi.fn(),
     onCollapse: vi.fn(),
   }),
-  TimelineExpansionProvider: ({ children }: any) => children,
+  TimelineExpansionProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 describe('Timeline Focus Isolation', () => {

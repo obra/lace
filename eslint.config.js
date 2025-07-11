@@ -7,7 +7,10 @@ import vitest from 'eslint-plugin-vitest';
 import globals from 'globals';
 
 export default [
-  js.configs.recommended,
+  {
+    ...js.configs.recommended,
+    ignores: ['dist/**/*'],
+  },
   ...tseslint.configs.recommendedTypeChecked.map(config => ({
     ...config,
     files: ['**/*.ts', '**/*.tsx'],
@@ -58,6 +61,7 @@ export default [
   },
   {
     files: ['src/cli/**/*.ts', 'src/interfaces/**/*.ts', 'src/app.ts'],
+    ignores: ['dist/**/*'],
     rules: {
       'no-console': 'off',
     },
@@ -76,6 +80,7 @@ export default [
   },
   {
     files: ['**/*.test.ts', '**/*.spec.ts'],
+    ignores: ['dist/**/*'],
     plugins: {
       vitest,
     },

@@ -11,13 +11,19 @@ import { TimelineExpansionProvider } from '~/interfaces/terminal/components/even
 
 // Mock dependencies
 vi.mock('../EventDisplay.js', () => ({
-  EventDisplay: ({ event }: any) => {
+  EventDisplay: ({ event }: { event: { type: string } }) => {
     return React.createElement(Text, {}, `EventDisplay:${event.type}`);
   },
 }));
 
 vi.mock('../tool-renderers/GenericToolRenderer.js', () => ({
-  GenericToolRenderer: ({ item, isSelected }: any) => {
+  GenericToolRenderer: ({
+    item,
+    isSelected,
+  }: {
+    item: { call: { name: string } };
+    isSelected?: boolean;
+  }) => {
     const focusState = isSelected ? 'FOCUS' : 'UNFOCUS';
     return React.createElement(
       Text,
@@ -32,7 +38,8 @@ vi.mock('../tool-renderers/getToolRenderer.js', () => ({
 }));
 
 vi.mock('../../message-display.js', () => ({
-  default: ({ message }: any) => React.createElement(Text, {}, `MessageDisplay:${message.type}`),
+  default: ({ message }: { message: { type: string } }) =>
+    React.createElement(Text, {}, `MessageDisplay:${message.type}`),
 }));
 
 vi.mock('../../../../../utils/logger.js', () => ({
@@ -309,7 +316,7 @@ describe('TimelineItem Component', () => {
         type: 'unknown_type',
         timestamp: new Date('2024-01-01T10:00:00Z'),
         content: 'Unknown content',
-      } as any;
+      } as unknown as TimelineItemType;
 
       const { lastFrame } = renderWithProvider(<TimelineItem item={item} {...defaultProps} />);
 

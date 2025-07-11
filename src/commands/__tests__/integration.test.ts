@@ -52,11 +52,11 @@ describe('Command System Integration', () => {
     } as MockAgent;
 
     mockUI = {
-      agent: mockAgent as any,
+      agent: mockAgent as unknown,
       displayMessage: vi.fn(),
       clearSession: vi.fn(),
       exit: vi.fn(),
-    } as UserInterface;
+    } as unknown as UserInterface;
   });
 
   describe('auto-discovery and execution', () => {

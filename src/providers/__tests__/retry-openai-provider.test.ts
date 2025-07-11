@@ -36,9 +36,15 @@ describe('OpenAIProvider retry functionality', () => {
     });
 
     // Add error handlers to prevent unhandled errors in tests
-    provider.on('error', () => {});
-    provider.on('retry_attempt', () => {});
-    provider.on('retry_exhausted', () => {});
+    provider.on('error', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
+    provider.on('retry_attempt', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
+    provider.on('retry_exhausted', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
   });
 
   afterEach(() => {
@@ -61,7 +67,9 @@ describe('OpenAIProvider retry functionality', () => {
       });
 
       const promise = provider.createResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       // Wait for first attempt
       await vi.advanceTimersByTimeAsync(0);
@@ -95,7 +103,9 @@ describe('OpenAIProvider retry functionality', () => {
       provider.on('retry_attempt', retryAttemptSpy);
 
       const promise = provider.createResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       await vi.advanceTimersByTimeAsync(0);
       await vi.advanceTimersByTimeAsync(1100);

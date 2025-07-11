@@ -23,7 +23,7 @@ vi.mock('@lmstudio/sdk', () => {
 
 describe('LMStudioProvider retry functionality', () => {
   let provider: LMStudioProvider;
-  let mockDiagnose: any;
+  let mockDiagnose: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -38,12 +38,18 @@ describe('LMStudioProvider retry functionality', () => {
     });
 
     // Mock the diagnose method to control connectivity
-    mockDiagnose = vi.spyOn(provider, 'diagnose');
+    mockDiagnose = vi.spyOn(provider, 'diagnose') as any;
 
     // Add error handlers to prevent unhandled errors in tests
-    provider.on('error', () => {});
-    provider.on('retry_attempt', () => {});
-    provider.on('retry_exhausted', () => {});
+    provider.on('error', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
+    provider.on('retry_attempt', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
+    provider.on('retry_exhausted', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
   });
 
   afterEach(() => {
@@ -62,7 +68,7 @@ describe('LMStudioProvider retry functionality', () => {
       // Mock successful model load
       const mockModel = {
         port: {
-          createChannel: vi.fn((type, config, onMessage) => {
+          createChannel: vi.fn((type: string, config: unknown, onMessage: (msg: any) => void) => {
             // Execute immediately with fake timers to avoid timeout
             onMessage({
               type: 'fragment',
@@ -88,7 +94,9 @@ describe('LMStudioProvider retry functionality', () => {
       mockLoad.mockResolvedValue(mockModel);
 
       const promise = provider.createResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       // Wait for first attempt
       await vi.advanceTimersByTimeAsync(0);
@@ -112,7 +120,7 @@ describe('LMStudioProvider retry functionality', () => {
 
       const mockModel = {
         port: {
-          createChannel: vi.fn((type, config, onMessage) => {
+          createChannel: vi.fn((type: string, config: unknown, onMessage: (msg: any) => void) => {
             // Execute immediately with fake timers to avoid timeout
             onMessage({
               type: 'fragment',
@@ -206,7 +214,7 @@ describe('LMStudioProvider retry functionality', () => {
 
       const mockModel = {
         port: {
-          createChannel: vi.fn((type, config, onMessage) => {
+          createChannel: vi.fn((type: string, config: unknown, onMessage: (msg: any) => void) => {
             // Execute immediately with fake timers to avoid timeout
             onMessage({
               type: 'fragment',
@@ -228,7 +236,9 @@ describe('LMStudioProvider retry functionality', () => {
       mockLoad.mockResolvedValue(mockModel);
 
       const promise = provider.createStreamingResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection during retry
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      }); // during retry
 
       // Wait for first attempt to fail
       await vi.advanceTimersByTimeAsync(0);
@@ -251,7 +261,7 @@ describe('LMStudioProvider retry functionality', () => {
 
       const mockModel = {
         port: {
-          createChannel: vi.fn((type, config, onMessage) => {
+          createChannel: vi.fn((type: string, config: unknown, onMessage: (msg: any) => void) => {
             // Start streaming immediately (sync), then fail
             onMessage({
               type: 'fragment',

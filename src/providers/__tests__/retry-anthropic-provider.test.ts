@@ -42,9 +42,15 @@ describe('AnthropicProvider retry functionality', () => {
     });
 
     // Add error handler to prevent unhandled errors in tests
-    provider.on('error', () => {});
-    provider.on('retry_attempt', () => {});
-    provider.on('retry_exhausted', () => {});
+    provider.on('error', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
+    provider.on('retry_attempt', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
+    provider.on('retry_exhausted', () => {
+      // Empty handler to prevent unhandled errors in tests
+    });
   });
 
   afterEach(() => {
@@ -63,7 +69,9 @@ describe('AnthropicProvider retry functionality', () => {
       });
 
       const promise = provider.createResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       // Wait for first attempt
       await vi.advanceTimersByTimeAsync(0);
@@ -93,7 +101,9 @@ describe('AnthropicProvider retry functionality', () => {
       provider.on('retry_attempt', retryAttemptSpy);
 
       const promise = provider.createResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      });
 
       await vi.advanceTimersByTimeAsync(0);
       await vi.advanceTimersByTimeAsync(1100);
@@ -159,7 +169,7 @@ describe('AnthropicProvider retry functionality', () => {
 
       // Create a proper stream mock for the successful retry
       const successfulStream = {
-        on: vi.fn((event, handler) => {
+        on: vi.fn((event: string, handler: (text: string) => void) => {
           if (event === 'text') {
             // Simulate some text events synchronously for testing
             handler('Hello ');
@@ -183,7 +193,9 @@ describe('AnthropicProvider retry functionality', () => {
         .mockImplementationOnce(() => successfulStream);
 
       const promise = provider.createStreamingResponse(messages, []);
-      promise.catch(() => {}); // Prevent unhandled rejection during retry
+      promise.catch(() => {
+        // Prevent unhandled rejection in test
+      }); // during retry
 
       // Wait for first attempt to fail
       await vi.advanceTimersByTimeAsync(0);

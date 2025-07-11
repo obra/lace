@@ -14,7 +14,12 @@ import { TimelineExpansionProvider } from '~/interfaces/terminal/components/even
 const renderWithProvider = (element: React.ReactElement, isSelected = false) => {
   return render(
     <TimelineExpansionProvider>
-      <TimelineItemProvider isSelected={isSelected} onToggle={() => {}}>
+      <TimelineItemProvider
+        isSelected={isSelected}
+        onToggle={() => {
+          // Mock onToggle for test - no action needed
+        }}
+      >
         {element}
       </TimelineItemProvider>
     </TimelineExpansionProvider>

@@ -141,9 +141,15 @@ class EnhancedStdout extends EventEmitter {
   };
 
   // Add methods that Ink might call
-  public cursorTo = () => {};
-  public clearLine = () => {};
-  public moveCursor = () => {};
+  public cursorTo = () => {
+    // Mock implementation for test stdout - no cursor movement needed
+  };
+  public clearLine = () => {
+    // Mock implementation for test stdout - no line clearing needed
+  };
+  public moveCursor = () => {
+    // Mock implementation for test stdout - no cursor movement needed
+  };
 }
 
 class EnhancedStderr extends EventEmitter {
@@ -184,7 +190,7 @@ export function renderInkComponent(tree: React.ReactElement): RenderResult {
   // Force TTY mode and color support to enable cursor rendering in tests
   const originalIsTTY = process.stdout.isTTY;
   const originalStderrIsTTY = process.stderr.isTTY;
-  const originalWrite = process.stdout.write;
+  const originalWrite = process.stdout.write.bind(process.stdout);
   const originalForceColor = process.env.FORCE_COLOR;
   const originalIsatty = tty.isatty;
   const originalColumns = process.stdout.columns;

@@ -193,7 +193,9 @@ describe('CLI Flow Tests', () => {
     });
 
     // Console output is automatically suppressed by global setup
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+    vi.spyOn(process, 'exit').mockImplementation((() => {
+      // Mock implementation - prevent actual process exit during tests
+    }) as never);
   });
 
   afterEach(() => {

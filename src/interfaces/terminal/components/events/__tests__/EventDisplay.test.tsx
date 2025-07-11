@@ -18,14 +18,19 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
     onExpand: vi.fn(),
     onCollapse: vi.fn(),
   }),
-  TimelineExpansionProvider: ({ children }: any) => children,
+  TimelineExpansionProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 // Helper to render with required providers
 function renderWithProviders(component: React.ReactElement) {
   return render(
     <TimelineExpansionProvider>
-      <TimelineItemProvider isSelected={false} onToggle={() => {}}>
+      <TimelineItemProvider
+        isSelected={false}
+        onToggle={() => {
+          // Mock onToggle for test - no action needed
+        }}
+      >
         {component}
       </TimelineItemProvider>
     </TimelineExpansionProvider>

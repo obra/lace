@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { FileScanner } from '~/interfaces/terminal/utils/file-scanner.js';
-import type { Dirent } from 'fs';
+import type { Dirent, PathLike } from 'fs';
 
 // Mock fs module
 vi.mock('fs');
@@ -24,7 +24,7 @@ function createMockDirent(name: string, isDirectory: boolean): Dirent {
     isSocket: () => false,
     path: '',
     parentPath: '',
-  } as Dirent;
+  } as Dirent<string>;
 }
 
 describe('FileScanner', () => {
@@ -54,7 +54,7 @@ describe('FileScanner', () => {
 
       const completions = await scanner.getCompletions();
 
-      expect(completions).toEqual(['src/', 'package.json', 'README.md']);
+      expect(completions).toEqual(['src/', 'package.json', 'README.md'] as string[]);
       expect(mockFs.readdirSync).toHaveBeenCalledWith(path.resolve(testWorkingDir, '.'), {
         withFileTypes: true,
       });
@@ -72,8 +72,8 @@ describe('FileScanner', () => {
       const completions = await scanner.getCompletions();
 
       // Directories should come first
-      expect(completions.slice(0, 2)).toEqual(['dist/', 'src/']);
-      expect(completions.slice(2)).toEqual(['app.ts', 'index.ts']);
+      expect(completions.slice(0, 2)).toEqual(['dist/', 'src/'] as string[]);
+      expect(completions.slice(2)).toEqual(['app.ts', 'index.ts'] as string[]);
     });
   });
 
@@ -91,7 +91,7 @@ describe('FileScanner', () => {
     it('should filter by prefix match', async () => {
       const completions = await scanner.getCompletions('s');
 
-      expect(completions).toEqual(['scripts/', 'src/', 'server.ts']);
+      expect(completions).toEqual(['scripts/', 'src/', 'server.ts'] as string[]);
     });
 
     it('should prioritize exact prefix matches', async () => {
@@ -107,8 +107,9 @@ describe('FileScanner', () => {
       mockFs.existsSync.mockReturnValue(false);
 
       // Mock different calls to readdirSync
-      mockFs.readdirSync.mockImplementation((dirPath: any) => {
-        if (dirPath.endsWith('src')) {
+      mockFs.readdirSync.mockImplementation((dirPath: PathLike) => {
+        const pathStr = typeof dirPath === 'string' ? dirPath : dirPath.toString();
+        if (pathStr.endsWith('src')) {
           return [
             createMockDirent('components', true),
             createMockDirent('utils', true),
@@ -120,14 +121,15 @@ describe('FileScanner', () => {
 
       const completions = await scanner.getCompletions('src/');
 
-      expect(completions).toEqual(['src/components/', 'src/utils/', 'src/app.ts']);
+      expect(completions).toEqual(['src/components/', 'src/utils/', 'src/app.ts'] as string[]);
     });
 
     it('should match nested paths with partial filename', async () => {
       mockFs.existsSync.mockReturnValue(false);
 
-      mockFs.readdirSync.mockImplementation((dirPath: any) => {
-        if (dirPath.endsWith('src')) {
+      mockFs.readdirSync.mockImplementation((dirPath: PathLike) => {
+        const pathStr = typeof dirPath === 'string' ? dirPath : dirPath.toString();
+        if (pathStr.endsWith('src')) {
           return [
             createMockDirent('app.ts', false),
             createMockDirent('agent.ts', false),
@@ -139,7 +141,7 @@ describe('FileScanner', () => {
 
       const completions = await scanner.getCompletions('src/a');
 
-      expect(completions).toEqual(['src/agent.ts', 'src/app.ts']);
+      expect(completions).toEqual(['src/agent.ts', 'src/app.ts'] as string[]);
     });
   });
 
@@ -179,7 +181,7 @@ describe('FileScanner', () => {
       const completions = await scanner.getCompletions();
 
       // Should still exclude common patterns even without .gitignore
-      expect(completions).toEqual(['src/']);
+      expect(completions).toEqual(['src/'] as string[]);
       expect(completions).not.toContain('node_modules/');
     });
 
@@ -237,7 +239,7 @@ describe('FileScanner', () => {
 
       const completions = await scanner.getCompletions();
 
-      expect(completions).toEqual([]);
+      expect(completions).toEqual([] as string[]);
     });
 
     it('should handle .gitignore read errors', async () => {
@@ -249,7 +251,7 @@ describe('FileScanner', () => {
 
       // Should not throw and still return results
       const completions = await scanner.getCompletions();
-      expect(completions).toEqual(['src/']);
+      expect(completions).toEqual(['src/'] as string[]);
     });
   });
 
@@ -266,8 +268,9 @@ describe('FileScanner', () => {
 
     it('should handle paths with trailing slashes', async () => {
       mockFs.existsSync.mockReturnValue(false);
-      mockFs.readdirSync.mockImplementation((dirPath: any) => {
-        if (dirPath.endsWith('src')) {
+      mockFs.readdirSync.mockImplementation((dirPath: PathLike) => {
+        const pathStr = typeof dirPath === 'string' ? dirPath : dirPath.toString();
+        if (pathStr.endsWith('src')) {
           return [createMockDirent('app.ts', false)] as any;
         }
         return [] as any;
@@ -275,7 +278,7 @@ describe('FileScanner', () => {
 
       const completions = await scanner.getCompletions('src/');
 
-      expect(completions).toEqual(['src/app.ts']);
+      expect(completions).toEqual(['src/app.ts'] as string[]);
     });
   });
 });

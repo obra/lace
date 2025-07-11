@@ -721,7 +721,9 @@ describe('Session Management', () => {
 
   describe('ThreadManager session management', () => {
     it('should start new session by default', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock console.log to suppress output during test
+      });
 
       const threadManager = new ThreadManager(tempDbPath);
       const sessionInfo = threadManager.resumeOrCreate();
@@ -736,7 +738,9 @@ describe('Session Management', () => {
     });
 
     it('should continue latest session', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock console.log to suppress output during test
+      });
 
       // Create a session first
       const firstManager = new ThreadManager(tempDbPath);
@@ -762,7 +766,9 @@ describe('Session Management', () => {
     });
 
     it('should continue specific session by ID', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock console.log to suppress output during test
+      });
 
       // Create multiple sessions
       const manager1 = new ThreadManager(tempDbPath);
@@ -793,8 +799,12 @@ describe('Session Management', () => {
     });
 
     it('should start new session if continue fails', async () => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock console.log to suppress output during test
+      });
+      vi.spyOn(console, 'warn').mockImplementation(() => {
+        // Mock console.warn to suppress output during test
+      });
 
       // Try to continue non-existent session
       const threadManager = new ThreadManager(tempDbPath);

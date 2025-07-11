@@ -91,7 +91,9 @@ describe('Agent Queue Processing', () => {
         agent as unknown as AgentWithPrivateMethods,
         '_processMessage'
       );
-      processMessageSpy.mockImplementation(async () => {});
+      processMessageSpy.mockImplementation(async () => {
+        // Mock implementation for testing - prevents actual message processing
+      });
 
       // Process queue should be called when state becomes idle
       await agent.processQueuedMessages();
@@ -184,7 +186,9 @@ describe('Agent Queue Processing', () => {
         agent as unknown as AgentWithPrivateMethods,
         '_processMessage'
       );
-      processMessageSpy.mockImplementation(async () => {});
+      processMessageSpy.mockImplementation(async () => {
+        // Mock implementation for testing - prevents actual message processing
+      });
 
       await agent.processQueuedMessages();
 
@@ -198,7 +202,9 @@ describe('Agent Queue Processing', () => {
       agent.queueMessage('test message');
 
       const processQueueSpy = vi.spyOn(agent, 'processQueuedMessages');
-      processQueueSpy.mockImplementation(async () => {});
+      processQueueSpy.mockImplementation(async () => {
+        // Mock implementation for testing - prevents actual queue processing
+      });
 
       // First set to non-idle state, then to idle to trigger the transition
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -213,7 +219,9 @@ describe('Agent Queue Processing', () => {
       agent.queueMessage('test message');
 
       const processQueueSpy = vi.spyOn(agent, 'processQueuedMessages');
-      processQueueSpy.mockImplementation(async () => {});
+      processQueueSpy.mockImplementation(async () => {
+        // Mock implementation for testing - prevents actual queue processing
+      });
 
       // Reset call count
       processQueueSpy.mockClear();

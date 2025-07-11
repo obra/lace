@@ -86,13 +86,13 @@ async function debugThread(options: DebugOptions): Promise<ThreadDebugInfo> {
 
   const buildConversationFromEvents = agentWithPrivates._buildConversationFromEvents.bind(agent);
 
-  const providerMessages = buildConversationFromEvents(thread.events);
+  const providerMessages = buildConversationFromEvents(thread.events) as ProviderMessage[];
 
   // Calculate token counts
   const tokenCounts = calculateTokenCounts(thread.events, providerMessages);
 
   // Convert to provider-specific format if needed
-  let conversation: ProviderMessage[] | unknown = providerMessages;
+  let conversation: unknown = providerMessages;
 
   if (options.provider === 'anthropic') {
     conversation = convertToAnthropicFormat(providerMessages);
@@ -328,7 +328,7 @@ async function main() {
 
     if (options.output) {
       const fs = await import('fs');
-      fs.writeFileSync(options.output, output);
+      fs.writeFileSync(options.output as string, output);
       console.warn(`Debug output written to ${options.output}`);
     } else {
       console.warn(output);
@@ -340,5 +340,5 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
+  void main();
 }

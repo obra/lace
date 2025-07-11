@@ -10,7 +10,6 @@ import {
   NewAgentSpec,
   isNewAgentSpec,
   createNewAgentSpec,
-  AssigneeId,
   isAssigneeId,
 } from '~/threads/types.js';
 

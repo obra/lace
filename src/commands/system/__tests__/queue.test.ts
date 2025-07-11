@@ -20,9 +20,9 @@ type MockAgent = {
   stop: MockedFunction<() => void>;
   resumeOrCreateThread: MockedFunction<() => string>;
   replaySessionEvents: MockedFunction<() => void>;
-  on: MockedFunction<(event: string, listener: Function) => void>;
-  off: MockedFunction<(event: string, listener: Function) => void>;
-  emit: MockedFunction<(event: string, ...args: any[]) => boolean>;
+  on: MockedFunction<(event: string, listener: (...args: unknown[]) => void) => void>;
+  off: MockedFunction<(event: string, listener: (...args: unknown[]) => void) => void>;
+  emit: MockedFunction<(event: string, ...args: unknown[]) => boolean>;
 };
 
 type MockUI = {
