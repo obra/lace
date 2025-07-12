@@ -9,9 +9,9 @@ import globals from 'globals';
 
 export default [
   {
-    ...js.configs.recommended,
-    ignores: ['dist/**/*'],
+    ignores: ['dist/**/*', 'vitest.config.ts'],
   },
+  js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map(config => ({
     ...config,
     files: ['**/*.ts', '**/*.tsx'],
@@ -58,7 +58,7 @@ export default [
           }
         ]
       }],
-      'no-var': 'error'
+      'no-var': 'error',
       'import/extensions': ['off']
     },
   },
