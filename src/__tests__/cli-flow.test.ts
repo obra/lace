@@ -101,7 +101,7 @@ describe('CLI Flow Tests', () => {
     listTools: false,
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
 
     // All imports are now static at the top level

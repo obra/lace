@@ -17,8 +17,10 @@ const TEST_HAR_FILE = '/tmp/test-cli-har.har';
 
 describe('HAR Integration', () => {
   beforeEach(() => {
-    // Set test environment
-    process.env.NODE_ENV = 'test';
+    // Set test environment - don't directly assign to readonly property
+    if (!process.env.NODE_ENV) {
+      Object.defineProperty(process.env, 'NODE_ENV', { value: 'test', writable: true });
+    }
 
     if (existsSync(TEST_HAR_FILE)) {
       unlinkSync(TEST_HAR_FILE);

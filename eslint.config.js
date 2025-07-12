@@ -19,7 +19,7 @@ export default [
   })),
   {
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['dist/**/*'],
+    ignores: ['dist/**/*', 'next.config.ts'],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',

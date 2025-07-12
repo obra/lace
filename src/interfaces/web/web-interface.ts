@@ -2,6 +2,8 @@
 // ABOUTME: Provides web UI access to Agent and ThreadManager through shared instances
 
 import { createServer } from 'node:http';
+import { parse } from 'node:url';
+import next from 'next';
 import type { Agent } from '~/agents/agent.js';
 import type { UserInterface } from '~/commands/types.js';
 import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types.js';
@@ -20,6 +22,7 @@ export class WebInterface implements UserInterface, ApprovalCallback {
   agent: Agent;
   private options: Required<WebInterfaceOptions>;
   private server?: ReturnType<typeof createServer>;
+  private nextApp?: ReturnType<typeof next>;
   private isRunning = false;
 
   constructor(agent: Agent, options: WebInterfaceOptions = {}) {
@@ -70,35 +73,39 @@ export class WebInterface implements UserInterface, ApprovalCallback {
       // Start the Agent
       await this.agent.start();
 
-      // Create a basic HTTP server for now
-      // TODO: Replace with embedded Next.js server
+      // Create Next.js app with custom app directory
+      this.nextApp = next({
+        dev: process.env.NODE_ENV !== 'production',
+        dir: './src/interfaces/web',
+        quiet: false,
+      });
+
+      const handle = this.nextApp.getRequestHandler();
+      await this.nextApp.prepare();
+
+      // Create custom server that integrates with Next.js
       this.server = createServer((req, res) => {
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>Lace Web Interface</title>
-            </head>
-            <body>
-              <h1>Lace Web Interface</h1>
-              <p>Next.js integration coming soon...</p>
-              <p>Provider: ${this.agent.providerName}</p>
-              <p>Thread ID: ${this.agent.getCurrentThreadId() || 'none'}</p>
-            </body>
-          </html>
-        `);
+        try {
+          const parsedUrl = parse(req.url!, true);
+          void handle(req, res, parsedUrl);
+        } catch (err) {
+          logger.error('Error handling request', { error: err });
+          res.statusCode = 500;
+          res.end('Internal Server Error');
+        }
       });
 
       // Start the server
       await new Promise<void>((resolve, reject) => {
         this.server!.listen(this.options.port, this.options.host, () => {
           logger.info(
-            `Web interface started on http://${this.options.host}:${this.options.port}`
+            `Next.js web interface started on http://${this.options.host}:${this.options.port}`
           );
           console.log(
             `🌐 Lace web interface available at http://${this.options.host}:${this.options.port}`
           );
+          console.log(`   Provider: ${this.agent.providerName}`);
+          console.log(`   Thread ID: ${this.agent.getCurrentThreadId() || 'none'}`);
           resolve();
         });
 
@@ -145,6 +152,12 @@ export class WebInterface implements UserInterface, ApprovalCallback {
             resolve();
           });
         });
+      }
+
+      // Close Next.js app
+      if (this.nextApp) {
+        await this.nextApp.close();
+        logger.info('Next.js app closed');
       }
     } catch (error) {
       logger.error('Error stopping web interface', { error });
