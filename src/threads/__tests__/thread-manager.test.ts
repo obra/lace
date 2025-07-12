@@ -2,7 +2,7 @@
 // ABOUTME: Tests verify ThreadManager operates as pure data persistence layer
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ThreadManager } from '~/threads/thread-manager.js';
+import { ThreadManager } from '~/threads/thread-manager';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';

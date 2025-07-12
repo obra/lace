@@ -5,12 +5,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { Agent } from '~/agents/agent.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
-import { Tool } from '~/tools/tool.js';
-import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy.js';
+import { Agent } from '~/agents/agent';
+import { ThreadManager } from '~/threads/thread-manager';
+import { ToolExecutor } from '~/tools/executor';
+import { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy';
 
 // Mock provider for testing
 class MockProvider extends AIProvider {

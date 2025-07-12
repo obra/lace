@@ -4,9 +4,9 @@
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect, vi } from 'vitest';
-import { BashToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/BashToolRenderer.js';
-import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
-import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { BashToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/BashToolRenderer';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
 
 // Mock the expansion toggle hooks
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({

@@ -5,8 +5,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import * as laceDir from '~/config/lace-dir.js';
+import { ThreadManager } from '~/threads/thread-manager';
+import * as laceDir from '~/config/lace-dir';
 
 describe('CLI Integration', () => {
   let tempDbPath: string;

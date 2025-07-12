@@ -5,9 +5,9 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { Text } from 'ink';
-import { Timeline, TimelineItem } from '~/interfaces/timeline-types.js';
-import { TimelineContent } from '~/interfaces/terminal/components/events/TimelineContent.js';
-import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
+import { Timeline, TimelineItem } from '~/interfaces/timeline-types';
+import { TimelineContent } from '~/interfaces/terminal/components/events/TimelineContent';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider';
 
 // Mock TimelineItem component
 vi.mock('../TimelineItem.js', () => ({

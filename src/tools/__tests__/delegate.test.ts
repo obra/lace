@@ -2,12 +2,12 @@
 // ABOUTME: Validates subagent creation, execution, and tool approval flow
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { DelegateTool } from '~/tools/implementations/delegate.js';
-import { Agent } from '~/agents/agent.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { AnthropicProvider } from '~/providers/anthropic-provider.js';
-import type { AIProvider } from '~/providers/base-provider.js';
+import { DelegateTool } from '~/tools/implementations/delegate';
+import { Agent } from '~/agents/agent';
+import { ThreadManager } from '~/threads/thread-manager';
+import { ToolExecutor } from '~/tools/executor';
+import { AnthropicProvider } from '~/providers/anthropic-provider';
+import type { AIProvider } from '~/providers/base-provider';
 
 // Note: Tool approval is not yet implemented in lace
 // When it is, subagent tool calls should use the same approval flow

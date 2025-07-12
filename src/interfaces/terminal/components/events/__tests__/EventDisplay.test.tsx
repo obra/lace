@@ -4,12 +4,12 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
-import { EventDisplay } from '~/interfaces/terminal/components/events/EventDisplay.js';
-import { ThreadEvent } from '~/threads/types.js';
-import { ToolCall, ToolResult } from '~/tools/types.js';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
-import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
-import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
+import { EventDisplay } from '~/interfaces/terminal/components/events/EventDisplay';
+import { ThreadEvent } from '~/threads/types';
+import { ToolCall, ToolResult } from '~/tools/types';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
 
 // Mock expansion hook
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({

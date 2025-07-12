@@ -2,9 +2,9 @@
 // ABOUTME: Validates task list formatting, grouping, and display options
 
 import { describe, it, expect } from 'vitest';
-import { TaskFormatter } from '~/tools/implementations/task-manager/formatter.js';
-import { Task } from '~/tools/implementations/task-manager/types.js';
-import { createThreadId, createNewAgentSpec } from '~/threads/types.js';
+import { TaskFormatter } from '~/tools/implementations/task-manager/formatter';
+import { Task } from '~/tools/implementations/task-manager/types';
+import { createThreadId, createNewAgentSpec } from '~/threads/types';
 
 describe('TaskFormatter', () => {
   const parentThreadId = createThreadId('lace_20250703_parent');

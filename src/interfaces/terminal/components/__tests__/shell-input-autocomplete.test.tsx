@@ -4,8 +4,8 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render as renderInkComponent } from 'ink-testing-library';
-import ShellInput from '~/interfaces/terminal/components/shell-input.js';
-import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
+import ShellInput from '~/interfaces/terminal/components/shell-input';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider';
 
 // Capture the useInput handler for direct testing
 interface KeyInfo {

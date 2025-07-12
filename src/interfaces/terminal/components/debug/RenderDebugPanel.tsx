@@ -3,8 +3,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { Timeline } from '~/interfaces/timeline-types.js';
-import { ViewportState } from '~/interfaces/terminal/components/events/hooks/useTimelineViewport.js';
+import { Timeline } from '~/interfaces/timeline-types';
+import { ViewportState } from '~/interfaces/terminal/components/events/hooks/useTimelineViewport';
 
 interface RenderDebugPanelProps {
   isVisible: boolean;

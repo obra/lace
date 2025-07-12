@@ -26,7 +26,7 @@
 // - That item updates its own expansion state and re-renders
 
 import React, { useCallback, useEffect, useState, createContext, useContext } from 'react';
-import { logger } from '~/utils/logger.js';
+import { logger } from '~/utils/logger';
 
 // Event emitter for timeline-to-item expansion and focus communication
 class ExpansionEmitter {

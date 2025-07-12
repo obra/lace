@@ -3,9 +3,9 @@
 
 import React from 'react';
 import { Text } from 'ink';
-import { ThreadEvent } from '~/threads/types.js';
-import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
+import { ThreadEvent } from '~/threads/types';
+import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme';
 
 interface UserSystemPromptDisplayProps {
   event: ThreadEvent;

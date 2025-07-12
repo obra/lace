@@ -3,8 +3,8 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { parseThinkingBlocks } from '~/interfaces/terminal/components/events/utils/thinking-parser.js';
-import { MarkdownDisplay } from '~/interfaces/terminal/components/ui/MarkdownDisplay.js';
+import { parseThinkingBlocks } from '~/interfaces/terminal/components/events/utils/thinking-parser';
+import { MarkdownDisplay } from '~/interfaces/terminal/components/ui/MarkdownDisplay';
 
 interface ContentPart {
   type: 'text' | 'thinking';

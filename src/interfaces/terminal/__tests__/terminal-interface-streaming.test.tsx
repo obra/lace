@@ -4,12 +4,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React from 'react';
 import { render } from 'ink-testing-library';
-import { Agent } from '~/agents/agent.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { TestProvider } from '~/__tests__/utils/test-provider.js';
-import { TerminalInterfaceComponent } from '~/interfaces/terminal/terminal-interface.js';
-import { ThreadEvent } from '~/threads/types.js';
+import { Agent } from '~/agents/agent';
+import { ThreadManager } from '~/threads/thread-manager';
+import { ToolExecutor } from '~/tools/executor';
+import { TestProvider } from '~/__tests__/utils/test-provider';
+import { TerminalInterfaceComponent } from '~/interfaces/terminal/terminal-interface';
+import { ThreadEvent } from '~/threads/types';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';

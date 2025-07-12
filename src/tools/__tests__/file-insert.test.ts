@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFile, writeFile, rm, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { FileInsertTool } from '~/tools/implementations/file-insert.js';
+import { FileInsertTool } from '~/tools/implementations/file-insert';
 
 describe('FileInsertTool with schema validation', () => {
   let tool: FileInsertTool;

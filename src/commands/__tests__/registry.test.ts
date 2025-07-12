@@ -2,8 +2,8 @@
 // ABOUTME: Tests command registration, alias resolution, and auto-discovery patterns
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CommandRegistry } from '~/commands/registry.js';
-import type { Command } from '~/commands/types.js';
+import { CommandRegistry } from '~/commands/registry';
+import type { Command } from '~/commands/types';
 
 describe('CommandRegistry', () => {
   let registry: CommandRegistry;

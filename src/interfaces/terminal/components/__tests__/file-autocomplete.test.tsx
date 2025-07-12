@@ -4,8 +4,8 @@
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
-import FileAutocomplete from '~/interfaces/terminal/components/file-autocomplete.js';
-import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
+import FileAutocomplete from '~/interfaces/terminal/components/file-autocomplete';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider';
 
 describe('FileAutocomplete', () => {
   // Helper to render with focus provider

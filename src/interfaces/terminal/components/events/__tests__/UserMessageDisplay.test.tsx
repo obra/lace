@@ -4,11 +4,11 @@
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
-import { UserMessageDisplay } from '~/interfaces/terminal/components/events/UserMessageDisplay.js';
-import { ThreadEvent } from '~/threads/types.js';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
-import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
-import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
+import { UserMessageDisplay } from '~/interfaces/terminal/components/events/UserMessageDisplay';
+import { ThreadEvent } from '~/threads/types';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
 
 // Helper to render with provider
 const renderWithProvider = (element: React.ReactElement, isSelected = false) => {

@@ -3,17 +3,14 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import {
-  TimelineEntry,
-  TimelineStatus,
-} from '~/interfaces/terminal/components/ui/TimelineEntry.js';
-import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { TimelineEntry, TimelineStatus } from '~/interfaces/terminal/components/ui/TimelineEntry';
+import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
 import {
   limitLines,
   type ToolRendererProps,
-} from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
-import { ToolResult } from '~/tools/types.js';
-import { logger } from '~/utils/logger.js';
+} from '~/interfaces/terminal/components/events/tool-renderers/components/shared';
+import { ToolResult } from '~/tools/types';
+import { logger } from '~/utils/logger';
 
 // Bash tool output structure
 interface BashOutput {

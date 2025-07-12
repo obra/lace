@@ -2,13 +2,13 @@
 // ABOUTME: Verifies timeline analysis functions for delegation and thread processing
 
 import { describe, it, expect } from 'vitest';
-import { Timeline, TimelineItem } from '~/interfaces/timeline-types.js';
+import { Timeline, TimelineItem } from '~/interfaces/timeline-types';
 import {
   isThreadComplete,
   extractTaskFromTimeline,
   calculateDuration,
   extractDelegateThreadId,
-} from '~/interfaces/terminal/components/events/utils/timeline-utils.js';
+} from '~/interfaces/terminal/components/events/utils/timeline-utils';
 
 // Create test data
 function createTestTimeline(items: TimelineItem[] = []): Timeline {

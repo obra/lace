@@ -3,17 +3,17 @@
 
 import React from 'react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { renderInkComponent } from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
-import StatusBar from '~/interfaces/terminal/components/status-bar.js';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
-import type { ProjectContext } from '~/interfaces/terminal/hooks/use-project-context.js';
+import { renderInkComponent } from '~/interfaces/terminal/__tests__/helpers/ink-test-utils';
+import StatusBar from '~/interfaces/terminal/components/status-bar';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme';
+import type { ProjectContext } from '~/interfaces/terminal/hooks/use-project-context';
 
 // Mock the terminal dimensions hook to simulate narrow terminals
 vi.mock('../../../utils/use-stdout-dimensions.js', () => ({
   default: vi.fn(() => [80, 24]), // Default to 80 columns
 }));
 
-import useStdoutDimensions from '~/utils/use-stdout-dimensions.js';
+import useStdoutDimensions from '~/utils/use-stdout-dimensions';
 const mockUseStdoutDimensions = useStdoutDimensions as ReturnType<typeof vi.fn>;
 
 describe('StatusBar Layout and Truncation', () => {

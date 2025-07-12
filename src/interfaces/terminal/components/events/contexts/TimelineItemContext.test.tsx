@@ -9,7 +9,7 @@ import {
   TimelineItemProvider,
   useTimelineItem,
   useTimelineItemOptional,
-} from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+} from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
 
 // Mock the expansion hook
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({

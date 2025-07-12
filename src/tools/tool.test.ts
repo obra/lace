@@ -3,8 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { Tool } from '~/tools/tool.js';
-import { ToolContext, ToolResult } from '~/tools/types.js';
+import { Tool } from '~/tools/tool';
+import { ToolContext, ToolResult } from '~/tools/types';
 
 // Test implementation of new Tool class
 class TestTool extends Tool {

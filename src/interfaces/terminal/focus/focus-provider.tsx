@@ -12,9 +12,9 @@ import React, {
   useRef,
 } from 'react';
 import { useFocusManager, useInput } from 'ink';
-import { FocusStack } from '~/interfaces/terminal/focus/focus-stack.js';
-import { FocusRegions } from '~/interfaces/terminal/focus/focus-regions.js';
-import { logger } from '~/utils/logger.js';
+import { FocusStack } from '~/interfaces/terminal/focus/focus-stack';
+import { FocusRegions } from '~/interfaces/terminal/focus/focus-regions';
+import { logger } from '~/utils/logger';
 
 /**
  * Context value interface for Lace focus management

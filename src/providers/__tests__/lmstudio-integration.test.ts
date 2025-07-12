@@ -2,10 +2,10 @@
 // ABOUTME: Tests tool calling, context preservation, and edge cases with real model
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { LMStudioProvider } from '~/providers/lmstudio-provider.js';
-import { Tool } from '~/tools/tool.js';
-import { ToolResult, ToolContext } from '~/tools/types.js';
-import { checkProviderAvailability } from '~/__tests__/utils/provider-test-helpers.js';
+import { LMStudioProvider } from '~/providers/lmstudio-provider';
+import { Tool } from '~/tools/tool';
+import { ToolResult, ToolContext } from '~/tools/types';
+import { checkProviderAvailability } from '~/__tests__/utils/provider-test-helpers';
 import { z } from 'zod';
 
 // Mock tool for testing without side effects

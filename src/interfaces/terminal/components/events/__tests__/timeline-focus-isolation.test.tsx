@@ -5,11 +5,11 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { Box } from 'ink';
-import TimelineDisplay from '~/interfaces/terminal/components/events/TimelineDisplay.js';
-import { Timeline } from '~/interfaces/timeline-types.js';
-import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
-import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
-import { FocusRegions } from '~/interfaces/terminal/focus/focus-regions.js';
+import TimelineDisplay from '~/interfaces/terminal/components/events/TimelineDisplay';
+import { Timeline } from '~/interfaces/timeline-types';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
+import { FocusRegions } from '~/interfaces/terminal/focus/focus-regions';
 
 // Mock the timeline viewport hook to track focus calls
 const mockNavigateUp = vi.fn();

@@ -2,10 +2,10 @@
 // ABOUTME: Verifies Agent correctly emits events for thread operations
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Agent } from '~/agents/agent.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { createMockProvider } from '~/__tests__/utils/mock-provider.js';
+import { Agent } from '~/agents/agent';
+import { ThreadManager } from '~/threads/thread-manager';
+import { ToolExecutor } from '~/tools/executor';
+import { createMockProvider } from '~/__tests__/utils/mock-provider';
 
 describe('Agent Single Event Source Integration', () => {
   let agent: Agent;

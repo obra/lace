@@ -2,7 +2,7 @@
 // ABOUTME: Ensures LMStudio provider doesn't hang indefinitely when server is unavailable
 
 import { describe, it, expect } from 'vitest';
-import { LMStudioProvider } from '~/providers/lmstudio-provider.js';
+import { LMStudioProvider } from '~/providers/lmstudio-provider';
 
 describe('LMStudio Provider Timeout Handling', () => {
   it('should timeout quickly when LMStudio server is unavailable', async () => {

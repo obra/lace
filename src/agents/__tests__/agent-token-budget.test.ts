@@ -2,13 +2,13 @@
 // ABOUTME: Verifies token budget tracking, warnings, and request blocking work correctly
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Agent, AgentConfig } from '~/agents/agent.js';
-import { AIProvider } from '~/providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
-import { Tool } from '~/tools/tool.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { BudgetStatus, BudgetRecommendations } from '~/token-management/types.js';
+import { Agent, AgentConfig } from '~/agents/agent';
+import { AIProvider } from '~/providers/base-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { ToolExecutor } from '~/tools/executor';
+import { ThreadManager } from '~/threads/thread-manager';
+import { BudgetStatus, BudgetRecommendations } from '~/token-management/types';
 
 // Mock provider for testing token budget integration
 class MockProvider extends AIProvider {

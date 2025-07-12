@@ -2,8 +2,8 @@
 // ABOUTME: Tests the core thread debugging functionality without requiring real threads
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { estimateTokens } from '~/utils/token-estimation.js';
-import { ThreadEvent } from '~/threads/types.js';
+import { estimateTokens } from '~/utils/token-estimation';
+import { ThreadEvent } from '~/threads/types';
 
 // Mock dependencies
 vi.mock('./config/env-loader.js', () => ({

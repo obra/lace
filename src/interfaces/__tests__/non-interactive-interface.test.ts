@@ -2,10 +2,10 @@
 // ABOUTME: Validates single prompt execution and graceful shutdown
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface.js';
-import type { Agent } from '~/agents/agent.js';
+import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
+import type { Agent } from '~/agents/agent';
 import { EventEmitter } from 'events';
-import { withConsoleCapture } from '~/__tests__/setup/console-capture.js';
+import { withConsoleCapture } from '~/__tests__/setup/console-capture';
 
 // Mock dependencies
 

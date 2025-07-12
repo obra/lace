@@ -4,7 +4,7 @@
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
-import { CodeDisplay } from '~/interfaces/terminal/components/ui/CodeDisplay.js';
+import { CodeDisplay } from '~/interfaces/terminal/components/ui/CodeDisplay';
 
 describe('CodeDisplay', () => {
   it('should render JSON with formatting', () => {

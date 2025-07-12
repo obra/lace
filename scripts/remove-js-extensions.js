@@ -41,8 +41,8 @@ async function main() {
   console.log('🔄 Removing .js extensions from TypeScript imports...\n');
   
   // Find all TypeScript files in src directory
-  const files = await glob('src/**/*.ts', { 
-    ignore: ['**/*.d.ts', '**/*.test.ts', '**/*.spec.ts'] 
+  const files = await glob('src/**/*.ts*', { 
+    ignore: ['**/*.d.ts']
   });
   
   let transformedCount = 0;

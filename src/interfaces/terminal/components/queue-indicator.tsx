@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import type { MessageQueueStats } from '~/agents/types.js';
+import type { MessageQueueStats } from '~/agents/types';
 
 interface QueueIndicatorProps {
   stats: MessageQueueStats;

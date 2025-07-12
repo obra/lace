@@ -2,11 +2,11 @@
 // ABOUTME: Verifies provider registration, retrieval, and management functionality
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ProviderRegistry } from '~/providers/registry.js';
-import { AnthropicProvider } from '~/providers/anthropic-provider.js';
-import { LMStudioProvider } from '~/providers/lmstudio-provider.js';
-import { OpenAIProvider } from '~/providers/openai-provider.js';
-import { OllamaProvider } from '~/providers/ollama-provider.js';
+import { ProviderRegistry } from '~/providers/registry';
+import { AnthropicProvider } from '~/providers/anthropic-provider';
+import { LMStudioProvider } from '~/providers/lmstudio-provider';
+import { OpenAIProvider } from '~/providers/openai-provider';
+import { OllamaProvider } from '~/providers/ollama-provider';
 
 describe('ProviderRegistry', () => {
   let registry: ProviderRegistry;

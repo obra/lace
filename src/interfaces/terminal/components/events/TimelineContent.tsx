@@ -3,8 +3,8 @@
 
 import React, { useMemo } from 'react';
 import { Box } from 'ink';
-import { Timeline, TimelineItem as TimelineItemType } from '~/interfaces/timeline-types.js';
-import { TimelineItem } from '~/interfaces/terminal/components/events/TimelineItem.js';
+import { Timeline, TimelineItem as TimelineItemType } from '~/interfaces/timeline-types';
+import { TimelineItem } from '~/interfaces/terminal/components/events/TimelineItem';
 
 interface ViewportState {
   selectedItemIndex: number;

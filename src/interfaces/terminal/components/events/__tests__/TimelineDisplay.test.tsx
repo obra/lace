@@ -4,9 +4,9 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
-import TimelineDisplay from '~/interfaces/terminal/components/events/TimelineDisplay.js';
-import { Timeline, TimelineItem } from '~/interfaces/timeline-types.js';
-import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
+import TimelineDisplay from '~/interfaces/terminal/components/events/TimelineDisplay';
+import { Timeline, TimelineItem } from '~/interfaces/timeline-types';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider';
 
 // Mock expansion hooks
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({

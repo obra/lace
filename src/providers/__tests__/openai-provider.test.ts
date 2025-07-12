@@ -2,11 +2,11 @@
 // ABOUTME: Tests streaming vs non-streaming responses, configuration, and error handling
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { OpenAIProvider } from '~/providers/openai-provider.js';
-import { Tool } from '~/tools/tool.js';
-import { ToolResult, ToolContext } from '~/tools/types.js';
+import { OpenAIProvider } from '~/providers/openai-provider';
+import { Tool } from '~/tools/tool';
+import { ToolResult, ToolContext } from '~/tools/types';
 import { z } from 'zod';
-import { StreamingEvents } from '~/providers/types.js';
+import { StreamingEvents } from '~/providers/types';
 
 // Mock the OpenAI SDK
 const mockCreate = vi.fn();

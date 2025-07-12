@@ -2,8 +2,8 @@
 // ABOUTME: Tests error classification, backoff calculation, and retry logic
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
-import { Tool } from '~/tools/tool.js';
+import { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
 
 // Mock implementation for testing
 class TestProvider extends AIProvider {

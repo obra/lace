@@ -3,9 +3,9 @@
 
 import React, { useMemo } from 'react';
 import { Box } from 'ink';
-import { EphemeralMessage } from '~/interfaces/timeline-types.js';
-import { useStreamingTimelineProcessor } from '~/interfaces/terminal/terminal-interface.js';
-import TimelineDisplay from '~/interfaces/terminal/components/events/TimelineDisplay.js';
+import { EphemeralMessage } from '~/interfaces/timeline-types';
+import { useStreamingTimelineProcessor } from '~/interfaces/terminal/terminal-interface';
+import TimelineDisplay from '~/interfaces/terminal/components/events/TimelineDisplay';
 
 interface Message {
   type: 'user' | 'assistant' | 'system' | 'tool';

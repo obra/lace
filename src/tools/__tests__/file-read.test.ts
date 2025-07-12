@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { writeFile, mkdir, rm } from 'fs/promises';
 import { join } from 'path';
-import { FileReadTool } from '~/tools/implementations/file-read.js';
+import { FileReadTool } from '~/tools/implementations/file-read';
 
 describe('FileReadTool', () => {
   const tool = new FileReadTool();

@@ -3,10 +3,10 @@
 
 import React from 'react';
 import { describe, it, expect } from 'vitest';
-import { renderInkComponent } from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
-import StatusBar from '~/interfaces/terminal/components/status-bar.js';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
-import type { ProjectContext } from '~/interfaces/terminal/hooks/use-project-context.js';
+import { renderInkComponent } from '~/interfaces/terminal/__tests__/helpers/ink-test-utils';
+import StatusBar from '~/interfaces/terminal/components/status-bar';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme';
+import type { ProjectContext } from '~/interfaces/terminal/hooks/use-project-context';
 
 describe('StatusBar', () => {
   const basicProps = {

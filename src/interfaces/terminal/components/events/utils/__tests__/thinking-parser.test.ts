@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseThinkingBlocks,
   countWords,
-} from '~/interfaces/terminal/components/events/utils/thinking-parser.js';
+} from '~/interfaces/terminal/components/events/utils/thinking-parser';
 
 describe('thinking-parser utilities', () => {
   describe('countWords', () => {

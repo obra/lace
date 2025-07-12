@@ -4,8 +4,8 @@
 import React from 'react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, act } from '@testing-library/react';
-import { FocusLifecycleWrapper } from '~/interfaces/terminal/focus/focus-lifecycle-wrapper.js';
-import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
+import { FocusLifecycleWrapper } from '~/interfaces/terminal/focus/focus-lifecycle-wrapper';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider';
 
 // Mock focus context
 const mockPushFocus = vi.fn();

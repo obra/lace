@@ -3,20 +3,17 @@
 
 import React, { forwardRef, useImperativeHandle, useState, useCallback } from 'react';
 import { Box, Text } from 'ink';
-import {
-  TimelineEntry,
-  TimelineStatus,
-} from '~/interfaces/terminal/components/ui/TimelineEntry.js';
-import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
-import { type ToolRendererProps } from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
-import { TimelineItemRef } from '~/interfaces/terminal/components/timeline-item-focus.js';
-import { formatTokenCount } from '~/utils/token-estimation.js';
-import { UI_SYMBOLS, UI_COLORS } from '~/interfaces/terminal/theme.js';
+import { TimelineEntry, TimelineStatus } from '~/interfaces/terminal/components/ui/TimelineEntry';
+import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
+import { type ToolRendererProps } from '~/interfaces/terminal/components/events/tool-renderers/components/shared';
+import { TimelineItemRef } from '~/interfaces/terminal/components/timeline-item-focus';
+import { formatTokenCount } from '~/utils/token-estimation';
+import { UI_SYMBOLS, UI_COLORS } from '~/interfaces/terminal/theme';
 import { useInput } from 'ink';
-import { useLaceFocus, FocusRegions } from '~/interfaces/terminal/focus/index.js';
-import { useTimelineItemFocusEntry } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
-import { logger } from '~/utils/logger.js';
-import { ToolResult } from '~/tools/types.js';
+import { useLaceFocus, FocusRegions } from '~/interfaces/terminal/focus/index';
+import { useTimelineItemFocusEntry } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
+import { logger } from '~/utils/logger';
+import { ToolResult } from '~/tools/types';
 
 // Parse delegate result to extract structured data
 interface DelegateResult {

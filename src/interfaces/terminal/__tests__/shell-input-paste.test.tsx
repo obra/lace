@@ -6,9 +6,9 @@ import { render } from '@testing-library/react';
 import { renderHook } from '@testing-library/react';
 import { act } from '@testing-library/react';
 import React from 'react';
-import ShellInput from '~/interfaces/terminal/components/shell-input.js';
-import { useTextBuffer } from '~/interfaces/terminal/hooks/use-text-buffer.js';
-import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
+import ShellInput from '~/interfaces/terminal/components/shell-input';
+import { useTextBuffer } from '~/interfaces/terminal/hooks/use-text-buffer';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider';
 
 // Mock clipboardy for Node.js clipboard access
 const mockReadSync = vi.fn();

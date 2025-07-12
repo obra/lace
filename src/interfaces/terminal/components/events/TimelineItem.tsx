@@ -3,16 +3,16 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { TimelineItem as TimelineItemType, EphemeralMessage } from '~/interfaces/timeline-types.js';
-import { EventType } from '~/threads/types.js';
-import { EventDisplay } from '~/interfaces/terminal/components/events/EventDisplay.js';
-import { GenericToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/GenericToolRenderer.js';
-import { getToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/getToolRenderer.js';
-import { ToolRendererErrorBoundary } from '~/interfaces/terminal/components/events/ToolRendererErrorBoundary.js';
-import MessageDisplay from '~/interfaces/terminal/components/message-display.js';
-import { logger } from '~/utils/logger.js';
-import { ToolRendererProps } from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
-import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { TimelineItem as TimelineItemType, EphemeralMessage } from '~/interfaces/timeline-types';
+import { EventType } from '~/threads/types';
+import { EventDisplay } from '~/interfaces/terminal/components/events/EventDisplay';
+import { GenericToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/GenericToolRenderer';
+import { getToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/getToolRenderer';
+import { ToolRendererErrorBoundary } from '~/interfaces/terminal/components/events/ToolRendererErrorBoundary';
+import MessageDisplay from '~/interfaces/terminal/components/message-display';
+import { logger } from '~/utils/logger';
+import { ToolRendererProps } from '~/interfaces/terminal/components/events/tool-renderers/components/shared';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
 
 interface TimelineItemProps {
   item: TimelineItemType;

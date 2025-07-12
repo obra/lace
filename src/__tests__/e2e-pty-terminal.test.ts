@@ -17,7 +17,7 @@ import {
   isLMStudioAvailable,
   HELP_COMMAND_TIMEOUT,
   AGENT_RESPONSE_TIMEOUT,
-} from '~/__tests__/helpers/terminal-e2e-helpers.js';
+} from '~/__tests__/helpers/terminal-e2e-helpers';
 
 describeE2E('PTY Terminal E2E Tests', () => {
   it.sequential(

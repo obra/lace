@@ -6,7 +6,7 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { randomUUID } from 'crypto';
-import { FileScanner } from '~/interfaces/terminal/utils/file-scanner.js';
+import { FileScanner } from '~/interfaces/terminal/utils/file-scanner';
 
 describe('FileScanner', () => {
   let scanner: FileScanner;

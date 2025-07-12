@@ -3,8 +3,8 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Box, Text, measureElement, DOMElement } from 'ink';
-import { UI_SYMBOLS, UI_BACKGROUNDS } from '~/interfaces/terminal/theme.js';
-import { useTimelineItemOptional } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { UI_SYMBOLS, UI_BACKGROUNDS } from '~/interfaces/terminal/theme';
+import { useTimelineItemOptional } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
 
 export type TimelineStatus = 'none' | 'pending' | 'success' | 'error';
 export type TimelineMessageType = 'tool' | 'agent' | 'user' | 'none';

@@ -6,10 +6,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { withConsoleCapture } from '~/__tests__/setup/console-capture.js';
-import { run } from '~/app.js';
-import { CLIOptions } from '~/cli/args.js';
-import { Agent } from '~/agents/agent.js';
+import { withConsoleCapture } from '~/__tests__/setup/console-capture';
+import { run } from '~/app';
+import { CLIOptions } from '~/cli/args';
+import { Agent } from '~/agents/agent';
 
 // Mock all external dependencies
 vi.mock('../agents/agent.js');

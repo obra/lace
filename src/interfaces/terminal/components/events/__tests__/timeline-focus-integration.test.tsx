@@ -5,15 +5,15 @@ import React, { useRef } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { Text, Box } from 'ink';
-import TimelineDisplay from '~/interfaces/terminal/components/events/TimelineDisplay.js';
-import { Timeline } from '~/interfaces/timeline-types.js';
-import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
-import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
+import TimelineDisplay from '~/interfaces/terminal/components/events/TimelineDisplay';
+import { Timeline } from '~/interfaces/timeline-types';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
 import {
   canTimelineItemAcceptFocus,
   getTimelineItemFocusId,
-} from '~/interfaces/terminal/components/timeline-item-focus.js';
-import { TimelineItem } from '~/interfaces/timeline-types.js';
+} from '~/interfaces/terminal/components/timeline-item-focus';
+import { TimelineItem } from '~/interfaces/timeline-types';
 
 // Mock dependencies to create focused integration test environment
 vi.mock('../../../terminal-interface.js', () => ({

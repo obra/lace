@@ -2,7 +2,7 @@
 // ABOUTME: Ensures task notifications are formatted correctly for agent consumption
 
 import { describe, it, expect } from 'vitest';
-import { NotificationFormatter } from '~/agents/notifications.js';
+import { NotificationFormatter } from '~/agents/notifications';
 
 describe('NotificationFormatter', () => {
   describe('formatTaskAssignment', () => {

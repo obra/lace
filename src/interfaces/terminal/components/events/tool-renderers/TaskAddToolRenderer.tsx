@@ -3,15 +3,12 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import {
-  TimelineEntry,
-  TimelineStatus,
-} from '~/interfaces/terminal/components/ui/TimelineEntry.js';
-import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { TimelineEntry, TimelineStatus } from '~/interfaces/terminal/components/ui/TimelineEntry';
+import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
 import {
   limitLines,
   type ToolRendererProps,
-} from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
+} from '~/interfaces/terminal/components/events/tool-renderers/components/shared';
 
 // Extract task ID from result content
 function extractTaskId(resultText: string): string | null {

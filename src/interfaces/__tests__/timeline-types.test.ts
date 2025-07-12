@@ -2,7 +2,7 @@
 // ABOUTME: Ensures timeline types can be imported from shared location
 
 import { describe, it, expect } from 'vitest';
-import { Timeline, TimelineItem, TimelineProcessor } from '~/interfaces/timeline-types.js';
+import { Timeline, TimelineItem, TimelineProcessor } from '~/interfaces/timeline-types';
 
 describe('Timeline Types', () => {
   it('should export Timeline interface', () => {

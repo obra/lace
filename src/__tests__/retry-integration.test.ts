@@ -2,10 +2,10 @@
 // ABOUTME: Validates that retry components work together correctly
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '~/agents/agent.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { AIProvider } from '~/providers/base-provider.js';
+import { Agent } from '~/agents/agent';
+import { ToolExecutor } from '~/tools/executor';
+import { ThreadManager } from '~/threads/thread-manager';
+import { AIProvider } from '~/providers/base-provider';
 
 describe('Retry System Integration Tests', () => {
   let agent: Agent;

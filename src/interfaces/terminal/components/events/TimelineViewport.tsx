@@ -3,16 +3,12 @@
 
 import React, { useRef } from 'react';
 import { Box, useInput, Text, DOMElement } from 'ink';
-import useStdoutDimensions from '~/utils/use-stdout-dimensions.js';
-import { Timeline } from '~/interfaces/timeline-types.js';
-import { useTimelineViewport } from '~/interfaces/terminal/components/events/hooks/useTimelineViewport.js';
-import { logger } from '~/utils/logger.js';
-import {
-  FocusRegions,
-  useLaceFocus,
-  useLaceFocusContext,
-} from '~/interfaces/terminal/focus/index.js';
-import { RenderDebugPanel } from '~/interfaces/terminal/components/debug/RenderDebugPanel.js';
+import useStdoutDimensions from '~/utils/use-stdout-dimensions';
+import { Timeline } from '~/interfaces/timeline-types';
+import { useTimelineViewport } from '~/interfaces/terminal/components/events/hooks/useTimelineViewport';
+import { logger } from '~/utils/logger';
+import { FocusRegions, useLaceFocus, useLaceFocusContext } from '~/interfaces/terminal/focus/index';
+import { RenderDebugPanel } from '~/interfaces/terminal/components/debug/RenderDebugPanel';
 
 interface TimelineViewportProps {
   timeline: Timeline;

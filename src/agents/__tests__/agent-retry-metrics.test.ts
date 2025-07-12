@@ -2,12 +2,12 @@
 // ABOUTME: Verifies that retry attempts, delays, and success/failure are tracked correctly
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, CurrentTurnMetrics } from '~/agents/agent.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { AIProvider } from '~/providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
-import { Tool } from '~/tools/tool.js';
+import { Agent, CurrentTurnMetrics } from '~/agents/agent';
+import { ToolExecutor } from '~/tools/executor';
+import { ThreadManager } from '~/threads/thread-manager';
+import { AIProvider } from '~/providers/base-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
 
 // Mock provider that can simulate retry scenarios
 class MockRetryMetricsProvider extends AIProvider {

@@ -3,8 +3,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { ApprovalDecision } from '~/tools/approval-types.js';
-import { ModalWrapper, useLaceFocus, FocusRegions } from '~/interfaces/terminal/focus/index.js';
+import { ApprovalDecision } from '~/tools/approval-types';
+import { ModalWrapper, useLaceFocus, FocusRegions } from '~/interfaces/terminal/focus/index';
 
 export interface ToolApprovalModalProps {
   toolName: string;
