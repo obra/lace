@@ -12,7 +12,8 @@ export interface CLIOptions {
   logLevel: 'error' | 'warn' | 'info' | 'debug';
   logFile: string | undefined;
   prompt: string | undefined;
-  ui: 'terminal';
+  ui: 'terminal' | 'web';
+  port?: number;
   continue?: string | boolean;
   harFile?: string;
   // Tool approval options
@@ -132,8 +133,9 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
     .option('--prompt <text>', 'Send a single prompt and exit (non-interactive mode)')
     .option('--continue [session_id]', 'Continue previous conversation (latest if no ID provided)')
     .addOption(
-      new Option('--ui <type>', 'Choose UI type').choices(['terminal']).default('terminal')
+      new Option('--ui <type>', 'Choose UI type').choices(['terminal', 'web']).default('terminal')
     )
+    .option('--port <number>', 'Port for web interface (default: 3000)', '3000')
     // Tool approval flags
     .option(
       '--allow-non-destructive-tools',
@@ -211,7 +213,8 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
     logFile: options.logFile as string | undefined,
     harFile: options.har as string | undefined,
     prompt: options.prompt as string | undefined,
-    ui: options.ui as 'terminal',
+    ui: options.ui as 'terminal' | 'web',
+    port: options.port ? parseInt(options.port as string, 10) : undefined,
     continue: options.continue as string | boolean | undefined,
     allowNonDestructiveTools: (options.allowNonDestructiveTools as boolean) || false,
     autoApproveTools: finalAutoApproveTools,
@@ -279,8 +282,9 @@ export async function showHelp(): Promise<void> {
     .option('--prompt <text>', 'Send a single prompt and exit (non-interactive mode)')
     .option('--continue [session_id]', 'Continue previous conversation (latest if no ID provided)')
     .addOption(
-      new Option('--ui <type>', 'Choose UI type').choices(['terminal']).default('terminal')
+      new Option('--ui <type>', 'Choose UI type').choices(['terminal', 'web']).default('terminal')
     )
+    .option('--port <number>', 'Port for web interface (default: 3000)', '3000')
     // Tool approval flags
     .option('--allow-non-destructive-tools', 'Automatically approve tools marked as read-only')
     .option(

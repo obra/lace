@@ -6,10 +6,18 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { withConsoleCapture } from '~/__tests__/setup/console-capture';
-import { run } from '~/app';
-import { CLIOptions } from '~/cli/args';
-import { Agent } from '~/agents/agent';
+import { withConsoleCapture } from '~/__tests__/setup/console-capture.js';
+import { run } from '~/app.js';
+import { CLIOptions } from '~/cli/args.js';
+import { Agent } from '~/agents/agent.js';
+import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface.js';
+import { TerminalInterface } from '~/interfaces/terminal/terminal-interface.js';
+import { getEnvVar } from '~/config/env-loader.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { logger } from '~/utils/logger.js';
+import { enableTrafficLogging } from '~/utils/traffic-logger.js';
+import { createGlobalPolicyCallback } from '~/tools/policy-wrapper.js';
 
 // Mock all external dependencies
 vi.mock('../agents/agent.js');
@@ -96,23 +104,10 @@ describe('CLI Flow Tests', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    // Setup common mocks
-    const { getEnvVar } = vi.mocked(await import('../config/env-loader'));
-    const { ThreadManager } = vi.mocked(await import('../threads/thread-manager'));
-    const { ToolExecutor } = vi.mocked(await import('../tools/executor'));
-    const { Agent } = vi.mocked(await import('../agents/agent'));
-    const { logger } = vi.mocked(await import('../utils/logger'));
-    const { enableTrafficLogging } = vi.mocked(await import('../utils/traffic-logger'));
-    const { NonInteractiveInterface } = vi.mocked(
-      await import('../interfaces/non-interactive-interface')
-    );
-    const { TerminalInterface } = vi.mocked(
-      await import('../interfaces/terminal/terminal-interface')
-    );
-    const { createGlobalPolicyCallback } = vi.mocked(await import('../tools/policy-wrapper'));
+    // All imports are now static at the top level
 
     // Mock environment variables
-    getEnvVar.mockImplementation((key) => {
+    vi.mocked(getEnvVar).mockImplementation((key) => {
       if (key === 'ANTHROPIC_KEY') return 'mock-anthropic-key';
       if (key === 'OPENAI_API_KEY' || key === 'OPENAI_KEY') return 'mock-openai-key';
       return undefined;
@@ -187,8 +182,8 @@ describe('CLI Flow Tests', () => {
     logger.error = vi.fn();
 
     // Mock other utilities
-    enableTrafficLogging.mockResolvedValue(undefined);
-    createGlobalPolicyCallback.mockReturnValue({
+    vi.mocked(enableTrafficLogging).mockResolvedValue(undefined);
+    vi.mocked(createGlobalPolicyCallback).mockReturnValue({
       requestApproval: vi.fn(),
     });
 
@@ -372,9 +367,6 @@ describe('CLI Flow Tests', () => {
 
   describe('interface selection', () => {
     it('should use NonInteractiveInterface for prompt execution', async () => {
-      const { NonInteractiveInterface } = vi.mocked(
-        await import('../interfaces/non-interactive-interface')
-      );
       const options = { ...mockCliOptions, prompt: 'test prompt' };
 
       await run(options);
@@ -386,10 +378,6 @@ describe('CLI Flow Tests', () => {
     });
 
     it('should use TerminalInterface for interactive mode', async () => {
-      const { TerminalInterface } = vi.mocked(
-        await import('../interfaces/terminal/terminal-interface')
-      );
-
       await run(mockCliOptions);
 
       expect(TerminalInterface).toHaveBeenCalledWith(expect.any(Object));

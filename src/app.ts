@@ -72,7 +72,10 @@ async function setupAgent(
   return agent;
 }
 
-function handleSessionWithAgent(agent: Agent, continueMode?: boolean | string): string {
+function handleSessionWithAgent(
+  agent: Agent,
+  continueMode?: boolean | string
+): string {
   let continueThreadId: string | undefined;
   if (continueMode) {
     if (typeof continueMode === 'string') {
@@ -117,11 +120,22 @@ export async function run(options: CLIOptions): Promise<void> {
     process.exit(0);
   }
 
-  const { TerminalInterface } = await import('./interfaces/terminal/terminal-interface');
-  const cli = new TerminalInterface(agent);
+  // Choose interface based on UI option
+  if (options.ui === 'web') {
+    const { WebInterface } = await import('./interfaces/web/web-interface.js');
+    const webInterface = new WebInterface(agent, { port: options.port });
 
-  const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);
-  agent.toolExecutor.setApprovalCallback(policyCallback);
+    const policyCallback = createGlobalPolicyCallback(webInterface, options, agent.toolExecutor);
+    agent.toolExecutor.setApprovalCallback(policyCallback);
 
-  await cli.startInteractive();
+    await webInterface.start();
+  } else {
+    const { TerminalInterface } = await import('./interfaces/terminal/terminal-interface.js');
+    const cli = new TerminalInterface(agent);
+
+    const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);
+    agent.toolExecutor.setApprovalCallback(policyCallback);
+
+    await cli.startInteractive();
+  }
 }
