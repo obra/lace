@@ -1,6 +1,9 @@
+// ABOUTME: Voice recognition UI component with audio visualization and transcription display
+// ABOUTME: Includes both full UI and compact button variants for different contexts
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMicrophone, faTimes } from '~/lib/fontawesome';
 
