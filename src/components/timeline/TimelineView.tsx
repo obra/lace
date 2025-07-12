@@ -9,16 +9,22 @@ interface TimelineViewProps {
   entries: TimelineEntry[];
   isTyping: boolean;
   currentAgent: string;
+  streamingContent?: string;
 }
 
-export function TimelineView({ entries, isTyping, currentAgent }: TimelineViewProps) {
+export function TimelineView({
+  entries,
+  isTyping,
+  currentAgent,
+  streamingContent,
+}: TimelineViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [entries, isTyping]);
+  }, [entries, isTyping, streamingContent]);
 
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto overscroll-contain">
@@ -27,7 +33,19 @@ export function TimelineView({ entries, isTyping, currentAgent }: TimelineViewPr
           <TimelineMessage key={entry.id} entry={entry} />
         ))}
 
-        {isTyping && <TypingIndicator agent={currentAgent} />}
+        {streamingContent && (
+          <TimelineMessage
+            entry={{
+              id: 'streaming',
+              type: 'ai',
+              content: streamingContent,
+              agent: currentAgent,
+              timestamp: new Date(),
+            }}
+          />
+        )}
+
+        {isTyping && !streamingContent && <TypingIndicator agent={currentAgent} />}
       </div>
     </div>
   );

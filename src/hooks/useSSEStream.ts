@@ -32,7 +32,7 @@ export function useSSEStream({ onEvent, onComplete, onError }: UseSSEStreamOptio
               const event = JSON.parse(line.slice(6)) as StreamEvent;
               onEvent?.(event);
 
-              if (event.type === 'complete' && event.content) {
+              if (event.type === 'conversation_complete' && event.content) {
                 onComplete?.(event.content);
               } else if (event.type === 'error' && event.error) {
                 onError?.(event.error);

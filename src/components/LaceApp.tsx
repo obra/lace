@@ -2,22 +2,16 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faBars, 
-  faSearch, 
-  faTerminal, 
-  faTasks, 
-  faFolder, 
-  faMicrophone 
-} from '~/lib/fontawesome';
+import { faBars, faSearch, faTerminal, faTasks, faFolder, faMicrophone } from '~/lib/fontawesome';
 import { Sidebar } from '~/components/layout/Sidebar';
 import { MobileSidebar } from '~/components/layout/MobileSidebar';
 import { TimelineView } from '~/components/timeline/TimelineView';
 import { EnhancedChatInput } from '~/components/chat/EnhancedChatInput';
 import { TaskBoardModal } from '~/components/modals/TaskBoardModal';
 import { VoiceRecognitionUI } from '~/components/ui/VoiceRecognitionUI';
-import { TimelineEntry, Project, Timeline, Task, RecentFile } from '~/types';
+import { TimelineEntry, Project, Timeline, Task, RecentFile, StreamEvent } from '~/types';
 import { useVoiceRecognition } from '~/hooks/useVoiceRecognition';
+import { useConversationStream } from '~/hooks/useConversationStream';
 
 const availableThemes = [
   { name: 'light', colors: { primary: '#570DF8', secondary: '#F000B8', accent: '#37CDBE' } },
@@ -39,22 +33,71 @@ export function LaceApp() {
 
   // Chat State
   const [prompt, setPrompt] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
   const [isToolRunning, setIsToolRunning] = useState(false);
   const nextEntryId = useRef(9);
+  const [currentStreamingContent, setCurrentStreamingContent] = useState('');
 
   // Voice Recognition
-  const { 
-    isListening, 
-    startListening, 
-    stopListening, 
-    transcript, 
-    interimTranscript, 
-    confidence, 
-    error 
+  const {
+    isListening,
+    startListening,
+    stopListening,
+    transcript,
+    interimTranscript,
+    confidence,
+    error,
   } = useVoiceRecognition({
     onResult: (transcript) => {
       setPrompt(transcript);
+    },
+  });
+
+  // Conversation Stream
+  const {
+    isStreaming,
+    isThinking,
+    currentThreadId,
+    sendMessage,
+  } = useConversationStream({
+    onStreamEvent: (event: StreamEvent) => {
+      if (event.type === 'token' && event.content) {
+        setCurrentStreamingContent((prev) => prev + event.content);
+      } else if (event.type === 'tool_call_start' && event.toolCall) {
+        const toolEntry: TimelineEntry = {
+          id: nextEntryId.current++,
+          type: 'tool',
+          tool: event.toolCall.name,
+          content: `${event.toolCall.name} started`,
+          timestamp: new Date(),
+        };
+        setTimelineEntries((prev) => [...prev, toolEntry]);
+      } else if (event.type === 'tool_call_complete' && event.toolCall && event.result) {
+        const toolResult = event.result.success ? 'completed successfully' : 'failed';
+        const toolEntry: TimelineEntry = {
+          id: nextEntryId.current++,
+          type: 'tool',
+          tool: event.toolCall.name,
+          content: `${event.toolCall.name} ${toolResult}`,
+          result: event.result.content,
+          timestamp: new Date(),
+        };
+        setTimelineEntries((prev) => [...prev, toolEntry]);
+      }
+    },
+    onMessageComplete: (content: string) => {
+      const aiEntry: TimelineEntry = {
+        id: nextEntryId.current++,
+        type: 'ai',
+        content: content.trim(),
+        agent: currentTimeline.agent,
+        timestamp: new Date(),
+      };
+      setTimelineEntries((prev) => [...prev, aiEntry]);
+      setCurrentStreamingContent('');
+    },
+    onError: (error: string) => {
+      console.error('Stream error:', error);
+      setCurrentStreamingContent('');
     },
   });
 
@@ -199,8 +242,8 @@ export function LaceApp() {
   }, []);
 
   // Handlers
-  const handleSendMessage = useCallback(() => {
-    if (!prompt.trim() || isTyping) return;
+  const handleSendMessage = useCallback(async () => {
+    if (!prompt.trim() || isStreaming) return;
 
     const humanEntry: TimelineEntry = {
       id: nextEntryId.current++,
@@ -213,22 +256,21 @@ export function LaceApp() {
     const userPrompt = prompt;
     setPrompt('');
 
-    setIsTyping(true);
-
-    // Simulate AI response
-    setTimeout(() => {
-      const aiEntry: TimelineEntry = {
+    // Send to real API
+    try {
+      await sendMessage(userPrompt, currentThreadId);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      // Add error message to timeline
+      const errorEntry: TimelineEntry = {
         id: nextEntryId.current++,
-        type: 'ai',
-        content: `I'll help you with "${userPrompt}". Let me analyze that and provide assistance.`,
-        agent: currentTimeline.agent,
+        type: 'admin',
+        content: `Error: ${error instanceof Error ? error.message : 'Failed to send message'}`,
         timestamp: new Date(),
       };
-
-      setTimelineEntries((prev) => [...prev, aiEntry]);
-      setIsTyping(false);
-    }, 1000);
-  }, [prompt, isTyping, currentTimeline.agent]);
+      setTimelineEntries((prev) => [...prev, errorEntry]);
+    }
+  }, [prompt, isStreaming, sendMessage, currentThreadId]);
 
   const handleProjectChange = (project: Project) => {
     setCurrentProject(project);
@@ -467,8 +509,9 @@ export function LaceApp() {
         {/* Timeline Container */}
         <TimelineView
           entries={timelineEntries}
-          isTyping={isTyping}
+          isTyping={isStreaming || isThinking}
           currentAgent={currentTimeline.agent}
+          streamingContent={currentStreamingContent}
         />
 
         {/* Chat Input */}
@@ -476,7 +519,7 @@ export function LaceApp() {
           value={prompt}
           onChange={setPrompt}
           onSubmit={() => void handleSendMessage()}
-          disabled={isTyping || isToolRunning}
+          disabled={isStreaming || isThinking || isToolRunning}
           isListening={isListening}
           onStartVoice={startListening}
           onStopVoice={stopListening}
@@ -497,10 +540,7 @@ export function LaceApp() {
           <div className="bg-base-100 rounded-lg p-6 m-4 max-w-md w-full">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Voice Input</h3>
-              <button
-                onClick={() => setShowVoiceUI(false)}
-                className="btn btn-ghost btn-sm"
-              >
+              <button onClick={() => setShowVoiceUI(false)} className="btn btn-ghost btn-sm">
                 ✕
               </button>
             </div>

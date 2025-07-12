@@ -6,12 +6,33 @@ export interface Message {
 }
 
 export interface StreamEvent {
-  type: 'start' | 'chunk' | 'complete' | 'tool_start' | 'tool_complete' | 'error';
+  type:
+    | 'connection'
+    | 'thinking_start'
+    | 'thinking_complete'
+    | 'token'
+    | 'tool_call_start'
+    | 'tool_call_complete'
+    | 'response_complete'
+    | 'conversation_complete'
+    | 'error';
   content?: string;
-  tool?: string;
   error?: string;
-  message?: string;
-  exitCode?: number;
+  timestamp?: string;
+  threadId?: string;
+  isNew?: boolean;
+  provider?: string;
+  model?: string;
+  toolCall?: {
+    name: string;
+    id: string;
+    parameters?: unknown;
+  };
+  result?: {
+    success: boolean;
+    content: string;
+    isError: boolean;
+  };
 }
 
 export interface ChatState {
