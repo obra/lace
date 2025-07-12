@@ -2,8 +2,8 @@
 
 import { useEffect, useRef } from 'react';
 import { TimelineEntry } from '~/types';
-import { TimelineMessage } from './TimelineMessage';
-import { TypingIndicator } from './TypingIndicator';
+import { TimelineMessage } from '~/components/timeline/TimelineMessage';
+import { TypingIndicator } from '~/components/timeline/TypingIndicator';
 
 interface TimelineViewProps {
   entries: TimelineEntry[];

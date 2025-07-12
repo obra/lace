@@ -53,12 +53,7 @@ export function LaceApp() {
   });
 
   // Conversation Stream
-  const {
-    isStreaming,
-    isThinking,
-    currentThreadId,
-    sendMessage,
-  } = useConversationStream({
+  const { isStreaming, isThinking, currentThreadId, sendMessage } = useConversationStream({
     onStreamEvent: (event: StreamEvent) => {
       if (event.type === 'token' && event.content) {
         setCurrentStreamingContent((prev) => prev + event.content);
@@ -551,7 +546,7 @@ export function LaceApp() {
               transcript={transcript}
               interimTranscript={interimTranscript}
               confidence={confidence}
-              error={error}
+              error={error as string | undefined}
             />
           </div>
         </div>
