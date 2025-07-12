@@ -6,7 +6,7 @@ import { logger } from '~/utils/logger.js';
 function loadAndLogEnvFile(path: string, description: string): void {
   const result = dotenv.config({ path });
   if (result.error) {
-    if (result.error.code === 'ENOENT') {
+    if ('code' in result.error && result.error.code === 'ENOENT') {
       logger.debug(`No ${description} file found`);
     } else {
       logger.debug(`${description} failed to parse`, { error: result.error.message });
