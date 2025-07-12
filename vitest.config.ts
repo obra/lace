@@ -20,5 +20,10 @@ export default defineConfig({
     },
     environment: 'jsdom', // Default to jsdom for React components
     setupFiles: ['./src/__tests__/setup.ts'],
+    env: {
+      // Disable colors in test environment to ensure consistent output
+      NO_COLOR: '1',
+      FORCE_COLOR: '0',
+    },
   },
 });
