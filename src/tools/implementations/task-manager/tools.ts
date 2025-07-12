@@ -30,7 +30,7 @@ let persistenceInstance: DatabasePersistence | null = null;
 
 async function getPersistence(): Promise<DatabasePersistence> {
   if (!persistenceInstance) {
-    const { getLaceDbPath } = await import('../../../config/lace-dir.js');
+    const { getLaceDbPath } = await import('../../../config/lace-dir');
     persistenceInstance = new DatabasePersistence(getLaceDbPath());
   }
   return persistenceInstance;

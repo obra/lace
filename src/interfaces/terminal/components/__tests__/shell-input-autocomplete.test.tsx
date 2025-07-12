@@ -273,7 +273,7 @@ describe('ShellInput Autocomplete Integration', () => {
 
   describe('word boundary detection', () => {
     it('should detect current word correctly', async () => {
-      const { FileScanner } = await import('../../utils/file-scanner.js');
+      const { FileScanner } = await import('../../utils/file-scanner');
       const mockScanner = vi.mocked(FileScanner).mock.instances[0] as unknown as {
         getCompletions: ReturnType<typeof vi.fn>;
       };
@@ -382,7 +382,7 @@ describe('ShellInput Autocomplete Integration', () => {
   describe('error handling', () => {
     it('should handle autocomplete loading errors gracefully', async () => {
       // Mock FileScanner to throw an error
-      const { FileScanner } = await import('../../utils/file-scanner.js');
+      const { FileScanner } = await import('../../utils/file-scanner');
       const mockScanner = vi.mocked(FileScanner).mock.instances[0] as unknown as {
         getCompletions: ReturnType<typeof vi.fn>;
       };

@@ -192,7 +192,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
       // Context-aware completion logic
       if (trimmedLine.startsWith('/') && bufferState.cursorLine === 0) {
         // Command completion at start of prompt
-        const { CommandRegistry } = await import('../../../commands/registry.js');
+        const { CommandRegistry } = await import('../../../commands/registry');
         const registry = await CommandRegistry.createWithAutoDiscovery();
         const commands = registry.getAllCommands();
 
@@ -202,7 +202,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
           .map((cmd) => `/${cmd.name}`);
       } else {
         // File/directory completion
-        const { FileScanner } = await import('../utils/file-scanner.js');
+        const { FileScanner } = await import('../utils/file-scanner');
         const scanner = new FileScanner();
 
         if (beforeCursor.startsWith('./')) {

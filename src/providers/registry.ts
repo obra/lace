@@ -30,7 +30,7 @@ export class ProviderRegistry {
     // Use dynamic imports with environment variable handling
     switch (providerName.toLowerCase()) {
       case 'anthropic': {
-        const { AnthropicProvider } = await import('./anthropic-provider.js');
+        const { AnthropicProvider } = await import('./anthropic-provider');
         const apiKey = (config.apiKey as string) || getEnvVar('ANTHROPIC_KEY');
         if (!apiKey) {
           throw new Error('ANTHROPIC_KEY environment variable required for Anthropic provider');
@@ -38,7 +38,7 @@ export class ProviderRegistry {
         return new AnthropicProvider({ ...config, apiKey });
       }
       case 'openai': {
-        const { OpenAIProvider } = await import('./openai-provider.js');
+        const { OpenAIProvider } = await import('./openai-provider');
         const apiKey =
           (config.apiKey as string) || getEnvVar('OPENAI_API_KEY') || getEnvVar('OPENAI_KEY');
         if (!apiKey) {
@@ -49,15 +49,15 @@ export class ProviderRegistry {
         return new OpenAIProvider({ ...config, apiKey });
       }
       case 'lmstudio': {
-        const { LMStudioProvider } = await import('./lmstudio-provider.js');
+        const { LMStudioProvider } = await import('./lmstudio-provider');
         return new LMStudioProvider(config);
       }
       case 'ollama': {
-        const { OllamaProvider } = await import('./ollama-provider.js');
+        const { OllamaProvider } = await import('./ollama-provider');
         return new OllamaProvider(config);
       }
       case 'test-provider': {
-        const { createMockProvider } = await import('../__tests__/utils/mock-provider.js');
+        const { createMockProvider } = await import('../__tests__/utils/mock-provider');
         return createMockProvider();
       }
       default:

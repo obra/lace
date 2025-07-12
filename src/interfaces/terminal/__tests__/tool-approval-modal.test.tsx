@@ -303,7 +303,7 @@ describe('ToolApprovalModal', () => {
   describe('focus integration behavior', () => {
     it('only handles input when focused', async () => {
       // Import the mock
-      const { useLaceFocus } = await import('../focus/index.js');
+      const { useLaceFocus } = await import('../focus/index');
 
       // Mock unfocused state
       vi.mocked(useLaceFocus).mockReturnValue({
