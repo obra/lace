@@ -88,14 +88,16 @@ export async function POST(request: NextRequest) {
     if (body.autoApprove) {
       // Auto-approve all tool calls
       const approvalCallback: ApprovalCallback = {
-        requestApproval: (): ApprovalDecision => ApprovalDecision.ALLOW_ONCE,
+        // eslint-disable-next-line @typescript-eslint/require-await
+        requestApproval: async (): Promise<ApprovalDecision> => ApprovalDecision.ALLOW_ONCE,
       };
       toolExecutor.setApprovalCallback(approvalCallback);
     } else {
       // For API usage, we'll auto-approve non-destructive tools
       // and require explicit approval for destructive ones
       const approvalCallback: ApprovalCallback = {
-        requestApproval: (toolName: string): ApprovalDecision => {
+        // eslint-disable-next-line @typescript-eslint/require-await
+        requestApproval: async (toolName: string): Promise<ApprovalDecision> => {
           const tool = toolExecutor.getTool(toolName);
           if (tool?.annotations?.destructiveHint) {
             // Return error for destructive tools without explicit approval
