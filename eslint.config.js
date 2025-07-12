@@ -35,10 +35,20 @@ export default [
     },
     settings: {
       'import/resolver': {
-        typescript: {}
+        typescript: {
+          project: './tsconfig.json',
+          alwaysTryTypes: true
+        }
       }
     },
     rules: {
+      'import/extensions': ['error', 'ignorePackages', {
+        'js': 'never',
+        'mjs': 'never', 
+        'jsx': 'never',
+        'ts': 'never',
+        'tsx': 'never'
+      }],
       ...prettierConfig.rules,
       'prettier/prettier': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
@@ -58,8 +68,7 @@ export default [
           }
         ]
       }],
-      'no-var': 'error',
-      'import/extensions': ['off']
+      'no-var': 'error'
     },
   },
   {
@@ -77,7 +86,25 @@ export default [
       sourceType: 'module',
       globals: globals.node,
     },
+    plugins: {
+      'import': importPlugin,
+    },
+    settings: {
+      'import/resolver': {
+        typescript: {
+          project: './tsconfig.json',
+          alwaysTryTypes: true
+        }
+      }
+    },
     rules: {
+      'import/extensions': ['error', 'ignorePackages', {
+        'js': 'never',
+        'mjs': 'never', 
+        'jsx': 'never',
+        'ts': 'never',
+        'tsx': 'never'
+      }],
       'no-var': 'error'
     },
   },
