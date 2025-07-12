@@ -21,6 +21,7 @@
     "lint:fix": "npm run typecheck && eslint src --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "prepare": "husky",
+    "test:web": "npm run build && node scripts/test-web-ui.js",
     "docker:build": "docker build -t lace-test .",
     "docker:run": "docker run -it --rm lace-test",
     "docker:shell": "docker run -it --rm lace-test /bin/bash"
@@ -30,6 +31,7 @@
     "@inkjs/ui": "^2.0.0",
     "@lmstudio/sdk": "^1.2.1",
     "@modelcontextprotocol/sdk": "^1.13.2",
+    "@tailwindcss/postcss": "^4.1.11",
     "@tailwindcss/typography": "^0.5.16",
     "@types/glob": "^8.1.0",
     "@types/marked": "^5.0.2",

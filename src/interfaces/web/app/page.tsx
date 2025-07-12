@@ -2,7 +2,7 @@
 // ABOUTME: Entry point that will integrate with shared Agent/ThreadManager instances
 
 import React from 'react';
-import { ChatInterface } from '../components/ChatInterface.js';
+import { ChatInterface } from '../components/ChatInterface';
 
 export default function HomePage() {
   return (
