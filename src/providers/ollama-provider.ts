@@ -2,10 +2,10 @@
 // ABOUTME: Supports tool calling with models that have native tool support (like qwen3:32b)
 
 import { Ollama, ChatResponse, Tool as OllamaTool } from 'ollama';
-import { AIProvider } from '~/providers/base-provider.js';
-import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider.js';
-import { Tool } from '~/tools/tool.js';
-import { logger } from '~/utils/logger.js';
+import { AIProvider } from '~/providers/base-provider';
+import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { logger } from '~/utils/logger';
 
 export interface OllamaProviderConfig extends ProviderConfig {
   host?: string;

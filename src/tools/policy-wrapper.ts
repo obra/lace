@@ -1,9 +1,9 @@
 // ABOUTME: Global policy wrapper that applies CLI options to any approval callback interface
 // ABOUTME: Ensures CLI tool policies work regardless of which interface is running (CLI, web, React/Ink)
 
-import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types.js';
-import { CLIOptions } from '~/cli/args.js';
-import { ToolExecutor } from '~/tools/executor.js';
+import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
+import { CLIOptions } from '~/cli/args';
+import { ToolExecutor } from '~/tools/executor';
 
 export function createGlobalPolicyCallback(
   interfaceCallback: ApprovalCallback,

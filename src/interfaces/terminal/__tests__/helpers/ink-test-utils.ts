@@ -7,7 +7,7 @@ import { act } from '@testing-library/react';
 import tty from 'node:tty';
 import { expect } from 'vitest';
 import React from 'react';
-import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider';
 
 /**
  * Strips ANSI escape codes from text for content testing

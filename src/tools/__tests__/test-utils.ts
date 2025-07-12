@@ -1,7 +1,7 @@
 // ABOUTME: Test utilities for tool testing
 // ABOUTME: Provides helper functions to create ToolCall objects for tests
 
-import { ToolCall } from '~/tools/types.js';
+import { ToolCall } from '~/tools/types';
 
 /**
  * Creates a ToolCall object for testing
@@ -31,4 +31,4 @@ export function createToolCallFactory(toolName: string) {
 }
 
 // Re-export temp directory utilities for convenience
-export { createTempDir, createTestTempDir, withTempDir } from './temp-utils.js';
+export { createTempDir, createTestTempDir, withTempDir } from './temp-utils';

@@ -3,7 +3,7 @@
 
 import { ZodType, ZodError } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import type { ToolResult, ToolContext, ToolInputSchema, ToolAnnotations } from '~/tools/types.js';
+import type { ToolResult, ToolContext, ToolInputSchema, ToolAnnotations } from '~/tools/types';
 
 export abstract class Tool {
   abstract name: string;

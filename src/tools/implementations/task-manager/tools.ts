@@ -2,12 +2,12 @@
 // ABOUTME: Provides task creation, querying, updates, and note management capabilities
 
 import { z } from 'zod';
-import { Tool } from '~/tools/tool.js';
-import { NonEmptyString } from '~/tools/schemas/common.js';
-import type { ToolResult, ToolContext } from '~/tools/types.js';
-import { DatabasePersistence } from '~/persistence/database.js';
-import { Task, TaskNote } from '~/tools/implementations/task-manager/types.js';
-import { isAssigneeId, AssigneeId } from '~/threads/types.js';
+import { Tool } from '~/tools/tool';
+import { NonEmptyString } from '~/tools/schemas/common';
+import type { ToolResult, ToolContext } from '~/tools/types';
+import { DatabasePersistence } from '~/persistence/database';
+import { Task, TaskNote } from '~/tools/implementations/task-manager/types';
+import { isAssigneeId, AssigneeId } from '~/threads/types';
 
 // Helper to generate task IDs
 function generateTaskId(): string {

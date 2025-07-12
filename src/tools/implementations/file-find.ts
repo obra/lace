@@ -4,10 +4,10 @@
 import { z } from 'zod';
 import { readdir, stat } from 'fs/promises';
 import { join, resolve } from 'path';
-import { Tool } from '~/tools/tool.js';
-import { NonEmptyString } from '~/tools/schemas/common.js';
-import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types.js';
-import { TOOL_LIMITS } from '~/tools/constants.js';
+import { Tool } from '~/tools/tool';
+import { NonEmptyString } from '~/tools/schemas/common';
+import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
+import { TOOL_LIMITS } from '~/tools/constants';
 
 const fileFindSchema = z.object({
   pattern: NonEmptyString,

@@ -1,7 +1,7 @@
 // ABOUTME: Type definitions for thread events and thread management
 // ABOUTME: Events include user messages, agent messages, tool calls, and tool results
 
-import { ToolCall, ToolResult } from '~/tools/types.js';
+import { ToolCall, ToolResult } from '~/tools/types';
 
 export type EventType =
   | 'USER_MESSAGE'

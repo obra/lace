@@ -1,12 +1,12 @@
 // ABOUTME: Enhanced summarization compaction strategy with intelligent event preservation
 // ABOUTME: Groups old conversation segments, preserves important events, and creates detailed summaries
 
-import { Thread, ThreadEvent } from '~/threads/types.js';
-import { CompactionStrategy, CompactionConfig } from '~/threads/compaction/types.js';
-import { logger } from '~/utils/logger.js';
-import { AIProvider, ProviderMessage } from '~/providers/base-provider.js';
-import { estimateTokens } from '~/utils/token-estimation.js';
-import { ToolResult } from '~/tools/types.js';
+import { Thread, ThreadEvent } from '~/threads/types';
+import { CompactionStrategy, CompactionConfig } from '~/threads/compaction/types';
+import { logger } from '~/utils/logger';
+import { AIProvider, ProviderMessage } from '~/providers/base-provider';
+import { estimateTokens } from '~/utils/token-estimation';
+import { ToolResult } from '~/tools/types';
 
 export class SummarizeStrategy implements CompactionStrategy {
   private config: CompactionConfig;

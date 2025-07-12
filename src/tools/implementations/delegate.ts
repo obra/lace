@@ -2,16 +2,16 @@
 // ABOUTME: Enables efficient token usage by delegating to cheaper models with enhanced parameter validation
 
 import { z } from 'zod';
-import { Tool } from '~/tools/tool.js';
-import { NonEmptyString } from '~/tools/schemas/common.js';
-import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types.js';
-import { ApprovalDecision } from '~/tools/approval-types.js';
-import { Agent } from '~/agents/agent.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { AIProvider } from '~/providers/base-provider.js';
-import { TokenBudgetConfig } from '~/token-management/types.js';
-import { ProviderRegistry } from '~/providers/registry.js';
-import { logger } from '~/utils/logger.js';
+import { Tool } from '~/tools/tool';
+import { NonEmptyString } from '~/tools/schemas/common';
+import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
+import { ApprovalDecision } from '~/tools/approval-types';
+import { Agent } from '~/agents/agent';
+import { ToolExecutor } from '~/tools/executor';
+import { AIProvider } from '~/providers/base-provider';
+import { TokenBudgetConfig } from '~/token-management/types';
+import { ProviderRegistry } from '~/providers/registry';
+import { logger } from '~/utils/logger';
 
 // Model format validation
 const ModelFormat = z.string().refine(

@@ -1,8 +1,8 @@
 // ABOUTME: Shared timeline types for timeline processing implementations
 // ABOUTME: Provides common interfaces for Timeline, TimelineItem, and TimelineProcessor
 
-import { ThreadEvent } from '~/threads/types.js';
-import { ToolCall, ToolResult } from '~/tools/types.js';
+import { ThreadEvent } from '~/threads/types';
+import { ToolCall, ToolResult } from '~/tools/types';
 
 export interface Timeline {
   items: TimelineItem[];

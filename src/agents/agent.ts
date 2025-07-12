@@ -2,24 +2,20 @@
 // ABOUTME: Core conversation engine that emits events instead of direct I/O for multiple interface support
 
 import { EventEmitter } from 'events';
-import { AIProvider, ProviderMessage, ProviderToolCall } from '~/providers/base-provider.js';
-import { ToolCall, ToolResult } from '~/tools/types.js';
-import { Tool } from '~/tools/tool.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { ApprovalDecision } from '~/tools/approval-types.js';
-import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager.js';
-import { ThreadEvent, EventType, asThreadId } from '~/threads/types.js';
-import { logger } from '~/utils/logger.js';
-import { StopReasonHandler } from '~/token-management/stop-reason-handler.js';
-import { TokenBudgetManager } from '~/token-management/token-budget-manager.js';
-import {
-  TokenBudgetConfig,
-  BudgetStatus,
-  BudgetRecommendations,
-} from '~/token-management/types.js';
-import { loadPromptConfig } from '~/config/prompts.js';
-import { estimateTokens } from '~/utils/token-estimation.js';
-import { QueuedMessage, MessageQueueStats } from '~/agents/types.js';
+import { AIProvider, ProviderMessage, ProviderToolCall } from '~/providers/base-provider';
+import { ToolCall, ToolResult } from '~/tools/types';
+import { Tool } from '~/tools/tool';
+import { ToolExecutor } from '~/tools/executor';
+import { ApprovalDecision } from '~/tools/approval-types';
+import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
+import { ThreadEvent, EventType, asThreadId } from '~/threads/types';
+import { logger } from '~/utils/logger';
+import { StopReasonHandler } from '~/token-management/stop-reason-handler';
+import { TokenBudgetManager } from '~/token-management/token-budget-manager';
+import { TokenBudgetConfig, BudgetStatus, BudgetRecommendations } from '~/token-management/types';
+import { loadPromptConfig } from '~/config/prompts';
+import { estimateTokens } from '~/utils/token-estimation';
+import { QueuedMessage, MessageQueueStats } from '~/agents/types';
 
 export interface AgentConfig {
   provider: AIProvider;

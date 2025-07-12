@@ -1,8 +1,8 @@
 // ABOUTME: Compact command that compresses thread history to save tokens
 // ABOUTME: Uses existing threadManager.compact() functionality
 
-import type { Command, UserInterface } from '~/commands/types.js';
-import { ThreadEvent } from '~/threads/types.js';
+import type { Command, UserInterface } from '~/commands/types';
+import { ThreadEvent } from '~/threads/types';
 export const compactCommand: Command = {
   name: 'compact',
   description: 'Compress thread history to save tokens',

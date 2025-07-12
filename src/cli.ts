@@ -2,10 +2,10 @@
 // ABOUTME: Main CLI entry point for Lace AI coding assistant
 // ABOUTME: Parses arguments and delegates to the main application logic.
 
-import { loadEnvFile } from '~/config/env-loader.js';
-import { parseArgs, validateProvider } from '~/cli/args.js';
-import { ProviderRegistry } from '~/providers/registry.js';
-import { run } from '~/app.js';
+import { loadEnvFile } from '~/config/env-loader';
+import { parseArgs, validateProvider } from '~/cli/args';
+import { ProviderRegistry } from '~/providers/registry';
+import { run } from '~/app';
 
 async function main() {
   // Load environment variables from .env file before anything else

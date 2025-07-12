@@ -1,7 +1,7 @@
 // ABOUTME: Timeline utility functions for delegation and timeline analysis
 // ABOUTME: Extracted from DelegationBox to be reusable across timeline components
 
-import { Timeline } from '~/interfaces/timeline-types.js';
+import { Timeline } from '~/interfaces/timeline-types';
 
 /**
  * Check if a thread timeline is complete

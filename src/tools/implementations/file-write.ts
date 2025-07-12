@@ -4,9 +4,9 @@
 import { z } from 'zod';
 import { writeFile, mkdir } from 'fs/promises';
 import { dirname, resolve } from 'path';
-import { Tool } from '~/tools/tool.js';
-import { NonEmptyString } from '~/tools/schemas/common.js';
-import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types.js';
+import { Tool } from '~/tools/tool';
+import { NonEmptyString } from '~/tools/schemas/common';
+import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 
 const fileWriteSchema = z.object({
   path: NonEmptyString.transform((path) => resolve(path)),

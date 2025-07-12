@@ -2,7 +2,7 @@
 // ABOUTME: Maps tool names to specific renderer components or returns null for GenericToolRenderer fallback
 
 import React, { ComponentType } from 'react';
-import { logger } from '~/utils/logger.js';
+import { logger } from '~/utils/logger';
 
 // Module-level cache to avoid repeated dynamic imports
 const rendererCache = new Map<string, React.ComponentType<unknown> | null>();

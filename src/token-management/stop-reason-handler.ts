@@ -1,9 +1,9 @@
 // ABOUTME: Handles provider stop reasons and filters incomplete tool calls
 // ABOUTME: Prevents broken tool calls from crashing the system when max_tokens is reached
 
-import { ProviderResponse, ProviderToolCall } from '~/providers/base-provider.js';
-import { Tool } from '~/tools/tool.js';
-import { logger } from '~/utils/logger.js';
+import { ProviderResponse, ProviderToolCall } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { logger } from '~/utils/logger';
 
 export interface StopReasonHandlerConfig {
   logTokenExhaustion?: boolean;

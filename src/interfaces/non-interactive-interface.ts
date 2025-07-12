@@ -1,8 +1,8 @@
 // ABOUTME: Non-interactive interface for single prompt execution
 // ABOUTME: Handles --prompt flag execution without user interaction
 
-import type { Agent } from '~/agents/agent.js';
-import type { UserInterface } from '~/commands/types.js';
+import type { Agent } from '~/agents/agent';
+import type { UserInterface } from '~/commands/types';
 
 /**
  * Non-interactive interface for single prompt execution

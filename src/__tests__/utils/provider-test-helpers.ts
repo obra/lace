@@ -1,7 +1,7 @@
 // ABOUTME: Simple provider availability checking for local server providers
 // ABOUTME: Returns availability status for conditional test execution
 
-import { withConsoleCapture } from '~/__tests__/setup/console-capture.js';
+import { withConsoleCapture } from '~/__tests__/setup/console-capture';
 
 /**
  * Check if a local provider (LMStudio, Ollama) is available.

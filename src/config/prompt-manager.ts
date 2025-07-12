@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { TemplateEngine } from '~/config/template-engine.js';
+import { TemplateEngine } from '~/config/template-engine';
 import {
   VariableProviderManager,
   SystemVariableProvider,
@@ -12,9 +12,9 @@ import {
   ProjectVariableProvider,
   ToolVariableProvider,
   ContextDisclaimerProvider,
-} from '~/config/variable-providers.js';
-import { getLaceDir } from '~/config/lace-dir.js';
-import { logger } from '~/utils/logger.js';
+} from '~/config/variable-providers';
+import { getLaceDir } from '~/config/lace-dir';
+import { logger } from '~/utils/logger';
 
 export interface PromptManagerOptions {
   tools?: Array<{ name: string; description: string }>;

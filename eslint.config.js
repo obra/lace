@@ -4,13 +4,14 @@ import prettier from 'eslint-plugin-prettier';
 import prettierConfig from 'eslint-config-prettier';
 import noRelativeImportPaths from 'eslint-plugin-no-relative-import-paths';
 import vitest from 'eslint-plugin-vitest';
+import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 
 export default [
   {
-    ...js.configs.recommended,
-    ignores: ['dist/**/*'],
+    ignores: ['dist/**/*', 'vitest.config.ts'],
   },
+  js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map(config => ({
     ...config,
     files: ['**/*.ts', '**/*.tsx'],
@@ -30,6 +31,7 @@ export default [
     plugins: {
       prettier,
       'no-relative-import-paths': noRelativeImportPaths,
+      'import': importPlugin,
     },
     settings: {
       'import/resolver': {
@@ -56,7 +58,8 @@ export default [
           }
         ]
       }],
-      'no-var': 'error'
+      'no-var': 'error',
+      'import/extensions': ['off']
     },
   },
   {

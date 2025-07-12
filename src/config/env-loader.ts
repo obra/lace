@@ -1,7 +1,7 @@
 // ABOUTME: Loads environment variables from .env files using dotenv
 
 import dotenv from 'dotenv';
-import { logger } from '~/utils/logger.js';
+import { logger } from '~/utils/logger';
 
 function loadAndLogEnvFile(path: string, description: string): void {
   const result = dotenv.config({ path });
