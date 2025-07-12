@@ -223,87 +223,80 @@ export function TimelineMessage({ entry }: TimelineMessageProps) {
           </div>
           <div className="bg-base-100 border border-base-300 rounded-lg p-4 shadow-sm">
             <h3 className="font-semibold text-base-content mb-3">{entry.title}</h3>
-            <Carousel
-              showNavigation={true}
-              showDots={true}
-              className="bg-base-200 rounded-box p-4"
-              itemsPerView={{ mobile: 1, tablet: 2, desktop: 3 }}
-            >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {entry.items.map((item, index) => (
-                <div key={index}>
-                  <div className="card bg-base-100 shadow-sm border border-base-300 h-full">
-                    <div className="card-body p-4">
-                      <div className="flex items-start justify-between">
-                        <h4 className="card-title text-sm">{item.title}</h4>
+                <div key={index} className="card bg-base-100 shadow-sm border border-base-300">
+                  <div className="card-body p-4">
+                    <div className="flex items-start justify-between">
+                      <h4 className="card-title text-sm">{item.title}</h4>
+                      <div
+                        className={`badge badge-sm ${
+                          item.type === 'feature'
+                            ? 'badge-success'
+                            : item.type === 'bugfix'
+                              ? 'badge-error'
+                              : item.type === 'refactor'
+                                ? 'badge-warning'
+                                : 'badge-ghost'
+                        }`}
+                      >
+                        {item.type}
+                      </div>
+                    </div>
+                    <p className="text-xs text-base-content/70 mt-2">{item.description}</p>
+
+                    <div className="flex items-center justify-between mt-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-base-content/50">Impact:</span>
+                        <div className="flex gap-1">
+                          {[1, 2, 3].map((i) => (
+                            <div
+                              key={i}
+                              className={`w-2 h-2 rounded-full ${
+                                item.impact === 'high' && i <= 3
+                                  ? 'bg-error'
+                                  : item.impact === 'medium' && i <= 2
+                                    ? 'bg-warning'
+                                    : item.impact === 'low' && i <= 1
+                                      ? 'bg-success'
+                                      : 'bg-base-300'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <span className="text-xs font-mono text-base-content/50">
+                        {item.commit}
+                      </span>
+                    </div>
+
+                    <div className="mt-3">
+                      <span className="text-xs text-base-content/50 block mb-1">Files:</span>
+                      {item.files.slice(0, 2).map((file, i) => (
                         <div
-                          className={`badge badge-sm ${
-                            item.type === 'feature'
-                              ? 'badge-success'
-                              : item.type === 'bugfix'
-                                ? 'badge-error'
-                                : item.type === 'refactor'
-                                  ? 'badge-warning'
-                                  : 'badge-ghost'
-                          }`}
+                          key={i}
+                          className="text-xs bg-base-200 px-2 py-1 rounded mb-1 font-mono"
                         >
-                          {item.type}
+                          {file}
                         </div>
-                      </div>
-                      <p className="text-xs text-base-content/70 mt-2">{item.description}</p>
-
-                      <div className="flex items-center justify-between mt-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-base-content/50">Impact:</span>
-                          <div className="flex gap-1">
-                            {[1, 2, 3].map((i) => (
-                              <div
-                                key={i}
-                                className={`w-2 h-2 rounded-full ${
-                                  item.impact === 'high' && i <= 3
-                                    ? 'bg-error'
-                                    : item.impact === 'medium' && i <= 2
-                                      ? 'bg-warning'
-                                      : item.impact === 'low' && i <= 1
-                                        ? 'bg-success'
-                                        : 'bg-base-300'
-                                }`}
-                              />
-                            ))}
-                          </div>
+                      ))}
+                      {item.files.length > 2 && (
+                        <div className="text-xs text-base-content/50">
+                          +{item.files.length - 2} more files
                         </div>
-                        <span className="text-xs font-mono text-base-content/50">
-                          {item.commit}
-                        </span>
-                      </div>
+                      )}
+                    </div>
 
-                      <div className="mt-3">
-                        <span className="text-xs text-base-content/50 block mb-1">Files:</span>
-                        {item.files.slice(0, 2).map((file, i) => (
-                          <div
-                            key={i}
-                            className="text-xs bg-base-200 px-2 py-1 rounded mb-1 font-mono"
-                          >
-                            {file}
-                          </div>
-                        ))}
-                        {item.files.length > 2 && (
-                          <div className="text-xs text-base-content/50">
-                            +{item.files.length - 2} more files
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="card-actions justify-end mt-3">
-                        <button className="btn btn-xs btn-outline">
-                          <FontAwesomeIcon icon={faExternalLinkAlt} className="mr-1" />
-                          View
-                        </button>
-                      </div>
+                    <div className="card-actions justify-end mt-3">
+                      <button className="btn btn-xs btn-outline">
+                        <FontAwesomeIcon icon={faExternalLinkAlt} className="mr-1" />
+                        View
+                      </button>
                     </div>
                   </div>
                 </div>
               ))}
-            </Carousel>
+            </div>
           </div>
         </div>
       </div>
