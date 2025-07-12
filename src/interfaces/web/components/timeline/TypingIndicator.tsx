@@ -1,4 +1,11 @@
+// ABOUTME: Animated typing indicator component for chat interface
+// ABOUTME: Shows agent-specific colored bouncing dots during AI response generation
+
 'use client';
+
+import React from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faRobot } from '~/lib/fontawesome';
 
 interface TypingIndicatorProps {
   agent: string;
@@ -17,11 +24,11 @@ export function TypingIndicator({ agent }: TypingIndicatorProps) {
     <div className="flex gap-3 lg:gap-4">
       <div className="flex-shrink-0">
         <div
-          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+          className={`w-8 h-8 rounded-md flex items-center justify-center text-sm font-medium ${
             agentColors[agent as keyof typeof agentColors] || 'bg-gray-600'
           } text-white`}
         >
-          <i className="fas fa-robot"></i>
+          <FontAwesomeIcon icon={faRobot} className="text-xs" />
         </div>
       </div>
       <div className="bg-base-100 border border-base-300 rounded-2xl px-4 py-3">

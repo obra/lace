@@ -3,15 +3,15 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars, faSearch, faTerminal, faTasks, faFolder, faMicrophone } from '~/lib/fontawesome';
-import { Sidebar } from '~/components/layout/Sidebar';
-import { MobileSidebar } from '~/components/layout/MobileSidebar';
-import { TimelineView } from '~/components/timeline/TimelineView';
-import { EnhancedChatInput } from '~/components/chat/EnhancedChatInput';
-import { TaskBoardModal } from '~/components/modals/TaskBoardModal';
-import { VoiceRecognitionUI } from '~/components/ui/VoiceRecognitionUI';
-import { TimelineEntry, Project, Timeline, Task, RecentFile, StreamEvent } from '~/types';
-import { useVoiceRecognition } from '~/hooks/useVoiceRecognition';
-import { useConversationStream } from '~/hooks/useConversationStream';
+import { Sidebar } from './layout/Sidebar';
+import { MobileSidebar } from './layout/MobileSidebar';
+import { TimelineView } from './timeline/TimelineView';
+import { EnhancedChatInput } from './chat/EnhancedChatInput';
+import { TaskBoardModal } from './modals/TaskBoardModal';
+import { VoiceRecognitionUI } from './ui/VoiceRecognitionUI';
+import { TimelineEntry, Project, Timeline, Task, RecentFile, StreamEvent } from '../types/chat';
+import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
+import { useConversationStream } from '../hooks/useConversationStream';
 
 const availableThemes = [
   { name: 'light', colors: { primary: '#570DF8', secondary: '#F000B8', accent: '#37CDBE' } },

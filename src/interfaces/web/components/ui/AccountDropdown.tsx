@@ -1,6 +1,17 @@
+// ABOUTME: Account dropdown component with user profile and settings
+// ABOUTME: Shows user info, plan status, and navigation to account features
+
 'use client';
 
-// Using FontAwesome instead of Heroicons
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faUser, 
+  faCog, 
+  faCreditCard, 
+  faSignOutAlt, 
+  faChevronUp, 
+  faCrown 
+} from '~/lib/fontawesome';
 
 export function AccountDropdown() {
   return (
@@ -20,11 +31,11 @@ export function AccountDropdown() {
           <div className="flex-1 min-w-0">
             <div className="font-medium text-sm text-base-content truncate">John Developer</div>
             <div className="flex items-center gap-1">
-              <i className="fas fa-crown w-3 h-3 text-yellow-600"></i>
+              <FontAwesomeIcon icon={faCrown} className="w-3 h-3 text-yellow-600" />
               <span className="text-xs text-base-content/60">Pro Plan</span>
             </div>
           </div>
-          <i className="fas fa-chevron-up w-4 h-4 text-base-content/40"></i>
+          <FontAwesomeIcon icon={faChevronUp} className="w-4 h-4 text-base-content/40" />
         </div>
         <ul
           tabIndex={0}
@@ -35,19 +46,19 @@ export function AccountDropdown() {
           </li>
           <li>
             <a className="flex items-center gap-3">
-              <i className="fas fa-user w-4 h-4"></i>
+              <FontAwesomeIcon icon={faUser} className="w-4 h-4" />
               <span>Profile</span>
             </a>
           </li>
           <li>
             <a className="flex items-center gap-3">
-              <i className="fas fa-cog w-4 h-4"></i>
+              <FontAwesomeIcon icon={faCog} className="w-4 h-4" />
               <span>Account Settings</span>
             </a>
           </li>
           <li>
             <a className="flex items-center gap-3">
-              <i className="fas fa-credit-card w-4 h-4"></i>
+              <FontAwesomeIcon icon={faCreditCard} className="w-4 h-4" />
               <span>Billing</span>
               <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-900/20 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400 ml-auto">
                 Pro
@@ -56,7 +67,7 @@ export function AccountDropdown() {
           </li>
           <li className="border-t border-base-300 mt-2 pt-2">
             <a className="text-base-content hover:bg-base-200 flex items-center gap-3">
-              <i className="fas fa-sign-out-alt w-4 h-4"></i>
+              <FontAwesomeIcon icon={faSignOutAlt} className="w-4 h-4" />
               <span>Sign Out</span>
             </a>
           </li>

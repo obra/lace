@@ -1,3 +1,6 @@
+// ABOUTME: Time and date formatting utilities for chat interface
+// ABOUTME: Provides consistent timestamp formatting across components
+
 export function formatTime(timestamp: Date): string {
   return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }

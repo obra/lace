@@ -1,9 +1,12 @@
+// ABOUTME: Main timeline view component displaying conversation entries with auto-scroll
+// ABOUTME: Handles both completed messages and streaming content display
+
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { TimelineEntry } from '~/types';
-import { TimelineMessage } from '~/components/timeline/TimelineMessage';
-import { TypingIndicator } from '~/components/timeline/TypingIndicator';
+import React, { useEffect, useRef } from 'react';
+import { TimelineEntry } from '../../types/chat';
+import { TimelineMessage } from './TimelineMessage';
+import { TypingIndicator } from './TypingIndicator';
 
 interface TimelineViewProps {
   entries: TimelineEntry[];

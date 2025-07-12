@@ -1,7 +1,11 @@
+// ABOUTME: Timeline message component handling different message types (user, AI, tool, integration, carousel)
+// ABOUTME: Renders agent-specific styling with code block formatting and interactive elements
+
 'use client';
 
-import { TimelineEntry } from '~/types';
-import { formatTime } from '~/utils/format';
+import React from 'react';
+import { TimelineEntry } from '../../types/chat';
+import { formatTime } from '../../utils/format';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faInfoCircle, faUser, faRobot, faTerminal, faExternalLinkAlt,

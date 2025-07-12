@@ -1,3 +1,6 @@
+// ABOUTME: Integration timeline entry component for external service activities
+// ABOUTME: Supports Google Drive, Sheets, Slack, GitHub integrations with type-specific content
+
 'use client';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';

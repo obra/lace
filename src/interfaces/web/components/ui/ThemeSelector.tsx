@@ -1,7 +1,11 @@
+// ABOUTME: Theme selector component for DaisyUI theme switching
+// ABOUTME: Visual theme picker with color previews and local storage persistence
+
 'use client';
 
 import { useState, useEffect } from 'react';
-// Using FontAwesome instead of Heroicons
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCheck } from '~/lib/fontawesome';
 
 const availableThemes = [
   { name: 'light', colors: { primary: '#570DF8', secondary: '#F000B8', accent: '#37CDBE' } },
@@ -72,7 +76,7 @@ export function ThemeSelector({ currentTheme: propTheme, onThemeChange }: ThemeS
             </div>
             {currentTheme === theme.name && (
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full flex items-center justify-center">
-                <i className="fas fa-check w-2 h-2 text-primary-content"></i>
+                <FontAwesomeIcon icon={faCheck} className="w-2 h-2 text-primary-content" />
               </div>
             )}
           </button>

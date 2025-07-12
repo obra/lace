@@ -1,3 +1,6 @@
+// ABOUTME: Responsive carousel component with touch/keyboard navigation
+// ABOUTME: Supports pagination, auto-scroll, and accessibility features
+
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
