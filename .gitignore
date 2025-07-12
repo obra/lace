@@ -9,6 +9,12 @@ dist/
 build/
 *.tsbuildinfo
 
+# Next.js
+src/interfaces/web/.next/
+src/interfaces/web/next-env.d.ts
+src/interfaces/web/tsconfig.json
+.vercel
+
 # Environment variables
 .env
 .env.local
