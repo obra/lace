@@ -4,7 +4,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faChevronLeft, faChevronRight } from '~/lib/fontawesome';
 
 interface CarouselProps {
   children: React.ReactNode[];
@@ -198,7 +199,7 @@ export function Carousel({
             aria-label="Previous page"
             disabled={currentIndex === 0}
           >
-            <ChevronLeftIcon className="w-4 h-4 text-base-content" />
+            <FontAwesomeIcon icon={faChevronLeft} className="w-4 h-4 text-base-content" />
           </button>
 
           <button
@@ -207,7 +208,7 @@ export function Carousel({
             aria-label="Next page"
             disabled={currentIndex >= maxIndex}
           >
-            <ChevronRightIcon className="w-4 h-4 text-base-content" />
+            <FontAwesomeIcon icon={faChevronRight} className="w-4 h-4 text-base-content" />
           </button>
         </>
       )}

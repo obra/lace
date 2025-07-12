@@ -1,6 +1,9 @@
+// ABOUTME: Enhanced chat input component with voice recognition and auto-resizing textarea
+// ABOUTME: Mobile-optimized design with contextual controls and status indicators
+
 'use client';
 
-import { useState, useRef, useEffect, FormEvent, KeyboardEvent } from 'react';
+import React, { useState, useRef, useEffect, FormEvent, KeyboardEvent } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMicrophone, faPaperPlane, faPaperclip } from '~/lib/fontawesome';
 
@@ -76,7 +79,7 @@ export function EnhancedChatInput({
     <div className="fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 p-4 lg:relative lg:bottom-auto">
       {/* Mobile Status Bar */}
       <div className="flex items-center justify-between text-xs text-base-content/60 mb-3 lg:hidden">
-        <span>{`Connected`}</span>
+        <span>Connected</span>
         {disabled && (
           <span className="flex items-center gap-1">
             <div className="w-2 h-2 bg-teal-500 rounded-full animate-pulse"></div>

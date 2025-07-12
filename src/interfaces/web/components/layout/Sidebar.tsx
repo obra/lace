@@ -1,6 +1,9 @@
+// ABOUTME: Desktop sidebar component with project selection, timeline management, and tool shortcuts
+// ABOUTME: Collapsible design with sections for conversations, tasks, files, and settings
+
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faSearch, 
@@ -11,16 +14,12 @@ import {
   faComments,
   faPlus,
   faCog,
-  faFileCode
+  faFileCode,
+  faChevronDown,
+  faChevronRight,
+  faChevronLeft
 } from '~/lib/fontawesome';
-import { 
-  ChevronDownIcon, 
-  ChevronRightIcon, 
-  ChevronLeftIcon 
-} from '~/lib/heroicons';
-import { Timeline, Project, Task, RecentFile } from '~/types';
-import { ThemeSelector } from '~/components/ui/ThemeSelector';
-import { AccountDropdown } from '~/components/ui/AccountDropdown';
+import { Timeline, Project, Task, RecentFile } from '../../types/chat';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -115,7 +114,7 @@ export function Sidebar({
           onClick={onToggle}
           className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-md z-10 group"
         >
-          <ChevronRightIcon className="w-3 h-3 text-base-content/60 group-hover:text-base-content transition-colors" />
+          <FontAwesomeIcon icon={faChevronRight} className="w-3 h-3 text-base-content/60 group-hover:text-base-content transition-colors" />
         </button>
       </div>
     );
@@ -155,7 +154,7 @@ export function Sidebar({
                 <FontAwesomeIcon icon={faFolderOpen} className="w-4 h-4 text-teal-600" />
                 <span className="truncate">{currentProject.name}</span>
               </div>
-              <ChevronDownIcon className="w-4 h-4" />
+              <FontAwesomeIcon icon={faChevronDown} className="w-4 h-4" />
             </div>
             <ul
               tabIndex={0}
@@ -179,11 +178,10 @@ export function Sidebar({
               className="flex items-center justify-between w-full text-left p-3 hover:bg-base-200 rounded-lg transition-colors"
             >
               <span className="text-sm font-medium text-base-content">Agent Chats</span>
-              {conversationsExpanded ? (
-                <ChevronDownIcon className="w-4 h-4 transition-transform text-base-content/60" />
-              ) : (
-                <ChevronRightIcon className="w-4 h-4 transition-transform text-base-content/60" />
-              )}
+              <FontAwesomeIcon 
+                icon={conversationsExpanded ? faChevronDown : faChevronRight} 
+                className="w-4 h-4 transition-transform text-base-content/60" 
+              />
             </button>
 
             {conversationsExpanded && (
@@ -256,11 +254,10 @@ export function Sidebar({
                 <span className="badge badge-sm bg-teal-500 text-white border-0">
                   {activeTasks.length}
                 </span>
-                {tasksExpanded ? (
-                  <ChevronDownIcon className="w-4 h-4 transition-transform text-base-content/60" />
-                ) : (
-                  <ChevronRightIcon className="w-4 h-4 transition-transform text-base-content/60" />
-                )}
+                <FontAwesomeIcon 
+                  icon={tasksExpanded ? faChevronDown : faChevronRight} 
+                  className="w-4 h-4 transition-transform text-base-content/60" 
+                />
               </div>
             </button>
 
@@ -310,11 +307,10 @@ export function Sidebar({
               className="flex items-center justify-between w-full text-left p-3 hover:bg-base-200 rounded-lg transition-colors"
             >
               <span className="text-sm font-medium text-base-content">Files</span>
-              {filesExpanded ? (
-                <ChevronDownIcon className="w-4 h-4 transition-transform text-base-content/60" />
-              ) : (
-                <ChevronRightIcon className="w-4 h-4 transition-transform text-base-content/60" />
-              )}
+              <FontAwesomeIcon 
+                icon={filesExpanded ? faChevronDown : faChevronRight} 
+                className="w-4 h-4 transition-transform text-base-content/60" 
+              />
             </button>
 
             {filesExpanded && (
@@ -343,17 +339,31 @@ export function Sidebar({
               className="flex items-center justify-between w-full text-left p-3 hover:bg-base-200 rounded-lg transition-colors"
             >
               <span className="text-sm font-medium text-base-content">Settings</span>
-              {settingsExpanded ? (
-                <ChevronDownIcon className="w-4 h-4 transition-transform text-base-content/60" />
-              ) : (
-                <ChevronRightIcon className="w-4 h-4 transition-transform text-base-content/60" />
-              )}
+              <FontAwesomeIcon 
+                icon={settingsExpanded ? faChevronDown : faChevronRight} 
+                className="w-4 h-4 transition-transform text-base-content/60" 
+              />
             </button>
 
             {settingsExpanded && (
               <div className="mt-2 space-y-4">
                 <div className="p-4 bg-base-200 rounded-lg space-y-4">
-                  <ThemeSelector currentTheme={currentTheme} onThemeChange={onThemeChange} />
+                  {/* Theme Selector - simplified for now */}
+                  <div>
+                    <label className="text-xs text-base-content/60 block mb-2">Theme</label>
+                    <select 
+                      className="select select-sm w-full"
+                      value={currentTheme}
+                      onChange={(e) => onThemeChange(e.target.value)}
+                    >
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                      <option value="cupcake">Cupcake</option>
+                      <option value="corporate">Corporate</option>
+                      <option value="synthwave">Synthwave</option>
+                      <option value="cyberpunk">Cyberpunk</option>
+                    </select>
+                  </div>
 
                   <div className="pt-2 border-t border-base-300">
                     <button
@@ -372,8 +382,18 @@ export function Sidebar({
           </div>
         </div>
 
-        {/* Account Section */}
-        <AccountDropdown />
+        {/* Account Section - simplified for now */}
+        <div className="p-4 border-t border-base-300">
+          <div className="flex items-center gap-2 p-2 bg-base-200 rounded-lg">
+            <div className="w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+              U
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-base-content">User</div>
+              <div className="text-xs text-base-content/60">Local Account</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Toggle Button */}
@@ -381,7 +401,7 @@ export function Sidebar({
         onClick={onToggle}
         className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-md z-10 group"
       >
-        <ChevronLeftIcon className="w-3 h-3 text-base-content/60 group-hover:text-base-content transition-colors" />
+        <FontAwesomeIcon icon={faChevronLeft} className="w-3 h-3 text-base-content/60 group-hover:text-base-content transition-colors" />
       </button>
     </div>
   );

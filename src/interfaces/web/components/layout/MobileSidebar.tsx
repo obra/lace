@@ -1,14 +1,18 @@
+// ABOUTME: Mobile sidebar component with project/timeline switchers and tool shortcuts
+// ABOUTME: Slide-out overlay design optimized for touch interaction on mobile devices
+
 'use client';
 
+import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faSearch, 
   faTerminal, 
   faTasks, 
-  faFolder
+  faFolder,
+  faChevronLeft
 } from '~/lib/fontawesome';
-import { ChevronLeftIcon } from '~/lib/heroicons';
-import { Timeline, Project, Task } from '~/types';
+import { Timeline, Project, Task } from '../../types/chat';
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -82,7 +86,7 @@ export function MobileSidebar({
             onClick={onClose} 
             className="p-2 hover:bg-base-200 rounded-lg transition-colors group"
           >
-            <ChevronLeftIcon className="w-6 h-6 transition-transform group-hover:-translate-x-1" />
+            <FontAwesomeIcon icon={faChevronLeft} className="w-6 h-6 transition-transform group-hover:-translate-x-1" />
           </button>
         </div>
 
