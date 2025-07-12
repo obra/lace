@@ -1,27 +1,29 @@
 // ABOUTME: Loads environment variables from .env files using dotenv
 
 import dotenv from 'dotenv';
-import path from 'path';
-import fs from 'fs';
 import { logger } from '~/utils/logger.js';
 
-export function loadEnvFile(): void {
-  const envPath = path.resolve(process.cwd(), '.env');
-
-  if (fs.existsSync(envPath)) {
-    const result = dotenv.config({ path: envPath });
-
-    if (result.error) {
-      logger.warn('Failed to parse .env file', { error: result.error.message });
+function loadAndLogEnvFile(path: string, description: string): void {
+  const result = dotenv.config({ path });
+  if (result.error) {
+    if ('code' in result.error && result.error.code === 'ENOENT') {
+      logger.debug(`No ${description} file found`);
     } else {
-      logger.debug('.env file loaded successfully', {
-        path: envPath,
-        variableCount: Object.keys(result.parsed || {}).length,
-      });
+      logger.debug(`${description} failed to parse`, { error: result.error.message });
     }
-  } else {
-    logger.debug('No .env file found', { searchPath: envPath });
+  } else if (result.parsed) {
+    logger.debug(`${description} loaded successfully`, {
+      variableCount: Object.keys(result.parsed).length,
+    });
   }
+}
+
+export function loadEnvFile(): void {
+  // Load .env.local first (highest priority - won't be overridden)
+  loadAndLogEnvFile('.env.local', '.env.local');
+
+  // Load .env second (lower priority - won't override existing variables)
+  loadAndLogEnvFile('.env', '.env');
 }
 
 export function getEnvVar(key: string, defaultValue?: string): string | undefined {
