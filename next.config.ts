@@ -16,17 +16,11 @@ const nextConfig: NextConfig = {
   // Enable custom server mode (important for embedding)
   output: 'standalone',
   
-  // Disable telemetry for embedded use
-  telemetry: false,
-
   // Enable React strict mode
   reactStrictMode: true,
 
-  // Configure for local development and embedded usage
-  experimental: {
-    // Allow server components in embedded mode
-    serverComponentsExternalPackages: [],
-  },
+  // Configure external packages for server components
+  serverExternalPackages: [],
 };
 
 export default nextConfig;

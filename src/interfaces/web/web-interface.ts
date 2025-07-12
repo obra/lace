@@ -2,7 +2,6 @@
 // ABOUTME: Provides web UI access to Agent and ThreadManager through shared instances
 
 import { createServer } from 'node:http';
-import { parse } from 'node:url';
 import next from 'next';
 import type { Agent } from '~/agents/agent.js';
 import type { UserInterface } from '~/commands/types.js';
@@ -86,8 +85,7 @@ export class WebInterface implements UserInterface, ApprovalCallback {
       // Create custom server that integrates with Next.js
       this.server = createServer((req, res) => {
         try {
-          const parsedUrl = parse(req.url!, true);
-          void handle(req, res, parsedUrl);
+          void handle(req, res);
         } catch (err) {
           logger.error('Error handling request', { error: err });
           res.statusCode = 500;
