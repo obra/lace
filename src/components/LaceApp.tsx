@@ -187,38 +187,6 @@ export function LaceApp() {
       timestamp: new Date(Date.now() - 1780000),
     },
     {
-      id: 5,
-      type: 'carousel',
-      title: 'Recent Code Changes',
-      timestamp: new Date(Date.now() - 1700000),
-      items: [
-        {
-          title: 'Authentication Module',
-          description: 'Added OAuth2 integration with Google and GitHub',
-          type: 'feature',
-          impact: 'high',
-          files: ['src/auth/oauth.ts', 'src/auth/providers.ts'],
-          commit: 'a1b2c3d',
-        },
-        {
-          title: 'Database Migration',
-          description: 'Updated user schema to support OAuth tokens',
-          type: 'maintenance',
-          impact: 'medium',
-          files: ['migrations/001_oauth_tokens.sql', 'src/models/user.ts'],
-          commit: 'e4f5g6h',
-        },
-        {
-          title: 'Login Bug Fix',
-          description: 'Fixed session timeout issue in production',
-          type: 'bugfix',
-          impact: 'high',
-          files: ['src/auth/session.ts'],
-          commit: 'i7j8k9l',
-        },
-      ],
-    },
-    {
       id: 6,
       type: 'integration',
       tool: 'Slack',
