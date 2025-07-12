@@ -19,6 +19,6 @@ export default defineConfig({
       exclude: ['node_modules/', 'dist/', '**/*.test.ts', '**/*.spec.ts'],
     },
     environment: 'jsdom', // Default to jsdom for React components
-    setupFiles: ['./src/__tests__/setup.ts'],
+    setupFiles: ['./src/__tests__/setup.ts', './src/__tests__/jest-dom.ts', './src/interfaces/web/__tests__/setup.ts'],
   },
 });
