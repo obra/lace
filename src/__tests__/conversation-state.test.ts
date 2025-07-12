@@ -2,11 +2,11 @@
 // ABOUTME: Tests the full conversation flow to catch context truncation bugs using event-driven Agent
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Agent } from '~/agents/agent.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { AIProvider, ProviderResponse } from '~/providers/base-provider.js';
-import { logger } from '~/utils/logger.js';
+import { Agent } from '~/agents/agent';
+import { ThreadManager } from '~/threads/thread-manager';
+import { ToolExecutor } from '~/tools/executor';
+import { AIProvider, ProviderResponse } from '~/providers/base-provider';
+import { logger } from '~/utils/logger';
 
 // Mock provider that returns predictable responses for stable testing
 class MockConversationProvider extends AIProvider {

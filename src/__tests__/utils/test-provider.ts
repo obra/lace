@@ -1,9 +1,9 @@
 // ABOUTME: Mock provider for testing that returns predictable responses
 // ABOUTME: Avoids expensive LLM calls during test execution
 
-import { AIProvider } from '~/providers/base-provider.js';
-import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider.js';
-import { Tool } from '~/tools/tool.js';
+import { AIProvider } from '~/providers/base-provider';
+import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
 
 export interface TestProviderConfig extends ProviderConfig {
   mockResponse?: string;

@@ -2,7 +2,7 @@
 // ABOUTME: Verifies help text includes all available providers from registry
 
 import { describe, it, expect } from 'vitest';
-import { ProviderRegistry } from '~/providers/registry.js';
+import { ProviderRegistry } from '~/providers/registry';
 
 describe('Dynamic Help Text Generation', () => {
   it('should generate help text with all auto-discovered providers', async () => {

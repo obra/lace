@@ -4,8 +4,8 @@
 import { z } from 'zod';
 import { readFile, writeFile } from 'fs/promises';
 import { resolve } from 'path';
-import { Tool } from '~/tools/tool.js';
-import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types.js';
+import { Tool } from '~/tools/tool';
+import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 
 const fileEditSchema = z.object({
   path: z

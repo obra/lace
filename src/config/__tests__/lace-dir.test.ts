@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { getLaceDir, ensureLaceDir, getLaceFilePath, getLaceDbPath } from '~/config/lace-dir.js';
+import { getLaceDir, ensureLaceDir, getLaceFilePath, getLaceDbPath } from '~/config/lace-dir';
 
 describe('Lace Directory Management', () => {
   let tempDir: string;

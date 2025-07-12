@@ -2,7 +2,7 @@
 // ABOUTME: Eliminates prop drilling and simplifies timeline item components
 
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useTimelineItemExpansion } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
+import { useTimelineItemExpansion } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
 
 interface TimelineItemContextValue {
   // Selection state

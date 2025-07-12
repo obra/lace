@@ -5,9 +5,9 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import { Text } from 'ink';
-import { TimelineViewport } from '~/interfaces/terminal/components/events/TimelineViewport.js';
-import { Timeline } from '~/interfaces/timeline-types.js';
-import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
+import { TimelineViewport } from '~/interfaces/terminal/components/events/TimelineViewport';
+import { Timeline } from '~/interfaces/timeline-types';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider';
 
 // Mock external dependencies that aren't core to the component logic
 vi.mock('../../../../../utils/use-stdout-dimensions.js', () => ({

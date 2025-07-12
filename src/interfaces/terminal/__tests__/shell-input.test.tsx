@@ -7,10 +7,10 @@ import { act } from '@testing-library/react';
 import {
   renderInkComponent,
   stripAnsi,
-} from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
-import ShellInput from '~/interfaces/terminal/components/shell-input.js';
-import * as TextBufferModule from '~/interfaces/terminal/hooks/use-text-buffer.js';
-import { LaceFocusProvider } from '~/interfaces/terminal/focus/index.js';
+} from '~/interfaces/terminal/__tests__/helpers/ink-test-utils';
+import ShellInput from '~/interfaces/terminal/components/shell-input';
+import * as TextBufferModule from '~/interfaces/terminal/hooks/use-text-buffer';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/index';
 
 // Mock the useTextBuffer hook
 vi.mock('../hooks/use-text-buffer.js', () => ({

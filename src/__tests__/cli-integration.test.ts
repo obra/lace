@@ -2,10 +2,10 @@
 // ABOUTME: Tests provider creation, tool setup, and CLIInterface integration
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseArgs } from '~/cli/args.js';
-import { AnthropicProvider } from '~/providers/anthropic-provider.js';
-import { LMStudioProvider } from '~/providers/lmstudio-provider.js';
-import { OllamaProvider } from '~/providers/ollama-provider.js';
+import { parseArgs } from '~/cli/args';
+import { AnthropicProvider } from '~/providers/anthropic-provider';
+import { LMStudioProvider } from '~/providers/lmstudio-provider';
+import { OllamaProvider } from '~/providers/ollama-provider';
 
 // Mock the CLIInterface to avoid readline complications
 vi.mock('../cli/interface.js', () => ({
@@ -136,14 +136,14 @@ describe('CLI Orchestration', () => {
   describe('tool registration', () => {
     it('should have all expected tool classes available', async () => {
       // Test that we can import and instantiate all expected tools
-      const { BashTool } = await import('../tools/implementations/bash.js');
-      const { FileReadTool } = await import('../tools/implementations/file-read.js');
-      const { FileWriteTool } = await import('../tools/implementations/file-write.js');
-      const { FileListTool } = await import('../tools/implementations/file-list.js');
-      const { RipgrepSearchTool } = await import('../tools/implementations/ripgrep-search.js');
-      const { FileFindTool } = await import('../tools/implementations/file-find.js');
+      const { BashTool } = await import('../tools/implementations/bash');
+      const { FileReadTool } = await import('../tools/implementations/file-read');
+      const { FileWriteTool } = await import('../tools/implementations/file-write');
+      const { FileListTool } = await import('../tools/implementations/file-list');
+      const { RipgrepSearchTool } = await import('../tools/implementations/ripgrep-search');
+      const { FileFindTool } = await import('../tools/implementations/file-find');
       const { TaskCreateTool, TaskListTool, TaskCompleteTool } = await import(
-        '../tools/implementations/task-manager/index.js'
+        '../tools/implementations/task-manager/index'
       );
 
       const tools = [
@@ -171,10 +171,10 @@ describe('CLI Orchestration', () => {
 
   describe('component integration', () => {
     it('should integrate Agent with TerminalInterface correctly', async () => {
-      const { Agent } = await import('../agents/agent.js');
-      const { TerminalInterface } = await import('../interfaces/terminal/terminal-interface.js');
-      const { ThreadManager } = await import('../threads/thread-manager.js');
-      const { ToolExecutor } = await import('../tools/executor.js');
+      const { Agent } = await import('../agents/agent');
+      const { TerminalInterface } = await import('../interfaces/terminal/terminal-interface');
+      const { ThreadManager } = await import('../threads/thread-manager');
+      const { ToolExecutor } = await import('../tools/executor');
 
       // Create all components like CLI does
       const provider = new LMStudioProvider({ systemPrompt: 'test' });

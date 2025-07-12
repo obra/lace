@@ -2,8 +2,8 @@
 // ABOUTME: Verifies retry logic works correctly with Ollama SDK
 
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
-import { OllamaProvider } from '~/providers/ollama-provider.js';
-import { ProviderMessage } from '~/providers/base-provider.js';
+import { OllamaProvider } from '~/providers/ollama-provider';
+import { ProviderMessage } from '~/providers/base-provider';
 
 // Create mock functions that we'll reference
 const mockChat = vi.fn();

@@ -3,17 +3,17 @@
 // ABOUTME: Outputs thread data in JSON or readable format with provider-specific conversation structure
 
 import { Command } from 'commander';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { Agent } from '~/agents/agent.js';
-import { ProviderRegistry } from '~/providers/registry.js';
-import { estimateTokens } from '~/utils/token-estimation.js';
-import { convertToAnthropicFormat } from '~/providers/format-converters.js';
-import { getLaceDir } from '~/config/lace-dir.js';
+import { ThreadManager } from '~/threads/thread-manager';
+import { Agent } from '~/agents/agent';
+import { ProviderRegistry } from '~/providers/registry';
+import { estimateTokens } from '~/utils/token-estimation';
+import { convertToAnthropicFormat } from '~/providers/format-converters';
+import { getLaceDir } from '~/config/lace-dir';
 import { join } from 'path';
-import { loadEnvFile } from '~/config/env-loader.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { ProviderMessage } from '~/providers/base-provider.js';
-import { ThreadEvent } from '~/threads/types.js';
+import { loadEnvFile } from '~/config/env-loader';
+import { ToolExecutor } from '~/tools/executor';
+import { ProviderMessage } from '~/providers/base-provider';
+import { ThreadEvent } from '~/threads/types';
 
 interface DebugOptions {
   threadId: string;

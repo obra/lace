@@ -4,9 +4,9 @@
 import React from 'react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { act } from '@testing-library/react';
-import { renderInkComponentWithFocus } from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
-import ToolApprovalModal from '~/interfaces/terminal/components/tool-approval-modal.js';
-import { ApprovalDecision } from '~/tools/approval-types.js';
+import { renderInkComponentWithFocus } from '~/interfaces/terminal/__tests__/helpers/ink-test-utils';
+import ToolApprovalModal from '~/interfaces/terminal/components/tool-approval-modal';
+import { ApprovalDecision } from '~/tools/approval-types';
 
 // Capture the useInput handler for direct testing
 interface KeyInfo {
@@ -303,7 +303,7 @@ describe('ToolApprovalModal', () => {
   describe('focus integration behavior', () => {
     it('only handles input when focused', async () => {
       // Import the mock
-      const { useLaceFocus } = await import('../focus/index.js');
+      const { useLaceFocus } = await import('../focus/index');
 
       // Mock unfocused state
       vi.mocked(useLaceFocus).mockReturnValue({

@@ -6,9 +6,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import Database from 'better-sqlite3';
-import { DatabasePersistence } from '~/persistence/database.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { Thread, ThreadEvent, EventType } from '~/threads/types.js';
+import { DatabasePersistence } from '~/persistence/database';
+import { ThreadManager } from '~/threads/thread-manager';
+import { Thread, ThreadEvent, EventType } from '~/threads/types';
 
 describe('DatabasePersistence (Thread Features)', () => {
   let tempDbPath: string;

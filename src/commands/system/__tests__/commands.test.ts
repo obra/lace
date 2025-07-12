@@ -2,14 +2,14 @@
 // ABOUTME: Tests individual command functionality and UserInterface integration
 
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
-import { createHelpCommand } from '~/commands/system/help.js';
-import { exitCommand } from '~/commands/system/exit.js';
-import { clearCommand } from '~/commands/system/clear.js';
-import { statusCommand } from '~/commands/system/status.js';
-import { compactCommand } from '~/commands/system/compact.js';
-import { queueCommand } from '~/commands/system/queue.js';
-import { CommandRegistry } from '~/commands/registry.js';
-import type { UserInterface, Command } from '~/commands/types.js';
+import { createHelpCommand } from '~/commands/system/help';
+import { exitCommand } from '~/commands/system/exit';
+import { clearCommand } from '~/commands/system/clear';
+import { statusCommand } from '~/commands/system/status';
+import { compactCommand } from '~/commands/system/compact';
+import { queueCommand } from '~/commands/system/queue';
+import { CommandRegistry } from '~/commands/registry';
+import type { UserInterface, Command } from '~/commands/types';
 
 type MockAgent = {
   getCurrentThreadId: MockedFunction<() => string | null>;

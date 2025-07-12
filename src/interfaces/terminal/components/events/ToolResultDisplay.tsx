@@ -3,10 +3,10 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ThreadEvent } from '~/threads/types.js';
-import { ToolResult } from '~/tools/types.js';
-import { CodeDisplay } from '~/interfaces/terminal/components/ui/CodeDisplay.js';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
+import { ThreadEvent } from '~/threads/types';
+import { ToolResult } from '~/tools/types';
+import { CodeDisplay } from '~/interfaces/terminal/components/ui/CodeDisplay';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme';
 
 interface ToolResultDisplayProps {
   event: ThreadEvent;

@@ -3,12 +3,12 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { useTextBuffer } from '~/interfaces/terminal/hooks/use-text-buffer.js';
-import TextRenderer from '~/interfaces/terminal/components/text-renderer.js';
-import FileAutocomplete from '~/interfaces/terminal/components/file-autocomplete.js';
-import { FocusRegions, useLaceFocus } from '~/interfaces/terminal/focus/index.js';
-import { UI_BACKGROUNDS } from '~/interfaces/terminal/theme.js';
-import { logger } from '~/utils/logger.js';
+import { useTextBuffer } from '~/interfaces/terminal/hooks/use-text-buffer';
+import TextRenderer from '~/interfaces/terminal/components/text-renderer';
+import FileAutocomplete from '~/interfaces/terminal/components/file-autocomplete';
+import { FocusRegions, useLaceFocus } from '~/interfaces/terminal/focus/index';
+import { UI_BACKGROUNDS } from '~/interfaces/terminal/theme';
+import { logger } from '~/utils/logger';
 
 // Keyboard shortcut system - list-based approach
 type KeyboardShortcut = string[]; // e.g., ['ctrl', 'a'] or ['meta', 'shift', 'z']
@@ -192,7 +192,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
       // Context-aware completion logic
       if (trimmedLine.startsWith('/') && bufferState.cursorLine === 0) {
         // Command completion at start of prompt
-        const { CommandRegistry } = await import('../../../commands/registry.js');
+        const { CommandRegistry } = await import('../../../commands/registry');
         const registry = await CommandRegistry.createWithAutoDiscovery();
         const commands = registry.getAllCommands();
 
@@ -202,7 +202,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
           .map((cmd) => `/${cmd.name}`);
       } else {
         // File/directory completion
-        const { FileScanner } = await import('../utils/file-scanner.js');
+        const { FileScanner } = await import('../utils/file-scanner');
         const scanner = new FileScanner();
 
         if (beforeCursor.startsWith('./')) {

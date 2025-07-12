@@ -2,7 +2,7 @@
 // ABOUTME: Thin wrapper around FocusLifecycleWrapper with modal-specific behavior
 
 import React, { ReactNode } from 'react';
-import { FocusLifecycleWrapper } from '~/interfaces/terminal/focus/focus-lifecycle-wrapper.js';
+import { FocusLifecycleWrapper } from '~/interfaces/terminal/focus/focus-lifecycle-wrapper';
 
 /**
  * Props for the ModalWrapper component

@@ -2,8 +2,8 @@
 // ABOUTME: Validates extended data model, thread scoping, and note management
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Task, TaskNote } from '~/tools/implementations/task-manager/types.js';
-import { createThreadId, createNewAgentSpec, isAssigneeId } from '~/threads/types.js';
+import { Task, TaskNote } from '~/tools/implementations/task-manager/types';
+import { createThreadId, createNewAgentSpec, isAssigneeId } from '~/threads/types';
 
 describe('Enhanced Task Data Model', () => {
   let testTask: Task;

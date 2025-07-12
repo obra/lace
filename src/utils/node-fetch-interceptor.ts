@@ -1,8 +1,8 @@
 // ABOUTME: Node-fetch interceptor for OpenAI SDK HAR recording
 // ABOUTME: Intercepts the node-fetch module that OpenAI SDK actually uses
 
-import { getHARRecorder } from '~/utils/har-recorder.js';
-import { logger } from '~/utils/logger.js';
+import { getHARRecorder } from '~/utils/har-recorder';
+import { logger } from '~/utils/logger';
 
 let originalNodeFetch:
   | ((url: string | Request, init?: Record<string, unknown>) => Promise<Response>)

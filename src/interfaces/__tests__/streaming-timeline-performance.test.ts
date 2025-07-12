@@ -2,8 +2,8 @@
 // ABOUTME: Verifies constant-time processing regardless of conversation length
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ThreadEvent } from '~/threads/types.js';
-import { StreamingTimelineProcessor } from '~/interfaces/streaming-timeline-processor.js';
+import { ThreadEvent } from '~/threads/types';
+import { StreamingTimelineProcessor } from '~/interfaces/streaming-timeline-processor';
 
 describe('StreamingTimelineProcessor Performance', () => {
   let processor: StreamingTimelineProcessor;

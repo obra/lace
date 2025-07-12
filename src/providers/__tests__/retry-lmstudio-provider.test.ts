@@ -2,8 +2,8 @@
 // ABOUTME: Verifies retry logic works correctly with LMStudio SDK
 
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
-import { LMStudioProvider } from '~/providers/lmstudio-provider.js';
-import { ProviderMessage } from '~/providers/base-provider.js';
+import { LMStudioProvider } from '~/providers/lmstudio-provider';
+import { ProviderMessage } from '~/providers/base-provider';
 
 // Create mock functions that we'll reference
 const mockListLoaded = vi.fn();

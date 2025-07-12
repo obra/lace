@@ -11,7 +11,7 @@ import {
   isNewAgentSpec,
   createNewAgentSpec,
   isAssigneeId,
-} from '~/threads/types.js';
+} from '~/threads/types';
 
 describe('ThreadId types', () => {
   describe('isThreadId', () => {

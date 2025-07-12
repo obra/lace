@@ -5,12 +5,12 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { Agent } from '~/agents/agent.js';
-import { ThreadEvent } from '~/threads/types.js';
-import { ProviderMessage, AIProvider } from '~/providers/base-provider.js';
-import { convertToAnthropicFormat } from '~/providers/format-converters.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
+import { Agent } from '~/agents/agent';
+import { ThreadEvent } from '~/threads/types';
+import { ProviderMessage, AIProvider } from '~/providers/base-provider';
+import { convertToAnthropicFormat } from '~/providers/format-converters';
+import { ToolExecutor } from '~/tools/executor';
+import { ThreadManager } from '~/threads/thread-manager';
 
 // Helper function for type-safe private method access
 function buildConversationFromEvents(agent: Agent, events: ThreadEvent[]): ProviderMessage[] {

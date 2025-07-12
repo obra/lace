@@ -1,7 +1,7 @@
 // ABOUTME: Shared utilities for tool renderers using TimelineEntry pattern
 // ABOUTME: Contains only essential type definitions and utility functions
 
-import { ToolCall, ToolResult } from '~/tools/types.js';
+import { ToolCall, ToolResult } from '~/tools/types';
 
 // Standard props interface for tool renderers using TimelineEntry
 export interface ToolRendererProps {

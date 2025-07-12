@@ -4,9 +4,9 @@
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect } from 'vitest';
-import { FileSearchToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/FileSearchToolRenderer.js';
-import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
-import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { FileSearchToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/FileSearchToolRenderer';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
 
 const mockToolCall = {
   id: 'call-123',

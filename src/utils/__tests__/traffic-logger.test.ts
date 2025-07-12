@@ -6,7 +6,7 @@ import {
   enableTrafficLogging,
   isTrafficLoggingEnabled,
   resetTrafficLogging,
-} from '~/utils/traffic-logger.js';
+} from '~/utils/traffic-logger';
 
 // Mock all the underlying modules
 vi.mock('../har-recorder.js', () => ({
@@ -33,10 +33,10 @@ describe('TrafficLogger', () => {
 
   describe('enableTrafficLogging', () => {
     it('should enable all traffic interception mechanisms', async () => {
-      const { initializeHARRecording } = await import('../har-recorder.js');
-      const { enableFetchInterception } = await import('../fetch-interceptor.js');
-      const { enableNodeFetchInterception } = await import('../node-fetch-interceptor.js');
-      const { enableWebSocketInterception } = await import('../websocket-interceptor.js');
+      const { initializeHARRecording } = await import('../har-recorder');
+      const { enableFetchInterception } = await import('../fetch-interceptor');
+      const { enableNodeFetchInterception } = await import('../node-fetch-interceptor');
+      const { enableWebSocketInterception } = await import('../websocket-interceptor');
 
       await enableTrafficLogging('/tmp/test.har');
 
@@ -48,7 +48,7 @@ describe('TrafficLogger', () => {
     });
 
     it('should not enable twice if already enabled', async () => {
-      const { initializeHARRecording } = await import('../har-recorder.js');
+      const { initializeHARRecording } = await import('../har-recorder');
 
       await enableTrafficLogging('/tmp/test1.har');
       await enableTrafficLogging('/tmp/test2.har');

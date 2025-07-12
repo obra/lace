@@ -3,15 +3,12 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import {
-  TimelineEntry,
-  TimelineStatus,
-} from '~/interfaces/terminal/components/ui/TimelineEntry.js';
-import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { TimelineEntry, TimelineStatus } from '~/interfaces/terminal/components/ui/TimelineEntry';
+import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
 import {
   limitLines,
   type ToolRendererProps,
-} from '~/interfaces/terminal/components/events/tool-renderers/components/shared.js';
+} from '~/interfaces/terminal/components/events/tool-renderers/components/shared';
 
 // Helper function to count tree elements
 function countTreeElements(text: string): { files: number; dirs: number } {

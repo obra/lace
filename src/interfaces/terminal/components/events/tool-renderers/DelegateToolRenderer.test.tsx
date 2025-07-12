@@ -4,10 +4,10 @@
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect, vi } from 'vitest';
-import { DelegateToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/DelegateToolRenderer.js';
-import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
-import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
-import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
+import { DelegateToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/DelegateToolRenderer';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider';
 
 // Mock the logger to avoid console output
 vi.mock('../../../../../utils/logger.js', () => ({

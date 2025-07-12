@@ -1,7 +1,7 @@
 // ABOUTME: Clear command that starts a new conversation session
 // ABOUTME: Recreates agent and thread, resets interface state
 
-import type { Command, UserInterface } from '~/commands/types.js';
+import type { Command, UserInterface } from '~/commands/types';
 
 export const clearCommand: Command = {
   name: 'clear',

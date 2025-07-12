@@ -2,7 +2,7 @@
 // ABOUTME: Ensures QueuedMessage and MessageQueueStats work correctly
 
 import { describe, it, expect } from 'vitest';
-import { QueuedMessage, MessageQueueStats } from '~/agents/types.js';
+import { QueuedMessage, MessageQueueStats } from '~/agents/types';
 
 describe('QueuedMessage', () => {
   it('should create a valid queued message', () => {

@@ -3,14 +3,14 @@
 
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { Tool } from '~/tools/tool.js';
+import { Tool } from '~/tools/tool';
 import {
   ToolResult,
   ToolAnnotations,
   createToolResult,
   createSuccessResult,
   createErrorResult,
-} from '~/tools/types.js';
+} from '~/tools/types';
 
 // Test tool class for testing annotations and schema generation
 class TestTool extends Tool {

@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync, existsSync, unlinkSync, rmSync } from 'fs';
-import { logger } from '~/utils/logger.js';
+import { logger } from '~/utils/logger';
 import { join } from 'path';
 
 describe('Logger', () => {

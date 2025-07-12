@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
-import { useLaceFocusContext } from '~/interfaces/terminal/focus/focus-provider.js';
+import { useLaceFocusContext } from '~/interfaces/terminal/focus/focus-provider';
 
 interface FocusDebugPanelProps {
   // Add any additional debug info props here

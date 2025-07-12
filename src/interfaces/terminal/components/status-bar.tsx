@@ -3,12 +3,12 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import useStdoutDimensions from '~/utils/use-stdout-dimensions.js';
-import { CurrentTurnMetrics } from '~/agents/agent.js';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
-import type { ProjectContext } from '~/interfaces/terminal/hooks/use-project-context.js';
-import type { MessageQueueStats } from '~/agents/types.js';
-import { QueueIndicator } from '~/interfaces/terminal/components/queue-indicator.js';
+import useStdoutDimensions from '~/utils/use-stdout-dimensions';
+import { CurrentTurnMetrics } from '~/agents/agent';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme';
+import type { ProjectContext } from '~/interfaces/terminal/hooks/use-project-context';
+import type { MessageQueueStats } from '~/agents/types';
+import { QueueIndicator } from '~/interfaces/terminal/components/queue-indicator';
 
 interface CumulativeTokens {
   promptTokens: number; // Current context size

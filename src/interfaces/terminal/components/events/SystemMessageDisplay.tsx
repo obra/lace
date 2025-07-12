@@ -3,8 +3,8 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ThreadEvent } from '~/threads/types.js';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
+import { ThreadEvent } from '~/threads/types';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme';
 
 interface SystemMessageDisplayProps {
   event: ThreadEvent;

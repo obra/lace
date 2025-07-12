@@ -2,10 +2,10 @@
 // ABOUTME: Validates that retry components work together correctly
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '~/agents/agent.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { AIProvider } from '~/providers/base-provider.js';
+import { Agent } from '~/agents/agent';
+import { ToolExecutor } from '~/tools/executor';
+import { ThreadManager } from '~/threads/thread-manager';
+import { AIProvider } from '~/providers/base-provider';
 
 describe('Retry System Integration Tests', () => {
   let agent: Agent;
@@ -189,7 +189,7 @@ describe('Retry System Integration Tests', () => {
 
     it('should verify UI theme includes retry symbols', async () => {
       // Import the UI theme and verify retry symbols are defined
-      const { UI_SYMBOLS } = await import('../interfaces/terminal/theme.js');
+      const { UI_SYMBOLS } = await import('../interfaces/terminal/theme');
 
       expect(UI_SYMBOLS.RETRY).toBeDefined();
       expect(typeof UI_SYMBOLS.RETRY).toBe('string');
@@ -198,7 +198,7 @@ describe('Retry System Integration Tests', () => {
 
     it('should verify StatusBar component accepts retry status', async () => {
       // Import StatusBar and verify it accepts retry status props
-      const StatusBarModule = await import('../interfaces/terminal/components/status-bar.js');
+      const StatusBarModule = await import('../interfaces/terminal/components/status-bar');
 
       // This test verifies the component exists and can be imported
       // The actual functionality is tested in the component-specific tests

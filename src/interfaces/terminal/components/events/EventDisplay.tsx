@@ -3,14 +3,14 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ThreadEvent } from '~/threads/types.js';
-import { ToolCallDisplay } from '~/interfaces/terminal/components/events/ToolCallDisplay.js';
-import { ToolResultDisplay } from '~/interfaces/terminal/components/events/ToolResultDisplay.js';
-import { UserMessageDisplay } from '~/interfaces/terminal/components/events/UserMessageDisplay.js';
-import { AgentMessageDisplay } from '~/interfaces/terminal/components/events/AgentMessageDisplay.js';
-import { SystemMessageDisplay } from '~/interfaces/terminal/components/events/SystemMessageDisplay.js';
-import { SystemPromptDisplay } from '~/interfaces/terminal/components/events/SystemPromptDisplay.js';
-import { UserSystemPromptDisplay } from '~/interfaces/terminal/components/events/UserSystemPromptDisplay.js';
+import { ThreadEvent } from '~/threads/types';
+import { ToolCallDisplay } from '~/interfaces/terminal/components/events/ToolCallDisplay';
+import { ToolResultDisplay } from '~/interfaces/terminal/components/events/ToolResultDisplay';
+import { UserMessageDisplay } from '~/interfaces/terminal/components/events/UserMessageDisplay';
+import { AgentMessageDisplay } from '~/interfaces/terminal/components/events/AgentMessageDisplay';
+import { SystemMessageDisplay } from '~/interfaces/terminal/components/events/SystemMessageDisplay';
+import { SystemPromptDisplay } from '~/interfaces/terminal/components/events/SystemPromptDisplay';
+import { UserSystemPromptDisplay } from '~/interfaces/terminal/components/events/UserSystemPromptDisplay';
 
 interface EventDisplayProps {
   event: ThreadEvent;

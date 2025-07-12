@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import mustache from 'mustache';
-import { logger } from '~/utils/logger.js';
+import { logger } from '~/utils/logger';
 
 export interface TemplateContext {
   [key: string]: unknown;

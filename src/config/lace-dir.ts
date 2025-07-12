@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { getEnvVar } from '~/config/env-loader.js';
+import { getEnvVar } from '~/config/env-loader';
 
 /**
  * Get the Lace configuration directory

@@ -3,8 +3,8 @@
 
 import React from 'react';
 import { useFocus } from 'ink';
-import { useLaceFocusContext } from '~/interfaces/terminal/focus/focus-provider.js';
-import { logger } from '~/utils/logger.js';
+import { useLaceFocusContext } from '~/interfaces/terminal/focus/focus-provider';
+import { logger } from '~/utils/logger';
 
 /**
  * Options for configuring focus behavior

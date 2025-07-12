@@ -2,11 +2,11 @@
 // ABOUTME: Verifies that retry events from providers are properly forwarded to Agent listeners
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '~/agents/agent.js';
-import { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { Tool } from '~/tools/tool.js';
+import { Agent } from '~/agents/agent';
+import { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { ToolExecutor } from '~/tools/executor';
+import { ThreadManager } from '~/threads/thread-manager';
+import { Tool } from '~/tools/tool';
 
 // Mock provider that can emit retry events
 class MockRetryProvider extends AIProvider {

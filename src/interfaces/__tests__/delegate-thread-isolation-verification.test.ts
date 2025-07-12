@@ -2,8 +2,8 @@
 // ABOUTME: Simple tests to ensure the current implementation correctly isolates threads
 
 import { describe, it, expect } from 'vitest';
-import { StreamingTimelineProcessor } from '~/interfaces/streaming-timeline-processor.js';
-import { ThreadEvent } from '~/threads/types.js';
+import { StreamingTimelineProcessor } from '~/interfaces/streaming-timeline-processor';
+import { ThreadEvent } from '~/threads/types';
 
 describe('Delegate Thread Isolation Verification', () => {
   describe('StreamingTimelineProcessor Isolation', () => {

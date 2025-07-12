@@ -2,9 +2,9 @@
 // ABOUTME: Handles automatic focus stack push/pop based on isActive state changes
 
 import React, { useEffect, ReactNode, useRef } from 'react';
-import { useLaceFocusContext } from '~/interfaces/terminal/focus/focus-provider.js';
-import { useLaceFocus } from '~/interfaces/terminal/focus/use-lace-focus.js';
-import { logger } from '~/utils/logger.js';
+import { useLaceFocusContext } from '~/interfaces/terminal/focus/focus-provider';
+import { useLaceFocus } from '~/interfaces/terminal/focus/use-lace-focus';
+import { logger } from '~/utils/logger';
 
 /**
  * Props for the FocusLifecycleWrapper component

@@ -2,8 +2,8 @@
 // ABOUTME: Validates note addition, ordering, and multi-agent communication
 
 import { describe, it, expect } from 'vitest';
-import { Task, TaskNote } from '~/tools/implementations/task-manager/types.js';
-import { createThreadId } from '~/threads/types.js';
+import { Task, TaskNote } from '~/tools/implementations/task-manager/types';
+import { createThreadId } from '~/threads/types';
 
 describe('Task Note Management', () => {
   const parentThreadId = createThreadId('lace_20250703_parent');

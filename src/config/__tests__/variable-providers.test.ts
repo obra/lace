@@ -13,7 +13,7 @@ import {
   ToolVariableProvider,
   ContextDisclaimerProvider,
   VariableProviderManager,
-} from '~/config/variable-providers.js';
+} from '~/config/variable-providers';
 
 // Mock interface for CommandRunner
 interface MockCommandRunner {

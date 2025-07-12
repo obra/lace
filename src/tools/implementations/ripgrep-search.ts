@@ -5,10 +5,10 @@ import { z } from 'zod';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { resolve } from 'path';
-import { Tool } from '~/tools/tool.js';
-import { NonEmptyString } from '~/tools/schemas/common.js';
-import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types.js';
-import { TOOL_LIMITS } from '~/tools/constants.js';
+import { Tool } from '~/tools/tool';
+import { NonEmptyString } from '~/tools/schemas/common';
+import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
+import { TOOL_LIMITS } from '~/tools/constants';
 
 const execAsync = promisify(exec);
 

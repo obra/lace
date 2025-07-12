@@ -4,8 +4,8 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render as renderInkComponent } from 'ink-testing-library';
-import ShellInput from '~/interfaces/terminal/components/shell-input.js';
-import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider.js';
+import ShellInput from '~/interfaces/terminal/components/shell-input';
+import { LaceFocusProvider } from '~/interfaces/terminal/focus/focus-provider';
 
 // Capture the useInput handler for direct testing
 interface KeyInfo {
@@ -273,7 +273,7 @@ describe('ShellInput Autocomplete Integration', () => {
 
   describe('word boundary detection', () => {
     it('should detect current word correctly', async () => {
-      const { FileScanner } = await import('../../utils/file-scanner.js');
+      const { FileScanner } = await import('../../utils/file-scanner');
       const mockScanner = vi.mocked(FileScanner).mock.instances[0] as unknown as {
         getCompletions: ReturnType<typeof vi.fn>;
       };
@@ -382,7 +382,7 @@ describe('ShellInput Autocomplete Integration', () => {
   describe('error handling', () => {
     it('should handle autocomplete loading errors gracefully', async () => {
       // Mock FileScanner to throw an error
-      const { FileScanner } = await import('../../utils/file-scanner.js');
+      const { FileScanner } = await import('../../utils/file-scanner');
       const mockScanner = vi.mocked(FileScanner).mock.instances[0] as unknown as {
         getCompletions: ReturnType<typeof vi.fn>;
       };

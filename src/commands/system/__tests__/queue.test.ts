@@ -2,8 +2,8 @@
 // ABOUTME: Tests queue display, clearing, and error handling
 
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
-import { queueCommand } from '~/commands/system/queue.js';
-import type { UserInterface } from '~/commands/types.js';
+import { queueCommand } from '~/commands/system/queue';
+import type { UserInterface } from '~/commands/types';
 
 type MockAgent = {
   getQueueStats: MockedFunction<

@@ -4,13 +4,14 @@ import prettier from 'eslint-plugin-prettier';
 import prettierConfig from 'eslint-config-prettier';
 import noRelativeImportPaths from 'eslint-plugin-no-relative-import-paths';
 import vitest from 'eslint-plugin-vitest';
+import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 
 export default [
   {
-    ...js.configs.recommended,
-    ignores: ['dist/**/*'],
+    ignores: ['dist/**/*', 'vitest.config.ts'],
   },
+  js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map(config => ({
     ...config,
     files: ['**/*.ts', '**/*.tsx'],
@@ -30,13 +31,24 @@ export default [
     plugins: {
       prettier,
       'no-relative-import-paths': noRelativeImportPaths,
+      'import': importPlugin,
     },
     settings: {
       'import/resolver': {
-        typescript: {}
+        typescript: {
+          project: './tsconfig.json',
+          alwaysTryTypes: true
+        }
       }
     },
     rules: {
+      'import/extensions': ['error', 'ignorePackages', {
+        'js': 'never',
+        'mjs': 'never', 
+        'jsx': 'never',
+        'ts': 'never',
+        'tsx': 'never'
+      }],
       ...prettierConfig.rules,
       'prettier/prettier': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
@@ -74,7 +86,25 @@ export default [
       sourceType: 'module',
       globals: globals.node,
     },
+    plugins: {
+      'import': importPlugin,
+    },
+    settings: {
+      'import/resolver': {
+        typescript: {
+          project: './tsconfig.json',
+          alwaysTryTypes: true
+        }
+      }
+    },
     rules: {
+      'import/extensions': ['error', 'ignorePackages', {
+        'js': 'never',
+        'mjs': 'never', 
+        'jsx': 'never',
+        'ts': 'never',
+        'tsx': 'never'
+      }],
       'no-var': 'error'
     },
   },

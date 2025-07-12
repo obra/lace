@@ -3,8 +3,8 @@
 
 import React from 'react';
 import { describe, it, expect } from 'vitest';
-import { renderInkComponent } from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
-import { ThinkingAwareContent } from '~/interfaces/terminal/components/ui/ThinkingAwareContent.js';
+import { renderInkComponent } from '~/interfaces/terminal/__tests__/helpers/ink-test-utils';
+import { ThinkingAwareContent } from '~/interfaces/terminal/components/ui/ThinkingAwareContent';
 
 describe('ThinkingAwareContent', () => {
   it('renders content without thinking blocks normally', () => {

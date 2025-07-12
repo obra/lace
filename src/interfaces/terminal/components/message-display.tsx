@@ -3,8 +3,8 @@
 
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
-import { MarkdownDisplay } from '~/interfaces/terminal/components/ui/MarkdownDisplay.js';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
+import { MarkdownDisplay } from '~/interfaces/terminal/components/ui/MarkdownDisplay';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme';
 
 interface Message {
   type: 'user' | 'assistant' | 'system' | 'tool' | 'thinking';

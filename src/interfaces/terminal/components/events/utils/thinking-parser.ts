@@ -2,7 +2,7 @@
 // ABOUTME: Handles extraction, word counting, and content transformation for AgentMessageDisplay
 
 import sax from 'sax';
-import { logger } from '~/utils/logger.js';
+import { logger } from '~/utils/logger';
 
 // Simple LRU cache for parsing results
 const CACHE_SIZE = 100;

@@ -42,7 +42,8 @@ Good naming is VERY VERY important. Think hard about naming things. It's always 
 
 ### Import Style
 - Use `~/*` path aliases for internal imports instead of relative paths
-- Example: `import { Agent } from '~/agents/agent.js'` instead of `import { Agent } from '../../agents/agent.js'`
+- **Omit file extensions** - prefer `import { Agent } from '~/agents/agent'` over `import { Agent } from '~/agents/agent.js'`
+- Example: `import { Agent } from '~/agents/agent'` instead of `import { Agent } from '../../agents/agent.js'`
 - This makes imports more readable and prevents breakage when moving files
 - The `~` prefix maps to the `src/` directory via TypeScript path mapping
 

@@ -3,10 +3,10 @@
 
 import { z } from 'zod';
 import { readFile, stat } from 'fs/promises';
-import { Tool } from '~/tools/tool.js';
-import { FilePath, LineNumber } from '~/tools/schemas/common.js';
-import type { ToolResult, ToolContext } from '~/tools/types.js';
-import { findSimilarPaths } from '~/tools/utils/file-suggestions.js';
+import { Tool } from '~/tools/tool';
+import { FilePath, LineNumber } from '~/tools/schemas/common';
+import type { ToolResult, ToolContext } from '~/tools/types';
+import { findSimilarPaths } from '~/tools/utils/file-suggestions';
 
 const MAX_FILE_SIZE = 32 * 1024; // 32KB limit for whole file reads
 const MAX_RANGE_SIZE = 100; // Maximum lines in a ranged read

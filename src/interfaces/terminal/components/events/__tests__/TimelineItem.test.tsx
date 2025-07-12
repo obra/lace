@@ -4,10 +4,10 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
-import { TimelineItem } from '~/interfaces/terminal/components/events/TimelineItem.js';
-import { TimelineItem as TimelineItemType } from '~/interfaces/timeline-types.js';
+import { TimelineItem } from '~/interfaces/terminal/components/events/TimelineItem';
+import { TimelineItem as TimelineItemType } from '~/interfaces/timeline-types';
 import { Text } from 'ink';
-import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
 
 // Mock dependencies
 vi.mock('../EventDisplay.js', () => ({

@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { PromptManager } from '~/config/prompt-manager.js';
+import { PromptManager } from '~/config/prompt-manager';
 
 // Mock logger to avoid console output during tests
 vi.mock('../../utils/logger.js', () => ({

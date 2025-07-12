@@ -6,8 +6,8 @@ import React from 'react';
 import {
   renderInkComponent,
   stripAnsi,
-} from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
-import TextRenderer from '~/interfaces/terminal/components/text-renderer.js';
+} from '~/interfaces/terminal/__tests__/helpers/ink-test-utils';
+import TextRenderer from '~/interfaces/terminal/components/text-renderer';
 
 describe('TextRenderer Component', () => {
   const defaultProps = {

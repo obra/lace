@@ -2,12 +2,12 @@
 // ABOUTME: Verifies queue contents retrieval with proper isolation
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '~/agents/agent.js';
-import { AIProvider } from '~/providers/base-provider.js';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider.js';
-import { Tool } from '~/tools/tool.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
+import { Agent } from '~/agents/agent';
+import { AIProvider } from '~/providers/base-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { ToolExecutor } from '~/tools/executor';
+import { ThreadManager } from '~/threads/thread-manager';
 
 class MockProvider extends AIProvider {
   constructor() {

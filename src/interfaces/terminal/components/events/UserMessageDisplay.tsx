@@ -3,9 +3,9 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ThreadEvent } from '~/threads/types.js';
-import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
-import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { ThreadEvent } from '~/threads/types';
+import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry';
+import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
 
 interface UserMessageDisplayProps {
   event: ThreadEvent;

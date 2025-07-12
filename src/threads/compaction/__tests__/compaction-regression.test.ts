@@ -2,8 +2,8 @@
 // ABOUTME: Tests tool call/result pairing preservation during compaction to prevent API failures
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy.js';
-import { ThreadEvent } from '~/threads/types.js';
+import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy';
+import { ThreadEvent } from '~/threads/types';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';

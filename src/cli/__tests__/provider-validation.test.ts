@@ -2,9 +2,9 @@
 // ABOUTME: Verifies provider validation works with registry instead of hardcoded lists
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { validateProvider } from '~/cli/args.js';
-import { ProviderRegistry } from '~/providers/registry.js';
-import { withConsoleCapture } from '~/__tests__/setup/console-capture.js';
+import { validateProvider } from '~/cli/args';
+import { ProviderRegistry } from '~/providers/registry';
+import { withConsoleCapture } from '~/__tests__/setup/console-capture';
 
 describe('CLI Provider Validation', () => {
   beforeEach(() => {

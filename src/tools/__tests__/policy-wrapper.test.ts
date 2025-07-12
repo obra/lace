@@ -2,14 +2,14 @@
 // ABOUTME: Tests CLI option policies apply correctly regardless of interface type
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGlobalPolicyCallback } from '~/tools/policy-wrapper.js';
-import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { CLIOptions } from '~/cli/args.js';
-import { BashTool } from '~/tools/implementations/bash.js';
-import { FileReadTool } from '~/tools/implementations/file-read.js';
-import { FileWriteTool } from '~/tools/implementations/file-write.js';
-import { Tool } from '~/tools/tool.js';
+import { createGlobalPolicyCallback } from '~/tools/policy-wrapper';
+import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
+import { ToolExecutor } from '~/tools/executor';
+import { CLIOptions } from '~/cli/args';
+import { BashTool } from '~/tools/implementations/bash';
+import { FileReadTool } from '~/tools/implementations/file-read';
+import { FileWriteTool } from '~/tools/implementations/file-write';
+import { Tool } from '~/tools/tool';
 import { z } from 'zod';
 
 // Mock interface callback for testing

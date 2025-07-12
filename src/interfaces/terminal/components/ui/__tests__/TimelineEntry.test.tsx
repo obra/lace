@@ -5,8 +5,8 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { measureElement, Text } from 'ink';
-import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
+import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme';
 
 // Mock measureElement to control height measurements
 vi.mock('ink', async () => {

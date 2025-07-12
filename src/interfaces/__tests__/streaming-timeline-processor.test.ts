@@ -2,9 +2,9 @@
 // ABOUTME: Verifies O(1) incremental processing and all event type handling
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ThreadEvent } from '~/threads/types.js';
-import { ToolCall, ToolResult } from '~/tools/types.js';
-import { StreamingTimelineProcessor } from '~/interfaces/streaming-timeline-processor.js';
+import { ThreadEvent } from '~/threads/types';
+import { ToolCall, ToolResult } from '~/tools/types';
+import { StreamingTimelineProcessor } from '~/interfaces/streaming-timeline-processor';
 
 describe('StreamingTimelineProcessor', () => {
   let streamingProcessor: StreamingTimelineProcessor;

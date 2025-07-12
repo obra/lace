@@ -3,12 +3,12 @@
 
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TimelineContent } from '~/interfaces/terminal/components/events/TimelineContent.js';
-import { Timeline } from '~/interfaces/timeline-types.js';
+import { TimelineContent } from '~/interfaces/terminal/components/events/TimelineContent';
+import { Timeline } from '~/interfaces/timeline-types';
 import {
   ViewportState,
   ViewportActions,
-} from '~/interfaces/terminal/components/events/hooks/useTimelineViewport.js';
+} from '~/interfaces/terminal/components/events/hooks/useTimelineViewport';
 
 // Mock TimelineItem since we're testing ref management, not item rendering
 vi.mock('./TimelineItem.js', () => ({

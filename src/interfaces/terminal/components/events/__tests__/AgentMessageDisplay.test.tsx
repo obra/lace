@@ -4,10 +4,10 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
-import { AgentMessageDisplay } from '~/interfaces/terminal/components/events/AgentMessageDisplay.js';
-import { ThreadEvent } from '~/threads/types.js';
-import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
-import { UI_SYMBOLS } from '~/interfaces/terminal/theme.js';
+import { AgentMessageDisplay } from '~/interfaces/terminal/components/events/AgentMessageDisplay';
+import { ThreadEvent } from '~/threads/types';
+import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
+import { UI_SYMBOLS } from '~/interfaces/terminal/theme';
 
 // Mock dependencies
 vi.mock('../contexts/TimelineItemContext.js', () => ({

@@ -2,8 +2,8 @@
 // ABOUTME: Verifies tool result truncation and system message generation
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { ToolResult } from '~/tools/types.js';
+import { ThreadManager } from '~/threads/thread-manager';
+import { ToolResult } from '~/tools/types';
 
 describe('Thread Compaction', () => {
   let threadManager: ThreadManager;

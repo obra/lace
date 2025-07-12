@@ -3,14 +3,14 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
-import { ThreadEvent } from '~/threads/types.js';
-import { ToolCall, ToolResult } from '~/tools/types.js';
-import { CompactOutput } from '~/interfaces/terminal/components/ui/CompactOutput.js';
-import { CodeDisplay } from '~/interfaces/terminal/components/ui/CodeDisplay.js';
-import { UI_SYMBOLS, UI_COLORS } from '~/interfaces/terminal/theme.js';
-import { useTimelineItemExpansion } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
-import { type TimelineStatus } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
+import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry';
+import { ThreadEvent } from '~/threads/types';
+import { ToolCall, ToolResult } from '~/tools/types';
+import { CompactOutput } from '~/interfaces/terminal/components/ui/CompactOutput';
+import { CodeDisplay } from '~/interfaces/terminal/components/ui/CodeDisplay';
+import { UI_SYMBOLS, UI_COLORS } from '~/interfaces/terminal/theme';
+import { useTimelineItemExpansion } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
+import { type TimelineStatus } from '~/interfaces/terminal/components/ui/TimelineEntry';
 
 interface ToolExecutionDisplayProps {
   callEvent: ThreadEvent;

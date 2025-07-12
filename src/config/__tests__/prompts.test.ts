@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { loadPromptConfig, getUserInstructionsFilePath } from '~/config/prompts.js';
+import { loadPromptConfig, getUserInstructionsFilePath } from '~/config/prompts';
 
 describe('Prompt Configuration', () => {
   let tempDir: string;

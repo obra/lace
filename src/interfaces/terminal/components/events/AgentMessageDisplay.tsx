@@ -3,11 +3,11 @@
 
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
-import { ThreadEvent } from '~/threads/types.js';
-import { ThinkingAwareContent } from '~/interfaces/terminal/components/ui/ThinkingAwareContent.js';
-import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
-import { parseThinkingBlocks } from '~/interfaces/terminal/components/events/utils/thinking-parser.js';
-import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext.js';
+import { ThreadEvent } from '~/threads/types';
+import { ThinkingAwareContent } from '~/interfaces/terminal/components/ui/ThinkingAwareContent';
+import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry';
+import { parseThinkingBlocks } from '~/interfaces/terminal/components/events/utils/thinking-parser';
+import { useTimelineItem } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
 
 interface AgentMessageDisplayProps {
   event: ThreadEvent;

@@ -2,20 +2,20 @@
 // ABOUTME: Tests the core application setup, provider creation, and session handling logic.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { run } from '~/app.js';
-import { CLIOptions } from '~/cli/args.js';
-import { Agent } from '~/agents/agent.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { Tool } from '~/tools/tool.js';
-import { getEnvVar } from '~/config/env-loader.js';
-import { enableTrafficLogging } from '~/utils/traffic-logger.js';
-import { logger } from '~/utils/logger.js';
-import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface.js';
-import { TerminalInterface } from '~/interfaces/terminal/terminal-interface.js';
-import { createGlobalPolicyCallback } from '~/tools/policy-wrapper.js';
-import { OllamaProvider } from '~/providers/ollama-provider.js';
-import { withConsoleCapture } from '~/__tests__/setup/console-capture.js';
+import { run } from '~/app';
+import { CLIOptions } from '~/cli/args';
+import { Agent } from '~/agents/agent';
+import { ThreadManager } from '~/threads/thread-manager';
+import { ToolExecutor } from '~/tools/executor';
+import { Tool } from '~/tools/tool';
+import { getEnvVar } from '~/config/env-loader';
+import { enableTrafficLogging } from '~/utils/traffic-logger';
+import { logger } from '~/utils/logger';
+import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
+import { TerminalInterface } from '~/interfaces/terminal/terminal-interface';
+import { createGlobalPolicyCallback } from '~/tools/policy-wrapper';
+import { OllamaProvider } from '~/providers/ollama-provider';
+import { withConsoleCapture } from '~/__tests__/setup/console-capture';
 
 // Mock external dependencies at the module level
 vi.mock('./agents/agent.js');
@@ -175,7 +175,7 @@ describe('App Initialization (run function)', () => {
   });
 
   it('should create an Anthropic provider with API key from env', async () => {
-    const { AnthropicProvider } = await import('./providers/anthropic-provider.js');
+    const { AnthropicProvider } = await import('./providers/anthropic-provider');
     await run(mockCliOptions);
     expect(AnthropicProvider).toHaveBeenCalledWith({
       apiKey: 'mock-anthropic-key',
@@ -185,7 +185,7 @@ describe('App Initialization (run function)', () => {
 
   it('should create an OpenAI provider with API key from env', async () => {
     const options = { ...mockCliOptions, provider: 'openai', model: 'gpt-4' };
-    const { OpenAIProvider } = await import('./providers/openai-provider.js');
+    const { OpenAIProvider } = await import('./providers/openai-provider');
     await run(options);
     expect(OpenAIProvider).toHaveBeenCalledWith({
       apiKey: 'mock-openai-key',
@@ -195,7 +195,7 @@ describe('App Initialization (run function)', () => {
 
   it('should create an LMstudio provider without API key', async () => {
     const options = { ...mockCliOptions, provider: 'lmstudio', model: 'local-model' };
-    const { LMStudioProvider } = await import('./providers/lmstudio-provider.js');
+    const { LMStudioProvider } = await import('./providers/lmstudio-provider');
     await run(options);
     expect(LMStudioProvider).toHaveBeenCalledWith({
       model: 'local-model',
@@ -416,7 +416,7 @@ describe('App Initialization (run function)', () => {
   });
 
   it('should start interactive mode if no prompt is given', async () => {
-    const { TerminalInterface } = await import('./interfaces/terminal/terminal-interface.js');
+    const { TerminalInterface } = await import('./interfaces/terminal/terminal-interface');
     await run(mockCliOptions);
     expect(TerminalInterface).toHaveBeenCalledWith(expect.any(Agent));
     expect(vi.mocked(TerminalInterface.prototype.startInteractive)).toHaveBeenCalledTimes(1);

@@ -2,16 +2,16 @@
 // ABOUTME: Renders timeline content with item interaction handling, viewport managed by TimelineViewport
 
 import React, { useCallback } from 'react';
-import { Timeline } from '~/interfaces/timeline-types.js';
-import { TimelineViewport } from '~/interfaces/terminal/components/events/TimelineViewport.js';
-import { TimelineContent } from '~/interfaces/terminal/components/events/TimelineContent.js';
+import { Timeline } from '~/interfaces/timeline-types';
+import { TimelineViewport } from '~/interfaces/terminal/components/events/TimelineViewport';
+import { TimelineContent } from '~/interfaces/terminal/components/events/TimelineContent';
 import {
   useExpansionExpand,
   useExpansionCollapse,
   useTimelineFocusEntry,
-} from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
-import { canTimelineItemAcceptFocus } from '~/interfaces/terminal/components/timeline-item-focus.js';
-import { logger } from '~/utils/logger.js';
+} from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
+import { canTimelineItemAcceptFocus } from '~/interfaces/terminal/components/timeline-item-focus';
+import { logger } from '~/utils/logger';
 
 interface TimelineDisplayProps {
   timeline: Timeline;

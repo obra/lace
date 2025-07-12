@@ -1,7 +1,7 @@
 // ABOUTME: Core interfaces for the extensible command system
 // ABOUTME: Defines UserInterface abstraction and Command interface for interface-agnostic commands
 
-import type { Agent } from '~/agents/agent.js';
+import type { Agent } from '~/agents/agent';
 
 /**
  * Minimal interface that commands work against

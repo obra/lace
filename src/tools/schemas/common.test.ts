@@ -9,7 +9,7 @@ import {
   LineNumber,
   MaxResults,
   FilePattern,
-} from '~/tools/schemas/common.js';
+} from '~/tools/schemas/common';
 
 describe('Common schema patterns', () => {
   describe('NonEmptyString', () => {

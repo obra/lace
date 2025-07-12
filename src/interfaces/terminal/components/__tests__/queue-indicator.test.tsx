@@ -6,9 +6,9 @@ import { describe, it, expect } from 'vitest';
 import {
   renderInkComponent,
   stripAnsi,
-} from '~/interfaces/terminal/__tests__/helpers/ink-test-utils.js';
-import { QueueIndicator } from '~/interfaces/terminal/components/queue-indicator.js';
-import type { MessageQueueStats } from '~/agents/types.js';
+} from '~/interfaces/terminal/__tests__/helpers/ink-test-utils';
+import { QueueIndicator } from '~/interfaces/terminal/components/queue-indicator';
+import type { MessageQueueStats } from '~/agents/types';
 
 describe('QueueIndicator', () => {
   it('should not render when queue is empty', () => {

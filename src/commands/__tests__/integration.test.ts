@@ -2,9 +2,9 @@
 // ABOUTME: Tests the full flow from registry creation to command execution
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { CommandRegistry } from '~/commands/registry.js';
-import { CommandExecutor } from '~/commands/executor.js';
-import type { UserInterface } from '~/commands/types.js';
+import { CommandRegistry } from '~/commands/registry';
+import { CommandExecutor } from '~/commands/executor';
+import type { UserInterface } from '~/commands/types';
 
 type MockAgent = {
   getCurrentThreadId: () => string;

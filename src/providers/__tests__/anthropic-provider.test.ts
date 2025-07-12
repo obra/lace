@@ -2,12 +2,12 @@
 // ABOUTME: Tests streaming vs non-streaming responses, configuration, and error handling
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AnthropicProvider } from '~/providers/anthropic-provider.js';
-import { Tool } from '~/tools/tool.js';
-import { ToolResult, ToolContext } from '~/tools/types.js';
+import { AnthropicProvider } from '~/providers/anthropic-provider';
+import { Tool } from '~/tools/tool';
+import { ToolResult, ToolContext } from '~/tools/types';
 import { z } from 'zod';
 import type Anthropic from '@anthropic-ai/sdk';
-import { StreamingEvents } from '~/providers/types.js';
+import { StreamingEvents } from '~/providers/types';
 
 // Mock the Anthropic SDK
 const mockCreateResponse = vi.fn();

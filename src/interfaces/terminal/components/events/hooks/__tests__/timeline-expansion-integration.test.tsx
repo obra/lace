@@ -11,7 +11,7 @@ import {
   useExpansionExpand,
   useExpansionCollapse,
   useTimelineItemExpansion,
-} from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle.js';
+} from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
 
 // Mock logger to avoid console output during tests
 vi.mock('../../../../../../utils/logger.js', () => ({
