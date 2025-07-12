@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import '~/app/globals.css';
+import '~/lib/fontawesome';
 
 export const metadata: Metadata = {
   title: 'Lace - AI Coding Assistant',
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-gray-50 text-gray-900 antialiased">{children}</body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

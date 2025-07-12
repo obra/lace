@@ -1,101 +1,57 @@
+// ABOUTME: Legacy API route - now redirects to proper conversation endpoints
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn } from 'child_process';
-import path from 'path';
 
 interface RequestBody {
   message: string;
   threadId?: string;
 }
 
+/**
+ * Legacy API endpoint for backward compatibility
+ * Redirects to the new conversation endpoints that use core Lace components
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as RequestBody;
 
-    // Use the compiled CLI with subprocess approach for better compatibility
-    const cliPath = path.join(process.cwd(), 'dist', 'cli.js');
-
-    // Create args for the CLI
-    const args = ['--prompt', body.message];
-    if (body.threadId) {
-      args.push('--continue', body.threadId);
+    // Validate request
+    if (!body.message) {
+      return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    // Stream the response using Server-Sent Events
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      start(controller) {
-        const child = spawn('node', [cliPath, ...args], {
-          stdio: ['pipe', 'pipe', 'pipe'],
-          env: { ...process.env },
-        });
+    // Get the base URL for internal API calls
+    const baseUrl = new URL(request.url).origin;
 
-        let output = '';
-
-        child.stdout.on('data', (data: Buffer) => {
-          const chunk = data.toString();
-          output += chunk;
-
-          // Send incremental updates as SSE
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`)
-          );
-        });
-
-        child.stderr.on('data', (data: Buffer) => {
-          const errorChunk = data.toString();
-          console.error('CLI stderr:', errorChunk);
-
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: 'error', error: errorChunk })}\n\n`)
-          );
-        });
-
-        child.on('close', (code: number) => {
-          if (code === 0) {
-            // Success - send complete message
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: 'complete',
-                  content: output.trim(),
-                  exitCode: code,
-                })}\n\n`
-              )
-            );
-          } else {
-            // Error
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: 'error',
-                  error: `CLI exited with code ${code}`,
-                  exitCode: code,
-                })}\n\n`
-              )
-            );
-          }
-          controller.close();
-        });
-
-        child.on('error', (error: Error) => {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: 'error',
-                error: error.message,
-              })}\n\n`
-            )
-          );
-          controller.close();
-        });
+    // Forward to the streaming conversation endpoint
+    const streamResponse = await fetch(`${baseUrl}/api/conversations/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        message: body.message,
+        threadId: body.threadId,
+        provider: 'anthropic', // Default provider
+      }),
     });
 
-    return new Response(stream, {
+    if (!streamResponse.ok) {
+      const errorData = await streamResponse.text();
+      return NextResponse.json(
+        { error: `Stream API error: ${errorData}` },
+        { status: streamResponse.status }
+      );
+    }
+
+    // Return the streaming response with proper headers
+    return new Response(streamResponse.body, {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST',
+        'Access-Control-Allow-Headers': 'Content-Type',
       },
     });
   } catch (error) {
@@ -106,4 +62,19 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Provide information about the API migration
+export function GET(): NextResponse {
+  return NextResponse.json({
+    message: 'Legacy API endpoint',
+    notice: 'This endpoint now uses core Lace components instead of CLI wrapping',
+    migration: {
+      'For conversations':
+        'Use /api/conversations for non-streaming or /api/conversations/stream for streaming',
+      'For tools': 'Use /api/tools',
+      'For thread management': 'Use /api/threads',
+    },
+    documentation: 'See the new API endpoints for direct access to Lace functionality',
+  });
 }
