@@ -1,19 +1,19 @@
 // ABOUTME: Core application setup and orchestration for the Lace AI assistant
 // ABOUTME: This module initializes all major components and starts the appropriate interface.
 
-import { Agent } from '~/agents/agent.js';
-import { AIProvider } from '~/providers/base-provider.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { DelegateTool } from '~/tools/implementations/delegate.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { getLaceDbPath } from '~/config/lace-dir.js';
-import { logger } from '~/utils/logger.js';
-import { CLIOptions } from '~/cli/args.js';
-import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface.js';
-import { createGlobalPolicyCallback } from '~/tools/policy-wrapper.js';
-import { enableTrafficLogging } from '~/utils/traffic-logger.js';
-import { getEnvVar } from '~/config/env-loader.js';
-import { ProviderRegistry } from '~/providers/registry.js';
+import { Agent } from '~/agents/agent';
+import { AIProvider } from '~/providers/base-provider';
+import { ToolExecutor } from '~/tools/executor';
+import { DelegateTool } from '~/tools/implementations/delegate';
+import { ThreadManager } from '~/threads/thread-manager';
+import { getLaceDbPath } from '~/config/lace-dir';
+import { logger } from '~/utils/logger';
+import { CLIOptions } from '~/cli/args';
+import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
+import { createGlobalPolicyCallback } from '~/tools/policy-wrapper';
+import { enableTrafficLogging } from '~/utils/traffic-logger';
+import { getEnvVar } from '~/config/env-loader';
+import { ProviderRegistry } from '~/providers/registry';
 
 export async function createProvider(providerType: string, model?: string): Promise<AIProvider> {
   try {

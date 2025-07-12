@@ -1,7 +1,7 @@
 // ABOUTME: Tool system type definitions and interfaces
 // ABOUTME: Model-agnostic tool definitions compatible with multiple AI SDKs and MCP
 
-import { ThreadId } from '~/threads/types.js';
+import { ThreadId } from '~/threads/types';
 
 export interface ToolContext {
   threadId?: ThreadId;

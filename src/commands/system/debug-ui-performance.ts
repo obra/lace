@@ -1,7 +1,7 @@
 // ABOUTME: Debug UI performance command to display timeline processing performance metrics
 // ABOUTME: Shows performance metrics from StreamingTimelineProcessor for monitoring O(1) behavior
 
-import type { Command, UserInterface } from '~/commands/types.js';
+import type { Command, UserInterface } from '~/commands/types';
 
 export const debugUiPerformanceCommand: Command = {
   name: 'debug-ui-performance',

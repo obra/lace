@@ -9,15 +9,15 @@ import {
   VersionHistoryEntry,
   ThreadId,
   AssigneeId,
-} from '~/threads/types.js';
-import type { ToolCall, ToolResult } from '~/tools/types.js';
+} from '~/threads/types';
+import type { ToolCall, ToolResult } from '~/tools/types';
 import {
   Task,
   TaskNote,
   TaskStatus,
   TaskPriority,
-} from '~/tools/implementations/task-manager/types.js';
-import { logger } from '~/utils/logger.js';
+} from '~/tools/implementations/task-manager/types';
+import { logger } from '~/utils/logger';
 
 export class DatabasePersistence {
   private db: Database.Database | null = null;

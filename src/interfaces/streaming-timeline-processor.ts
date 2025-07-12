@@ -1,10 +1,10 @@
 // ABOUTME: O(1) incremental timeline processor for real-time event processing
 // ABOUTME: Replaces ThreadProcessor to eliminate O(n) reprocessing performance issues
 
-import { ThreadEvent } from '~/threads/types.js';
-import { ToolCall, ToolResult } from '~/tools/types.js';
-import { logger } from '~/utils/logger.js';
-import { Timeline, TimelineItem, TimelineProcessor } from '~/interfaces/timeline-types.js';
+import { ThreadEvent } from '~/threads/types';
+import { ToolCall, ToolResult } from '~/tools/types';
+import { logger } from '~/utils/logger';
+import { Timeline, TimelineItem, TimelineProcessor } from '~/interfaces/timeline-types';
 
 interface PerformanceMetrics {
   totalAppendTime: number;

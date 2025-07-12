@@ -4,8 +4,8 @@
 import { glob } from 'glob';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { AIProvider, ProviderResponse, ProviderConfig } from '~/providers/base-provider.js';
-import { getEnvVar } from '~/config/env-loader.js';
+import { AIProvider, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
+import { getEnvVar } from '~/config/env-loader';
 
 export class ProviderRegistry {
   private _providers = new Map<string, AIProvider>();
