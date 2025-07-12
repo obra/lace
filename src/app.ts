@@ -199,11 +199,21 @@ export async function run(options: CLIOptions): Promise<void> {
     process.exit(0);
   }
 
-  const { TerminalInterface } = await import('./interfaces/terminal/terminal-interface.js');
-  const cli = new TerminalInterface(agent);
+  if (options.ui === 'web') {
+    const { WebInterface } = await import('./interfaces/web/web-interface.js');
+    const webInterface = new WebInterface(agent, { port: options.port });
+    
+    const policyCallback = createGlobalPolicyCallback(webInterface, options, agent.toolExecutor);
+    agent.toolExecutor.setApprovalCallback(policyCallback);
+    
+    await webInterface.start();
+  } else {
+    const { TerminalInterface } = await import('./interfaces/terminal/terminal-interface.js');
+    const cli = new TerminalInterface(agent);
 
-  const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);
-  agent.toolExecutor.setApprovalCallback(policyCallback);
+    const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);
+    agent.toolExecutor.setApprovalCallback(policyCallback);
 
-  await cli.startInteractive();
+    await cli.startInteractive();
+  }
 }
