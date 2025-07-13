@@ -251,10 +251,10 @@ export function AnimatedMobileSidebar({
                 </motion.label>
                 <motion.select
                   className="select select-bordered w-full"
-                  value={currentTimeline.id}
+                  value={currentTimeline.threadId}
                   onChange={(e) => {
                     const timeline = [currentTimeline, ...timelines].find(
-                      (t) => t.id === parseInt(e.target.value)
+                      (t) => t.threadId === e.target.value
                     );
                     if (timeline) onTimelineChange(timeline);
                   }}
@@ -264,12 +264,12 @@ export function AnimatedMobileSidebar({
                     transition: springConfig.gentle,
                   }}
                 >
-                  <option value={currentTimeline.id}>
-                    {currentTimeline.name} ({currentTimeline.agent})
+                  <option value={currentTimeline.threadId}>
+                    {currentTimeline.name} ({currentTimeline.agent}) - {currentTimeline.threadId}
                   </option>
                   {timelines.map((timeline) => (
-                    <option key={timeline.id} value={timeline.id}>
-                      {timeline.name} ({timeline.agent})
+                    <option key={timeline.threadId} value={timeline.threadId}>
+                      {timeline.name} ({timeline.agent}) - {timeline.threadId}
                     </option>
                   ))}
                 </motion.select>

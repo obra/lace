@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { POST, GET } from '../route';
+import { POST, GET } from '~/interfaces/web/app/api/conversations/route';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
@@ -107,9 +107,9 @@ describe('POST /api/conversations', () => {
     const request = new NextRequest('http://localhost:3000/api/conversations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         message: 'Hello world',
-        threadId: existingThreadId 
+        threadId: existingThreadId,
       }),
     });
 
@@ -218,7 +218,7 @@ describe('GET /api/conversations', () => {
   it('should return thread history when thread exists', async () => {
     // Use the agent's current thread which already has events
     const threadId = agent.getCurrentThreadId();
-    
+
     // Add some sample events to the thread
     threadManager.addEvent(threadId!, 'USER_MESSAGE', 'Hello');
     threadManager.addEvent(threadId!, 'AGENT_MESSAGE', 'Hi there!');

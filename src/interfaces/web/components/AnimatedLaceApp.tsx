@@ -21,9 +21,18 @@ import { EnhancedChatInput } from '~/interfaces/web/components/chat/EnhancedChat
 import { AnimatedModal } from '~/interfaces/web/components/ui/AnimatedModal';
 import { TaskBoardModal } from '~/interfaces/web/components/modals/TaskBoardModal';
 import { VoiceRecognitionUI } from '~/interfaces/web/components/ui/VoiceRecognitionUI';
-import { TimelineEntry, Project, Timeline, Task, RecentFile } from '~/interfaces/web/types';
+import {
+  TimelineEntry,
+  Project,
+  Timeline,
+  Task,
+  RecentFile,
+  ThreadId,
+  createThreadId,
+} from '~/interfaces/web/types';
 import { useVoiceRecognition } from '~/interfaces/web/hooks/useVoiceRecognition';
 import { useAgentConversation } from '~/interfaces/web/hooks/useAgentConversation';
+import { useAgentStatus } from '~/interfaces/web/hooks/useAgentStatus';
 import {
   pageTransition,
   fadeInUp,
@@ -75,12 +84,6 @@ export function AnimatedLaceApp() {
     },
   });
 
-  // Real Conversation System
-  const { sendMessage, isLoading: isStreaming, messages } = useAgentConversation();
-
-  // isTyping is now derived from the conversation stream state
-  const isTyping = isStreaming;
-
   // Data State
   const [currentProject, setCurrentProject] = useState<Project>({
     id: 1,
@@ -94,18 +97,25 @@ export function AnimatedLaceApp() {
     { id: 3, name: 'Data Pipeline', path: '/projects/data-pipeline' },
   ]);
 
-  const [currentTimeline, setCurrentTimeline] = useState<Timeline>({
-    id: 1,
-    name: 'Main Dev',
-    agent: 'Claude',
+  const [currentTimeline, setCurrentTimeline] = useState<Timeline | null>(null);
+
+  // Get initial Agent status to establish thread context
+  const { loading: agentLoading, error: agentError, status: agentStatus } = useAgentStatus();
+
+  // Real Conversation System - pass the current timeline's threadId if available
+  const {
+    sendMessage,
+    isLoading: isStreaming,
+    messages,
+    currentThreadId,
+  } = useAgentConversation({
+    threadId: currentTimeline?.threadId,
   });
 
-  const [timelines, setTimelines] = useState<Timeline[]>([
-    { id: 2, name: 'Code Review', agent: 'Claude' },
-    { id: 3, name: 'Research', agent: 'Gemini' },
-    { id: 4, name: 'Testing', agent: 'Claude' },
-    { id: 5, name: 'Data Analysis', agent: 'GPT-4' },
-  ]);
+  // isTyping is now derived from the conversation stream state
+  const isTyping = isStreaming;
+
+  const [timelines, setTimelines] = useState<Timeline[]>([]);
 
   const [recentFiles] = useState<RecentFile[]>([
     { name: 'app.py', path: '/src/app.py' },
@@ -157,7 +167,7 @@ export function AnimatedLaceApp() {
     type: message.role === 'user' ? 'human' : 'ai',
     content: message.content,
     timestamp: message.timestamp,
-    agent: message.role === 'assistant' ? currentTimeline.agent : undefined,
+    agent: message.role === 'assistant' ? currentTimeline?.agent || 'Claude' : undefined,
   }));
 
   // Combine conversation and additional entries, sorted by timestamp
@@ -171,6 +181,49 @@ export function AnimatedLaceApp() {
     setCurrentTheme(savedTheme);
     document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
+
+  // Initialize timeline from Agent status when available
+  useEffect(() => {
+    if (agentStatus && !currentTimeline) {
+      if (agentStatus.latestThreadId) {
+        // Agent has an existing thread, create timeline with it
+        const agentTimeline: Timeline = {
+          threadId: agentStatus.latestThreadId as ThreadId,
+          name: 'Resumed Chat',
+          agent: 'Claude',
+        };
+        setCurrentTimeline(agentTimeline);
+        setTimelines([agentTimeline]);
+
+        // Also save to localStorage for next time
+        localStorage.setItem('currentTimelineId', agentStatus.latestThreadId);
+      } else {
+        // No existing thread, Agent will create one when first message is sent
+        // Don't create timeline yet, wait for 'connection' event
+      }
+    }
+  }, [agentStatus, currentTimeline]);
+
+  // Create or update timeline when we get a thread ID from the Agent
+  useEffect(() => {
+    if (currentThreadId && !currentTimeline) {
+      // Create a new timeline with the Agent-provided thread ID (use as-is from Agent)
+      const newTimeline: Timeline = {
+        threadId: currentThreadId as ThreadId,
+        name: `Chat ${new Date().toLocaleTimeString()}`,
+        agent: 'Claude',
+      };
+      setCurrentTimeline(newTimeline);
+      setTimelines((prev) => [...prev, newTimeline]);
+    }
+  }, [currentThreadId, currentTimeline]);
+
+  // Save current timeline to localStorage when it changes
+  useEffect(() => {
+    if (currentTimeline) {
+      localStorage.setItem('currentTimelineId', currentTimeline.threadId);
+    }
+  }, [currentTimeline?.threadId]);
 
   // Auto-dismiss notifications
   useEffect(() => {
@@ -210,15 +263,10 @@ export function AnimatedLaceApp() {
   };
 
   const handleNewTimeline = () => {
-    const newTimelineId = Math.max(...timelines.map((t) => t.id)) + 1;
-    const newTimeline: Timeline = {
-      id: newTimelineId,
-      name: `Timeline ${newTimelineId}`,
-      agent: 'Claude',
-    };
-    setTimelines((prev) => [...prev, newTimeline]);
-    setCurrentTimeline(newTimeline);
-    addSystemMessage(`New timeline created: ${newTimeline.name}`);
+    // Don't create a timeline here - let the user start a conversation
+    // and the Agent will provide the thread ID
+    setCurrentTimeline(null);
+    addSystemMessage('Starting new chat...');
   };
 
   const handleThemeChange = (theme: string) => {
@@ -326,24 +374,26 @@ export function AnimatedLaceApp() {
               exit="closed"
               className="relative w-80 h-full"
             >
-              <MobileSidebar
-                isOpen={showMobileNav}
-                onClose={() => setShowMobileNav(false)}
-                currentProject={currentProject}
-                projects={projects}
-                currentTimeline={currentTimeline}
-                timelines={timelines}
-                activeTasks={activeTasks}
-                currentTheme={currentTheme}
-                availableThemes={availableThemes}
-                onProjectChange={handleProjectChange}
-                onTimelineChange={handleTimelineChange}
-                onThemeChange={handleThemeChange}
-                onTriggerTool={handleTriggerTool}
-                onOpenTaskBoard={handleOpenTaskBoard}
-                onOpenFileManager={handleOpenFileManager}
-                onOpenTaskDetail={handleOpenTask}
-              />
+              {currentTimeline && (
+                <MobileSidebar
+                  isOpen={showMobileNav}
+                  onClose={() => setShowMobileNav(false)}
+                  currentProject={currentProject}
+                  projects={projects}
+                  currentTimeline={currentTimeline}
+                  timelines={timelines}
+                  activeTasks={activeTasks}
+                  currentTheme={currentTheme}
+                  availableThemes={availableThemes}
+                  onProjectChange={handleProjectChange}
+                  onTimelineChange={handleTimelineChange}
+                  onThemeChange={handleThemeChange}
+                  onTriggerTool={handleTriggerTool}
+                  onOpenTaskBoard={handleOpenTaskBoard}
+                  onOpenFileManager={handleOpenFileManager}
+                  onOpenTaskDetail={handleOpenTask}
+                />
+              )}
             </motion.div>
           </motion.div>
         )}
@@ -356,27 +406,29 @@ export function AnimatedLaceApp() {
         transition={springConfig.smooth}
         className="hidden lg:block"
       >
-        <Sidebar
-          isOpen={showDesktopSidebar}
-          onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
-          currentProject={currentProject}
-          projects={projects}
-          currentTimeline={currentTimeline}
-          timelines={timelines}
-          activeTasks={activeTasks}
-          recentFiles={recentFiles}
-          currentTheme={currentTheme}
-          onProjectChange={handleProjectChange}
-          onTimelineChange={handleTimelineChange}
-          onNewTimeline={handleNewTimeline}
-          onOpenTask={handleOpenTask}
-          onOpenFile={handleOpenFile}
-          onTriggerTool={handleTriggerTool}
-          onOpenTaskBoard={handleOpenTaskBoard}
-          onOpenFileManager={handleOpenFileManager}
-          onOpenRulesFile={handleOpenRulesFile}
-          onThemeChange={handleThemeChange}
-        />
+        {currentTimeline && (
+          <Sidebar
+            isOpen={showDesktopSidebar}
+            onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
+            currentProject={currentProject}
+            projects={projects}
+            currentTimeline={currentTimeline}
+            timelines={timelines}
+            activeTasks={activeTasks}
+            recentFiles={recentFiles}
+            currentTheme={currentTheme}
+            onProjectChange={handleProjectChange}
+            onTimelineChange={handleTimelineChange}
+            onNewTimeline={handleNewTimeline}
+            onOpenTask={handleOpenTask}
+            onOpenFile={handleOpenFile}
+            onTriggerTool={handleTriggerTool}
+            onOpenTaskBoard={handleOpenTaskBoard}
+            onOpenFileManager={handleOpenFileManager}
+            onOpenRulesFile={handleOpenRulesFile}
+            onThemeChange={handleThemeChange}
+          />
+        )}
       </motion.div>
 
       {/* Main Content Area */}
@@ -403,30 +455,44 @@ export function AnimatedLaceApp() {
               >
                 <FontAwesomeIcon icon={faBars} className="w-6 h-6" />
               </motion.button>
-              <div className="flex items-center gap-2">
-                <motion.h1
-                  className="font-semibold text-base-content truncate"
-                  key={currentTimeline.name}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={springConfig.gentle}
-                >
-                  {currentTimeline.name}
-                </motion.h1>
-                <motion.span
-                  className={`text-xs px-1.5 py-0.5 rounded hidden sm:inline-flex ${
-                    currentTimeline.agent === 'Claude'
-                      ? 'bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
-                      : currentTimeline.agent === 'Gemini'
-                        ? 'bg-blue-900/20 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                        : 'bg-base-content/10 text-base-content/60'
-                  }`}
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.1, ...springConfig.bouncy }}
-                >
-                  {currentTimeline.agent}
-                </motion.span>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <motion.h1
+                    className="font-semibold text-base-content truncate"
+                    key={currentTimeline?.name || 'new-chat'}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={springConfig.gentle}
+                  >
+                    {agentLoading ? 'Loading...' : currentTimeline?.name || 'New Chat'}
+                  </motion.h1>
+                  {currentTimeline && (
+                    <motion.span
+                      className={`text-xs px-1.5 py-0.5 rounded hidden sm:inline-flex ${
+                        currentTimeline.agent === 'Claude'
+                          ? 'bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
+                          : currentTimeline.agent === 'Gemini'
+                            ? 'bg-blue-900/20 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                            : 'bg-base-content/10 text-base-content/60'
+                      }`}
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: 0.1, ...springConfig.bouncy }}
+                    >
+                      {currentTimeline.agent}
+                    </motion.span>
+                  )}
+                </div>
+                {currentTimeline && (
+                  <motion.div
+                    className="text-xs text-base-content/50 font-mono"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.15 }}
+                  >
+                    Thread: {currentTimeline.threadId}
+                  </motion.div>
+                )}
               </div>
             </motion.div>
 
@@ -509,7 +575,7 @@ export function AnimatedLaceApp() {
         <AnimatedTimelineView
           entries={timelineEntries}
           isTyping={isTyping}
-          currentAgent={currentTimeline.agent}
+          currentAgent={currentTimeline?.agent || 'Claude'}
         />
 
         {/* Chat Input */}

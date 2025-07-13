@@ -29,7 +29,7 @@ export async function createProvider(providerType: string, model?: string): Prom
 }
 
 async function initializeServices(options: CLIOptions) {
-  logger.configure(options.logLevel, options.logFile);
+  logger.configure(options.logLevel, options.logFile, options.logToStderr || false);
   if (options.harFile) {
     await enableTrafficLogging(options.harFile);
   }
@@ -81,6 +81,9 @@ function handleSessionWithAgent(agent: Agent, continueMode?: boolean | string): 
       // Get latest thread ID through Agent API
       continueThreadId = agent.getLatestThreadId() || undefined;
     }
+  } else {
+    // If not in continue mode, use the current thread (don't create new one)
+    continueThreadId = agent.getCurrentThreadId() || undefined;
   }
 
   const sessionInfo = agent.resumeOrCreateThread(continueThreadId);

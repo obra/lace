@@ -11,6 +11,7 @@ export interface CLIOptions {
   help: boolean;
   logLevel: 'error' | 'warn' | 'info' | 'debug';
   logFile: string | undefined;
+  logToStderr?: boolean;
   prompt: string | undefined;
   ui: 'terminal' | 'web';
   port?: number;
@@ -126,6 +127,7 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
       'info'
     )
     .option('--log-file <path>', 'Write logs to file (no file = no logging)')
+    .option('--log-to-stderr', 'Output logs to stderr instead of file')
     .option(
       '--har <path>',
       'Record HTTP traffic to HAR file for debugging (includes all provider requests)'
@@ -211,6 +213,7 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
     help: (options.help as boolean) || false,
     logLevel: options.logLevel as 'error' | 'warn' | 'info' | 'debug',
     logFile: options.logFile as string | undefined,
+    logToStderr: (options.logToStderr as boolean) || false,
     harFile: options.har as string | undefined,
     prompt: options.prompt as string | undefined,
     ui: options.ui as 'terminal' | 'web',
@@ -275,6 +278,7 @@ export async function showHelp(): Promise<void> {
       'info'
     )
     .option('--log-file <path>', 'Write logs to file (no file = no logging)')
+    .option('--log-to-stderr', 'Output logs to stderr instead of file')
     .option(
       '--har <path>',
       'Record HTTP traffic to HAR file for debugging (includes all provider requests)'

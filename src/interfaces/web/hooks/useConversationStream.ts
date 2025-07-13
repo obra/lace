@@ -7,7 +7,7 @@ import type { StreamEvent } from '~/interfaces/web/types';
 export interface StreamRequest {
   message: string;
   agentId?: string;
-  sessionId?: string;
+  threadId?: string;
   provider?: string;
   model?: string;
 }
@@ -38,27 +38,27 @@ export function useConversationStream({
   const [state, setState] = useState<ConversationStreamState>({
     isStreaming: false,
     isThinking: false,
+    isConnected: false,
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const currentContentRef = useRef<string>('');
 
-  const sendMessage = useCallback(
-    async (message: string, threadId?: string) => {
-      // Abort any existing stream
+  // Establish persistent SSE connection
+  const connectToStream = useCallback(
+    async (request: StreamConnectionRequest) => {
+      // Abort any existing connection
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
 
       abortControllerRef.current = new AbortController();
-      currentContentRef.current = '';
 
-      setState({
-        isStreaming: true,
-        isThinking: false,
-        currentThreadId: threadId,
+      setState((prev) => ({
+        ...prev,
+        isConnected: false,
         error: undefined,
-      });
+      }));
 
       try {
         const response = await fetch('/api/conversations/stream', {
@@ -66,11 +66,7 @@ export function useConversationStream({
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            message,
-            threadId,
-            provider: 'anthropic',
-          }),
+          body: JSON.stringify(request),
           signal: abortControllerRef.current.signal,
         });
 
@@ -82,6 +78,8 @@ export function useConversationStream({
         if (!reader) {
           throw new Error('No response stream available');
         }
+
+        setState((prev) => ({ ...prev, isConnected: true }));
 
         const decoder = new TextDecoder();
         let buffer = '';
@@ -125,6 +123,11 @@ export function useConversationStream({
                   case 'token':
                     if (event.content) {
                       currentContentRef.current += event.content;
+                      // Call onToken callback for real-time updates
+                      if (onToken) {
+                        // We don't have messageId in this context, so pass the content as messageId for now
+                        onToken(currentContentRef.current, 'current-message');
+                      }
                     }
                     break;
 
@@ -136,7 +139,13 @@ export function useConversationStream({
                     }));
                     if (currentContentRef.current) {
                       onMessageComplete?.(currentContentRef.current);
+                      // Call onComplete callback for final content
+                      if (onComplete) {
+                        onComplete(currentContentRef.current, 'current-message');
+                      }
                     }
+                    // Reset for next message
+                    currentContentRef.current = '';
                     break;
 
                   case 'error':
@@ -147,7 +156,7 @@ export function useConversationStream({
                       error: event.error,
                     }));
                     if (event.error) {
-                      onError?.(event.error, undefined);
+                      onError?.(event.error);
                     }
                     break;
                 }
@@ -159,21 +168,64 @@ export function useConversationStream({
         }
       } catch (error) {
         if (error instanceof Error && error.name !== 'AbortError') {
-          const errorMessage = error.message || 'Failed to send message';
+          const errorMessage = error.message || 'Failed to connect to stream';
           setState((prev) => ({
             ...prev,
-            isStreaming: false,
-            isThinking: false,
+            isConnected: false,
             error: errorMessage,
           }));
-          onError?.(errorMessage, undefined);
+          onError?.(errorMessage);
         }
       }
     },
-    [onStreamEvent, onMessageComplete, onError]
+    [onStreamEvent, onMessageComplete, onError, onToken, onComplete]
   );
 
-  const stopStream = useCallback(() => {
+  // Send message through separate endpoint  
+  const sendMessage = useCallback(
+    async (message: string, threadId?: string, messageId?: string) => {
+      if (!state.isConnected) {
+        onError?.('Not connected to stream', messageId);
+        return;
+      }
+
+      setState((prev) => ({
+        ...prev,
+        isStreaming: true,
+        error: undefined,
+      }));
+
+      try {
+        const response = await fetch('/api/conversations/message', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message,
+            threadId: threadId || state.currentThreadId,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+
+        // Success - the response will come through the SSE stream
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+        setState((prev) => ({
+          ...prev,
+          isStreaming: false,
+          error: errorMessage,
+        }));
+        onError?.(errorMessage, messageId);
+      }
+    },
+    [state.isConnected, state.currentThreadId, onError]
+  );
+
+  const disconnect = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -182,28 +234,38 @@ export function useConversationStream({
       ...prev,
       isStreaming: false,
       isThinking: false,
+      isConnected: false,
     }));
   }, []);
 
+  // Legacy compatibility
   const startStream = useCallback(
-    async (request: StreamRequest, messageId?: string) => {
-      // For now, just delegate to sendMessage
-      // TODO: Implement proper streaming with the new API format
-      await sendMessage(request.message, request.sessionId);
+    async (request: { message: string; threadId?: string }, messageId?: string) => {
+      // If not connected, connect first
+      if (!state.isConnected) {
+        await connectToStream({
+          threadId: request.threadId,
+          provider: 'anthropic',
+        });
+      }
+      
+      // Then send the message
+      await sendMessage(request.message, request.threadId, messageId);
 
-      // Return mock response for compatibility
       return {
-        agentId: request.agentId,
-        sessionId: request.sessionId,
+        sessionId: state.currentThreadId,
       };
     },
-    [sendMessage]
+    [state.isConnected, state.currentThreadId, connectToStream, sendMessage]
   );
 
   return {
     ...state,
+    connectToStream,
     sendMessage,
-    startStream,
-    stopStream,
+    startStream, // Legacy compatibility
+    disconnect,
+    stopStream: disconnect, // Legacy compatibility
+    currentThreadId: state.currentThreadId,
   };
 }

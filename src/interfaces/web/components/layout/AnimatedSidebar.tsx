@@ -387,7 +387,7 @@ export function AnimatedSidebar({
                   <motion.div variants={staggerContainer} initial="initial" animate="animate">
                     {timelines.map((timeline, index) => (
                       <motion.button
-                        key={timeline.id}
+                        key={timeline.threadId}
                         onClick={() => onTimelineChange(timeline)}
                         className="w-full text-left p-3 hover:bg-base-200 rounded-lg text-sm text-base-content/80 transition-colors"
                         variants={staggerItem}

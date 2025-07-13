@@ -204,31 +204,36 @@ export function Sidebar({
                 </div>
                 {timelines.map((timeline) => (
                   <button
-                    key={timeline.id}
+                    key={timeline.threadId}
                     onClick={() => onTimelineChange(timeline)}
                     className="w-full text-left p-3 hover:bg-base-200 rounded-lg text-sm text-base-content/80 transition-colors"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FontAwesomeIcon
-                          icon={faComments}
-                          className="w-4 h-4 text-base-content/40"
-                        />
-                        <span className="truncate">{timeline.name}</span>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FontAwesomeIcon
+                            icon={faComments}
+                            className="w-4 h-4 text-base-content/40"
+                          />
+                          <span className="truncate">{timeline.name}</span>
+                        </div>
+                        <span
+                          className={`text-xs px-1.5 py-0.5 rounded ${
+                            timeline.agent === 'Claude'
+                              ? 'bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
+                              : timeline.agent === 'GPT-4'
+                                ? 'bg-green-900/20 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+                                : timeline.agent === 'Gemini'
+                                  ? 'bg-blue-900/20 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                                  : 'bg-base-content/10 text-base-content/60'
+                          }`}
+                        >
+                          {timeline.agent}
+                        </span>
                       </div>
-                      <span
-                        className={`text-xs px-1.5 py-0.5 rounded ${
-                          timeline.agent === 'Claude'
-                            ? 'bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
-                            : timeline.agent === 'GPT-4'
-                              ? 'bg-green-900/20 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                              : timeline.agent === 'Gemini'
-                                ? 'bg-blue-900/20 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                                : 'bg-base-content/10 text-base-content/60'
-                        }`}
-                      >
-                        {timeline.agent}
-                      </span>
+                      <div className="text-xs text-base-content/40 font-mono ml-6">
+                        {timeline.threadId}
+                      </div>
                     </div>
                   </button>
                 ))}

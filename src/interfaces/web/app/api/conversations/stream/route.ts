@@ -18,10 +18,17 @@ interface ThreadInfo {
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = Math.random().toString(36).substring(7);
+  
+  logger.info('Stream API request received', { requestId, url: request.url });
+  
+  let body: StreamConversationRequest | undefined;
+  
   try {
-    const body = (await request.json()) as StreamConversationRequest;
+    body = (await request.json()) as StreamConversationRequest;
+    logger.info('Stream API request body', { requestId, body });
 
-    if (!body.message) {
+    if (!body?.message) {
       return new Response(JSON.stringify({ error: 'Message is required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
@@ -30,7 +37,24 @@ export async function POST(request: NextRequest) {
 
     // Create agent through direct context access
     const agent = getAgentFromRequest(request);
-    const sessionInfo = agent.resumeOrCreateThread(body.threadId);
+    
+    // Get thread state
+    const currentThreadId = agent.getCurrentThreadId();
+    const latestThreadId = agent.getLatestThreadId();
+    
+    logger.info('Stream API thread debug:', {
+      requestId,
+      requestedThreadId: body.threadId,
+      currentThreadId,
+      latestThreadId,
+    });
+    
+    // If no threadId provided, use current active thread instead of creating new one
+    const targetThreadId = body.threadId || currentThreadId || undefined;
+    
+    const sessionInfo = agent.resumeOrCreateThread(targetThreadId);
+    
+    logger.info('Session info:', { requestId, sessionInfo });
 
     const threadInfo: ThreadInfo = {
       threadId: sessionInfo.threadId,
@@ -49,8 +73,8 @@ export async function POST(request: NextRequest) {
                 type: 'connection',
                 threadId: threadInfo.threadId,
                 isNew: threadInfo.isNew,
-                provider: body.provider || 'anthropic',
-                model: body.model || 'default',
+                provider: body?.provider || 'anthropic',
+                model: body?.model || 'default',
               })}\n\n`
             )
           );
@@ -147,10 +171,7 @@ export async function POST(request: NextRequest) {
                 })}\n\n`
               )
             );
-
-            // Clean up and close stream
-            agent.stop();
-            controller.close();
+            // Stream stays open for next message
           });
 
           agent.on('error', ({ error }: { error: Error }) => {
@@ -163,20 +184,27 @@ export async function POST(request: NextRequest) {
                 })}\n\n`
               )
             );
-
-            agent.stop();
-            controller.close();
+            // Stream stays open - client can send another message
           });
 
           // Start conversation
+          logger.info('Starting agent and sending message', { requestId, message: body!.message });
           await agent.start();
-          await agent.sendMessage(body.message);
+          await agent.sendMessage(body!.message);
+          logger.info('Message sent successfully', { requestId });
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Failed to process conversation';
+          logger.error('Stream processing error:', { 
+            requestId, 
+            error: errorMessage, 
+            stack: error instanceof Error ? error.stack : undefined 
+          });
+          
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
                 type: 'error',
-                error: error instanceof Error ? error.message : 'Failed to process conversation',
+                error: errorMessage,
                 timestamp: new Date().toISOString(),
               })}\n\n`
             )
@@ -187,12 +215,7 @@ export async function POST(request: NextRequest) {
       },
 
       cancel() {
-        // Clean up if client disconnects
-        try {
-          agent.stop();
-        } catch (error) {
-          logger.error('Error stopping agent during stream cancel:', error);
-        }
+        // Clean up if client disconnects - keep Agent alive for subsequent requests
       },
     });
 
@@ -207,7 +230,12 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    logger.error('API streaming conversation error:', error);
+    logger.error('API streaming conversation error:', {
+      requestId,
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
+      body: body || 'Failed to parse body',
+    });
 
     return new Response(
       JSON.stringify({

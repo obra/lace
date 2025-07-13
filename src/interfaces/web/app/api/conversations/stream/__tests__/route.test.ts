@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { POST } from '../route';
+import { POST } from '~/interfaces/web/app/api/conversations/stream/route';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
@@ -118,11 +118,11 @@ describe('POST /api/conversations/stream', () => {
 
     const chunk = decoder.decode(value);
     expect(chunk).toContain('data: {');
-    
+
     const lines = chunk.split('\n');
-    const dataLine = lines.find(line => line.startsWith('data: '));
+    const dataLine = lines.find((line) => line.startsWith('data: '));
     expect(dataLine).toBeDefined();
-    
+
     const eventData = JSON.parse(dataLine!.substring(6));
     expect(eventData.type).toBe('connection');
     expect(eventData.threadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
@@ -136,10 +136,10 @@ describe('POST /api/conversations/stream', () => {
     const request = new NextRequest('http://localhost:3000/api/conversations/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         message: 'Hello world',
         provider: 'openai',
-        model: 'gpt-4' 
+        model: 'gpt-4',
       }),
     });
 
@@ -156,9 +156,9 @@ describe('POST /api/conversations/stream', () => {
 
     const chunk = decoder.decode(value);
     const lines = chunk.split('\n');
-    const dataLine = lines.find(line => line.startsWith('data: '));
+    const dataLine = lines.find((line) => line.startsWith('data: '));
     const eventData = JSON.parse(dataLine!.substring(6));
-    
+
     expect(eventData.provider).toBe('openai');
     expect(eventData.model).toBe('gpt-4');
 
@@ -173,9 +173,9 @@ describe('POST /api/conversations/stream', () => {
     const request = new NextRequest('http://localhost:3000/api/conversations/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         message: 'Hello world',
-        threadId: existingThreadId 
+        threadId: existingThreadId,
       }),
     });
 
@@ -190,9 +190,9 @@ describe('POST /api/conversations/stream', () => {
     const { done: _done, value } = await reader.read();
     const chunk = decoder.decode(value);
     const lines = chunk.split('\n');
-    const dataLine = lines.find(line => line.startsWith('data: '));
+    const dataLine = lines.find((line) => line.startsWith('data: '));
     const eventData = JSON.parse(dataLine!.substring(6));
-    
+
     expect(eventData.threadId).toBe(existingThreadId);
     expect(eventData.isNew).toBe(false);
 

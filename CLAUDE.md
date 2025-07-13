@@ -24,6 +24,22 @@ npm run test:run    # Run tests once
 npm run test:unit   # Unit tests only
 npm run test:integration # Integration tests
 npm run test:coverage # Run tests with coverage report
+
+# E2E tests with real API (requires ANTHROPIC_KEY)
+ANTHROPIC_KEY=your_key npm run test:run -- --testNamePattern="Thread ID Consistency with Real API"
+```
+
+### Web Interface
+```bash
+# Start web interface (requires build first)
+npm run build
+node dist/cli.js --ui web --port 3000
+
+# Start with debug logging
+node dist/cli.js --ui web --log-level=debug --log-file=web-debug.log --port 3000
+
+# Test thread consistency (automated)
+ANTHROPIC_KEY=your_key npm run test:run -- src/interfaces/web/__tests__/e2e/thread-consistency-real.test.ts
 ```
 
 

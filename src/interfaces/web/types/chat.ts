@@ -1,6 +1,14 @@
 // ABOUTME: Type definitions for the web interface chat system
 // ABOUTME: Includes message types, stream events, and UI state interfaces
 
+// Strongly typed thread ID
+export type ThreadId = string & { readonly __brand: 'ThreadId' };
+
+// Helper function to create ThreadId from string
+export function createThreadId(id: string): ThreadId {
+  return id as ThreadId;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -22,7 +30,7 @@ export interface StreamEvent {
   content?: string;
   error?: string;
   timestamp?: string;
-  threadId?: string;
+  threadId?: ThreadId;
   isNew?: boolean;
   provider?: string;
   model?: string;
@@ -75,7 +83,7 @@ export interface Project {
 }
 
 export interface Timeline {
-  id: number;
+  threadId: ThreadId;
   name: string;
   agent: 'Claude' | 'GPT-4' | 'Gemini';
 }

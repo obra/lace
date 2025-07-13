@@ -59,13 +59,13 @@ describe('Streaming API Integration', () => {
     // Configure test provider with custom response
     const customProvider = new TestProvider({
       mockResponse: 'Hello! I received your message.',
-      delay: 10
+      delay: 10,
     });
 
     // Create new agent with custom provider
     const customThreadId = threadManager.generateThreadId();
     threadManager.createThread(customThreadId);
-    
+
     const customAgent = new Agent({
       provider: customProvider,
       toolExecutor: new ToolExecutor(),
@@ -102,7 +102,7 @@ describe('Streaming API Integration', () => {
     const timeoutMs = 5000; // 5 second timeout
     const startTime = Date.now();
 
-    while (!done && (Date.now() - startTime) < timeoutMs) {
+    while (!done && Date.now() - startTime < timeoutMs) {
       try {
         const { done: readerDone, value } = await reader.read();
         done = readerDone;
@@ -110,12 +110,12 @@ describe('Streaming API Integration', () => {
         if (value) {
           const chunk = decoder.decode(value);
           const lines = chunk.split('\n');
-          
+
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               const eventData = JSON.parse(line.substring(6));
               events.push(eventData);
-              
+
               // Stop reading after conversation_complete
               if (eventData.type === 'conversation_complete') {
                 done = true;
@@ -143,18 +143,18 @@ describe('Streaming API Integration', () => {
     expect(connectionEvent.isNew).toBe(true);
 
     // Should have thinking events
-    const thinkingStartEvent = events.find(e => e.type === 'thinking_start');
+    const thinkingStartEvent = events.find((e) => e.type === 'thinking_start');
     expect(thinkingStartEvent).toBeDefined();
 
-    const thinkingCompleteEvent = events.find(e => e.type === 'thinking_complete');
+    const thinkingCompleteEvent = events.find((e) => e.type === 'thinking_complete');
     expect(thinkingCompleteEvent).toBeDefined();
 
     // Should have response complete event
-    const responseCompleteEvent = events.find(e => e.type === 'response_complete');
+    const responseCompleteEvent = events.find((e) => e.type === 'response_complete');
     expect(responseCompleteEvent).toBeDefined();
 
     // Final event should be conversation complete
-    const conversationCompleteEvent = events.find(e => e.type === 'conversation_complete');
+    const conversationCompleteEvent = events.find((e) => e.type === 'conversation_complete');
     expect(conversationCompleteEvent).toBeDefined();
     expect(conversationCompleteEvent.threadId).toBe(connectionEvent.threadId);
   });
@@ -163,7 +163,7 @@ describe('Streaming API Integration', () => {
     // Create test provider that simulates a tool call
     const toolCallProvider = new TestProvider({
       mockResponse: 'I need to use a tool.',
-      delay: 10
+      delay: 10,
     });
 
     // Override the createResponse method to include tool calls
@@ -185,7 +185,7 @@ describe('Streaming API Integration', () => {
     // Create new agent with tool call provider
     const toolCallThreadId = threadManager.generateThreadId();
     threadManager.createThread(toolCallThreadId);
-    
+
     const toolCallAgent = new Agent({
       provider: toolCallProvider,
       toolExecutor: new ToolExecutor(),
@@ -218,7 +218,7 @@ describe('Streaming API Integration', () => {
     const timeoutMs = 5000;
     const startTime = Date.now();
 
-    while (!done && (Date.now() - startTime) < timeoutMs) {
+    while (!done && Date.now() - startTime < timeoutMs) {
       try {
         const { done: readerDone, value } = await reader.read();
         done = readerDone;
@@ -226,12 +226,12 @@ describe('Streaming API Integration', () => {
         if (value) {
           const chunk = decoder.decode(value);
           const lines = chunk.split('\n');
-          
+
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               const eventData = JSON.parse(line.substring(6));
               events.push(eventData);
-              
+
               // Stop reading after conversation_complete
               if (eventData.type === 'conversation_complete') {
                 done = true;
@@ -250,12 +250,12 @@ describe('Streaming API Integration', () => {
     toolCallAgent.stop();
 
     // Should have tool call events
-    const toolCallStart = events.find(e => e.type === 'tool_call_start');
+    const toolCallStart = events.find((e) => e.type === 'tool_call_start');
     expect(toolCallStart).toBeDefined();
     expect(toolCallStart.toolCall.name).toBe('file_read');
     expect(toolCallStart.toolCall.id).toBe('tool_call_123');
 
-    const toolCallComplete = events.find(e => e.type === 'tool_call_complete');
+    const toolCallComplete = events.find((e) => e.type === 'tool_call_complete');
     expect(toolCallComplete).toBeDefined();
     expect(toolCallComplete.toolCall.name).toBe('file_read');
     expect(toolCallComplete.result).toBeDefined();
@@ -265,13 +265,13 @@ describe('Streaming API Integration', () => {
     // Create test provider that throws error
     const errorProvider = new TestProvider({
       shouldError: true,
-      delay: 10
+      delay: 10,
     });
 
     // Create new agent with error provider
     const errorThreadId = threadManager.generateThreadId();
     threadManager.createThread(errorThreadId);
-    
+
     const errorAgent = new Agent({
       provider: errorProvider,
       toolExecutor: new ToolExecutor(),
@@ -304,7 +304,7 @@ describe('Streaming API Integration', () => {
     const timeoutMs = 5000;
     const startTime = Date.now();
 
-    while (!done && (Date.now() - startTime) < timeoutMs) {
+    while (!done && Date.now() - startTime < timeoutMs) {
       try {
         const { done: readerDone, value } = await reader.read();
         done = readerDone;
@@ -312,12 +312,12 @@ describe('Streaming API Integration', () => {
         if (value) {
           const chunk = decoder.decode(value);
           const lines = chunk.split('\n');
-          
+
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               const eventData = JSON.parse(line.substring(6));
               events.push(eventData);
-              
+
               // Stop reading after error
               if (eventData.type === 'error') {
                 done = true;
@@ -336,7 +336,7 @@ describe('Streaming API Integration', () => {
     errorAgent.stop();
 
     // Should have error event
-    const errorEvent = events.find(e => e.type === 'error');
+    const errorEvent = events.find((e) => e.type === 'error');
     expect(errorEvent).toBeDefined();
     expect(errorEvent.error).toContain('Mock provider error');
   });
@@ -345,13 +345,13 @@ describe('Streaming API Integration', () => {
     // Create test provider with custom response
     const persistProvider = new TestProvider({
       mockResponse: 'Persistent response',
-      delay: 10
+      delay: 10,
     });
 
     // Create new agent with persist provider
     const persistThreadId = threadManager.generateThreadId();
     threadManager.createThread(persistThreadId);
-    
+
     const persistAgent = new Agent({
       provider: persistProvider,
       toolExecutor: new ToolExecutor(),
@@ -384,7 +384,7 @@ describe('Streaming API Integration', () => {
     const timeoutMs = 5000;
     const startTime = Date.now();
 
-    while (!done && (Date.now() - startTime) < timeoutMs) {
+    while (!done && Date.now() - startTime < timeoutMs) {
       try {
         const { done: readerDone, value } = await reader.read();
         done = readerDone;
@@ -392,7 +392,7 @@ describe('Streaming API Integration', () => {
         if (value) {
           const chunk = decoder.decode(value);
           const lines = chunk.split('\n');
-          
+
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               const eventData = JSON.parse(line.substring(6));
@@ -420,12 +420,12 @@ describe('Streaming API Integration', () => {
     expect(threadEvents.length).toBeGreaterThan(0);
 
     // Should have user message event
-    const userMessageEvent = threadEvents.find(e => e.type === 'USER_MESSAGE');
+    const userMessageEvent = threadEvents.find((e) => e.type === 'USER_MESSAGE');
     expect(userMessageEvent).toBeDefined();
     expect(userMessageEvent!.data).toBe('Save this conversation');
 
     // Should have agent message event
-    const agentMessageEvent = threadEvents.find(e => e.type === 'AGENT_MESSAGE');
+    const agentMessageEvent = threadEvents.find((e) => e.type === 'AGENT_MESSAGE');
     expect(agentMessageEvent).toBeDefined();
   });
 });

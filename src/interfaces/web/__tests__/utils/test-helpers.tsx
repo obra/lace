@@ -4,7 +4,14 @@
 import React from 'react';
 import { render, RenderOptions } from '@testing-library/react';
 import { vi } from 'vitest';
-import { TimelineEntry, Project, Timeline, Task, RecentFile } from '~/interfaces/web/types';
+import {
+  TimelineEntry,
+  Project,
+  Timeline,
+  Task,
+  RecentFile,
+  createThreadId,
+} from '~/interfaces/web/types';
 
 // Default render wrapper
 export const renderWithDefaults = (ui: React.ReactElement, options?: RenderOptions) => {
@@ -28,7 +35,7 @@ export const createMockProject = (overrides: Partial<Project> = {}): Project => 
 });
 
 export const createMockTimeline = (overrides: Partial<Timeline> = {}): Timeline => ({
-  id: 1,
+  threadId: createThreadId('test-timeline-1'),
   name: 'Test Timeline',
   agent: 'Claude',
   ...overrides,
@@ -57,7 +64,9 @@ export const mockSidebarProps = {
   currentProject: createMockProject(),
   projects: [createMockProject()],
   currentTimeline: createMockTimeline(),
-  timelines: [createMockTimeline({ id: 2, name: 'Timeline 2' })],
+  timelines: [
+    createMockTimeline({ threadId: createThreadId('test-timeline-2'), name: 'Timeline 2' }),
+  ],
   activeTasks: [createMockTask()],
   recentFiles: [createMockRecentFile()],
   currentTheme: 'dark',

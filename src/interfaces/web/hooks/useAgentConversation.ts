@@ -3,15 +3,13 @@
 
 import { useState, useCallback } from 'react';
 import type { Message } from '~/interfaces/web/types';
-import {
-  useConversationStream,
-  type StreamRequest,
-} from '~/interfaces/web/hooks/useConversationStream';
+import { useConversationStream } from '~/interfaces/web/hooks/useConversationStream';
 import { logger } from '~/interfaces/web/utils/client-logger';
 
 export interface UseAgentConversationOptions {
   agentId?: string;
   sessionId?: string;
+  threadId?: string;
   provider?: string;
   model?: string;
 }
@@ -34,7 +32,7 @@ export function useAgentConversation(options: UseAgentConversationOptions = {}) 
     setMessages((prev) => prev.map((msg) => (msg.id === messageId ? { ...msg, content } : msg)));
   }, []);
 
-  const { startStream, isStreaming } = useConversationStream({
+  const { startStream, isStreaming, currentThreadId } = useConversationStream({
     onToken: (content: string, messageId: string) => {
       updateMessageContent(messageId, content);
     },
@@ -79,20 +77,16 @@ export function useAgentConversation(options: UseAgentConversationOptions = {}) 
       setMessages((prev) => [...prev, assistantMessage]);
 
       try {
-        const streamRequest: StreamRequest = {
+        const streamRequest = {
           message: messageContent,
-          agentId: currentAgentId,
-          sessionId: currentSessionId,
+          threadId: options.threadId || currentSessionId,
           provider: options.provider,
           model: options.model,
         };
 
         const response = await startStream(streamRequest, assistantMessageId);
 
-        // Update agent/session IDs if they were created
-        if (response?.agentId && response.agentId !== currentAgentId) {
-          setCurrentAgentId(response.agentId);
-        }
+        // Update session ID if it was created
         if (response?.sessionId && response.sessionId !== currentSessionId) {
           setCurrentSessionId(response.sessionId);
         }
@@ -149,6 +143,7 @@ export function useAgentConversation(options: UseAgentConversationOptions = {}) 
     sendMessage,
     currentAgentId,
     currentSessionId,
+    currentThreadId,
     switchAgent,
     loadAgentHistory,
   };

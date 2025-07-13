@@ -16,10 +16,12 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 class Logger {
   private _level: LogLevel = 'info';
   private _logFile?: string;
+  private _logToStderr = false;
 
-  configure(level: LogLevel, logFile?: string) {
+  configure(level: LogLevel, logFile?: string, logToStderr = false) {
     this._level = level;
     this._logFile = logFile;
+    this._logToStderr = logToStderr;
 
     if (logFile) {
       const logDir = dirname(logFile);
@@ -39,7 +41,7 @@ class Logger {
   }
 
   private _write(level: LogLevel, message: string, data?: unknown) {
-    if (!this._shouldLog(level) || !this._logFile) {
+    if (!this._shouldLog(level)) {
       return;
     }
 
@@ -48,10 +50,18 @@ class Logger {
       ? `${timestamp} [${level.toUpperCase()}] ${message} ${JSON.stringify(data)}\n`
       : `${timestamp} [${level.toUpperCase()}] ${message}\n`;
 
-    try {
-      appendFileSync(this._logFile, logEntry);
-    } catch {
-      // Ignore write errors to avoid breaking the app
+    // Write to stderr if enabled
+    if (this._logToStderr) {
+      process.stderr.write(logEntry);
+    }
+
+    // Write to file if specified
+    if (this._logFile) {
+      try {
+        appendFileSync(this._logFile, logEntry);
+      } catch {
+        // Ignore write errors to avoid breaking the app
+      }
     }
   }
 
