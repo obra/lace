@@ -2,13 +2,18 @@
 // ABOUTME: Provides session creation, listing, and metadata management for agent containers
 
 import { NextRequest, NextResponse } from 'next/server';
-import { sharedAgentService } from '~/interfaces/web/lib/agent-service';
+import { getAgentFromRequest } from '~/interfaces/web/lib/agent-context';
 import { logger } from '~/utils/logger';
 import { SessionInfo } from '~/interfaces/web/types/agent';
 
 interface CreateSessionRequest {
   name?: string;
   metadata?: Record<string, unknown>;
+}
+
+interface ThreadInfo {
+  threadId: string;
+  isNew: boolean;
 }
 
 // GET endpoint to retrieve session information
@@ -62,10 +67,17 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as CreateSessionRequest;
     logger.info('Session creation request body parsed', { name: body.name, hasMetadata: !!body.metadata });
 
-    // Create new session (parent thread) through agent service
+    // Create new session (parent thread) directly through Agent
     // This will give us a proper thread ID from the core app.ts infrastructure
-    logger.debug('Attempting to create agent thread through shared service');
-    const { threadInfo } = sharedAgentService.createAgentForThread();
+    logger.debug('Attempting to create agent thread through direct Agent access');
+    const agent = getAgentFromRequest(request);
+    const sessionInfo = agent.resumeOrCreateThread();
+    
+    const threadInfo: ThreadInfo = {
+      threadId: sessionInfo.threadId,
+      isNew: !sessionInfo.isResumed,
+    };
+    
     logger.info('Agent thread created successfully', { threadId: threadInfo.threadId, isNew: threadInfo.isNew });
 
     const response: SessionInfo = {
