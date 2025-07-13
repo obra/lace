@@ -2,7 +2,7 @@
 // ABOUTME: Provides real-time AI chat functionality using Agent event emitter pattern
 
 import { NextRequest } from 'next/server';
-import { sharedAgentService } from '~/interfaces/web/lib/agent-service';
+import { getAgentFromRequest } from '~/interfaces/web/lib/agent-context';
 import { logger } from '~/utils/logger';
 
 interface StreamConversationRequest {
@@ -10,6 +10,11 @@ interface StreamConversationRequest {
   threadId?: string;
   provider?: string;
   model?: string;
+}
+
+interface ThreadInfo {
+  threadId: string;
+  isNew: boolean;
 }
 
 export async function POST(request: NextRequest) {
@@ -23,8 +28,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Create agent through centralized service
-    const { agent, threadInfo } = await sharedAgentService.createAgentForThread(body.threadId);
+    // Create agent through direct context access
+    const agent = getAgentFromRequest(request);
+    const sessionInfo = agent.resumeOrCreateThread(body.threadId);
+    
+    const threadInfo: ThreadInfo = {
+      threadId: sessionInfo.threadId,
+      isNew: !sessionInfo.isResumed,
+    };
 
     // Create streaming response
     const encoder = new TextEncoder();

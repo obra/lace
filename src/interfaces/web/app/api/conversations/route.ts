@@ -2,7 +2,7 @@
 // ABOUTME: Provides synchronous conversation handling and thread history access
 
 import { NextRequest, NextResponse } from 'next/server';
-import { sharedAgentService } from '~/interfaces/web/lib/agent-service';
+import { getAgentFromRequest } from '~/interfaces/web/lib/agent-context';
 import { logger } from '~/utils/logger';
 
 interface CreateConversationRequest {
@@ -19,6 +19,11 @@ interface ConversationResponse {
   isNew: boolean;
 }
 
+interface ThreadInfo {
+  threadId: string;
+  isNew: boolean;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as CreateConversationRequest;
@@ -27,8 +32,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    // Get agent through shared service (uses core app.ts infrastructure)
-    const { agent, threadInfo } = await sharedAgentService.createAgentForThread(body.threadId);
+    // Get agent directly through request context
+    const agent = getAgentFromRequest(request);
+    const sessionInfo = agent.resumeOrCreateThread(body.threadId);
+    
+    const threadInfo: ThreadInfo = {
+      threadId: sessionInfo.threadId,
+      isNew: !sessionInfo.isResumed,
+    };
 
     // Create promise to collect the response using Agent's event emitter
     const conversationPromise = new Promise<ConversationResponse>((resolve, reject) => {
@@ -91,8 +102,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'threadId parameter is required' }, { status: 400 });
     }
 
-    // Get conversation history through shared agent service
-    const messages = await sharedAgentService.getThreadHistory(threadId);
+    // Get conversation history through agent
+    const agent = getAgentFromRequest(request);
+    const threadEvents = agent.getThreadEvents(threadId);
+
+    if (!threadEvents || threadEvents.length === 0) {
+      return NextResponse.json({ error: 'Thread not found' }, { status: 404 });
+    }
+
+    // Transform events into API-friendly format
+    const messages = threadEvents
+      .filter((event: any) => event.type === 'USER_MESSAGE' || event.type === 'AGENT_MESSAGE')
+      .map((event: any) => ({
+        id: event.id,
+        type: event.type.toLowerCase().replace('_', ''),
+        content: typeof event.data === 'string' ? event.data : '',
+        timestamp: event.timestamp.toISOString(),
+      }));
 
     return NextResponse.json({
       threadId,

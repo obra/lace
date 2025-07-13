@@ -2,7 +2,7 @@
 // ABOUTME: Provides thread listing and creation through proper Agent encapsulation
 
 import { NextRequest, NextResponse } from 'next/server';
-import { sharedAgentService } from '~/interfaces/web/lib/agent-service';
+import { getAgentFromRequest } from '~/interfaces/web/lib/agent-context';
 import { logger } from '~/utils/logger';
 
 interface CreateThreadRequest {
@@ -29,8 +29,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'threadId parameter is required' }, { status: 400 });
     }
 
-    // Get thread history through agent service
-    const messages = await sharedAgentService.getThreadHistory(threadId);
+    // Get thread history through agent
+    const agent = getAgentFromRequest(request);
+    const threadEvents = agent.getThreadEvents(threadId);
+
+    if (!threadEvents || threadEvents.length === 0) {
+      return NextResponse.json({ error: 'Thread not found' }, { status: 404 });
+    }
+
+    // Transform events into API-friendly format
+    const messages = threadEvents
+      .filter((event: any) => event.type === 'USER_MESSAGE' || event.type === 'AGENT_MESSAGE')
+      .map((event: any) => ({
+        id: event.id,
+        type: event.type.toLowerCase().replace('_', ''),
+        content: typeof event.data === 'string' ? event.data : '',
+        timestamp: event.timestamp.toISOString(),
+      }));
 
     // Calculate thread metadata from messages
     const threadInfo: ThreadInfo = {
@@ -62,8 +77,14 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as CreateThreadRequest;
 
-    // Create new thread through agent service
-    const { threadInfo } = await sharedAgentService.createAgentForThread();
+    // Create new thread through agent
+    const agent = getAgentFromRequest(request);
+    const sessionInfo = agent.resumeOrCreateThread();
+    
+    const threadInfo = {
+      threadId: sessionInfo.threadId,
+      isNew: !sessionInfo.isResumed,
+    };
 
     const response: ThreadInfo = {
       threadId: threadInfo.threadId,
