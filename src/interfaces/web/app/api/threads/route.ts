@@ -2,7 +2,7 @@
 // ABOUTME: Provides thread listing and creation through proper Agent encapsulation
 
 import { NextRequest, NextResponse } from 'next/server';
-import { agentService } from '~/interfaces/web/lib/agent-service';
+import { sharedAgentService } from '~/interfaces/web/lib/agent-service';
 import { logger } from '~/utils/logger';
 
 interface CreateThreadRequest {
@@ -20,7 +20,7 @@ interface ThreadInfo {
 }
 
 // GET endpoint to retrieve thread information
-export function GET(request: NextRequest): NextResponse {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
     const threadId = searchParams.get('threadId');
@@ -30,7 +30,7 @@ export function GET(request: NextRequest): NextResponse {
     }
 
     // Get thread history through agent service
-    const messages = agentService.getThreadHistory(threadId);
+    const messages = await sharedAgentService.getThreadHistory(threadId);
 
     // Calculate thread metadata from messages
     const threadInfo: ThreadInfo = {
@@ -63,9 +63,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as CreateThreadRequest;
 
     // Create new thread through agent service
-    const { threadInfo } = await agentService.createAgent({
-      // Don't pass threadId to create a new thread
-    });
+    const { threadInfo } = await sharedAgentService.createAgentForThread();
 
     const response: ThreadInfo = {
       threadId: threadInfo.threadId,

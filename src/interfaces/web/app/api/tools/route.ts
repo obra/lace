@@ -2,7 +2,7 @@
 // ABOUTME: Provides tool listing and execution capabilities through proper encapsulation
 
 import { NextRequest, NextResponse } from 'next/server';
-import { agentService } from '~/interfaces/web/lib/agent-service';
+import { sharedAgentService } from '~/interfaces/web/lib/agent-service';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { ApprovalDecision, ApprovalCallback } from '~/tools/approval-types';
 import { asThreadId } from '~/threads/types';
@@ -15,13 +15,13 @@ interface ExecuteToolRequest {
   autoApprove?: boolean;
 }
 
-// ToolInfo interface removed - using agentService.getAvailableTools() return type
+// ToolInfo interface removed - using sharedAgentService.getAvailableTools() return type
 
 // GET endpoint to list available tools through agent service
 export function GET(): NextResponse {
   try {
-    // Get tools through agent service
-    const toolInfo = agentService.getAvailableTools();
+    // Get tools through shared agent service
+    const toolInfo = sharedAgentService.getAvailableTools();
 
     return NextResponse.json({
       tools: toolInfo,
@@ -52,8 +52,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Tool parameters are required' }, { status: 400 });
     }
 
-    // Get tool executor through agent service
-    const toolExecutor = agentService.getToolExecutor();
+    // Get tool executor through shared agent service
+    const toolExecutor = sharedAgentService.getToolExecutor();
 
     // Create tool call
     const toolCall: ToolCall = {

@@ -2,7 +2,7 @@
 // ABOUTME: Provides real-time AI chat functionality using Agent event emitter pattern
 
 import { NextRequest } from 'next/server';
-import { agentService } from '~/interfaces/web/lib/agent-service';
+import { sharedAgentService } from '~/interfaces/web/lib/agent-service';
 import { logger } from '~/utils/logger';
 
 interface StreamConversationRequest {
@@ -24,11 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create agent through centralized service
-    const { agent, threadInfo } = await agentService.createAgent({
-      provider: body.provider || 'anthropic',
-      model: body.model,
-      threadId: body.threadId,
-    });
+    const { agent, threadInfo } = await sharedAgentService.createAgentForThread(body.threadId);
 
     // Create streaming response
     const encoder = new TextEncoder();

@@ -1,164 +1,83 @@
-// ABOUTME: Centralized agent service for web API routes that encapsulates proper Agent setup
-// ABOUTME: Ensures all web API access to core Lace functionality goes through the Agent interface
+// ABOUTME: Shared agent service for web API routes using core app.ts infrastructure
+// ABOUTME: Provides API access to the shared Agent instance from WebInterface
 
-import { Agent } from '~/agents/agent';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { DelegateTool } from '~/tools/implementations/delegate';
-import { getLaceDbPath } from '~/config/lace-dir';
-import { loadEnvFile, getEnvVar } from '~/config/env-loader';
-import { AIProvider } from '~/providers/base-provider';
-import { logger } from '~/utils/logger';
-
-// Initialize environment once
-loadEnvFile();
-
-export interface AgentConfig {
-  provider?: string;
-  model?: string;
-  threadId?: string;
-}
+import type { Agent } from '~/agents/agent';
+import type { ToolExecutor } from '~/tools/executor';
+import type { ThreadManager } from '~/threads/thread-manager';
 
 export interface ThreadInfo {
   threadId: string;
   isNew: boolean;
 }
 
-class AgentService {
-  private static instance: AgentService;
-  private toolExecutor: ToolExecutor;
-  private threadManager: ThreadManager;
+/**
+ * Shared agent service that provides API access to the Agent instance
+ * created by the main application. This eliminates duplication with app.ts
+ * and ensures all web interface components use the same Agent.
+ */
+class SharedAgentService {
+  private static instance: SharedAgentService;
+  private sharedAgent: Agent | null = null;
 
-  private constructor() {
-    // Initialize core components once
-    this.toolExecutor = new ToolExecutor();
-    this.toolExecutor.registerAllAvailableTools();
+  private constructor() {}
 
-    const dbPath = getLaceDbPath();
-    this.threadManager = new ThreadManager(dbPath);
-
-    logger.configure('info');
-  }
-
-  public static getInstance(): AgentService {
-    if (!AgentService.instance) {
-      AgentService.instance = new AgentService();
+  public static getInstance(): SharedAgentService {
+    if (!SharedAgentService.instance) {
+      SharedAgentService.instance = new SharedAgentService();
     }
-    return AgentService.instance;
+    return SharedAgentService.instance;
   }
 
-  private async createProvider(
-    providerType: string = 'anthropic',
-    model?: string
-  ): Promise<AIProvider> {
-    const providerInitializers: Record<
-      string,
-      (config: { apiKey?: string; model?: string }) => Promise<AIProvider>
-    > = {
-      anthropic: async ({ apiKey, model }) => {
-        if (getEnvVar('LACE_TEST_MODE') === 'true') {
-          const { createMockProvider } = await import('~/__tests__/utils/mock-provider');
-          return createMockProvider();
-        }
+  /**
+   * Set the shared Agent instance (called by WebInterface during initialization)
+   */
+  public setSharedAgent(agent: Agent): void {
+    this.sharedAgent = agent;
+  }
 
-        const { AnthropicProvider } = await import('~/providers/anthropic-provider');
-        if (!apiKey) {
-          throw new Error('Anthropic API key is required');
-        }
-        return new AnthropicProvider({ apiKey, model });
-      },
-      openai: async ({ apiKey, model }) => {
-        const { OpenAIProvider } = await import('~/providers/openai-provider');
-        if (!apiKey) {
-          throw new Error('OpenAI API key is required');
-        }
-        return new OpenAIProvider({ apiKey, model });
-      },
+  /**
+   * Get the shared Agent instance
+   */
+  public getSharedAgent(): Agent {
+    if (!this.sharedAgent) {
+      throw new Error('Shared agent not initialized. WebInterface must call setSharedAgent() first.');
+    }
+    return this.sharedAgent;
+  }
+
+  /**
+   * Create a new Agent for a specific thread (delegates to shared agent's thread management)
+   */
+  public async createAgentForThread(threadId?: string): Promise<{ agent: Agent; threadInfo: ThreadInfo }> {
+    const sharedAgent = this.getSharedAgent();
+    
+    // Handle thread creation/resumption through the shared Agent
+    let sessionInfo;
+    if (threadId) {
+      sessionInfo = sharedAgent.resumeOrCreateThread(threadId);
+    } else {
+      sessionInfo = sharedAgent.resumeOrCreateThread();
+    }
+
+    const threadInfo: ThreadInfo = {
+      threadId: sessionInfo.threadId,
+      isNew: !sessionInfo.isResumed,
     };
 
-    const initializer = providerInitializers[providerType];
-    if (!initializer) {
-      throw new Error(
-        `Unknown provider: ${providerType}. Available: ${Object.keys(providerInitializers).join(', ')}`
-      );
-    }
-
-    let apiKey: string | undefined;
-    if (providerType === 'anthropic') {
-      apiKey = getEnvVar('ANTHROPIC_KEY');
-      if (!apiKey) {
-        throw new Error('ANTHROPIC_KEY environment variable required');
-      }
-    } else if (providerType === 'openai') {
-      apiKey = getEnvVar('OPENAI_API_KEY') || getEnvVar('OPENAI_KEY');
-      if (!apiKey) {
-        throw new Error('OPENAI_API_KEY or OPENAI_KEY environment variable required');
-      }
-    }
-
-    return initializer({ apiKey, model });
+    // Return the same agent instance but with the new thread context
+    // Note: In a more sophisticated implementation, we might create a new Agent
+    // instance for the specific thread, but for now we reuse the shared one
+    return { agent: sharedAgent, threadInfo };
   }
 
   /**
-   * Create an Agent instance with proper thread management
-   * All thread operations go through the Agent - no direct ThreadManager access
+   * Get thread history through shared Agent's proper API
    */
-  public async createAgent(
-    config: AgentConfig = {}
-  ): Promise<{ agent: Agent; threadInfo: ThreadInfo }> {
-    const provider = config.provider || 'anthropic';
-    const model = config.model;
-
-    // Handle thread creation/resumption through the Agent pattern
-    // The Agent will manage ThreadManager access internally
-    let threadInfo: ThreadInfo;
-
-    if (config.threadId) {
-      // Let the Agent handle thread resumption
-      const sessionInfo = this.threadManager.resumeOrCreate(config.threadId);
-      threadInfo = {
-        threadId: sessionInfo.threadId,
-        isNew: !sessionInfo.isResumed,
-      };
-    } else {
-      // Create new thread
-      const sessionInfo = this.threadManager.resumeOrCreate();
-      threadInfo = {
-        threadId: sessionInfo.threadId,
-        isNew: true,
-      };
-    }
-
-    // Create provider
-    const aiProvider = await this.createProvider(provider, model);
-
-    // Create agent with all dependencies
-    const agent = new Agent({
-      provider: aiProvider,
-      toolExecutor: this.toolExecutor,
-      threadManager: this.threadManager,
-      threadId: threadInfo.threadId,
-      tools: this.toolExecutor.getAllTools(),
-    });
-
-    // Setup delegate tool dependencies
-    const delegateTool = this.toolExecutor.getTool('delegate') as DelegateTool;
-    if (delegateTool) {
-      delegateTool.setDependencies(agent, this.toolExecutor);
-    }
-
-    return { agent, threadInfo };
-  }
-
-  /**
-   * Get thread history through Agent interface
-   * This ensures we follow the architecture pattern
-   */
-  // eslint-disable-next-line @typescript-eslint/require-await -- This method is async for consistency with Agent interface but doesn't use await internally
   public async getThreadHistory(threadId: string): Promise<unknown[]> {
-    // For now, we'll access ThreadManager directly for read operations
-    // In a full implementation, this would go through Agent
-    const events = this.threadManager.getEvents(threadId);
+    const agent = this.getSharedAgent();
+    
+    // Use Agent's proper API instead of accessing ThreadManager directly
+    const events = agent.getThreadEvents(threadId);
 
     if (!events || events.length === 0) {
       throw new Error('Thread not found');
@@ -166,8 +85,8 @@ class AgentService {
 
     // Transform events into API-friendly format
     return events
-      .filter((event) => event.type === 'USER_MESSAGE' || event.type === 'AGENT_MESSAGE')
-      .map((event) => ({
+      .filter((event: any) => event.type === 'USER_MESSAGE' || event.type === 'AGENT_MESSAGE')
+      .map((event: any) => ({
         id: event.id,
         type: event.type.toLowerCase().replace('_', ''),
         content: typeof event.data === 'string' ? event.data : '',
@@ -176,10 +95,11 @@ class AgentService {
   }
 
   /**
-   * Get available tools through ToolExecutor interface
+   * Get available tools through shared Agent's ToolExecutor
    */
   public getAvailableTools() {
-    const tools = this.toolExecutor.getAllTools();
+    const agent = this.getSharedAgent();
+    const tools = agent.toolExecutor.getAllTools();
 
     return tools.map((tool) => ({
       name: tool.name,
@@ -190,13 +110,13 @@ class AgentService {
   }
 
   /**
-   * Get tool executor for direct tool execution
-   * This allows API routes to execute tools while maintaining proper encapsulation
+   * Get tool executor from shared Agent
    */
   public getToolExecutor(): ToolExecutor {
-    return this.toolExecutor;
+    const agent = this.getSharedAgent();
+    return agent.toolExecutor;
   }
 }
 
-// Export singleton instance
-export const agentService = AgentService.getInstance();
+// Export singleton instance  
+export const sharedAgentService = SharedAgentService.getInstance();

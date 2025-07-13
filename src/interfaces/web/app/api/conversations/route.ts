@@ -2,7 +2,7 @@
 // ABOUTME: Provides synchronous conversation handling and thread history access
 
 import { NextRequest, NextResponse } from 'next/server';
-import { agentService } from '~/interfaces/web/lib/agent-service';
+import { sharedAgentService } from '~/interfaces/web/lib/agent-service';
 import { logger } from '~/utils/logger';
 
 interface CreateConversationRequest {
@@ -27,12 +27,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    // Create agent through centralized service
-    const { agent, threadInfo } = await agentService.createAgent({
-      provider: body.provider || 'anthropic',
-      model: body.model,
-      threadId: body.threadId,
-    });
+    // Get agent through shared service (uses core app.ts infrastructure)
+    const { agent, threadInfo } = await sharedAgentService.createAgentForThread(body.threadId);
 
     // Create promise to collect the response using Agent's event emitter
     const conversationPromise = new Promise<ConversationResponse>((resolve, reject) => {
@@ -85,8 +81,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET endpoint to retrieve conversation history through Agent service
-export function GET(request: NextRequest): NextResponse {
+// GET endpoint to retrieve conversation history through shared Agent service
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
     const threadId = searchParams.get('threadId');
@@ -95,8 +91,8 @@ export function GET(request: NextRequest): NextResponse {
       return NextResponse.json({ error: 'threadId parameter is required' }, { status: 400 });
     }
 
-    // Get conversation history through agent service
-    const messages = agentService.getThreadHistory(threadId);
+    // Get conversation history through shared agent service
+    const messages = await sharedAgentService.getThreadHistory(threadId);
 
     return NextResponse.json({
       threadId,
