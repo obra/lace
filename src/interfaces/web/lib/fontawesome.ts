@@ -41,7 +41,8 @@ export {
   faTable,
   faMinus,
   faPlug,
-  // Carousel navigation
+  // Carousel and sidebar navigation
   faChevronLeft,
   faChevronRight,
+  faChevronDown,
 } from '@fortawesome/free-solid-svg-icons';

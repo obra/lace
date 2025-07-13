@@ -1,6 +1,7 @@
 // ABOUTME: Test setup for web interface components
 // ABOUTME: Configures testing environment for React components and hooks
 
+import React from 'react'; // eslint-disable-line @typescript-eslint/no-unused-vars
 import { beforeEach, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
@@ -72,10 +73,14 @@ global.fetch = vi.fn(() =>
 );
 
 // Mock IntersectionObserver for Framer Motion
-global.IntersectionObserver = vi.fn(() => ({
+global.IntersectionObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),
   disconnect: vi.fn(),
   unobserve: vi.fn(),
+  root: null,
+  rootMargin: '',
+  thresholds: [],
+  takeRecords: vi.fn(() => []),
 }));
 
 // Mock ResizeObserver
@@ -84,3 +89,15 @@ global.ResizeObserver = vi.fn(() => ({
   disconnect: vi.fn(),
   unobserve: vi.fn(),
 }));
+
+// Mock scrollTo for DOM elements
+Object.defineProperty(Element.prototype, 'scrollTo', {
+  value: vi.fn(),
+  writable: true,
+});
+
+// Mock scrollIntoView for DOM elements
+Object.defineProperty(Element.prototype, 'scrollIntoView', {
+  value: vi.fn(),
+  writable: true,
+});

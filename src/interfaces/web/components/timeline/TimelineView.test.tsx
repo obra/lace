@@ -1,18 +1,31 @@
 // ABOUTME: Tests for TimelineView component
 // ABOUTME: Ensures timeline rendering, scrolling, and typing indicators work correctly
 
+import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TimelineView } from './TimelineView';
 import { createMockTimelineEntry } from '../../__tests__/utils/test-helpers';
+import '../../__tests__/setup';
 
 // Mock Framer Motion to avoid animation issues in tests
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: any) => React.createElement('div', props, children),
   },
-  AnimatePresence: ({ children }: any) => <>{children}</>,
+  AnimatePresence: ({ children }: any) => children,
   useInView: () => true,
+}));
+
+// Mock child components
+vi.mock('./TimelineMessage', () => ({
+  TimelineMessage: ({ entry }: { entry: any }) => 
+    React.createElement('div', { 'data-testid': 'timeline-message' }, entry.content),
+}));
+
+vi.mock('./TypingIndicator', () => ({
+  TypingIndicator: ({ agent }: { agent: string }) => 
+    React.createElement('div', { 'data-testid': 'typing-indicator' }, `${agent} is thinking...`),
 }));
 
 describe('TimelineView', () => {

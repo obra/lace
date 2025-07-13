@@ -192,7 +192,7 @@ export function Carousel({
 
       {/* Navigation arrows */}
       {showNavigation && totalPages > 1 && (
-        <>
+        <React.Fragment>
           <button
             onClick={goToPrevious}
             className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-base-100/80 hover:bg-base-100 border border-base-300 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 disabled:opacity-25"
@@ -210,7 +210,7 @@ export function Carousel({
           >
             <FontAwesomeIcon icon={faChevronRight} className="w-4 h-4 text-base-content" />
           </button>
-        </>
+        </React.Fragment>
       )}
 
       {/* Dots navigation */}

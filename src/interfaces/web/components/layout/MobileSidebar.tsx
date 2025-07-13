@@ -57,7 +57,7 @@ export function MobileSidebar({
   if (!isOpen) return null;
 
   return (
-    <>
+    <React.Fragment>
       {/* Overlay */}
       <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />
 
@@ -249,6 +249,6 @@ export function MobileSidebar({
           </div>
         </div>
       </div>
-    </>
+    </React.Fragment>
   );
 }

@@ -1,16 +1,19 @@
 // ABOUTME: Tests for TypingIndicator component
 // ABOUTME: Verifies agent-specific styling and animation behavior
 
+import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TypingIndicator } from './TypingIndicator';
+import '../../__tests__/setup';
 
 // Mock Framer Motion
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: any) => React.createElement('div', props, children),
+    span: ({ children, ...props }: any) => React.createElement('span', props, children),
   },
-  AnimatePresence: ({ children }: any) => <>{children}</>,
+  AnimatePresence: ({ children }: any) => children,
 }));
 
 describe('TypingIndicator', () => {
