@@ -45,4 +45,5 @@ export {
   faChevronLeft,
   faChevronRight,
   faChevronDown,
+  faChevronUp,
 } from '@fortawesome/free-solid-svg-icons';

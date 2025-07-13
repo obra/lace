@@ -1,5 +1,5 @@
 // ABOUTME: Animation utilities and variants for Framer Motion
-// ABOUTME: Provides reusable animation configurations for web interface components
+// ABOUTME: Comprehensive animation system for web interface components
 
 import { Variants, Transition } from 'framer-motion';
 
