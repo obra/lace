@@ -2,7 +2,7 @@
 // ABOUTME: Provides agent listing and creation within sessions through Agent service pattern
 
 import { NextRequest, NextResponse } from 'next/server';
-import { sharedAgentService } from '~/interfaces/web/lib/agent-service';
+import { getAgentFromRequest } from '~/interfaces/web/lib/agent-context';
 import { logger } from '~/utils/logger';
 import { AgentMetadata } from '~/interfaces/web/types/agent';
 
@@ -31,6 +31,11 @@ interface AgentInfo {
   metadata?: Record<string, unknown>;
 }
 
+interface ThreadInfo {
+  threadId: string;
+  isNew: boolean;
+}
+
 // GET endpoint to retrieve agent information
 export function GET(request: NextRequest): NextResponse {
   try {
@@ -40,7 +45,22 @@ export function GET(request: NextRequest): NextResponse {
 
     if (agentId) {
       // Get specific agent info
-      const messages = sharedAgentService.getThreadHistory(agentId);
+      const agent = getAgentFromRequest(request);
+      const threadEvents = agent.getThreadEvents(agentId);
+      
+      if (!threadEvents || threadEvents.length === 0) {
+        return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
+      }
+      
+      // Transform events into API-friendly format (similar to SharedAgentService logic)
+      const messages = threadEvents
+        .filter((event: any) => event.type === 'USER_MESSAGE' || event.type === 'AGENT_MESSAGE')
+        .map((event: any) => ({
+          id: event.id,
+          type: event.type.toLowerCase().replace('_', ''),
+          content: typeof event.data === 'string' ? event.data : '',
+          timestamp: event.timestamp.toISOString(),
+        }));
 
       const agentInfo: AgentInfo = {
         agentId,
@@ -85,7 +105,13 @@ export async function POST(request: NextRequest) {
 
     // Create new agent as child thread if sessionId is provided
     // Otherwise create a standalone agent
-    const { threadInfo } = sharedAgentService.createAgentForThread(body.sessionId);
+    const agent = getAgentFromRequest(request);
+    const sessionInfo = agent.resumeOrCreateThread(body.sessionId);
+    
+    const threadInfo: ThreadInfo = {
+      threadId: sessionInfo.threadId,
+      isNew: !sessionInfo.isResumed,
+    };
 
     const response: AgentInfo = {
       agentId: threadInfo.threadId,

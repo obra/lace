@@ -2,7 +2,7 @@
 // ABOUTME: Provides tool listing and execution capabilities through proper encapsulation
 
 import { NextRequest, NextResponse } from 'next/server';
-import { sharedAgentService } from '~/interfaces/web/lib/agent-service';
+import { getAgentFromRequest } from '~/interfaces/web/lib/agent-context';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { ApprovalDecision, ApprovalCallback } from '~/tools/approval-types';
 import { asThreadId } from '~/threads/types';
@@ -18,10 +18,18 @@ interface ExecuteToolRequest {
 // ToolInfo interface removed - using sharedAgentService.getAvailableTools() return type
 
 // GET endpoint to list available tools through agent service
-export function GET(): NextResponse {
+export function GET(request: NextRequest): NextResponse {
   try {
-    // Get tools through shared agent service
-    const toolInfo = sharedAgentService.getAvailableTools();
+    // Get tools through agent
+    const agent = getAgentFromRequest(request);
+    const tools = agent.toolExecutor.getAllTools();
+
+    const toolInfo = tools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      schema: tool.inputSchema,
+      destructive: tool.annotations?.destructiveHint || false,
+    }));
 
     return NextResponse.json({
       tools: toolInfo,
@@ -52,8 +60,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Tool parameters are required' }, { status: 400 });
     }
 
-    // Get tool executor through shared agent service
-    const toolExecutor = sharedAgentService.getToolExecutor();
+    // Get tool executor through agent
+    const agent = getAgentFromRequest(request);
+    const toolExecutor = agent.toolExecutor;
 
     // Create tool call
     const toolCall: ToolCall = {
