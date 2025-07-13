@@ -50,67 +50,73 @@ export function useAgentConversation(options: UseAgentConversationOptions = {}) 
     },
   });
 
-  const sendMessage = useCallback(async () => {
-    if (!input.trim() || isLoading || isStreaming) return;
+  const sendMessage = useCallback(
+    async (messageText?: string) => {
+      const messageContent = messageText || input.trim();
+      if (!messageContent || isLoading || isStreaming) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
-
-    // Create assistant message for streaming
-    const assistantMessageId = (Date.now() + 1).toString();
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      role: 'assistant',
-      content: '',
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, assistantMessage]);
-
-    try {
-      const streamRequest: StreamRequest = {
-        message: userMessage.content,
-        agentId: currentAgentId,
-        sessionId: currentSessionId,
-        provider: options.provider,
-        model: options.model,
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: messageContent,
+        timestamp: new Date(),
       };
 
-      const response = await startStream(streamRequest, assistantMessageId);
+      setMessages((prev) => [...prev, userMessage]);
+      if (!messageText) {
+        setInput('');
+      }
+      setIsLoading(true);
 
-      // Update agent/session IDs if they were created
-      if (response?.agentId && response.agentId !== currentAgentId) {
-        setCurrentAgentId(response.agentId);
+      // Create assistant message for streaming
+      const assistantMessageId = (Date.now() + 1).toString();
+      const assistantMessage: Message = {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+
+      try {
+        const streamRequest: StreamRequest = {
+          message: messageContent,
+          agentId: currentAgentId,
+          sessionId: currentSessionId,
+          provider: options.provider,
+          model: options.model,
+        };
+
+        const response = await startStream(streamRequest, assistantMessageId);
+
+        // Update agent/session IDs if they were created
+        if (response?.agentId && response.agentId !== currentAgentId) {
+          setCurrentAgentId(response.agentId);
+        }
+        if (response?.sessionId && response.sessionId !== currentSessionId) {
+          setCurrentSessionId(response.sessionId);
+        }
+      } catch (error) {
+        logger.error('Error calling agent conversation API:', error);
+        updateMessageContent(
+          assistantMessageId,
+          'Sorry, there was an error connecting to the agent. Please try again.'
+        );
+        setIsLoading(false);
       }
-      if (response?.sessionId && response.sessionId !== currentSessionId) {
-        setCurrentSessionId(response.sessionId);
-      }
-    } catch (error) {
-      logger.error('Error calling agent conversation API:', error);
-      updateMessageContent(
-        assistantMessageId,
-        'Sorry, there was an error connecting to the agent. Please try again.'
-      );
-      setIsLoading(false);
-    }
-  }, [
-    input,
-    isLoading,
-    isStreaming,
-    currentAgentId,
-    currentSessionId,
-    options.provider,
-    options.model,
-    startStream,
-    updateMessageContent,
-  ]);
+    },
+    [
+      input,
+      isLoading,
+      isStreaming,
+      currentAgentId,
+      currentSessionId,
+      options.provider,
+      options.model,
+      startStream,
+      updateMessageContent,
+    ]
+  );
 
   const switchAgent = useCallback((agentId: string, sessionId?: string) => {
     setCurrentAgentId(agentId);

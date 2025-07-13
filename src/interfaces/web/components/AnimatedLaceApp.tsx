@@ -23,6 +23,7 @@ import { TaskBoardModal } from '~/interfaces/web/components/modals/TaskBoardModa
 import { VoiceRecognitionUI } from '~/interfaces/web/components/ui/VoiceRecognitionUI';
 import { TimelineEntry, Project, Timeline, Task, RecentFile } from '~/interfaces/web/types';
 import { useVoiceRecognition } from '~/interfaces/web/hooks/useVoiceRecognition';
+import { useAgentConversation } from '~/interfaces/web/hooks/useAgentConversation';
 import {
   pageTransition,
   fadeInUp,
@@ -56,9 +57,8 @@ export function AnimatedLaceApp() {
 
   // Chat State
   const [prompt, setPrompt] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
   const [isToolRunning, setIsToolRunning] = useState(false);
-  const nextEntryId = useRef(9);
+  const nextEntryId = useRef(1000); // Start with high number to avoid conflicts
 
   // Voice Recognition
   const {
@@ -74,6 +74,12 @@ export function AnimatedLaceApp() {
       setPrompt(transcript);
     },
   });
+
+  // Real Conversation System
+  const { sendMessage, isLoading: isStreaming, messages } = useAgentConversation();
+
+  // isTyping is now derived from the conversation stream state
+  const isTyping = isStreaming;
 
   // Data State
   const [currentProject, setCurrentProject] = useState<Project>({
@@ -135,78 +141,29 @@ export function AnimatedLaceApp() {
     },
   ]);
 
-  const [timelineEntries, setTimelineEntries] = useState<TimelineEntry[]>([
+  // Additional entries for tool/admin messages
+  const [additionalEntries, setAdditionalEntries] = useState<TimelineEntry[]>([
     {
-      id: 1,
+      id: 'admin-1',
       type: 'admin',
       content: 'Timeline started',
       timestamp: new Date(Date.now() - 3600000),
     },
-    {
-      id: 2,
-      type: 'human',
-      content: 'Help me analyze the recent code changes',
-      timestamp: new Date(Date.now() - 1800000),
-    },
-    {
-      id: 3,
-      type: 'ai',
-      content: "I'll analyze the codebase changes for you. Let me examine the recent commits.",
-      agent: 'Claude',
-      timestamp: new Date(Date.now() - 1790000),
-    },
-    {
-      id: 4,
-      type: 'integration',
-      tool: 'Google Drive',
-      action: 'created',
-      title: 'Analysis Report.docx',
-      description: 'Code analysis report generated',
-      link: 'https://drive.google.com/file/d/example',
-      timestamp: new Date(Date.now() - 1780000),
-    },
-    {
-      id: 5,
-      type: 'carousel',
-      title: 'Recent Code Changes',
-      timestamp: new Date(Date.now() - 1700000),
-      items: [
-        {
-          title: 'Authentication Module',
-          description: 'Added OAuth2 integration with Google and GitHub',
-          type: 'feature',
-          impact: 'high',
-          files: ['src/auth/oauth.ts', 'src/auth/providers.ts'],
-          commit: 'a1b2c3d',
-        },
-        {
-          title: 'Database Migration',
-          description: 'Updated user schema to support OAuth tokens',
-          type: 'maintenance',
-          impact: 'medium',
-          files: ['migrations/001_oauth_tokens.sql', 'src/models/user.ts'],
-          commit: 'e4f5g6h',
-        },
-        {
-          title: 'Login Bug Fix',
-          description: 'Fixed session timeout issue in production',
-          type: 'bugfix',
-          impact: 'high',
-          files: ['src/auth/session.ts'],
-          commit: 'i7j8k9l',
-        },
-      ],
-    },
-    {
-      id: 6,
-      type: 'integration',
-      tool: 'Slack',
-      action: 'updated',
-      title: 'Development Team',
-      description: 'Code review completed, changes deployed',
-      timestamp: new Date(Date.now() - 900000),
-    },
   ]);
+
+  // Convert real conversation messages to timeline entries
+  const conversationEntries: TimelineEntry[] = messages.map((message, index) => ({
+    id: `msg-${message.id}`,
+    type: message.role === 'user' ? 'human' : 'ai',
+    content: message.content,
+    timestamp: message.timestamp,
+    agent: message.role === 'assistant' ? currentTimeline.agent : undefined,
+  }));
+
+  // Combine conversation and additional entries, sorted by timestamp
+  const timelineEntries = [...conversationEntries, ...additionalEntries].sort(
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+  );
 
   useEffect(() => {
     // Set theme on mount
@@ -226,36 +183,19 @@ export function AnimatedLaceApp() {
   }, [notification]);
 
   // Handlers
-  const handleSendMessage = useCallback(() => {
-    if (!prompt.trim() || isTyping) return;
+  const handleSendMessage = useCallback(async () => {
+    if (!prompt.trim() || isStreaming) return;
 
-    const humanEntry: TimelineEntry = {
-      id: nextEntryId.current++,
-      type: 'human',
-      content: prompt.trim(),
-      timestamp: new Date(),
-    };
-
-    setTimelineEntries((prev) => [...prev, humanEntry]);
-    const userPrompt = prompt;
+    const userMessage = prompt.trim();
     setPrompt('');
 
-    setIsTyping(true);
-
-    // Simulate AI response
-    setTimeout(() => {
-      const aiEntry: TimelineEntry = {
-        id: nextEntryId.current++,
-        type: 'ai',
-        content: `I'll help you with "${userPrompt}". Let me analyze that and provide assistance.`,
-        agent: currentTimeline.agent,
-        timestamp: new Date(),
-      };
-
-      setTimelineEntries((prev) => [...prev, aiEntry]);
-      setIsTyping(false);
-    }, 1000);
-  }, [prompt, isTyping, currentTimeline.agent]);
+    try {
+      await sendMessage(userMessage);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      setNotification('Failed to send message. Please try again.');
+    }
+  }, [prompt, isStreaming, sendMessage]);
 
   const handleProjectChange = (project: Project) => {
     setCurrentProject(project);
@@ -303,7 +243,7 @@ export function AnimatedLaceApp() {
         timestamp: new Date(),
       };
 
-      setTimelineEntries((prev) => [...prev, toolEntry]);
+      setAdditionalEntries((prev) => [...prev, toolEntry]);
       setIsToolRunning(false);
       setNotification(`Tool ${toolName} executed successfully`);
     }, 1500);
@@ -316,7 +256,7 @@ export function AnimatedLaceApp() {
       content: message,
       timestamp: new Date(),
     };
-    setTimelineEntries((prev) => [...prev, adminEntry]);
+    setAdditionalEntries((prev) => [...prev, adminEntry]);
   };
 
   const handleOpenTask = (_task: Task) => {
