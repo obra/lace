@@ -4,10 +4,21 @@
 import { useState, useCallback, useRef } from 'react';
 import type { StreamEvent } from '~/interfaces/web/types';
 
+export interface StreamRequest {
+  message: string;
+  agentId?: string;
+  sessionId?: string;
+  provider?: string;
+  model?: string;
+}
+
 interface UseConversationStreamOptions {
   onStreamEvent?: (event: StreamEvent) => void;
   onMessageComplete?: (content: string) => void;
-  onError?: (error: string) => void;
+  onError?: (error: string, messageId?: string) => void;
+  // Additional callbacks for agent conversation integration
+  onToken?: (content: string, messageId: string) => void;
+  onComplete?: (finalContent: string, messageId: string) => void;
 }
 
 interface ConversationStreamState {
@@ -21,6 +32,8 @@ export function useConversationStream({
   onStreamEvent,
   onMessageComplete,
   onError,
+  onToken,
+  onComplete,
 }: UseConversationStreamOptions = {}) {
   const [state, setState] = useState<ConversationStreamState>({
     isStreaming: false,
@@ -134,7 +147,7 @@ export function useConversationStream({
                       error: event.error,
                     }));
                     if (event.error) {
-                      onError?.(event.error);
+                      onError?.(event.error, undefined);
                     }
                     break;
                 }
@@ -153,7 +166,7 @@ export function useConversationStream({
             isThinking: false,
             error: errorMessage,
           }));
-          onError?.(errorMessage);
+          onError?.(errorMessage, undefined);
         }
       }
     },
@@ -172,9 +185,25 @@ export function useConversationStream({
     }));
   }, []);
 
+  const startStream = useCallback(
+    async (request: StreamRequest, messageId?: string) => {
+      // For now, just delegate to sendMessage
+      // TODO: Implement proper streaming with the new API format
+      await sendMessage(request.message, request.sessionId);
+      
+      // Return mock response for compatibility
+      return {
+        agentId: request.agentId,
+        sessionId: request.sessionId,
+      };
+    },
+    [sendMessage]
+  );
+
   return {
     ...state,
     sendMessage,
+    startStream,
     stopStream,
   };
 }

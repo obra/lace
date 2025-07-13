@@ -39,8 +39,10 @@ export function useAgentConversation(options: UseAgentConversationOptions = {}) 
       updateMessageContent(messageId, finalContent);
       setIsLoading(false);
     },
-    onError: (error: string, messageId: string) => {
-      updateMessageContent(messageId, `Error: ${error}`);
+    onError: (error: string, messageId?: string) => {
+      if (messageId) {
+        updateMessageContent(messageId, `Error: ${error}`);
+      }
       setIsLoading(false);
     },
   });
