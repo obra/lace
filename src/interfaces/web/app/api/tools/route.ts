@@ -15,7 +15,7 @@ interface ExecuteToolRequest {
   autoApprove?: boolean;
 }
 
-// ToolInfo interface removed - using sharedAgentService.getAvailableTools() return type
+// ToolInfo interface removed - using getAgentFromRequest(request).getAvailableTools() return type
 
 // GET endpoint to list available tools through agent service
 export function GET(request: NextRequest): NextResponse {

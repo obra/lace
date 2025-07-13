@@ -4,14 +4,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, POST, DELETE } from '../route';
-import { sharedAgentService } from '~/interfaces/web/lib/agent-service';
+import { getAgentFromRequest } from '~/interfaces/web/lib/agent-context';
+import type { Agent } from '~/agents/agent';
 
-// Mock the shared agent service
-vi.mock('~/interfaces/web/lib/agent-service', () => ({
-  sharedAgentService: {
-    createAgentForThread: vi.fn(),
-    getSharedAgent: vi.fn(),
-  },
+// Mock the agent context helper
+vi.mock('~/interfaces/web/lib/agent-context', () => ({
+  getAgentFromRequest: vi.fn(),
 }));
 
 // Use real logger - we want to see actual log output in tests
@@ -68,16 +66,15 @@ describe('/api/sessions', () => {
 
   describe('POST endpoint', () => {
     it('should create a new session successfully', async () => {
-      const mockThreadInfo = {
-        threadId: 'lace_20250713_abc123',
-        isNew: true,
-      };
+      const mockAgent = {
+        resumeOrCreateThread: vi.fn().mockReturnValue({
+          threadId: 'lace_20250713_abc123',
+          isResumed: false,
+        }),
+      } as unknown as Agent;
 
-      // Mock the agent service
-      vi.mocked(sharedAgentService.createAgentForThread).mockReturnValue({
-        agent: {} as any,
-        threadInfo: mockThreadInfo,
-      });
+      // Mock the agent context helper
+      vi.mocked(getAgentFromRequest).mockReturnValue(mockAgent);
 
       const requestBody = {
         name: 'Test Session',
