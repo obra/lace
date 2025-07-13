@@ -13,16 +13,16 @@ import {
   faTasks,
   faFolder,
   faMicrophone,
-} from '../lib/fontawesome';
-import { Sidebar } from './layout/Sidebar';
-import { MobileSidebar } from './layout/MobileSidebar';
-import { AnimatedTimelineView } from './timeline/AnimatedTimelineView';
-import { EnhancedChatInput } from './chat/EnhancedChatInput';
-import { AnimatedModal } from './ui/AnimatedModal';
-import { TaskBoardModal } from './modals/TaskBoardModal';
-import { VoiceRecognitionUI } from './ui/VoiceRecognitionUI';
-import { TimelineEntry, Project, Timeline, Task, RecentFile } from '../types';
-import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
+} from '~/interfaces/web/lib/fontawesome';
+import { Sidebar } from '~/interfaces/web/components/layout/Sidebar';
+import { MobileSidebar } from '~/interfaces/web/components/layout/MobileSidebar';
+import { AnimatedTimelineView } from '~/interfaces/web/components/timeline/AnimatedTimelineView';
+import { EnhancedChatInput } from '~/interfaces/web/components/chat/EnhancedChatInput';
+import { AnimatedModal } from '~/interfaces/web/components/ui/AnimatedModal';
+import { TaskBoardModal } from '~/interfaces/web/components/modals/TaskBoardModal';
+import { VoiceRecognitionUI } from '~/interfaces/web/components/ui/VoiceRecognitionUI';
+import { TimelineEntry, Project, Timeline, Task, RecentFile } from '~/interfaces/web/types';
+import { useVoiceRecognition } from '~/interfaces/web/hooks/useVoiceRecognition';
 import {
   pageTransition,
   fadeInUp,
@@ -33,7 +33,7 @@ import {
   springConfig,
   sidebarVariants,
   notificationVariants,
-} from '../lib/animations';
+} from '~/interfaces/web/lib/animations';
 
 const availableThemes = [
   { name: 'light', colors: { primary: '#570DF8', secondary: '#F000B8', accent: '#37CDBE' } },

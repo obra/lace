@@ -47,11 +47,11 @@ export function GET(request: NextRequest): NextResponse {
       // Get specific agent info
       const agent = getAgentFromRequest(request);
       const threadEvents = agent.getThreadEvents(agentId);
-      
+
       if (!threadEvents || threadEvents.length === 0) {
         return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
       }
-      
+
       // Transform events into API-friendly format (similar to SharedAgentService logic)
       const messages = threadEvents
         .filter((event: any) => event.type === 'USER_MESSAGE' || event.type === 'AGENT_MESSAGE')
@@ -76,7 +76,10 @@ export function GET(request: NextRequest): NextResponse {
     } else if (sessionId) {
       // List all agents in session
       // TODO: Implement session-based agent listing
-      return NextResponse.json({ error: 'Session-based agent listing not yet implemented' }, { status: 501 });
+      return NextResponse.json(
+        { error: 'Session-based agent listing not yet implemented' },
+        { status: 501 }
+      );
     } else {
       // List all agents
       // TODO: Implement agent listing
@@ -107,7 +110,7 @@ export async function POST(request: NextRequest) {
     // Otherwise create a standalone agent
     const agent = getAgentFromRequest(request);
     const sessionInfo = agent.resumeOrCreateThread(body.sessionId);
-    
+
     const threadInfo: ThreadInfo = {
       threadId: sessionInfo.threadId,
       isNew: !sessionInfo.isResumed,
@@ -115,7 +118,11 @@ export async function POST(request: NextRequest) {
 
     const response: AgentInfo = {
       agentId: threadInfo.threadId,
-      sessionId: body.sessionId || (threadInfo.threadId.includes('.') ? threadInfo.threadId.split('.')[0] : threadInfo.threadId),
+      sessionId:
+        body.sessionId ||
+        (threadInfo.threadId.includes('.')
+          ? threadInfo.threadId.split('.')[0]
+          : threadInfo.threadId),
       id: threadInfo.threadId,
       name: body.name,
       provider: body.provider,
@@ -128,12 +135,12 @@ export async function POST(request: NextRequest) {
       metadata: body.metadata,
     };
 
-    logger.info('Agent created:', { 
-      agentId: threadInfo.threadId, 
+    logger.info('Agent created:', {
+      agentId: threadInfo.threadId,
       sessionId: body.sessionId,
-      name: body.name 
+      name: body.name,
     });
-    
+
     return NextResponse.json(response, { status: 201 });
   } catch (error) {
     logger.error('API agent creation error:', error);

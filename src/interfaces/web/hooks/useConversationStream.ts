@@ -190,7 +190,7 @@ export function useConversationStream({
       // For now, just delegate to sendMessage
       // TODO: Implement proper streaming with the new API format
       await sendMessage(request.message, request.sessionId);
-      
+
       // Return mock response for compatibility
       return {
         agentId: request.agentId,

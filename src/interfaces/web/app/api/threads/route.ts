@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     // Create new thread through agent
     const agent = getAgentFromRequest(request);
     const sessionInfo = agent.resumeOrCreateThread();
-    
+
     const threadInfo = {
       threadId: sessionInfo.threadId,
       isNew: !sessionInfo.isResumed,

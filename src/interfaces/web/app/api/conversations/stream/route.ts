@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     // Create agent through direct context access
     const agent = getAgentFromRequest(request);
     const sessionInfo = agent.resumeOrCreateThread(body.threadId);
-    
+
     const threadInfo: ThreadInfo = {
       threadId: sessionInfo.threadId,
       isNew: !sessionInfo.isResumed,

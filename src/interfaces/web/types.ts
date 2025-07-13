@@ -1,4 +1,4 @@
-// ABOUTME: TypeScript interfaces for web interface request context  
+// ABOUTME: TypeScript interfaces for web interface request context
 // ABOUTME: Re-exports all web types plus new request context interface
 
 import type { IncomingMessage } from 'http';

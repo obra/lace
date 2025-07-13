@@ -7,7 +7,7 @@ import type { Agent } from '~/agents/agent.js';
 import type { UserInterface } from '~/commands/types.js';
 import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types.js';
 import { logger } from '~/utils/logger.js';
-import type { LaceRequest } from './types.js';
+import type { LaceRequest } from '~/interfaces/web/types.js';
 
 export interface WebInterfaceOptions {
   port?: number;

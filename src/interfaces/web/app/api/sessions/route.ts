@@ -63,22 +63,28 @@ export function GET(request: NextRequest): NextResponse {
 export async function POST(request: NextRequest) {
   try {
     logger.info('Session creation requested', { url: request.url });
-    
+
     const body = (await request.json()) as CreateSessionRequest;
-    logger.info('Session creation request body parsed', { name: body.name, hasMetadata: !!body.metadata });
+    logger.info('Session creation request body parsed', {
+      name: body.name,
+      hasMetadata: !!body.metadata,
+    });
 
     // Create new session (parent thread) directly through Agent
     // This will give us a proper thread ID from the core app.ts infrastructure
     logger.debug('Attempting to create agent thread through direct Agent access');
     const agent = getAgentFromRequest(request);
     const sessionInfo = agent.resumeOrCreateThread();
-    
+
     const threadInfo: ThreadInfo = {
       threadId: sessionInfo.threadId,
       isNew: !sessionInfo.isResumed,
     };
-    
-    logger.info('Agent thread created successfully', { threadId: threadInfo.threadId, isNew: threadInfo.isNew });
+
+    logger.info('Agent thread created successfully', {
+      threadId: threadInfo.threadId,
+      isNew: threadInfo.isNew,
+    });
 
     const response: SessionInfo = {
       id: threadInfo.threadId, // This is the session ID (parent thread)
@@ -98,7 +104,7 @@ export async function POST(request: NextRequest) {
     // Provide more specific error information
     const errorMessage = error instanceof Error ? error.message : 'Failed to create session';
     const errorDetails = error instanceof Error ? error.stack : undefined;
-    
+
     return NextResponse.json(
       {
         error: errorMessage,

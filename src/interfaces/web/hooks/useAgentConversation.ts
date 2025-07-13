@@ -3,8 +3,11 @@
 
 import { useState, useCallback } from 'react';
 import type { Message } from '~/interfaces/web/types';
-import { useConversationStream, type StreamRequest } from '~/interfaces/web/hooks/useConversationStream';
-import { logger } from '../utils/client-logger';
+import {
+  useConversationStream,
+  type StreamRequest,
+} from '~/interfaces/web/hooks/useConversationStream';
+import { logger } from '~/interfaces/web/utils/client-logger';
 
 export interface UseAgentConversationOptions {
   agentId?: string;
@@ -79,7 +82,7 @@ export function useAgentConversation(options: UseAgentConversationOptions = {}) 
         provider: options.provider,
         model: options.model,
       };
-      
+
       const response = await startStream(streamRequest, assistantMessageId);
 
       // Update agent/session IDs if they were created
@@ -97,7 +100,17 @@ export function useAgentConversation(options: UseAgentConversationOptions = {}) 
       );
       setIsLoading(false);
     }
-  }, [input, isLoading, isStreaming, currentAgentId, currentSessionId, options.provider, options.model, startStream, updateMessageContent]);
+  }, [
+    input,
+    isLoading,
+    isStreaming,
+    currentAgentId,
+    currentSessionId,
+    options.provider,
+    options.model,
+    startStream,
+    updateMessageContent,
+  ]);
 
   const switchAgent = useCallback((agentId: string, sessionId?: string) => {
     setCurrentAgentId(agentId);
@@ -113,7 +126,7 @@ export function useAgentConversation(options: UseAgentConversationOptions = {}) 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       // TODO: Convert agent events to Message format and set messages
       logger.debug('Agent history loaded:', data);

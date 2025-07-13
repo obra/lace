@@ -3,7 +3,7 @@
 
 'use client';
 
-import { AnimatedLaceApp } from './AnimatedLaceApp';
+import { AnimatedLaceApp } from '~/interfaces/web/components/AnimatedLaceApp';
 
 export default function ChatInterface() {
   return <AnimatedLaceApp />;
