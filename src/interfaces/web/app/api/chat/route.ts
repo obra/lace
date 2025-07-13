@@ -9,7 +9,7 @@
 
 export async function POST(request: Request) {
   try {
-    const { message } = await request.json() as { message?: string };
+    const { message } = (await request.json()) as { message?: string };
 
     if (!message) {
       return Response.json({ error: 'Message is required' }, { status: 400 });
@@ -25,10 +25,7 @@ export async function POST(request: Request) {
     return Response.json(response);
   } catch (error) {
     console.error('Error in chat API:', error);
-    return Response.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 

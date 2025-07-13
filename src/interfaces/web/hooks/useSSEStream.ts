@@ -1,7 +1,7 @@
 // ABOUTME: Server-Sent Events (SSE) stream processing hook
 // ABOUTME: Handles streaming data from API responses with event parsing
 import { useCallback } from 'react';
-import type { StreamEvent } from '~/types';
+import type { StreamEvent } from '~/interfaces/web/types';
 
 interface UseSSEStreamOptions {
   onEvent?: (event: StreamEvent) => void;

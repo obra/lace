@@ -26,12 +26,23 @@ interface TaskColumn {
 
 const taskColumns: TaskColumn[] = [
   { id: 'todo', title: 'To Do', status: 'pending', color: 'bg-blue-100 border-blue-200' },
-  { id: 'progress', title: 'In Progress', status: 'in_progress', color: 'bg-yellow-100 border-yellow-200' },
+  {
+    id: 'progress',
+    title: 'In Progress',
+    status: 'in_progress',
+    color: 'bg-yellow-100 border-yellow-200',
+  },
   { id: 'review', title: 'Review', status: 'review', color: 'bg-purple-100 border-purple-200' },
   { id: 'done', title: 'Done', status: 'completed', color: 'bg-green-100 border-green-200' },
 ];
 
-export function TaskBoardModal({ isOpen, onClose, tasks, onTaskUpdate, onTaskCreate }: TaskBoardModalProps) {
+export function TaskBoardModal({
+  isOpen,
+  onClose,
+  tasks,
+  onTaskUpdate,
+  onTaskCreate,
+}: TaskBoardModalProps) {
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [showNewTaskForm, setShowNewTaskForm] = useState(false);
   const [newTask, setNewTask] = useState({
@@ -43,15 +54,19 @@ export function TaskBoardModal({ isOpen, onClose, tasks, onTaskUpdate, onTaskCre
 
   const getPriorityColor = (priority: Task['priority']) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'high':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'low':
+        return 'bg-green-100 text-green-800 border-green-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   const getTasksByStatus = (status: Task['status']) => {
-    return tasks.filter(task => task.status === status);
+    return tasks.filter((task) => task.status === status);
   };
 
   const handleDragStart = (e: React.DragEvent, task: Task) => {
@@ -89,13 +104,7 @@ export function TaskBoardModal({ isOpen, onClose, tasks, onTaskUpdate, onTaskCre
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Task Board"
-      size="full"
-      className="h-[90vh]"
-    >
+    <Modal isOpen={isOpen} onClose={onClose} title="Task Board" size="full" className="h-[90vh]">
       <div className="h-full flex flex-col">
         {/* Header with actions */}
         <div className="flex items-center justify-between mb-4 pb-4 border-b border-base-300">
@@ -104,11 +113,8 @@ export function TaskBoardModal({ isOpen, onClose, tasks, onTaskUpdate, onTaskCre
             <span className="text-lg font-medium">Project Tasks</span>
             <span className="badge badge-primary">{tasks.length}</span>
           </div>
-          
-          <button
-            onClick={() => setShowNewTaskForm(true)}
-            className="btn btn-primary btn-sm"
-          >
+
+          <button onClick={() => setShowNewTaskForm(true)} className="btn btn-primary btn-sm">
             <FontAwesomeIcon icon={faPlus} className="w-4 h-4 mr-1" />
             New Task
           </button>
@@ -129,7 +135,9 @@ export function TaskBoardModal({ isOpen, onClose, tasks, onTaskUpdate, onTaskCre
                 />
                 <select
                   value={newTask.priority}
-                  onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as Task['priority'] })}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, priority: e.target.value as Task['priority'] })
+                  }
                   className="select select-bordered w-full"
                 >
                   <option value="low">Low Priority</option>
@@ -137,7 +145,7 @@ export function TaskBoardModal({ isOpen, onClose, tasks, onTaskUpdate, onTaskCre
                   <option value="high">High Priority</option>
                 </select>
               </div>
-              
+
               <textarea
                 placeholder="Task description (optional)"
                 value={newTask.description}
@@ -145,7 +153,7 @@ export function TaskBoardModal({ isOpen, onClose, tasks, onTaskUpdate, onTaskCre
                 className="textarea textarea-bordered w-full"
                 rows={2}
               />
-              
+
               <div className="flex gap-2 justify-end">
                 <button
                   type="button"
@@ -166,7 +174,7 @@ export function TaskBoardModal({ isOpen, onClose, tasks, onTaskUpdate, onTaskCre
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 overflow-hidden">
           {taskColumns.map((column) => {
             const columnTasks = getTasksByStatus(column.status);
-            
+
             return (
               <div
                 key={column.id}
@@ -197,26 +205,26 @@ export function TaskBoardModal({ isOpen, onClose, tasks, onTaskUpdate, onTaskCre
                             <h4 className="font-medium text-sm text-base-content leading-tight">
                               {task.title}
                             </h4>
-                            <span className={`px-1.5 py-0.5 text-xs rounded border ${getPriorityColor(task.priority)}`}>
+                            <span
+                              className={`px-1.5 py-0.5 text-xs rounded border ${getPriorityColor(task.priority)}`}
+                            >
                               {task.priority}
                             </span>
                           </div>
-                          
+
                           {task.description && (
                             <p className="text-xs text-base-content/70 line-clamp-2">
                               {task.description}
                             </p>
                           )}
-                          
+
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-1 text-xs text-base-content/60">
                               <FontAwesomeIcon icon={faUser} className="w-3 h-3" />
                               <span>{task.assignee}</span>
                             </div>
-                            
-                            <div className="text-xs text-base-content/50">
-                              Task #{task.id}
-                            </div>
+
+                            <div className="text-xs text-base-content/50">Task #{task.id}</div>
                           </div>
                         </div>
                       </div>

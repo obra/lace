@@ -4,14 +4,14 @@
 'use client';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faUser, 
-  faCog, 
-  faCreditCard, 
-  faSignOutAlt, 
-  faChevronUp,
-  faCrown
+import {
+  faUser,
+  faCog,
+  faCreditCard,
+  faSignOutAlt,
+  faCrown,
 } from '~/interfaces/web/lib/fontawesome';
+import { ChevronUpIcon } from '~/interfaces/web/lib/heroicons';
 
 export function AccountDropdown() {
   return (
@@ -35,7 +35,7 @@ export function AccountDropdown() {
               <span className="text-xs text-base-content/60">Pro Plan</span>
             </div>
           </div>
-          <FontAwesomeIcon icon={faChevronUp} className="w-4 h-4 text-base-content/40" />
+          <ChevronUpIcon className="w-4 h-4 text-base-content/40" />
         </div>
         <ul
           tabIndex={0}

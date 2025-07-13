@@ -43,7 +43,7 @@ export function VoiceRecognitionUI({
       // Simulate audio levels with some randomness
       const newLevel = Math.random() * 100;
       setAudioLevel(newLevel);
-      
+
       // Generate random heights for visualization bars
       const bars = Array.from({ length: 20 }, () => Math.random() * 100);
       setAnimationBars(bars);
@@ -74,9 +74,10 @@ export function VoiceRecognitionUI({
           onClick={handleToggleListening}
           className={`
             relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200
-            ${isListening 
-              ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg scale-110' 
-              : 'bg-primary hover:bg-primary-focus text-primary-content shadow-md hover:scale-105'
+            ${
+              isListening
+                ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg scale-110'
+                : 'bg-primary hover:bg-primary-focus text-primary-content shadow-md hover:scale-105'
             }
           `}
           aria-label={isListening ? 'Stop listening' : 'Start listening'}
@@ -103,7 +104,7 @@ export function VoiceRecognitionUI({
               <div
                 key={index}
                 className="bg-primary rounded-t w-1 transition-all duration-100"
-                style={{ 
+                style={{
                   height: `${Math.max(height, 10)}%`,
                   opacity: 0.7 + (height / 100) * 0.3,
                 }}
@@ -124,12 +125,8 @@ export function VoiceRecognitionUI({
 
           {/* Status text */}
           <div className="text-center">
-            <div className="text-sm font-medium text-base-content animate-pulse">
-              Listening...
-            </div>
-            <div className="text-xs text-base-content/60 mt-1">
-              Tap the microphone to stop
-            </div>
+            <div className="text-sm font-medium text-base-content animate-pulse">Listening...</div>
+            <div className="text-xs text-base-content/60 mt-1">Tap the microphone to stop</div>
           </div>
         </div>
       )}
@@ -141,9 +138,7 @@ export function VoiceRecognitionUI({
           {transcript && (
             <div>
               <div className="text-xs text-base-content/60 mb-1">Transcribed:</div>
-              <div className="text-sm text-base-content font-medium">
-                {transcript}
-              </div>
+              <div className="text-sm text-base-content font-medium">{transcript}</div>
             </div>
           )}
 
@@ -151,9 +146,7 @@ export function VoiceRecognitionUI({
           {interimTranscript && (
             <div>
               <div className="text-xs text-base-content/60 mb-1">Current:</div>
-              <div className="text-sm text-base-content/70 italic">
-                {interimTranscript}
-              </div>
+              <div className="text-sm text-base-content/70 italic">{interimTranscript}</div>
             </div>
           )}
 
@@ -197,18 +190,22 @@ interface CompactVoiceButtonProps {
   variant?: 'primary' | 'ghost' | 'outline';
 }
 
-export function CompactVoiceButton({ 
-  isListening, 
-  onToggle, 
+export function CompactVoiceButton({
+  isListening,
+  onToggle,
   size = 'md',
-  variant = 'primary' 
+  variant = 'primary',
 }: CompactVoiceButtonProps) {
   const getSizeClasses = () => {
     switch (size) {
-      case 'sm': return 'w-8 h-8';
-      case 'md': return 'w-10 h-10';
-      case 'lg': return 'w-12 h-12';
-      default: return 'w-10 h-10';
+      case 'sm':
+        return 'w-8 h-8';
+      case 'md':
+        return 'w-10 h-10';
+      case 'lg':
+        return 'w-12 h-12';
+      default:
+        return 'w-10 h-10';
     }
   };
 
@@ -216,21 +213,29 @@ export function CompactVoiceButton({
     if (isListening) {
       return 'bg-red-500 hover:bg-red-600 text-white';
     }
-    
+
     switch (variant) {
-      case 'primary': return 'bg-primary hover:bg-primary-focus text-primary-content';
-      case 'ghost': return 'bg-transparent hover:bg-base-200 text-base-content';
-      case 'outline': return 'border border-base-300 hover:bg-base-200 text-base-content';
-      default: return 'bg-primary hover:bg-primary-focus text-primary-content';
+      case 'primary':
+        return 'bg-primary hover:bg-primary-focus text-primary-content';
+      case 'ghost':
+        return 'bg-transparent hover:bg-base-200 text-base-content';
+      case 'outline':
+        return 'border border-base-300 hover:bg-base-200 text-base-content';
+      default:
+        return 'bg-primary hover:bg-primary-focus text-primary-content';
     }
   };
 
   const getIconSize = () => {
     switch (size) {
-      case 'sm': return 'w-3 h-3';
-      case 'md': return 'w-4 h-4';
-      case 'lg': return 'w-5 h-5';
-      default: return 'w-4 h-4';
+      case 'sm':
+        return 'w-3 h-3';
+      case 'md':
+        return 'w-4 h-4';
+      case 'lg':
+        return 'w-5 h-5';
+      default:
+        return 'w-4 h-4';
     }
   };
 
@@ -244,11 +249,8 @@ export function CompactVoiceButton({
       `}
       aria-label={isListening ? 'Stop listening' : 'Start voice input'}
     >
-      <FontAwesomeIcon 
-        icon={isListening ? faTimes : faMicrophone} 
-        className={getIconSize()} 
-      />
-      
+      <FontAwesomeIcon icon={isListening ? faTimes : faMicrophone} className={getIconSize()} />
+
       {/* Active indicator */}
       {isListening && (
         <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-25"></div>

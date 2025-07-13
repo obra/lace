@@ -7,12 +7,21 @@ import React from 'react';
 import { TimelineEntry } from '~/interfaces/web/types';
 import { formatTime } from '~/interfaces/web/utils/format';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faInfoCircle, faUser, faRobot, faTerminal, faExternalLinkAlt,
-  faFolderPlus, faShare, faEdit, faCheckCircle, faImages, faPlug
+import {
+  faInfoCircle,
+  faUser,
+  faRobot,
+  faTerminal,
+  faExternalLinkAlt,
+  faFolderPlus,
+  faShare,
+  faEdit,
+  faCheckCircle,
+  faImages,
+  faPlug,
 } from '~/interfaces/web/lib/fontawesome';
-import { Carousel } from './Carousel';
-import { IntegrationEntry } from './IntegrationEntry';
+import { Carousel } from '~/interfaces/web/components/timeline/Carousel';
+import { IntegrationEntry } from '~/interfaces/web/components/timeline/IntegrationEntry';
 
 interface TimelineMessageProps {
   entry: TimelineEntry;
@@ -269,9 +278,7 @@ export function TimelineMessage({ entry }: TimelineMessageProps) {
                           ))}
                         </div>
                       </div>
-                      <span className="text-xs font-mono text-base-content/50">
-                        {item.commit}
-                      </span>
+                      <span className="text-xs font-mono text-base-content/50">{item.commit}</span>
                     </div>
 
                     <div className="mt-3">

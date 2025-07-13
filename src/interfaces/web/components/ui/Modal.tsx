@@ -68,12 +68,18 @@ export function Modal({
 
   const getSizeClasses = () => {
     switch (size) {
-      case 'sm': return 'max-w-md';
-      case 'md': return 'max-w-lg';
-      case 'lg': return 'max-w-2xl';
-      case 'xl': return 'max-w-4xl';
-      case 'full': return 'max-w-[95vw] max-h-[95vh]';
-      default: return 'max-w-lg';
+      case 'sm':
+        return 'max-w-md';
+      case 'md':
+        return 'max-w-lg';
+      case 'lg':
+        return 'max-w-2xl';
+      case 'xl':
+        return 'max-w-4xl';
+      case 'full':
+        return 'max-w-[95vw] max-h-[95vh]';
+      default:
+        return 'max-w-lg';
     }
   };
 
@@ -88,7 +94,7 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
         onClick={handleBackdropClick}
         aria-hidden="true"
@@ -130,9 +136,7 @@ export function Modal({
           )}
 
           {/* Content */}
-          <div className="p-4">
-            {children}
-          </div>
+          <div className="p-4">{children}</div>
         </div>
       </div>
     </div>
@@ -163,10 +167,14 @@ export function ConfirmModal({
 }: ConfirmModalProps) {
   const getVariantClasses = () => {
     switch (variant) {
-      case 'danger': return 'btn-error';
-      case 'warning': return 'btn-warning';
-      case 'info': return 'btn-primary';
-      default: return 'btn-primary';
+      case 'danger':
+        return 'btn-error';
+      case 'warning':
+        return 'btn-warning';
+      case 'info':
+        return 'btn-primary';
+      default:
+        return 'btn-primary';
     }
   };
 
@@ -176,26 +184,15 @@ export function ConfirmModal({
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={title}
-      size="sm"
-    >
+    <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
       <div className="space-y-4">
         <p className="text-base-content/80">{message}</p>
-        
+
         <div className="flex gap-3 justify-end">
-          <button 
-            onClick={onClose}
-            className="btn btn-ghost"
-          >
+          <button onClick={onClose} className="btn btn-ghost">
             {cancelText}
           </button>
-          <button 
-            onClick={handleConfirm}
-            className={`btn ${getVariantClasses()}`}
-          >
+          <button onClick={handleConfirm} className={`btn ${getVariantClasses()}`}>
             {confirmText}
           </button>
         </div>

@@ -3,8 +3,8 @@
 
 'use client';
 
-import { LaceApp } from './LaceApp';
+import { AnimatedLaceApp } from './AnimatedLaceApp';
 
 export default function ChatInterface() {
-  return <LaceApp />;
+  return <AnimatedLaceApp />;
 }

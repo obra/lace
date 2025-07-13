@@ -45,22 +45,16 @@ export default function GoogleDocChatMessage({ message }: GoogleDocChatMessagePr
       <Avatar role={message.role} />
       <div className="chat-header">
         {message.role === 'user' ? 'You' : 'Lace'}
-        <time className="text-xs opacity-50 ml-1">
-          {message.timestamp.toLocaleTimeString()}
-        </time>
+        <time className="text-xs opacity-50 ml-1">{message.timestamp.toLocaleTimeString()}</time>
       </div>
-      
+
       <div
         className={`chat-bubble ${
           message.role === 'user' ? 'chat-bubble-primary' : 'chat-bubble-secondary'
         } max-w-md`}
       >
         {/* Text content */}
-        {message.content && (
-          <div className="mb-3">
-            {message.content}
-          </div>
-        )}
+        {message.content && <div className="mb-3">{message.content}</div>}
 
         {/* Google Doc attachment */}
         {message.document && (
@@ -68,26 +62,26 @@ export default function GoogleDocChatMessage({ message }: GoogleDocChatMessagePr
             {/* Document header */}
             <div className="p-3 bg-base-200 border-b border-base-300">
               <div className="flex items-center gap-2">
-                <FontAwesomeIcon 
-                  icon={faFileAlt} 
-                  className="text-blue-600 text-sm" 
-                />
+                <FontAwesomeIcon icon={faFileAlt} className="text-blue-600 text-sm" />
                 <div className="flex-1 min-w-0">
                   <h4 className="font-medium text-sm truncate" title={message.document.title}>
                     {message.document.title}
                   </h4>
                   <p className="text-xs text-base-content/70">
-                    By {message.document.owner} • {message.document.lastModified.toLocaleDateString()}
+                    By {message.document.owner} •{' '}
+                    {message.document.lastModified.toLocaleDateString()}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    message.document.permissions === 'edit' 
-                      ? 'bg-green-100 text-green-700' 
-                      : message.document.permissions === 'comment'
-                      ? 'bg-yellow-100 text-yellow-700'
-                      : 'bg-gray-100 text-gray-700'
-                  }`}>
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      message.document.permissions === 'edit'
+                        ? 'bg-green-100 text-green-700'
+                        : message.document.permissions === 'comment'
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
                     {message.document.permissions}
                   </span>
                   <button
@@ -95,10 +89,7 @@ export default function GoogleDocChatMessage({ message }: GoogleDocChatMessagePr
                     className="btn btn-ghost btn-xs"
                     title={isExpanded ? 'Collapse' : 'Expand'}
                   >
-                    <FontAwesomeIcon 
-                      icon={faFileAlt} 
-                      className="text-xs" 
-                    />
+                    <FontAwesomeIcon icon={faFileAlt} className="text-xs" />
                   </button>
                 </div>
               </div>
@@ -125,25 +116,20 @@ export default function GoogleDocChatMessage({ message }: GoogleDocChatMessagePr
               {/* Text preview */}
               {message.document.preview && (
                 <div className="mb-3">
-                  <p className={`text-sm text-base-content/80 ${
-                    !isExpanded ? 'line-clamp-3' : ''
-                  }`}>
+                  <p
+                    className={`text-sm text-base-content/80 ${!isExpanded ? 'line-clamp-3' : ''}`}
+                  >
                     {message.document.preview}
                   </p>
                   {!isExpanded && message.document.preview.length > 150 && (
-                    <p className="text-xs text-base-content/60 mt-1">
-                      Click expand to see more...
-                    </p>
+                    <p className="text-xs text-base-content/60 mt-1">Click expand to see more...</p>
                   )}
                 </div>
               )}
 
               {/* Action buttons */}
               <div className="flex justify-between items-center">
-                <button
-                  onClick={handleDocumentClick}
-                  className="btn btn-primary btn-sm"
-                >
+                <button onClick={handleDocumentClick} className="btn btn-primary btn-sm">
                   <FontAwesomeIcon icon={faExternalLinkAlt} className="mr-1" />
                   Open in Google Docs
                 </button>

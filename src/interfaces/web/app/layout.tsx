@@ -2,7 +2,7 @@
 // ABOUTME: Provides HTML structure, global styles, and FontAwesome setup for the Lace web app
 
 import type { Metadata } from 'next';
-import './globals.css';
+import '~/interfaces/web/app/globals.css';
 import '~/interfaces/web/lib/fontawesome';
 
 export const metadata: Metadata = {

@@ -4,7 +4,12 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { shimmer, springConfig, staggerContainer, staggerItem } from '~/interfaces/web/lib/animations';
+import {
+  shimmer,
+  springConfig,
+  staggerContainer,
+  staggerItem,
+} from '~/interfaces/web/lib/animations';
 
 interface LoadingSkeletonProps {
   variant?: 'text' | 'card' | 'avatar' | 'timeline' | 'carousel';
@@ -12,7 +17,11 @@ interface LoadingSkeletonProps {
   className?: string;
 }
 
-export function LoadingSkeleton({ variant = 'text', count = 1, className = '' }: LoadingSkeletonProps) {
+export function LoadingSkeleton({
+  variant = 'text',
+  count = 1,
+  className = '',
+}: LoadingSkeletonProps) {
   const renderTextSkeleton = () => (
     <motion.div
       className={`bg-gradient-to-r from-base-300 via-base-200 to-base-300 bg-[length:200%_100%] rounded ${className}`}
@@ -84,11 +93,7 @@ export function LoadingSkeleton({ variant = 'text', count = 1, className = '' }:
       animate="animate"
     >
       {Array.from({ length: 3 }).map((_, index) => (
-        <motion.div
-          key={index}
-          className="flex gap-3"
-          variants={staggerItem}
-        >
+        <motion.div key={index} className="flex gap-3" variants={staggerItem}>
           <motion.div
             className="w-8 h-8 bg-gradient-to-r from-base-300 via-base-200 to-base-300 bg-[length:200%_100%] rounded-md flex-shrink-0"
             variants={shimmer}

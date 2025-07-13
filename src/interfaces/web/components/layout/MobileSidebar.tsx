@@ -5,13 +5,8 @@
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faSearch, 
-  faTerminal, 
-  faTasks, 
-  faFolder,
-  faChevronLeft
-} from '~/interfaces/web/lib/fontawesome';
+import { faSearch, faTerminal, faTasks, faFolder } from '~/interfaces/web/lib/fontawesome';
+import { ChevronLeftIcon } from '~/interfaces/web/lib/heroicons';
 import { Timeline, Project, Task } from '~/interfaces/web/types';
 
 interface MobileSidebarProps {
@@ -82,11 +77,11 @@ export function MobileSidebar({
             </div>
             <h1 className="font-semibold text-base-content">Lace</h1>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="p-2 hover:bg-base-200 rounded-lg transition-colors group"
           >
-            <FontAwesomeIcon icon={faChevronLeft} className="w-6 h-6 transition-transform group-hover:-translate-x-1" />
+            <ChevronLeftIcon className="w-6 h-6 transition-transform group-hover:-translate-x-1" />
           </button>
         </div>
 

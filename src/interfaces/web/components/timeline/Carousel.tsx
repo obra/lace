@@ -4,8 +4,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronLeft, faChevronRight } from '~/interfaces/web/lib/fontawesome';
+import { ChevronLeftIcon, ChevronRightIcon } from '~/interfaces/web/lib/heroicons';
 
 interface CarouselProps {
   children: React.ReactNode[];
@@ -142,7 +141,7 @@ export function Carousel({
   }
 
   return (
-    <div 
+    <div
       className={`relative group ${className}`}
       onKeyDown={handleKeyDown}
       tabIndex={0}
@@ -154,10 +153,10 @@ export function Carousel({
         <div
           ref={scrollRef}
           className="flex overflow-x-auto scroll-smooth snap-x snap-mandatory hide-scrollbar"
-          style={{ 
-            scrollbarWidth: 'none', 
+          style={{
+            scrollbarWidth: 'none',
             msOverflowStyle: 'none',
-            WebkitOverflowScrolling: 'touch'
+            WebkitOverflowScrolling: 'touch',
           }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -181,14 +180,14 @@ export function Carousel({
                 </div>
               ))}
               {/* Fill empty slots on last page */}
-              {pageItems.length < currentItemsPerView && Array.from({ length: currentItemsPerView - pageItems.length }).map((_, emptyIndex) => (
-                <div key={`empty-${emptyIndex}`} className="flex-1" />
-              ))}
+              {pageItems.length < currentItemsPerView &&
+                Array.from({ length: currentItemsPerView - pageItems.length }).map(
+                  (_, emptyIndex) => <div key={`empty-${emptyIndex}`} className="flex-1" />
+                )}
             </div>
           ))}
         </div>
       </div>
-
 
       {/* Navigation arrows */}
       {showNavigation && totalPages > 1 && (
@@ -199,7 +198,7 @@ export function Carousel({
             aria-label="Previous page"
             disabled={currentIndex === 0}
           >
-            <FontAwesomeIcon icon={faChevronLeft} className="w-4 h-4 text-base-content" />
+            <ChevronLeftIcon className="w-4 h-4 text-base-content" />
           </button>
 
           <button
@@ -208,7 +207,7 @@ export function Carousel({
             aria-label="Next page"
             disabled={currentIndex >= maxIndex}
           >
-            <FontAwesomeIcon icon={faChevronRight} className="w-4 h-4 text-base-content" />
+            <ChevronRightIcon className="w-4 h-4 text-base-content" />
           </button>
         </React.Fragment>
       )}

@@ -1,7 +1,7 @@
 // ABOUTME: Chat hook providing message management and API communication
 // ABOUTME: Handles user input, message sending, and streaming responses
 import { useState, useCallback } from 'react';
-import type { Message } from '~/types';
+import type { Message } from '~/interfaces/web/types';
 import { useSSEStream } from '~/interfaces/web/hooks/useSSEStream';
 
 const INITIAL_MESSAGE: Message = {

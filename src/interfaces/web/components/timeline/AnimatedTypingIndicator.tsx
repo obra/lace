@@ -26,17 +26,18 @@ export function AnimatedTypingIndicator({ agent }: AnimatedTypingIndicatorProps)
   };
 
   const dotColor = agentColors[agent as keyof typeof agentColors] || 'bg-gray-600';
-  const avatarColor = agentColorClasses[agent as keyof typeof agentColorClasses] || 'bg-gray-600 text-white';
+  const avatarColor =
+    agentColorClasses[agent as keyof typeof agentColorClasses] || 'bg-gray-600 text-white';
 
   return (
-    <motion.div 
+    <motion.div
       className="flex gap-3 lg:gap-4"
       variants={fadeInUp}
       initial="initial"
       animate="animate"
       exit="exit"
     >
-      <motion.div 
+      <motion.div
         className="flex-shrink-0"
         initial={{ scale: 0, rotate: -180 }}
         animate={{ scale: 1, rotate: 0 }}
@@ -54,25 +55,25 @@ export function AnimatedTypingIndicator({ agent }: AnimatedTypingIndicatorProps)
           transition={{
             duration: 2,
             repeat: Infinity,
-            ease: "easeInOut",
+            ease: 'easeInOut',
           }}
         >
           <FontAwesomeIcon icon={faRobot} className="text-xs" />
         </motion.div>
       </motion.div>
-      
-      <motion.div 
+
+      <motion.div
         className="bg-base-100 border border-base-300 rounded-2xl px-4 py-3 shadow-sm"
         initial={{ opacity: 0, scale: 0.9, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ delay: 0.2, ...springConfig.gentle }}
-        whileHover={{ 
+        whileHover={{
           scale: 1.02,
-          boxShadow: "0 8px 25px -8px rgba(0,0,0,0.1)",
-          transition: springConfig.snappy
+          boxShadow: '0 8px 25px -8px rgba(0,0,0,0.1)',
+          transition: springConfig.snappy,
         }}
       >
-        <motion.div 
+        <motion.div
           className="flex gap-1.5 items-center"
           variants={loadingDots}
           initial="initial"
@@ -92,11 +93,11 @@ export function AnimatedTypingIndicator({ agent }: AnimatedTypingIndicatorProps)
                 duration: 1.2,
                 repeat: Infinity,
                 delay: index * 0.2,
-                ease: "easeInOut",
+                ease: 'easeInOut',
               }}
             />
           ))}
-          
+
           {/* Subtle text hint */}
           <motion.span
             className="text-xs text-base-content/40 ml-2"
@@ -106,7 +107,7 @@ export function AnimatedTypingIndicator({ agent }: AnimatedTypingIndicatorProps)
             transition={{
               duration: 2,
               repeat: Infinity,
-              ease: "easeInOut",
+              ease: 'easeInOut',
             }}
           >
             {agent} is thinking...

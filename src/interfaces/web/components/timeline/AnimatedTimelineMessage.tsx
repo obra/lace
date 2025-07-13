@@ -7,21 +7,30 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TimelineEntry } from '~/interfaces/web/types';
 import { formatTime } from '~/interfaces/web/utils/format';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faInfoCircle, faUser, faRobot, faTerminal, faExternalLinkAlt,
-  faFolderPlus, faShare, faEdit, faCheckCircle, faImages, faPlug
+import {
+  faInfoCircle,
+  faUser,
+  faRobot,
+  faTerminal,
+  faExternalLinkAlt,
+  faFolderPlus,
+  faShare,
+  faEdit,
+  faCheckCircle,
+  faImages,
+  faPlug,
 } from '~/interfaces/web/lib/fontawesome';
-import { Carousel } from './Carousel';
-import { IntegrationEntry } from './IntegrationEntry';
-import { 
-  messageVariants, 
-  fadeInUp, 
-  scaleIn, 
+import { Carousel } from '~/interfaces/web/components/timeline/Carousel';
+import { IntegrationEntry } from '~/interfaces/web/components/timeline/IntegrationEntry';
+import {
+  messageVariants,
+  fadeInUp,
+  scaleIn,
   hoverLift,
   buttonTap,
   springConfig,
   staggerContainer,
-  staggerItem
+  staggerItem,
 } from '~/interfaces/web/lib/animations';
 
 interface AnimatedTimelineMessageProps {
@@ -60,7 +69,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
   // Admin Messages
   if (entry.type === 'admin') {
     return (
-      <motion.div 
+      <motion.div
         variants={scaleIn}
         initial="initial"
         animate="animate"
@@ -68,7 +77,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
         className="flex justify-center"
         layout
       >
-        <motion.div 
+        <motion.div
           className="bg-base-200 border border-base-300 rounded-full px-4 py-2 text-sm text-base-content/70"
           whileHover={{ scale: 1.02 }}
           transition={springConfig.gentle}
@@ -97,7 +106,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
   // Human Messages
   if (entry.type === 'human') {
     return (
-      <motion.div 
+      <motion.div
         variants={messageVariants}
         initial="initial"
         animate="animate"
@@ -106,13 +115,13 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
         layout
         transition={{ delay: index * 0.05 }}
       >
-        <motion.div 
+        <motion.div
           className="flex-shrink-0"
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.1, ...springConfig.bouncy }}
         >
-          <motion.div 
+          <motion.div
             className="w-8 h-8 rounded-md bg-teal-600 text-white flex items-center justify-center text-sm font-medium"
             whileHover={{ scale: 1.1, rotate: 5 }}
             transition={springConfig.snappy}
@@ -123,7 +132,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
         <motion.div className="flex-1 min-w-0" variants={staggerContainer}>
           <motion.div className="flex items-baseline gap-2 mb-1" variants={staggerItem}>
             <span className="font-medium text-sm text-base-content">You</span>
-            <motion.span 
+            <motion.span
               className="text-xs text-base-content/50"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -132,10 +141,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
               {formatTime(entry.timestamp)}
             </motion.span>
           </motion.div>
-          <motion.div 
-            className="text-sm leading-relaxed text-base-content"
-            variants={staggerItem}
-          >
+          <motion.div className="text-sm leading-relaxed text-base-content" variants={staggerItem}>
             {entry.content}
           </motion.div>
         </motion.div>
@@ -158,7 +164,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
     };
 
     return (
-      <motion.div 
+      <motion.div
         variants={messageVariants}
         initial="initial"
         animate="animate"
@@ -167,7 +173,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
         layout
         transition={{ delay: index * 0.05 }}
       >
-        <motion.div 
+        <motion.div
           className="flex-shrink-0"
           initial={{ scale: 0, opacity: 0, rotate: -180 }}
           animate={{ scale: 1, opacity: 1, rotate: 0 }}
@@ -186,7 +192,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
         <motion.div className="flex-1 min-w-0" variants={staggerContainer}>
           <motion.div className="flex items-baseline gap-2 mb-1" variants={staggerItem}>
             <span className="font-medium text-sm text-base-content">{entry.agent}</span>
-            <motion.span 
+            <motion.span
               className="text-xs text-base-content/50"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -219,7 +225,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
   // Tool Call with animated terminal effect
   if (entry.type === 'tool') {
     return (
-      <motion.div 
+      <motion.div
         variants={messageVariants}
         initial="initial"
         animate="animate"
@@ -228,25 +234,25 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
         layout
         transition={{ delay: index * 0.05 }}
       >
-        <motion.div 
+        <motion.div
           className="flex-shrink-0"
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.1, ...springConfig.bouncy }}
         >
-          <motion.div 
+          <motion.div
             className="w-8 h-8 rounded-md bg-teal-100 text-teal-700 flex items-center justify-center text-sm"
-            animate={{ 
+            animate={{
               boxShadow: [
-                "0 0 0 0 rgba(20, 184, 166, 0)",
-                "0 0 0 10px rgba(20, 184, 166, 0.1)",
-                "0 0 0 0 rgba(20, 184, 166, 0)"
-              ]
+                '0 0 0 0 rgba(20, 184, 166, 0)',
+                '0 0 0 10px rgba(20, 184, 166, 0.1)',
+                '0 0 0 0 rgba(20, 184, 166, 0)',
+              ],
             }}
-            transition={{ 
+            transition={{
               duration: 2,
               repeat: Infinity,
-              repeatDelay: 1
+              repeatDelay: 1,
             }}
           >
             <FontAwesomeIcon icon={faTerminal} className="text-xs" />
@@ -255,7 +261,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
         <motion.div className="flex-1 min-w-0" variants={staggerContainer}>
           <motion.div className="flex items-baseline gap-2 mb-1" variants={staggerItem}>
             <span className="font-medium text-sm text-base-content">Tool</span>
-            <motion.span 
+            <motion.span
               className="text-xs text-base-content/50"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -263,7 +269,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
             >
               {formatTime(entry.timestamp)}
             </motion.span>
-            <motion.span 
+            <motion.span
               className="text-xs px-1.5 py-0.5 rounded bg-base-content/10 text-base-content/60"
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -272,12 +278,12 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
               {entry.tool}
             </motion.span>
           </motion.div>
-          <motion.div 
+          <motion.div
             className="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300"
             variants={fadeInUp}
             {...hoverLift}
           >
-            <motion.div 
+            <motion.div
               className="text-base-content/80 mb-2"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -285,7 +291,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
             >
               $ {entry.content}
             </motion.div>
-            <motion.div 
+            <motion.div
               className="text-base-content/60 text-xs whitespace-pre-wrap"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -371,7 +377,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
   // Carousel with animated cards
   if (entry.type === 'carousel' && entry.items) {
     return (
-      <motion.div 
+      <motion.div
         variants={messageVariants}
         initial="initial"
         animate="animate"
@@ -380,13 +386,13 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
         layout
         transition={{ delay: index * 0.05 }}
       >
-        <motion.div 
+        <motion.div
           className="flex-shrink-0"
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.1, ...springConfig.bouncy }}
         >
-          <motion.div 
+          <motion.div
             className="w-8 h-8 rounded-md bg-teal-100 text-teal-700 flex items-center justify-center text-sm"
             whileHover={{ scale: 1.1, rotate: 5 }}
             transition={springConfig.snappy}
@@ -397,7 +403,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
         <motion.div className="flex-1 min-w-0" variants={staggerContainer}>
           <motion.div className="flex items-baseline gap-2 mb-2" variants={staggerItem}>
             <span className="font-medium text-sm text-base-content">System</span>
-            <motion.span 
+            <motion.span
               className="text-xs text-base-content/50"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -406,12 +412,12 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
               {formatTime(entry.timestamp)}
             </motion.span>
           </motion.div>
-          <motion.div 
+          <motion.div
             className="bg-base-100 border border-base-300 rounded-lg p-4 shadow-sm"
             variants={fadeInUp}
             {...hoverLift}
           >
-            <motion.h3 
+            <motion.h3
               className="font-semibold text-base-content mb-3"
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -426,14 +432,14 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
               itemsPerView={{ mobile: 1, tablet: 2, desktop: 3 }}
             >
               {entry.items.map((item, itemIndex) => (
-                <motion.div 
+                <motion.div
                   key={itemIndex}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.3 + itemIndex * 0.1, ...springConfig.gentle }}
                   whileHover={{ y: -4 }}
                 >
-                  <motion.div 
+                  <motion.div
                     className="card bg-base-100 shadow-sm border border-base-300 h-full"
                     {...hoverLift}
                   >
@@ -477,9 +483,9 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
                                 }`}
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
-                                transition={{ 
-                                  delay: 0.5 + itemIndex * 0.1 + i * 0.05, 
-                                  ...springConfig.bouncy 
+                                transition={{
+                                  delay: 0.5 + itemIndex * 0.1 + i * 0.05,
+                                  ...springConfig.bouncy,
                                 }}
                               />
                             ))}
@@ -511,7 +517,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
                       </div>
 
                       <div className="card-actions justify-end mt-3">
-                        <motion.button 
+                        <motion.button
                           className="btn btn-xs btn-outline"
                           {...buttonTap}
                           whileHover={{ scale: 1.05 }}

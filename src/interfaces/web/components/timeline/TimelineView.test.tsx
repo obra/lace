@@ -4,9 +4,9 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { TimelineView } from './TimelineView';
-import { createMockTimelineEntry } from '../../__tests__/utils/test-helpers';
-import '../../__tests__/setup';
+import { TimelineView } from '~/interfaces/web/components/timeline/TimelineView';
+import { createMockTimelineEntry } from '~/interfaces/web/__tests__/utils/test-helpers';
+import '~/interfaces/web/__tests__/setup';
 
 // Mock Framer Motion to avoid animation issues in tests
 vi.mock('framer-motion', () => ({
@@ -19,12 +19,12 @@ vi.mock('framer-motion', () => ({
 
 // Mock child components
 vi.mock('./TimelineMessage', () => ({
-  TimelineMessage: ({ entry }: { entry: any }) => 
+  TimelineMessage: ({ entry }: { entry: any }) =>
     React.createElement('div', { 'data-testid': 'timeline-message' }, entry.content),
 }));
 
 vi.mock('./TypingIndicator', () => ({
-  TypingIndicator: ({ agent }: { agent: string }) => 
+  TypingIndicator: ({ agent }: { agent: string }) =>
     React.createElement('div', { 'data-testid': 'typing-indicator' }, `${agent} is thinking...`),
 }));
 
@@ -51,34 +51,34 @@ describe('TimelineView', () => {
     ];
 
     render(<TimelineView {...defaultProps} entries={entries} />);
-    
+
     expect(screen.getByText('First message')).toBeInTheDocument();
     expect(screen.getByText('Second message')).toBeInTheDocument();
   });
 
   it('shows typing indicator when isTyping is true', () => {
     render(<TimelineView {...defaultProps} isTyping={true} />);
-    
+
     // TypingIndicator should be rendered but we'll check for agent name
     expect(screen.getByText('Claude is thinking...')).toBeInTheDocument();
   });
 
   it('does not show typing indicator when isTyping is false', () => {
     render(<TimelineView {...defaultProps} isTyping={false} />);
-    
+
     expect(screen.queryByText('Claude is thinking...')).not.toBeInTheDocument();
   });
 
   it('handles empty entries array', () => {
     render(<TimelineView {...defaultProps} entries={[]} />);
-    
+
     // Should render container without errors
     expect(document.querySelector('.space-y-4')).toBeInTheDocument();
   });
 
   it('displays different agent names in typing indicator', () => {
     render(<TimelineView {...defaultProps} isTyping={true} currentAgent="GPT-4" />);
-    
+
     expect(screen.getByText('GPT-4 is thinking...')).toBeInTheDocument();
   });
 });

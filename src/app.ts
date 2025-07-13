@@ -72,10 +72,7 @@ async function setupAgent(
   return agent;
 }
 
-function handleSessionWithAgent(
-  agent: Agent,
-  continueMode?: boolean | string
-): string {
+function handleSessionWithAgent(agent: Agent, continueMode?: boolean | string): string {
   let continueThreadId: string | undefined;
   if (continueMode) {
     if (typeof continueMode === 'string') {

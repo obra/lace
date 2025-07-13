@@ -4,8 +4,8 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { TypingIndicator } from './TypingIndicator';
-import '../../__tests__/setup';
+import { TypingIndicator } from '~/interfaces/web/components/timeline/TypingIndicator';
+import '~/interfaces/web/__tests__/setup';
 
 // Mock Framer Motion
 vi.mock('framer-motion', () => ({

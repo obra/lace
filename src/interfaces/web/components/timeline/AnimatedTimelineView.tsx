@@ -6,8 +6,8 @@
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { TimelineEntry } from '~/interfaces/web/types';
-import { AnimatedTimelineMessage } from './AnimatedTimelineMessage';
-import { AnimatedTypingIndicator } from './AnimatedTypingIndicator';
+import { AnimatedTimelineMessage } from '~/interfaces/web/components/timeline/AnimatedTimelineMessage';
+import { AnimatedTypingIndicator } from '~/interfaces/web/components/timeline/AnimatedTypingIndicator';
 import { staggerContainer, fadeInUp, springConfig } from '~/interfaces/web/lib/animations';
 
 interface AnimatedTimelineViewProps {
@@ -16,39 +16,43 @@ interface AnimatedTimelineViewProps {
   currentAgent: string;
 }
 
-export function AnimatedTimelineView({ entries, isTyping, currentAgent }: AnimatedTimelineViewProps) {
+export function AnimatedTimelineView({
+  entries,
+  isTyping,
+  currentAgent,
+}: AnimatedTimelineViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
-  const isInViewport = useInView(messagesRef, { margin: "0px 0px -100px 0px" });
+  const isInViewport = useInView(messagesRef, { margin: '0px 0px -100px 0px' });
 
   // Smooth scroll to bottom when new messages arrive
   useEffect(() => {
     if (containerRef.current) {
       const container = containerRef.current;
-      const isScrolledToBottom = 
+      const isScrolledToBottom =
         container.scrollHeight - container.clientHeight <= container.scrollTop + 100;
-      
+
       if (isScrolledToBottom) {
         // Smooth scroll animation
         container.scrollTo({
           top: container.scrollHeight,
-          behavior: 'smooth'
+          behavior: 'smooth',
         });
       }
     }
   }, [entries, isTyping]);
 
   return (
-    <div 
-      ref={containerRef} 
+    <div
+      ref={containerRef}
       className="flex-1 overflow-y-auto overscroll-contain"
-      style={{ 
+      style={{
         scrollBehavior: 'smooth',
         // Add momentum scrolling for iOS
-        WebkitOverflowScrolling: 'touch'
+        WebkitOverflowScrolling: 'touch',
       }}
     >
-      <motion.div 
+      <motion.div
         ref={messagesRef}
         className="p-4 pb-32"
         variants={staggerContainer}
@@ -62,20 +66,20 @@ export function AnimatedTimelineView({ entries, isTyping, currentAgent }: Animat
                 key={entry.id}
                 layout
                 initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                animate={{ 
-                  opacity: 1, 
-                  y: 0, 
+                animate={{
+                  opacity: 1,
+                  y: 0,
                   scale: 1,
                   transition: {
                     delay: Math.min(index * 0.05, 0.5), // Cap delay for performance
-                    ...springConfig.gentle
-                  }
+                    ...springConfig.gentle,
+                  },
                 }}
-                exit={{ 
-                  opacity: 0, 
+                exit={{
+                  opacity: 0,
                   scale: 0.95,
                   y: -10,
-                  transition: { duration: 0.2 }
+                  transition: { duration: 0.2 },
                 }}
                 className="timeline-entry"
               >
@@ -90,17 +94,17 @@ export function AnimatedTimelineView({ entries, isTyping, currentAgent }: Animat
           {isTyping && (
             <motion.div
               initial={{ opacity: 0, y: 20, scale: 0.9 }}
-              animate={{ 
-                opacity: 1, 
-                y: 0, 
+              animate={{
+                opacity: 1,
+                y: 0,
                 scale: 1,
-                transition: springConfig.gentle
+                transition: springConfig.gentle,
               }}
-              exit={{ 
-                opacity: 0, 
+              exit={{
+                opacity: 0,
                 y: -10,
                 scale: 0.9,
-                transition: { duration: 0.2 }
+                transition: { duration: 0.2 },
               }}
               layout
             >
@@ -114,38 +118,33 @@ export function AnimatedTimelineView({ entries, isTyping, currentAgent }: Animat
           {!isInViewport && entries.length > 3 && (
             <motion.button
               initial={{ opacity: 0, scale: 0 }}
-              animate={{ 
-                opacity: 1, 
+              animate={{
+                opacity: 1,
                 scale: 1,
-                transition: springConfig.bouncy
+                transition: springConfig.bouncy,
               }}
-              exit={{ 
-                opacity: 0, 
+              exit={{
+                opacity: 0,
                 scale: 0,
-                transition: { duration: 0.2 }
+                transition: { duration: 0.2 },
               }}
               className="fixed bottom-20 right-4 z-10 w-12 h-12 bg-primary text-primary-content rounded-full shadow-lg flex items-center justify-center"
               onClick={() => {
                 if (containerRef.current) {
                   containerRef.current.scrollTo({
                     top: containerRef.current.scrollHeight,
-                    behavior: 'smooth'
+                    behavior: 'smooth',
                   });
                 }
               }}
-              whileHover={{ 
+              whileHover={{
                 scale: 1.1,
-                boxShadow: "0 10px 30px -10px rgba(0,0,0,0.3)",
-                transition: springConfig.snappy
+                boxShadow: '0 10px 30px -10px rgba(0,0,0,0.3)',
+                transition: springConfig.snappy,
               }}
               whileTap={{ scale: 0.95 }}
             >
-              <svg 
-                className="w-5 h-5" 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <motion.path
                   strokeLinecap="round"
                   strokeLinejoin="round"
