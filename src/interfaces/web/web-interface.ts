@@ -7,7 +7,7 @@ import type { Agent } from '~/agents/agent.js';
 import type { UserInterface } from '~/commands/types.js';
 import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types.js';
 import { logger } from '~/utils/logger.js';
-import { sharedAgentService } from './lib/agent-service.js';
+import type { LaceRequest } from './types.js';
 
 export interface WebInterfaceOptions {
   port?: number;
@@ -73,9 +73,6 @@ export class WebInterface implements UserInterface, ApprovalCallback {
       // Start the Agent
       await this.agent.start();
 
-      // Register the agent with the shared service for API routes
-      sharedAgentService.setSharedAgent(this.agent);
-
       // Create Next.js app with custom app directory
       this.nextApp = next({
         dev: process.env.NODE_ENV !== 'production',
@@ -87,8 +84,10 @@ export class WebInterface implements UserInterface, ApprovalCallback {
       await this.nextApp.prepare();
 
       // Create custom server that integrates with Next.js
-      this.server = createServer((req, res) => {
+      this.server = createServer((req: LaceRequest, res) => {
         try {
+          // Add agent to request context for API routes
+          req.laceAgent = this.agent;
           void handle(req, res);
         } catch (err) {
           logger.error('Error handling request', { error: err });
