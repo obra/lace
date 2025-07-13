@@ -1,102 +1,15 @@
 // ABOUTME: Streaming conversation API using Server-Sent Events with core Lace components
-// ABOUTME: Provides real-time AI chat functionality integrated with Lace's backend
+// ABOUTME: Provides real-time AI chat functionality using Agent event emitter pattern
 
 import { NextRequest } from 'next/server';
-import { Agent } from '~/agents/agent';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { DelegateTool } from '~/tools/implementations/delegate';
-import { getLaceDbPath } from '~/config/lace-dir';
-import { loadEnvFile, getEnvVar } from '~/config/env-loader';
+import { agentService } from '~/interfaces/web/lib/agent-service';
 import { logger } from '~/utils/logger';
-import { AIProvider } from '~/providers/base-provider';
-
-// Initialize environment
-loadEnvFile();
 
 interface StreamConversationRequest {
   message: string;
   threadId?: string;
   provider?: string;
   model?: string;
-}
-
-// Provider initialization
-async function createProvider(
-  providerType: string = 'anthropic',
-  model?: string
-): Promise<AIProvider> {
-  const providerInitializers: Record<
-    string,
-    (config: { apiKey?: string; model?: string }) => Promise<AIProvider>
-  > = {
-    anthropic: async ({ apiKey, model }) => {
-      if (getEnvVar('LACE_TEST_MODE') === 'true') {
-        const { createMockProvider } = await import('~/__tests__/utils/mock-provider');
-        return createMockProvider();
-      }
-
-      const { AnthropicProvider } = await import('~/providers/anthropic-provider');
-      if (!apiKey) {
-        throw new Error('Anthropic API key is required');
-      }
-      return new AnthropicProvider({ apiKey, model });
-    },
-    openai: async ({ apiKey, model }) => {
-      const { OpenAIProvider } = await import('~/providers/openai-provider');
-      if (!apiKey) {
-        throw new Error('OpenAI API key is required');
-      }
-      return new OpenAIProvider({ apiKey, model });
-    },
-  };
-
-  const initializer = providerInitializers[providerType];
-  if (!initializer) {
-    throw new Error(
-      `Unknown provider: ${providerType}. Available: ${Object.keys(providerInitializers).join(', ')}`
-    );
-  }
-
-  let apiKey: string | undefined;
-  if (providerType === 'anthropic') {
-    apiKey = getEnvVar('ANTHROPIC_KEY');
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_KEY environment variable required');
-    }
-  } else if (providerType === 'openai') {
-    apiKey = getEnvVar('OPENAI_API_KEY') || getEnvVar('OPENAI_KEY');
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY or OPENAI_KEY environment variable required');
-    }
-  }
-
-  return initializer({ apiKey, model });
-}
-
-async function setupAgent(threadId: string, provider: string, model?: string): Promise<Agent> {
-  const toolExecutor = new ToolExecutor();
-  toolExecutor.registerAllAvailableTools();
-
-  const dbPath = getLaceDbPath();
-  const threadManager = new ThreadManager(dbPath);
-
-  const aiProvider = await createProvider(provider, model);
-
-  const agent = new Agent({
-    provider: aiProvider,
-    toolExecutor,
-    threadManager,
-    threadId,
-    tools: toolExecutor.getAllTools(),
-  });
-
-  const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
-  if (delegateTool) {
-    delegateTool.setDependencies(agent, toolExecutor);
-  }
-
-  return agent;
 }
 
 export async function POST(request: NextRequest) {
@@ -110,32 +23,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Configure logger
-    logger.configure('info');
-
-    const provider = body.provider || 'anthropic';
-    const model = body.model;
-
-    // Setup thread management
-    const dbPath = getLaceDbPath();
-    const threadManager = new ThreadManager(dbPath);
-
-    // Handle existing thread or create new one
-    let threadId: string;
-    let isNew = false;
-
-    if (body.threadId) {
-      const sessionInfo = threadManager.resumeOrCreate(body.threadId);
-      threadId = sessionInfo.threadId;
-      isNew = !sessionInfo.isResumed;
-    } else {
-      const sessionInfo = threadManager.resumeOrCreate();
-      threadId = sessionInfo.threadId;
-      isNew = true;
-    }
-
-    // Setup agent
-    const agent = await setupAgent(threadId, provider, model);
+    // Create agent through centralized service
+    const { agent, threadInfo } = await agentService.createAgent({
+      provider: body.provider || 'anthropic',
+      model: body.model,
+      threadId: body.threadId,
+    });
 
     // Create streaming response
     const encoder = new TextEncoder();
@@ -147,10 +40,10 @@ export async function POST(request: NextRequest) {
             encoder.encode(
               `data: ${JSON.stringify({
                 type: 'connection',
-                threadId,
-                isNew,
-                provider,
-                model: model || 'default',
+                threadId: threadInfo.threadId,
+                isNew: threadInfo.isNew,
+                provider: body.provider || 'anthropic',
+                model: body.model || 'default',
               })}\n\n`
             )
           );
@@ -242,7 +135,7 @@ export async function POST(request: NextRequest) {
               encoder.encode(
                 `data: ${JSON.stringify({
                   type: 'conversation_complete',
-                  threadId,
+                  threadId: threadInfo.threadId,
                   timestamp: new Date().toISOString(),
                 })}\n\n`
               )

@@ -1,6 +1,7 @@
-// ABOUTME: FontAwesome configuration and icon exports for web interface
-// ABOUTME: Centralizes icon imports and configures FontAwesome for React
+// ABOUTME: FontAwesome configuration for React components in web interface
+// ABOUTME: Prevents auto CSS injection and exports commonly used icons
 
+// FontAwesome configuration for React components
 import { config } from '@fortawesome/fontawesome-svg-core';
 
 // Prevent FontAwesome from adding CSS since we'll import it manually
@@ -41,9 +42,4 @@ export {
   faTable,
   faMinus,
   faPlug,
-  // Carousel and sidebar navigation
-  faChevronLeft,
-  faChevronRight,
-  faChevronDown,
-  faChevronUp,
 } from '@fortawesome/free-solid-svg-icons';

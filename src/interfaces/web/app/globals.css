@@ -1,3 +1,94 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@plugin 'daisyui';
+@import '@fortawesome/fontawesome-svg-core/styles.css';
+
+/* Mobile-specific improvements */
+@supports (padding: max(0px)) {
+  .h-safe-bottom {
+    height: max(16px, env(safe-area-inset-bottom));
+  }
+}
+
+/* Smooth scrolling for mobile */
+.overscroll-contain {
+  overscroll-behavior: contain;
+}
+
+/* Better mobile text selection */
+.timeline-entry {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Prevent zoom on input focus (iOS) */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+@media (min-width: 1024px) {
+  input,
+  textarea,
+  select {
+    font-size: 14px;
+  }
+}
+
+/* Dropdown animation fix */
+[x-collapse] {
+  overflow: hidden;
+  transition: height 0.3s ease;
+}
+
+/* Sidebar toggle button enhancement */
+.sidebar-toggle {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Smooth sidebar transitions */
+.sidebar-content {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Avatar ring effect */
+.avatar-ring {
+  box-shadow:
+    0 0 0 2px var(--b3),
+    0 0 0 4px var(--p);
+}
+
+/* Progress bar animation */
+.progress-fill {
+  transition: width 0.6s ease;
+}
+
+/* Collapsed sidebar icon hover effects */
+.collapsed-icon:hover {
+  transform: scale(1.1);
+  transition: transform 0.2s ease;
+}
+
+/* Mobile sidebar slide animation */
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.3s ease-out;
+}
+
+/* Hide scrollbar for carousel */
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
