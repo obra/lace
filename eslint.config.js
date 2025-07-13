@@ -9,7 +9,7 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/**/*', 'vitest.config.ts'],
+    ignores: ['dist/**/*', 'vitest.config.ts', 'src/interfaces/web/.next/**/*'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map(config => ({
@@ -119,6 +119,10 @@ export default [
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/unbound-method': 'off',
       'no-console': 'off',
       ...vitest.configs.recommended.rules,

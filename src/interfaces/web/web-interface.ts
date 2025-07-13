@@ -8,6 +8,7 @@ import type { UserInterface } from '~/commands/types.js';
 import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types.js';
 import { logger } from '~/utils/logger.js';
 import type { LaceRequest } from '~/interfaces/web/types.js';
+import { setSharedAgent } from '~/interfaces/web/lib/agent-context.js';
 
 export interface WebInterfaceOptions {
   port?: number;
@@ -72,6 +73,9 @@ export class WebInterface implements UserInterface, ApprovalCallback {
     try {
       // Start the Agent
       await this.agent.start();
+
+      // Set the shared agent for API routes
+      setSharedAgent(this.agent);
 
       // Create Next.js app with custom app directory
       this.nextApp = next({

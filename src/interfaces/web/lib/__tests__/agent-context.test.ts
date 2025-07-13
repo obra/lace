@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { getAgentFromRequest } from '~/interfaces/web/lib/agent-context';
+import { getAgentFromRequest, setSharedAgent } from '~/interfaces/web/lib/agent-context';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
@@ -48,6 +48,9 @@ describe('getAgentFromRequest', () => {
     // Clean up to prevent memory leaks
     threadManager.close();
     await rm(testDir, { recursive: true, force: true });
+
+    // Reset shared agent to prevent test interference
+    setSharedAgent(null as any);
   });
 
   it('should return agent when available in request context', () => {
@@ -96,5 +99,39 @@ describe('getAgentFromRequest', () => {
     expect(typeof result.createThread).toBe('function');
     expect(typeof result.getThreadEvents).toBe('function');
     expect(result.toolExecutor).toBeDefined();
+  });
+
+  it('should fall back to shared agent when request does not have agent', () => {
+    const request = new NextRequest('http://localhost:3000/api/test');
+
+    // Set shared agent but don't attach to request
+    setSharedAgent(agent);
+
+    const result = getAgentFromRequest(request);
+
+    expect(result).toBe(agent);
+    expect(result.getCurrentThreadId()).toMatch(/^lace_\d{8}_[a-z0-9]{6}$/);
+  });
+
+  it('should prefer request agent over shared agent', () => {
+    const request = new NextRequest('http://localhost:3000/api/test');
+
+    // Create a different agent for shared context
+    const sharedAgent = new Agent({
+      provider: new TestProvider(),
+      toolExecutor: new ToolExecutor(),
+      threadManager,
+      threadId: threadManager.generateThreadId(),
+      tools: [],
+    });
+
+    setSharedAgent(sharedAgent);
+    (request as any).laceAgent = agent;
+
+    const result = getAgentFromRequest(request);
+
+    // Should get the request agent, not the shared one
+    expect(result).toBe(agent);
+    expect(result).not.toBe(sharedAgent);
   });
 });

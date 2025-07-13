@@ -207,9 +207,9 @@ describe('Agent Queue Processing', () => {
       });
 
       // First set to non-idle state, then to idle to trigger the transition
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       (agent as any)._setState('thinking');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       (agent as any)._setState('idle');
 
       expect(processQueueSpy).toHaveBeenCalled();
@@ -227,11 +227,11 @@ describe('Agent Queue Processing', () => {
       processQueueSpy.mockClear();
 
       // Simulate state changes to non-idle states
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       (agent as any)._setState('thinking');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       (agent as any)._setState('streaming');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       (agent as any)._setState('tool_execution');
 
       expect(processQueueSpy).not.toHaveBeenCalled();
