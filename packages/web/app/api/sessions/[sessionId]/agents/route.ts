@@ -69,7 +69,7 @@ export async function GET(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ agents: session.agents });
+    return NextResponse.json({ agents: session.agents || [] });
   } catch (error) {
     console.error('Error in GET /api/sessions/[sessionId]/agents:', error);
     return NextResponse.json(

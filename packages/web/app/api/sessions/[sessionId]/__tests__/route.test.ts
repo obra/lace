@@ -4,10 +4,23 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '../route';
-import { mockSessionService } from '@/__mocks__/session-service';
 import type { ThreadId } from '@/types/api';
 
-vi.mock('@/lib/server/session-service');
+// Create the mock service outside so we can access it
+const mockSessionService = {
+  createSession: vi.fn(),
+  listSessions: vi.fn(),
+  getSession: vi.fn(),
+  spawnAgent: vi.fn(),
+  getAgent: vi.fn(),
+  sendMessage: vi.fn(),
+  handleAgentEvent: vi.fn(),
+};
+
+// Mock the session service
+vi.mock('@/lib/server/session-service', () => ({
+  getSessionService: () => mockSessionService
+}));
 
 describe('Session Detail API Route', () => {
   beforeEach(() => {

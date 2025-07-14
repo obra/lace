@@ -28,7 +28,7 @@ export async function POST(
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    if (body.message.trim() === '') {
+    if (typeof body.message === 'string' && body.message.trim() === '') {
       return NextResponse.json({ error: 'Message cannot be empty' }, { status: 400 });
     }
 
