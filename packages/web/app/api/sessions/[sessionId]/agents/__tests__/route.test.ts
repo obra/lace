@@ -1,13 +1,38 @@
 // ABOUTME: Tests for agent spawning API endpoints (POST/GET /api/sessions/{sessionId}/agents)
 // ABOUTME: Agents are child threads within a session, identified by threadId like sessionId.N
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { POST, GET } from '../route';
-import type { ThreadId } from '@/types/api';
+import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
+import type { ThreadId, Agent, Session } from '@/types/api';
+
+// Response types
+interface AgentResponse {
+  agent: Agent;
+}
+
+interface AgentsListResponse {
+  agents: Agent[];
+}
+
+interface ErrorResponse {
+  error: string;
+}
 
 // Create the mock service outside so we can access it
-const mockSessionService = {
+interface MockSessionService {
+  createSession: ReturnType<typeof vi.fn>;
+  listSessions: ReturnType<typeof vi.fn>;
+  getSession: ReturnType<typeof vi.fn>;
+  spawnAgent: ReturnType<typeof vi.fn>;
+  getAgent: ReturnType<typeof vi.fn>;
+  sendMessage: ReturnType<typeof vi.fn>;
+  handleAgentEvent: ReturnType<typeof vi.fn>;
+}
+
+const mockSessionService: MockSessionService = {
   createSession: vi.fn(),
   listSessions: vi.fn(),
   getSession: vi.fn(),
@@ -19,7 +44,7 @@ const mockSessionService = {
 
 // Mock the session service
 vi.mock('@/lib/server/session-service', () => ({
-  getSessionService: () => mockSessionService
+  getSessionService: () => mockSessionService,
 }));
 
 describe('Agent Spawning API', () => {
@@ -33,24 +58,40 @@ describe('Agent Spawning API', () => {
 
     it('should create agent with threadId like {sessionId}.{n}', async () => {
       // Mock session exists with existing agents
+      const existingAgents: Agent[] = [
+        {
+          threadId: `${sessionId}.1` as ThreadId,
+          name: 'agent1',
+          provider: 'anthropic',
+          model: 'claude-3-haiku',
+          status: 'idle',
+          createdAt: new Date().toISOString(),
+        },
+        {
+          threadId: `${sessionId}.2` as ThreadId,
+          name: 'agent2',
+          provider: 'anthropic',
+          model: 'claude-3-haiku',
+          status: 'idle',
+          createdAt: new Date().toISOString(),
+        },
+      ];
+
       mockSessionService.getSession.mockResolvedValueOnce({
         id: sessionId,
         name: 'Test Session',
         createdAt: new Date().toISOString(),
-        agents: [
-          { threadId: `${sessionId}.1` as ThreadId, name: 'agent1', provider: 'anthropic', model: 'claude-3-haiku', status: 'idle', createdAt: new Date().toISOString() },
-          { threadId: `${sessionId}.2` as ThreadId, name: 'agent2', provider: 'anthropic', model: 'claude-3-haiku', status: 'idle', createdAt: new Date().toISOString() }
-        ]
-      });
-      
+        agents: existingAgents,
+      } as Session);
+
       const newThreadId = `${sessionId}.3` as ThreadId;
-      const newAgent = {
+      const newAgent: Agent = {
         threadId: newThreadId,
         name: 'architect',
         provider: 'anthropic',
         model: 'claude-3-opus-20240229',
-        status: 'idle' as const,
-        createdAt: new Date().toISOString()
+        status: 'idle',
+        createdAt: new Date().toISOString(),
       };
       mockSessionService.spawnAgent.mockResolvedValueOnce(newAgent);
 
@@ -59,13 +100,13 @@ describe('Agent Spawning API', () => {
         body: JSON.stringify({
           name: 'architect',
           provider: 'anthropic',
-          model: 'claude-3-opus-20240229'
+          model: 'claude-3-opus-20240229',
         }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await POST(request, { params: Promise.resolve({ sessionId }) });
-      const data = await response.json();
+      const data = (await response.json()) as AgentResponse;
 
       expect(response.status).toBe(201);
       expect(data.agent).toMatchObject({
@@ -73,7 +114,7 @@ describe('Agent Spawning API', () => {
         name: 'architect',
         provider: 'anthropic',
         model: 'claude-3-opus-20240229',
-        status: 'idle'
+        status: 'idle',
       });
       expect(mockSessionService.spawnAgent).toHaveBeenCalledWith(
         sessionId,
@@ -88,15 +129,15 @@ describe('Agent Spawning API', () => {
         id: sessionId,
         name: 'Test Session',
         createdAt: new Date().toISOString(),
-        agents: []
-      });
-      const newAgent = {
+        agents: [],
+      } as Session);
+      const newAgent: Agent = {
         threadId: `${sessionId}.1` as ThreadId,
         name: 'reviewer',
         provider: 'openai',
         model: 'gpt-4',
-        status: 'idle' as const,
-        createdAt: new Date().toISOString()
+        status: 'idle',
+        createdAt: new Date().toISOString(),
       };
       mockSessionService.spawnAgent.mockResolvedValueOnce(newAgent);
 
@@ -105,13 +146,13 @@ describe('Agent Spawning API', () => {
         body: JSON.stringify({
           name: 'reviewer',
           provider: 'openai',
-          model: 'gpt-4'
+          model: 'gpt-4',
         }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await POST(request, { params: Promise.resolve({ sessionId }) });
-      const data = await response.json();
+      const data = (await response.json()) as AgentResponse;
 
       expect(response.status).toBe(201);
       expect(data.agent.provider).toBe('openai');
@@ -124,32 +165,32 @@ describe('Agent Spawning API', () => {
         id: sessionId,
         name: 'Test Session',
         createdAt: new Date().toISOString(),
-        agents: []
-      });
-      const newAgent = {
+        agents: [],
+      } as Session);
+      const newAgent: Agent = {
         threadId,
         name: 'pm',
         provider: 'anthropic',
         model: 'claude-3-haiku-20240307',
-        status: 'idle' as const,
-        createdAt: new Date().toISOString()
+        status: 'idle',
+        createdAt: new Date().toISOString(),
       };
       mockSessionService.spawnAgent.mockResolvedValueOnce(newAgent);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         body: JSON.stringify({ name: 'pm' }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await POST(request, { params: Promise.resolve({ sessionId }) });
-      const data = await response.json();
+      const data = (await response.json()) as AgentResponse;
 
       expect(data.agent).toMatchObject({
         threadId,
         name: 'pm',
         status: 'idle',
-        createdAt: expect.any(String)
+        createdAt: expect.any(String),
       });
     });
 
@@ -159,26 +200,26 @@ describe('Agent Spawning API', () => {
         id: sessionId,
         name: 'Test Session',
         createdAt: new Date().toISOString(),
-        agents: []
-      });
-      const firstAgent = {
+        agents: [],
+      } as Session);
+      const firstAgent: Agent = {
         threadId: `${sessionId}.1` as ThreadId,
         name: 'agent1',
         provider: 'anthropic',
         model: 'claude-3-haiku-20240307',
-        status: 'idle' as const,
-        createdAt: new Date().toISOString()
+        status: 'idle',
+        createdAt: new Date().toISOString(),
       };
       mockSessionService.spawnAgent.mockResolvedValueOnce(firstAgent);
 
       const request1 = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         body: JSON.stringify({ name: 'agent1' }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const response1 = await POST(request1, { params: Promise.resolve({ sessionId }) });
-      const data1 = await response1.json();
+      const data1 = (await response1.json()) as AgentResponse;
       expect(data1.agent.threadId).toBe(`${sessionId}.1`);
 
       // Second call - one existing agent
@@ -186,26 +227,26 @@ describe('Agent Spawning API', () => {
         id: sessionId,
         name: 'Test Session',
         createdAt: new Date().toISOString(),
-        agents: [firstAgent]
-      });
-      const secondAgent = {
+        agents: [firstAgent],
+      } as Session);
+      const secondAgent: Agent = {
         threadId: `${sessionId}.2` as ThreadId,
         name: 'agent2',
         provider: 'anthropic',
         model: 'claude-3-haiku-20240307',
-        status: 'idle' as const,
-        createdAt: new Date().toISOString()
+        status: 'idle',
+        createdAt: new Date().toISOString(),
       };
       mockSessionService.spawnAgent.mockResolvedValueOnce(secondAgent);
 
       const request2 = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         body: JSON.stringify({ name: 'agent2' }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const response2 = await POST(request2, { params: Promise.resolve({ sessionId }) });
-      const data2 = await response2.json();
+      const data2 = (await response2.json()) as AgentResponse;
       expect(data2.agent.threadId).toBe(`${sessionId}.2`);
     });
 
@@ -215,11 +256,11 @@ describe('Agent Spawning API', () => {
       const request = new NextRequest(`http://localhost:3000/api/sessions/invalid/agents`, {
         method: 'POST',
         body: JSON.stringify({ name: 'test' }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await POST(request, { params: Promise.resolve({ sessionId: 'invalid' }) });
-      const data = await response.json();
+      const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Session not found');
@@ -230,17 +271,17 @@ describe('Agent Spawning API', () => {
         id: sessionId,
         name: 'Test Session',
         createdAt: new Date().toISOString(),
-        agents: []
-      });
+        agents: [],
+      } as Session);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         body: JSON.stringify({}),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await POST(request, { params: Promise.resolve({ sessionId }) });
-      const data = await response.json();
+      const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Agent name is required');
@@ -251,35 +292,35 @@ describe('Agent Spawning API', () => {
     const sessionId = 'lace_20250113_session1' as ThreadId;
 
     it('should list all agents in session', async () => {
-      const agents = [
+      const agents: Agent[] = [
         {
           threadId: `${sessionId}.1` as ThreadId,
           name: 'pm',
           provider: 'anthropic',
           model: 'claude-3-haiku-20240307',
-          status: 'idle' as const,
-          createdAt: new Date().toISOString()
+          status: 'idle',
+          createdAt: new Date().toISOString(),
         },
         {
           threadId: `${sessionId}.2` as ThreadId,
           name: 'architect',
           provider: 'anthropic',
           model: 'claude-3-opus-20240229',
-          status: 'idle' as const,
-          createdAt: new Date().toISOString()
-        }
+          status: 'idle',
+          createdAt: new Date().toISOString(),
+        },
       ];
-      
+
       mockSessionService.getSession.mockResolvedValueOnce({
-        id: sessionId,  
+        id: sessionId,
         name: 'Test Session',
         createdAt: new Date().toISOString(),
-        agents
-      });
+        agents,
+      } as Session);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`);
       const response = await GET(request, { params: Promise.resolve({ sessionId }) });
-      const data = await response.json();
+      const data = (await response.json()) as AgentsListResponse;
 
       expect(response.status).toBe(200);
       expect(data.agents).toHaveLength(2);
@@ -287,36 +328,36 @@ describe('Agent Spawning API', () => {
         threadId: `${sessionId}.1`,
         name: 'pm',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307'
+        model: 'claude-3-haiku-20240307',
       });
       expect(data.agents[1]).toMatchObject({
         threadId: `${sessionId}.2`,
         name: 'architect',
         provider: 'anthropic',
-        model: 'claude-3-opus-20240229'
+        model: 'claude-3-opus-20240229',
       });
     });
 
     it('should include agent threadIds and metadata', async () => {
-      const testAgent = {
+      const testAgent: Agent = {
         threadId: `${sessionId}.1` as ThreadId,
         name: 'pm',
         provider: 'anthropic',
         model: 'claude-3-haiku-20240307',
-        status: 'thinking' as const,
-        createdAt: '2025-01-13T10:00:00Z'
+        status: 'thinking',
+        createdAt: '2025-01-13T10:00:00Z',
       };
-      
+
       mockSessionService.getSession.mockResolvedValueOnce({
         id: sessionId,
         name: 'Test Session',
         createdAt: new Date().toISOString(),
-        agents: [testAgent]
-      });
+        agents: [testAgent],
+      } as Session);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`);
       const response = await GET(request, { params: Promise.resolve({ sessionId }) });
-      const data = await response.json();
+      const data = (await response.json()) as AgentsListResponse;
 
       expect(data.agents[0]).toMatchObject({
         threadId: testAgent.threadId,
@@ -324,7 +365,7 @@ describe('Agent Spawning API', () => {
         provider: 'anthropic',
         model: 'claude-3-haiku-20240307',
         status: 'thinking',
-        createdAt: '2025-01-13T10:00:00Z'
+        createdAt: '2025-01-13T10:00:00Z',
       });
     });
 
@@ -333,12 +374,12 @@ describe('Agent Spawning API', () => {
         id: sessionId,
         name: 'Test Session',
         createdAt: new Date().toISOString(),
-        agents: []
-      });
+        agents: [],
+      } as Session);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`);
       const response = await GET(request, { params: Promise.resolve({ sessionId }) });
-      const data = await response.json();
+      const data = (await response.json()) as AgentsListResponse;
 
       expect(response.status).toBe(200);
       expect(data.agents).toEqual([]);
@@ -349,7 +390,7 @@ describe('Agent Spawning API', () => {
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/invalid/agents`);
       const response = await GET(request, { params: Promise.resolve({ sessionId: 'invalid' }) });
-      const data = await response.json();
+      const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Session not found');

@@ -25,7 +25,7 @@ export default [
       sourceType: 'module',
       globals: globals.node,
       parserOptions: {
-        project: './tsconfig.json',
+        project: ['./tsconfig.json', './packages/*/tsconfig.json'],
       },
     },
     plugins: {
@@ -36,7 +36,7 @@ export default [
     settings: {
       'import/resolver': {
         typescript: {
-          project: './tsconfig.json',
+          project: ['./tsconfig.json', './packages/*/tsconfig.json'],
           alwaysTryTypes: true
         }
       }
@@ -92,7 +92,7 @@ export default [
     settings: {
       'import/resolver': {
         typescript: {
-          project: './tsconfig.json',
+          project: ['./tsconfig.json', './packages/*/tsconfig.json'],
           alwaysTryTypes: true
         }
       }

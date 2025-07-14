@@ -1,20 +1,22 @@
 // ABOUTME: Tests for thread messaging API endpoint (POST /api/threads/{threadId}/message)
 // ABOUTME: Handles sending messages to specific agent threads and emitting events via SSE
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { POST } from '../route';
+import { POST } from '@/app/api/threads/[threadId]/message/route';
 import type { ThreadId } from '@/types/api';
 
 // Mock SSE manager
 const mockSSEManager = {
-  broadcast: vi.fn()
+  broadcast: vi.fn(),
 };
 
 vi.mock('@/lib/sse-manager', () => ({
   SSEManager: {
-    getInstance: () => mockSSEManager
-  }
+    getInstance: () => mockSSEManager,
+  },
 }));
 
 // Create the mock service outside so we can access it
@@ -30,7 +32,7 @@ const mockSessionService = {
 
 // Mock the session service
 vi.mock('@/lib/server/session-service', () => ({
-  getSessionService: () => mockSessionService
+  getSessionService: () => mockSessionService,
 }));
 
 describe('Thread Messaging API', () => {
@@ -50,14 +52,14 @@ describe('Thread Messaging API', () => {
         model: 'claude-3-haiku-20240307',
         status: 'idle',
         createdAt: new Date().toISOString(),
-        sendMessage: vi.fn().mockResolvedValue(undefined)
+        sendMessage: vi.fn().mockResolvedValue(undefined),
       };
       mockSessionService.getAgent.mockReturnValue(mockAgent);
 
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
         body: JSON.stringify({ message: 'Help me implement OAuth' }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await POST(request, { params: Promise.resolve({ threadId }) });
@@ -67,7 +69,7 @@ describe('Thread Messaging API', () => {
       expect(data).toMatchObject({
         status: 'accepted',
         threadId,
-        messageId: expect.any(String)
+        messageId: expect.any(String),
       });
       expect(mockAgent.sendMessage).toHaveBeenCalledWith('Help me implement OAuth');
     });
@@ -80,9 +82,11 @@ describe('Thread Messaging API', () => {
         model: 'claude-3-opus',
         status: 'idle',
         createdAt: new Date().toISOString(),
-        sendMessage: vi.fn().mockImplementation(() => 
-          new Promise(resolve => setTimeout(() => resolve(undefined), 1000))
-        )
+        sendMessage: vi
+          .fn()
+          .mockImplementation(
+            () => new Promise((resolve) => setTimeout(() => resolve(undefined), 1000))
+          ),
       };
       mockSessionService.getAgent.mockReturnValue(mockAgent);
 
@@ -90,7 +94,7 @@ describe('Thread Messaging API', () => {
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
         body: JSON.stringify({ message: 'Design the architecture' }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await POST(request, { params: Promise.resolve({ threadId }) });
@@ -102,15 +106,20 @@ describe('Thread Messaging API', () => {
 
     it('should validate threadId format', async () => {
       const invalidThreadId = 'invalid_thread_id';
-      
-      const request = new NextRequest(`http://localhost:3000/api/threads/${invalidThreadId}/message`, {
-        method: 'POST',
-        body: JSON.stringify({ message: 'Test message' }),
-        headers: { 'Content-Type': 'application/json' }
-      });
 
-      const response = await POST(request, { params: Promise.resolve({ threadId: invalidThreadId }) });
-      const data = await response.json();
+      const request = new NextRequest(
+        `http://localhost:3000/api/threads/${invalidThreadId}/message`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ message: 'Test message' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      const response = await POST(request, {
+        params: Promise.resolve({ threadId: invalidThreadId }),
+      });
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid thread ID format');
@@ -122,11 +131,11 @@ describe('Thread Messaging API', () => {
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
         body: JSON.stringify({ message: 'Test message' }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await POST(request, { params: Promise.resolve({ threadId }) });
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Agent not found');
@@ -140,14 +149,14 @@ describe('Thread Messaging API', () => {
         model: 'claude-3-haiku',
         status: 'idle',
         createdAt: new Date().toISOString(),
-        sendMessage: vi.fn().mockResolvedValue(undefined)
+        sendMessage: vi.fn().mockResolvedValue(undefined),
       };
       mockSessionService.getAgent.mockReturnValue(mockAgent);
 
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
         body: JSON.stringify({ message: 'Test message' }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       await POST(request, { params: Promise.resolve({ threadId }) });
@@ -158,7 +167,7 @@ describe('Thread Messaging API', () => {
         expect.objectContaining({
           type: 'USER_MESSAGE',
           threadId,
-          data: { content: 'Test message' }
+          data: { content: 'Test message' },
         })
       );
     });
@@ -168,11 +177,11 @@ describe('Thread Messaging API', () => {
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
         body: JSON.stringify({ message: '' }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await POST(request, { params: Promise.resolve({ threadId }) });
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Message is required');
@@ -186,18 +195,18 @@ describe('Thread Messaging API', () => {
         model: 'claude-3-haiku',
         status: 'idle',
         createdAt: new Date().toISOString(),
-        sendMessage: vi.fn()
+        sendMessage: vi.fn(),
       };
       mockSessionService.getAgent.mockReturnValue(mockAgent);
 
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
         body: JSON.stringify({}),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await POST(request, { params: Promise.resolve({ threadId }) });
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Message is required');
@@ -211,19 +220,19 @@ describe('Thread Messaging API', () => {
         model: 'claude-3-haiku',
         status: 'idle',
         createdAt: new Date().toISOString(),
-        sendMessage: vi.fn().mockRejectedValue(new Error('Provider error'))
+        sendMessage: vi.fn().mockRejectedValue(new Error('Provider error')),
       };
       mockSessionService.getAgent.mockReturnValue(mockAgent);
 
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
         body: JSON.stringify({ message: 'Test message' }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await POST(request, { params: Promise.resolve({ threadId }) });
-      const data = await response.json();
-      
+      const _data = await response.json();
+
       // Should still return 202 as processing happens async
       expect(response.status).toBe(202);
     });
@@ -237,15 +246,18 @@ describe('Thread Messaging API', () => {
         model: 'claude-3-haiku',
         status: 'idle',
         createdAt: new Date().toISOString(),
-        sendMessage: vi.fn().mockResolvedValue(undefined)
+        sendMessage: vi.fn().mockResolvedValue(undefined),
       };
       mockSessionService.getAgent.mockReturnValue(mockAgent);
 
-      const agentRequest = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
-        method: 'POST',
-        body: JSON.stringify({ message: 'Message to agent' }),
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const agentRequest = new NextRequest(
+        `http://localhost:3000/api/threads/${threadId}/message`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ message: 'Message to agent' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
       const agentResponse = await POST(agentRequest, { params: Promise.resolve({ threadId }) });
       expect(agentResponse.status).toBe(202);
