@@ -8,6 +8,8 @@ import {
   ProviderResponse,
   ProviderConfig,
   ProviderToolCall,
+  ProviderInfo,
+  ModelInfo,
 } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
@@ -398,5 +400,65 @@ export class OpenAIProvider extends AIProvider {
       default:
         return 'stop';
     }
+  }
+
+  getProviderInfo(): ProviderInfo {
+    return {
+      name: 'openai',
+      displayName: 'OpenAI',
+      requiresApiKey: true,
+      configurationHint: 'Set OPENAI_API_KEY or OPENAI_KEY environment variable',
+    };
+  }
+
+  getAvailableModels(): ModelInfo[] {
+    return [
+      {
+        id: 'gpt-4o',
+        displayName: 'GPT-4o',
+        description: 'Most capable GPT-4 model with vision',
+        contextWindow: 128000,
+        maxOutputTokens: 16384,
+        capabilities: ['vision', 'function-calling'],
+        isDefault: true,
+      },
+      {
+        id: 'gpt-4o-mini',
+        displayName: 'GPT-4o Mini',
+        description: 'Small, affordable, intelligent model',
+        contextWindow: 128000,
+        maxOutputTokens: 16384,
+        capabilities: ['vision', 'function-calling'],
+      },
+      {
+        id: 'gpt-4-turbo',
+        displayName: 'GPT-4 Turbo',
+        description: 'Previous generation GPT-4 with vision',
+        contextWindow: 128000,
+        maxOutputTokens: 4096,
+        capabilities: ['vision', 'function-calling'],
+      },
+      {
+        id: 'gpt-4',
+        displayName: 'GPT-4',
+        description: 'Original GPT-4 model',
+        contextWindow: 8192,
+        maxOutputTokens: 4096,
+        capabilities: ['function-calling'],
+      },
+      {
+        id: 'gpt-3.5-turbo',
+        displayName: 'GPT-3.5 Turbo',
+        description: 'Fast, efficient model for simple tasks',
+        contextWindow: 16384,
+        maxOutputTokens: 4096,
+        capabilities: ['function-calling'],
+      },
+    ];
+  }
+
+  isConfigured(): boolean {
+    const config = this._config as OpenAIProviderConfig;
+    return !!config.apiKey && config.apiKey.length > 0;
   }
 }

@@ -26,6 +26,71 @@ export class ProviderRegistry {
     return Array.from(this._providers.keys());
   }
 
+  // Get all available provider metadata
+  async getAvailableProviders(): Promise<
+    Array<{
+      info: import('./base-provider').ProviderInfo;
+      models: import('./base-provider').ModelInfo[];
+      configured: boolean;
+    }>
+  > {
+    const providers = ['anthropic', 'openai', 'lmstudio', 'ollama'];
+    const results = [];
+
+    for (const providerName of providers) {
+      try {
+        // Try to create provider instance to check configuration
+        const provider = await this.createProvider(providerName);
+        const info = provider.getProviderInfo();
+        const models = provider.getAvailableModels();
+        const configured = provider.isConfigured();
+
+        // Clean up provider
+        provider.cleanup();
+
+        results.push({ info, models, configured });
+      } catch (error) {
+        // Provider not configured - still return info
+        const tempProvider = await this.getProviderClass(providerName);
+        if (tempProvider) {
+          const info = tempProvider.getProviderInfo();
+          const models = tempProvider.getAvailableModels();
+          results.push({ info, models, configured: false });
+        }
+      }
+    }
+
+    return results;
+  }
+
+  // Helper to get provider class without full instantiation
+  private async getProviderClass(providerName: string): Promise<AIProvider | null> {
+    try {
+      switch (providerName.toLowerCase()) {
+        case 'anthropic': {
+          const { AnthropicProvider } = await import('./anthropic-provider');
+          return new AnthropicProvider({ apiKey: 'dummy' });
+        }
+        case 'openai': {
+          const { OpenAIProvider } = await import('./openai-provider');
+          return new OpenAIProvider({ apiKey: 'dummy' });
+        }
+        case 'lmstudio': {
+          const { LMStudioProvider } = await import('./lmstudio-provider');
+          return new LMStudioProvider({});
+        }
+        case 'ollama': {
+          const { OllamaProvider } = await import('./ollama-provider');
+          return new OllamaProvider({});
+        }
+        default:
+          return null;
+      }
+    } catch {
+      return null;
+    }
+  }
+
   async createProvider(providerName: string, config: ProviderConfig = {}): Promise<AIProvider> {
     // Use dynamic imports with environment variable handling
     switch (providerName.toLowerCase()) {
@@ -128,6 +193,20 @@ export class ProviderRegistry {
                   }
                   createResponse(): Promise<ProviderResponse> {
                     return Promise.reject(new Error('Provider not properly configured'));
+                  }
+                  getProviderInfo(): import('./base-provider').ProviderInfo {
+                    return {
+                      name: this.providerName,
+                      displayName: this.providerName,
+                      requiresApiKey: true,
+                      configurationHint: 'Provider not properly configured',
+                    };
+                  }
+                  getAvailableModels(): import('./base-provider').ModelInfo[] {
+                    return [];
+                  }
+                  isConfigured(): boolean {
+                    return false;
                   }
                 }
 

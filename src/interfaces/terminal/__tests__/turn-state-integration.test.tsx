@@ -5,13 +5,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import { AIProvider } from '~/providers/base-provider';
+import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { TerminalInterface } from '~/interfaces/terminal/terminal-interface';
 
 // Mock provider for testing
-class MockProvider extends AIProvider {
+class MockProvider extends BaseMockProvider {
   private mockResponse: ProviderResponse;
   private delay: number;
 

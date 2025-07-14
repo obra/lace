@@ -117,7 +117,7 @@ export async function run(options: CLIOptions): Promise<void> {
     process.exit(0);
   }
 
-  const { TerminalInterface } = await import('./interfaces/terminal/terminal-interface');
+  const { TerminalInterface } = await import('~/interfaces/terminal/terminal-interface');
   const cli = new TerminalInterface(agent);
 
   const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);

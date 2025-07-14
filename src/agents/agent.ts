@@ -1478,5 +1478,4 @@ export class Agent extends EventEmitter {
       this.emit('queue_processing_complete');
     }
   }
-
 }

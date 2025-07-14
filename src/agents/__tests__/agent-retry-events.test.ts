@@ -3,13 +3,14 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent';
-import { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { Tool } from '~/tools/tool';
 
 // Mock provider that can emit retry events
-class MockRetryProvider extends AIProvider {
+class MockRetryProvider extends BaseMockProvider {
   get providerName(): string {
     return 'mock-retry';
   }

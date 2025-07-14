@@ -1,9 +1,10 @@
 // ABOUTME: Agent creation interface for spawning new agents in a session
-// ABOUTME: Allows provider/model selection and agent naming
+// ABOUTME: Uses dynamic provider/model discovery API instead of hardcoded lists
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Agent, CreateAgentRequest, ThreadId } from '@/types/api';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
+import type { ProviderWithModels, ProvidersResponse } from '@/app/api/providers/route';
 
 interface AgentSpawnerProps {
   sessionId: ThreadId;
@@ -11,26 +12,84 @@ interface AgentSpawnerProps {
   onAgentSpawn: (agent: Agent) => void;
 }
 
-const PROVIDERS = [
-  { name: 'anthropic', models: ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'] },
-  { name: 'openai', models: ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'] },
-];
+interface ModelOption {
+  value: string; // provider/model format
+  label: string;
+  description?: string;
+  isDefault?: boolean;
+  disabled?: boolean;
+}
 
 export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerProps) {
   const [showForm, setShowForm] = useState(false);
   const [agentName, setAgentName] = useState('');
-  const [provider, setProvider] = useState('anthropic');
-  const [model, setModel] = useState('claude-3-haiku-20240307');
+  const [selectedModel, setSelectedModel] = useState('');
+  const [providers, setProviders] = useState<ProviderWithModels[]>([]);
+  const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const { spawnAgent, loading, error } = useSessionAPI();
 
-  const currentProvider = PROVIDERS.find(p => p.name === provider);
-  const availableModels = currentProvider?.models || [];
+  // Load providers on mount
+  useEffect(() => {
+    loadProviders();
+  }, []);
+
+  async function loadProviders() {
+    try {
+      const res = await fetch('/api/providers');
+      const data: ProvidersResponse = await res.json();
+      setProviders(data.providers);
+      
+      // Build model options
+      const options: ModelOption[] = [];
+      let defaultOption: string | null = null;
+      
+      data.providers.forEach(provider => {
+        if (!provider.configured) {
+          // Add disabled option for unconfigured provider
+          options.push({
+            value: '',
+            label: `${provider.displayName} (Not Configured)`,
+            description: provider.configurationHint,
+            disabled: true,
+          });
+        } else {
+          // Add all models from configured provider
+          provider.models.forEach(model => {
+            const value = `${provider.name}/${model.id}`;
+            options.push({
+              value,
+              label: `${provider.displayName} - ${model.displayName}`,
+              description: model.description,
+              isDefault: model.isDefault,
+              disabled: false,
+            });
+            
+            if (model.isDefault && !defaultOption) {
+              defaultOption = value;
+            }
+          });
+        }
+      });
+      
+      setModelOptions(options);
+      
+      // Set default selection
+      if (defaultOption) {
+        setSelectedModel(defaultOption);
+      } else if (options.length > 0 && !options[0].disabled) {
+        setSelectedModel(options[0].value);
+      }
+    } catch (error) {
+      console.error('Failed to load providers:', error);
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!agentName.trim()) return;
+    if (!agentName.trim() || !selectedModel) return;
 
+    const [provider, model] = selectedModel.split('/');
     const request: CreateAgentRequest = {
       name: agentName.trim(),
       provider,
@@ -44,6 +103,8 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
       setShowForm(false);
     }
   };
+
+  const selectedOption = modelOptions.find(opt => opt.value === selectedModel);
 
   return (
     <div className="mb-4">
@@ -69,39 +130,35 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
             autoFocus
           />
           
-          <div className="flex gap-2">
-            <select
-              value={provider}
-              onChange={(e) => {
-                setProvider(e.target.value);
-                const newProvider = PROVIDERS.find(p => p.name === e.target.value);
-                if (newProvider && newProvider.models.length > 0) {
-                  setModel(newProvider.models[0]);
-                }
-              }}
-              className="flex-1 px-3 py-1 bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-terminal-green text-sm"
-              disabled={loading}
-            >
-              {PROVIDERS.map(p => (
-                <option key={p.name} value={p.name}>{p.name}</option>
-              ))}
-            </select>
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="w-full px-3 py-1 bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-terminal-green text-sm"
+            disabled={loading || modelOptions.length === 0}
+          >
+            {modelOptions.length === 0 && (
+              <option value="">Loading providers...</option>
+            )}
+            {modelOptions.map((option, idx) => (
+              <option 
+                key={idx} 
+                value={option.value} 
+                disabled={option.disabled}
+              >
+                {option.label}
+              </option>
+            ))}
+          </select>
 
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="flex-1 px-3 py-1 bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-terminal-green text-sm"
-              disabled={loading}
-            >
-              {availableModels.map(m => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          </div>
+          {selectedOption?.description && (
+            <p className="text-xs text-gray-500 px-1">
+              {selectedOption.description}
+            </p>
+          )}
 
           <button
             type="submit"
-            disabled={loading || !agentName.trim()}
+            disabled={loading || !agentName.trim() || !selectedModel}
             className="w-full px-3 py-1 bg-terminal-purple text-black rounded hover:bg-terminal-purple/80 transition-colors disabled:opacity-50 text-sm"
           >
             {loading ? 'Spawning...' : 'Spawn Agent'}

@@ -3,7 +3,13 @@
 
 import { LMStudioClient } from '@lmstudio/sdk';
 import { AIProvider } from '~/providers/base-provider';
-import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
+import {
+  ProviderMessage,
+  ProviderResponse,
+  ProviderConfig,
+  ProviderInfo,
+  ModelInfo,
+} from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 
@@ -694,5 +700,34 @@ export class LMStudioProvider extends AIProvider {
     // Note: LMStudio SDK doesn't expose explicit connection close methods
     // The WebSocket connections should be cleaned up when the client object is GC'd
     // In practice, we force exit the process to ensure cleanup
+  }
+
+  getProviderInfo(): ProviderInfo {
+    return {
+      name: 'lmstudio',
+      displayName: 'LMStudio',
+      requiresApiKey: false,
+      configurationHint: 'Ensure LMStudio is running on localhost:1234',
+    };
+  }
+
+  getAvailableModels(): ModelInfo[] {
+    // LMStudio models are dynamically loaded - return generic info
+    return [
+      {
+        id: 'auto',
+        displayName: 'Auto (Use loaded model)',
+        description: 'Use whatever model is currently loaded in LMStudio',
+        contextWindow: 4096, // Conservative default
+        maxOutputTokens: 2048,
+        capabilities: ['function-calling'],
+        isDefault: true,
+      },
+    ];
+  }
+
+  isConfigured(): boolean {
+    // LMStudio just needs to be running - no API key required
+    return true;
   }
 }

@@ -8,13 +8,13 @@ import { Agent, CurrentTurnMetrics } from '~/agents/agent';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ThreadEvent } from '~/threads/types';
-import { AIProvider } from '~/providers/base-provider';
+import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import StatusBar from '~/interfaces/terminal/components/status-bar';
 
 // Mock provider that can emit retry events
-class MockRetryUIProvider extends AIProvider {
+class MockRetryUIProvider extends BaseMockProvider {
   get providerName(): string {
     return 'mock-retry-ui';
   }

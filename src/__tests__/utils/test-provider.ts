@@ -1,9 +1,9 @@
 // ABOUTME: Mock provider for testing that returns predictable responses
 // ABOUTME: Avoids expensive LLM calls during test execution
 
-import { AIProvider } from '~/providers/base-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
+import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 
 export interface TestProviderConfig extends ProviderConfig {
   mockResponse?: string;
@@ -11,7 +11,7 @@ export interface TestProviderConfig extends ProviderConfig {
   delay?: number;
 }
 
-export class TestProvider extends AIProvider {
+export class TestProvider extends BaseMockProvider {
   private readonly mockResponse: string;
   private readonly shouldError: boolean;
   private readonly delay: number;

@@ -8,6 +8,8 @@ import {
   ProviderResponse,
   ProviderConfig,
   ProviderToolCall,
+  ProviderInfo,
+  ModelInfo,
 } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
@@ -379,5 +381,65 @@ export class AnthropicProvider extends AIProvider {
       default:
         return 'stop';
     }
+  }
+
+  getProviderInfo(): ProviderInfo {
+    return {
+      name: 'anthropic',
+      displayName: 'Anthropic Claude',
+      requiresApiKey: true,
+      configurationHint: 'Set ANTHROPIC_KEY environment variable or pass apiKey in config',
+    };
+  }
+
+  getAvailableModels(): ModelInfo[] {
+    return [
+      {
+        id: 'claude-3-5-sonnet-20241022',
+        displayName: 'Claude 3.5 Sonnet',
+        description: 'Most intelligent model, best for complex tasks',
+        contextWindow: 200000,
+        maxOutputTokens: 8192,
+        capabilities: ['vision', 'function-calling'],
+        isDefault: true,
+      },
+      {
+        id: 'claude-3-5-haiku-20241022',
+        displayName: 'Claude 3.5 Haiku',
+        description: 'Fast and efficient for simple tasks',
+        contextWindow: 200000,
+        maxOutputTokens: 8192,
+        capabilities: ['function-calling'],
+      },
+      {
+        id: 'claude-3-opus-20240229',
+        displayName: 'Claude 3 Opus',
+        description: 'Powerful model for complex analysis',
+        contextWindow: 200000,
+        maxOutputTokens: 4096,
+        capabilities: ['vision', 'function-calling'],
+      },
+      {
+        id: 'claude-3-sonnet-20240229',
+        displayName: 'Claude 3 Sonnet',
+        description: 'Balanced performance and intelligence',
+        contextWindow: 200000,
+        maxOutputTokens: 4096,
+        capabilities: ['vision', 'function-calling'],
+      },
+      {
+        id: 'claude-3-haiku-20240307',
+        displayName: 'Claude 3 Haiku',
+        description: 'Fastest model for simple queries',
+        contextWindow: 200000,
+        maxOutputTokens: 4096,
+        capabilities: ['vision', 'function-calling'],
+      },
+    ];
+  }
+
+  isConfigured(): boolean {
+    const config = this._config as AnthropicProviderConfig;
+    return !!config.apiKey && config.apiKey.length > 0;
   }
 }
