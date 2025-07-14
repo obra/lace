@@ -21,10 +21,36 @@ export interface Agent {
 }
 
 export interface SessionEvent {
-  type: 'USER_MESSAGE' | 'AGENT_MESSAGE' | 'TOOL_CALL' | 'TOOL_RESULT' | 'THINKING' | 'SYSTEM_MESSAGE' | 'LOCAL_SYSTEM_MESSAGE';
+  type: 'USER_MESSAGE' | 'AGENT_MESSAGE' | 'TOOL_CALL' | 'TOOL_RESULT' | 'THINKING' | 'SYSTEM_MESSAGE' | 'LOCAL_SYSTEM_MESSAGE' | 'TOOL_APPROVAL_REQUEST';
   threadId: ThreadId;
   timestamp: string;
   data: any;
+}
+
+// Tool approval event data - extends what the agent emits
+export interface ToolApprovalRequestData {
+  requestId: string;
+  toolName: string;
+  input: unknown;  // Matches backend - not just Record<string, unknown>
+  isReadOnly: boolean;
+  // Additional metadata for UI
+  toolDescription?: string;
+  toolAnnotations?: {
+    title?: string;
+    readOnlyHint?: boolean;
+    destructiveHint?: boolean;
+    idempotentHint?: boolean;
+    safeInternal?: boolean;
+  };
+  riskLevel: 'safe' | 'moderate' | 'destructive';
+  timeout?: number;  // Seconds until auto-deny
+}
+
+// API request/response for approval decisions
+export interface ToolApprovalResponse {
+  requestId: string;
+  decision: 'allow_once' | 'allow_session' | 'deny';
+  reason?: string;
 }
 
 export interface MessageRequest {

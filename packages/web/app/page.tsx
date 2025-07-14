@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { Session, ThreadId, SessionEvent } from '@/types/api';
+import type { Session, ThreadId, SessionEvent, ToolApprovalRequestData } from '@/types/api';
 import { ConversationDisplay } from '@/components/ConversationDisplay';
+import { ToolApprovalModal } from '@/components/ToolApprovalModal';
 
 export default function Home() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -14,6 +15,7 @@ export default function Home() {
   const [message, setMessage] = useState('');
   const [selectedAgent, setSelectedAgent] = useState<ThreadId | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [approvalRequest, setApprovalRequest] = useState<ToolApprovalRequestData | null>(null);
 
   // Load sessions on mount
   useEffect(() => {
@@ -33,14 +35,20 @@ export default function Home() {
     // Listen to all event types
     const eventTypes = [
       'USER_MESSAGE', 'AGENT_MESSAGE', 'TOOL_CALL', 'TOOL_RESULT', 
-      'THINKING', 'SYSTEM_MESSAGE', 'LOCAL_SYSTEM_MESSAGE'
+      'THINKING', 'SYSTEM_MESSAGE', 'LOCAL_SYSTEM_MESSAGE', 'TOOL_APPROVAL_REQUEST'
     ];
     
     eventTypes.forEach(eventType => {
       eventSource.addEventListener(eventType, (event: MessageEvent) => {
         try {
           const data = JSON.parse(event.data);
-          setEvents(prev => [...prev, data as SessionEvent]);
+          
+          // Handle approval requests separately
+          if (data.type === 'TOOL_APPROVAL_REQUEST') {
+            setApprovalRequest(data.data as ToolApprovalRequestData);
+          } else {
+            setEvents(prev => [...prev, data as SessionEvent]);
+          }
         } catch (error) {
           console.error('Failed to parse event:', error);
         }
@@ -134,6 +142,34 @@ export default function Home() {
       console.error('Failed to spawn agent:', error);
     }
     setLoading(false);
+  }
+
+  async function handleApprovalDecision(decision: 'allow_once' | 'allow_session' | 'deny') {
+    if (!approvalRequest) return;
+    
+    try {
+      const res = await fetch(`/api/approvals/${approvalRequest.requestId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          requestId: approvalRequest.requestId,
+          decision,
+          reason: `User ${decision.replace('_', ' ')}`
+        })
+      });
+      
+      if (!res.ok) {
+        console.error('Failed to submit approval decision');
+      }
+      
+      setApprovalRequest(null);
+    } catch (error) {
+      console.error('Failed to submit approval decision:', error);
+    }
+  }
+
+  function handleApprovalTimeout() {
+    setApprovalRequest(null);
   }
 
   async function sendMessage() {
@@ -292,6 +328,15 @@ export default function Home() {
           </>
         )}
       </div>
+      
+      {/* Tool Approval Modal */}
+      {approvalRequest && (
+        <ToolApprovalModal
+          request={approvalRequest}
+          onDecision={handleApprovalDecision}
+          onTimeout={handleApprovalTimeout}
+        />
+      )}
     </div>
   );
 }

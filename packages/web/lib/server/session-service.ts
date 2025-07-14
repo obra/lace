@@ -5,6 +5,7 @@ import { Agent, ThreadManager, ProviderRegistry, ToolExecutor, getLaceDbPath, ge
 import type { ThreadId } from './lace-imports';
 import { Session, Agent as AgentType, SessionEvent } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
+import { getApprovalManager } from '@/lib/server/approval-manager';
 
 // Active agent instances
 const activeAgents = new Map<ThreadId, Agent>();
@@ -287,25 +288,41 @@ export class SessionService {
     });
     
     // Handle tool approval requests
-    agent.on('approval_request', ({ toolName, input, isReadOnly, requestId, resolve }) => {
+    agent.on('approval_request', async ({ toolName, input, isReadOnly, requestId, resolve }) => {
       console.log(`Tool approval requested for ${toolName} (${isReadOnly ? 'read-only' : 'destructive'})`);
       
-      // For now, auto-approve read-only tools and deny destructive ones
-      // TODO: Implement UI-based approval flow
-      if (isReadOnly) {
-        console.log(`Auto-approving read-only tool: ${toolName}`);
-        resolve('allow_once');
-      } else {
-        console.log(`Auto-denying destructive tool: ${toolName}`);
+      const approvalManager = getApprovalManager();
+      
+      try {
+        // Get tool metadata from the tool executor
+        const tool = (agent as any)._toolExecutor?.getTool(toolName);
+        const toolDescription = tool?.description;
+        const toolAnnotations = tool?.annotations;
+        
+        // Request approval through the manager
+        const decision = await approvalManager.requestApproval(
+          threadId,
+          sessionId,
+          toolName,
+          toolDescription,
+          toolAnnotations,
+          input,
+          isReadOnly
+        );
+        
+        resolve(decision);
+      } catch (error) {
+        // On timeout or error, deny the request
+        console.error(`Approval request failed for ${toolName}:`, error);
         resolve('deny');
         
-        // Notify UI about the denial
+        // Notify UI about the timeout/error
         const event: SessionEvent = {
           type: 'LOCAL_SYSTEM_MESSAGE',
           threadId,
           timestamp: new Date().toISOString(),
           data: { 
-            message: `Tool "${toolName}" was denied (destructive operations not yet supported in web UI)`
+            message: `Tool "${toolName}" was denied (${error instanceof Error ? error.message : 'approval failed'})`
           }
         };
         sseManager.broadcast(sessionId, event);
