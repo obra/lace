@@ -23,8 +23,15 @@ export class SessionService {
   }
 
   async createProvider(providerType: string, model?: string) {
-    const registry = await ProviderRegistry.createWithAutoDiscovery();
-    return await registry.createProvider(providerType, { model });
+    try {
+      const registry = await ProviderRegistry.createWithAutoDiscovery();
+      const provider = await registry.createProvider(providerType, { model });
+      console.log(`Created provider: ${providerType} with model: ${model}`);
+      return provider;
+    } catch (error) {
+      console.error(`Failed to create provider ${providerType}:`, error);
+      throw error;
+    }
   }
 
   async createSession(name?: string): Promise<Session> {
@@ -188,7 +195,10 @@ export class SessionService {
     const sseManager = SSEManager.getInstance();
     const threadId = agent.threadId as ThreadId;
     
+    console.log(`Setting up SSE event handlers for agent ${threadId} in session ${sessionId}`);
+    
     agent.on('agent_thinking_start', () => {
+      console.log(`Agent ${threadId} started thinking`);
       const event: SessionEvent = {
         type: 'THINKING',
         threadId,

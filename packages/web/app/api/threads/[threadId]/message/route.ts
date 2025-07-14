@@ -60,10 +60,21 @@ export async function POST(
 
     // Process message asynchronously
     console.log(`Processing message for agent ${threadId}: "${body.message}"`);
-    agent.sendMessage(body.message).catch(error => {
-      console.error('Error processing message:', error);
-      // Could emit an error event here if needed
-    });
+    agent.sendMessage(body.message)
+      .then(() => {
+        console.log(`Message processing started for agent ${threadId}`);
+      })
+      .catch(error => {
+        console.error('Error processing message:', error);
+        // Emit error event
+        const errorEvent: SessionEvent = {
+          type: 'LOCAL_SYSTEM_MESSAGE',
+          threadId,
+          timestamp: new Date().toISOString(),
+          data: { message: `Error: ${error.message}` }
+        };
+        sseManager.broadcast(sessionId, errorEvent);
+      });
 
     // Return immediate acknowledgment
     const response: MessageResponse = {
