@@ -24,8 +24,15 @@ interface UseConversationStreamOptions {
 interface ConversationStreamState {
   isStreaming: boolean;
   isThinking: boolean;
+  isConnected: boolean;
   currentThreadId?: string;
   error?: string;
+}
+
+export interface StreamConnectionRequest {
+  threadId?: string;
+  provider?: string;
+  model?: string;
 }
 
 export function useConversationStream({
