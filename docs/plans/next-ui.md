@@ -435,12 +435,109 @@ export interface Thread {
 - [ ] UI/API integration verified
 - [ ] Performance acceptable for single-user scenarios
 
+### Phase 5: Provider/Model Discovery API
+
+#### 5.1 API Design
+
+**GET /api/providers**
+Returns all available providers and their models in a single call.
+
+```typescript
+interface ProvidersResponse {
+  providers: ProviderInfo[];
+}
+
+interface ProviderInfo {
+  name: string;                    // 'anthropic', 'openai', etc.
+  displayName: string;             // 'Anthropic Claude', 'OpenAI', etc.
+  models: ModelInfo[];
+  configured: boolean;             // Has valid credentials
+  requiresApiKey: boolean;         // Needs API key vs local provider
+  configurationHint?: string;      // e.g., "Set ANTHROPIC_KEY environment variable"
+}
+
+interface ModelInfo {
+  id: string;                      // 'claude-3-opus-20240229'
+  displayName: string;             // 'Claude 3 Opus'
+  description?: string;            // 'Most capable model for complex tasks'
+  context_window?: number;         // 200000
+  capabilities?: string[];         // ['vision', 'function-calling']
+  isDefault?: boolean;             // Recommended default for this provider
+}
+```
+
+**POST /api/providers/{provider}/configure** (Future)
+Configure credentials for a specific provider.
+
+```typescript
+interface ConfigureProviderRequest {
+  apiKey?: string;
+  baseUrl?: string;              // For custom endpoints
+  // Other provider-specific config
+}
+
+interface ConfigureProviderResponse {
+  success: boolean;
+  provider: ProviderInfo;        // Updated provider info
+  error?: string;
+}
+```
+
+**GET /api/providers/{provider}/test**
+Test if a provider is properly configured and working.
+
+```typescript
+interface TestProviderResponse {
+  success: boolean;
+  message: string;               // "Successfully connected to Anthropic API"
+  error?: string;
+}
+```
+
+#### 5.2 Backend Requirements
+
+1. **ProviderRegistry Enhancement:**
+   - Add method to get provider metadata
+   - Add method to check if provider is configured
+   - Add method to list available models per provider
+
+2. **Provider Base Class Enhancement:**
+   - Add abstract methods for model listing
+   - Add metadata about the provider (display name, requirements)
+
+3. **Individual Provider Updates:**
+   - Each provider implements model listing
+   - Return proper metadata about available models
+
+#### 5.3 Frontend Integration
+
+Update `AgentSpawner.tsx` to use the API:
+```typescript
+// Fetch once on component mount
+const { providers } = await fetch('/api/providers').then(r => r.json());
+
+// Show all models from all configured providers in a single dropdown
+const allModels = providers
+  .filter(p => p.configured)
+  .flatMap(p => p.models.map(m => ({
+    value: `${p.name}/${m.id}`,
+    label: `${p.displayName} - ${m.displayName}`,
+    description: m.description,
+    isDefault: m.isDefault
+  })));
+
+// When spawning, split the model ID
+const [provider, model] = selectedModel.split('/');
+await spawnAgent(sessionId, agentName, provider, model);
+```
+
 ## Implementation Order
 
 1. **Week 1**: Write all API tests (Phase 1)
 2. **Week 2**: Implement API to pass tests (Phase 2)
 3. **Week 3**: Build simple UI (Phase 3)
 4. **Week 4**: Polish and testing (Phase 4)
+5. **Week 5**: Provider/Model Discovery API (Phase 5)
 
 ## Future Considerations
 
@@ -449,5 +546,7 @@ export interface Thread {
 - **Scaling**: Event distribution for multiple processes
 - **Mobile support**: Responsive design considerations
 - **Real-time collaboration**: Multiple users in same session
+- **Dynamic Provider Configuration**: Web-based credential management
+- **Provider Hot-Reload**: Add/remove providers without restart
 
 This plan provides a clear path from test-driven API development to a functional web UI that proves the architecture works for both single-agent and future multi-agent scenarios.
