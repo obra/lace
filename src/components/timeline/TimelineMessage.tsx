@@ -3,12 +3,16 @@
 import { TimelineEntry } from '~/types';
 import { formatTime } from '~/utils/format';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faInfoCircle, faUser, faRobot, faTerminal, faExternalLinkAlt,
-  faFolderPlus, faShare, faEdit, faCheckCircle, faImages, faPlug
+import {
+  faInfoCircle,
+  faUser,
+  faRobot,
+  faTerminal,
+  faExternalLinkAlt,
+  faImages,
 } from '~/lib/fontawesome';
-import { Carousel } from './Carousel';
-import { IntegrationEntry } from './IntegrationEntry';
+import { IntegrationEntry } from '~/components/timeline/IntegrationEntry';
+import GoogleDocChatMessage from '~/components/chat/GoogleDocChatMessage';
 
 interface TimelineMessageProps {
   entry: TimelineEntry;
@@ -17,12 +21,15 @@ interface TimelineMessageProps {
 export function TimelineMessage({ entry }: TimelineMessageProps) {
   const renderMessage = (content: string) => {
     // Code block formatting
-    let formatted = content.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
-      return `<div class="bg-base-300 border border-base-content/20 rounded-lg p-3 my-2 overflow-x-auto">
+    let formatted = content.replace(
+      /```(\w+)?\n([\s\S]*?)```/g,
+      (_match, lang: string, code: string) => {
+        return `<div class="bg-base-300 border border-base-content/20 rounded-lg p-3 my-2 overflow-x-auto">
         <div class="text-xs text-base-content/60 mb-2">${lang || 'code'}</div>
         <pre class="text-accent text-sm"><code>${escapeHtml(code.trim())}</code></pre>
       </div>`;
-    });
+      }
+    );
 
     // Inline code formatting
     formatted = formatted.replace(
@@ -70,7 +77,10 @@ export function TimelineMessage({ entry }: TimelineMessageProps) {
             <span className="font-medium text-sm text-base-content">You</span>
             <span className="text-xs text-base-content/50">{formatTime(entry.timestamp)}</span>
           </div>
-          <div className="text-sm leading-relaxed text-base-content">{entry.content}</div>
+          <div 
+            className="text-sm leading-relaxed text-base-content"
+            dangerouslySetInnerHTML={{ __html: renderMessage(entry.content || '') }}
+          />
         </div>
       </div>
     );
@@ -265,9 +275,7 @@ export function TimelineMessage({ entry }: TimelineMessageProps) {
                           ))}
                         </div>
                       </div>
-                      <span className="text-xs font-mono text-base-content/50">
-                        {item.commit}
-                      </span>
+                      <span className="text-xs font-mono text-base-content/50">{item.commit}</span>
                     </div>
 
                     <div className="mt-3">
@@ -297,6 +305,45 @@ export function TimelineMessage({ entry }: TimelineMessageProps) {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Google Doc Messages
+  if (entry.type === 'google-doc') {
+    const message = {
+      id: entry.id.toString(),
+      role: entry.agent ? ('assistant' as const) : ('user' as const),
+      content: entry.content || '',
+      timestamp: entry.timestamp,
+      document: entry.document,
+    };
+
+    return (
+      <div className="flex gap-3">
+        <div className="flex-shrink-0">
+          <div
+            className={`w-8 h-8 rounded-md flex items-center justify-center text-sm font-medium ${
+              entry.agent ? 'bg-orange-500 text-white' : 'bg-teal-600 text-white'
+            }`}
+          >
+            <FontAwesomeIcon icon={entry.agent ? faRobot : faUser} className="text-xs" />
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="font-medium text-sm text-base-content">{entry.agent || 'You'}</span>
+            <span className="text-xs text-base-content/50">{formatTime(entry.timestamp)}</span>
+            {entry.agent && (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
+                {entry.agent}
+              </span>
+            )}
+          </div>
+          <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+            <GoogleDocChatMessage message={message} />
           </div>
         </div>
       </div>

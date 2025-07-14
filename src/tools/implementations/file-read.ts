@@ -3,10 +3,10 @@
 
 import { z } from 'zod';
 import { readFile, stat } from 'fs/promises';
-import { Tool } from '../tool.js';
-import { FilePath, LineNumber } from '../schemas/common.js';
-import type { ToolResult, ToolContext } from '../types.js';
-import { findSimilarPaths } from '../utils/file-suggestions.js';
+import { Tool } from '~/tools/tool';
+import { FilePath, LineNumber } from '~/tools/schemas/common';
+import type { ToolResult, ToolContext } from '~/tools/types';
+import { findSimilarPaths } from '~/tools/utils/file-suggestions';
 
 const MAX_FILE_SIZE = 32 * 1024; // 32KB limit for whole file reads
 const MAX_RANGE_SIZE = 100; // Maximum lines in a ranged read
@@ -92,9 +92,9 @@ export class FileReadTool extends Tool {
         linesReturned,
         fileSize: this.formatFileSize(content.length),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle file not found with helpful suggestions
-      if (error.code === 'ENOENT') {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
         const suggestions = await findSimilarPaths(args.path);
         const suggestionText =
           suggestions.length > 0 ? `\n\nSimilar files: ${suggestions.join(', ')}` : '';
@@ -103,16 +103,17 @@ export class FileReadTool extends Tool {
       }
 
       // Handle permission errors
-      if (error.code === 'EACCES') {
+      if (error instanceof Error && 'code' in error && error.code === 'EACCES') {
         return this.createError(
           `Permission denied accessing file: ${args.path}. Check file permissions and try again.`
         );
       }
 
       // Handle other file system errors
-      if (error.code) {
+      if (error instanceof Error && 'code' in error && error.code) {
+        const errorCode = (error as NodeJS.ErrnoException).code;
         return this.createError(
-          `File system error (${error.code}): ${error.message}. Check the file path and try again.`
+          `File system error (${errorCode}): ${error.message}. Check the file path and try again.`
         );
       }
 

@@ -1,9 +1,9 @@
 // ABOUTME: API route for thread/conversation management using core Lace components
 import { NextRequest, NextResponse } from 'next/server';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { getLaceDbPath } from '~/config/lace-dir.js';
-import { loadEnvFile } from '~/config/env-loader.js';
-import { logger } from '~/utils/logger.js';
+import { ThreadManager } from '~/threads/thread-manager';
+import { getLaceDbPath } from '~/config/lace-dir';
+import { loadEnvFile } from '~/config/env-loader';
+import { logger } from '~/utils/logger';
 
 // Initialize environment
 loadEnvFile();

@@ -2,20 +2,20 @@
 // ABOUTME: Enables efficient token usage by delegating to cheaper models with enhanced parameter validation
 
 import { z } from 'zod';
-import { Tool } from '../tool.js';
-import { NonEmptyString } from '../schemas/common.js';
-import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
-import { ApprovalDecision } from '../approval-types.js';
-import { Agent } from '../../agents/agent.js';
-import { ThreadManager } from '../../threads/thread-manager.js';
-import { ToolExecutor } from '../executor.js';
-import { AnthropicProvider } from '../../providers/anthropic-provider.js';
-import { LMStudioProvider } from '../../providers/lmstudio-provider.js';
-import { OllamaProvider } from '../../providers/ollama-provider.js';
-import { AIProvider } from '../../providers/base-provider.js';
-import { TokenBudgetConfig } from '../../token-management/types.js';
-import { getEnvVar } from '../../config/env-loader.js';
-import { logger } from '../../utils/logger.js';
+import { Tool } from '~/tools/tool';
+import { NonEmptyString } from '~/tools/schemas/common';
+import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
+import { ApprovalDecision } from '~/tools/approval-types';
+import { Agent } from '~/agents/agent';
+// import { ThreadManager } from '../../threads/thread-manager';
+import { ToolExecutor } from '~/tools/executor';
+import { AnthropicProvider } from '~/providers/anthropic-provider';
+import { LMStudioProvider } from '~/providers/lmstudio-provider';
+import { OllamaProvider } from '~/providers/ollama-provider';
+import { AIProvider } from '~/providers/base-provider';
+import { TokenBudgetConfig } from '~/token-management/types';
+import { getEnvVar } from '~/config/env-loader';
+import { logger } from '~/utils/logger';
 
 // Model format validation
 const ModelFormat = z.string().refine(
@@ -91,7 +91,7 @@ Examples:
 
     try {
       // Create provider for subagent
-      const provider = await this.createProvider(providerName, modelName, expected_response);
+      const provider = this.createProvider(providerName, modelName, expected_response);
       if (!provider) {
         return this.createError(`Unknown provider: ${providerName}`);
       }
@@ -113,7 +113,7 @@ Examples:
       // Note: Delegation metadata is now shown in the delegation box UI
 
       // Get all tools for the subagent
-      const availableTools = toolExecutor.getAllTools();
+      // const _availableTools = toolExecutor.getAllTools();
 
       // Configure token budget for subagent (more conservative than parent)
       const tokenBudget: TokenBudgetConfig = {
@@ -207,11 +207,11 @@ Examples:
     }
   }
 
-  private async createProvider(
+  private createProvider(
     providerName: string,
     modelName: string,
     expectedResponse: string
-  ): Promise<AIProvider | null> {
+  ): AIProvider | null {
     // Create system prompt for subagent
     const systemPrompt = `You are a focused task assistant. You have been delegated a specific task by another agent.
 
@@ -275,8 +275,8 @@ IMPORTANT: Once you have gathered enough information to provide the expected res
     } else {
       // SAFE DEFAULT: If no approval callback, deny all tools
       childExecutor.setApprovalCallback({
-        async requestApproval() {
-          return ApprovalDecision.DENY;
+        requestApproval() {
+          return Promise.resolve(ApprovalDecision.DENY);
         },
       });
     }

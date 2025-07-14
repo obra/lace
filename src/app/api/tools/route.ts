@@ -1,11 +1,11 @@
 // ABOUTME: API route for tool management and execution using core Lace components
 import { NextRequest, NextResponse } from 'next/server';
-import { ToolExecutor } from '~/tools/executor.js';
-import { ToolCall, ToolResult } from '~/tools/types.js';
-import { ApprovalDecision, ApprovalCallback } from '~/tools/approval-types.js';
-import { asThreadId } from '~/threads/types.js';
-import { loadEnvFile } from '~/config/env-loader.js';
-import { logger } from '~/utils/logger.js';
+import { ToolExecutor } from '~/tools/executor';
+import { ToolCall, ToolResult } from '~/tools/types';
+import { ApprovalDecision, ApprovalCallback } from '~/tools/approval-types';
+import { asThreadId } from '~/threads/types';
+import { loadEnvFile } from '~/config/env-loader';
+import { logger } from '~/utils/logger';
 
 // Initialize environment
 loadEnvFile();

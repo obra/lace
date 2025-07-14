@@ -9,6 +9,7 @@ import { TimelineView } from '~/components/timeline/TimelineView';
 import { EnhancedChatInput } from '~/components/chat/EnhancedChatInput';
 import { TaskBoardModal } from '~/components/modals/TaskBoardModal';
 import { VoiceRecognitionUI } from '~/components/ui/VoiceRecognitionUI';
+import { StreamingIndicator } from '~/components/ui/StreamingIndicator';
 import { TimelineEntry, Project, Timeline, Task, RecentFile, StreamEvent } from '~/types';
 import { useVoiceRecognition } from '~/hooks/useVoiceRecognition';
 import { useConversationStream } from '~/hooks/useConversationStream';
@@ -53,7 +54,7 @@ export function LaceApp() {
   });
 
   // Conversation Stream
-  const { isStreaming, isThinking, currentThreadId, sendMessage } = useConversationStream({
+  const { isStreaming, isThinking, currentThreadId, sendMessage, interruptStream } = useConversationStream({
     onStreamEvent: (event: StreamEvent) => {
       if (event.type === 'token' && event.content) {
         setCurrentStreamingContent((prev) => prev + event.content);
@@ -238,7 +239,14 @@ export function LaceApp() {
 
   // Handlers
   const handleSendMessage = useCallback(async () => {
-    if (!prompt.trim() || isStreaming) return;
+    if (!prompt.trim()) return;
+
+    // If currently streaming, interrupt first
+    if (isStreaming) {
+      interruptStream();
+      // Small delay to ensure the interrupt is processed
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
 
     const humanEntry: TimelineEntry = {
       id: nextEntryId.current++,
@@ -250,6 +258,9 @@ export function LaceApp() {
     setTimelineEntries((prev) => [...prev, humanEntry]);
     const userPrompt = prompt;
     setPrompt('');
+    
+    // Reset streaming content for new message
+    setCurrentStreamingContent('');
 
     // Send to real API
     try {
@@ -265,7 +276,7 @@ export function LaceApp() {
       };
       setTimelineEntries((prev) => [...prev, errorEntry]);
     }
-  }, [prompt, isStreaming, sendMessage, currentThreadId]);
+  }, [prompt, isStreaming, interruptStream, sendMessage, currentThreadId]);
 
   const handleProjectChange = (project: Project) => {
     setCurrentProject(project);
@@ -514,12 +525,21 @@ export function LaceApp() {
           value={prompt}
           onChange={setPrompt}
           onSubmit={() => void handleSendMessage()}
-          disabled={isStreaming || isThinking || isToolRunning}
+          disabled={isToolRunning}
+          isStreaming={isStreaming}
           isListening={isListening}
           onStartVoice={startListening}
           onStopVoice={stopListening}
+          onInterrupt={interruptStream}
         />
       </div>
+
+      {/* Streaming Indicator */}
+      <StreamingIndicator 
+        isVisible={isStreaming || isThinking}
+        onInterrupt={interruptStream}
+        agent={currentTimeline.agent}
+      />
 
       {/* Modals */}
       <TaskBoardModal

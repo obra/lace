@@ -1,0 +1,52 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "esnext",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "jsx": "react-jsx",
+    "baseUrl": "./src",
+    "paths": {
+      "~/*": ["./*"],
+      "~/agents/*": ["./agents/*"],
+      "~/config/*": ["./config/*"],
+      "~/threads/*": ["./threads/*"],
+      "~/tools/*": ["./tools/*"],
+      "~/providers/*": ["./providers/*"],
+      "~/utils/*": ["./utils/*"],
+      "~/token-management/*": ["./token-management/*"],
+      "~/persistence/*": ["./persistence/*"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/__tests__/**/*",
+    "src/app/**/*",
+    "src/components/**/*",
+    "src/hooks/**/*",
+    "src/interfaces/terminal/**/*",
+    "src/lib/animations.ts",
+    "next-env.d.ts",
+    "next.config.ts",
+    "vitest.config.ts"
+  ]
+}

@@ -2,16 +2,17 @@
 // ABOUTME: Wraps Anthropic SDK in the common provider interface
 
 import Anthropic from '@anthropic-ai/sdk';
-import { AIProvider } from '~/providers/base-provider.js';
+import { AIProvider } from '~/providers/base-provider';
 import {
   ProviderMessage,
   ProviderResponse,
   ProviderConfig,
   ProviderToolCall,
-} from '~/providers/base-provider.js';
-import { Tool } from '~/tools/tool.js';
-import { logger } from '~/utils/logger.js';
-import { convertToAnthropicFormat } from '~/providers/format-converters.js';
+} from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { logger } from '~/utils/logger';
+import { convertToAnthropicFormat } from '~/providers/format-converters';
+import { tokenUsageTracker } from '~/lib/tokenUsage';
 
 export interface AnthropicProviderConfig extends ProviderConfig {
   apiKey: string;
@@ -190,6 +191,15 @@ export class AnthropicProvider extends AIProvider {
           usage: response.usage,
         });
 
+        // Track token usage for billing estimation
+        if (response.usage) {
+          tokenUsageTracker.trackUsage(
+            response.usage.input_tokens,
+            response.usage.output_tokens,
+            this.modelName
+          );
+        }
+
         return {
           content: textContent,
           toolCalls,
@@ -330,6 +340,15 @@ export class AnthropicProvider extends AIProvider {
             toolCallNames: toolCalls.map((tc: ProviderToolCall) => tc.name),
             usage: finalMessage.usage,
           });
+
+          // Track token usage for billing estimation
+          if (finalMessage.usage) {
+            tokenUsageTracker.trackUsage(
+              finalMessage.usage.input_tokens,
+              finalMessage.usage.output_tokens,
+              this.modelName
+            );
+          }
 
           const response = {
             content: textContent,

@@ -4,9 +4,9 @@
 import { z } from 'zod';
 import { readdir, stat } from 'fs/promises';
 import { join, resolve } from 'path';
-import { Tool } from '../tool.js';
-import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
-import { TOOL_LIMITS } from '../constants.js';
+import { Tool } from '~/tools/tool';
+import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
+import { TOOL_LIMITS } from '~/tools/constants';
 
 interface TreeNode {
   name: string;

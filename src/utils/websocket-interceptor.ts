@@ -60,7 +60,7 @@ export function enableWebSocketInterception(): void {
           dataString = '[Blob data]';
         } else {
           // ArrayBufferView
-          dataString = new TextDecoder().decode(data as ArrayBufferView);
+          dataString = new TextDecoder().decode(data as Uint8Array);
         }
 
         tracker.messages.push({

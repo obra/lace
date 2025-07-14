@@ -271,15 +271,15 @@ export class HARRecorder {
         headers = new Headers();
       }
 
-      for (const [name, value] of headers.entries()) {
+      headers.forEach((value, name) => {
         requestHeaders.push({ name, value });
-      }
+      });
     }
 
     const responseHeaders: HARHeader[] = [];
-    for (const [name, value] of response.headers.entries()) {
+    response.headers.forEach((value, name) => {
       responseHeaders.push({ name, value });
-    }
+    });
 
     // Parse URL for query string
     const urlObj = new URL(url);
@@ -632,12 +632,12 @@ export class HARRecorder {
         let eventData;
 
         try {
-          eventData = JSON.parse(dataMatch[1]) as unknown;
+          eventData = JSON.parse(dataMatch[1]) as Record<string, unknown>;
         } catch (e) {
           eventData = {
             raw: dataMatch[1],
             parse_error: e instanceof Error ? e.message : String(e),
-          } as unknown;
+          };
         }
 
         // Add to events array

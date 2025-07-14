@@ -1,13 +1,13 @@
 // ABOUTME: Proper API route for conversation management using core Lace components
 import { NextRequest, NextResponse } from 'next/server';
-import { Agent } from '~/agents/agent.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { DelegateTool } from '~/tools/implementations/delegate.js';
-import { getLaceDbPath } from '~/config/lace-dir.js';
-import { loadEnvFile, getEnvVar } from '~/config/env-loader.js';
-import { logger } from '~/utils/logger.js';
-import { AIProvider } from '~/providers/base-provider.js';
+import { Agent } from '~/agents/agent';
+import { ToolExecutor } from '~/tools/executor';
+import { ThreadManager } from '~/threads/thread-manager';
+import { DelegateTool } from '~/tools/implementations/delegate';
+import { getLaceDbPath } from '~/config/lace-dir';
+import { loadEnvFile, getEnvVar } from '~/config/env-loader';
+import { logger } from '~/utils/logger';
+import { AIProvider } from '~/providers/base-provider';
 
 // Initialize environment
 loadEnvFile();
@@ -38,18 +38,18 @@ async function createProvider(
     anthropic: async ({ apiKey, model }) => {
       // Check for test mode
       if (getEnvVar('LACE_TEST_MODE') === 'true') {
-        const { createMockProvider } = await import('~/__tests__/utils/mock-provider.js');
+        const { createMockProvider } = await import('~/__tests__/utils/mock-provider');
         return createMockProvider();
       }
 
-      const { AnthropicProvider } = await import('~/providers/anthropic-provider.js');
+      const { AnthropicProvider } = await import('~/providers/anthropic-provider');
       if (!apiKey) {
         throw new Error('Anthropic API key is required');
       }
       return new AnthropicProvider({ apiKey, model });
     },
     openai: async ({ apiKey, model }) => {
-      const { OpenAIProvider } = await import('~/providers/openai-provider.js');
+      const { OpenAIProvider } = await import('~/providers/openai-provider');
       if (!apiKey) {
         throw new Error('OpenAI API key is required');
       }

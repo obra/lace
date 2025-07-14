@@ -14,15 +14,17 @@ export interface StreamEvent {
     | 'tool_call_start'
     | 'tool_call_complete'
     | 'response_complete'
-    | 'conversation_complete'
+    | 'ready_for_input'
     | 'error';
   content?: string;
   error?: string;
   timestamp?: string;
   threadId?: string;
-  isNew?: boolean;
+  isNewThread?: boolean;
+  isNewAgent?: boolean;
   provider?: string;
   model?: string;
+  connectionKey?: string;
   toolCall?: {
     name: string;
     id: string;
@@ -41,9 +43,20 @@ export interface ChatState {
   error?: string;
 }
 
+export interface GoogleDocAttachment {
+  id: string;
+  title: string;
+  url: string;
+  thumbnailUrl?: string;
+  lastModified: Date;
+  owner: string;
+  permissions: 'view' | 'comment' | 'edit';
+  preview?: string;
+}
+
 export interface TimelineEntry {
   id: string | number;
-  type: 'admin' | 'human' | 'ai' | 'tool' | 'integration' | 'carousel';
+  type: 'admin' | 'human' | 'ai' | 'tool' | 'integration' | 'carousel' | 'google-doc';
   content?: string;
   timestamp: Date;
   agent?: string;
@@ -54,6 +67,7 @@ export interface TimelineEntry {
   description?: string;
   link?: string;
   items?: CarouselItem[];
+  document?: GoogleDocAttachment;
 }
 
 export interface CarouselItem {

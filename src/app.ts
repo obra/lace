@@ -1,18 +1,18 @@
 // ABOUTME: Core application setup and orchestration for the Lace AI assistant
 // ABOUTME: This module initializes all major components and starts the appropriate interface.
 
-import { Agent } from './agents/agent.js';
-import { AIProvider } from './providers/base-provider.js';
-import { ToolExecutor } from './tools/executor.js';
-import { DelegateTool } from './tools/implementations/delegate.js';
-import { ThreadManager } from './threads/thread-manager.js';
-import { getLaceDbPath } from './config/lace-dir.js';
-import { logger } from './utils/logger.js';
-import { CLIOptions } from './cli/args.js';
-import { NonInteractiveInterface } from './interfaces/non-interactive-interface.js';
-import { createGlobalPolicyCallback } from './tools/policy-wrapper.js';
-import { enableTrafficLogging } from './utils/traffic-logger.js';
-import { getEnvVar } from './config/env-loader.js';
+import { Agent } from '~/agents/agent.js';
+import { AIProvider } from '~/providers/base-provider.js';
+import { ToolExecutor } from '~/tools/executor.js';
+import { DelegateTool } from '~/tools/implementations/delegate.js';
+import { ThreadManager } from '~/threads/thread-manager.js';
+import { getLaceDbPath } from '~/config/lace-dir.js';
+import { logger } from '~/utils/logger.js';
+import { CLIOptions } from '~/cli/args.js';
+import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface.js';
+import { createGlobalPolicyCallback } from '~/tools/policy-wrapper.js';
+import { enableTrafficLogging } from '~/utils/traffic-logger.js';
+import { getEnvVar } from '~/config/env-loader.js';
 
 // Provider creation mapping
 const providerInitializers: Record<
@@ -121,40 +121,38 @@ async function setupAgent(
   return agent;
 }
 
-async function handleSession(
-  threadManager: ThreadManager,
-  continueMode?: boolean | string
-): Promise<string> {
-  let continueThreadId: string | undefined;
-  if (continueMode) {
-    if (typeof continueMode === 'string') {
-      continueThreadId = continueMode;
-    } else {
-      logger.debug('Attempting to get latest thread ID');
-      continueThreadId = threadManager.getLatestThreadId() || undefined;
-      logger.debug(`Latest thread ID: ${continueThreadId}`);
-    }
-  }
+// Legacy function - replaced by handleSessionWithAgent
+// async function handleSession(
+//   threadManager: ThreadManager,
+//   continueMode?: boolean | string
+// ): Promise<string> {
+//   let continueThreadId: string | undefined;
+//   if (continueMode) {
+//     if (typeof continueMode === 'string') {
+//       continueThreadId = continueMode;
+//     } else {
+//       logger.debug('Attempting to get latest thread ID');
+//       continueThreadId = threadManager.getLatestThreadId() || undefined;
+//       logger.debug(`Latest thread ID: ${continueThreadId}`);
+//     }
+//   }
+//
+//   const sessionInfo = threadManager.resumeOrCreate(continueThreadId);
+//   const { threadId } = sessionInfo;
+//
+//   if (sessionInfo.isResumed) {
+//     console.log(`📖 Continuing conversation ${threadId}`);
+//   } else if (sessionInfo.resumeError) {
+//     console.warn(`⚠️  ${sessionInfo.resumeError}`);
+//     console.log(`🆕 Starting new conversation ${threadId}`);
+//   } else {
+//     console.log(`🆕 Starting conversation ${threadId}`);
+//   }
+//
+//   return threadId;
+// }
 
-  const sessionInfo = threadManager.resumeOrCreate(continueThreadId);
-  const { threadId } = sessionInfo;
-
-  if (sessionInfo.isResumed) {
-    console.log(`📖 Continuing conversation ${threadId}`);
-  } else if (sessionInfo.resumeError) {
-    console.warn(`⚠️  ${sessionInfo.resumeError}`);
-    console.log(`🆕 Starting new conversation ${threadId}`);
-  } else {
-    console.log(`🆕 Starting conversation ${threadId}`);
-  }
-
-  return threadId;
-}
-
-async function handleSessionWithAgent(
-  agent: Agent,
-  continueMode?: boolean | string
-): Promise<string> {
+function handleSessionWithAgent(agent: Agent, continueMode?: boolean | string): string {
   let continueThreadId: string | undefined;
   if (continueMode) {
     if (typeof continueMode === 'string') {
@@ -165,7 +163,7 @@ async function handleSessionWithAgent(
     }
   }
 
-  const sessionInfo = await agent.resumeOrCreateThread(continueThreadId);
+  const sessionInfo = agent.resumeOrCreateThread(continueThreadId);
   const { threadId } = sessionInfo;
 
   if (sessionInfo.isResumed) {
@@ -191,7 +189,7 @@ export async function run(options: CLIOptions): Promise<void> {
   const agent = await setupAgent(options, tempThreadId, threadManager);
 
   // Use Agent to handle session resumption with automatic replay
-  const sessionThreadId = await handleSessionWithAgent(agent, options.continue);
+  handleSessionWithAgent(agent, options.continue);
 
   if (options.prompt) {
     const nonInteractive = new NonInteractiveInterface(agent);
@@ -199,11 +197,19 @@ export async function run(options: CLIOptions): Promise<void> {
     process.exit(0);
   }
 
-  const { TerminalInterface } = await import('./interfaces/terminal/terminal-interface.js');
-  const cli = new TerminalInterface(agent);
+  try {
+    const { TerminalInterface } = await import('./interfaces/terminal/terminal-interface');
+    const cli = new TerminalInterface(agent);
 
-  const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);
-  agent.toolExecutor.setApprovalCallback(policyCallback);
+    const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);
+    agent.toolExecutor.setApprovalCallback(policyCallback);
 
-  await cli.startInteractive();
+    await cli.startInteractive();
+  } catch (error) {
+    console.error(
+      'Terminal interface not available in this build:',
+      error instanceof Error ? error.message : 'Unknown error'
+    );
+    process.exit(1);
+  }
 }

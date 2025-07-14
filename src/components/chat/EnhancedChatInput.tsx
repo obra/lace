@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, FormEvent, KeyboardEvent } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMicrophone, faPaperPlane, faPaperclip } from '~/lib/fontawesome';
+import { faMicrophone, faPaperPlane, faPaperclip, faStop } from '~/lib/fontawesome';
 
 interface EnhancedChatInputProps {
   value: string;
@@ -12,6 +12,8 @@ interface EnhancedChatInputProps {
   isListening?: boolean;
   onStartVoice?: () => void;
   onStopVoice?: () => void;
+  onInterrupt?: () => void;
+  isStreaming?: boolean;
   placeholder?: string;
 }
 
@@ -23,6 +25,8 @@ export function EnhancedChatInput({
   isListening = false,
   onStartVoice,
   onStopVoice,
+  onInterrupt,
+  isStreaming = false,
   placeholder = 'Message the agent...',
 }: EnhancedChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -41,6 +45,16 @@ export function EnhancedChatInput({
   useEffect(() => {
     adjustTextareaHeight();
   }, [value]);
+
+  // Auto-focus when component becomes enabled after being disabled
+  useEffect(() => {
+    if (!disabled && textareaRef.current) {
+      // Use setTimeout to ensure DOM has updated
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 100);
+    }
+  }, [disabled]);
 
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current;
@@ -61,6 +75,9 @@ export function EnhancedChatInput({
       e.preventDefault();
       if (!value.trim() || disabled) return;
       onSubmit();
+    } else if (e.key === 'Escape' && isStreaming && onInterrupt) {
+      e.preventDefault();
+      onInterrupt();
     }
   };
 
@@ -111,20 +128,37 @@ export function EnhancedChatInput({
               onChange={(e) => onChange(e.target.value)}
               onKeyDown={handleKeyDown}
               className="w-full bg-base-200 border border-base-300 rounded-2xl px-4 py-3 pr-12 resize-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-base-content placeholder-base-content/60 text-base"
-              placeholder={isListening ? 'Listening...' : placeholder}
+              placeholder={
+                isListening 
+                  ? 'Listening...' 
+                  : isStreaming 
+                    ? 'Press ESC to interrupt...' 
+                    : placeholder
+              }
               rows={1}
               style={{ minHeight: '44px', maxHeight: '120px' }}
               disabled={disabled}
             />
 
-            {/* Send Button */}
-            <button
-              type="submit"
-              disabled={!value.trim() || disabled}
-              className="absolute right-2 bottom-2 p-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <FontAwesomeIcon icon={faPaperPlane} className="w-5 h-5" />
-            </button>
+            {/* Send/Stop Button */}
+            {isStreaming && onInterrupt ? (
+              <button
+                type="button"
+                onClick={onInterrupt}
+                className="absolute right-2 bottom-2 p-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
+                title="Stop response (ESC)"
+              >
+                <FontAwesomeIcon icon={faStop} className="w-5 h-5" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!value.trim() || disabled}
+                className="absolute right-2 bottom-2 p-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <FontAwesomeIcon icon={faPaperPlane} className="w-5 h-5" />
+              </button>
+            )}
           </div>
 
           {/* Attachment Button (Mobile) */}

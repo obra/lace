@@ -1,8 +1,8 @@
 // ABOUTME: Task formatter utility for displaying tasks in CLI-friendly format
 // ABOUTME: Provides formatting for task lists and individual tasks with various display options
 
-import { Task } from './types.js';
-import { ThreadId, AssigneeId } from '../../../threads/types.js';
+import { Task } from '~/tools/implementations/task-manager/types';
+import { ThreadId, AssigneeId } from '~/threads/types';
 
 export interface FormatOptions {
   showAssignee?: boolean;

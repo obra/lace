@@ -1,8 +1,11 @@
 'use client';
 
+import { useTokenUsage } from '~/hooks/useTokenUsage';
+
 // Using FontAwesome instead of Heroicons
 
 export function AccountDropdown() {
+  const { usage, loading, error } = useTokenUsage();
   return (
     <div className="mt-auto border-t border-base-300 p-4">
       <div className="dropdown dropdown-top w-full">
@@ -63,18 +66,50 @@ export function AccountDropdown() {
         </ul>
       </div>
 
-      {/* Usage Stats */}
+      {/* Real Token Usage Stats */}
       <div className="mt-3 px-3">
-        <div className="flex items-center justify-between text-xs text-base-content/60 mb-1">
-          <span>API Usage</span>
-          <span>847 / 1,000</span>
-        </div>
-        <div className="w-full bg-base-300 rounded-full h-2 overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-teal-500 to-teal-600 rounded-full transition-all duration-300"
-            style={{ width: '84.7%' }}
-          ></div>
-        </div>
+        {loading ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-base-content/60 mb-1">
+              <span>Loading usage...</span>
+            </div>
+            <div className="w-full bg-base-300 rounded-full h-2 animate-pulse"></div>
+          </div>
+        ) : error ? (
+          <div className="text-xs text-error">
+            Failed to load usage
+          </div>
+        ) : usage ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-base-content/60 mb-1">
+              <span>Today</span>
+              <span title={`${usage.usage.daily.totalTokensFormatted} tokens`}>
+                {usage.usage.daily.estimatedCostFormatted}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-base-content/60 mb-1">
+              <span>This Month</span>
+              <span title={`${usage.usage.monthly.totalTokensFormatted} tokens`}>
+                {usage.usage.monthly.estimatedCostFormatted}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-base-content/80 font-medium mb-1">
+              <span>Total Usage</span>
+              <span title={`${usage.usage.total.totalTokensFormatted} tokens`}>
+                {usage.usage.total.estimatedCostFormatted}
+              </span>
+            </div>
+            {usage.apiKey.hasKey && (
+              <div className="text-xs text-base-content/50 font-mono">
+                Key: {usage.apiKey.maskedKey}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-xs text-base-content/60">
+            No usage data available
+          </div>
+        )}
       </div>
     </div>
   );

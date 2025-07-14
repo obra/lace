@@ -2,12 +2,12 @@
 // ABOUTME: Provides task creation, querying, updates, and note management capabilities
 
 import { z } from 'zod';
-import { Tool } from '../../tool.js';
-import { NonEmptyString } from '../../schemas/common.js';
-import type { ToolResult, ToolContext } from '../../types.js';
-import { DatabasePersistence } from '../../../persistence/database.js';
-import { Task, TaskNote, TaskStatus, TaskPriority } from './types.js';
-import { isAssigneeId, AssigneeId, ThreadId } from '../../../threads/types.js';
+import { Tool } from '~/tools/tool';
+import { NonEmptyString } from '~/tools/schemas/common';
+import type { ToolResult, ToolContext } from '~/tools/types';
+import { DatabasePersistence } from '~/persistence/database';
+import { Task, TaskNote } from '~/tools/implementations/task-manager/types';
+import { isAssigneeId, AssigneeId } from '~/threads/types';
 
 // Helper to generate task IDs
 function generateTaskId(): string {
@@ -30,7 +30,7 @@ let persistenceInstance: DatabasePersistence | null = null;
 
 async function getPersistence(): Promise<DatabasePersistence> {
   if (!persistenceInstance) {
-    const { getLaceDbPath } = await import('../../../config/lace-dir.js');
+    const { getLaceDbPath } = await import('../../../config/lace-dir');
     persistenceInstance = new DatabasePersistence(getLaceDbPath());
   }
   return persistenceInstance;
@@ -143,7 +143,7 @@ export class TaskListTool extends Tool {
           tasks = persistence.loadTasksByThread(parentThreadId);
           break;
 
-        case 'all':
+        case 'all': {
           // All tasks I can see (assigned to me or in my thread)
           const assignedToMe = persistence.loadTasksByAssignee(context.threadId);
           const inThread = persistence.loadTasksByThread(parentThreadId);
@@ -152,6 +152,7 @@ export class TaskListTool extends Tool {
           [...assignedToMe, ...inThread].forEach((t) => taskMap.set(t.id, t));
           tasks = Array.from(taskMap.values());
           break;
+        }
       }
 
       // Filter completed if needed
@@ -224,7 +225,7 @@ export class TaskCompleteTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof completeTaskSchema>,
-    context?: ToolContext
+    _context?: ToolContext
   ): Promise<ToolResult> {
     try {
       const persistence = await this.getPersistence();
@@ -274,7 +275,7 @@ export class TaskUpdateTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof updateTaskSchema>,
-    context?: ToolContext
+    _context?: ToolContext
   ): Promise<ToolResult> {
     try {
       const persistence = await this.getPersistence();
@@ -379,7 +380,7 @@ export class TaskViewTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof viewTaskSchema>,
-    context?: ToolContext
+    _context?: ToolContext
   ): Promise<ToolResult> {
     try {
       const persistence = await this.getPersistence();

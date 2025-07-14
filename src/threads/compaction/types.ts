@@ -1,7 +1,7 @@
 // ABOUTME: Type definitions for thread compaction strategies
 // ABOUTME: Defines interface for analyzing and compacting thread events
 
-import { Thread, ThreadEvent } from '../types.js';
+import { Thread, ThreadEvent } from '~/threads/types';
 
 export interface CompactionStrategy {
   // Analyze thread and determine if compaction needed (async for provider-aware token counting)

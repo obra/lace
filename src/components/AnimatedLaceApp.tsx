@@ -3,14 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faBars, 
-  faSearch, 
-  faTerminal, 
-  faTasks, 
-  faFolder, 
-  faMicrophone 
-} from '~/lib/fontawesome';
+import { faBars, faSearch, faTerminal, faTasks, faFolder, faMicrophone } from '~/lib/fontawesome';
 import { Sidebar } from '~/components/layout/Sidebar';
 import { MobileSidebar } from '~/components/layout/MobileSidebar';
 import { AnimatedTimelineView } from '~/components/timeline/AnimatedTimelineView';
@@ -20,16 +13,15 @@ import { TaskBoardModal } from '~/components/modals/TaskBoardModal';
 import { VoiceRecognitionUI } from '~/components/ui/VoiceRecognitionUI';
 import { TimelineEntry, Project, Timeline, Task, RecentFile } from '~/types';
 import { useVoiceRecognition } from '~/hooks/useVoiceRecognition';
-import { 
+import {
   pageTransition,
   fadeInUp,
   staggerContainer,
   staggerItem,
   buttonTap,
-  hoverLift,
   springConfig,
   sidebarVariants,
-  notificationVariants
+  notificationVariants,
 } from '~/lib/animations';
 
 const availableThemes = [
@@ -58,14 +50,14 @@ export function AnimatedLaceApp() {
   const nextEntryId = useRef(9);
 
   // Voice Recognition
-  const { 
-    isListening, 
-    startListening, 
-    stopListening, 
-    transcript, 
-    interimTranscript, 
-    confidence, 
-    error 
+  const {
+    isListening,
+    startListening,
+    stopListening,
+    transcript,
+    interimTranscript,
+    confidence,
+    error,
   } = useVoiceRecognition({
     onResult: (transcript) => {
       setPrompt(transcript);
@@ -353,7 +345,7 @@ export function AnimatedLaceApp() {
   };
 
   return (
-    <motion.div 
+    <motion.div
       className="flex h-screen bg-base-200 text-base-content font-sans overflow-hidden"
       variants={pageTransition}
       initial="initial"
@@ -437,19 +429,15 @@ export function AnimatedLaceApp() {
       </motion.div>
 
       {/* Main Content Area */}
-      <motion.div 
-        className="flex-1 flex flex-col min-w-0"
-        layout
-        transition={springConfig.smooth}
-      >
+      <motion.div className="flex-1 flex flex-col min-w-0" layout transition={springConfig.smooth}>
         {/* Top Bar */}
-        <motion.div 
+        <motion.div
           className="bg-base-100 border-b border-base-300 sticky top-0 z-30"
           variants={fadeInUp}
           initial="initial"
           animate="animate"
         >
-          <motion.div 
+          <motion.div
             className="flex items-center justify-between p-4 lg:px-6"
             variants={staggerContainer}
             initial="initial"
@@ -465,7 +453,7 @@ export function AnimatedLaceApp() {
                 <FontAwesomeIcon icon={faBars} className="w-6 h-6" />
               </motion.button>
               <div className="flex items-center gap-2">
-                <motion.h1 
+                <motion.h1
                   className="font-semibold text-base-content truncate"
                   key={currentTimeline.name}
                   initial={{ opacity: 0, y: -10 }}
@@ -508,16 +496,16 @@ export function AnimatedLaceApp() {
                 </svg>
               </motion.button>
               <div className="flex items-center gap-2">
-                <motion.div 
+                <motion.div
                   className="w-2 h-2 bg-teal-500 rounded-full"
-                  animate={{ 
+                  animate={{
                     scale: [1, 1.2, 1],
-                    opacity: [0.7, 1, 0.7]
+                    opacity: [0.7, 1, 0.7],
                   }}
-                  transition={{ 
-                    duration: 2, 
+                  transition={{
+                    duration: 2,
                     repeat: Infinity,
-                    ease: "easeInOut"
+                    ease: 'easeInOut',
                   }}
                 />
                 <span className="text-sm text-base-content/60 hidden sm:inline">Connected</span>
@@ -528,14 +516,14 @@ export function AnimatedLaceApp() {
           {/* Mobile Quick Actions Bar */}
           <AnimatePresence>
             {showQuickActions && (
-              <motion.div 
+              <motion.div
                 className="border-t border-base-300 p-4 lg:hidden"
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={springConfig.gentle}
               >
-                <motion.div 
+                <motion.div
                   className="flex gap-2 overflow-x-auto pb-2"
                   variants={staggerContainer}
                   initial="initial"

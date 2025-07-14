@@ -39,4 +39,5 @@ export {
   faTable,
   faMinus,
   faPlug,
+  faStop,
 } from '@fortawesome/free-solid-svg-icons';

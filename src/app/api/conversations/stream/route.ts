@@ -1,13 +1,14 @@
-// ABOUTME: Streaming conversation API using Server-Sent Events with core Lace components
+// ABOUTME: Persistent streaming conversation API using Server-Sent Events with core Lace components
 import { NextRequest } from 'next/server';
-import { Agent } from '~/agents/agent.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { ThreadManager } from '~/threads/thread-manager.js';
-import { DelegateTool } from '~/tools/implementations/delegate.js';
-import { getLaceDbPath } from '~/config/lace-dir.js';
-import { loadEnvFile, getEnvVar } from '~/config/env-loader.js';
-import { logger } from '~/utils/logger.js';
-import { AIProvider } from '~/providers/base-provider.js';
+import { Agent } from '~/agents/agent';
+import { ToolExecutor } from '~/tools/executor';
+import { ThreadManager } from '~/threads/thread-manager';
+import { DelegateTool } from '~/tools/implementations/delegate';
+import { getLaceDbPath } from '~/config/lace-dir';
+import { loadEnvFile, getEnvVar } from '~/config/env-loader';
+import { logger } from '~/utils/logger';
+import { AIProvider } from '~/providers/base-provider';
+import { ToolResult } from '~/tools/types';
 
 // Initialize environment
 loadEnvFile();
@@ -19,7 +20,34 @@ interface StreamConversationRequest {
   model?: string;
 }
 
-// Provider initialization (same as conversations/route.ts)
+// Global persistent instances (reused across requests for same thread)
+const threadManagers = new Map<string, ThreadManager>();
+const agents = new Map<string, Agent>();
+const toolExecutors = new Map<string, ToolExecutor>();
+
+// Clean up inactive connections after 30 minutes
+const CLEANUP_INTERVAL = 30 * 60 * 1000; // 30 minutes
+const connectionTimestamps = new Map<string, number>();
+
+// Periodic cleanup of inactive connections
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamp] of connectionTimestamps.entries()) {
+    if (now - timestamp > CLEANUP_INTERVAL) {
+      const agent = agents.get(key);
+      if (agent) {
+        agent.stop();
+      }
+      agents.delete(key);
+      threadManagers.delete(key);
+      toolExecutors.delete(key);
+      connectionTimestamps.delete(key);
+      logger.info(`Cleaned up inactive connection: ${key}`);
+    }
+  }
+}, CLEANUP_INTERVAL);
+
+// Provider initialization
 async function createProvider(
   providerType: string = 'anthropic',
   model?: string
@@ -30,18 +58,18 @@ async function createProvider(
   > = {
     anthropic: async ({ apiKey, model }) => {
       if (getEnvVar('LACE_TEST_MODE') === 'true') {
-        const { createMockProvider } = await import('~/__tests__/utils/mock-provider.js');
+        const { createMockProvider } = await import('~/__tests__/utils/mock-provider');
         return createMockProvider();
       }
 
-      const { AnthropicProvider } = await import('~/providers/anthropic-provider.js');
+      const { AnthropicProvider } = await import('~/providers/anthropic-provider');
       if (!apiKey) {
         throw new Error('Anthropic API key is required');
       }
       return new AnthropicProvider({ apiKey, model });
     },
     openai: async ({ apiKey, model }) => {
-      const { OpenAIProvider } = await import('~/providers/openai-provider.js');
+      const { OpenAIProvider } = await import('~/providers/openai-provider');
       if (!apiKey) {
         throw new Error('OpenAI API key is required');
       }
@@ -72,16 +100,35 @@ async function createProvider(
   return initializer({ apiKey, model });
 }
 
-async function setupAgent(threadId: string, provider: string, model?: string): Promise<Agent> {
-  const toolExecutor = new ToolExecutor();
-  toolExecutor.registerAllAvailableTools();
+async function getOrCreateAgent(
+  connectionKey: string,
+  threadId: string,
+  provider: string,
+  model?: string
+): Promise<{ agent: Agent; threadManager: ThreadManager; isNew: boolean }> {
+  // Check if we already have an agent for this connection
+  let agent = agents.get(connectionKey);
+  let threadManager = threadManagers.get(connectionKey);
+  let toolExecutor = toolExecutors.get(connectionKey);
 
+  if (agent && threadManager && toolExecutor) {
+    // Update activity timestamp
+    connectionTimestamps.set(connectionKey, Date.now());
+    return { agent, threadManager, isNew: false };
+  }
+
+  // Create new persistent instances
   const dbPath = getLaceDbPath();
-  const threadManager = new ThreadManager(dbPath);
+  threadManager = new ThreadManager(dbPath);
+  threadManagers.set(connectionKey, threadManager);
+
+  toolExecutor = new ToolExecutor();
+  toolExecutor.registerAllAvailableTools();
+  toolExecutors.set(connectionKey, toolExecutor);
 
   const aiProvider = await createProvider(provider, model);
 
-  const agent = new Agent({
+  agent = new Agent({
     provider: aiProvider,
     toolExecutor,
     threadManager,
@@ -94,7 +141,10 @@ async function setupAgent(threadId: string, provider: string, model?: string): P
     delegateTool.setDependencies(agent, toolExecutor);
   }
 
-  return agent;
+  agents.set(connectionKey, agent);
+  connectionTimestamps.set(connectionKey, Date.now());
+
+  return { agent, threadManager, isNew: true };
 }
 
 export async function POST(request: NextRequest) {
@@ -114,26 +164,42 @@ export async function POST(request: NextRequest) {
     const provider = body.provider || 'anthropic';
     const model = body.model;
 
-    // Setup thread management
-    const dbPath = getLaceDbPath();
-    const threadManager = new ThreadManager(dbPath);
+    // Create connection key for this client/thread combination
+    // const connectionKey = `${body.threadId || 'new'}-${provider}-${model || 'default'}`;
 
     // Handle existing thread or create new one
     let threadId: string;
-    let isNew = false;
+    let isNewThread = false;
+
+    // Get or create thread manager first to determine thread ID
+    const dbPath = getLaceDbPath();
+    const tempThreadManager = new ThreadManager(dbPath);
 
     if (body.threadId) {
-      const sessionInfo = threadManager.resumeOrCreate(body.threadId);
+      const sessionInfo = tempThreadManager.resumeOrCreate(body.threadId);
       threadId = sessionInfo.threadId;
-      isNew = !sessionInfo.isResumed;
+      isNewThread = !sessionInfo.isResumed;
     } else {
-      const sessionInfo = threadManager.resumeOrCreate();
+      const sessionInfo = tempThreadManager.resumeOrCreate();
       threadId = sessionInfo.threadId;
-      isNew = true;
+      isNewThread = true;
     }
 
-    // Setup agent
-    const agent = await setupAgent(threadId, provider, model);
+    // Update connection key with actual thread ID
+    const actualConnectionKey = `${threadId}-${provider}-${model || 'default'}`;
+
+    // Get or create persistent agent and thread manager
+    const { agent, isNew: isNewAgent } = await getOrCreateAgent(
+      actualConnectionKey,
+      threadId,
+      provider,
+      model
+    );
+
+    // Initialize agent if it's new
+    if (isNewAgent) {
+      await agent.start();
+    }
 
     // Create streaming response
     const encoder = new TextEncoder();
@@ -146,15 +212,17 @@ export async function POST(request: NextRequest) {
               `data: ${JSON.stringify({
                 type: 'connection',
                 threadId,
-                isNew,
+                isNewThread,
+                isNewAgent,
                 provider,
                 model: model || 'default',
+                connectionKey: actualConnectionKey,
               })}\n\n`
             )
           );
 
-          // Setup agent event listeners
-          agent.on('agent_thinking_start', () => {
+          // Setup one-time event listeners for this stream
+          const thinking_start = () => {
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
@@ -163,9 +231,9 @@ export async function POST(request: NextRequest) {
                 })}\n\n`
               )
             );
-          });
+          };
 
-          agent.on('agent_thinking_complete', () => {
+          const thinking_complete = () => {
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
@@ -174,9 +242,9 @@ export async function POST(request: NextRequest) {
                 })}\n\n`
               )
             );
-          });
+          };
 
-          agent.on('agent_token', ({ token }: { token: string }) => {
+          const agent_token = ({ token }: { token: string }) => {
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
@@ -186,9 +254,17 @@ export async function POST(request: NextRequest) {
                 })}\n\n`
               )
             );
-          });
+          };
 
-          agent.on('tool_call_start', ({ toolName, input, callId }) => {
+          const tool_call_start = ({
+            toolName,
+            input,
+            callId,
+          }: {
+            toolName: string;
+            input: Record<string, unknown>;
+            callId: string;
+          }) => {
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
@@ -202,9 +278,17 @@ export async function POST(request: NextRequest) {
                 })}\n\n`
               )
             );
-          });
+          };
 
-          agent.on('tool_call_complete', ({ toolName, result, callId }) => {
+          const tool_call_complete = ({
+            toolName,
+            result,
+            callId,
+          }: {
+            toolName: string;
+            result: ToolResult;
+            callId: string;
+          }) => {
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
@@ -215,16 +299,18 @@ export async function POST(request: NextRequest) {
                   },
                   result: {
                     success: !result.isError,
-                    content: result.content,
+                    content: result.content
+                      .map((block) => block.text || block.data || block.uri || '')
+                      .join('\n'),
                     isError: result.isError,
                   },
                   timestamp: new Date().toISOString(),
                 })}\n\n`
               )
             );
-          });
+          };
 
-          agent.on('agent_response_complete', () => {
+          const agent_response_complete = () => {
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
@@ -233,25 +319,13 @@ export async function POST(request: NextRequest) {
                 })}\n\n`
               )
             );
-          });
 
-          agent.on('conversation_complete', () => {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: 'conversation_complete',
-                  threadId,
-                  timestamp: new Date().toISOString(),
-                })}\n\n`
-              )
-            );
-
-            // Clean up and close stream
-            agent.stop();
+            // Clean up listeners and close stream - frontend will create new stream for next message
+            cleanupListeners();
             controller.close();
-          });
+          };
 
-          agent.on('error', ({ error }: { error: Error }) => {
+          const error = ({ error }: { error: Error }) => {
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
@@ -262,13 +336,35 @@ export async function POST(request: NextRequest) {
               )
             );
 
-            agent.stop();
+            // Clean up this specific stream on error, but keep agent alive
+            cleanupListeners();
             controller.close();
-          });
+          };
 
-          // Start conversation
-          await agent.start();
+          // Add event listeners
+          const cleanupListeners = () => {
+            agent.off('agent_thinking_start', thinking_start);
+            agent.off('agent_thinking_complete', thinking_complete);
+            agent.off('agent_token', agent_token);
+            agent.off('tool_call_start', tool_call_start);
+            agent.off('tool_call_complete', tool_call_complete);
+            agent.off('agent_response_complete', agent_response_complete);
+            agent.off('error', error);
+          };
+
+          agent.on('agent_thinking_start', thinking_start);
+          agent.on('agent_thinking_complete', thinking_complete);
+          agent.on('agent_token', agent_token);
+          agent.on('tool_call_start', tool_call_start);
+          agent.on('tool_call_complete', tool_call_complete);
+          agent.on('agent_response_complete', agent_response_complete);
+          agent.on('error', error);
+
+          // Send the message
           await agent.sendMessage(body.message);
+
+          // Keep the stream open for potential future messages
+          // The client will need to explicitly close or send another message
         } catch (error) {
           controller.enqueue(
             encoder.encode(
@@ -285,11 +381,13 @@ export async function POST(request: NextRequest) {
       },
 
       cancel() {
-        // Clean up if client disconnects
+        // Clean up if client disconnects, but keep agent alive for potential reconnection
         try {
-          agent.stop();
+          // Update timestamp to indicate recent activity even on disconnect
+          connectionTimestamps.set(actualConnectionKey, Date.now());
+          logger.info(`Client disconnected from connection: ${actualConnectionKey}`);
         } catch (error) {
-          logger.error('Error stopping agent during stream cancel:', error);
+          logger.error('Error handling stream cancel:', error);
         }
       },
     });

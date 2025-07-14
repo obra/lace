@@ -42,12 +42,13 @@ export function enableFetchInterception(): void {
       // Record to HAR synchronously to ensure it completes before process exits
       try {
         // Safely convert init to Record format for HAR recording
+        const initWithCache = init as RequestInit & { cache?: string };
         const initRecord: Record<string, unknown> = init
           ? {
               method: init.method,
               headers: init.headers,
               body: init.body,
-              ...(init.cache && { cache: init.cache }),
+              ...(initWithCache.cache && { cache: initWithCache.cache }),
               ...(init.credentials && { credentials: init.credentials }),
               ...(init.mode && { mode: init.mode }),
               ...(init.redirect && { redirect: init.redirect }),

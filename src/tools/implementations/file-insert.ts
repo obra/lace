@@ -4,9 +4,9 @@
 import { z } from 'zod';
 import { writeFile, readFile, stat } from 'fs/promises';
 import { resolve } from 'path';
-import { Tool } from '../tool.js';
-import { NonEmptyString, LineNumber } from '../schemas/common.js';
-import type { ToolResult, ToolContext, ToolAnnotations } from '../types.js';
+import { Tool } from '~/tools/tool';
+import { NonEmptyString, LineNumber } from '~/tools/schemas/common';
+import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 
 const fileInsertSchema = z.object({
   path: NonEmptyString.transform((path) => resolve(path)),

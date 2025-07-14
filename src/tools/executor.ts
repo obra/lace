@@ -1,17 +1,17 @@
 // ABOUTME: Simplified tool execution engine with configuration API and approval integration
 // ABOUTME: Handles tool registration, approval checks, and safe execution with simple configuration
 
-import { ToolResult, ToolContext, ToolCall, createErrorResult } from '~/tools/types.js';
-import { Tool } from '~/tools/tool.js';
-import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types.js';
-import { BashTool } from '~/tools/implementations/bash.js';
-import { FileReadTool } from '~/tools/implementations/file-read.js';
-import { FileWriteTool } from '~/tools/implementations/file-write.js';
-import { FileEditTool } from '~/tools/implementations/file-edit.js';
-import { FileInsertTool } from '~/tools/implementations/file-insert.js';
-import { FileListTool } from '~/tools/implementations/file-list.js';
-import { RipgrepSearchTool } from '~/tools/implementations/ripgrep-search.js';
-import { FileFindTool } from '~/tools/implementations/file-find.js';
+import { ToolResult, ToolContext, ToolCall, createErrorResult } from '~/tools/types';
+import { Tool } from '~/tools/tool';
+import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
+import { BashTool } from '~/tools/implementations/bash';
+import { FileReadTool } from '~/tools/implementations/file-read';
+import { FileWriteTool } from '~/tools/implementations/file-write';
+import { FileEditTool } from '~/tools/implementations/file-edit';
+import { FileInsertTool } from '~/tools/implementations/file-insert';
+import { FileListTool } from '~/tools/implementations/file-list';
+import { RipgrepSearchTool } from '~/tools/implementations/ripgrep-search';
+import { FileFindTool } from '~/tools/implementations/file-find';
 import {
   TaskCreateTool,
   TaskListTool,
@@ -19,9 +19,9 @@ import {
   TaskUpdateTool,
   TaskAddNoteTool,
   TaskViewTool,
-} from '~/tools/implementations/task-manager/index.js';
-import { DelegateTool } from '~/tools/implementations/delegate.js';
-import { UrlFetchTool } from '~/tools/implementations/url-fetch.js';
+} from '~/tools/implementations/task-manager/index';
+import { DelegateTool } from '~/tools/implementations/delegate';
+import { UrlFetchTool } from '~/tools/implementations/url-fetch';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
