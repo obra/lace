@@ -3,14 +3,19 @@
 
 import { ToolCall, ToolResult } from '~/tools/types';
 
-export type EventType =
-  | 'USER_MESSAGE'
-  | 'AGENT_MESSAGE'
-  | 'TOOL_CALL'
-  | 'TOOL_RESULT'
-  | 'LOCAL_SYSTEM_MESSAGE'
-  | 'SYSTEM_PROMPT'
-  | 'USER_SYSTEM_PROMPT';
+// Single source of truth for all event types
+export const EVENT_TYPES = [
+  'USER_MESSAGE',
+  'AGENT_MESSAGE',
+  'TOOL_CALL',
+  'TOOL_RESULT',
+  'LOCAL_SYSTEM_MESSAGE',
+  'SYSTEM_PROMPT',
+  'USER_SYSTEM_PROMPT',
+] as const;
+
+// Derive EventType union from the array
+export type EventType = (typeof EVENT_TYPES)[number];
 
 export interface ThreadEvent {
   id: string;
