@@ -143,7 +143,7 @@ export class FileScanner {
   /**
    * Get all files and directories in a path, with caching
    */
-  public getCompletions(partialPath: string = ''): Promise<string[]> {
+  public getCompletions(partialPath: string = ''): string[] {
     // Determine search directory - if partialPath ends with "/", search that directory
     // Otherwise, search the parent directory of the partial path
     const searchDir = partialPath.endsWith('/')
