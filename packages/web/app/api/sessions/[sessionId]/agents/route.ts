@@ -27,6 +27,17 @@ export async function POST(
       body.provider,
       body.model
     );
+    
+    // Test SSE broadcast
+    const { SSEManager } = await import('@/lib/sse-manager');
+    const sseManager = SSEManager.getInstance();
+    const testEvent = {
+      type: 'LOCAL_SYSTEM_MESSAGE' as const,
+      threadId: agent.threadId,
+      timestamp: new Date().toISOString(),
+      data: { message: `Agent "${agent.name}" spawned successfully` }
+    };
+    sseManager.broadcast(sessionId, testEvent);
 
     return NextResponse.json({ agent }, { status: 201 });
   } catch (error) {

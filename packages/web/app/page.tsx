@@ -30,14 +30,22 @@ export default function Home() {
 
     const eventSource = new EventSource(`/api/sessions/${selectedSession}/events/stream`);
     
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        setEvents(prev => [...prev, data as SessionEvent]);
-      } catch (error) {
-        console.error('Failed to parse event:', error);
-      }
-    };
+    // Listen to all event types
+    const eventTypes = [
+      'USER_MESSAGE', 'AGENT_MESSAGE', 'TOOL_CALL', 'TOOL_RESULT', 
+      'THINKING', 'SYSTEM_MESSAGE', 'LOCAL_SYSTEM_MESSAGE'
+    ];
+    
+    eventTypes.forEach(eventType => {
+      eventSource.addEventListener(eventType, (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          setEvents(prev => [...prev, data as SessionEvent]);
+        } catch (error) {
+          console.error('Failed to parse event:', error);
+        }
+      });
+    });
 
     eventSource.addEventListener('connection', (event) => {
       const connectionEvent: SessionEvent = {

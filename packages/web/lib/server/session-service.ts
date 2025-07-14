@@ -219,6 +219,7 @@ export class SessionService {
     });
 
     agent.on('agent_response_complete', ({ content }: { content: string }) => {
+      console.log(`Agent ${threadId} response complete:`, content.substring(0, 100) + '...');
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
         threadId,
@@ -226,6 +227,13 @@ export class SessionService {
         data: { content }
       };
       sseManager.broadcast(sessionId, event);
+    });
+    
+    // Also listen for streaming tokens if needed
+    agent.on('agent_token', ({ token }: { token: string }) => {
+      // For now, we'll just log this to see if tokens are being emitted
+      // Later we could stream these to the UI for real-time display
+      process.stdout.write(token);
     });
 
     agent.on('tool_call_start', ({ toolName, input }: { toolName: string; input: any }) => {
@@ -247,6 +255,29 @@ export class SessionService {
       };
       sseManager.broadcast(sessionId, event);
     });
+    
+    // Listen for state changes to debug
+    agent.on('state_change', ({ from, to }: { from: string; to: string }) => {
+      console.log(`Agent ${threadId} state changed: ${from} -> ${to}`);
+    });
+    
+    // Listen for any errors
+    agent.on('error', ({ error }: { error: Error }) => {
+      console.error(`Agent ${threadId} error:`, error);
+      const event: SessionEvent = {
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        threadId,
+        timestamp: new Date().toISOString(),
+        data: { message: `Agent error: ${error.message}` }
+      };
+      sseManager.broadcast(sessionId, event);
+    });
+  }
+
+  private getAgentStatus(agent: Agent): 'idle' | 'thinking' | 'streaming' | 'tool_execution' {
+    // Access the agent's internal state
+    const state = (agent as any)._state;
+    return state || 'idle';
   }
 
   private getSessionAgents(sessionId: ThreadId): AgentType[] {
@@ -261,7 +292,7 @@ export class SessionService {
           name: metadata.name,
           provider: metadata.provider,
           model: metadata.model,
-          status: agent ? 'idle' : 'inactive',
+          status: agent ? this.getAgentStatus(agent) : 'inactive',
           createdAt: new Date().toISOString() // Would need to track this properly
         });
       }
