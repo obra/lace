@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-terminal-bg text-terminal-fg font-mono;
+  }
+}
+
+@layer components {
+  .terminal-container {
+    @apply bg-black/90 backdrop-blur-sm rounded-lg shadow-2xl;
+  }
+
+  .terminal-header {
+    @apply bg-gray-800 px-4 py-2 rounded-t-lg flex items-center justify-between;
+  }
+
+  .terminal-content {
+    @apply p-4 h-[600px] overflow-y-auto;
+  }
+
+  .terminal-input {
+    @apply bg-transparent border-0 outline-none flex-1 text-terminal-fg;
+  }
+
+  .terminal-prompt {
+    @apply text-terminal-green mr-2;
+  }
+
+  .message-user {
+    @apply text-terminal-blue;
+  }
+
+  .message-agent {
+    @apply text-terminal-fg;
+  }
+
+  .message-thinking {
+    @apply text-terminal-purple italic;
+  }
+
+  .message-tool {
+    @apply text-terminal-yellow;
+  }
+
+  .status-idle {
+    @apply text-gray-500;
+  }
+
+  .status-thinking {
+    @apply text-terminal-purple animate-pulse;
+  }
+
+  .status-streaming {
+    @apply text-terminal-green;
+  }
+
+  .status-tool-execution {
+    @apply text-terminal-yellow;
+  }
+}
+
+/* Custom scrollbar */
+@layer utilities {
+  .scrollbar-terminal::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .scrollbar-terminal::-webkit-scrollbar-track {
+    @apply bg-gray-900;
+  }
+
+  .scrollbar-terminal::-webkit-scrollbar-thumb {
+    @apply bg-gray-700 rounded;
+  }
+
+  .scrollbar-terminal::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-600;
+  }
+}
