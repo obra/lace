@@ -49,7 +49,7 @@ export class ProviderRegistry {
         provider.cleanup();
 
         results.push({ info, models, configured });
-      } catch (error) {
+      } catch {
         // Provider not configured - still return info
         const tempProvider = await this.getProviderClass(providerName);
         if (tempProvider) {

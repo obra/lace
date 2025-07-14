@@ -8,7 +8,7 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
-import { ThreadEvent, EventType, asThreadId, Thread } from '~/threads/types';
+import { ThreadEvent, EventType, asThreadId } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
 import { TokenBudgetManager } from '~/token-management/token-budget-manager';

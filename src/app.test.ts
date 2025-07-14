@@ -28,12 +28,12 @@ vi.mock('~/config/env-loader');
 vi.mock('~/utils/logger');
 vi.mock('~/utils/traffic-logger');
 vi.mock('~/interfaces/non-interactive-interface', () => ({
-  NonInteractiveInterface: vi.fn().mockImplementation(() => ({
+  NonInteractiveInterface: vi.fn(() => ({
     executePrompt: vi.fn().mockResolvedValue(undefined),
   })),
 }));
 vi.mock('~/interfaces/terminal/terminal-interface', () => ({
-  TerminalInterface: vi.fn().mockImplementation(() => ({
+  TerminalInterface: vi.fn(() => ({
     startInteractive: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue(undefined),
     requestApproval: vi.fn(),
@@ -442,7 +442,9 @@ describe('App Initialization (run function)', () => {
     const options = { ...mockCliOptions, prompt: 'test prompt' };
     await run(options);
     expect(NonInteractiveInterface).toHaveBeenCalledWith(expect.any(Agent));
-    const mockNonInteractive = vi.mocked(NonInteractiveInterface).mock.results[0].value;
+    const mockNonInteractive = vi.mocked(NonInteractiveInterface).mock.results[0]?.value as {
+      executePrompt: ReturnType<typeof vi.fn>;
+    };
     expect(mockNonInteractive.executePrompt).toHaveBeenCalledWith('test prompt');
     expect(process.exit).toHaveBeenCalledWith(0);
   });
@@ -451,7 +453,9 @@ describe('App Initialization (run function)', () => {
     const { TerminalInterface } = await import('~/interfaces/terminal/terminal-interface');
     await run(mockCliOptions);
     expect(TerminalInterface).toHaveBeenCalledWith(expect.any(Agent));
-    const mockInstance = vi.mocked(TerminalInterface).mock.results[0].value;
+    const mockInstance = vi.mocked(TerminalInterface).mock.results[0]?.value as {
+      startInteractive: ReturnType<typeof vi.fn>;
+    };
     expect(mockInstance.startInteractive).toHaveBeenCalledTimes(1);
   });
 
