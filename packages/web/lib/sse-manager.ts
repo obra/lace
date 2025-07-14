@@ -41,7 +41,11 @@ export class SSEManager {
 
   broadcast(sessionId: ThreadId, event: SessionEvent): void {
     const controllers = this.sessionStreams.get(sessionId);
-    if (!controllers) return;
+    console.log(`Broadcasting to session ${sessionId}:`, event.type, `(${controllers?.size || 0} connections)`);
+    if (!controllers || controllers.size === 0) {
+      console.log('No active connections for session:', sessionId);
+      return;
+    }
 
     const sseData = this.formatSSEEvent(event);
     const deadControllers: ReadableStreamDefaultController<Uint8Array>[] = [];

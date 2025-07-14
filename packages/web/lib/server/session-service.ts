@@ -3,7 +3,8 @@
 
 import { Agent, ThreadManager, ProviderRegistry, ToolExecutor, getLaceDbPath, getEnvVar, DelegateTool } from './lace-imports';
 import type { ThreadId } from './lace-imports';
-import { Session, Agent as AgentType } from '@/types/api';
+import { Session, Agent as AgentType, SessionEvent } from '@/types/api';
+import { SSEManager } from '@/lib/sse-manager';
 
 // Active agent instances
 const activeAgents = new Map<ThreadId, Agent>();
@@ -76,6 +77,9 @@ export class SessionService {
     
     // Start the agent
     await agent.start();
+    
+    // Set up event handlers for SSE broadcasting
+    this.setupAgentEventHandlers(agent, threadId);
     
     return session;
   }
@@ -154,6 +158,9 @@ export class SessionService {
     // Start the delegate agent
     await delegateAgent.start();
     
+    // Set up event handlers for SSE broadcasting
+    this.setupAgentEventHandlers(delegateAgent, sessionId);
+    
     // Store agent metadata
     agentMetadata.set(delegateAgent.threadId as ThreadId, {
       name,
@@ -175,6 +182,61 @@ export class SessionService {
 
   getAgent(threadId: ThreadId): Agent | null {
     return activeAgents.get(threadId) || null;
+  }
+
+  private setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
+    const sseManager = SSEManager.getInstance();
+    const threadId = agent.threadId as ThreadId;
+    
+    agent.on('agent_thinking_start', () => {
+      const event: SessionEvent = {
+        type: 'THINKING',
+        threadId,
+        timestamp: new Date().toISOString(),
+        data: { status: 'start' }
+      };
+      sseManager.broadcast(sessionId, event);
+    });
+
+    agent.on('agent_thinking_complete', () => {
+      const event: SessionEvent = {
+        type: 'THINKING',
+        threadId,
+        timestamp: new Date().toISOString(),
+        data: { status: 'complete' }
+      };
+      sseManager.broadcast(sessionId, event);
+    });
+
+    agent.on('agent_response_complete', ({ content }: { content: string }) => {
+      const event: SessionEvent = {
+        type: 'AGENT_MESSAGE',
+        threadId,
+        timestamp: new Date().toISOString(),
+        data: { content }
+      };
+      sseManager.broadcast(sessionId, event);
+    });
+
+    agent.on('tool_call_start', ({ toolName, input }: { toolName: string; input: any }) => {
+      const event: SessionEvent = {
+        type: 'TOOL_CALL',
+        threadId,
+        timestamp: new Date().toISOString(),
+        data: { toolName, input }
+      };
+      sseManager.broadcast(sessionId, event);
+    });
+
+    agent.on('tool_call_complete', ({ toolName, result }: { toolName: string; result: any }) => {
+      const event: SessionEvent = {
+        type: 'TOOL_RESULT',
+        threadId,
+        timestamp: new Date().toISOString(),
+        data: { toolName, result }
+      };
+      sseManager.broadcast(sessionId, event);
+    });
   }
 
   private getSessionAgents(sessionId: ThreadId): AgentType[] {

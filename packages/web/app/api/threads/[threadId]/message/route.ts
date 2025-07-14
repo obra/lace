@@ -44,10 +44,9 @@ export async function POST(
       return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
     }
 
-    // Set up event handlers to broadcast via SSE
+    // Broadcast user message event via SSE
     const sseManager = SSEManager.getInstance();
     
-    // Emit user message event
     const userMessageEvent: SessionEvent = {
       type: 'USER_MESSAGE',
       threadId,
@@ -56,60 +55,11 @@ export async function POST(
     };
     sseManager.broadcast(sessionId, userMessageEvent);
 
-    agent.on('agent_thinking_start', () => {
-      const event: SessionEvent = {
-        type: 'THINKING',
-        threadId,
-        timestamp: new Date().toISOString(),
-        data: { status: 'start' }
-      };
-      sseManager.broadcast(sessionId, event);
-    });
-
-    agent.on('agent_thinking_complete', () => {
-      const event: SessionEvent = {
-        type: 'THINKING',
-        threadId,
-        timestamp: new Date().toISOString(),
-        data: { status: 'complete' }
-      };
-      sseManager.broadcast(sessionId, event);
-    });
-
-    agent.on('agent_response_complete', ({ content }: { content: string }) => {
-      const event: SessionEvent = {
-        type: 'AGENT_MESSAGE',
-        threadId,
-        timestamp: new Date().toISOString(),
-        data: { content }
-      };
-      sseManager.broadcast(sessionId, event);
-    });
-
-    agent.on('tool_call_start', ({ toolName, input }: { toolName: string; input: any }) => {
-      const event: SessionEvent = {
-        type: 'TOOL_CALL',
-        threadId,
-        timestamp: new Date().toISOString(),
-        data: { toolName, input }
-      };
-      sseManager.broadcast(sessionId, event);
-    });
-
-    agent.on('tool_call_complete', ({ toolName, result }: { toolName: string; result: any }) => {
-      const event: SessionEvent = {
-        type: 'TOOL_RESULT',
-        threadId,
-        timestamp: new Date().toISOString(),
-        data: { toolName, result }
-      };
-      sseManager.broadcast(sessionId, event);
-    });
-
     // Generate message ID
     const messageId = randomUUID();
 
     // Process message asynchronously
+    console.log(`Processing message for agent ${threadId}: "${body.message}"`);
     agent.sendMessage(body.message).catch(error => {
       console.error('Error processing message:', error);
       // Could emit an error event here if needed
