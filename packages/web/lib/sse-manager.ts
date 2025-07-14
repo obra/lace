@@ -3,18 +3,23 @@
 
 import { SessionEvent, ThreadId } from '@/types/api';
 
+// Use global to persist across HMR in development
+declare global {
+  // eslint-disable-next-line no-var
+  var sseManager: SSEManager | undefined;
+}
+
 export class SSEManager {
-  private static instance: SSEManager;
   private sessionStreams: Map<ThreadId, Set<ReadableStreamDefaultController<Uint8Array>>> = new Map();
   private encoder = new TextEncoder();
 
   private constructor() {}
 
   static getInstance(): SSEManager {
-    if (!SSEManager.instance) {
-      SSEManager.instance = new SSEManager();
+    if (!global.sseManager) {
+      global.sseManager = new SSEManager();
     }
-    return SSEManager.instance;
+    return global.sseManager;
   }
 
   addConnection(sessionId: ThreadId, controller: ReadableStreamDefaultController<Uint8Array>): void {

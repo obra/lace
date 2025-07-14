@@ -122,6 +122,8 @@ export class SessionService {
     // Get the parent agent to access thread manager
     const parentAgent = activeAgents.get(sessionId);
     if (!parentAgent) {
+      console.error('Session not found:', sessionId);
+      console.error('Active agents:', Array.from(activeAgents.keys()));
       throw new Error('Session not found');
     }
     
@@ -197,12 +199,15 @@ export class SessionService {
   }
 }
 
-// Singleton instance
-let sessionService: SessionService | null = null;
+// Use global to persist across HMR in development
+declare global {
+  // eslint-disable-next-line no-var
+  var sessionService: SessionService | undefined;
+}
 
 export function getSessionService(): SessionService {
-  if (!sessionService) {
-    sessionService = new SessionService();
+  if (!global.sessionService) {
+    global.sessionService = new SessionService();
   }
-  return sessionService;
+  return global.sessionService;
 }

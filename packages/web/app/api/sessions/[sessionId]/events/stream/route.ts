@@ -47,7 +47,7 @@ export async function GET(
         );
 
         // Register this stream with SSE manager
-        sseManager.addStream(sessionId, controller);
+        sseManager.addConnection(sessionId, controller);
 
         // Send heartbeat every 30 seconds
         const heartbeat = setInterval(() => {
@@ -62,7 +62,7 @@ export async function GET(
         // Cleanup on close
         request.signal.addEventListener('abort', () => {
           clearInterval(heartbeat);
-          sseManager.removeStream(sessionId, controller);
+          sseManager.removeConnection(sessionId, controller);
           controller.close();
         });
       }
