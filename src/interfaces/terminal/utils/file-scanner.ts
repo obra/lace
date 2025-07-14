@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { logger } from '../../../utils/logger.js';
+import { logger } from '~/utils/logger.js';
 
 interface ScanResult {
   files: string[];
@@ -143,7 +143,7 @@ export class FileScanner {
   /**
    * Get all files and directories in a path, with caching
    */
-  public async getCompletions(partialPath: string = ''): Promise<string[]> {
+  public getCompletions(partialPath: string = ''): Promise<string[]> {
     // Determine search directory - if partialPath ends with "/", search that directory
     // Otherwise, search the parent directory of the partial path
     const searchDir = partialPath.endsWith('/')

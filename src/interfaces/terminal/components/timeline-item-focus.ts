@@ -1,8 +1,8 @@
 // ABOUTME: Timeline item focus interface and detection utilities for enabling keyboard focus on specific timeline items
 // ABOUTME: Provides type-safe way to identify focusable timeline items and manage focus entry/exit
 
-import { TimelineItem } from '../../timeline-types.js';
-import { FocusRegions } from '../focus/index.js';
+import { TimelineItem } from '~/interfaces/timeline-types.js';
+import { FocusRegions } from '~/interfaces/terminal/focus/index.js';
 
 /**
  * Interface for timeline items that can accept keyboard focus
@@ -82,12 +82,18 @@ export function getTimelineItemFocusId(item: TimelineItem): string | null {
  * @returns true if this is a valid delegate result with thread data
  */
 export function isDelegateToolCallResult(result: unknown): boolean {
-  if (!result || (result as any).isError) {
+  if (!result || typeof result !== 'object') {
+    return false;
+  }
+
+  const resultObj = result as Record<string, unknown>;
+  if (resultObj.isError) {
     return false;
   }
 
   // For delegate tool results, the thread ID is stored in metadata.threadId
-  const threadId = (result as any).metadata?.threadId;
+  const metadata = resultObj.metadata as Record<string, unknown> | undefined;
+  const threadId = metadata?.threadId;
   return typeof threadId === 'string' && threadId.length > 0;
 }
 
@@ -102,7 +108,10 @@ export function extractDelegateThreadId(result: unknown): string | null {
     return null;
   }
 
-  return (result as any).metadata?.threadId || null;
+  const resultObj = result as Record<string, unknown>;
+  const metadata = resultObj.metadata as Record<string, unknown> | undefined;
+  const threadId = metadata?.threadId;
+  return typeof threadId === 'string' ? threadId : null;
 }
 
 /**

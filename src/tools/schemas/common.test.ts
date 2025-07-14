@@ -2,7 +2,13 @@
 // ABOUTME: Validates reusable schema components work correctly
 
 import { describe, it, expect } from 'vitest';
-import { NonEmptyString, FilePath, LineNumber, MaxResults, FilePattern } from './common.js';
+import {
+  NonEmptyString,
+  FilePath,
+  LineNumber,
+  MaxResults,
+  FilePattern,
+} from '~/tools/schemas/common.js';
 
 describe('Common schema patterns', () => {
   describe('NonEmptyString', () => {
@@ -23,8 +29,9 @@ describe('Common schema patterns', () => {
     it('provides helpful error message', () => {
       try {
         NonEmptyString.parse('');
-      } catch (error: any) {
-        expect(error.issues[0].message).toContain('Cannot be empty');
+      } catch (error: unknown) {
+        const zodError = error as { issues: Array<{ message: string }> };
+        expect(zodError.issues[0].message).toContain('Cannot be empty');
       }
     });
   });
@@ -77,14 +84,16 @@ describe('Common schema patterns', () => {
     it('provides helpful error messages', () => {
       try {
         LineNumber.parse(0);
-      } catch (error: any) {
-        expect(error.issues[0].message).toContain('Must be positive');
+      } catch (error: unknown) {
+        const zodError = error as { issues: Array<{ message: string }> };
+        expect(zodError.issues[0].message).toContain('Must be positive');
       }
 
       try {
         LineNumber.parse(1.5);
-      } catch (error: any) {
-        expect(error.issues[0].message).toContain('Must be an integer');
+      } catch (error: unknown) {
+        const zodError = error as { issues: Array<{ message: string }> };
+        expect(zodError.issues[0].message).toContain('Must be an integer');
       }
     });
   });
@@ -125,8 +134,9 @@ describe('Common schema patterns', () => {
     it('provides helpful error message', () => {
       try {
         FilePattern.parse('');
-      } catch (error: any) {
-        expect(error.issues[0].message).toContain('Pattern cannot be empty');
+      } catch (error: unknown) {
+        const zodError = error as { issues: Array<{ message: string }> };
+        expect(zodError.issues[0].message).toContain('Pattern cannot be empty');
       }
     });
   });
