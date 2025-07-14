@@ -5,6 +5,12 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    environmentMatchGlobs: [
+      // Use jsdom for component and hook tests
+      ['**/*.{test,spec}.{ts,tsx}', 'jsdom'],
+      // Keep node environment for API route tests
+      ['app/api/**/*.test.ts', 'node'],
+    ],
   },
   resolve: {
     alias: {

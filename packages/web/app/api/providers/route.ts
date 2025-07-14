@@ -16,21 +16,20 @@ export interface ProvidersResponse {
 
 export async function GET(): Promise<NextResponse<ProvidersResponse>> {
   try {
-    const registry = new ProviderRegistry();
+    const registry = await ProviderRegistry.createWithAutoDiscovery();
     const providerData = await registry.getAvailableProviders();
-    
-    const providers: ProviderWithModels[] = providerData.map(({ info, models, configured }) => ({
-      ...info,
-      models,
-      configured,
-    }));
-    
+
+    const providers: ProviderWithModels[] = providerData.map(
+      (data): ProviderWithModels => ({
+        ...data.provider,
+        models: data.models,
+        configured: data.configured,
+      })
+    );
+
     return NextResponse.json({ providers });
   } catch (error) {
     console.error('Failed to get providers:', error);
-    return NextResponse.json(
-      { error: 'Failed to retrieve providers' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to retrieve providers' }, { status: 500 });
   }
 }

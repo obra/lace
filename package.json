@@ -24,10 +24,10 @@
     "docker:build": "docker build -t lace-test .",
     "docker:run": "docker run -it --rm lace-test",
     "docker:shell": "docker run -it --rm lace-test /bin/bash",
-    "web:dev": "cd src/interfaces/web && npm run dev",
-    "web:build": "cd src/interfaces/web && npm run build",
-    "web:start": "cd src/interfaces/web && npm run start",
-    "web:install": "cd src/interfaces/web && npm install"
+    "web:dev": "cd packages/web && npm run dev",
+    "web:build": "cd packages/web && npm run build",
+    "web:start": "cd packages/web && npm run start",
+    "web:install": "cd packages/web && npm install"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",

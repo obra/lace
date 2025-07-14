@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { Session, ThreadId, SessionEvent, ToolApprovalRequestData, ApprovalDecision } from '@/types/api';
+import type { Session, ThreadId, SessionEvent, ToolApprovalRequestData, ApprovalDecision, Agent } from '@/types/api';
 import { ConversationDisplay } from '@/components/ConversationDisplay';
 import { ToolApprovalModal } from '@/components/ToolApprovalModal';
+import { AgentSpawner } from '@/components/AgentSpawner';
 import { getAllEventTypes } from '@/types/events';
 
 export default function Home() {
@@ -12,7 +13,6 @@ export default function Home() {
   const [sessionName, setSessionName] = useState('');
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<SessionEvent[]>([]);
-  const [agentName, setAgentName] = useState('');
   const [message, setMessage] = useState('');
   const [selectedAgent, setSelectedAgent] = useState<ThreadId | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
@@ -112,35 +112,13 @@ export default function Home() {
     setLoading(false);
   }
 
-  async function spawnAgent() {
-    if (!selectedSession || !agentName.trim()) return;
-    
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/sessions/${selectedSession}/agents`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          name: agentName,
-          provider: 'anthropic',
-          model: 'claude-3-5-sonnet-20241022'
-        })
-      });
-      
-      if (res.ok) {
-        setAgentName('');
-        await loadSessions();
-        // Select the new agent
-        const data = await res.json();
-        if (data.agent?.threadId) {
-          setSelectedAgent(data.agent.threadId);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to spawn agent:', error);
+  const handleAgentSpawn = async (agent: Agent) => {
+    await loadSessions();
+    // Select the new agent
+    if (agent.threadId) {
+      setSelectedAgent(agent.threadId);
     }
-    setLoading(false);
-  }
+  };
 
   async function handleApprovalDecision(decision: ApprovalDecision) {
     if (!approvalRequest) return;
@@ -250,43 +228,31 @@ export default function Home() {
             {/* Agent Management */}
             <div className="bg-gray-800 rounded-lg p-4 mb-6">
               <h2 className="text-xl mb-4">Agents</h2>
-              <div className="mb-4">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={agentName}
-                    onChange={(e) => setAgentName(e.target.value)}
-                    placeholder="Agent name..."
-                    className="flex-1 px-3 py-2 bg-gray-700 rounded text-white"
-                    onKeyDown={(e) => e.key === 'Enter' && spawnAgent()}
-                  />
-                  <button
-                    onClick={spawnAgent}
-                    disabled={loading || !agentName.trim()}
-                    className="px-4 py-2 bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
-                  >
-                    Spawn Agent
-                  </button>
-                </div>
-              </div>
+              <AgentSpawner
+                sessionId={selectedSession}
+                agents={sessions.find(s => s.id === selectedSession)?.agents || []}
+                onAgentSpawn={handleAgentSpawn}
+              />
               
               {/* Agent List */}
-              {sessions.find(s => s.id === selectedSession)?.agents.map(agent => (
-                <div
-                  key={agent.threadId}
-                  onClick={() => setSelectedAgent(agent.threadId)}
-                  className={`p-3 mb-2 rounded cursor-pointer ${
-                    selectedAgent === agent.threadId 
-                      ? 'bg-green-600' 
-                      : 'bg-gray-700 hover:bg-gray-600'
-                  }`}
-                >
-                  <div className="font-semibold">{agent.name}</div>
-                  <div className="text-sm text-gray-300">
-                    {agent.threadId} • {agent.status}
+              <div className="mt-4">
+                {sessions.find(s => s.id === selectedSession)?.agents.map(agent => (
+                  <div
+                    key={agent.threadId}
+                    onClick={() => setSelectedAgent(agent.threadId)}
+                    className={`p-3 mb-2 rounded cursor-pointer ${
+                      selectedAgent === agent.threadId 
+                        ? 'bg-green-600' 
+                        : 'bg-gray-700 hover:bg-gray-600'
+                    }`}
+                  >
+                    <div className="font-semibold">{agent.name}</div>
+                    <div className="text-sm text-gray-300">
+                      {agent.threadId} • {agent.status}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
             {/* Message Input */}
