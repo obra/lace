@@ -3,7 +3,27 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId, CreateAgentRequest } from '@/types/api';
+import { ThreadId, CreateAgentRequest, Agent } from '@/types/api';
+
+// Type guard for unknown error values
+function isError(error: unknown): error is Error {
+  return error instanceof Error;
+}
+
+// Type guard for CreateAgentRequest
+function isCreateAgentRequest(body: unknown): body is CreateAgentRequest {
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    'name' in body &&
+    typeof (body as { name: unknown }).name === 'string'
+  );
+}
+
+// Type guard for ThreadId
+function isValidThreadId(sessionId: string): sessionId is ThreadId {
+  return typeof sessionId === 'string' && sessionId.length > 0;
+}
 
 export async function POST(
   request: NextRequest,
@@ -12,10 +32,21 @@ export async function POST(
   try {
     const sessionService = getSessionService();
     const { sessionId: sessionIdParam } = await params;
-    const sessionId = sessionIdParam as ThreadId;
 
-    // Parse request body
-    const body: CreateAgentRequest = await request.json();
+    if (!isValidThreadId(sessionIdParam)) {
+      return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
+    }
+
+    const sessionId = sessionIdParam;
+
+    // Parse and validate request body
+    const bodyData: unknown = await request.json();
+
+    if (!isCreateAgentRequest(bodyData)) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
+    const body: CreateAgentRequest = bodyData;
 
     if (!body.name) {
       return NextResponse.json({ error: 'Agent name is required' }, { status: 400 });
@@ -26,19 +57,20 @@ export async function POST(
     // Test SSE broadcast
     const { SSEManager } = await import('@/lib/sse-manager');
     const sseManager = SSEManager.getInstance();
+    const agentThreadId = agent.threadId as ThreadId;
     const testEvent = {
       type: 'LOCAL_SYSTEM_MESSAGE' as const,
-      threadId: agent.threadId,
+      threadId: agentThreadId,
       timestamp: new Date().toISOString(),
       data: { message: `Agent "${agent.name}" spawned successfully` },
     };
     sseManager.broadcast(sessionId, testEvent);
 
     return NextResponse.json({ agent }, { status: 201 });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in POST /api/sessions/[sessionId]/agents:', error);
 
-    if (error instanceof Error && error.message === 'Session not found') {
+    if (isError(error) && error.message === 'Session not found') {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
@@ -53,7 +85,12 @@ export async function GET(
   try {
     const sessionService = getSessionService();
     const { sessionId: sessionIdParam } = await params;
-    const sessionId = sessionIdParam as ThreadId;
+
+    if (!isValidThreadId(sessionIdParam)) {
+      return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
+    }
+
+    const sessionId = sessionIdParam;
 
     const session = await sessionService.getSession(sessionId);
 
@@ -62,7 +99,7 @@ export async function GET(
     }
 
     return NextResponse.json({ agents: session.agents || [] });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in GET /api/sessions/[sessionId]/agents:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

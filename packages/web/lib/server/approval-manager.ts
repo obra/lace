@@ -32,7 +32,7 @@ class ApprovalManager {
     // Check if already approved for session
     const sessionApproved = this.sessionApprovals.get(sessionId);
     if (sessionApproved?.has(toolName)) {
-      console.log(`Tool ${toolName} already approved for session ${sessionId}`);
+      console.warn(`Tool ${toolName} already approved for session ${sessionId}`);
       return ApprovalDecision.ALLOW_SESSION;
     }
 
@@ -42,7 +42,7 @@ class ApprovalManager {
       // Set timeout
       const timeout = setTimeout(() => {
         this.pendingApprovals.delete(requestId);
-        console.log(`Approval request ${requestId} timed out`);
+        console.error(`Approval request ${requestId} timed out`);
         reject(new Error('Approval request timed out'));
       }, timeoutMs);
 
@@ -75,7 +75,7 @@ class ApprovalManager {
         data: approvalData,
       };
 
-      console.log(`Sending approval request ${requestId} for tool ${toolName}`);
+      console.warn(`Sending approval request ${requestId} for tool ${toolName}`);
       SSEManager.getInstance().broadcast(sessionId, event);
     });
   }
@@ -83,7 +83,7 @@ class ApprovalManager {
   resolveApproval(requestId: string, decision: ApprovalDecision): boolean {
     const pending = this.pendingApprovals.get(requestId);
     if (!pending) {
-      console.log(`No pending approval found for ${requestId}`);
+      console.warn(`No pending approval found for ${requestId}`);
       return false;
     }
 
@@ -95,14 +95,14 @@ class ApprovalManager {
         this.sessionApprovals.set(pending.sessionId, new Set());
       }
       this.sessionApprovals.get(pending.sessionId)!.add(pending.toolName);
-      console.log(
+      console.warn(
         `Added session-wide approval for ${pending.toolName} in session ${pending.sessionId}`
       );
     }
 
     pending.resolve(decision);
     this.pendingApprovals.delete(requestId);
-    console.log(`Resolved approval ${requestId} with decision: ${decision}`);
+    console.warn(`Resolved approval ${requestId} with decision: ${decision}`);
     return true;
   }
 

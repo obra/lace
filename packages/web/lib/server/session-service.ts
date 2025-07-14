@@ -9,14 +9,20 @@ import {
   getLaceDbPath,
   getEnvVar,
   DelegateTool,
-} from '~/../lib/server/lace-imports';
-import type { ThreadId, AgentState } from '~/../lib/server/lace-imports';
+  ApprovalDecision,
+} from '~/../packages/web/lib/server/lace-imports';
+import type {
+  ThreadId,
+  AgentState,
+  ToolAnnotations,
+} from '~/../packages/web/lib/server/lace-imports';
+import { createThreadId, asThreadId } from '~/../packages/web/lib/server/lace-imports';
 import { Session, Agent as AgentType, SessionEvent } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
 import { getApprovalManager } from '@/lib/server/approval-manager';
 
 // Active agent instances
-const activeAgents = new Map<ThreadId, Agent>();
+const activeAgents = new Map<ThreadId, InstanceType<typeof Agent>>();
 
 // Session metadata storage (temporary until we have proper DB support)
 const sessionMetadata = new Map<ThreadId, { name: string; createdAt: string; isSession: true }>();
@@ -41,7 +47,7 @@ export class SessionService {
       );
 
       const registry = await ProviderRegistry.createWithAutoDiscovery();
-      const provider = await registry.createProvider(providerType, { model });
+      const provider = await registry.createProvider(providerType, model ? { model } : undefined);
       console.log(`Created provider: ${providerType} with model: ${model}`);
       return provider;
     } catch (error) {
@@ -56,8 +62,9 @@ export class SessionService {
     const defaultModel = 'claude-3-haiku-20240307';
 
     // Generate thread ID for the session
-    const threadId = this.threadManager.generateThreadId();
-    this.threadManager.createThread(threadId);
+    const threadIdString = this.threadManager.generateThreadId();
+    const threadId = asThreadId(threadIdString);
+    this.threadManager.createThread(threadIdString);
 
     // Create tool executor
     const toolExecutor = new ToolExecutor();
@@ -111,7 +118,7 @@ export class SessionService {
     // Return sessions from our metadata store
     const sessions: Session[] = [];
 
-    for (const [threadId, metadata] of sessionMetadata.entries()) {
+    for (const [threadId, metadata] of Array.from(sessionMetadata.entries())) {
       const agents = this.getSessionAgents(threadId);
       sessions.push({
         id: threadId,
@@ -173,7 +180,7 @@ export class SessionService {
     }
 
     // Store the agent
-    activeAgents.set(delegateAgent.threadId as ThreadId, delegateAgent);
+    activeAgents.set(asThreadId(delegateAgent.threadId), delegateAgent);
 
     // Start the delegate agent
     await delegateAgent.start();
@@ -182,14 +189,14 @@ export class SessionService {
     this.setupAgentEventHandlers(delegateAgent, sessionId);
 
     // Store agent metadata
-    agentMetadata.set(delegateAgent.threadId as ThreadId, {
+    agentMetadata.set(asThreadId(delegateAgent.threadId), {
       name,
       provider: providerType,
       model: modelName,
     });
 
     const agentData: AgentType = {
-      threadId: delegateAgent.threadId as ThreadId,
+      threadId: asThreadId(delegateAgent.threadId),
       name,
       provider: providerType,
       model: modelName,
@@ -206,12 +213,12 @@ export class SessionService {
 
   private setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
     const sseManager = SSEManager.getInstance();
-    const threadId = agent.threadId as ThreadId;
+    const threadId = asThreadId(agent.threadId);
 
     console.log(`Setting up SSE event handlers for agent ${threadId} in session ${sessionId}`);
 
     // Check if agent is started
-    const isRunning = (agent as any)._isRunning;
+    const isRunning = (agent as unknown as { _isRunning?: boolean })._isRunning;
     console.log(`Agent ${threadId} running state:`, isRunning);
 
     agent.on('agent_thinking_start', () => {
@@ -253,7 +260,7 @@ export class SessionService {
       process.stdout.write(token);
     });
 
-    agent.on('tool_call_start', ({ toolName, input }: { toolName: string; input: any }) => {
+    agent.on('tool_call_start', ({ toolName, input }: { toolName: string; input: unknown }) => {
       const event: SessionEvent = {
         type: 'TOOL_CALL',
         threadId,
@@ -263,15 +270,18 @@ export class SessionService {
       sseManager.broadcast(sessionId, event);
     });
 
-    agent.on('tool_call_complete', ({ toolName, result }: { toolName: string; result: any }) => {
-      const event: SessionEvent = {
-        type: 'TOOL_RESULT',
-        threadId,
-        timestamp: new Date().toISOString(),
-        data: { toolName, result },
-      };
-      sseManager.broadcast(sessionId, event);
-    });
+    agent.on(
+      'tool_call_complete',
+      ({ toolName, result }: { toolName: string; result: unknown }) => {
+        const event: SessionEvent = {
+          type: 'TOOL_RESULT',
+          threadId,
+          timestamp: new Date().toISOString(),
+          data: { toolName, result },
+        };
+        sseManager.broadcast(sessionId, event);
+      }
+    );
 
     // Listen for state changes to debug
     agent.on('state_change', ({ from, to }: { from: string; to: string }) => {
@@ -296,61 +306,83 @@ export class SessionService {
     });
 
     // Handle tool approval requests
-    agent.on('approval_request', async ({ toolName, input, isReadOnly, requestId, resolve }) => {
-      console.log(
-        `Tool approval requested for ${toolName} (${isReadOnly ? 'read-only' : 'destructive'})`
-      );
-
-      const approvalManager = getApprovalManager();
-
-      try {
-        // Get tool metadata from the tool executor
-        const tool = (agent as any)._toolExecutor?.getTool(toolName);
-        const toolDescription = tool?.description;
-        const toolAnnotations = tool?.annotations;
-
-        // Request approval through the manager
-        const decision = await approvalManager.requestApproval(
-          threadId,
-          sessionId,
-          toolName,
-          toolDescription,
-          toolAnnotations,
-          input,
-          isReadOnly
+    agent.on(
+      'approval_request',
+      async ({
+        toolName,
+        input,
+        isReadOnly,
+        requestId,
+        resolve,
+      }: {
+        toolName: string;
+        input: unknown;
+        isReadOnly: boolean;
+        requestId: string;
+        resolve: (decision: ApprovalDecision) => void;
+      }) => {
+        console.log(
+          `Tool approval requested for ${toolName} (${isReadOnly ? 'read-only' : 'destructive'})`
         );
 
-        resolve(decision);
-      } catch (error) {
-        // On timeout or error, deny the request
-        console.error(`Approval request failed for ${toolName}:`, error);
-        resolve(ApprovalDecision.DENY);
+        const approvalManager = getApprovalManager();
 
-        // Notify UI about the timeout/error
-        const event: SessionEvent = {
-          type: 'LOCAL_SYSTEM_MESSAGE',
-          threadId,
-          timestamp: new Date().toISOString(),
-          data: {
-            message: `Tool "${toolName}" was denied (${error instanceof Error ? error.message : 'approval failed'})`,
-          },
-        };
-        sseManager.broadcast(sessionId, event);
+        try {
+          // Get tool metadata from the tool executor
+          // Use the public toolExecutor property instead of unsafe casting
+          const tool = agent.toolExecutor?.getTool(toolName);
+          const toolDescription = tool?.description;
+          const toolAnnotations = tool?.annotations;
+
+          // Request approval through the manager
+          const decision = await approvalManager.requestApproval(
+            threadId,
+            sessionId,
+            toolName,
+            toolDescription,
+            toolAnnotations,
+            input,
+            isReadOnly
+          );
+
+          resolve(decision);
+        } catch (error) {
+          // On timeout or error, deny the request
+          console.error(`Approval request failed for ${toolName}:`, error);
+          resolve(ApprovalDecision.DENY);
+
+          // Notify UI about the timeout/error
+          const event: SessionEvent = {
+            type: 'LOCAL_SYSTEM_MESSAGE',
+            threadId,
+            timestamp: new Date().toISOString(),
+            data: {
+              message: `Tool "${toolName}" was denied (${error instanceof Error ? error.message : 'approval failed'})`,
+            },
+          };
+          sseManager.broadcast(sessionId, event);
+        }
       }
-    });
+    );
   }
 
   private getAgentStatus(agent: Agent): AgentState {
-    // Access the agent's internal state
-    const state = (agent as any)._state;
-    return state || 'idle';
+    // Check if agent has a public method to get state
+    if (agent && typeof agent === 'object' && 'getState' in agent) {
+      const state = (agent as { getState(): AgentState }).getState();
+      return state;
+    }
+
+    // Fallback to checking known properties safely
+    const agentWithState = agent as unknown as { _state?: AgentState };
+    return agentWithState._state || 'idle';
   }
 
   private getSessionAgents(sessionId: ThreadId): AgentType[] {
     const agents: AgentType[] = [];
 
     // Find all agents that are children of this session
-    for (const [threadId, metadata] of agentMetadata.entries()) {
+    for (const [threadId, metadata] of Array.from(agentMetadata.entries())) {
       if (threadId.startsWith(`${sessionId}.`)) {
         const agent = activeAgents.get(threadId);
         agents.push({

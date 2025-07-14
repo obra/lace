@@ -20,7 +20,7 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const sessionService = getSessionService();
-    const body: CreateSessionRequest = await request.json();
+    const body = (await request.json()) as CreateSessionRequest;
 
     const session = await sessionService.createSession(body.name);
 

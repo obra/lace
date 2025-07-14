@@ -2,7 +2,7 @@
 // ABOUTME: Defines interfaces for sessions, agents, and events
 
 // Import core types from Lace
-export type { ThreadId } from '../../../../src/types/threads';
+export type { ThreadId } from '@/lib/server/lace-imports';
 import type { ApprovalDecision } from '@/lib/server/lace-imports';
 
 export interface Session {
@@ -23,14 +23,20 @@ export interface Agent {
   createdAt: string;
 }
 
-// Import the proper event types
-import type { SessionEventType } from '~/../types/events';
+// Types for session events
+type SessionEventType =
+  | 'USER_MESSAGE'
+  | 'AGENT_MESSAGE'
+  | 'TOOL_CALL'
+  | 'TOOL_RESULT'
+  | 'THINKING'
+  | 'LOCAL_SYSTEM_MESSAGE';
 
 export interface SessionEvent {
   type: SessionEventType;
   threadId: ThreadId;
   timestamp: string;
-  data: any;
+  data: unknown;
 }
 
 // Tool approval event data - extends what the agent emits

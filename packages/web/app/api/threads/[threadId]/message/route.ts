@@ -22,7 +22,14 @@ export async function POST(
     }
 
     // Parse request body
-    const body: MessageRequest = await request.json();
+    const bodyRaw: unknown = await request.json();
+
+    // Type-safe body validation
+    if (!bodyRaw || typeof bodyRaw !== 'object' || !('message' in bodyRaw)) {
+      return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+    }
+
+    const body = bodyRaw as MessageRequest;
 
     if (!body.message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
@@ -57,20 +64,21 @@ export async function POST(
     const messageId = randomUUID();
 
     // Process message asynchronously
-    console.log(`Processing message for agent ${threadId}: "${body.message}"`);
+    console.info(`Processing message for agent ${threadId}: "${body.message}"`);
     agent
       .sendMessage(body.message)
       .then(() => {
-        console.log(`Message processing started for agent ${threadId}`);
+        console.info(`Message processing started for agent ${threadId}`);
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error('Error processing message:', error);
         // Emit error event
+        const errorMessage = error instanceof Error ? error.message : String(error);
         const errorEvent: SessionEvent = {
           type: 'LOCAL_SYSTEM_MESSAGE',
           threadId,
           timestamp: new Date().toISOString(),
-          data: { message: `Error: ${error.message}` },
+          data: { message: `Error: ${errorMessage}` },
         };
         sseManager.broadcast(sessionId, errorEvent);
       });
@@ -83,7 +91,7 @@ export async function POST(
     };
 
     return NextResponse.json(response, { status: 202 });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in POST /api/threads/[threadId]/message:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

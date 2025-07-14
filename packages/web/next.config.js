@@ -16,9 +16,9 @@ const nextConfig = {
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': path.resolve(__dirname),
-      // Only add lace alias on server-side
+      // Only add ~ alias for main project source on server-side
       ...(isServer ? {
-        '@lace-core': path.resolve(__dirname, '../../src'),
+        '~': path.resolve(__dirname, '../../src'),
       } : {}),
     };
     return config;

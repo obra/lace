@@ -1,8 +1,7 @@
 // ABOUTME: Server-side imports for Lace core modules
-// ABOUTME: Uses module path aliases that must be configured in build tools
+// ABOUTME: Uses ~ path aliases to reference main project source
 
-// Import from built Lace dist directory
-// These paths assume the web app is run from packages/web
+// Import from main project source using ~ alias
 export { Agent } from '~/agents/agent';
 export { ThreadManager } from '~/threads/thread-manager';
 export { ProviderRegistry } from '~/providers/registry';
@@ -11,13 +10,16 @@ export { getLaceDbPath } from '~/config/lace-dir';
 export { getEnvVar } from '~/config/env-loader';
 export { DelegateTool } from '~/tools/implementations/delegate';
 
-// Types can use source paths since they're compile-time only
-export type { ThreadId } from '~/types/threads';
+// Types and constants
+export type { ThreadId } from '~/threads/types';
 export type { ThreadEvent, EventType } from '~/threads/types';
-export type { ApprovalDecision } from '~/tools/approval-types';
+export { ApprovalDecision } from '~/tools/approval-types';
 export type { ToolAnnotations } from '~/tools/types';
 export type { AgentState } from '~/agents/agent';
 export type { ProviderInfo, ModelInfo } from '~/providers/base-provider';
 
-// Constants can be imported from built code
+// Constants
 export { EVENT_TYPES } from '~/threads/types';
+
+// Utility functions for ThreadId
+export { asThreadId, createThreadId, isThreadId } from '~/threads/types';

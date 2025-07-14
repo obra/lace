@@ -14,14 +14,18 @@ export interface ProvidersResponse {
   providers: ProviderWithModels[];
 }
 
-export async function GET(): Promise<NextResponse<ProvidersResponse>> {
+export interface ErrorResponse {
+  error: string;
+}
+
+export async function GET(): Promise<NextResponse<ProvidersResponse | ErrorResponse>> {
   try {
     const registry = await ProviderRegistry.createWithAutoDiscovery();
     const providerData = await registry.getAvailableProviders();
 
     const providers: ProviderWithModels[] = providerData.map(
       (data): ProviderWithModels => ({
-        ...data.provider,
+        ...data.info,
         models: data.models,
         configured: data.configured,
       })

@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET } from '~/app/api/sessions/[sessionId]/events/stream/route';
+import { GET } from '@/app/api/sessions/[sessionId]/events/stream/route';
 import type { ThreadId } from '@/types/api';
 
 // Create the mock service outside so we can access it
@@ -37,25 +37,8 @@ vi.mock('@/lib/sse-manager', () => ({
 }));
 
 describe('Session SSE Stream API', () => {
-  let mockController: any;
-  let mockWriter: any;
-  let mockEncoder: TextEncoder;
-
   beforeEach(() => {
     vi.clearAllMocks();
-
-    mockEncoder = new TextEncoder();
-    mockWriter = {
-      write: vi.fn(),
-      close: vi.fn(),
-      abort: vi.fn(),
-    };
-
-    mockController = {
-      enqueue: vi.fn(),
-      close: vi.fn(),
-      error: vi.fn(),
-    };
 
     // Reset SSE manager state
     mockSSEManager.sessionStreams.clear();
@@ -74,7 +57,7 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      });
+      } as const);
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
@@ -94,7 +77,7 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      });
+      } as const);
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
@@ -120,18 +103,18 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      });
+      } as const);
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
       );
-      const response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const _response = await GET(request, { params: Promise.resolve({ sessionId }) });
 
       // Simulate broadcasting events
       expect(mockSSEManager.addConnection).toHaveBeenCalledWith(sessionId, expect.any(Object));
 
       // Verify that the connection was added for the correct session
-      const addConnectionCall = mockSSEManager.addConnection.mock.calls[0];
+      const addConnectionCall = mockSSEManager.addConnection.mock.calls[0] as [string, unknown];
       expect(addConnectionCall[0]).toBe(sessionId);
     });
 
@@ -143,7 +126,7 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      });
+      } as const);
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
@@ -169,7 +152,7 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      });
+      } as const);
 
       const abortController = new AbortController();
       const request = new NextRequest(
@@ -179,7 +162,7 @@ describe('Session SSE Stream API', () => {
         }
       );
 
-      const response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const _response = await GET(request, { params: Promise.resolve({ sessionId }) });
 
       // Simulate client disconnect
       abortController.abort();
@@ -194,7 +177,7 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      });
+      } as const);
 
       // Create multiple connections
       const request1 = new NextRequest(
@@ -207,11 +190,13 @@ describe('Session SSE Stream API', () => {
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
       );
 
-      await Promise.all([
+      const responses = await Promise.all([
         GET(request1, { params: Promise.resolve({ sessionId }) }),
         GET(request2, { params: Promise.resolve({ sessionId }) }),
         GET(request3, { params: Promise.resolve({ sessionId }) }),
       ]);
+      // Responses are created for all connections
+      expect(responses).toHaveLength(3);
 
       // Should have 3 connections added
       expect(mockSSEManager.addConnection).toHaveBeenCalledTimes(3);
@@ -223,13 +208,13 @@ describe('Session SSE Stream API', () => {
     });
 
     it('should return 404 for non-existent session', async () => {
-      mockSessionService.getSession.mockResolvedValue(null);
+      mockSessionService.getSession.mockResolvedValue(null as const);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/invalid/events/stream`);
       const response = await GET(request, { params: Promise.resolve({ sessionId: 'invalid' }) });
 
       expect(response.status).toBe(404);
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
       expect(data.error).toBe('Session not found');
     });
 
@@ -239,12 +224,12 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      });
+      } as const);
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
       );
-      const response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const _response = await GET(request, { params: Promise.resolve({ sessionId }) });
 
       // Verify SSE manager was called to add connection
       expect(mockSSEManager.addConnection).toHaveBeenCalledWith(sessionId, expect.any(Object));
@@ -256,7 +241,7 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      });
+      } as const);
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`

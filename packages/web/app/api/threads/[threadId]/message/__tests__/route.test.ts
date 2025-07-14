@@ -1,16 +1,31 @@
 // ABOUTME: Tests for thread messaging API endpoint (POST /api/threads/{threadId}/message)
 // ABOUTME: Handles sending messages to specific agent threads and emitting events via SSE
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/threads/[threadId]/message/route';
-import type { ThreadId } from '@/types/api';
+import type { ThreadId, SessionEvent, MessageResponse } from '@/types/api';
+import type { Agent } from '@/lib/server/lace-imports';
 
-// Mock SSE manager
+// Mock Agent interface
+interface MockAgent {
+  threadId: ThreadId;
+  name: string;
+  provider: string;
+  model: string;
+  status: string;
+  createdAt: string;
+  sendMessage: ReturnType<typeof vi.fn>;
+}
+
+// Error response interface
+interface ErrorResponse {
+  error: string;
+}
+
+// Mock SSE manager with proper types
 const mockSSEManager = {
-  broadcast: vi.fn(),
+  broadcast: vi.fn<[ThreadId, SessionEvent], void>(),
 };
 
 vi.mock('@/lib/sse-manager', () => ({
@@ -25,7 +40,7 @@ const mockSessionService = {
   listSessions: vi.fn(),
   getSession: vi.fn(),
   spawnAgent: vi.fn(),
-  getAgent: vi.fn(),
+  getAgent: vi.fn<[ThreadId], Agent | null>(),
   sendMessage: vi.fn(),
   handleAgentEvent: vi.fn(),
 };
@@ -42,10 +57,11 @@ describe('Thread Messaging API', () => {
 
   describe('POST /api/threads/{threadId}/message', () => {
     const threadId = 'lace_20250113_session1.1' as ThreadId;
+
     const sessionId = 'lace_20250113_session1' as ThreadId;
 
     it('should accept message and queue for processing', async () => {
-      const mockAgent = {
+      const mockAgent: MockAgent = {
         threadId,
         name: 'pm',
         provider: 'anthropic',
@@ -54,7 +70,8 @@ describe('Thread Messaging API', () => {
         createdAt: new Date().toISOString(),
         sendMessage: vi.fn().mockResolvedValue(undefined),
       };
-      mockSessionService.getAgent.mockReturnValue(mockAgent);
+
+      mockSessionService.getAgent.mockReturnValue(mockAgent as Agent);
 
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
@@ -63,19 +80,21 @@ describe('Thread Messaging API', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ threadId }) });
-      const data = await response.json();
+      const data = (await response.json()) as MessageResponse;
 
       expect(response.status).toBe(202);
       expect(data).toMatchObject({
         status: 'accepted',
+
         threadId,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         messageId: expect.any(String),
       });
       expect(mockAgent.sendMessage).toHaveBeenCalledWith('Help me implement OAuth');
     });
 
     it('should return immediate acknowledgment', async () => {
-      const mockAgent = {
+      const mockAgent: MockAgent = {
         threadId,
         name: 'architect',
         provider: 'anthropic',
@@ -88,7 +107,8 @@ describe('Thread Messaging API', () => {
             () => new Promise((resolve) => setTimeout(() => resolve(undefined), 1000))
           ),
       };
-      mockSessionService.getAgent.mockReturnValue(mockAgent);
+
+      mockSessionService.getAgent.mockReturnValue(mockAgent as Agent);
 
       const start = Date.now();
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
@@ -119,7 +139,7 @@ describe('Thread Messaging API', () => {
       const response = await POST(request, {
         params: Promise.resolve({ threadId: invalidThreadId }),
       });
-      const data = (await response.json()) as { error: string };
+      const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid thread ID format');
@@ -135,14 +155,14 @@ describe('Thread Messaging API', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ threadId }) });
-      const data = (await response.json()) as { error: string };
+      const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Agent not found');
     });
 
     it('should emit events via session SSE stream', async () => {
-      const mockAgent = {
+      const mockAgent: MockAgent = {
         threadId,
         name: 'pm',
         provider: 'anthropic',
@@ -151,7 +171,8 @@ describe('Thread Messaging API', () => {
         createdAt: new Date().toISOString(),
         sendMessage: vi.fn().mockResolvedValue(undefined),
       };
-      mockSessionService.getAgent.mockReturnValue(mockAgent);
+
+      mockSessionService.getAgent.mockReturnValue(mockAgent as Agent);
 
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
@@ -166,6 +187,7 @@ describe('Thread Messaging API', () => {
         sessionId,
         expect.objectContaining({
           type: 'USER_MESSAGE',
+
           threadId,
           data: { content: 'Test message' },
         })
@@ -181,14 +203,14 @@ describe('Thread Messaging API', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ threadId }) });
-      const data = (await response.json()) as { error: string };
+      const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Message is required');
     });
 
     it('should handle missing message field', async () => {
-      const mockAgent = {
+      const mockAgent: MockAgent = {
         threadId,
         name: 'pm',
         provider: 'anthropic',
@@ -197,7 +219,8 @@ describe('Thread Messaging API', () => {
         createdAt: new Date().toISOString(),
         sendMessage: vi.fn(),
       };
-      mockSessionService.getAgent.mockReturnValue(mockAgent);
+
+      mockSessionService.getAgent.mockReturnValue(mockAgent as Agent);
 
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
@@ -206,14 +229,14 @@ describe('Thread Messaging API', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ threadId }) });
-      const data = (await response.json()) as { error: string };
+      const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Message is required');
     });
 
     it('should handle agent processing errors gracefully', async () => {
-      const mockAgent = {
+      const mockAgent: MockAgent = {
         threadId,
         name: 'pm',
         provider: 'anthropic',
@@ -222,7 +245,8 @@ describe('Thread Messaging API', () => {
         createdAt: new Date().toISOString(),
         sendMessage: vi.fn().mockRejectedValue(new Error('Provider error')),
       };
-      mockSessionService.getAgent.mockReturnValue(mockAgent);
+
+      mockSessionService.getAgent.mockReturnValue(mockAgent as Agent);
 
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
@@ -231,7 +255,7 @@ describe('Thread Messaging API', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ threadId }) });
-      const _data = await response.json();
+      await response.json();
 
       // Should still return 202 as processing happens async
       expect(response.status).toBe(202);
@@ -239,7 +263,7 @@ describe('Thread Messaging API', () => {
 
     it('should support sending to agent threads', async () => {
       // Test agent thread
-      const mockAgent = {
+      const mockAgent: MockAgent = {
         threadId,
         name: 'pm',
         provider: 'anthropic',
@@ -248,7 +272,8 @@ describe('Thread Messaging API', () => {
         createdAt: new Date().toISOString(),
         sendMessage: vi.fn().mockResolvedValue(undefined),
       };
-      mockSessionService.getAgent.mockReturnValue(mockAgent);
+
+      mockSessionService.getAgent.mockReturnValue(mockAgent as Agent);
 
       const agentRequest = new NextRequest(
         `http://localhost:3000/api/threads/${threadId}/message`,

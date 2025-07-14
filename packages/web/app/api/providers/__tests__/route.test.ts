@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, vi, MockedFunction } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, type ProviderWithModels } from '@/app/api/providers/route';
 import type { ProviderInfo, ModelInfo } from '@/lib/server/lace-imports';
-import { ProviderRegistry } from '@/lib/server/lace-imports';
+// ProviderRegistry is mocked but not directly used in tests
 
 // Response type for tests
 interface ProvidersResponse {
@@ -14,20 +14,22 @@ interface ProvidersResponse {
 }
 
 // Mock the module
+const mockProviderRegistry = {
+  createWithAutoDiscovery: vi.fn(),
+};
+
 vi.mock('@/lib/server/lace-imports', () => ({
-  ProviderRegistry: {
-    createWithAutoDiscovery: vi.fn(),
-  },
+  ProviderRegistry: mockProviderRegistry,
 }));
 
 // Get typed reference to the mock
-const mockCreateWithAutoDiscovery = ProviderRegistry.createWithAutoDiscovery as MockedFunction<
-  typeof ProviderRegistry.createWithAutoDiscovery
->;
+const mockCreateWithAutoDiscovery = mockProviderRegistry.createWithAutoDiscovery;
 
 describe('Provider Discovery API', () => {
   let mockRegistry: {
-    getAvailableProviders: ReturnType<typeof vi.fn>;
+    getAvailableProviders: MockedFunction<
+      () => Promise<Array<{ info: ProviderInfo; models: ModelInfo[]; configured: boolean }>>
+    >;
   };
 
   beforeEach(() => {
@@ -41,12 +43,12 @@ describe('Provider Discovery API', () => {
   describe('GET /api/providers', () => {
     it('should list all available providers with their models', async () => {
       const mockProviders: Array<{
-        provider: ProviderInfo;
+        info: ProviderInfo;
         models: ModelInfo[];
         configured: boolean;
       }> = [
         {
-          provider: {
+          info: {
             name: 'anthropic',
             displayName: 'Anthropic Claude',
             requiresApiKey: true,
@@ -74,7 +76,7 @@ describe('Provider Discovery API', () => {
           configured: true,
         },
         {
-          provider: {
+          info: {
             name: 'openai',
             displayName: 'OpenAI',
             requiresApiKey: true,
@@ -102,35 +104,32 @@ describe('Provider Discovery API', () => {
       const data = (await response.json()) as ProvidersResponse;
 
       expect(response.status).toBe(200);
-      expect(data).toMatchObject({
-        providers: [
-          expect.objectContaining({
-            name: 'anthropic',
-            displayName: 'Anthropic Claude',
-            requiresApiKey: true,
-            configured: true,
-            models: expect.arrayContaining([
-              expect.objectContaining({
-                id: 'claude-3-5-sonnet-20241022',
-                displayName: 'Claude 3.5 Sonnet',
-              }),
-            ]),
-          }),
-          expect.objectContaining({
-            name: 'openai',
-            displayName: 'OpenAI',
-            requiresApiKey: true,
-            configured: false,
-            configurationHint: 'Set OPENAI_API_KEY environment variable',
-            models: expect.arrayContaining([
-              expect.objectContaining({
-                id: 'gpt-4-turbo',
-                displayName: 'GPT-4 Turbo',
-              }),
-            ]),
-          }),
-        ],
+      expect(data.providers).toHaveLength(2);
+      expect(data.providers[0]).toMatchObject({
+        name: 'anthropic',
+        displayName: 'Anthropic Claude',
+        requiresApiKey: true,
+        configured: true,
       });
+      expect(data.providers[0]?.models).toContainEqual(
+        expect.objectContaining({
+          id: 'claude-3-5-sonnet-20241022',
+          displayName: 'Claude 3.5 Sonnet',
+        })
+      );
+      expect(data.providers[1]).toMatchObject({
+        name: 'openai',
+        displayName: 'OpenAI',
+        requiresApiKey: true,
+        configured: false,
+        configurationHint: 'Set OPENAI_API_KEY environment variable',
+      });
+      expect(data.providers[1]?.models).toContainEqual(
+        expect.objectContaining({
+          id: 'gpt-4-turbo',
+          displayName: 'GPT-4 Turbo',
+        })
+      );
     });
 
     it('should handle empty provider list', async () => {
@@ -147,7 +146,7 @@ describe('Provider Discovery API', () => {
     it('should include configuration hints for unconfigured providers', async () => {
       const mockProviders = [
         {
-          provider: {
+          info: {
             name: 'anthropic',
             displayName: 'Anthropic Claude',
             requiresApiKey: true,
@@ -176,7 +175,7 @@ describe('Provider Discovery API', () => {
         name: 'anthropic',
         configured: false,
         configurationHint: 'Set ANTHROPIC_API_KEY environment variable',
-      });
+      } as Partial<ProviderWithModels>);
     });
 
     it('should handle provider discovery errors gracefully', async () => {
@@ -197,7 +196,7 @@ describe('Provider Discovery API', () => {
     it('should mark providers with default models correctly', async () => {
       const mockProviders = [
         {
-          provider: {
+          info: {
             name: 'anthropic',
             displayName: 'Anthropic Claude',
             requiresApiKey: true,
@@ -229,17 +228,17 @@ describe('Provider Discovery API', () => {
       const data = (await response.json()) as ProvidersResponse;
 
       expect(response.status).toBe(200);
-      const defaultModel = (data.providers[0] as ProviderWithModels).models.find(
-        (m) => m.isDefault
-      );
+      const provider = data.providers[0] as ProviderWithModels;
+      expect(provider).toBeDefined();
+      const defaultModel = provider.models.find((m) => m.isDefault);
       expect(defaultModel).toBeDefined();
-      expect(defaultModel.id).toBe('claude-3-5-sonnet-20241022');
+      expect(defaultModel?.id).toBe('claude-3-5-sonnet-20241022');
     });
 
     it('should include model capabilities when available', async () => {
       const mockProviders = [
         {
-          provider: {
+          info: {
             name: 'openai',
             displayName: 'OpenAI',
             requiresApiKey: true,
@@ -264,11 +263,11 @@ describe('Provider Discovery API', () => {
       const data = (await response.json()) as ProvidersResponse;
 
       expect(response.status).toBe(200);
-      expect(data.providers[0].models[0].capabilities).toEqual([
-        'vision',
-        'function-calling',
-        'json-mode',
-      ]);
+      const provider = data.providers[0] as ProviderWithModels;
+      expect(provider).toBeDefined();
+      const model = provider.models[0];
+      expect(model).toBeDefined();
+      expect(model?.capabilities).toEqual(['vision', 'function-calling', 'json-mode']);
     });
   });
 });

@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getApprovalManager } from '@/lib/server/approval-manager';
 import { ToolApprovalResponse } from '@/types/api';
-import { ApprovalDecision } from '@/lib/server/lace-imports';
+import type { ApprovalDecision } from '@/lib/server/lace-imports';
 
 export async function POST(
   request: NextRequest,
@@ -12,14 +12,10 @@ export async function POST(
 ): Promise<NextResponse> {
   try {
     const { requestId } = await params;
-    const body: ToolApprovalResponse = await request.json();
+    const body = (await request.json()) as ToolApprovalResponse;
 
     // Validate decision matches ApprovalDecision enum
-    const validDecisions: ApprovalDecision[] = [
-      ApprovalDecision.ALLOW_ONCE,
-      ApprovalDecision.ALLOW_SESSION,
-      ApprovalDecision.DENY,
-    ];
+    const validDecisions: ApprovalDecision[] = ['allow_once', 'allow_session', 'deny'];
 
     if (!validDecisions.includes(body.decision)) {
       return NextResponse.json(
@@ -35,7 +31,7 @@ export async function POST(
       return NextResponse.json({ error: 'Approval request not found or expired' }, { status: 404 });
     }
 
-    console.log(`Approval decision for ${requestId}: ${body.decision}`);
+    console.info(`Approval decision for ${requestId}: ${body.decision}`);
     return NextResponse.json({ status: 'resolved', decision: body.decision });
   } catch (error) {
     console.error('Error in POST /api/approvals/[requestId]:', error);

@@ -3,18 +3,15 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET } from '~/app/api/sessions/[sessionId]/route';
-import type { ThreadId } from '@/types/api';
+import { GET } from '@/app/api/sessions/[sessionId]/route';
+import type { ThreadId, Session } from '@/types/api';
+import type { SessionService } from '@/lib/server/session-service';
+import type { AgentState } from '@/lib/server/lace-imports';
+import { asThreadId } from '@/lib/server/lace-imports';
 
-// Create the mock service outside so we can access it
-const mockSessionService = {
-  createSession: vi.fn(),
-  listSessions: vi.fn(),
+// Create a properly typed mock service
+const mockSessionService: Pick<SessionService, 'getSession'> = {
   getSession: vi.fn(),
-  spawnAgent: vi.fn(),
-  getAgent: vi.fn(),
-  sendMessage: vi.fn(),
-  handleAgentEvent: vi.fn(),
 };
 
 // Mock the session service
@@ -29,28 +26,28 @@ describe('Session Detail API Route', () => {
 
   describe('GET /api/sessions/[sessionId]', () => {
     it('should return session details with agents', async () => {
-      const sessionId = 'lace_20240101_abcd1234' as ThreadId;
-      const mockSession = {
+      const sessionId: ThreadId = asThreadId('lace_20240101_abcd1234');
+      const mockSession: Session = {
         id: sessionId,
         name: 'Test Session',
         createdAt: '2024-01-01T12:00:00Z',
         agents: [
           {
-            threadId: `${sessionId}.1` as ThreadId,
+            threadId: asThreadId(`${sessionId}.1`),
             name: 'Agent 1',
             provider: 'anthropic',
             model: 'claude-3-opus',
-            status: 'idle' as const,
+            status: 'idle' as AgentState,
             createdAt: '2024-01-01T12:01:00Z',
           },
         ],
       };
 
-      mockSessionService.getSession.mockResolvedValueOnce(mockSession);
+      vi.mocked(mockSessionService.getSession).mockResolvedValueOnce(mockSession);
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
       const response = await GET(request, { params: Promise.resolve({ sessionId }) });
-      const data = await response.json();
+      const data = (await response.json()) as { session: Session };
 
       expect(response.status).toBe(200);
       expect(data.session).toEqual(mockSession);
@@ -58,24 +55,24 @@ describe('Session Detail API Route', () => {
     });
 
     it('should return 404 for non-existent session', async () => {
-      const sessionId = 'non_existent' as ThreadId;
-      mockSessionService.getSession.mockResolvedValueOnce(null);
+      const sessionId: ThreadId = asThreadId('non_existent');
+      vi.mocked(mockSessionService.getSession).mockResolvedValueOnce(null);
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
       const response = await GET(request, { params: Promise.resolve({ sessionId }) });
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Session not found');
     });
 
     it('should handle errors gracefully', async () => {
-      const sessionId = 'lace_20240101_abcd1234' as ThreadId;
-      mockSessionService.getSession.mockRejectedValueOnce(new Error('Database error'));
+      const sessionId: ThreadId = asThreadId('lace_20240101_abcd1234');
+      vi.mocked(mockSessionService.getSession).mockRejectedValueOnce(new Error('Database error'));
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
       const response = await GET(request, { params: Promise.resolve({ sessionId }) });
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Internal server error');

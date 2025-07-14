@@ -3,16 +3,18 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { POST, GET } from '@/api/sessions/route';
-import type { ThreadId } from '@/types/api';
+import { POST, GET } from '@/app/api/sessions/route';
+import type { Session } from '@/types/api';
+import type { SessionService } from '@/lib/server/session-service';
+import { createThreadId } from '@/lib/server/lace-imports';
 
-// Create the mock service outside so we can access it
+// Create the properly typed mock service
 const mockSessionService = {
-  createSession: vi.fn(),
-  listSessions: vi.fn(),
-  getSession: vi.fn(),
-  spawnAgent: vi.fn(),
-  getAgent: vi.fn(),
+  createSession: vi.fn<SessionService['createSession']>(),
+  listSessions: vi.fn<SessionService['listSessions']>(),
+  getSession: vi.fn<SessionService['getSession']>(),
+  spawnAgent: vi.fn<SessionService['spawnAgent']>(),
+  getAgent: vi.fn<SessionService['getAgent']>(),
 };
 
 // Mock the session service
@@ -28,14 +30,14 @@ describe('Session API Routes', () => {
   describe('POST /api/sessions', () => {
     it('should create a new session with provided name', async () => {
       const sessionName = 'Test Session';
-      const mockSession = {
-        id: 'lace_20240101_abcd1234' as ThreadId,
+      const mockSession: Session = {
+        id: createThreadId('lace_20240101_abcd12'),
         name: sessionName,
         createdAt: '2024-01-01T12:00:00Z',
         agents: [],
       };
 
-      mockSessionService.createSession.mockResolvedValueOnce(mockSession);
+      void mockSessionService.createSession.mockResolvedValueOnce(mockSession);
 
       const request = new NextRequest('http://localhost:3005/api/sessions', {
         method: 'POST',
@@ -44,7 +46,7 @@ describe('Session API Routes', () => {
       });
 
       const response = await POST(request);
-      const data = await response.json();
+      const data = (await response.json()) as { session: typeof mockSession };
 
       expect(response.status).toBe(201);
       expect(data.session).toEqual(mockSession);
@@ -52,14 +54,14 @@ describe('Session API Routes', () => {
     });
 
     it('should create session with default name when name not provided', async () => {
-      const mockSession = {
-        id: 'lace_20240101_abcd1234' as ThreadId,
+      const mockSession: Session = {
+        id: createThreadId('lace_20240101_abcd12'),
         name: 'Untitled Session',
         createdAt: '2024-01-01T12:00:00Z',
         agents: [],
       };
 
-      mockSessionService.createSession.mockResolvedValueOnce(mockSession);
+      void mockSessionService.createSession.mockResolvedValueOnce(mockSession);
 
       const request = new NextRequest('http://localhost:3005/api/sessions', {
         method: 'POST',
@@ -68,7 +70,7 @@ describe('Session API Routes', () => {
       });
 
       const response = await POST(request);
-      const data = await response.json();
+      const data = (await response.json()) as { session: typeof mockSession };
 
       expect(response.status).toBe(201);
       expect(data.session.name).toBe('Untitled Session');
@@ -76,7 +78,7 @@ describe('Session API Routes', () => {
     });
 
     it('should handle session creation errors', async () => {
-      mockSessionService.createSession.mockRejectedValueOnce(new Error('Database error'));
+      void mockSessionService.createSession.mockRejectedValueOnce(new Error('Database error'));
 
       const request = new NextRequest('http://localhost:3005/api/sessions', {
         method: 'POST',
@@ -85,7 +87,7 @@ describe('Session API Routes', () => {
       });
 
       const response = await POST(request);
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Internal server error');
@@ -94,20 +96,20 @@ describe('Session API Routes', () => {
 
   describe('GET /api/sessions', () => {
     it('should list all sessions', async () => {
-      const mockSessions = [
+      const mockSessions: Session[] = [
         {
-          id: 'lace_20240101_abcd1234' as ThreadId,
+          id: createThreadId('lace_20240101_abcd12'),
           name: 'Session 1',
           createdAt: '2024-01-01T12:00:00Z',
           agents: [],
         },
         {
-          id: 'lace_20240101_efgh5678' as ThreadId,
+          id: createThreadId('lace_20240101_efgh56'),
           name: 'Session 2',
           createdAt: '2024-01-01T13:00:00Z',
           agents: [
             {
-              threadId: 'lace_20240101_efgh5678.1' as ThreadId,
+              threadId: createThreadId('lace_20240101_efgh56.1'),
               name: 'Agent 1',
               provider: 'anthropic',
               model: 'claude-3-opus',
@@ -118,11 +120,11 @@ describe('Session API Routes', () => {
         },
       ];
 
-      mockSessionService.listSessions.mockResolvedValueOnce(mockSessions);
+      void mockSessionService.listSessions.mockResolvedValueOnce(mockSessions);
 
       const request = new NextRequest('http://localhost:3005/api/sessions');
       const response = await GET(request);
-      const data = await response.json();
+      const data = (await response.json()) as { sessions: typeof mockSessions };
 
       expect(response.status).toBe(200);
       expect(data.sessions).toEqual(mockSessions);
@@ -130,22 +132,22 @@ describe('Session API Routes', () => {
     });
 
     it('should return empty array when no sessions exist', async () => {
-      mockSessionService.listSessions.mockResolvedValueOnce([]);
+      void mockSessionService.listSessions.mockResolvedValueOnce([]);
 
       const request = new NextRequest('http://localhost:3005/api/sessions');
       const response = await GET(request);
-      const data = await response.json();
+      const data = (await response.json()) as { sessions: unknown[] };
 
       expect(response.status).toBe(200);
       expect(data.sessions).toEqual([]);
     });
 
     it('should handle listing errors', async () => {
-      mockSessionService.listSessions.mockRejectedValueOnce(new Error('Database error'));
+      void mockSessionService.listSessions.mockRejectedValueOnce(new Error('Database error'));
 
       const request = new NextRequest('http://localhost:3005/api/sessions');
       const response = await GET(request);
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Internal server error');
