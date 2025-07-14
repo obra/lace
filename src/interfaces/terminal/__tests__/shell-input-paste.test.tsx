@@ -26,11 +26,7 @@ const originalPlatform = process.platform;
 describe('ShellInput Paste Functionality', () => {
   // Helper to render with focus provider
   const renderWithFocus = (component: React.ReactElement) => {
-    return render(
-      <LaceFocusProvider>
-        {component}
-      </LaceFocusProvider>
-    );
+    return render(<LaceFocusProvider>{component}</LaceFocusProvider>);
   };
   beforeEach(() => {
     // Reset mocks

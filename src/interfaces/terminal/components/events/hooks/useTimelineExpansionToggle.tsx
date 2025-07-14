@@ -105,9 +105,7 @@ const ExpansionEmitterContext = createContext<ExpansionEmitter | null>(null);
 export function TimelineExpansionProvider({ children }: { children: React.ReactNode }) {
   const [emitter] = useState(() => new ExpansionEmitter());
   return (
-    <ExpansionEmitterContext.Provider value={emitter}>
-      {children}
-    </ExpansionEmitterContext.Provider>
+    <ExpansionEmitterContext.Provider value={emitter}>{children}</ExpansionEmitterContext.Provider>
   );
 }
 
@@ -167,7 +165,10 @@ export function useTimelineItemFocusEntry(isSelected: boolean, onFocusEntry?: ()
 // - Call this hook with isSelected indicating if this item has the timeline cursor
 // - When isSelected=true, this item will respond to timeline-level expand/collapse events
 // - Use onExpand/onCollapse for manual expansion control (e.g., mouse clicks)
-export function useTimelineItemExpansion(isSelected: boolean, onExpansionChange?: (expanded: boolean) => void): {
+export function useTimelineItemExpansion(
+  isSelected: boolean,
+  onExpansionChange?: (expanded: boolean) => void
+): {
   isExpanded: boolean;
   onExpand: () => void;
   onCollapse: () => void;

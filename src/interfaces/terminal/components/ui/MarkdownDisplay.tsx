@@ -7,7 +7,6 @@ import { marked } from 'marked';
 import TerminalRenderer from 'marked-terminal';
 import { UI_SYMBOLS } from '../../theme.js';
 
-
 interface MarkdownDisplayProps {
   content: string;
   showIcon?: boolean;
@@ -44,7 +43,7 @@ export function MarkdownDisplay({
   } catch (error) {
     // Fallback to plain text if markdown parsing fails
     const trimmedContent = content.trim();
-    
+
     return (
       <Box flexDirection="column">
         <Text color={dimmed ? 'dim' : 'white'} wrap="wrap">

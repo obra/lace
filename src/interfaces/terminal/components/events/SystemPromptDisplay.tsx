@@ -15,11 +15,7 @@ interface SystemPromptDisplayProps {
   // Selection and expansion state comes from context
 }
 
-export function SystemPromptDisplay({
-  event,
-  isStreaming,
-  isFocused,
-}: SystemPromptDisplayProps) {
+export function SystemPromptDisplay({ event, isStreaming, isFocused }: SystemPromptDisplayProps) {
   const systemPrompt = event.data as string;
 
   // Get expansion state from context

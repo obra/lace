@@ -23,41 +23,42 @@ const mockBashCall = {
   name: 'bash',
   arguments: {
     command: 'ls -la',
-    description: 'List files'
-  }
+    description: 'List files',
+  },
 };
 
 const mockSuccessResult = {
-  content: [{
-    type: 'text' as const,
-    text: JSON.stringify({
-      stdout: 'file1.txt\nfile2.txt\n',
-      stderr: '',
-      exitCode: 0
-    })
-  }],
-  isError: false
+  content: [
+    {
+      type: 'text' as const,
+      text: JSON.stringify({
+        stdout: 'file1.txt\nfile2.txt\n',
+        stderr: '',
+        exitCode: 0,
+      }),
+    },
+  ],
+  isError: false,
 };
 
 const mockErrorResult = {
-  content: [{
-    type: 'text' as const,
-    text: JSON.stringify({
-      stdout: '',
-      stderr: 'bash: command not found',
-      exitCode: 127
-    })
-  }],
-  isError: false
+  content: [
+    {
+      type: 'text' as const,
+      text: JSON.stringify({
+        stdout: '',
+        stderr: 'bash: command not found',
+        exitCode: 127,
+      }),
+    },
+  ],
+  isError: false,
 };
 
 function renderWithProviders(component: React.ReactElement) {
   return render(
     <TimelineExpansionProvider>
-      <TimelineItemProvider
-        isSelected={false}
-        onToggle={() => {}}
-      >
+      <TimelineItemProvider isSelected={false} onToggle={() => {}}>
         {component}
       </TimelineItemProvider>
     </TimelineExpansionProvider>
@@ -71,12 +72,10 @@ describe('BashToolRenderer', () => {
       call: mockBashCall,
       result: mockSuccessResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <BashToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<BashToolRenderer item={item} />);
 
     const frame = lastFrame();
     expect(frame).toContain('✔'); // Success symbol
@@ -91,12 +90,10 @@ describe('BashToolRenderer', () => {
       call: mockBashCall,
       result: mockErrorResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <BashToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<BashToolRenderer item={item} />);
 
     const frame = lastFrame();
     expect(frame).toContain('✘'); // Error symbol
@@ -110,12 +107,10 @@ describe('BashToolRenderer', () => {
       call: mockBashCall,
       result: undefined, // Still running
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <BashToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<BashToolRenderer item={item} />);
 
     const frame = lastFrame();
     expect(frame).toContain('⧖'); // Pending symbol
@@ -128,8 +123,8 @@ describe('BashToolRenderer', () => {
       id: 'call-123',
       name: 'bash',
       arguments: {
-        command: 'pwd'
-      }
+        command: 'pwd',
+      },
     };
 
     const item = {
@@ -137,12 +132,10 @@ describe('BashToolRenderer', () => {
       call,
       result: mockSuccessResult,
       timestamp: new Date(),
-      callId: 'call-123'
+      callId: 'call-123',
     };
 
-    const { lastFrame } = renderWithProviders(
-      <BashToolRenderer item={item} />
-    );
+    const { lastFrame } = renderWithProviders(<BashToolRenderer item={item} />);
 
     const frame = lastFrame();
     expect(frame).toContain('✔'); // Success symbol

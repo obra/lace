@@ -36,14 +36,7 @@ vi.mock('../ui/MarkdownDisplay.js', () => ({
 }));
 
 vi.mock('../ui/TimelineEntry.js', () => ({
-  TimelineEntry: ({
-    children,
-    label,
-    summary,
-    isExpanded,
-    onExpandedChange,
-    isFocused,
-  }: any) => {
+  TimelineEntry: ({ children, label, summary, isExpanded, onExpandedChange, isFocused }: any) => {
     return React.createElement(
       'collapsible',
       {
@@ -59,7 +52,6 @@ vi.mock('../ui/TimelineEntry.js', () => ({
 }));
 
 describe('AgentMessageDisplay - Enhanced with Thinking', () => {
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -204,11 +196,7 @@ describe('AgentMessageDisplay - Enhanced with Thinking', () => {
       const event = createEvent('Partial response...');
 
       const { lastFrame } = render(
-        <AgentMessageDisplay
-          event={event}
-          isStreaming={true}
-          isFocused={true}
-                  />
+        <AgentMessageDisplay event={event} isStreaming={true} isFocused={true} />
       );
 
       expect(lastFrame()).toContain('(thinking...)');

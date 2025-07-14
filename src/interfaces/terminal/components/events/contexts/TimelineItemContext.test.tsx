@@ -5,7 +5,11 @@ import React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect, vi } from 'vitest';
 import { Text, Box } from 'ink';
-import { TimelineItemProvider, useTimelineItem, useTimelineItemOptional } from './TimelineItemContext.js';
+import {
+  TimelineItemProvider,
+  useTimelineItem,
+  useTimelineItemOptional,
+} from './TimelineItemContext.js';
 
 // Mock the expansion hook
 vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
@@ -19,7 +23,7 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
 // Test component that uses the required hook
 function TestComponentRequired() {
   const context = useTimelineItem();
-  
+
   return (
     <Box flexDirection="column">
       <Text>Selected: {context.isSelected ? 'true' : 'false'}</Text>
@@ -36,11 +40,11 @@ function TestComponentRequired() {
 // Test component that uses the optional hook
 function TestComponentOptional() {
   const context = useTimelineItemOptional();
-  
+
   if (!context) {
     return <Text>No context available</Text>;
   }
-  
+
   return (
     <Box flexDirection="column">
       <Text>Selected: {context.isSelected ? 'true' : 'false'}</Text>
@@ -58,7 +62,7 @@ describe('TimelineItemContext', () => {
   describe('TimelineItemProvider', () => {
     it('should provide context values to children', () => {
       const mockOnToggle = vi.fn();
-      
+
       const { lastFrame } = render(
         <TimelineItemProvider
           isSelected={true}
@@ -79,12 +83,9 @@ describe('TimelineItemContext', () => {
 
     it('should provide minimal required context values', () => {
       const mockOnToggle = vi.fn();
-      
+
       const { lastFrame } = render(
-        <TimelineItemProvider
-          isSelected={false}
-          onToggle={mockOnToggle}
-        >
+        <TimelineItemProvider isSelected={false} onToggle={mockOnToggle}>
           <TestComponentRequired />
         </TimelineItemProvider>
       );
@@ -98,12 +99,9 @@ describe('TimelineItemContext', () => {
 
     it('should call onToggle when toggle button is clicked', () => {
       const mockOnToggle = vi.fn();
-      
+
       render(
-        <TimelineItemProvider
-          isSelected={false}
-          onToggle={mockOnToggle}
-        >
+        <TimelineItemProvider isSelected={false} onToggle={mockOnToggle}>
           <TestComponentRequired />
         </TimelineItemProvider>
       );
@@ -120,7 +118,7 @@ describe('TimelineItemContext', () => {
       const originalError = console.error;
       const mockError = vi.fn();
       console.error = mockError;
-      
+
       try {
         render(<TestComponentRequired />);
         // If we get here, the test should fail
@@ -128,13 +126,13 @@ describe('TimelineItemContext', () => {
       } catch (error) {
         expect(error).toBeDefined();
       }
-      
+
       console.error = originalError;
     });
 
     it('should return context values when used within provider', () => {
       const mockOnToggle = vi.fn();
-      
+
       const { lastFrame } = render(
         <TimelineItemProvider
           isSelected={true}
@@ -157,13 +155,13 @@ describe('TimelineItemContext', () => {
   describe('useTimelineItemOptional', () => {
     it('should return null when used outside provider', () => {
       const { lastFrame } = render(<TestComponentOptional />);
-      
+
       expect(lastFrame()).toContain('No context available');
     });
 
     it('should return context values when used within provider', () => {
       const mockOnToggle = vi.fn();
-      
+
       const { lastFrame } = render(
         <TimelineItemProvider
           isSelected={false}
@@ -184,9 +182,7 @@ describe('TimelineItemContext', () => {
 
     it('should handle missing onToggle gracefully', () => {
       const { lastFrame } = render(
-        <TimelineItemProvider
-          isSelected={false}
-        >
+        <TimelineItemProvider isSelected={false}>
           <TestComponentOptional />
         </TimelineItemProvider>
       );
@@ -202,12 +198,9 @@ describe('TimelineItemContext', () => {
   describe('Context state management', () => {
     it('should handle expansion state changes', () => {
       const mockOnToggle = vi.fn();
-      
+
       render(
-        <TimelineItemProvider
-          isSelected={false}
-          onToggle={mockOnToggle}
-        >
+        <TimelineItemProvider isSelected={false} onToggle={mockOnToggle}>
           <TestComponentRequired />
         </TimelineItemProvider>
       );
@@ -218,12 +211,9 @@ describe('TimelineItemContext', () => {
 
     it('should provide default values for optional props', () => {
       const mockOnToggle = vi.fn();
-      
+
       const { lastFrame } = render(
-        <TimelineItemProvider
-          isSelected={true}
-          onToggle={mockOnToggle}
-        >
+        <TimelineItemProvider isSelected={true} onToggle={mockOnToggle}>
           <TestComponentRequired />
         </TimelineItemProvider>
       );

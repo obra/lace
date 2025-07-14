@@ -432,7 +432,7 @@ export function AnimatedLaceApp() {
       <motion.div className="flex-1 flex flex-col min-w-0" layout transition={springConfig.smooth}>
         {/* Top Bar */}
         <motion.div
-          className="bg-base-100 border-b border-base-300 sticky top-0 z-30"
+          className="bg-transparent sticky top-0 z-30"
           variants={fadeInUp}
           initial="initial"
           animate="animate"
@@ -495,21 +495,6 @@ export function AnimatedLaceApp() {
                   />
                 </svg>
               </motion.button>
-              <div className="flex items-center gap-2">
-                <motion.div
-                  className="w-2 h-2 bg-teal-500 rounded-full"
-                  animate={{
-                    scale: [1, 1.2, 1],
-                    opacity: [0.7, 1, 0.7],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: 'easeInOut',
-                  }}
-                />
-                <span className="text-sm text-base-content/60 hidden sm:inline">Connected</span>
-              </div>
             </motion.div>
           </motion.div>
 
@@ -535,10 +520,10 @@ export function AnimatedLaceApp() {
                     { icon: faTasks, label: 'Tasks', action: handleOpenTaskBoard },
                     { icon: faFolder, label: 'Files', action: handleOpenFileManager },
                     { icon: faMicrophone, label: 'Voice', action: () => setShowVoiceUI(true) },
-                  ].map((item, index) => (
+                  ].map((item, _index) => (
                     <motion.button
                       key={item.label}
-                      onClick={item.action || (() => handleTriggerTool(item.tool!))}
+                      onClick={item.action || (() => handleTriggerTool(item.tool ?? ''))}
                       className="btn btn-sm btn-outline flex-shrink-0"
                       variants={staggerItem}
                       {...buttonTap}

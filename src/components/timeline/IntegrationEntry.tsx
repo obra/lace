@@ -72,24 +72,24 @@ export function IntegrationTimelineEntry({ entry, compact = false }: Integration
         created: 'Created',
         shared: 'Shared',
         updated: 'Updated',
-        completed: 'Completed'
+        completed: 'Completed',
       },
       'google-sheets': {
         created: 'Created',
         updated: 'Updated data in',
         shared: 'Shared',
-        completed: 'Completed analysis in'
+        completed: 'Completed analysis in',
       },
-      'slack': {
+      slack: {
         posted: 'Posted to',
         commented: 'Commented in',
-        shared: 'Shared in'
+        shared: 'Shared in',
       },
-      'github': {
+      github: {
         created: 'Created PR in',
         updated: 'Updated',
-        completed: 'Merged PR in'
-      }
+        completed: 'Merged PR in',
+      },
     };
 
     return actionMap[type]?.[action] || action;
@@ -128,9 +128,7 @@ export function IntegrationTimelineEntry({ entry, compact = false }: Integration
         return (
           <div className="text-xs text-base-content/60 space-y-1">
             <div>Sheet: {sheetsEntry.sheetName}</div>
-            {sheetsEntry.rowsAdded && (
-              <div>Added {sheetsEntry.rowsAdded} rows</div>
-            )}
+            {sheetsEntry.rowsAdded && <div>Added {sheetsEntry.rowsAdded} rows</div>}
             {sheetsEntry.collaborators && (
               <div>Collaborators: {sheetsEntry.collaborators.join(', ')}</div>
             )}
@@ -162,12 +160,8 @@ export function IntegrationTimelineEntry({ entry, compact = false }: Integration
         return (
           <div className="text-xs text-base-content/60 space-y-1">
             <div>Repository: {githubEntry.repository}</div>
-            {githubEntry.pullRequest && (
-              <div>PR #{githubEntry.pullRequest}</div>
-            )}
-            {githubEntry.commitCount && (
-              <div>{githubEntry.commitCount} commits</div>
-            )}
+            {githubEntry.pullRequest && <div>PR #{githubEntry.pullRequest}</div>}
+            {githubEntry.commitCount && <div>{githubEntry.commitCount} commits</div>}
           </div>
         );
 
@@ -179,7 +173,9 @@ export function IntegrationTimelineEntry({ entry, compact = false }: Integration
   if (compact) {
     return (
       <div className="flex items-center gap-3 p-3 bg-base-100 border border-base-300 rounded-lg">
-        <div className={`w-8 h-8 ${integrationInfo.color} rounded flex items-center justify-center text-white text-sm`}>
+        <div
+          className={`w-8 h-8 ${integrationInfo.color} rounded flex items-center justify-center text-white text-sm`}
+        >
           {integrationInfo.icon}
         </div>
         <div className="flex-1 min-w-0">
@@ -191,10 +187,7 @@ export function IntegrationTimelineEntry({ entry, compact = false }: Integration
           </div>
         </div>
         {entry.url && (
-          <button 
-            onClick={() => window.open(entry.url, '_blank')}
-            className="btn btn-xs btn-ghost"
-          >
+          <button onClick={() => window.open(entry.url, '_blank')} className="btn btn-xs btn-ghost">
             <FontAwesomeIcon icon={faExternalLinkAlt} className="w-3 h-3" />
           </button>
         )}
@@ -207,7 +200,9 @@ export function IntegrationTimelineEntry({ entry, compact = false }: Integration
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 ${integrationInfo.color} rounded-lg flex items-center justify-center text-white`}>
+          <div
+            className={`w-10 h-10 ${integrationInfo.color} rounded-lg flex items-center justify-center text-white`}
+          >
             {integrationInfo.icon}
           </div>
           <div>
@@ -220,9 +215,9 @@ export function IntegrationTimelineEntry({ entry, compact = false }: Integration
             </div>
           </div>
         </div>
-        
+
         {entry.url && (
-          <button 
+          <button
             onClick={() => window.open(entry.url, '_blank')}
             className="btn btn-sm btn-outline"
           >
@@ -233,16 +228,10 @@ export function IntegrationTimelineEntry({ entry, compact = false }: Integration
       </div>
 
       {/* Description */}
-      {entry.description && (
-        <div className="text-sm text-base-content/80">
-          {entry.description}
-        </div>
-      )}
+      {entry.description && <div className="text-sm text-base-content/80">{entry.description}</div>}
 
       {/* Type-specific content */}
-      <div className="pt-2 border-t border-base-300">
-        {renderTypeSpecificContent()}
-      </div>
+      <div className="pt-2 border-t border-base-300">{renderTypeSpecificContent()}</div>
     </div>
   );
 }

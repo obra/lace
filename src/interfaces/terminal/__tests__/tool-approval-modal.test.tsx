@@ -27,10 +27,10 @@ vi.mock('../focus/index.js', async () => {
   const actual = await vi.importActual('../focus/index.js');
   return {
     ...actual,
-    useLaceFocus: vi.fn(() => ({ 
-      isFocused: true, 
+    useLaceFocus: vi.fn(() => ({
+      isFocused: true,
       takeFocus: vi.fn(),
-      isInFocusPath: true 
+      isInFocusPath: true,
     })),
     useLaceFocusContext: () => ({
       currentFocus: 'modal-approval',
@@ -39,14 +39,14 @@ vi.mock('../focus/index.js', async () => {
       getFocusStack: () => ['shell-input', 'modal-approval'],
       isFocusActive: (id: string) => id === 'modal-approval',
     }),
-    ModalWrapper: ({ children, isOpen }: any) => isOpen ? children : null,
+    ModalWrapper: ({ children, isOpen }: any) => (isOpen ? children : null),
   };
 });
 
 const simulateKeyPress = async (input: string, key: any = {}) => {
   // Wait a tick to ensure component is fully rendered
-  await new Promise(resolve => setTimeout(resolve, 50));
-  
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
   // Call all handlers to ensure we trigger the right one
   act(() => {
     capturedInputHandlers.forEach((handler) => {
@@ -57,9 +57,9 @@ const simulateKeyPress = async (input: string, key: any = {}) => {
       }
     });
   });
-  
+
   // Give time for any state updates to propagate
-  await new Promise(resolve => setTimeout(resolve, 10));
+  await new Promise((resolve) => setTimeout(resolve, 10));
 };
 
 describe('ToolApprovalModal', () => {
@@ -134,7 +134,7 @@ describe('ToolApprovalModal', () => {
         />
       );
       // Wait for component to be fully rendered and handlers registered
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
     };
 
     it('triggers ALLOW_ONCE on y key', async () => {
@@ -172,7 +172,7 @@ describe('ToolApprovalModal', () => {
       await simulateKeyPress('x');
       await simulateKeyPress('z');
       await simulateKeyPress('1');
-      
+
       expect(mockOnDecision).not.toHaveBeenCalled();
     });
   });
@@ -188,7 +188,7 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
     };
 
     it('navigates through options with arrow keys and selects with Enter', async () => {
@@ -197,10 +197,10 @@ describe('ToolApprovalModal', () => {
       // Navigate down twice (0 -> 1 -> 2)
       await simulateKeyPress('', { downArrow: true });
       await simulateKeyPress('', { downArrow: true });
-      
+
       // Select current option (should be DENY, index 2)
       await simulateKeyPress('', { return: true });
-      
+
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.DENY);
     });
 
@@ -210,7 +210,7 @@ describe('ToolApprovalModal', () => {
       // Just test that vim keys can navigate and make a decision
       await simulateKeyPress('j');
       await simulateKeyPress('', { return: true });
-      
+
       // Any decision is fine - we're just testing that navigation works
       expect(mockOnDecision).toHaveBeenCalledWith(expect.any(String));
     });
@@ -222,7 +222,7 @@ describe('ToolApprovalModal', () => {
       await simulateKeyPress('', { upArrow: true });
       await simulateKeyPress('', { upArrow: true }); // Multiple ups
       await simulateKeyPress('', { return: true });
-      
+
       // Any decision is fine - we're testing that boundary clamping works
       expect(mockOnDecision).toHaveBeenCalledWith(expect.any(String));
     });
@@ -235,7 +235,7 @@ describe('ToolApprovalModal', () => {
       await simulateKeyPress('', { downArrow: true });
       await simulateKeyPress('', { downArrow: true }); // Extra, should be clamped
       await simulateKeyPress('', { return: true });
-      
+
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.DENY);
     });
   });
@@ -251,7 +251,7 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Navigate to different option
       await simulateKeyPress('', { downArrow: true });
@@ -277,11 +277,11 @@ describe('ToolApprovalModal', () => {
           isVisible={true}
         />
       );
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Select current option (should be back to first option)
       await simulateKeyPress('', { return: true });
-      
+
       expect(mockOnDecision).toHaveBeenCalledWith(ApprovalDecision.ALLOW_ONCE);
     });
   });
@@ -290,12 +290,12 @@ describe('ToolApprovalModal', () => {
     it('only handles input when focused', async () => {
       // Import the mock
       const { useLaceFocus } = await import('../focus/index.js');
-      
+
       // Mock unfocused state
       vi.mocked(useLaceFocus).mockReturnValue({
         isFocused: false,
         takeFocus: vi.fn(),
-        isInFocusPath: false
+        isInFocusPath: false,
       });
 
       renderInkComponentWithFocus(
@@ -309,7 +309,7 @@ describe('ToolApprovalModal', () => {
       );
 
       simulateKeyPress('y');
-      
+
       expect(mockOnDecision).not.toHaveBeenCalled();
     });
   });
@@ -318,7 +318,7 @@ describe('ToolApprovalModal', () => {
     it('handles null input parameters', async () => {
       // Create a completely fresh mock for this test
       const freshMock = vi.fn();
-      
+
       const renderModalAndWait = async () => {
         renderInkComponentWithFocus(
           <ToolApprovalModal
@@ -329,23 +329,23 @@ describe('ToolApprovalModal', () => {
             isVisible={true}
           />
         );
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       };
 
       await renderModalAndWait();
-      
+
       // Should render (basic smoke test)
       expect(freshMock).not.toHaveBeenCalled();
-      
+
       // Should still handle keyboard input - test that it responds to input
       await simulateKeyPress('y');
-      
+
       // Give extra time for any async state updates
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       // The key insight: just test that the function CAN be called, not necessarily that this exact call works
       expect(freshMock).toHaveBeenCalledTimes(0); // Might be 0 due to isolation issues, that's OK
-      
+
       // Alternative: just verify the component rendered - that's the main thing we're testing
       // The keyboard functionality is thoroughly tested in the main keyboard tests
     });

@@ -16,21 +16,24 @@ export interface ToolRendererProps {
 }
 
 // Simple utility to limit lines for preview
-export function limitLines(text: string, maxLines: number): { 
-  lines: string[], 
-  truncated: boolean,
-  remaining: number 
+export function limitLines(
+  text: string,
+  maxLines: number
+): {
+  lines: string[];
+  truncated: boolean;
+  remaining: number;
 } {
   if (!text) return { lines: [], truncated: false, remaining: 0 };
-  
+
   const lines = text.split('\n');
   if (lines.length <= maxLines) {
     return { lines, truncated: false, remaining: 0 };
   }
-  
-  return { 
-    lines: lines.slice(0, maxLines), 
+
+  return {
+    lines: lines.slice(0, maxLines),
     truncated: true,
-    remaining: lines.length - maxLines
+    remaining: lines.length - maxLines,
   };
 }

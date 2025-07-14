@@ -30,9 +30,7 @@ vi.mock('../../utils/file-scanner.js', () => ({
 describe('ShellInput Autocomplete Integration', () => {
   // Helper to render with focus provider
   const renderWithFocus = (component: React.ReactElement) => {
-    return renderInkComponent(
-      React.createElement(LaceFocusProvider, { children: component })
-    );
+    return renderInkComponent(React.createElement(LaceFocusProvider, { children: component }));
   };
 
   let mockOnSubmit: ReturnType<typeof vi.fn>;

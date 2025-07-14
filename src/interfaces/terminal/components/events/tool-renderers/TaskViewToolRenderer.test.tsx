@@ -20,11 +20,7 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
 
 const createMockProvider = () => {
   return ({ children }: { children: React.ReactNode }) => (
-    <TimelineItemProvider
-      isSelected={false}
-    >
-      {children}
-    </TimelineItemProvider>
+    <TimelineItemProvider isSelected={false}>{children}</TimelineItemProvider>
   );
 };
 
@@ -36,28 +32,31 @@ describe('TaskViewToolRenderer', () => {
   });
 
   const mockTaskResult = {
-    content: [{
-      type: 'text' as const,
-      text: JSON.stringify({
-        id: 'task_20250705_b9qers',
-        title: 'Test task management suite',
-        status: 'pending',
-        priority: 'high',
-        assignedTo: 'new:anthropic/claude-3-5-sonnet',
-        description: 'Testing the upgraded task management system',
-        prompt: 'Systematically test all task management tools including add, list, update, complete, view, and add_note functions to verify they work correctly after the recent upgrade',
-        notes: [
-          {
-            id: 'note_1',
-            authorId: 'lace_20250705_2opxkw',
-            timestamp: '2025-07-05T16:07:10.000Z',
-            content: 'Started investigation - checking current timeout'
-          }
-        ]
-      })
-    }],
+    content: [
+      {
+        type: 'text' as const,
+        text: JSON.stringify({
+          id: 'task_20250705_b9qers',
+          title: 'Test task management suite',
+          status: 'pending',
+          priority: 'high',
+          assignedTo: 'new:anthropic/claude-3-5-sonnet',
+          description: 'Testing the upgraded task management system',
+          prompt:
+            'Systematically test all task management tools including add, list, update, complete, view, and add_note functions to verify they work correctly after the recent upgrade',
+          notes: [
+            {
+              id: 'note_1',
+              authorId: 'lace_20250705_2opxkw',
+              timestamp: '2025-07-05T16:07:10.000Z',
+              content: 'Started investigation - checking current timeout',
+            },
+          ],
+        }),
+      },
+    ],
     isError: false,
-    id: 'test-call-id'
+    id: 'test-call-id',
   };
 
   const mockSuccessItem: ToolRendererProps['item'] = {
@@ -66,12 +65,12 @@ describe('TaskViewToolRenderer', () => {
       id: 'test-call-id',
       name: 'task_view',
       arguments: {
-        taskId: 'task_20250705_b9qers'
-      }
+        taskId: 'task_20250705_b9qers',
+      },
     },
     result: mockTaskResult,
     timestamp: new Date('2025-07-05T16:06:43.912Z'),
-    callId: 'test-call-id'
+    callId: 'test-call-id',
   };
 
   it('should render task view with all details', () => {
@@ -82,20 +81,20 @@ describe('TaskViewToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     // Should show success status
     expect(output).toContain('✔  task_view:');
     expect(output).toContain('task_20250705_b9qers');
-    
+
     // Should show title, priority, and status
     expect(output).toContain('Test task management suite [high] ○ pending');
-    
+
     // Should show description
     expect(output).toContain('Description: Testing the upgraded task management system');
-    
+
     // Should show prompt
     expect(output).toContain('Prompt: Systematically test all task management tools');
-    
+
     // Should show notes
     expect(output).toContain('Notes (1):');
     expect(output).toContain('• [lace_20250705_2opxkw]');
@@ -106,20 +105,22 @@ describe('TaskViewToolRenderer', () => {
     const taskWithoutDescription: ToolRendererProps['item'] = {
       ...mockSuccessItem,
       result: {
-        content: [{
-          type: 'text' as const,
-          text: JSON.stringify({
-            id: 'task_20250705_simple',
-            title: 'Simple task',
-            status: 'in_progress',
-            priority: 'medium',
-            prompt: 'Just a simple task prompt',
-            notes: []
-          })
-        }],
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify({
+              id: 'task_20250705_simple',
+              title: 'Simple task',
+              status: 'in_progress',
+              priority: 'medium',
+              prompt: 'Just a simple task prompt',
+              notes: [],
+            }),
+          },
+        ],
         isError: false,
-        id: 'test-call-id'
-      }
+        id: 'test-call-id',
+      },
     };
 
     const { lastFrame } = render(
@@ -129,7 +130,7 @@ describe('TaskViewToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('Simple task [medium] ◐ in_progress');
     expect(output).toContain('Prompt: Just a simple task prompt');
     // Should not show description section
@@ -142,21 +143,23 @@ describe('TaskViewToolRenderer', () => {
     const taskWithoutNotes: ToolRendererProps['item'] = {
       ...mockSuccessItem,
       result: {
-        content: [{
-          type: 'text' as const,
-          text: JSON.stringify({
-            id: 'task_20250705_nonotes',
-            title: 'Task without notes',
-            status: 'completed',
-            priority: 'low',
-            description: 'A task with no notes',
-            prompt: 'Complete this task',
-            notes: []
-          })
-        }],
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify({
+              id: 'task_20250705_nonotes',
+              title: 'Task without notes',
+              status: 'completed',
+              priority: 'low',
+              description: 'A task with no notes',
+              prompt: 'Complete this task',
+              notes: [],
+            }),
+          },
+        ],
         isError: false,
-        id: 'test-call-id'
-      }
+        id: 'test-call-id',
+      },
     };
 
     const { lastFrame } = render(
@@ -166,7 +169,7 @@ describe('TaskViewToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('Task without notes [low] ✓ completed');
     expect(output).toContain('Description: A task with no notes');
     expect(output).toContain('Prompt: Complete this task');
@@ -177,13 +180,15 @@ describe('TaskViewToolRenderer', () => {
     const errorItem: ToolRendererProps['item'] = {
       ...mockSuccessItem,
       result: {
-        content: [{
-          type: 'text' as const,
-          text: 'Task not found: task_invalid_id'
-        }],
+        content: [
+          {
+            type: 'text' as const,
+            text: 'Task not found: task_invalid_id',
+          },
+        ],
         isError: true,
-        id: 'test-call-id'
-      }
+        id: 'test-call-id',
+      },
     };
 
     const { lastFrame } = render(
@@ -193,7 +198,7 @@ describe('TaskViewToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('✘ task_view:');
     expect(output).toContain('Task not found: task_invalid_id');
   });
@@ -201,7 +206,7 @@ describe('TaskViewToolRenderer', () => {
   it('should render pending state', () => {
     const pendingItem: ToolRendererProps['item'] = {
       ...mockSuccessItem,
-      result: undefined // No result means still running
+      result: undefined, // No result means still running
     };
 
     const { lastFrame } = render(
@@ -211,7 +216,7 @@ describe('TaskViewToolRenderer', () => {
     );
 
     const output = lastFrame();
-    
+
     expect(output).toContain('⧖ task_view:');
     expect(output).toContain('Loading task task_20250705_b9qers...');
   });

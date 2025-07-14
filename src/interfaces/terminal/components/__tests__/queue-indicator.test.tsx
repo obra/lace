@@ -15,7 +15,7 @@ describe('QueueIndicator', () => {
     };
 
     const { lastFrame } = renderInkComponent(<QueueIndicator stats={emptyStats} />);
-    
+
     const frame = stripAnsi(lastFrame() || '');
     expect(frame).toBe('');
   });
@@ -28,7 +28,7 @@ describe('QueueIndicator', () => {
     };
 
     const { lastFrame } = renderInkComponent(<QueueIndicator stats={stats} />);
-    
+
     const frame = lastFrame();
     expect(frame).toContain('📬 3 queued');
   });
@@ -41,7 +41,7 @@ describe('QueueIndicator', () => {
     };
 
     const { lastFrame } = renderInkComponent(<QueueIndicator stats={stats} />);
-    
+
     const frame = lastFrame();
     expect(frame).toContain('📬 5 queued');
     expect(frame).toContain('(2 high)');
@@ -55,7 +55,7 @@ describe('QueueIndicator', () => {
     };
 
     const { lastFrame } = renderInkComponent(<QueueIndicator stats={stats} />);
-    
+
     const frame = lastFrame();
     expect(frame).toContain('📬 2 queued');
     expect(frame).toContain('(2 high)');
@@ -69,7 +69,7 @@ describe('QueueIndicator', () => {
     };
 
     const { lastFrame } = renderInkComponent(<QueueIndicator stats={stats} />);
-    
+
     const frame = lastFrame();
     expect(frame).toContain('📬 4 queued');
     expect(frame).not.toContain('high');
@@ -82,7 +82,7 @@ describe('QueueIndicator', () => {
     };
 
     const { lastFrame } = renderInkComponent(<QueueIndicator stats={stats} />);
-    
+
     const frame = lastFrame();
     expect(frame).toContain('📬 1 queued');
     expect(frame).toContain('(1 high)');
@@ -95,7 +95,7 @@ describe('QueueIndicator', () => {
     };
 
     const { lastFrame } = renderInkComponent(<QueueIndicator stats={stats} />);
-    
+
     // Check that the component renders (yellow color will be in ANSI codes)
     const frame = lastFrame();
     expect(frame).toContain('📬 2 queued');

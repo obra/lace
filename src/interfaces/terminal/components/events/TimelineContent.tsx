@@ -56,16 +56,16 @@ export function TimelineContent({
   const itemsToRender = useMemo(() => {
     const buffer = 5;
     const maxItems = viewportLines + buffer;
-    
+
     if (timeline.items.length <= maxItems) {
       return timeline.items.map((item, index) => ({ item, originalIndex: index }));
     }
-    
+
     // Only render the most recent items
     const startIndex = timeline.items.length - maxItems;
-    return timeline.items.slice(startIndex).map((item, index) => ({ 
-      item, 
-      originalIndex: startIndex + index 
+    return timeline.items.slice(startIndex).map((item, index) => ({
+      item,
+      originalIndex: startIndex + index,
     }));
   }, [timeline.items, viewportLines]);
 

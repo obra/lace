@@ -9,10 +9,10 @@ interface StreamingIndicatorProps {
   agent?: string;
 }
 
-export function StreamingIndicator({ 
-  isVisible, 
-  onInterrupt, 
-  agent = 'Claude' 
+export function StreamingIndicator({
+  isVisible,
+  onInterrupt,
+  agent = 'Claude',
 }: StreamingIndicatorProps) {
   if (!isVisible) return null;
 
@@ -27,12 +27,18 @@ export function StreamingIndicator({
             <span className="text-sm font-medium text-base-content">{agent} is responding</span>
             <div className="flex gap-1">
               <div className="w-1 h-1 bg-orange-500 rounded-full animate-pulse"></div>
-              <div className="w-1 h-1 bg-orange-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-              <div className="w-1 h-1 bg-orange-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+              <div
+                className="w-1 h-1 bg-orange-500 rounded-full animate-pulse"
+                style={{ animationDelay: '0.2s' }}
+              ></div>
+              <div
+                className="w-1 h-1 bg-orange-500 rounded-full animate-pulse"
+                style={{ animationDelay: '0.4s' }}
+              ></div>
             </div>
           </div>
         </div>
-        
+
         {onInterrupt && (
           <button
             onClick={onInterrupt}

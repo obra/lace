@@ -1,12 +1,7 @@
 'use client';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faSearch, 
-  faTerminal, 
-  faTasks, 
-  faFolder
-} from '~/lib/fontawesome';
+import { faSearch, faTerminal, faTasks, faFolder } from '~/lib/fontawesome';
 import { ChevronLeftIcon } from '~/lib/heroicons';
 import { Timeline, Project, Task } from '~/types';
 
@@ -78,8 +73,8 @@ export function MobileSidebar({
             </div>
             <h1 className="font-semibold text-base-content">Lace</h1>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="p-2 hover:bg-base-200 rounded-lg transition-colors group"
           >
             <ChevronLeftIcon className="w-6 h-6 transition-transform group-hover:-translate-x-1" />

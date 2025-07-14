@@ -12,11 +12,7 @@ import { TimelineExpansionProvider } from '../hooks/useTimelineExpansionToggle.j
 // Mock dependencies
 vi.mock('../EventDisplay.js', () => ({
   EventDisplay: ({ event }: any) => {
-    return React.createElement(
-      Text,
-      {},
-      `EventDisplay:${event.type}`
-    );
+    return React.createElement(Text, {}, `EventDisplay:${event.type}`);
   },
 }));
 
@@ -36,12 +32,7 @@ vi.mock('../tool-renderers/getToolRenderer.js', () => ({
 }));
 
 vi.mock('../../message-display.js', () => ({
-  default: ({ message }: any) =>
-    React.createElement(
-      Text,
-      {},
-      `MessageDisplay:${message.type}`
-    ),
+  default: ({ message }: any) => React.createElement(Text, {}, `MessageDisplay:${message.type}`),
 }));
 
 vi.mock('../../../../../utils/logger.js', () => ({
@@ -69,11 +60,7 @@ describe('TimelineItem Component', () => {
 
   // Helper to render with TimelineExpansionProvider
   const renderWithProvider = (component: React.ReactElement) => {
-    return render(
-      <TimelineExpansionProvider>
-        {component}
-      </TimelineExpansionProvider>
-    );
+    return render(<TimelineExpansionProvider>{component}</TimelineExpansionProvider>);
   };
 
   describe('user_message items', () => {

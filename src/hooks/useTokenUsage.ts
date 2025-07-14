@@ -22,7 +22,8 @@ export interface UsageResponse {
     };
     apiKey: {
       hasKey: boolean;
-      maskedKey?: string;
+      provider?: string;
+      keyType?: string;
     };
     lastUpdated: string;
   };

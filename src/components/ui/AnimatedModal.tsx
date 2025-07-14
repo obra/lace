@@ -4,13 +4,13 @@ import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes } from '~/lib/fontawesome';
-import { 
-  modalOverlay, 
-  modalContent, 
-  buttonTap, 
+import {
+  modalOverlay,
+  modalContent,
+  buttonTap,
   springConfig,
   fadeInUp,
-  scaleIn
+  scaleIn,
 } from '~/lib/animations';
 
 interface AnimatedModalProps {
@@ -74,12 +74,18 @@ export function AnimatedModal({
 
   const getSizeClasses = () => {
     switch (size) {
-      case 'sm': return 'max-w-md';
-      case 'md': return 'max-w-lg';
-      case 'lg': return 'max-w-2xl';
-      case 'xl': return 'max-w-4xl';
-      case 'full': return 'max-w-[95vw] max-h-[95vh]';
-      default: return 'max-w-lg';
+      case 'sm':
+        return 'max-w-md';
+      case 'md':
+        return 'max-w-lg';
+      case 'lg':
+        return 'max-w-2xl';
+      case 'xl':
+        return 'max-w-4xl';
+      case 'full':
+        return 'max-w-[95vw] max-h-[95vh]';
+      default:
+        return 'max-w-lg';
     }
   };
 
@@ -94,7 +100,7 @@ export function AnimatedModal({
       {isOpen && (
         <motion.div className="fixed inset-0 z-50 overflow-y-auto">
           {/* Animated Backdrop */}
-          <motion.div 
+          <motion.div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm"
             onClick={handleBackdropClick}
             aria-hidden="true"
@@ -121,12 +127,13 @@ export function AnimatedModal({
               animate="animate"
               exit="exit"
               style={{
-                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1)",
+                boxShadow:
+                  '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1)',
               }}
             >
               {/* Header */}
               {(title || showCloseButton) && (
-                <motion.div 
+                <motion.div
                   className="flex items-center justify-between p-6 border-b border-base-300/50"
                   variants={fadeInUp}
                   initial="initial"
@@ -134,8 +141,8 @@ export function AnimatedModal({
                   transition={{ delay: 0.1 }}
                 >
                   {title && (
-                    <motion.h2 
-                      id="modal-title" 
+                    <motion.h2
+                      id="modal-title"
                       className="text-xl font-semibold text-base-content"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -153,23 +160,20 @@ export function AnimatedModal({
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.2, ...springConfig.bouncy }}
                       {...buttonTap}
-                      whileHover={{ 
+                      whileHover={{
                         scale: 1.1,
-                        backgroundColor: "rgba(0,0,0,0.05)",
-                        transition: springConfig.snappy
+                        backgroundColor: 'rgba(0,0,0,0.05)',
+                        transition: springConfig.snappy,
                       }}
                     >
-                      <FontAwesomeIcon 
-                        icon={faTimes} 
-                        className="w-5 h-5 text-base-content/60" 
-                      />
+                      <FontAwesomeIcon icon={faTimes} className="w-5 h-5 text-base-content/60" />
                     </motion.button>
                   )}
                 </motion.div>
               )}
 
               {/* Content */}
-              <motion.div 
+              <motion.div
                 className="p-6"
                 variants={fadeInUp}
                 initial="initial"
@@ -210,19 +214,27 @@ export function AnimatedConfirmModal({
 }: AnimatedConfirmModalProps) {
   const getVariantClasses = () => {
     switch (variant) {
-      case 'danger': return 'btn-error';
-      case 'warning': return 'btn-warning';
-      case 'info': return 'btn-primary';
-      default: return 'btn-primary';
+      case 'danger':
+        return 'btn-error';
+      case 'warning':
+        return 'btn-warning';
+      case 'info':
+        return 'btn-primary';
+      default:
+        return 'btn-primary';
     }
   };
 
   const getIconForVariant = () => {
     switch (variant) {
-      case 'danger': return '⚠️';
-      case 'warning': return '⚡';
-      case 'info': return 'ℹ️';
-      default: return 'ℹ️';
+      case 'danger':
+        return '⚠️';
+      case 'warning':
+        return '⚡';
+      case 'info':
+        return 'ℹ️';
+      default:
+        return 'ℹ️';
     }
   };
 
@@ -232,19 +244,14 @@ export function AnimatedConfirmModal({
   };
 
   return (
-    <AnimatedModal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={title}
-      size="sm"
-    >
-      <motion.div 
+    <AnimatedModal isOpen={isOpen} onClose={onClose} title={title} size="sm">
+      <motion.div
         className="space-y-6"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}
       >
-        <motion.div 
+        <motion.div
           className="flex items-start gap-4"
           initial={{ x: -20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
@@ -260,20 +267,20 @@ export function AnimatedConfirmModal({
           </motion.div>
           <p className="text-base-content/80 leading-relaxed">{message}</p>
         </motion.div>
-        
-        <motion.div 
+
+        <motion.div
           className="flex gap-3 justify-end"
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.35, ...springConfig.gentle }}
         >
-          <motion.button 
+          <motion.button
             onClick={onClose}
             className="btn btn-ghost"
             {...buttonTap}
-            whileHover={{ 
+            whileHover={{
               scale: 1.02,
-              transition: springConfig.snappy 
+              transition: springConfig.snappy,
             }}
             initial={{ x: 20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
@@ -281,14 +288,14 @@ export function AnimatedConfirmModal({
           >
             {cancelText}
           </motion.button>
-          <motion.button 
+          <motion.button
             onClick={handleConfirm}
             className={`btn ${getVariantClasses()}`}
             {...buttonTap}
-            whileHover={{ 
+            whileHover={{
               scale: 1.02,
-              boxShadow: "0 8px 25px -8px rgba(0,0,0,0.2)",
-              transition: springConfig.snappy 
+              boxShadow: '0 8px 25px -8px rgba(0,0,0,0.2)',
+              transition: springConfig.snappy,
             }}
             initial={{ x: 20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}

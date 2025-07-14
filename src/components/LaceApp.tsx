@@ -10,6 +10,8 @@ import { EnhancedChatInput } from '~/components/chat/EnhancedChatInput';
 import { TaskBoardModal } from '~/components/modals/TaskBoardModal';
 import { VoiceRecognitionUI } from '~/components/ui/VoiceRecognitionUI';
 import { StreamingIndicator } from '~/components/ui/StreamingIndicator';
+import { DragDropOverlay } from '~/components/ui/DragDropOverlay';
+import { AttachedFile } from '~/components/ui/FileAttachment';
 import { TimelineEntry, Project, Timeline, Task, RecentFile, StreamEvent } from '~/types';
 import { useVoiceRecognition } from '~/hooks/useVoiceRecognition';
 import { useConversationStream } from '~/hooks/useConversationStream';
@@ -37,6 +39,7 @@ export function LaceApp() {
   const [isToolRunning, setIsToolRunning] = useState(false);
   const nextEntryId = useRef(9);
   const [currentStreamingContent, setCurrentStreamingContent] = useState('');
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
 
   // Voice Recognition
   const {
@@ -54,48 +57,49 @@ export function LaceApp() {
   });
 
   // Conversation Stream
-  const { isStreaming, isThinking, currentThreadId, sendMessage, interruptStream } = useConversationStream({
-    onStreamEvent: (event: StreamEvent) => {
-      if (event.type === 'token' && event.content) {
-        setCurrentStreamingContent((prev) => prev + event.content);
-      } else if (event.type === 'tool_call_start' && event.toolCall) {
-        const toolEntry: TimelineEntry = {
+  const { isStreaming, isThinking, currentThreadId, sendMessage, interruptStream } =
+    useConversationStream({
+      onStreamEvent: (event: StreamEvent) => {
+        if (event.type === 'token' && event.content) {
+          setCurrentStreamingContent((prev) => prev + event.content);
+        } else if (event.type === 'tool_call_start' && event.toolCall) {
+          const toolEntry: TimelineEntry = {
+            id: nextEntryId.current++,
+            type: 'tool',
+            tool: event.toolCall.name,
+            content: `${event.toolCall.name} started`,
+            timestamp: new Date(),
+          };
+          setTimelineEntries((prev) => [...prev, toolEntry]);
+        } else if (event.type === 'tool_call_complete' && event.toolCall && event.result) {
+          const toolResult = event.result.success ? 'completed successfully' : 'failed';
+          const toolEntry: TimelineEntry = {
+            id: nextEntryId.current++,
+            type: 'tool',
+            tool: event.toolCall.name,
+            content: `${event.toolCall.name} ${toolResult}`,
+            result: event.result.content,
+            timestamp: new Date(),
+          };
+          setTimelineEntries((prev) => [...prev, toolEntry]);
+        }
+      },
+      onMessageComplete: (content: string) => {
+        const aiEntry: TimelineEntry = {
           id: nextEntryId.current++,
-          type: 'tool',
-          tool: event.toolCall.name,
-          content: `${event.toolCall.name} started`,
+          type: 'ai',
+          content: content.trim(),
+          agent: currentTimeline.agent,
           timestamp: new Date(),
         };
-        setTimelineEntries((prev) => [...prev, toolEntry]);
-      } else if (event.type === 'tool_call_complete' && event.toolCall && event.result) {
-        const toolResult = event.result.success ? 'completed successfully' : 'failed';
-        const toolEntry: TimelineEntry = {
-          id: nextEntryId.current++,
-          type: 'tool',
-          tool: event.toolCall.name,
-          content: `${event.toolCall.name} ${toolResult}`,
-          result: event.result.content,
-          timestamp: new Date(),
-        };
-        setTimelineEntries((prev) => [...prev, toolEntry]);
-      }
-    },
-    onMessageComplete: (content: string) => {
-      const aiEntry: TimelineEntry = {
-        id: nextEntryId.current++,
-        type: 'ai',
-        content: content.trim(),
-        agent: currentTimeline.agent,
-        timestamp: new Date(),
-      };
-      setTimelineEntries((prev) => [...prev, aiEntry]);
-      setCurrentStreamingContent('');
-    },
-    onError: (error: string) => {
-      console.error('Stream error:', error);
-      setCurrentStreamingContent('');
-    },
-  });
+        setTimelineEntries((prev) => [...prev, aiEntry]);
+        setCurrentStreamingContent('');
+      },
+      onError: (error: string) => {
+        console.error('Stream error:', error);
+        setCurrentStreamingContent('');
+      },
+    });
 
   // Data State
   const [currentProject, setCurrentProject] = useState<Project>({
@@ -245,7 +249,7 @@ export function LaceApp() {
     if (isStreaming) {
       interruptStream();
       // Small delay to ensure the interrupt is processed
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     const humanEntry: TimelineEntry = {
@@ -257,8 +261,10 @@ export function LaceApp() {
 
     setTimelineEntries((prev) => [...prev, humanEntry]);
     const userPrompt = prompt;
+    // const messageFiles = [...attachedFiles]; // Capture current files
     setPrompt('');
-    
+    setAttachedFiles([]); // Clear attachments after sending
+
     // Reset streaming content for new message
     setCurrentStreamingContent('');
 
@@ -362,6 +368,43 @@ export function LaceApp() {
     addSystemMessage(`New task created: "${task.title}"`);
   };
 
+  // File attachment handlers
+  const handleFilesAttached = (files: AttachedFile[]) => {
+    setAttachedFiles((prev) => [...prev, ...files]);
+    if (files.length === 1) {
+      addSystemMessage(`File attached: ${files[0].name}`);
+    } else {
+      addSystemMessage(`${files.length} files attached`);
+    }
+  };
+
+  const handleFileRemoved = (fileId: string) => {
+    setAttachedFiles((prev) => {
+      const file = prev.find((f) => f.id === fileId);
+      if (file) {
+        addSystemMessage(`File removed: ${file.name}`);
+      }
+      return prev.filter((f) => f.id !== fileId);
+    });
+  };
+
+  const handleFileCleared = () => {
+    const count = attachedFiles.length;
+    setAttachedFiles([]);
+    addSystemMessage(`${count} file${count === 1 ? '' : 's'} cleared`);
+  };
+
+  const handleFilesDropped = (files: FileList) => {
+    const newFiles: AttachedFile[] = Array.from(files).map((file, index) => ({
+      id: `${Date.now()}-${index}`,
+      file,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    }));
+    handleFilesAttached(newFiles);
+  };
+
   const handleOpenFileManager = () => {
     setShowMobileNav(false);
     addSystemMessage('File Manager opened');
@@ -417,9 +460,13 @@ export function LaceApp() {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <DragDropOverlay
+        onFilesDropped={handleFilesDropped}
+        disabled={isToolRunning || isStreaming}
+        className="flex-1 flex flex-col min-w-0"
+      >
         {/* Top Bar */}
-        <div className="bg-base-100 border-b border-base-300 sticky top-0 z-30">
+        <div className="bg-transparent sticky top-0 z-30">
           <div className="flex items-center justify-between p-4 lg:px-6">
             <div className="flex items-center gap-3">
               <button
@@ -458,10 +505,6 @@ export function LaceApp() {
                   />
                 </svg>
               </button>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-teal-500 rounded-full animate-pulse"></div>
-                <span className="text-sm text-base-content/60 hidden sm:inline">Connected</span>
-              </div>
             </div>
           </div>
 
@@ -531,11 +574,15 @@ export function LaceApp() {
           onStartVoice={startListening}
           onStopVoice={stopListening}
           onInterrupt={interruptStream}
+          attachedFiles={attachedFiles}
+          onFilesAttached={handleFilesAttached}
+          onFileRemoved={handleFileRemoved}
+          onFileCleared={handleFileCleared}
         />
-      </div>
+      </DragDropOverlay>
 
       {/* Streaming Indicator */}
-      <StreamingIndicator 
+      <StreamingIndicator
         isVisible={isStreaming || isThinking}
         onInterrupt={interruptStream}
         agent={currentTimeline.agent}

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect, FormEvent, KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, FormEvent, KeyboardEvent, DragEvent } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMicrophone, faPaperPlane, faPaperclip, faStop } from '~/lib/fontawesome';
+import { FileAttachment, AttachedFile } from '~/components/ui/FileAttachment';
 
 interface EnhancedChatInputProps {
   value: string;
@@ -15,6 +16,10 @@ interface EnhancedChatInputProps {
   onInterrupt?: () => void;
   isStreaming?: boolean;
   placeholder?: string;
+  attachedFiles?: AttachedFile[];
+  onFilesAttached?: (files: AttachedFile[]) => void;
+  onFileRemoved?: (fileId: string) => void;
+  onFileCleared?: () => void;
 }
 
 export function EnhancedChatInput({
@@ -28,9 +33,14 @@ export function EnhancedChatInput({
   onInterrupt,
   isStreaming = false,
   placeholder = 'Message the agent...',
+  attachedFiles = [],
+  onFilesAttached,
+  onFileRemoved,
+  onFileCleared,
 }: EnhancedChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -89,19 +99,91 @@ export function EnhancedChatInput({
     }
   };
 
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!disabled && onFilesAttached && e.dataTransfer.types.includes('Files')) {
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only clear drag state if we're leaving the input container
+    if (e.currentTarget === e.target) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    if (!disabled && onFilesAttached && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+      const attachedFiles = files.map((file, index) => ({
+        id: `${Date.now()}-${index}`,
+        file,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      }));
+      onFilesAttached(attachedFiles);
+    }
+  };
+
+  const handleFileAttachClick = () => {
+    if (disabled) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept =
+      'image/*,text/*,.pdf,.doc,.docx,.md,.json,.csv,.xlsx,.ts,.tsx,.js,.jsx,.py,.html,.css,.scss,.sass';
+    input.onchange = (e) => {
+      const target = e.target;
+      if (!target || !(target instanceof HTMLInputElement)) return;
+      const files = target.files;
+      if (files && files.length > 0 && onFilesAttached) {
+        const attachedFiles: AttachedFile[] = Array.from(files).map((file, index) => ({
+          id: `${Date.now()}-${index}`,
+          file,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+        }));
+        onFilesAttached(attachedFiles);
+      }
+    };
+    input.click();
+  };
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 p-4 lg:relative lg:bottom-auto">
       {/* Mobile Status Bar */}
-      <div className="flex items-center justify-between text-xs text-base-content/60 mb-3 lg:hidden">
-        <span>{`Connected`}</span>
-        {disabled && (
+      {disabled && (
+        <div className="flex items-center justify-center text-xs text-base-content/60 mb-3 lg:hidden">
           <span className="flex items-center gap-1">
             <div className="w-2 h-2 bg-teal-500 rounded-full animate-pulse"></div>
             Tool running...
           </span>
-        )}
-        <span>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-      </div>
+        </div>
+      )}
+
+      {/* File Attachment Area - Above Input */}
+      {onFilesAttached && attachedFiles.length > 0 && (
+        <div className="mb-3">
+          <FileAttachment
+            attachedFiles={attachedFiles}
+            onFilesAttached={onFilesAttached}
+            onFileRemoved={onFileRemoved || (() => {})}
+            onFileCleared={onFileCleared || (() => {})}
+            disabled={disabled}
+          />
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="relative">
         <div className="flex gap-3 items-end">
@@ -121,55 +203,83 @@ export function EnhancedChatInput({
           )}
 
           {/* Message Input */}
-          <div className="flex-1 relative">
-            <textarea
-              ref={textareaRef}
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="w-full bg-base-200 border border-base-300 rounded-2xl px-4 py-3 pr-12 resize-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-base-content placeholder-base-content/60 text-base"
-              placeholder={
-                isListening 
-                  ? 'Listening...' 
-                  : isStreaming 
-                    ? 'Press ESC to interrupt...' 
-                    : placeholder
-              }
-              rows={1}
-              style={{ minHeight: '44px', maxHeight: '120px' }}
-              disabled={disabled}
-            />
-
-            {/* Send/Stop Button */}
-            {isStreaming && onInterrupt ? (
-              <button
-                type="button"
-                onClick={onInterrupt}
-                className="absolute right-2 bottom-2 p-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
-                title="Stop response (ESC)"
-              >
-                <FontAwesomeIcon icon={faStop} className="w-5 h-5" />
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={!value.trim() || disabled}
-                className="absolute right-2 bottom-2 p-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <FontAwesomeIcon icon={faPaperPlane} className="w-5 h-5" />
-              </button>
-            )}
-          </div>
-
-          {/* Attachment Button (Mobile) */}
-          {isMobile && (
-            <button
-              type="button"
-              className="p-3 text-base-content/60 hover:text-teal-600 hover:bg-base-200 rounded-full transition-colors lg:hidden"
+          <div
+            className="flex-1 relative"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <div
+              className={`relative ${
+                isDragOver ? 'ring-2 ring-primary ring-opacity-50 rounded-2xl' : ''
+              }`}
             >
-              <FontAwesomeIcon icon={faPaperclip} className="w-5 h-5" />
-            </button>
-          )}
+              <textarea
+                ref={textareaRef}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className={`w-full bg-base-200 border border-base-300 rounded-2xl px-4 py-3 pr-20 resize-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-base-content placeholder-base-content/60 text-base transition-all duration-200 ${
+                  isDragOver ? 'border-primary bg-primary/5' : ''
+                }`}
+                placeholder={
+                  isDragOver
+                    ? 'Drop files here...'
+                    : isListening
+                      ? 'Listening...'
+                      : isStreaming
+                        ? 'Press ESC to interrupt...'
+                        : placeholder
+                }
+                rows={1}
+                style={{ minHeight: '44px', maxHeight: '120px' }}
+                disabled={disabled}
+              />
+
+              {/* Drag overlay indicator */}
+              {isDragOver && (
+                <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-2xl flex items-center justify-center pointer-events-none">
+                  <span className="text-primary font-medium">Drop files here</span>
+                </div>
+              )}
+            </div>
+
+            {/* Right Side Buttons */}
+            <div className="absolute right-2 bottom-2 flex gap-1">
+              {/* File Attachment Button */}
+              {onFilesAttached && (
+                <button
+                  type="button"
+                  onClick={handleFileAttachClick}
+                  disabled={disabled}
+                  className="p-2 text-base-content/60 hover:text-teal-600 hover:bg-base-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Attach files"
+                >
+                  <FontAwesomeIcon icon={faPaperclip} className="w-4 h-4" />
+                </button>
+              )}
+
+              {/* Send/Stop Button */}
+              {isStreaming && onInterrupt ? (
+                <button
+                  type="button"
+                  onClick={onInterrupt}
+                  className="p-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
+                  title="Stop response (ESC)"
+                >
+                  <FontAwesomeIcon icon={faStop} className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!value.trim() || disabled}
+                  className="p-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <FontAwesomeIcon icon={faPaperPlane} className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Voice Status Indicator (Mobile) */}

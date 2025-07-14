@@ -1,7 +1,16 @@
 // ABOUTME: React context provider for hierarchical focus management in terminal UI
 // ABOUTME: Wraps Ink's focus system with stack-based navigation and global keyboard handling
 
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo, useRef } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  ReactNode,
+  useMemo,
+  useRef,
+} from 'react';
 import { useFocusManager, useInput } from 'ink';
 import { FocusStack } from './focus-stack.js';
 import { FocusRegions } from './focus-regions.js';
@@ -16,22 +25,22 @@ interface LaceFocusContextValue {
    * Current focused region ID
    */
   currentFocus: string;
-  
+
   /**
    * Push a new focus onto the stack and update Ink's focus
    */
   pushFocus: (focusId: string) => void;
-  
+
   /**
    * Pop the current focus and return to the previous one
    */
   popFocus: () => string | undefined;
-  
+
   /**
    * Get a copy of the current focus stack for debugging
    */
   getFocusStack: () => string[];
-  
+
   /**
    * Check if a specific focus ID is currently active
    */
@@ -52,13 +61,13 @@ interface LaceFocusProviderProps {
 
 /**
  * Provider component that manages hierarchical focus state and global keyboard handling.
- * 
+ *
  * This provider:
  * - Maintains a focus stack for hierarchical navigation
  * - Wraps Ink's focus management with stack-based logic
  * - Provides global Escape key handling for "going back"
  * - Disables Ink's Tab cycling to prevent conflicts
- * 
+ *
  * Usage:
  * ```tsx
  * <LaceFocusProvider>
@@ -79,13 +88,16 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
   }, []); // Empty deps - run only once, not on every inkFocus change
 
   // Intercept Tab to prevent default cycling - HIGH PRIORITY
-  useInput((input, key) => {
-    if (key.tab) {
-      // Consume tab events to prevent default cycling
-      logger.debug('LaceFocusProvider: Tab intercepted and consumed');
-      return;
-    }
-  }, { isActive: true }); // Always active to ensure it runs before component handlers
+  useInput(
+    (input, key) => {
+      if (key.tab) {
+        // Consume tab events to prevent default cycling
+        logger.debug('LaceFocusProvider: Tab intercepted and consumed');
+        return;
+      }
+    },
+    { isActive: true }
+  ); // Always active to ensure it runs before component handlers
 
   // Global Escape handler - vi-like behavior with proper focus switching
   useInput((input, key) => {
@@ -94,7 +106,7 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
         currentFocus,
         stackBefore: focusStackRef.current.getStack(),
       });
-      
+
       // Vi-like behavior: shell escape goes to timeline using focusNext
       if (currentFocus === FocusRegions.shell) {
         // From shell, navigate to timeline using focusNext (which works)
@@ -123,33 +135,36 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
   /**
    * Push a new focus onto the stack and update Ink's focus
    */
-  const pushFocus = useCallback((focusId: string) => {
-    logger.debug('LaceFocusProvider: pushFocus called', {
-      fromFocus: focusStackRef.current.current(),
-      toFocus: focusId,
-      stackBefore: focusStackRef.current.getStack(),
-    });
-    const newFocus = focusStackRef.current.push(focusId);
-    setCurrentFocus(newFocus);
-    
-    logger.debug('LaceFocusProvider: Calling inkFocus.focus', {
-      focusId,
-      newFocus,
-    });
-    try {
-      inkFocus.focus(focusId);
-    } catch (error) {
-      logger.warn('LaceFocusProvider: Failed to focus component', {
-        focusId,
-        error: error instanceof Error ? error.message : String(error),
+  const pushFocus = useCallback(
+    (focusId: string) => {
+      logger.debug('LaceFocusProvider: pushFocus called', {
+        fromFocus: focusStackRef.current.current(),
+        toFocus: focusId,
+        stackBefore: focusStackRef.current.getStack(),
       });
-    }
-    
-    logger.debug('LaceFocusProvider: pushFocus completed', {
-      newCurrentFocus: newFocus,
-      stackAfter: focusStackRef.current.getStack(),
-    });
-  }, [inkFocus]); // Removed focusStack dependency - now stable ref
+      const newFocus = focusStackRef.current.push(focusId);
+      setCurrentFocus(newFocus);
+
+      logger.debug('LaceFocusProvider: Calling inkFocus.focus', {
+        focusId,
+        newFocus,
+      });
+      try {
+        inkFocus.focus(focusId);
+      } catch (error) {
+        logger.warn('LaceFocusProvider: Failed to focus component', {
+          focusId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      logger.debug('LaceFocusProvider: pushFocus completed', {
+        newCurrentFocus: newFocus,
+        stackAfter: focusStackRef.current.getStack(),
+      });
+    },
+    [inkFocus]
+  ); // Removed focusStack dependency - now stable ref
 
   /**
    * Pop the current focus and return to the previous one
@@ -158,7 +173,7 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
     const newFocus = focusStackRef.current.pop();
     if (newFocus) {
       setCurrentFocus(newFocus);
-      
+
       logger.debug('LaceFocusProvider: Calling inkFocus.focus (pop)', {
         focusId: newFocus,
       });
@@ -170,7 +185,7 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
           error: error instanceof Error ? error.message : String(error),
         });
       }
-      
+
       return newFocus;
     }
     return undefined;
@@ -197,25 +212,24 @@ export function LaceFocusProvider({ children }: LaceFocusProviderProps) {
   // CRITICAL: Only depend on currentFocus, not the callback functions
   // When callbacks change due to currentFocus changing, it causes re-render cycles
   // that trigger FocusLifecycleWrapper cleanup and destroy focus
-  const contextValue: LaceFocusContextValue = useMemo(() => ({
-    currentFocus,
-    pushFocus,
-    popFocus,
-    getFocusStack,
-    isFocusActive,
-  }), [currentFocus]); // ONLY depend on currentFocus to break re-render cycle
+  const contextValue: LaceFocusContextValue = useMemo(
+    () => ({
+      currentFocus,
+      pushFocus,
+      popFocus,
+      getFocusStack,
+      isFocusActive,
+    }),
+    [currentFocus]
+  ); // ONLY depend on currentFocus to break re-render cycle
 
-  return (
-    <LaceFocusContext.Provider value={contextValue}>
-      {children}
-    </LaceFocusContext.Provider>
-  );
+  return <LaceFocusContext.Provider value={contextValue}>{children}</LaceFocusContext.Provider>;
 }
 
 /**
  * Hook to access the Lace focus context.
  * Must be used within a LaceFocusProvider.
- * 
+ *
  * @returns The focus context value
  * @throws Error if used outside of LaceFocusProvider
  */

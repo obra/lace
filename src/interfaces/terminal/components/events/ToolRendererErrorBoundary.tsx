@@ -49,11 +49,7 @@ export class ToolRendererErrorBoundary extends Component<
         },
       };
 
-      return (
-        <GenericToolRenderer
-          item={errorItem}
-        />
-      );
+      return <GenericToolRenderer item={errorItem} />;
     }
 
     return this.props.children;

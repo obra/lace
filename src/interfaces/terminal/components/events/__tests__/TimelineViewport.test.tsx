@@ -26,11 +26,7 @@ vi.mock('../../../../../utils/logger.js', () => ({
 describe('TimelineViewport', () => {
   // Helper to render with focus provider
   const renderWithFocus = (component: React.ReactElement) => {
-    return render(
-      <LaceFocusProvider>
-        {component}
-      </LaceFocusProvider>
-    );
+    return render(<LaceFocusProvider>{component}</LaceFocusProvider>);
   };
 
   const createMockTimeline = (itemCount: number): Timeline => {
@@ -137,12 +133,10 @@ describe('TimelineViewport', () => {
     const timeline = createMockTimeline(1);
 
     const { lastFrame } = renderWithFocus(
-      <TimelineViewport timeline={timeline}>
-        {() => <Text>Content</Text>}
-      </TimelineViewport>
+      <TimelineViewport timeline={timeline}>{() => <Text>Content</Text>}</TimelineViewport>
     );
 
-    // Should contain cursor indicator when focused  
+    // Should contain cursor indicator when focused
     // Note: cursor only shows when component is actually focused via Ink's focus system
     // In tests, we'll just check that the content renders without error
     expect(lastFrame()).toContain('Content');
@@ -173,9 +167,7 @@ describe('TimelineViewport', () => {
     const timeline = createMockTimeline(1);
 
     const { lastFrame } = renderWithFocus(
-      <TimelineViewport timeline={timeline}>
-        {() => <Text>Focused content</Text>}
-      </TimelineViewport>
+      <TimelineViewport timeline={timeline}>{() => <Text>Focused content</Text>}</TimelineViewport>
     );
 
     // Should render without crashing with focus props

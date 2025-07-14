@@ -25,10 +25,7 @@ vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
 function renderWithProviders(component: React.ReactElement) {
   return render(
     <TimelineExpansionProvider>
-      <TimelineItemProvider
-        isSelected={false}
-        onToggle={() => {}}
-      >
+      <TimelineItemProvider isSelected={false} onToggle={() => {}}>
         {component}
       </TimelineItemProvider>
     </TimelineExpansionProvider>

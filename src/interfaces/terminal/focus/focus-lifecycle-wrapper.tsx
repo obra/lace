@@ -14,36 +14,36 @@ interface FocusLifecycleWrapperProps {
    * Unique focus ID for this component
    */
   focusId: string;
-  
+
   /**
    * Whether the component should be focused (generic trigger)
    */
   isActive: boolean;
-  
+
   /**
    * The content to render
    */
   children: ReactNode;
-  
+
   /**
    * Whether to render children when inactive
    * - true: always render children (for timeline items)
    * - false: hide children when inactive (for modals)
    */
   renderWhenInactive?: boolean;
-  
+
   /**
    * Whether to automatically take focus when becoming active
    * - true: automatically focus when isActive becomes true (for modals)
    * - false: only push onto focus stack, don't auto-focus (default)
    */
   autoFocus?: boolean;
-  
+
   /**
    * Optional callback when focus is activated
    */
   onFocusActivated?: () => void;
-  
+
   /**
    * Optional callback when focus is restored to previous context
    */
@@ -52,23 +52,23 @@ interface FocusLifecycleWrapperProps {
 
 /**
  * A wrapper component that automatically manages focus lifecycle for any component.
- * 
+ *
  * This component:
  * - Automatically pushes focus onto the stack when isActive becomes true
  * - Automatically pops focus from the stack when isActive becomes false
  * - Ensures proper cleanup if the component unmounts while active
  * - Provides callbacks for focus lifecycle events
  * - Supports both modal-style (hide when inactive) and persistent rendering
- * 
+ *
  * The focus management is tied to the `isActive` prop, making it reusable
  * for modals, timeline items, and other focusable components.
- * 
+ *
  * @example Modal usage
  * ```tsx
  * function MyModal({ isVisible, onClose }) {
  *   return (
- *     <FocusLifecycleWrapper 
- *       focusId="my-modal" 
+ *     <FocusLifecycleWrapper
+ *       focusId="my-modal"
  *       isActive={isVisible}
  *       renderWhenInactive={false}
  *       onFocusRestored={onClose}
@@ -78,13 +78,13 @@ interface FocusLifecycleWrapperProps {
  *   );
  * }
  * ```
- * 
+ *
  * @example Timeline item usage
  * ```tsx
  * function FocusableTimelineItem({ isFocused }) {
  *   return (
- *     <FocusLifecycleWrapper 
- *       focusId="timeline-item-123" 
+ *     <FocusLifecycleWrapper
+ *       focusId="timeline-item-123"
  *       isActive={isFocused}
  *       renderWhenInactive={true}
  *     >
@@ -107,7 +107,7 @@ export function FocusLifecycleWrapper({
   const { takeFocus } = useLaceFocus(focusId);
   const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isActiveRef = useRef(isActive);
-  
+
   // Update ref to track current active state
   isActiveRef.current = isActive;
 
@@ -117,13 +117,13 @@ export function FocusLifecycleWrapper({
       focusId,
       isActive,
     });
-    
+
     // Clear any pending cleanup
     if (cleanupTimeoutRef.current) {
       clearTimeout(cleanupTimeoutRef.current);
       cleanupTimeoutRef.current = null;
     }
-    
+
     if (isActive) {
       // Component is becoming active - push focus
       logger.debug('FocusLifecycleWrapper: calling pushFocus', {
@@ -131,7 +131,7 @@ export function FocusLifecycleWrapper({
         autoFocus,
       });
       pushFocus(focusId);
-      
+
       // Auto-focus if requested
       if (autoFocus) {
         logger.debug('FocusLifecycleWrapper: auto-focusing component', {
@@ -139,9 +139,9 @@ export function FocusLifecycleWrapper({
         });
         takeFocus();
       }
-      
+
       onFocusActivated?.();
-      
+
       // Return cleanup function for when component becomes inactive
       return () => {
         // Add small delay to prevent immediate cleanup during re-render cycles
@@ -156,15 +156,18 @@ export function FocusLifecycleWrapper({
               onFocusRestored?.();
             }
           } else {
-            logger.debug('FocusLifecycleWrapper: cleanup cancelled - component became active again', {
-              focusId,
-            });
+            logger.debug(
+              'FocusLifecycleWrapper: cleanup cancelled - component became active again',
+              {
+                focusId,
+              }
+            );
           }
           cleanupTimeoutRef.current = null;
         }, 10); // 10ms delay to survive React re-render cycles
       };
     }
-    
+
     // If component is not active, no cleanup needed
     return undefined;
   }, [isActive, focusId, pushFocus, popFocus, onFocusActivated, onFocusRestored]);

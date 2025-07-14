@@ -20,20 +20,21 @@ function extractTaskIdFromArgs(args: Record<string, unknown>): string {
 
 export function TaskCompleteToolRenderer({ item }: ToolRendererProps) {
   const { isExpanded } = useTimelineItem();
-  
+
   // Extract data from the tool call and result
   const args = item.call.arguments as Record<string, unknown>;
   const taskIdFromArgs = extractTaskIdFromArgs(args);
-  
+
   const resultText = item.result?.content?.[0]?.text || '';
   const hasError = item.result?.isError;
   const isRunning = !item.result;
-  
-  const taskId = item.result && !hasError ? (extractTaskId(resultText) || taskIdFromArgs) : taskIdFromArgs;
-  
+
+  const taskId =
+    item.result && !hasError ? extractTaskId(resultText) || taskIdFromArgs : taskIdFromArgs;
+
   // Determine status
   const status: TimelineStatus = isRunning ? 'pending' : hasError ? 'error' : 'success';
-  
+
   // Build header based on state
   const header = (() => {
     if (isRunning) {
@@ -44,7 +45,7 @@ export function TaskCompleteToolRenderer({ item }: ToolRendererProps) {
         </Box>
       );
     }
-    
+
     if (hasError) {
       return (
         <Box>
@@ -53,7 +54,7 @@ export function TaskCompleteToolRenderer({ item }: ToolRendererProps) {
         </Box>
       );
     }
-    
+
     // Success case
     return (
       <Box>
@@ -64,12 +65,7 @@ export function TaskCompleteToolRenderer({ item }: ToolRendererProps) {
   })();
 
   return (
-    <TimelineEntry
-      label={header}
-      summary={null}
-      status={status}
-      isExpandable={false}
-    >
+    <TimelineEntry label={header} summary={null} status={status} isExpandable={false}>
       {null}
     </TimelineEntry>
   );

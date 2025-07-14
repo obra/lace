@@ -31,6 +31,8 @@ export {
   faExternalLinkAlt,
   faImages,
   faFileAlt,
+  faFile,
+  faImage,
   faFileExcel,
   faFolderPlus,
   faShare,

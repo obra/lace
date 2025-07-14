@@ -141,17 +141,28 @@ export class TokenUsageTracker {
     };
   }
 
-  // Get API key info (masked)
-  getApiKeyInfo(): { hasKey: boolean; maskedKey?: string } {
-    const apiKey = getEnvVar('ANTHROPIC_KEY');
-    if (!apiKey) {
-      return { hasKey: false };
+  // Get API key info (provider based)
+  getApiKeyInfo(): { hasKey: boolean; provider?: string; keyType?: string } {
+    const anthropicKey = getEnvVar('ANTHROPIC_KEY');
+    const openaiKey = getEnvVar('OPENAI_API_KEY') || getEnvVar('OPENAI_KEY');
+
+    if (anthropicKey) {
+      return {
+        hasKey: true,
+        provider: 'Anthropic',
+        keyType: 'API Key',
+      };
     }
 
-    return {
-      hasKey: true,
-      maskedKey: `sk-ant-...${apiKey.slice(-6)}`,
-    };
+    if (openaiKey) {
+      return {
+        hasKey: true,
+        provider: 'OpenAI',
+        keyType: 'API Key',
+      };
+    }
+
+    return { hasKey: false };
   }
 
   // Format cost as currency

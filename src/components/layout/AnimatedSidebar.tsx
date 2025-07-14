@@ -3,27 +3,22 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faSearch, 
-  faTerminal, 
-  faTasks, 
-  faFolder, 
-  faFolderOpen, 
+import {
+  faSearch,
+  faTerminal,
+  faTasks,
+  faFolder,
+  faFolderOpen,
   faComments,
   faPlus,
   faCog,
-  faFileCode
+  faFileCode,
 } from '~/lib/fontawesome';
-import { 
-  ChevronDownIcon, 
-  ChevronRightIcon, 
-  ChevronLeftIcon 
-} from '~/lib/heroicons';
+import { ChevronDownIcon, ChevronRightIcon, ChevronLeftIcon } from '~/lib/heroicons';
 import { Timeline, Project, Task, RecentFile } from '~/types';
 import { ThemeSelector } from '~/components/ui/ThemeSelector';
 import { AccountDropdown } from '~/components/ui/AccountDropdown';
-import { 
-  fadeInLeft,
+import {
   fadeInUp,
   staggerContainer,
   staggerItem,
@@ -31,7 +26,7 @@ import {
   hoverLift,
   springConfig,
   scaleIn,
-  popIn
+  popIn,
 } from '~/lib/animations';
 
 interface AnimatedSidebarProps {
@@ -92,61 +87,72 @@ export function AnimatedSidebar({
   if (!isOpen) {
     // Animated collapsed sidebar
     return (
-      <motion.div 
+      <motion.div
         className="hidden lg:flex bg-base-100 border-r border-base-300 flex-col relative w-16"
         initial={{ width: 350 }}
         animate={{ width: 64 }}
         transition={springConfig.smooth}
       >
-        <motion.div 
+        <motion.div
           className="flex flex-col items-center py-4 space-y-6"
           variants={staggerContainer}
           initial="initial"
           animate="animate"
         >
           {/* Logo */}
-          <motion.div 
-            className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center shadow-lg overflow-hidden relative"
+          <motion.div
+            className="w-10 h-10 bg-gradient-to-br from-teal-600 to-teal-700 rounded-lg flex items-center justify-center shadow-lg overflow-hidden relative"
             variants={popIn}
-            whileHover={{ 
+            whileHover={{
               scale: 1.1,
-              rotate: 5,
-              transition: springConfig.bouncy 
+              rotate: 360,
+              transition: springConfig.bouncy,
             }}
             {...buttonTap}
           >
             <motion.div
-              className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"
+              className="absolute inset-0 opacity-20"
               animate={{
-                opacity: [0.2, 0.4, 0.2],
+                background: [
+                  'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)',
+                  'repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)',
+                  'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)',
+                ],
               }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
+              transition={{ duration: 4, repeat: Infinity }}
             />
-            <span className="text-primary-content font-bold text-lg relative z-10">L</span>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <motion.div
+                className="w-5 h-5 border-2 border-white/30 rounded transform rotate-45"
+                animate={{ rotate: [45, 225, 45] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              />
+              <motion.div
+                className="absolute w-3 h-3 border border-white/20 rounded transform rotate-45"
+                animate={{ rotate: [45, -135, 45] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            </div>
           </motion.div>
 
           {/* Quick Actions */}
-          <motion.div 
+          <motion.div
             className="flex flex-col gap-4"
             variants={staggerContainer}
             initial="initial"
             animate="animate"
           >
-            {quickActions.map((action, index) => (
+            {quickActions.map((action, _index) => (
               <motion.button
                 key={action.title}
-                onClick={action.action || (() => onTriggerTool(action.tool!))}
+                onClick={action.action || (() => onTriggerTool(action.tool))}
                 className="p-2 hover:bg-base-200 rounded-lg transition-colors group relative"
                 title={action.title}
                 variants={staggerItem}
-                whileHover={{ 
+                whileHover={{
                   scale: 1.1,
-                  backgroundColor: "rgba(0,0,0,0.05)",
-                  transition: springConfig.snappy 
+                  backgroundColor: 'rgba(0,0,0,0.05)',
+                  transition: springConfig.snappy,
                 }}
                 {...buttonTap}
               >
@@ -155,12 +161,12 @@ export function AnimatedSidebar({
                   whileHover={{ rotate: 10 }}
                   transition={springConfig.gentle}
                 >
-                  <FontAwesomeIcon 
-                    icon={action.icon} 
-                    className={`w-5 h-5 ${action.color} group-hover:scale-110 transition-all`} 
+                  <FontAwesomeIcon
+                    icon={action.icon}
+                    className={`w-5 h-5 ${action.color} group-hover:scale-110 transition-all`}
                   />
                 </motion.div>
-                
+
                 {/* Tooltip */}
                 <motion.div
                   className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-base-content text-base-100 text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50"
@@ -179,10 +185,10 @@ export function AnimatedSidebar({
         <motion.button
           onClick={onToggle}
           className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-md z-10 group"
-          whileHover={{ 
+          whileHover={{
             scale: 1.1,
-            boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
-            transition: springConfig.snappy 
+            boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+            transition: springConfig.snappy,
           }}
           {...buttonTap}
         >
@@ -199,61 +205,58 @@ export function AnimatedSidebar({
   }
 
   return (
-    <motion.div 
+    <motion.div
       className="hidden lg:flex bg-base-100 border-r border-base-300 flex-col relative w-[350px]"
       initial={{ width: 64 }}
       animate={{ width: 350 }}
       transition={springConfig.smooth}
     >
-      <motion.div 
+      <motion.div
         className="flex flex-col h-full"
         variants={staggerContainer}
         initial="initial"
         animate="animate"
       >
         {/* Header */}
-        <motion.div 
-          className="p-4 border-b border-base-300"
-          variants={fadeInUp}
-        >
+        <motion.div className="p-4 border-b border-base-300" variants={fadeInUp}>
           <div className="flex items-center justify-between">
-            <motion.div 
+            <motion.div
               className="flex items-center gap-2"
               whileHover={{ scale: 1.02 }}
               transition={springConfig.gentle}
             >
-              <motion.div 
+              <motion.div
                 className="w-8 h-8 bg-gradient-to-br from-teal-600 to-teal-700 rounded-lg flex items-center justify-center shadow-lg overflow-hidden relative"
-                whileHover={{ 
+                whileHover={{
                   rotate: 360,
-                  transition: { duration: 0.8, ease: "easeInOut" }
+                  transition: { duration: 0.8, ease: 'easeInOut' },
                 }}
               >
-                <motion.div 
+                <motion.div
                   className="absolute inset-0 opacity-20"
                   animate={{
                     background: [
-                      "repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)",
-                      "repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)",
-                      "repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)"
-                    ]
+                      'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)',
+                      'repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)',
+                      'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)',
+                    ],
                   }}
                   transition={{ duration: 4, repeat: Infinity }}
                 />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <motion.div 
+                  <motion.div
                     className="w-5 h-5 border-2 border-white/30 rounded transform rotate-45"
                     animate={{ rotate: [45, 225, 45] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
                   />
-                  <motion.div 
+                  <motion.div
                     className="absolute w-3 h-3 border border-white/20 rounded transform rotate-45"
                     animate={{ rotate: [45, -135, 45] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                   />
                 </div>
               </motion.div>
-              <motion.h1 
+              <motion.h1
                 className="font-semibold text-base-content"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -266,25 +269,22 @@ export function AnimatedSidebar({
         </motion.div>
 
         {/* Project Selector */}
-        <motion.div 
-          className="p-4 border-b border-base-300"
-          variants={fadeInUp}
-        >
-          <motion.div 
+        <motion.div className="p-4 border-b border-base-300" variants={fadeInUp}>
+          <motion.div
             className="dropdown w-full"
             whileHover={{ scale: 1.01 }}
             transition={springConfig.gentle}
           >
-            <motion.div 
-              tabIndex={0} 
-              role="button" 
+            <motion.div
+              tabIndex={0}
+              role="button"
               className="btn btn-ghost justify-between w-full"
               {...hoverLift}
             >
               <div className="flex items-center gap-2">
                 <motion.div
                   animate={{ rotate: [0, 10, 0] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                 >
                   <FontAwesomeIcon icon={faFolderOpen} className="w-4 h-4 text-teal-600" />
                 </motion.div>
@@ -292,7 +292,7 @@ export function AnimatedSidebar({
               </div>
               <motion.div
                 animate={{ rotate: [0, 180, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
               >
                 <ChevronDownIcon className="w-4 h-4" />
               </motion.div>
@@ -304,17 +304,14 @@ export function AnimatedSidebar({
               initial="initial"
               animate="animate"
             >
-              {projects.map((project, index) => (
-                <motion.li 
+              {projects.map((project, _index) => (
+                <motion.li
                   key={project.id}
                   variants={staggerItem}
                   whileHover={{ x: 5 }}
                   transition={springConfig.gentle}
                 >
-                  <motion.a 
-                    onClick={() => onProjectChange(project)}
-                    {...buttonTap}
-                  >
+                  <motion.a onClick={() => onProjectChange(project)} {...buttonTap}>
                     {project.name}
                   </motion.a>
                 </motion.li>
@@ -324,7 +321,7 @@ export function AnimatedSidebar({
         </motion.div>
 
         {/* Content */}
-        <motion.div 
+        <motion.div
           className="flex-1 overflow-y-auto"
           variants={staggerContainer}
           initial="initial"
@@ -349,7 +346,7 @@ export function AnimatedSidebar({
 
             <AnimatePresence>
               {conversationsExpanded && (
-                <motion.div 
+                <motion.div
                   className="mt-2 space-y-1"
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
@@ -357,22 +354,22 @@ export function AnimatedSidebar({
                   transition={springConfig.gentle}
                 >
                   {/* Current Timeline */}
-                  <motion.div 
+                  <motion.div
                     className="p-3 bg-teal-500/10 border border-teal-500/30 rounded-lg text-sm"
                     variants={scaleIn}
                     {...hoverLift}
                   >
                     <div className="flex items-center gap-2">
-                      <motion.div 
+                      <motion.div
                         className="w-2 h-2 bg-teal-500 rounded-full"
-                        animate={{ 
+                        animate={{
                           scale: [1, 1.2, 1],
-                          opacity: [0.7, 1, 0.7]
+                          opacity: [0.7, 1, 0.7],
                         }}
-                        transition={{ 
-                          duration: 2, 
+                        transition={{
+                          duration: 2,
                           repeat: Infinity,
-                          ease: "easeInOut"
+                          ease: 'easeInOut',
                         }}
                       />
                       <span>{currentTimeline.name}</span>
@@ -394,12 +391,8 @@ export function AnimatedSidebar({
                   </motion.div>
 
                   {/* Other Timelines */}
-                  <motion.div
-                    variants={staggerContainer}
-                    initial="initial"
-                    animate="animate"
-                  >
-                    {timelines.map((timeline, index) => (
+                  <motion.div variants={staggerContainer} initial="initial" animate="animate">
+                    {timelines.map((timeline, _index) => (
                       <motion.button
                         key={timeline.id}
                         onClick={() => onTimelineChange(timeline)}
@@ -410,11 +403,11 @@ export function AnimatedSidebar({
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <motion.div
-                              whileHover={{ rotate: 360 }}
-                              transition={{ duration: 0.5 }}
-                            >
-                              <FontAwesomeIcon icon={faComments} className="w-4 h-4 text-base-content/40" />
+                            <motion.div whileHover={{ rotate: 360 }} transition={{ duration: 0.5 }}>
+                              <FontAwesomeIcon
+                                icon={faComments}
+                                className="w-4 h-4 text-base-content/40"
+                              />
                             </motion.div>
                             <span className="truncate">{timeline.name}</span>
                           </div>
@@ -441,18 +434,15 @@ export function AnimatedSidebar({
                   <motion.button
                     onClick={onNewTimeline}
                     className="w-full p-3 border border-dashed border-base-300 rounded-lg text-sm text-center hover:bg-base-200 transition-colors"
-                    whileHover={{ 
-                      borderColor: "rgb(var(--primary))",
-                      backgroundColor: "rgba(var(--primary), 0.05)",
-                      scale: 1.02
+                    whileHover={{
+                      borderColor: 'rgb(var(--primary))',
+                      backgroundColor: 'rgba(var(--primary), 0.05)',
+                      scale: 1.02,
                     }}
                     {...buttonTap}
                   >
                     <div className="flex items-center justify-center gap-2">
-                      <motion.div
-                        whileHover={{ rotate: 90 }}
-                        transition={springConfig.snappy}
-                      >
+                      <motion.div whileHover={{ rotate: 90 }} transition={springConfig.snappy}>
                         <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
                       </motion.div>
                       New Timeline
@@ -473,15 +463,15 @@ export function AnimatedSidebar({
             >
               <span className="text-sm font-medium text-base-content">Tasks</span>
               <div className="flex items-center gap-2">
-                <motion.span 
+                <motion.span
                   className="badge badge-sm bg-teal-500 text-white border-0"
-                  animate={{ 
+                  animate={{
                     scale: [1, 1.1, 1],
                   }}
-                  transition={{ 
-                    duration: 2, 
+                  transition={{
+                    duration: 2,
                     repeat: Infinity,
-                    ease: "easeInOut"
+                    ease: 'easeInOut',
                   }}
                 >
                   {activeTasks.length}
@@ -497,18 +487,14 @@ export function AnimatedSidebar({
 
             <AnimatePresence>
               {tasksExpanded && (
-                <motion.div 
+                <motion.div
                   className="mt-2 space-y-2"
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={springConfig.gentle}
                 >
-                  <motion.div
-                    variants={staggerContainer}
-                    initial="initial"
-                    animate="animate"
-                  >
+                  <motion.div variants={staggerContainer} initial="initial" animate="animate">
                     {activeTasks.slice(0, 3).map((task, index) => (
                       <motion.div
                         key={task.id}
@@ -516,15 +502,15 @@ export function AnimatedSidebar({
                         onClick={() => onOpenTask(task)}
                         variants={staggerItem}
                         {...hoverLift}
-                        whileHover={{ 
+                        whileHover={{
                           x: 5,
-                          backgroundColor: "rgba(var(--primary), 0.05)"
+                          backgroundColor: 'rgba(var(--primary), 0.05)',
                         }}
                         {...buttonTap}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <motion.h4 
+                            <motion.h4
                               className="text-sm font-medium text-base-content truncate"
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
@@ -532,7 +518,7 @@ export function AnimatedSidebar({
                             >
                               {task.title}
                             </motion.h4>
-                            <motion.p 
+                            <motion.p
                               className="text-xs text-base-content/60 mt-1"
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
@@ -540,7 +526,7 @@ export function AnimatedSidebar({
                             >
                               {task.description}
                             </motion.p>
-                            <motion.div 
+                            <motion.div
                               className="flex items-center gap-2 mt-2"
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
@@ -565,12 +551,12 @@ export function AnimatedSidebar({
                       </motion.div>
                     ))}
                   </motion.div>
-                  
-                  <motion.button 
+
+                  <motion.button
                     className="w-full p-2 text-xs text-base-content/60 hover:text-base-content hover:bg-base-200 rounded transition-colors"
-                    whileHover={{ 
+                    whileHover={{
                       scale: 1.02,
-                      backgroundColor: "rgba(var(--primary), 0.05)"
+                      backgroundColor: 'rgba(var(--primary), 0.05)',
                     }}
                     {...buttonTap}
                   >
@@ -600,19 +586,15 @@ export function AnimatedSidebar({
 
             <AnimatePresence>
               {filesExpanded && (
-                <motion.div 
+                <motion.div
                   className="mt-2 space-y-1 max-h-64 overflow-y-auto"
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={springConfig.gentle}
                 >
-                  <motion.div
-                    variants={staggerContainer}
-                    initial="initial"
-                    animate="animate"
-                  >
-                    {recentFiles.map((file, index) => (
+                  <motion.div variants={staggerContainer} initial="initial" animate="animate">
+                    {recentFiles.map((file, _index) => (
                       <motion.button
                         key={file.path}
                         className="w-full text-left p-3 hover:bg-base-200 rounded-lg text-sm text-base-content/80 flex items-center transition-colors group"
@@ -625,25 +607,25 @@ export function AnimatedSidebar({
                           whileHover={{ scale: 1.2, rotate: 10 }}
                           transition={springConfig.gentle}
                         >
-                          <FontAwesomeIcon 
-                            icon={faFileCode} 
-                            className="w-4 h-4 mr-2 text-base-content/40 group-hover:text-teal-600 transition-colors" 
+                          <FontAwesomeIcon
+                            icon={faFileCode}
+                            className="w-4 h-4 mr-2 text-base-content/40 group-hover:text-teal-600 transition-colors"
                           />
                         </motion.div>
                         <div className="flex-1 min-w-0">
-                          <motion.div 
+                          <motion.div
                             className="truncate"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            transition={{ delay: index * 0.05 }}
+                            transition={{ delay: _index * 0.05 }}
                           >
                             {file.name}
                           </motion.div>
-                          <motion.div 
+                          <motion.div
                             className="text-xs text-base-content/50 truncate"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            transition={{ delay: index * 0.05 + 0.1 }}
+                            transition={{ delay: _index * 0.05 + 0.1 }}
                           >
                             {file.path}
                           </motion.div>
@@ -675,17 +657,14 @@ export function AnimatedSidebar({
 
             <AnimatePresence>
               {settingsExpanded && (
-                <motion.div 
+                <motion.div
                   className="mt-2 space-y-4"
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={springConfig.gentle}
                 >
-                  <motion.div 
-                    className="p-4 bg-base-200 rounded-lg space-y-4"
-                    variants={scaleIn}
-                  >
+                  <motion.div className="p-4 bg-base-200 rounded-lg space-y-4" variants={scaleIn}>
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -694,7 +673,7 @@ export function AnimatedSidebar({
                       <ThemeSelector currentTheme={currentTheme} onThemeChange={onThemeChange} />
                     </motion.div>
 
-                    <motion.div 
+                    <motion.div
                       className="pt-2 border-t border-base-300"
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -704,16 +683,13 @@ export function AnimatedSidebar({
                         onClick={onOpenRulesFile}
                         className="w-full p-2 text-sm text-center border border-base-300 rounded hover:bg-base-300 transition-colors"
                         {...hoverLift}
-                        whileHover={{ 
-                          borderColor: "rgb(var(--primary))",
-                          backgroundColor: "rgba(var(--primary), 0.05)"
+                        whileHover={{
+                          borderColor: 'rgb(var(--primary))',
+                          backgroundColor: 'rgba(var(--primary), 0.05)',
                         }}
                       >
                         <div className="flex items-center justify-center gap-2">
-                          <motion.div
-                            whileHover={{ rotate: 180 }}
-                            transition={springConfig.gentle}
-                          >
+                          <motion.div whileHover={{ rotate: 180 }} transition={springConfig.gentle}>
                             <FontAwesomeIcon icon={faCog} className="w-4 h-4" />
                           </motion.div>
                           Edit Rules
@@ -742,10 +718,10 @@ export function AnimatedSidebar({
       <motion.button
         onClick={onToggle}
         className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-md z-10 group"
-        whileHover={{ 
+        whileHover={{
           scale: 1.1,
-          boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
-          transition: springConfig.snappy 
+          boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+          transition: springConfig.snappy,
         }}
         {...buttonTap}
       >

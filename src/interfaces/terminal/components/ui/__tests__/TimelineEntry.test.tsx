@@ -25,7 +25,7 @@ describe('TimelineEntry Height Measurement', () => {
     vi.useFakeTimers();
     // Default mock returns height of 2
     mockMeasureElement.mockReturnValue({ height: 2, width: 40 });
-    
+
     // Reset the mock implementation to ensure it's callable
     mockMeasureElement.mockImplementation(() => ({ height: 2, width: 40 }));
   });
@@ -37,11 +37,7 @@ describe('TimelineEntry Height Measurement', () => {
   describe('Basic rendering', () => {
     it('should render with children when expanded', () => {
       const { lastFrame } = render(
-        <TimelineEntry
-          isExpanded={true}
-          onExpandedChange={vi.fn()}
-          isExpandable={true}
-        >
+        <TimelineEntry isExpanded={true} onExpandedChange={vi.fn()} isExpandable={true}>
           <Text>Test content</Text>
         </TimelineEntry>
       );
@@ -69,11 +65,7 @@ describe('TimelineEntry Height Measurement', () => {
   describe('Height measurement timing', () => {
     it('should respond properly to expansion state changes', () => {
       const { rerender, lastFrame } = render(
-        <TimelineEntry
-          isExpanded={true}
-          onExpandedChange={vi.fn()}
-          isExpandable={true}
-        >
+        <TimelineEntry isExpanded={true} onExpandedChange={vi.fn()} isExpandable={true}>
           <Text>Expanded content</Text>
         </TimelineEntry>
       );
@@ -96,7 +88,7 @@ describe('TimelineEntry Height Measurement', () => {
       // Should now show collapsed content
       expect(lastFrame()).toContain('Collapsed content');
       expect(lastFrame()).not.toContain('Expanded content');
-      
+
       // Verify the component completed the state change successfully
       expect(lastFrame()).toBeTruthy();
     });
@@ -139,11 +131,7 @@ describe('TimelineEntry Height Measurement', () => {
 
     it('should update content when children change', () => {
       const { rerender, lastFrame } = render(
-        <TimelineEntry
-          isExpanded={true}
-          onExpandedChange={vi.fn()}
-          isExpandable={true}
-        >
+        <TimelineEntry isExpanded={true} onExpandedChange={vi.fn()} isExpandable={true}>
           <Text>Content 1</Text>
         </TimelineEntry>
       );
@@ -152,11 +140,7 @@ describe('TimelineEntry Height Measurement', () => {
 
       // Change children
       rerender(
-        <TimelineEntry
-          isExpanded={true}
-          onExpandedChange={vi.fn()}
-          isExpandable={true}
-        >
+        <TimelineEntry isExpanded={true} onExpandedChange={vi.fn()} isExpandable={true}>
           <Text>Content 2</Text>
         </TimelineEntry>
       );
@@ -185,11 +169,7 @@ describe('TimelineEntry Height Measurement', () => {
 
     it('should handle component lifecycle without crashing', () => {
       const { unmount } = render(
-        <TimelineEntry
-          isExpanded={true}
-          onExpandedChange={vi.fn()}
-          isExpandable={true}
-        >
+        <TimelineEntry isExpanded={true} onExpandedChange={vi.fn()} isExpandable={true}>
           <Text>Test content</Text>
         </TimelineEntry>
       );
@@ -207,11 +187,7 @@ describe('TimelineEntry Height Measurement', () => {
       mockMeasureElement.mockReturnValue({ height: 1, width: 40 });
 
       const { lastFrame } = render(
-        <TimelineEntry
-          isExpanded={false}
-          onExpandedChange={vi.fn()}
-          isExpandable={true}
-        >
+        <TimelineEntry isExpanded={false} onExpandedChange={vi.fn()} isExpandable={true}>
           <Text>Content</Text>
         </TimelineEntry>
       );
@@ -228,11 +204,7 @@ describe('TimelineEntry Height Measurement', () => {
       mockMeasureElement.mockReturnValue({ height: 1, width: 40 });
 
       const { lastFrame } = render(
-        <TimelineEntry
-          isExpanded={false}
-          onExpandedChange={vi.fn()}
-          isExpandable={false}
-        >
+        <TimelineEntry isExpanded={false} onExpandedChange={vi.fn()} isExpandable={false}>
           <Text>Content</Text>
         </TimelineEntry>
       );
@@ -248,11 +220,7 @@ describe('TimelineEntry Height Measurement', () => {
 
     it('should show expanded indicator for expanded items', () => {
       const { lastFrame } = render(
-        <TimelineEntry
-          isExpanded={true}
-          onExpandedChange={vi.fn()}
-          isExpandable={true}
-        >
+        <TimelineEntry isExpanded={true} onExpandedChange={vi.fn()} isExpandable={true}>
           <Text>Multi-line content</Text>
         </TimelineEntry>
       );
@@ -265,31 +233,34 @@ describe('TimelineEntry Height Measurement', () => {
 
   describe('Integration behavior', () => {
     it('should integrate properly with different statuses', () => {
-      const statuses: Array<'none' | 'pending' | 'success' | 'error'> = ['none', 'pending', 'success', 'error'];
-      
-      statuses.forEach(status => {
-        expect(() => render(
-          <TimelineEntry
-            isExpanded={false}
-            onExpandedChange={vi.fn()}
-            isExpandable={true}
-            status={status}
-          >
-            <Text>Content</Text>
-          </TimelineEntry>
-        )).not.toThrow();
+      const statuses: Array<'none' | 'pending' | 'success' | 'error'> = [
+        'none',
+        'pending',
+        'success',
+        'error',
+      ];
+
+      statuses.forEach((status) => {
+        expect(() =>
+          render(
+            <TimelineEntry
+              isExpanded={false}
+              onExpandedChange={vi.fn()}
+              isExpandable={true}
+              status={status}
+            >
+              <Text>Content</Text>
+            </TimelineEntry>
+          )
+        ).not.toThrow();
       });
     });
 
     it('should call onExpandedChange when user interacts', () => {
       const onExpandedChange = vi.fn();
-      
+
       render(
-        <TimelineEntry
-          isExpanded={false}
-          onExpandedChange={onExpandedChange}
-          isExpandable={true}
-        >
+        <TimelineEntry isExpanded={false} onExpandedChange={onExpandedChange} isExpandable={true}>
           <div>Content</div>
         </TimelineEntry>
       );
@@ -303,11 +274,7 @@ describe('TimelineEntry Height Measurement', () => {
   describe('Performance considerations', () => {
     it('should not remeasure when height has not changed', () => {
       const { rerender } = render(
-        <TimelineEntry
-          isExpanded={true}
-          onExpandedChange={vi.fn()}
-          isExpandable={true}
-        >
+        <TimelineEntry isExpanded={true} onExpandedChange={vi.fn()} isExpandable={true}>
           <Text>Content</Text>
         </TimelineEntry>
       );
@@ -318,11 +285,7 @@ describe('TimelineEntry Height Measurement', () => {
 
       // Re-render with same content
       rerender(
-        <TimelineEntry
-          isExpanded={true}
-          onExpandedChange={vi.fn()}
-          isExpandable={true}
-        >
+        <TimelineEntry isExpanded={true} onExpandedChange={vi.fn()} isExpandable={true}>
           <Text>Content</Text>
         </TimelineEntry>
       );
@@ -335,11 +298,7 @@ describe('TimelineEntry Height Measurement', () => {
 
     it('should cancel pending measurements when component unmounts', () => {
       const { unmount } = render(
-        <TimelineEntry
-          isExpanded={true}
-          onExpandedChange={vi.fn()}
-          isExpandable={true}
-        >
+        <TimelineEntry isExpanded={true} onExpandedChange={vi.fn()} isExpandable={true}>
           <Text>Content</Text>
         </TimelineEntry>
       );

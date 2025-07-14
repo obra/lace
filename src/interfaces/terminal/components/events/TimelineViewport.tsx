@@ -14,7 +14,12 @@ interface TimelineViewportProps {
   timeline: Timeline;
   bottomSectionHeight?: number;
   focusRegion?: string; // Optional focus region ID, defaults to FocusRegions.timeline
-  onItemInteraction?: (selectedItemIndex: number, input: string, key: any, itemRefs?: React.MutableRefObject<Map<number, any>>) => void;
+  onItemInteraction?: (
+    selectedItemIndex: number,
+    input: string,
+    key: any,
+    itemRefs?: React.MutableRefObject<Map<number, any>>
+  ) => void;
   isTimelineLayoutDebugVisible?: boolean;
   children: (props: {
     timeline: Timeline;
@@ -43,9 +48,10 @@ export function TimelineViewport({
   children,
 }: TimelineViewportProps) {
   // Use Lace focus system with custom focus region or default
-  const { isFocused, takeFocus } = useLaceFocus(focusRegion || FocusRegions.timeline, { autoFocus: false });
+  const { isFocused, takeFocus } = useLaceFocus(focusRegion || FocusRegions.timeline, {
+    autoFocus: false,
+  });
   const [, terminalHeight] = useStdoutDimensions();
-
 
   // Item refs for measurement
   const itemRefs = useRef<Map<number, any>>(new Map());
@@ -75,7 +81,7 @@ export function TimelineViewport({
 
   // Get focus context to check for delegate focus
   const { currentFocus } = useLaceFocusContext();
-  
+
   // Handle keyboard navigation
   useInput(
     (input, key) => {
@@ -91,7 +97,7 @@ export function TimelineViewport({
       // Don't handle keys if focus is in a delegate context and this is the main timeline
       const isMainTimeline = (focusRegion || FocusRegions.timeline) === FocusRegions.timeline;
       const isInDelegateContext = currentFocus.startsWith('delegate-');
-      
+
       logger.debug('TimelineViewport: Key handling decision', {
         currentFocus,
         focusRegion: focusRegion || FocusRegions.timeline,
@@ -99,12 +105,11 @@ export function TimelineViewport({
         isInDelegateContext,
         willIgnore: isMainTimeline && isInDelegateContext,
       });
-      
+
       if (isMainTimeline && isInDelegateContext) {
         logger.debug('TimelineViewport: Ignoring key in main timeline while in delegate context');
         return; // Let delegate timeline handle all keys
       }
-
 
       // No escape handling - provider handles global escape to pop focus stack
 
@@ -126,7 +131,9 @@ export function TimelineViewport({
           currentFocus,
           focusRegion: focusRegion || FocusRegions.timeline,
           selectedItemIndex: viewport.selectedItemIndex,
-          key: Object.keys(key).filter(k => (key as any)[k]).join('+'),
+          key: Object.keys(key)
+            .filter((k) => (key as any)[k])
+            .join('+'),
           hasCallback: !!onItemInteraction,
         });
         if (onItemInteraction) {
@@ -169,17 +176,17 @@ export function TimelineViewport({
         </Box>
 
         {/* Cursor overlay */}
- 	{ isFocused && 
-        <Box
-          position="absolute"
-          flexDirection="column"
-          marginTop={-viewport.lineScrollOffset + viewport.selectedLine}
-        >
-          <Text backgroundColor="white" color="black">
-            {'>'}
-          </Text>
-        </Box>
-	}
+        {isFocused && (
+          <Box
+            position="absolute"
+            flexDirection="column"
+            marginTop={-viewport.lineScrollOffset + viewport.selectedLine}
+          >
+            <Text backgroundColor="white" color="black">
+              {'>'}
+            </Text>
+          </Box>
+        )}
       </Box>
 
       {/* Scroll indicator - more content below */}

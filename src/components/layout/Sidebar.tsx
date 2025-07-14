@@ -2,22 +2,18 @@
 
 import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faSearch, 
-  faTerminal, 
-  faTasks, 
-  faFolder, 
-  faFolderOpen, 
+import {
+  faSearch,
+  faTerminal,
+  faTasks,
+  faFolder,
+  faFolderOpen,
   faComments,
   faPlus,
   faCog,
-  faFileCode
+  faFileCode,
 } from '~/lib/fontawesome';
-import { 
-  ChevronDownIcon, 
-  ChevronRightIcon, 
-  ChevronLeftIcon 
-} from '~/lib/heroicons';
+import { ChevronDownIcon, ChevronRightIcon, ChevronLeftIcon } from '~/lib/heroicons';
 import { Timeline, Project, Task, RecentFile } from '~/types';
 import { ThemeSelector } from '~/components/ui/ThemeSelector';
 import { AccountDropdown } from '~/components/ui/AccountDropdown';
@@ -75,8 +71,19 @@ export function Sidebar({
     return (
       <div className="hidden lg:flex bg-base-100 border-r border-base-300 flex-col relative transition-all duration-300 w-16">
         <div className="flex flex-col items-center py-4 space-y-6">
-          <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center shadow-lg">
-            <span className="text-primary-content font-bold text-lg">L</span>
+          <div className="w-10 h-10 bg-gradient-to-br from-teal-600 to-teal-700 rounded-lg flex items-center justify-center shadow-lg overflow-hidden relative">
+            <div className="absolute inset-0 opacity-20">
+              <div
+                className="absolute inset-0"
+                style={{
+                  backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px), repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)`,
+                }}
+              ></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-5 h-5 border-2 border-white/30 rounded transform rotate-45"></div>
+              <div className="absolute w-3 h-3 border border-white/20 rounded transform rotate-45"></div>
+            </div>
           </div>
 
           <div className="flex flex-col gap-4">
@@ -213,7 +220,10 @@ export function Sidebar({
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <FontAwesomeIcon icon={faComments} className="w-4 h-4 text-base-content/40" />
+                        <FontAwesomeIcon
+                          icon={faComments}
+                          className="w-4 h-4 text-base-content/40"
+                        />
                         <span className="truncate">{timeline.name}</span>
                       </div>
                       <span
@@ -325,7 +335,10 @@ export function Sidebar({
                     className="w-full text-left p-3 hover:bg-base-200 rounded-lg text-sm text-base-content/80 flex items-center transition-colors group"
                     onClick={() => onOpenFile(file)}
                   >
-                    <FontAwesomeIcon icon={faFileCode} className="w-4 h-4 mr-2 text-base-content/40 group-hover:text-teal-600" />
+                    <FontAwesomeIcon
+                      icon={faFileCode}
+                      className="w-4 h-4 mr-2 text-base-content/40 group-hover:text-teal-600"
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="truncate">{file.name}</div>
                       <div className="text-xs text-base-content/50 truncate">{file.path}</div>

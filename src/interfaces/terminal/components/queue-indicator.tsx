@@ -15,14 +15,13 @@ export const QueueIndicator: React.FC<QueueIndicatorProps> = ({ stats }) => {
   }
 
   const baseText = `📬 ${stats.queueLength} queued`;
-  const highPriorityText = stats.highPriorityCount > 0 
-    ? ` (${stats.highPriorityCount} high)`
-    : '';
+  const highPriorityText = stats.highPriorityCount > 0 ? ` (${stats.highPriorityCount} high)` : '';
 
   return (
     <Box>
       <Text color="yellow">
-        {baseText}{highPriorityText}
+        {baseText}
+        {highPriorityText}
       </Text>
     </Box>
   );

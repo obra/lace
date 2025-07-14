@@ -84,7 +84,7 @@ const ShellInput: React.FC<ShellInputProps> = ({
   // Use Lace focus system
   const { isFocused, takeFocus } = useLaceFocus(FocusRegions.shell);
   const actualIsFocused = isFocused && !disabled;
-  
+
   // No auto-focus logic needed - provider handles initial focus
   const [bufferState, bufferOps] = useTextBuffer(value);
 
@@ -488,7 +488,14 @@ const ShellInput: React.FC<ShellInputProps> = ({
   }, [autocompleteVisible, autocompleteItems, autocompleteSelectedIndex, getCurrentWord]);
 
   return (
-    <Box flexDirection="column" backgroundColor={UI_BACKGROUNDS.SHELL_INPUT} width="100%" margin={1} padding={1} marginRight={2}>
+    <Box
+      flexDirection="column"
+      backgroundColor={UI_BACKGROUNDS.SHELL_INPUT}
+      width="100%"
+      margin={1}
+      padding={1}
+      marginRight={2}
+    >
       <Box>
         <Text color="cyan">&gt; </Text>
         <Box flexDirection="column" flexGrow={1}>

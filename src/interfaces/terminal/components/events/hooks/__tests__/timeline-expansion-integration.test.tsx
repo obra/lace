@@ -40,22 +40,22 @@ describe('Timeline Expansion Architecture Integration', () => {
             <Text>Timeline Controls:</Text>
             <Text>Emit Expand (simulated)</Text>
             <Text>Emit Collapse (simulated)</Text>
-            
-            <MockTimelineItem 
-              id="item1" 
-              isSelected={selectedItem === 'item1'} 
+
+            <MockTimelineItem
+              id="item1"
+              isSelected={selectedItem === 'item1'}
               onExpansionChange={(expanded) => {
                 expansionEvents.push(`item1-${expanded ? 'expanded' : 'collapsed'}`);
               }}
             />
-            <MockTimelineItem 
-              id="item2" 
-              isSelected={selectedItem === 'item2'} 
+            <MockTimelineItem
+              id="item2"
+              isSelected={selectedItem === 'item2'}
               onExpansionChange={(expanded) => {
                 expansionEvents.push(`item2-${expanded ? 'expanded' : 'collapsed'}`);
               }}
             />
-            
+
             <Text>Select Item 2 (simulated)</Text>
           </Box>
         );
@@ -108,20 +108,25 @@ describe('Timeline Expansion Architecture Integration', () => {
   }
 
   // Test component that simulates a timeline item
-  function MockTimelineItem({ 
-    id, 
-    isSelected, 
-    onExpansionChange 
-  }: { 
-    id: string; 
-    isSelected: boolean; 
+  function MockTimelineItem({
+    id,
+    isSelected,
+    onExpansionChange,
+  }: {
+    id: string;
+    isSelected: boolean;
     onExpansionChange?: (expanded: boolean) => void;
   }) {
-    const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected, onExpansionChange);
+    const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
+      isSelected,
+      onExpansionChange
+    );
 
     return (
       <Box>
-        <Text>Item {id}: {isSelected ? '[SELECTED]' : '[unselected]'} </Text>
+        <Text>
+          Item {id}: {isSelected ? '[SELECTED]' : '[unselected]'}{' '}
+        </Text>
         <Text>{isExpanded ? '[EXPANDED]' : '[collapsed]'}</Text>
         <Text>Expand (simulated)</Text>
         <Text>Collapse (simulated)</Text>
@@ -132,10 +137,10 @@ describe('Timeline Expansion Architecture Integration', () => {
   describe('Basic timeline-to-item communication', () => {
     it('should expand only the selected item when timeline emits expand', () => {
       let expandCallbacks: Record<string, MockedFunction<(expanded: boolean) => void>> = {};
-      
+
       function TestComponent() {
         const [selectedItem, setSelectedItem] = useState('item1');
-        
+
         // Track expansion changes for verification
         expandCallbacks.item1 = vi.fn() as MockedFunction<(expanded: boolean) => void>;
         expandCallbacks.item2 = vi.fn() as MockedFunction<(expanded: boolean) => void>;
@@ -143,14 +148,14 @@ describe('Timeline Expansion Architecture Integration', () => {
         return (
           <TimelineExpansionProvider>
             <MockTimeline>
-              <MockTimelineItem 
-                id="item1" 
-                isSelected={selectedItem === 'item1'} 
+              <MockTimelineItem
+                id="item1"
+                isSelected={selectedItem === 'item1'}
                 onExpansionChange={expandCallbacks.item1}
               />
-              <MockTimelineItem 
-                id="item2" 
-                isSelected={selectedItem === 'item2'} 
+              <MockTimelineItem
+                id="item2"
+                isSelected={selectedItem === 'item2'}
                 onExpansionChange={expandCallbacks.item2}
               />
               <Text>Select Item 2 (simulated)</Text>
@@ -180,15 +185,19 @@ describe('Timeline Expansion Architecture Integration', () => {
       function TestComponent() {
         return (
           <TimelineExpansionProvider>
-            <MockTimelineItem 
-              id="item1" 
+            <MockTimelineItem
+              id="item1"
               isSelected={false}
-              onExpansionChange={(expanded) => { expansionStates.item1 = expanded; }}
+              onExpansionChange={(expanded) => {
+                expansionStates.item1 = expanded;
+              }}
             />
-            <MockTimelineItem 
-              id="item2" 
+            <MockTimelineItem
+              id="item2"
               isSelected={false}
-              onExpansionChange={(expanded) => { expansionStates.item2 = expanded; }}
+              onExpansionChange={(expanded) => {
+                expansionStates.item2 = expanded;
+              }}
             />
           </TimelineExpansionProvider>
         );
@@ -207,13 +216,13 @@ describe('Timeline Expansion Architecture Integration', () => {
 
   describe('Context isolation between timeline instances', () => {
     it('should isolate expansion events between different timeline providers', () => {
-      const timeline1Callbacks = { 
-        item1: vi.fn() as MockedFunction<(expanded: boolean) => void>, 
-        item2: vi.fn() as MockedFunction<(expanded: boolean) => void> 
+      const timeline1Callbacks = {
+        item1: vi.fn() as MockedFunction<(expanded: boolean) => void>,
+        item2: vi.fn() as MockedFunction<(expanded: boolean) => void>,
       };
-      const timeline2Callbacks = { 
-        item3: vi.fn() as MockedFunction<(expanded: boolean) => void>, 
-        item4: vi.fn() as MockedFunction<(expanded: boolean) => void> 
+      const timeline2Callbacks = {
+        item3: vi.fn() as MockedFunction<(expanded: boolean) => void>,
+        item4: vi.fn() as MockedFunction<(expanded: boolean) => void>,
       };
 
       function MultiTimelineTest() {
@@ -223,14 +232,14 @@ describe('Timeline Expansion Architecture Integration', () => {
             <TimelineExpansionProvider>
               <Text>Timeline 1:</Text>
               <MockTimeline>
-                <MockTimelineItem 
-                  id="item1" 
-                  isSelected={true} 
+                <MockTimelineItem
+                  id="item1"
+                  isSelected={true}
                   onExpansionChange={timeline1Callbacks.item1}
                 />
-                <MockTimelineItem 
-                  id="item2" 
-                  isSelected={false} 
+                <MockTimelineItem
+                  id="item2"
+                  isSelected={false}
                   onExpansionChange={timeline1Callbacks.item2}
                 />
               </MockTimeline>
@@ -240,14 +249,14 @@ describe('Timeline Expansion Architecture Integration', () => {
             <TimelineExpansionProvider>
               <Text>Timeline 2:</Text>
               <MockTimeline>
-                <MockTimelineItem 
-                  id="item3" 
-                  isSelected={true} 
+                <MockTimelineItem
+                  id="item3"
+                  isSelected={true}
                   onExpansionChange={timeline2Callbacks.item3}
                 />
-                <MockTimelineItem 
-                  id="item4" 
-                  isSelected={false} 
+                <MockTimelineItem
+                  id="item4"
+                  isSelected={false}
                   onExpansionChange={timeline2Callbacks.item4}
                 />
               </MockTimeline>
@@ -279,9 +288,9 @@ describe('Timeline Expansion Architecture Integration', () => {
         return (
           <TimelineExpansionProvider>
             <MockTimeline>
-              <MockTimelineItem 
-                id="test-item" 
-                isSelected={isSelected} 
+              <MockTimelineItem
+                id="test-item"
+                isSelected={isSelected}
                 onExpansionChange={expansionCallback}
               />
               <Text>Toggle Selection (simulated)</Text>
@@ -311,9 +320,9 @@ describe('Timeline Expansion Architecture Integration', () => {
         return (
           <TimelineExpansionProvider>
             <MockTimeline>
-              <MockTimelineItem 
-                id="faulty-item" 
-                isSelected={true} 
+              <MockTimelineItem
+                id="faulty-item"
+                isSelected={true}
                 onExpansionChange={faultyCallback}
               />
             </MockTimeline>
@@ -333,9 +342,9 @@ describe('Timeline Expansion Architecture Integration', () => {
       function ManualControlTest() {
         return (
           <TimelineExpansionProvider>
-            <MockTimelineItem 
-              id="manual-item" 
-              isSelected={false}  // Not selected, so won't respond to timeline events
+            <MockTimelineItem
+              id="manual-item"
+              isSelected={false} // Not selected, so won't respond to timeline events
               onExpansionChange={expansionCallback}
             />
           </TimelineExpansionProvider>
@@ -357,20 +366,25 @@ describe('Timeline Expansion Architecture Integration', () => {
 
 describe('Hook usage patterns', () => {
   // Test component that simulates a timeline item (moved inside scope)
-  function MockTimelineItem({ 
-    id, 
-    isSelected, 
-    onExpansionChange 
-  }: { 
-    id: string; 
-    isSelected: boolean; 
+  function MockTimelineItem({
+    id,
+    isSelected,
+    onExpansionChange,
+  }: {
+    id: string;
+    isSelected: boolean;
     onExpansionChange?: (expanded: boolean) => void;
   }) {
-    const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected, onExpansionChange);
+    const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
+      isSelected,
+      onExpansionChange
+    );
 
     return (
       <Box>
-        <Text>Item {id}: {isSelected ? '[SELECTED]' : '[unselected]'} </Text>
+        <Text>
+          Item {id}: {isSelected ? '[SELECTED]' : '[unselected]'}{' '}
+        </Text>
         <Text>{isExpanded ? '[EXPANDED]' : '[collapsed]'}</Text>
         <Text>Expand (simulated)</Text>
         <Text>Collapse (simulated)</Text>
@@ -390,9 +404,8 @@ describe('Hook usage patterns', () => {
     // Should render successfully with provider
     const { lastFrame } = render(<TestWithProvider />);
     expect(lastFrame()).toContain('Item test: [unselected] [collapsed]');
-    
+
     // The architecture enforces provider requirement through useContext validation
     // This demonstrates proper context usage pattern
   });
-
 });

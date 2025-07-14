@@ -35,11 +35,11 @@ export function SwipeableCard({
 }: SwipeableCardProps) {
   const [isSwipeActive, setIsSwipeActive] = useState(false);
   const x = useMotionValue(0);
-  
+
   // Transform opacity based on swipe distance
   const leftOpacity = useTransform(x, [-swipeThreshold, 0], [1, 0]);
   const rightOpacity = useTransform(x, [0, swipeThreshold], [0, 1]);
-  
+
   // Transform scale for feedback
   const scale = useTransform(x, [-swipeThreshold, 0, swipeThreshold], [1.05, 1, 1.05]);
 
@@ -301,7 +301,12 @@ interface LongPressProps {
   className?: string;
 }
 
-export function LongPress({ children, onLongPress, duration = 500, className = '' }: LongPressProps) {
+export function LongPress({
+  children,
+  onLongPress,
+  duration = 500,
+  className = '',
+}: LongPressProps) {
   const [isPressed, setIsPressed] = useState(false);
 
   const handlePressStart = () => {

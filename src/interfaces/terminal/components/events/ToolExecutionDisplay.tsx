@@ -42,7 +42,10 @@ export function ToolExecutionDisplay({
   const toolCallData = callEvent.data as ToolCall;
 
   // Use shared expansion state management
-  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected || false, (expanded) => onToggle?.());
+  const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
+    isSelected || false,
+    (expanded) => onToggle?.()
+  );
 
   // Create handler that works with TimelineEntry interface
   const handleExpandedChange = (expanded: boolean) => {
@@ -62,7 +65,13 @@ export function ToolExecutionDisplay({
   );
   const output = firstTextBlock?.text;
   const error = toolResultData?.isError ? output : undefined;
-  const markerStatus: TimelineStatus = isStreaming ? 'pending' : success ? 'success' : toolResultData ? 'error' : 'none';
+  const markerStatus: TimelineStatus = isStreaming
+    ? 'pending'
+    : success
+      ? 'success'
+      : toolResultData
+        ? 'error'
+        : 'none';
 
   // Determine tool command for compact header
   const getToolCommand = (toolName: string, input: Record<string, unknown>): string => {

@@ -117,8 +117,8 @@ describe('StatusBar', () => {
         modified: 2,
         deleted: 1,
         untracked: 3,
-        staged: 1
-      }
+        staged: 1,
+      },
     };
 
     it('renders two rows when project context is provided', () => {
@@ -127,10 +127,10 @@ describe('StatusBar', () => {
       );
 
       const frame = lastFrame();
-      
+
       // Should contain original status bar content
       expect(frame).toContain(UI_SYMBOLS.PROVIDER + ' anthropic');
-      
+
       // Should contain project context row
       expect(frame).toContain('~/project');
       expect(frame).toContain(UI_SYMBOLS.GIT_BRANCH + ' main');
@@ -142,12 +142,12 @@ describe('StatusBar', () => {
       );
 
       const frame = lastFrame();
-      
+
       // Should show counts for non-zero values
       expect(frame).toContain(`2${UI_SYMBOLS.GIT_MODIFIED}`); // 2 modified
-      expect(frame).toContain(`1${UI_SYMBOLS.GIT_DELETED}`);  // 1 deleted
+      expect(frame).toContain(`1${UI_SYMBOLS.GIT_DELETED}`); // 1 deleted
       expect(frame).toContain(`3${UI_SYMBOLS.GIT_UNTRACKED}`); // 3 untracked
-      expect(frame).toContain(`1${UI_SYMBOLS.GIT_STAGED}`);   // 1 staged
+      expect(frame).toContain(`1${UI_SYMBOLS.GIT_STAGED}`); // 1 staged
     });
 
     it('only shows non-zero git status counts', () => {
@@ -160,8 +160,8 @@ describe('StatusBar', () => {
           modified: 0,
           deleted: 0,
           untracked: 1,
-          staged: 0
-        }
+          staged: 0,
+        },
       };
 
       const { lastFrame } = renderInkComponent(
@@ -169,10 +169,10 @@ describe('StatusBar', () => {
       );
 
       const frame = lastFrame();
-      
+
       // Should only show untracked count
       expect(frame).toContain(`1${UI_SYMBOLS.GIT_UNTRACKED}`);
-      
+
       // Should not show zero counts
       expect(frame).not.toContain(`0${UI_SYMBOLS.GIT_MODIFIED}`);
       expect(frame).not.toContain(`0${UI_SYMBOLS.GIT_DELETED}`);
@@ -183,7 +183,7 @@ describe('StatusBar', () => {
       const nonGitContext: ProjectContext = {
         cwd: '/Users/testuser/project',
         displayPath: '~/project',
-        isGitRepo: false
+        isGitRepo: false,
       };
 
       const { lastFrame } = renderInkComponent(
@@ -191,7 +191,7 @@ describe('StatusBar', () => {
       );
 
       const frame = lastFrame();
-      
+
       // Should show path but no git info
       expect(frame).toContain('~/project');
       expect(frame).not.toContain(UI_SYMBOLS.GIT_BRANCH);
@@ -202,7 +202,7 @@ describe('StatusBar', () => {
         cwd: '/Users/testuser/project',
         displayPath: '~/project',
         isGitRepo: false,
-        error: 'Not a git repository'
+        error: 'Not a git repository',
       };
 
       const { lastFrame } = renderInkComponent(
@@ -210,7 +210,7 @@ describe('StatusBar', () => {
       );
 
       const frame = lastFrame();
-      
+
       // Should show path and error indicator
       expect(frame).toContain('~/project');
       expect(frame).toContain(UI_SYMBOLS.GIT_ERROR);
@@ -226,8 +226,8 @@ describe('StatusBar', () => {
           modified: 0,
           deleted: 0,
           untracked: 0,
-          staged: 0
-        }
+          staged: 0,
+        },
       };
 
       const { lastFrame } = renderInkComponent(
@@ -235,7 +235,7 @@ describe('StatusBar', () => {
       );
 
       const frame = lastFrame();
-      
+
       // Should show path without branch info
       expect(frame).toContain('~/project');
       expect(frame).not.toContain(UI_SYMBOLS.GIT_BRANCH);
@@ -245,11 +245,11 @@ describe('StatusBar', () => {
       const { lastFrame } = renderInkComponent(<StatusBar {...basicProps} />);
 
       const frame = lastFrame();
-      
+
       // Should render normally without project context
       expect(frame).toContain(UI_SYMBOLS.PROVIDER + ' anthropic');
       expect(frame).toContain(UI_SYMBOLS.MESSAGE + ' 5');
-      
+
       // Should not contain project context elements
       expect(frame).not.toContain(UI_SYMBOLS.GIT_BRANCH);
     });
@@ -261,15 +261,15 @@ describe('StatusBar', () => {
 
       const frame = lastFrame();
       expect(frame).toBeDefined();
-      
+
       // Path should appear on the left
       const pathIndex = frame!.indexOf('~/project');
       expect(pathIndex).toBeGreaterThan(0);
-      
+
       // Git branch should appear on the right (after the path)
       const branchIndex = frame!.indexOf(UI_SYMBOLS.GIT_BRANCH + ' main');
       expect(branchIndex).toBeGreaterThan(pathIndex);
-      
+
       // Git status counts should be on the right side
       const modifiedIndex = frame!.indexOf(`2${UI_SYMBOLS.GIT_MODIFIED}`);
       expect(modifiedIndex).toBeGreaterThan(branchIndex);

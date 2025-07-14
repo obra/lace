@@ -111,7 +111,6 @@ export class UrlFetchTool extends Tool {
 
   private static tempFiles: string[] = [];
   private static cleanupRegistered = false;
-  private static readonly cleanupLock = Symbol('cleanup-lock');
   private turndownService: TurndownService;
 
   constructor() {
@@ -165,9 +164,7 @@ export class UrlFetchTool extends Tool {
     // Use a more robust singleton pattern to prevent race conditions
     if (UrlFetchTool.cleanupRegistered) return;
 
-    // Double-check locking pattern for thread safety
-    if ((globalThis as Record<string, unknown>)[UrlFetchTool.cleanupLock]) return;
-    (globalThis as Record<string, unknown>)[UrlFetchTool.cleanupLock] = true;
+    // Simple check to prevent duplicate registration
 
     UrlFetchTool.cleanupRegistered = true;
 

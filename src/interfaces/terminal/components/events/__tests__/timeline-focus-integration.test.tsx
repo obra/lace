@@ -1,4 +1,4 @@
-// ABOUTME: E2E test for timeline entry focus functionality  
+// ABOUTME: E2E test for timeline entry focus functionality
 // ABOUTME: Tests actual Return/Escape key behavior and focus lifecycle integration
 
 import React, { useRef } from 'react';
@@ -29,7 +29,12 @@ vi.mock('../../../../../../utils/token-estimation.js', () => ({
 vi.mock('../utils/timeline-utils.js', () => ({
   extractDelegateThreadId: (item: any) => {
     // Extract from successful delegate results using metadata
-    if (item.type === 'tool_execution' && item.call.name === 'delegate' && item.result && !item.result.isError) {
+    if (
+      item.type === 'tool_execution' &&
+      item.call.name === 'delegate' &&
+      item.result &&
+      !item.result.isError
+    ) {
       return item.result.metadata?.threadId || null;
     }
     return null;
@@ -52,8 +57,8 @@ const mockPopFocus = vi.fn();
 const mockIsFocused = vi.fn(() => false);
 
 vi.mock('../../../focus/index.js', () => ({
-  useLaceFocus: () => ({ 
-    isFocused: false 
+  useLaceFocus: () => ({
+    isFocused: false,
   }),
   useLaceFocusContext: () => ({
     currentFocus: 'timeline',
@@ -91,10 +96,12 @@ describe('Timeline Entry Focus E2E Tests', () => {
             arguments: { task: 'Complete the analysis task' },
           },
           result: {
-            content: [{ 
-              type: 'text' as const, 
-              text: JSON.stringify({ threadId: 'delegate-thread-123', status: 'created' }) 
-            }],
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify({ threadId: 'delegate-thread-123', status: 'created' }),
+              },
+            ],
             isError: false,
             metadata: {
               threadId: 'delegate-thread-123',
@@ -118,7 +125,7 @@ describe('Timeline Entry Focus E2E Tests', () => {
     };
   }
 
-  // Create non-focusable timeline 
+  // Create non-focusable timeline
   function createTimelineWithoutDelegate(): Timeline {
     return {
       items: [
@@ -155,23 +162,23 @@ describe('Timeline Entry Focus E2E Tests', () => {
   describe('Timeline Return Key Integration', () => {
     it('should trigger focus entry when Return pressed on delegate item', async () => {
       const timeline = createTimelineWithDelegate();
-      
+
       function TestTimelineWithInput() {
         const timelineRef = useRef<any>(null);
-        
+
         // Simulate Return key press on selected delegate item
         React.useEffect(() => {
           // Simulate timeline having delegate item selected (index 1)
           const selectedItemIndex = 1;
           const selectedItem = timeline.items[selectedItemIndex];
-          
+
           // Simulate Return key press
           if (timelineRef.current && canTimelineItemAcceptFocus(selectedItem)) {
             // This simulates the handleItemInteraction logic
             timelineRef.current.enterTimelineItem?.(selectedItemIndex);
           }
         }, []);
-        
+
         return (
           <LaceFocusProvider>
             <TimelineExpansionProvider>
@@ -182,10 +189,10 @@ describe('Timeline Entry Focus E2E Tests', () => {
       }
 
       const { lastFrame } = render(<TestTimelineWithInput />);
-      
+
       // Verify timeline renders delegate item
       expect(lastFrame()).toContain('delegate');
-      
+
       // The actual Return key behavior is tested through ref forwarding
       // We verify the delegate item is focusable
       const delegateItem = timeline.items[1];
@@ -197,41 +204,45 @@ describe('Timeline Entry Focus E2E Tests', () => {
   describe('Real Focus Behavior Integration', () => {
     it('should trigger focus operations when timeline interaction occurs', () => {
       const timeline = createTimelineWithDelegate();
-      
+
       function TimelineWithFocusSimulation() {
-        const [simulatedFocusState, setSimulatedFocusState] = React.useState<'none' | 'entering' | 'focused' | 'exiting'>('none');
+        const [simulatedFocusState, setSimulatedFocusState] = React.useState<
+          'none' | 'entering' | 'focused' | 'exiting'
+        >('none');
         const delegateItem = timeline.items[1];
         const focusId = getTimelineItemFocusId(delegateItem);
-        
+
         // Simulate the timeline interaction workflow
         React.useEffect(() => {
           if (canTimelineItemAcceptFocus(delegateItem)) {
             const timeouts = [
               // Step 1: User navigates to delegate item and presses Return
               setTimeout(() => setSimulatedFocusState('entering'), 10),
-              
+
               // Step 2: Focus entry completes
               setTimeout(() => setSimulatedFocusState('focused'), 20),
-              
+
               // Step 3: User presses Escape to exit
               setTimeout(() => setSimulatedFocusState('exiting'), 30),
-              
+
               // Step 4: Focus exit completes
               setTimeout(() => setSimulatedFocusState('none'), 40),
             ];
-            
+
             return () => {
-              timeouts.forEach(timeout => clearTimeout(timeout));
+              timeouts.forEach((timeout) => clearTimeout(timeout));
             };
           }
         }, []);
-        
+
         return (
           <LaceFocusProvider>
             <TimelineExpansionProvider>
               <Box flexDirection="column">
                 <Text>Timeline Focus Integration Test</Text>
-                <Text>Delegate item focusable: {canTimelineItemAcceptFocus(delegateItem).toString()}</Text>
+                <Text>
+                  Delegate item focusable: {canTimelineItemAcceptFocus(delegateItem).toString()}
+                </Text>
                 <Text>Focus ID: {focusId}</Text>
                 <Text>Current state: {simulatedFocusState}</Text>
                 <TimelineDisplay timeline={timeline} />
@@ -242,7 +253,7 @@ describe('Timeline Entry Focus E2E Tests', () => {
       }
 
       const { lastFrame } = render(<TimelineWithFocusSimulation />);
-      
+
       // Verify the integration test setup
       const output = lastFrame();
       expect(output).toContain('Timeline Focus Integration Test');
@@ -255,7 +266,7 @@ describe('Timeline Entry Focus E2E Tests', () => {
       const timeline = createTimelineWithDelegate();
       const delegateItem = timeline.items[1];
       const focusId = getTimelineItemFocusId(delegateItem);
-      
+
       // Simple test that validates the focus integration works
       function FocusIntegrationTest() {
         return (
@@ -264,7 +275,9 @@ describe('Timeline Entry Focus E2E Tests', () => {
               <Box flexDirection="column">
                 <Text>Focus Integration Test</Text>
                 <Text>Focus ID: {focusId}</Text>
-                <Text>Delegate focusable: {canTimelineItemAcceptFocus(delegateItem).toString()}</Text>
+                <Text>
+                  Delegate focusable: {canTimelineItemAcceptFocus(delegateItem).toString()}
+                </Text>
                 <TimelineDisplay timeline={timeline} />
               </Box>
             </TimelineExpansionProvider>
@@ -273,7 +286,7 @@ describe('Timeline Entry Focus E2E Tests', () => {
       }
 
       const { lastFrame } = render(<FocusIntegrationTest />);
-      
+
       // Verify the integration test renders correctly
       const output = lastFrame();
       expect(output).toContain('Focus Integration Test');
@@ -322,7 +335,7 @@ describe('Timeline Entry Focus E2E Tests', () => {
     it('should validate focus ID pattern for delegate items', () => {
       const timeline = createTimelineWithDelegate();
       const delegateItem = timeline.items[1];
-      
+
       const focusId = getTimelineItemFocusId(delegateItem);
       expect(focusId).toBe('delegate-delegate-thread-123');
       expect(focusId).toMatch(/^delegate-delegate-thread-\d+$/);

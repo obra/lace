@@ -6,12 +6,9 @@ export default function MissingComponentsPage() {
   return (
     <div className="min-h-screen bg-base-200 p-4">
       <div className="max-w-6xl mx-auto space-y-6">
-        
         {/* Header */}
         <div className="bg-base-100 rounded-lg border border-base-300 p-6">
-          <h1 className="text-3xl font-bold text-base-content mb-2">
-            Components We Need to Build
-          </h1>
+          <h1 className="text-3xl font-bold text-base-content mb-2">Components We Need to Build</h1>
           <p className="text-base-content/70">
             YAGNI-focused list of missing components required for backend integration
           </p>
@@ -23,11 +20,9 @@ export default function MissingComponentsPage() {
             <span className="px-2 py-1 text-xs font-medium rounded border bg-red-100 text-red-800 border-red-200">
               HIGH PRIORITY
             </span>
-            <h2 className="text-xl font-bold text-base-content">
-              Carousel Timeline Component
-            </h2>
+            <h2 className="text-xl font-bold text-base-content">Carousel Timeline Component</h2>
           </div>
-          
+
           <div className="space-y-4">
             <div className="border border-base-300 rounded p-4">
               <h3 className="font-semibold mb-2">Code Changes Carousel</h3>
@@ -48,7 +43,8 @@ export default function MissingComponentsPage() {
                 </div>
               </div>
               <div className="mt-3 text-sm text-base-content/70">
-                <strong>Backend needs:</strong> File change detection, git integration, impact analysis
+                <strong>Backend needs:</strong> File change detection, git integration, impact
+                analysis
               </div>
             </div>
 
@@ -74,7 +70,7 @@ export default function MissingComponentsPage() {
         <div className="bg-base-100 rounded-lg border border-base-300 p-6">
           <div className="flex items-center gap-2 mb-4">
             <span className="px-2 py-1 text-xs font-medium rounded border bg-red-100 text-red-800 border-red-200">
-              HIGH PRIORITY  
+              HIGH PRIORITY
             </span>
             <h2 className="text-xl font-bold text-base-content">
               External Integration Timeline Entries
@@ -94,9 +90,7 @@ export default function MissingComponentsPage() {
                 <div className="text-xs text-base-content/60">
                   Created by Claude • 2 minutes ago
                 </div>
-                <button className="btn btn-xs btn-outline mt-2">
-                  Open in Drive
-                </button>
+                <button className="btn btn-xs btn-outline mt-2">Open in Drive</button>
               </div>
             </div>
 
@@ -112,16 +106,14 @@ export default function MissingComponentsPage() {
                 <div className="text-xs text-base-content/60">
                   "Code review completed for user auth feature"
                 </div>
-                <button className="btn btn-xs btn-outline mt-2">
-                  View in Slack  
-                </button>
+                <button className="btn btn-xs btn-outline mt-2">View in Slack</button>
               </div>
             </div>
           </div>
 
           <div className="mt-4 p-3 bg-base-200 rounded text-sm">
-            <strong>Backend Integration:</strong> OAuth connectors, webhook handlers, 
-            external API abstraction layer, integration event tracking
+            <strong>Backend Integration:</strong> OAuth connectors, webhook handlers, external API
+            abstraction layer, integration event tracking
           </div>
         </div>
 
@@ -131,9 +123,7 @@ export default function MissingComponentsPage() {
             <span className="px-2 py-1 text-xs font-medium rounded border bg-orange-100 text-orange-800 border-orange-200">
               MEDIUM PRIORITY
             </span>
-            <h2 className="text-xl font-bold text-base-content">
-              Modal System
-            </h2>
+            <h2 className="text-xl font-bold text-base-content">Modal System</h2>
           </div>
 
           <div className="grid md:grid-cols-3 gap-4">
@@ -166,7 +156,7 @@ export default function MissingComponentsPage() {
           </div>
 
           <div className="mt-4 p-3 bg-base-200 rounded text-sm">
-            <strong>Backend Integration:</strong> Task management API, file system abstraction, 
+            <strong>Backend Integration:</strong> Task management API, file system abstraction,
             command registry and execution
           </div>
         </div>
@@ -177,9 +167,7 @@ export default function MissingComponentsPage() {
             <span className="px-2 py-1 text-xs font-medium rounded border bg-orange-100 text-orange-800 border-orange-200">
               MEDIUM PRIORITY
             </span>
-            <h2 className="text-xl font-bold text-base-content">
-              Enhanced Voice Recognition UI
-            </h2>
+            <h2 className="text-xl font-bold text-base-content">Enhanced Voice Recognition UI</h2>
           </div>
 
           <div className="border border-base-300 rounded p-4">
@@ -187,12 +175,12 @@ export default function MissingComponentsPage() {
             <div className="bg-base-200 p-3 rounded">
               <div className="flex items-end justify-center gap-1 h-12">
                 {[...Array(20)].map((_, i) => (
-                  <div 
-                    key={i} 
+                  <div
+                    key={i}
                     className="bg-primary rounded-t w-1 animate-pulse"
-                    style={{ 
+                    style={{
                       height: `${Math.random() * 100}%`,
-                      animationDelay: `${i * 0.1}s`
+                      animationDelay: `${i * 0.1}s`,
                     }}
                   ></div>
                 ))}
@@ -202,8 +190,8 @@ export default function MissingComponentsPage() {
               </div>
             </div>
             <div className="mt-3 text-sm text-base-content/70">
-              <strong>Features needed:</strong> Real-time audio level detection, 
-              mobile-optimized controls, transcription display
+              <strong>Features needed:</strong> Real-time audio level detection, mobile-optimized
+              controls, transcription display
             </div>
           </div>
         </div>
@@ -213,39 +201,38 @@ export default function MissingComponentsPage() {
           <h2 className="text-xl font-bold text-base-content mb-4">
             Implementation Strategy (YAGNI)
           </h2>
-          
+
           <div className="space-y-3 text-sm">
             <div className="flex items-start gap-3">
               <ChevronRightIcon className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
               <div>
-                <strong>Sprint 1:</strong> Build basic Carousel component with horizontal scroll 
-                and navigation dots. Start with simple text/file list carousels.
+                <strong>Sprint 1:</strong> Build basic Carousel component with horizontal scroll and
+                navigation dots. Start with simple text/file list carousels.
               </div>
             </div>
-            
+
             <div className="flex items-start gap-3">
               <ChevronRightIcon className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
               <div>
-                <strong>Sprint 2:</strong> Add integration timeline entries for Google Drive/Sheets. 
+                <strong>Sprint 2:</strong> Add integration timeline entries for Google Drive/Sheets.
                 Build OAuth flow and basic external API connectors.
               </div>
             </div>
-            
+
             <div className="flex items-start gap-3">
               <ChevronRightIcon className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
               <div>
-                <strong>Future:</strong> Modal system and voice enhancements only when user workflows 
-                demand them. Avoid building unused features.
+                <strong>Future:</strong> Modal system and voice enhancements only when user
+                workflows demand them. Avoid building unused features.
               </div>
             </div>
           </div>
 
           <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded text-sm">
-            <strong>YAGNI Principle:</strong> Each component should solve a specific user need 
-            and have clear backend integration requirements before development.
+            <strong>YAGNI Principle:</strong> Each component should solve a specific user need and
+            have clear backend integration requirements before development.
           </div>
         </div>
-
       </div>
     </div>
   );

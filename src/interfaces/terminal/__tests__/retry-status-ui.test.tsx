@@ -61,10 +61,10 @@ describe('Retry Status UI Integration', () => {
 
   beforeEach(async () => {
     vi.useFakeTimers();
-    
+
     threadId = 'test-thread-id';
     mockProvider = new MockRetryUIProvider({});
-    
+
     // Mock ToolExecutor
     mockToolExecutor = {
       executeTool: vi.fn(),
@@ -224,7 +224,10 @@ describe('Retry Status UI Integration', () => {
             errorType = 'server error';
           } else if (error.message.includes('auth') || error.message.includes('401')) {
             errorType = 'auth error';
-          } else if (error.message.includes('connection') || error.message.includes('ECONNREFUSED')) {
+          } else if (
+            error.message.includes('connection') ||
+            error.message.includes('ECONNREFUSED')
+          ) {
             errorType = 'connection error';
           }
           return errorType;

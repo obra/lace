@@ -138,7 +138,7 @@ export function Carousel({
   }
 
   return (
-    <div 
+    <div
       className={`relative group ${className}`}
       onKeyDown={handleKeyDown}
       tabIndex={0}
@@ -150,10 +150,10 @@ export function Carousel({
         <div
           ref={scrollRef}
           className="flex overflow-x-auto scroll-smooth snap-x snap-mandatory hide-scrollbar"
-          style={{ 
-            scrollbarWidth: 'none', 
+          style={{
+            scrollbarWidth: 'none',
             msOverflowStyle: 'none',
-            WebkitOverflowScrolling: 'touch'
+            WebkitOverflowScrolling: 'touch',
           }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -162,13 +162,13 @@ export function Carousel({
           {pages.map((pageItems, pageIndex) => (
             <div
               key={pageIndex}
-              className="w-full flex-shrink-0 snap-start flex gap-4"
+              className="w-full flex-shrink-0 snap-start flex gap-4 justify-start"
               aria-hidden={pageIndex !== currentIndex}
             >
               {pageItems.map((child, itemIndex) => (
                 <div
                   key={itemIndex}
-                  className="flex-1"
+                  className="flex-none"
                   style={{
                     minWidth: 0, // Prevent flex items from overflowing
                   }}
@@ -177,14 +177,14 @@ export function Carousel({
                 </div>
               ))}
               {/* Fill empty slots on last page */}
-              {pageItems.length < currentItemsPerView && Array.from({ length: currentItemsPerView - pageItems.length }).map((_, emptyIndex) => (
-                <div key={`empty-${emptyIndex}`} className="flex-1" />
-              ))}
+              {pageItems.length < currentItemsPerView &&
+                Array.from({ length: currentItemsPerView - pageItems.length }).map(
+                  (_, emptyIndex) => <div key={`empty-${emptyIndex}`} className="flex-none" />
+                )}
             </div>
           ))}
         </div>
       </div>
-
 
       {/* Navigation arrows */}
       {showNavigation && totalPages > 1 && (

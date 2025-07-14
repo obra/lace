@@ -76,9 +76,7 @@ export function AccountDropdown() {
             <div className="w-full bg-base-300 rounded-full h-2 animate-pulse"></div>
           </div>
         ) : error ? (
-          <div className="text-xs text-error">
-            Failed to load usage
-          </div>
+          <div className="text-xs text-error">Failed to load usage</div>
         ) : usage ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-base-content/60 mb-1">
@@ -101,14 +99,12 @@ export function AccountDropdown() {
             </div>
             {usage.apiKey.hasKey && (
               <div className="text-xs text-base-content/50 font-mono">
-                Key: {usage.apiKey.maskedKey}
+                Key: {'maskedKey' in usage.apiKey ? String(usage.apiKey.maskedKey) : 'N/A'}
               </div>
             )}
           </div>
         ) : (
-          <div className="text-xs text-base-content/60">
-            No usage data available
-          </div>
+          <div className="text-xs text-base-content/60">No usage data available</div>
         )}
       </div>
     </div>

@@ -106,11 +106,7 @@ describe('FocusLifecycleWrapper', () => {
 
       render(
         <TestWrapper>
-          <FocusLifecycleWrapper
-            focusId="test"
-            isActive={true}
-            onFocusActivated={onFocusActivated}
-          >
+          <FocusLifecycleWrapper focusId="test" isActive={true} onFocusActivated={onFocusActivated}>
             <div>content</div>
           </FocusLifecycleWrapper>
         </TestWrapper>
@@ -125,11 +121,7 @@ describe('FocusLifecycleWrapper', () => {
 
       const { rerender } = render(
         <TestWrapper>
-          <FocusLifecycleWrapper
-            focusId="test"
-            isActive={true}
-            onFocusRestored={onFocusRestored}
-          >
+          <FocusLifecycleWrapper focusId="test" isActive={true} onFocusRestored={onFocusRestored}>
             <div>content</div>
           </FocusLifecycleWrapper>
         </TestWrapper>
@@ -163,11 +155,7 @@ describe('FocusLifecycleWrapper', () => {
 
       const { rerender } = render(
         <TestWrapper>
-          <FocusLifecycleWrapper
-            focusId="test"
-            isActive={true}
-            onFocusRestored={onFocusRestored}
-          >
+          <FocusLifecycleWrapper focusId="test" isActive={true} onFocusRestored={onFocusRestored}>
             <div>content</div>
           </FocusLifecycleWrapper>
         </TestWrapper>
@@ -250,11 +238,7 @@ describe('FocusLifecycleWrapper', () => {
     it('renders children when inactive and renderWhenInactive=true', () => {
       const { getByText } = render(
         <TestWrapper>
-          <FocusLifecycleWrapper
-            focusId="test"
-            isActive={false}
-            renderWhenInactive={true}
-          >
+          <FocusLifecycleWrapper focusId="test" isActive={false} renderWhenInactive={true}>
             <div>test content</div>
           </FocusLifecycleWrapper>
         </TestWrapper>
@@ -266,11 +250,7 @@ describe('FocusLifecycleWrapper', () => {
     it('does not render children when inactive and renderWhenInactive=false', () => {
       const { queryByText } = render(
         <TestWrapper>
-          <FocusLifecycleWrapper
-            focusId="test"
-            isActive={false}
-            renderWhenInactive={false}
-          >
+          <FocusLifecycleWrapper focusId="test" isActive={false} renderWhenInactive={false}>
             <div>test content</div>
           </FocusLifecycleWrapper>
         </TestWrapper>
@@ -294,11 +274,7 @@ describe('FocusLifecycleWrapper', () => {
     it('shows/hides children based on isActive changes when renderWhenInactive=false', () => {
       const { getByText, queryByText, rerender } = render(
         <TestWrapper>
-          <FocusLifecycleWrapper
-            focusId="test"
-            isActive={true}
-            renderWhenInactive={false}
-          >
+          <FocusLifecycleWrapper focusId="test" isActive={true} renderWhenInactive={false}>
             <div>test content</div>
           </FocusLifecycleWrapper>
         </TestWrapper>
@@ -311,11 +287,7 @@ describe('FocusLifecycleWrapper', () => {
       act(() => {
         rerender(
           <TestWrapper>
-            <FocusLifecycleWrapper
-              focusId="test"
-              isActive={false}
-              renderWhenInactive={false}
-            >
+            <FocusLifecycleWrapper focusId="test" isActive={false} renderWhenInactive={false}>
               <div>test content</div>
             </FocusLifecycleWrapper>
           </TestWrapper>
@@ -328,11 +300,7 @@ describe('FocusLifecycleWrapper', () => {
       act(() => {
         rerender(
           <TestWrapper>
-            <FocusLifecycleWrapper
-              focusId="test"
-              isActive={true}
-              renderWhenInactive={false}
-            >
+            <FocusLifecycleWrapper focusId="test" isActive={true} renderWhenInactive={false}>
               <div>test content</div>
             </FocusLifecycleWrapper>
           </TestWrapper>
@@ -345,11 +313,7 @@ describe('FocusLifecycleWrapper', () => {
     it('always shows children when renderWhenInactive=true regardless of isActive', () => {
       const { getByText, rerender } = render(
         <TestWrapper>
-          <FocusLifecycleWrapper
-            focusId="test"
-            isActive={false}
-            renderWhenInactive={true}
-          >
+          <FocusLifecycleWrapper focusId="test" isActive={false} renderWhenInactive={true}>
             <div>test content</div>
           </FocusLifecycleWrapper>
         </TestWrapper>
@@ -362,11 +326,7 @@ describe('FocusLifecycleWrapper', () => {
       act(() => {
         rerender(
           <TestWrapper>
-            <FocusLifecycleWrapper
-              focusId="test"
-              isActive={true}
-              renderWhenInactive={true}
-            >
+            <FocusLifecycleWrapper focusId="test" isActive={true} renderWhenInactive={true}>
               <div>test content</div>
             </FocusLifecycleWrapper>
           </TestWrapper>
@@ -379,11 +339,7 @@ describe('FocusLifecycleWrapper', () => {
       act(() => {
         rerender(
           <TestWrapper>
-            <FocusLifecycleWrapper
-              focusId="test"
-              isActive={false}
-              renderWhenInactive={true}
-            >
+            <FocusLifecycleWrapper focusId="test" isActive={false} renderWhenInactive={true}>
               <div>test content</div>
             </FocusLifecycleWrapper>
           </TestWrapper>
