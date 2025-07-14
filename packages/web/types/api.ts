@@ -3,6 +3,7 @@
 
 // Import core types from Lace
 export type { ThreadId } from '../../../../src/types/threads';
+import type { ApprovalDecision } from '@/lib/server/lace-imports';
 
 export interface Session {
   id: ThreadId;         // sessionId (parent threadId)
@@ -11,12 +12,14 @@ export interface Session {
   agents: Agent[];
 }
 
+import type { AgentState } from '@/lib/server/lace-imports';
+
 export interface Agent {
   threadId: ThreadId;    // Full thread ID like sessionId.1
   name: string;
   provider: string;
   model: string;
-  status: 'idle' | 'thinking' | 'streaming' | 'tool_execution';
+  status: AgentState;
   createdAt: string;
 }
 
@@ -52,7 +55,7 @@ export interface ToolApprovalRequestData {
 // API request/response for approval decisions
 export interface ToolApprovalResponse {
   requestId: string;
-  decision: 'allow_once' | 'allow_session' | 'deny';
+  decision: ApprovalDecision;
   reason?: string;
 }
 

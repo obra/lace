@@ -16,6 +16,7 @@ export type { ThreadId } from '../../../../src/types/threads';
 export type { ThreadEvent, EventType } from '../../../../src/threads/types';
 export type { ApprovalDecision } from '../../../../src/tools/approval-types';
 export type { ToolAnnotations } from '../../../../src/tools/types';
+export type { AgentState } from '../../../../src/agents/agent';
 
 // Constants can be imported from built code 
 export { EVENT_TYPES } from '../../../../dist/threads/types.js';

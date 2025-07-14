@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { Session, ThreadId, SessionEvent, ToolApprovalRequestData } from '@/types/api';
+import type { Session, ThreadId, SessionEvent, ToolApprovalRequestData, ApprovalDecision } from '@/types/api';
 import { ConversationDisplay } from '@/components/ConversationDisplay';
 import { ToolApprovalModal } from '@/components/ToolApprovalModal';
 import { getAllEventTypes } from '@/types/events';
@@ -142,7 +142,7 @@ export default function Home() {
     setLoading(false);
   }
 
-  async function handleApprovalDecision(decision: 'allow_once' | 'allow_session' | 'deny') {
+  async function handleApprovalDecision(decision: ApprovalDecision) {
     if (!approvalRequest) return;
     
     try {

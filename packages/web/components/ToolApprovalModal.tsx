@@ -3,10 +3,11 @@
 
 import React, { useState, useEffect } from 'react';
 import type { ToolApprovalRequestData } from '@/types/api';
+import { ApprovalDecision } from '@/lib/server/lace-imports';
 
 interface ToolApprovalModalProps {
   request: ToolApprovalRequestData;
-  onDecision: (decision: 'allow_once' | 'allow_session' | 'deny') => void;
+  onDecision: (decision: ApprovalDecision) => void;
   onTimeout: () => void;
 }
 
@@ -38,20 +39,20 @@ export function ToolApprovalModal({
         case 'y':
         case 'a':
           e.preventDefault();
-          onDecision('allow_once');
+          onDecision(ApprovalDecision.ALLOW_ONCE);
           break;
         case 's':
           e.preventDefault();
-          onDecision('allow_session');
+          onDecision(ApprovalDecision.ALLOW_SESSION);
           break;
         case 'n':
         case 'd':
           e.preventDefault();
-          onDecision('deny');
+          onDecision(ApprovalDecision.DENY);
           break;
         case 'escape':
           e.preventDefault();
-          onDecision('deny');
+          onDecision(ApprovalDecision.DENY);
           break;
       }
     };
@@ -158,14 +159,14 @@ export function ToolApprovalModal({
         {/* Action Buttons */}
         <div className="flex gap-2">
           <button
-            onClick={() => onDecision('allow_once')}
+            onClick={() => onDecision(ApprovalDecision.ALLOW_ONCE)}
             className="flex-1 px-4 py-3 bg-green-600 rounded hover:bg-green-700 font-medium transition-colors"
           >
             Allow Once
             <span className="text-xs text-green-200 ml-2">[Y/A]</span>
           </button>
           <button
-            onClick={() => onDecision('allow_session')}
+            onClick={() => onDecision(ApprovalDecision.ALLOW_SESSION)}
             className="flex-1 px-4 py-3 bg-blue-600 rounded hover:bg-blue-700 font-medium transition-colors"
           >
             Allow Session

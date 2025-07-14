@@ -2,7 +2,7 @@
 // ABOUTME: Provides high-level API for managing sessions and agents using the Agent class
 
 import { Agent, ThreadManager, ProviderRegistry, ToolExecutor, getLaceDbPath, getEnvVar, DelegateTool } from './lace-imports';
-import type { ThreadId } from './lace-imports';
+import type { ThreadId, AgentState } from './lace-imports';
 import { Session, Agent as AgentType, SessionEvent } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
 import { getApprovalManager } from '@/lib/server/approval-manager';
@@ -314,7 +314,7 @@ export class SessionService {
       } catch (error) {
         // On timeout or error, deny the request
         console.error(`Approval request failed for ${toolName}:`, error);
-        resolve('deny');
+        resolve(ApprovalDecision.DENY);
         
         // Notify UI about the timeout/error
         const event: SessionEvent = {
@@ -330,7 +330,7 @@ export class SessionService {
     });
   }
 
-  private getAgentStatus(agent: Agent): 'idle' | 'thinking' | 'streaming' | 'tool_execution' {
+  private getAgentStatus(agent: Agent): AgentState {
     // Access the agent's internal state
     const state = (agent as any)._state;
     return state || 'idle';

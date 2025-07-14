@@ -33,7 +33,7 @@ class ApprovalManager {
     const sessionApproved = this.sessionApprovals.get(sessionId);
     if (sessionApproved?.has(toolName)) {
       console.log(`Tool ${toolName} already approved for session ${sessionId}`);
-      return 'allow_session';
+      return ApprovalDecision.ALLOW_SESSION;
     }
 
     const requestId = randomUUID();
@@ -90,7 +90,7 @@ class ApprovalManager {
     clearTimeout(pending.timeout);
     
     // Handle session-wide approvals
-    if (decision === 'allow_session') {
+    if (decision === ApprovalDecision.ALLOW_SESSION) {
       if (!this.sessionApprovals.has(pending.sessionId)) {
         this.sessionApprovals.set(pending.sessionId, new Set());
       }
