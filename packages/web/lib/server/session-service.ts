@@ -129,11 +129,10 @@ export class SessionService {
     const toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
     
-    // Create provider if specified
-    let delegateProvider;
-    if (provider) {
-      delegateProvider = await this.createProvider(provider, model);
-    }
+    // Create provider - default to anthropic if not specified
+    const providerType = provider || 'anthropic';
+    const modelName = model || 'claude-3-5-sonnet-20241022';
+    const delegateProvider = await this.createProvider(providerType, modelName);
     
     // Create delegate agent
     const delegateAgent = parentAgent.createDelegateAgent(
@@ -154,18 +153,17 @@ export class SessionService {
     await delegateAgent.start();
     
     // Store agent metadata
-    const defaultModel = 'claude-3-haiku-20240307';
     agentMetadata.set(delegateAgent.threadId as ThreadId, {
       name,
-      provider: delegateAgent.providerName,
-      model: model || defaultModel
+      provider: providerType,
+      model: modelName
     });
     
     const agentData: AgentType = {
       threadId: delegateAgent.threadId as ThreadId,
       name,
-      provider: delegateAgent.providerName,
-      model: model || defaultModel,
+      provider: providerType,
+      model: modelName,
       status: 'idle',
       createdAt: new Date().toISOString()
     };

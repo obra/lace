@@ -46,6 +46,15 @@ export async function POST(
 
     // Set up event handlers to broadcast via SSE
     const sseManager = SSEManager.getInstance();
+    
+    // Emit user message event
+    const userMessageEvent: SessionEvent = {
+      type: 'USER_MESSAGE',
+      threadId,
+      timestamp: new Date().toISOString(),
+      data: { content: body.message }
+    };
+    sseManager.broadcast(sessionId, userMessageEvent);
 
     agent.on('agent_thinking_start', () => {
       const event: SessionEvent = {
@@ -67,32 +76,32 @@ export async function POST(
       sseManager.broadcast(sessionId, event);
     });
 
-    agent.on('agent_message', (data: any) => {
+    agent.on('agent_response_complete', ({ content }: { content: string }) => {
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
         threadId,
         timestamp: new Date().toISOString(),
-        data
+        data: { content }
       };
       sseManager.broadcast(sessionId, event);
     });
 
-    agent.on('tool_call_start', (data: any) => {
+    agent.on('tool_call_start', ({ toolName, input }: { toolName: string; input: any }) => {
       const event: SessionEvent = {
         type: 'TOOL_CALL',
         threadId,
         timestamp: new Date().toISOString(),
-        data: { ...data, status: 'start' }
+        data: { toolName, input }
       };
       sseManager.broadcast(sessionId, event);
     });
 
-    agent.on('tool_call_complete', (data: any) => {
+    agent.on('tool_call_complete', ({ toolName, result }: { toolName: string; result: any }) => {
       const event: SessionEvent = {
         type: 'TOOL_RESULT',
         threadId,
         timestamp: new Date().toISOString(),
-        data
+        data: { toolName, result }
       };
       sseManager.broadcast(sessionId, event);
     });

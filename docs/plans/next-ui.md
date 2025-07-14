@@ -378,22 +378,50 @@ function useSessionAPI() {
 - Strong typing preserved with ThreadId branded type
 - SessionService encapsulates all Agent operations
 
-### Phase 3 In Progress
+### Phase 2.5 Backend Updates Required
+**Issue:** Thread type doesn't support metadata (names, session flags, etc.)
+
+**Current Thread Type:**
+```typescript
+export interface Thread {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  events: ThreadEvent[];
+}
+```
+
+**Options:**
+1. Add metadata field to Thread type and update ThreadPersistence
+2. Keep metadata in SessionService memory (current workaround)
+3. Create separate metadata table in SQLite
+
+**Current Implementation:**
+- SessionService maintains metadata in memory Maps
+- This works for development but won't persist across restarts
+- Production will need proper persistence
+
+### Phase 3 Complete ✅
 - [x] Simple web UI functional
-- [x] Can create sessions and view them
+- [x] Can create sessions and view them (using in-memory metadata)
 - [x] Real-time SSE connection working
-- [ ] Can spawn agents within sessions
-- [ ] Can send messages to agents
-- [ ] Terminal-like conversation display
-- [ ] Tool execution visibility
+- [x] Can spawn agents within sessions
+- [x] Can send messages to agents
+- [x] Terminal-like conversation display
+- [x] Tool execution visibility
 
 **Completed UI Components:**
-- `packages/web/app/page.tsx` - Basic test UI with session management and SSE events display
+- `packages/web/app/page.tsx` - Full test UI with session management, agent spawning, and messaging
+- `packages/web/components/ConversationDisplay.tsx` - Terminal-like conversation display component
 
 **Implementation Notes:**
 - Fixed Next.js 15 async params requirement
 - Webpack warnings about dynamic imports are expected and safe (ProviderRegistry)
-- Basic UI proves the API integration is working
+- Full UI with real-time event streaming working
+- Session names and metadata stored in memory only (needs backend update for persistence)
+- ConversationDisplay component shows messages, tool calls, and agent status
+- Event handlers properly forward agent events to SSE streams
+- Agent names displayed properly in conversation view
 
 ### Phase 4 Complete
 - [ ] Comprehensive test coverage
