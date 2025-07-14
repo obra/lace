@@ -20,8 +20,11 @@ export interface Agent {
   createdAt: string;
 }
 
+// Import the proper event types
+import type { SessionEventType } from './events';
+
 export interface SessionEvent {
-  type: 'USER_MESSAGE' | 'AGENT_MESSAGE' | 'TOOL_CALL' | 'TOOL_RESULT' | 'THINKING' | 'SYSTEM_MESSAGE' | 'LOCAL_SYSTEM_MESSAGE' | 'TOOL_APPROVAL_REQUEST';
+  type: SessionEventType;
   threadId: ThreadId;
   timestamp: string;
   data: any;

@@ -13,6 +13,6 @@ export { DelegateTool } from '../../../../dist/tools/implementations/delegate.js
 
 // Types can use source paths since they're compile-time only
 export type { ThreadId } from '../../../../src/types/threads';
-export type { ThreadEvent } from '../../../../src/types/events';
+export type { ThreadEvent, EventType } from '../../../../src/threads/types';
 export type { ApprovalDecision } from '../../../../src/tools/approval-types';
 export type { ToolAnnotations } from '../../../../src/tools/types';

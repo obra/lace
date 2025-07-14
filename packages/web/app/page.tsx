@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import type { Session, ThreadId, SessionEvent, ToolApprovalRequestData } from '@/types/api';
 import { ConversationDisplay } from '@/components/ConversationDisplay';
 import { ToolApprovalModal } from '@/components/ToolApprovalModal';
+import { getAllEventTypes } from '@/types/events';
 
 export default function Home() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -33,10 +34,7 @@ export default function Home() {
     const eventSource = new EventSource(`/api/sessions/${selectedSession}/events/stream`);
     
     // Listen to all event types
-    const eventTypes = [
-      'USER_MESSAGE', 'AGENT_MESSAGE', 'TOOL_CALL', 'TOOL_RESULT', 
-      'THINKING', 'SYSTEM_MESSAGE', 'LOCAL_SYSTEM_MESSAGE', 'TOOL_APPROVAL_REQUEST'
-    ];
+    const eventTypes = getAllEventTypes();
     
     eventTypes.forEach(eventType => {
       eventSource.addEventListener(eventType, (event: MessageEvent) => {
