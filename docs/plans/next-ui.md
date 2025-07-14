@@ -422,6 +422,8 @@ export interface Thread {
 - ConversationDisplay component shows messages, tool calls, and agent status
 - Event handlers properly forward agent events to SSE streams
 - Agent names displayed properly in conversation view
+- Tool approvals: Currently auto-approves read-only tools, denies destructive tools
+- TODO: Implement interactive tool approval UI flow
 
 ### Phase 4 Complete
 - [ ] Comprehensive test coverage

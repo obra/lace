@@ -285,6 +285,32 @@ export class SessionService {
     agent.on('conversation_complete', () => {
       console.log(`Agent ${threadId} conversation complete`);
     });
+    
+    // Handle tool approval requests
+    agent.on('approval_request', ({ toolName, input, isReadOnly, requestId, resolve }) => {
+      console.log(`Tool approval requested for ${toolName} (${isReadOnly ? 'read-only' : 'destructive'})`);
+      
+      // For now, auto-approve read-only tools and deny destructive ones
+      // TODO: Implement UI-based approval flow
+      if (isReadOnly) {
+        console.log(`Auto-approving read-only tool: ${toolName}`);
+        resolve('allow_once');
+      } else {
+        console.log(`Auto-denying destructive tool: ${toolName}`);
+        resolve('deny');
+        
+        // Notify UI about the denial
+        const event: SessionEvent = {
+          type: 'LOCAL_SYSTEM_MESSAGE',
+          threadId,
+          timestamp: new Date().toISOString(),
+          data: { 
+            message: `Tool "${toolName}" was denied (destructive operations not yet supported in web UI)`
+          }
+        };
+        sseManager.broadcast(sessionId, event);
+      }
+    });
   }
 
   private getAgentStatus(agent: Agent): 'idle' | 'thinking' | 'streaming' | 'tool_execution' {
