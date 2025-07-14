@@ -2,7 +2,7 @@
 // ABOUTME: Maps tool names to specific renderer components or returns null for GenericToolRenderer fallback
 
 import React from 'react';
-import { logger } from '../../../../../utils/logger.js';
+import { logger } from '~/utils/logger.js';
 
 // Module-level cache to avoid repeated dynamic imports
 const rendererCache = new Map<string, React.ComponentType<unknown> | null>();
@@ -43,7 +43,7 @@ export async function getToolRenderer(
     });
 
     // Attempt dynamic import
-    const module = await import(fileName);
+    const module = (await import(fileName)) as Record<string, unknown>;
     const moduleKeys = Object.keys(module);
 
     logger.debug('Tool renderer module loaded', {
@@ -54,7 +54,9 @@ export async function getToolRenderer(
     });
 
     // Return the default export or named export matching component name
-    const renderer = module.default || module[componentName] || null;
+    const defaultExport = module.default as React.ComponentType<unknown> | undefined;
+    const namedExport = module[componentName] as React.ComponentType<unknown> | undefined;
+    const renderer = defaultExport || namedExport || null;
 
     // Cache the result (including null for not found)
     rendererCache.set(toolName, renderer);
@@ -62,15 +64,15 @@ export async function getToolRenderer(
     logger.info('Tool renderer discovery result', {
       toolName,
       found: !!renderer,
-      rendererName: renderer?.name,
-      usedExport: module.default ? 'default' : module[componentName] ? 'named' : 'none',
+      rendererName: typeof renderer === 'function' ? renderer.name : undefined,
+      usedExport: defaultExport ? 'default' : namedExport ? 'named' : 'none',
     });
 
     return renderer;
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.debug('Tool renderer discovery failed', {
       toolName,
-      error: error?.message,
+      error: error instanceof Error ? error.message : String(error),
       fallback: 'GenericToolRenderer',
     });
     // Cache the null result to avoid repeated failed imports
