@@ -24,6 +24,10 @@ export class SessionService {
 
   async createProvider(providerType: string, model?: string) {
     try {
+      // Ensure environment variables are available
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      console.log(`Creating provider ${providerType} with API key:`, apiKey ? 'present' : 'missing');
+      
       const registry = await ProviderRegistry.createWithAutoDiscovery();
       const provider = await registry.createProvider(providerType, { model });
       console.log(`Created provider: ${providerType} with model: ${model}`);
@@ -197,6 +201,10 @@ export class SessionService {
     
     console.log(`Setting up SSE event handlers for agent ${threadId} in session ${sessionId}`);
     
+    // Check if agent is started
+    const isRunning = (agent as any)._isRunning;
+    console.log(`Agent ${threadId} running state:`, isRunning);
+    
     agent.on('agent_thinking_start', () => {
       console.log(`Agent ${threadId} started thinking`);
       const event: SessionEvent = {
@@ -271,6 +279,11 @@ export class SessionService {
         data: { message: `Agent error: ${error.message}` }
       };
       sseManager.broadcast(sessionId, event);
+    });
+    
+    // Listen for conversation complete
+    agent.on('conversation_complete', () => {
+      console.log(`Agent ${threadId} conversation complete`);
     });
   }
 
