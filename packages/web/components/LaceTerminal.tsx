@@ -27,70 +27,72 @@ export function LaceTerminal({ session, onAgentSpawn }: LaceTerminalProps) {
   const [activeAgentId, setActiveAgentId] = useState<ThreadId | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  
+
   const { connected, events, error: sseError } = useSSEStream(session.id);
   const { sendMessage, loading } = useSessionAPI();
 
   // Process SSE events into messages
   useEffect(() => {
-    const processedEvents = events.map(event => {
-      const messageId = `${event.threadId}-${event.timestamp}`;
-      
-      switch (event.type) {
-        case 'USER_MESSAGE':
-          return {
-            id: messageId,
-            type: 'user' as const,
-            content: event.data.content || event.data.message || '',
-            threadId: event.threadId,
-            timestamp: event.timestamp,
-          };
-          
-        case 'AGENT_MESSAGE':
-          return {
-            id: messageId,
-            type: 'agent' as const,
-            content: event.data.content || '',
-            threadId: event.threadId,
-            timestamp: event.timestamp,
-          };
-          
-        case 'THINKING':
-          return {
-            id: messageId,
-            type: 'thinking' as const,
-            content: event.data.status === 'start' ? 'Thinking...' : '',
-            threadId: event.threadId,
-            timestamp: event.timestamp,
-          };
-          
-        case 'TOOL_CALL':
-          return {
-            id: messageId,
-            type: 'tool' as const,
-            content: `Calling tool: ${event.data.name || 'unknown'}`,
-            threadId: event.threadId,
-            timestamp: event.timestamp,
-            metadata: event.data,
-          };
-          
-        case 'TOOL_RESULT':
-          return {
-            id: messageId,
-            type: 'tool' as const,
-            content: `Tool result: ${JSON.stringify(event.data.result || event.data, null, 2)}`,
-            threadId: event.threadId,
-            timestamp: event.timestamp,
-            metadata: event.data,
-          };
-          
-        default:
-          return null;
-      }
-    }).filter(Boolean) as Message[];
+    const processedEvents = events
+      .map((event) => {
+        const messageId = `${event.threadId}-${event.timestamp}`;
+
+        switch (event.type) {
+          case 'USER_MESSAGE':
+            return {
+              id: messageId,
+              type: 'user' as const,
+              content: event.data.content || event.data.message || '',
+              threadId: event.threadId,
+              timestamp: event.timestamp,
+            };
+
+          case 'AGENT_MESSAGE':
+            return {
+              id: messageId,
+              type: 'agent' as const,
+              content: event.data.content || '',
+              threadId: event.threadId,
+              timestamp: event.timestamp,
+            };
+
+          case 'THINKING':
+            return {
+              id: messageId,
+              type: 'thinking' as const,
+              content: event.data.status === 'start' ? 'Thinking...' : '',
+              threadId: event.threadId,
+              timestamp: event.timestamp,
+            };
+
+          case 'TOOL_CALL':
+            return {
+              id: messageId,
+              type: 'tool' as const,
+              content: `Calling tool: ${event.data.name || 'unknown'}`,
+              threadId: event.threadId,
+              timestamp: event.timestamp,
+              metadata: event.data,
+            };
+
+          case 'TOOL_RESULT':
+            return {
+              id: messageId,
+              type: 'tool' as const,
+              content: `Tool result: ${JSON.stringify(event.data.result || event.data, null, 2)}`,
+              threadId: event.threadId,
+              timestamp: event.timestamp,
+              metadata: event.data,
+            };
+
+          default:
+            return null;
+        }
+      })
+      .filter(Boolean) as Message[];
 
     if (processedEvents.length > 0) {
-      setMessages(prev => [...prev, ...processedEvents]);
+      setMessages((prev) => [...prev, ...processedEvents]);
     }
   }, [events]);
 
@@ -108,12 +110,12 @@ export function LaceTerminal({ session, onAgentSpawn }: LaceTerminalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!input.trim() || loading) return;
-    
+
     const targetThreadId = activeAgentId || session.id;
     const message = input.trim();
-    
+
     // Add user message immediately
     const userMessage: Message = {
       id: `user-${Date.now()}`,
@@ -122,17 +124,17 @@ export function LaceTerminal({ session, onAgentSpawn }: LaceTerminalProps) {
       threadId: targetThreadId,
       timestamp: new Date().toISOString(),
     };
-    setMessages(prev => [...prev, userMessage]);
-    
+    setMessages((prev) => [...prev, userMessage]);
+
     // Clear input
     setInput('');
-    
+
     // Send message
     await sendMessage(targetThreadId, message);
   };
 
   const getAgentName = (threadId: ThreadId): string => {
-    const agent = session.agents.find(a => a.threadId === threadId);
+    const agent = session.agents.find((a) => a.threadId === threadId);
     return agent?.name || 'Unknown';
   };
 
@@ -150,11 +152,7 @@ export function LaceTerminal({ session, onAgentSpawn }: LaceTerminalProps) {
             {sseError && <span className="ml-2 text-terminal-red">{sseError}</span>}
           </p>
         </div>
-        <AgentSpawner
-          sessionId={session.id}
-          agents={session.agents}
-          onAgentSpawn={onAgentSpawn}
-        />
+        <AgentSpawner sessionId={session.id} agents={session.agents} onAgentSpawn={onAgentSpawn} />
       </div>
 
       <div className="terminal-content scrollbar-terminal flex-1">
@@ -172,7 +170,8 @@ export function LaceTerminal({ session, onAgentSpawn }: LaceTerminalProps) {
                 )}
                 {message.type === 'agent' && (
                   <div className="message-agent">
-                    <span className="text-terminal-purple">{getAgentName(message.threadId)}:</span> {message.content}
+                    <span className="text-terminal-purple">{getAgentName(message.threadId)}:</span>{' '}
+                    {message.content}
                   </div>
                 )}
                 {message.type === 'thinking' && message.content && (
@@ -199,7 +198,7 @@ export function LaceTerminal({ session, onAgentSpawn }: LaceTerminalProps) {
               className="px-2 py-1 bg-gray-800 rounded text-sm focus:outline-none focus:ring-2 focus:ring-terminal-green"
             >
               <option value={session.id}>Session</option>
-              {session.agents.map(agent => (
+              {session.agents.map((agent) => (
                 <option key={agent.threadId} value={agent.threadId}>
                   {agent.name} ({agent.status})
                 </option>

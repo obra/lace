@@ -23,7 +23,7 @@ export async function POST(
 
     // Parse request body
     const body: MessageRequest = await request.json();
-    
+
     if (!body.message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
@@ -33,25 +33,23 @@ export async function POST(
     }
 
     // Determine session ID (parent thread for agents, or self for sessions)
-    const sessionId = threadId.includes('.') 
-      ? threadId.split('.')[0] as ThreadId 
-      : threadId;
+    const sessionId = threadId.includes('.') ? (threadId.split('.')[0] as ThreadId) : threadId;
 
     // Get agent instance
     const agent = sessionService.getAgent(threadId);
-    
+
     if (!agent) {
       return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
     }
 
     // Broadcast user message event via SSE
     const sseManager = SSEManager.getInstance();
-    
+
     const userMessageEvent: SessionEvent = {
       type: 'USER_MESSAGE',
       threadId,
       timestamp: new Date().toISOString(),
-      data: { content: body.message }
+      data: { content: body.message },
     };
     sseManager.broadcast(sessionId, userMessageEvent);
 
@@ -60,18 +58,19 @@ export async function POST(
 
     // Process message asynchronously
     console.log(`Processing message for agent ${threadId}: "${body.message}"`);
-    agent.sendMessage(body.message)
+    agent
+      .sendMessage(body.message)
       .then(() => {
         console.log(`Message processing started for agent ${threadId}`);
       })
-      .catch(error => {
+      .catch((error) => {
         console.error('Error processing message:', error);
         // Emit error event
         const errorEvent: SessionEvent = {
           type: 'LOCAL_SYSTEM_MESSAGE',
           threadId,
           timestamp: new Date().toISOString(),
-          data: { message: `Error: ${error.message}` }
+          data: { message: `Error: ${error.message}` },
         };
         sseManager.broadcast(sessionId, errorEvent);
       });
@@ -80,15 +79,12 @@ export async function POST(
     const response: MessageResponse = {
       status: 'accepted',
       threadId,
-      messageId
+      messageId,
     };
 
     return NextResponse.json(response, { status: 202 });
   } catch (error) {
     console.error('Error in POST /api/threads/[threadId]/message:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

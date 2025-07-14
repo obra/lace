@@ -6,7 +6,7 @@ export type { ThreadId } from '../../../../src/types/threads';
 import type { ApprovalDecision } from '@/lib/server/lace-imports';
 
 export interface Session {
-  id: ThreadId;         // sessionId (parent threadId)
+  id: ThreadId; // sessionId (parent threadId)
   name: string;
   createdAt: string;
   agents: Agent[];
@@ -15,7 +15,7 @@ export interface Session {
 import type { AgentState } from '@/lib/server/lace-imports';
 
 export interface Agent {
-  threadId: ThreadId;    // Full thread ID like sessionId.1
+  threadId: ThreadId; // Full thread ID like sessionId.1
   name: string;
   provider: string;
   model: string;
@@ -24,7 +24,7 @@ export interface Agent {
 }
 
 // Import the proper event types
-import type { SessionEventType } from './events';
+import type { SessionEventType } from '~/../types/events';
 
 export interface SessionEvent {
   type: SessionEventType;
@@ -37,7 +37,7 @@ export interface SessionEvent {
 export interface ToolApprovalRequestData {
   requestId: string;
   toolName: string;
-  input: unknown;  // Matches backend - not just Record<string, unknown>
+  input: unknown; // Matches backend - not just Record<string, unknown>
   isReadOnly: boolean;
   // Additional metadata for UI
   toolDescription?: string;
@@ -49,7 +49,7 @@ export interface ToolApprovalRequestData {
     safeInternal?: boolean;
   };
   riskLevel: 'safe' | 'moderate' | 'destructive';
-  timeout?: number;  // Seconds until auto-deny
+  timeout?: number; // Seconds until auto-deny
 }
 
 // API request/response for approval decisions

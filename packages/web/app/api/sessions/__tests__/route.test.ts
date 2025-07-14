@@ -12,12 +12,12 @@ const mockSessionService = {
   listSessions: vi.fn(),
   getSession: vi.fn(),
   spawnAgent: vi.fn(),
-  getAgent: vi.fn()
+  getAgent: vi.fn(),
 };
 
 // Mock the session service
 vi.mock('@/lib/server/session-service', () => ({
-  getSessionService: () => mockSessionService
+  getSessionService: () => mockSessionService,
 }));
 
 describe('Session API Routes', () => {
@@ -32,15 +32,15 @@ describe('Session API Routes', () => {
         id: 'lace_20240101_abcd1234' as ThreadId,
         name: sessionName,
         createdAt: '2024-01-01T12:00:00Z',
-        agents: []
+        agents: [],
       };
-      
+
       mockSessionService.createSession.mockResolvedValueOnce(mockSession);
 
       const request = new NextRequest('http://localhost:3005/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: sessionName })
+        body: JSON.stringify({ name: sessionName }),
       });
 
       const response = await POST(request);
@@ -56,15 +56,15 @@ describe('Session API Routes', () => {
         id: 'lace_20240101_abcd1234' as ThreadId,
         name: 'Untitled Session',
         createdAt: '2024-01-01T12:00:00Z',
-        agents: []
+        agents: [],
       };
-      
+
       mockSessionService.createSession.mockResolvedValueOnce(mockSession);
 
       const request = new NextRequest('http://localhost:3005/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
+        body: JSON.stringify({}),
       });
 
       const response = await POST(request);
@@ -81,7 +81,7 @@ describe('Session API Routes', () => {
       const request = new NextRequest('http://localhost:3005/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Test Session' })
+        body: JSON.stringify({ name: 'Test Session' }),
       });
 
       const response = await POST(request);
@@ -99,7 +99,7 @@ describe('Session API Routes', () => {
           id: 'lace_20240101_abcd1234' as ThreadId,
           name: 'Session 1',
           createdAt: '2024-01-01T12:00:00Z',
-          agents: []
+          agents: [],
         },
         {
           id: 'lace_20240101_efgh5678' as ThreadId,
@@ -112,12 +112,12 @@ describe('Session API Routes', () => {
               provider: 'anthropic',
               model: 'claude-3-opus',
               status: 'idle' as const,
-              createdAt: '2024-01-01T13:01:00Z'
-            }
-          ]
-        }
+              createdAt: '2024-01-01T13:01:00Z',
+            },
+          ],
+        },
       ];
-      
+
       mockSessionService.listSessions.mockResolvedValueOnce(mockSessions);
 
       const request = new NextRequest('http://localhost:3005/api/sessions');

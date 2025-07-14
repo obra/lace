@@ -13,38 +13,32 @@ export async function POST(
   try {
     const { requestId } = await params;
     const body: ToolApprovalResponse = await request.json();
-    
+
     // Validate decision matches ApprovalDecision enum
     const validDecisions: ApprovalDecision[] = [
       ApprovalDecision.ALLOW_ONCE,
       ApprovalDecision.ALLOW_SESSION,
-      ApprovalDecision.DENY
+      ApprovalDecision.DENY,
     ];
-    
-    if (!validDecisions.includes(body.decision as ApprovalDecision)) {
+
+    if (!validDecisions.includes(body.decision)) {
       return NextResponse.json(
         { error: 'Invalid decision. Must be: allow_once, allow_session, or deny' },
         { status: 400 }
       );
     }
-    
+
     const approvalManager = getApprovalManager();
-    const success = approvalManager.resolveApproval(requestId, body.decision as ApprovalDecision);
-    
+    const success = approvalManager.resolveApproval(requestId, body.decision);
+
     if (!success) {
-      return NextResponse.json(
-        { error: 'Approval request not found or expired' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Approval request not found or expired' }, { status: 404 });
     }
-    
+
     console.log(`Approval decision for ${requestId}: ${body.decision}`);
     return NextResponse.json({ status: 'resolved', decision: body.decision });
   } catch (error) {
     console.error('Error in POST /api/approvals/[requestId]:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

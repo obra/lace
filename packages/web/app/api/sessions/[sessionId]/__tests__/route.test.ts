@@ -19,7 +19,7 @@ const mockSessionService = {
 
 // Mock the session service
 vi.mock('@/lib/server/session-service', () => ({
-  getSessionService: () => mockSessionService
+  getSessionService: () => mockSessionService,
 }));
 
 describe('Session Detail API Route', () => {
@@ -41,11 +41,11 @@ describe('Session Detail API Route', () => {
             provider: 'anthropic',
             model: 'claude-3-opus',
             status: 'idle' as const,
-            createdAt: '2024-01-01T12:01:00Z'
-          }
-        ]
+            createdAt: '2024-01-01T12:01:00Z',
+          },
+        ],
       };
-      
+
       mockSessionService.getSession.mockResolvedValueOnce(mockSession);
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);

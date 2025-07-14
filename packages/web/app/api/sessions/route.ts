@@ -9,14 +9,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const sessionService = getSessionService();
     const sessions = await sessionService.listSessions();
-    
+
     return NextResponse.json({ sessions });
   } catch (error) {
     console.error('Error in GET /api/sessions:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -24,15 +21,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const sessionService = getSessionService();
     const body: CreateSessionRequest = await request.json();
-    
+
     const session = await sessionService.createSession(body.name);
 
     return NextResponse.json({ session }, { status: 201 });
   } catch (error) {
     console.error('Error in POST /api/sessions:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

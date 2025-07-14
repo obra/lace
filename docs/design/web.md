@@ -35,6 +35,37 @@ The Lace web interface provides a browser-based UI for interacting with AI agent
 - **Real-time**: Server-Sent Events (SSE)
 - **Backend Integration**: Direct use of Lace Agent class
 - **State Management**: Event sourcing with SSE updates
+- **Testing**: Vitest with React Testing Library
+
+## Project Structure
+
+```
+packages/web/
+├── app/                    # Next.js app directory
+│   ├── api/               # API routes
+│   │   ├── sessions/      # Session management
+│   │   ├── threads/       # Message handling
+│   │   ├── providers/     # Provider discovery
+│   │   └── approvals/     # Tool approvals
+│   ├── page.tsx           # Main UI page
+│   └── layout.tsx         # Root layout
+├── components/            # React components
+│   ├── AgentSpawner.tsx  # Dynamic agent creation
+│   ├── ConversationDisplay.tsx
+│   └── ToolApprovalModal.tsx
+├── hooks/                 # Custom React hooks
+│   ├── useSSEStream.ts   # SSE connection management
+│   └── useSessionAPI.ts  # API client hooks
+├── lib/                   # Server-side utilities
+│   ├── server/           # Server-only code
+│   │   ├── session-service.ts
+│   │   ├── approval-manager.ts
+│   │   └── lace-imports.ts
+│   └── sse-manager.ts    # SSE broadcasting
+└── types/                 # TypeScript types
+    ├── api.ts            # API interfaces
+    └── events.ts         # Event type mappings
+```
 
 ## API Design
 
@@ -48,6 +79,7 @@ The Lace web interface provides a browser-based UI for interacting with AI agent
 - Create new session
 - Body: `{ name?: string }`
 - Returns: `{ session: Session }`
+- Creates parent thread with default agent
 
 **GET /api/sessions/{sessionId}**
 - Get session details with agents
@@ -59,6 +91,7 @@ The Lace web interface provides a browser-based UI for interacting with AI agent
 - Spawn new agent within session
 - Body: `{ name: string, provider?: string, model?: string }`
 - Returns: `{ agent: Agent }`
+- Creates delegate agent with incremented thread ID
 
 **GET /api/sessions/{sessionId}/agents**
 - List agents in session
@@ -70,6 +103,8 @@ The Lace web interface provides a browser-based UI for interacting with AI agent
 - Send message to specific agent
 - Body: `{ message: string }`
 - Returns: `{ status: 'accepted', threadId, messageId }`
+- Validates thread ID format
+- Emits USER_MESSAGE event via SSE
 
 ### Event Streaming
 
@@ -77,6 +112,7 @@ The Lace web interface provides a browser-based UI for interacting with AI agent
 - SSE endpoint for real-time events
 - Sends all events for agents within the session
 - Event types include both persisted and UI-only events
+- Automatic reconnection support
 
 ### Tool Approvals
 
@@ -84,16 +120,15 @@ The Lace web interface provides a browser-based UI for interacting with AI agent
 - Submit approval decision for tool execution
 - Body: `{ requestId: string, decision: ApprovalDecision, reason?: string }`
 - Returns: `{ success: boolean }`
+- Supports session-wide approval policies
 
-### Provider Discovery (Planned)
+### Provider Discovery
 
 **GET /api/providers**
 - List all providers with available models
-- Returns: `{ providers: ProviderInfo[] }`
-
-**GET /api/providers/{provider}/test**
-- Test provider connectivity
-- Returns: `{ success: boolean, message: string }`
+- Returns: `{ providers: ProviderWithModels[] }`
+- Includes configuration status
+- Dynamic model discovery for local providers
 
 ## Event System
 
@@ -122,6 +157,14 @@ Agent processes → Emits events → SSE stream
 Browser receives events → Updates UI in real-time
 ```
 
+### Event Type Management
+
+Event types are centrally managed through:
+- `EVENT_TYPES` array from backend (persisted events)
+- `UI_EVENT_TYPES` array in web (UI-only events)
+- `getAllEventTypes()` helper combines both
+- Type-safe event discrimination
+
 ## Type System
 
 ### Shared Type Strategy
@@ -137,12 +180,26 @@ Browser receives events → Updates UI in real-time
    - `AgentState` - Agent state machine states
    - `ApprovalDecision` - Tool approval enum
    - `ToolAnnotations` - Tool metadata
+   - `ProviderInfo` / `ModelInfo` - Provider metadata
 
 3. **Web-Specific Types**
    - `Session` - Session metadata interface
    - `Agent` - Agent info with status
    - `SessionEvent` - Combined thread + UI events
    - API request/response interfaces
+
+### Type Import Pattern
+
+```typescript
+// Runtime imports from dist/
+export { Agent } from '../../../../dist/agents/agent.js';
+
+// Type-only imports from src/
+export type { ThreadId } from '../../../../src/types/threads';
+
+// Constants from built code
+export { EVENT_TYPES } from '../../../../dist/threads/types.js';
+```
 
 ## Implementation Details
 
@@ -152,7 +209,14 @@ Central service managing sessions and agents:
 - Wraps Agent class for web API usage
 - Handles agent lifecycle and event routing
 - Manages tool approval flow
-- Maintains session/agent metadata (temporary)
+- Maintains session/agent metadata (in-memory)
+- Creates delegates via `agent.createDelegateAgent()`
+
+Key responsibilities:
+- Thread ID generation and management
+- Provider instantiation with credentials
+- Event handler setup for SSE broadcasting
+- Agent state tracking
 
 ### SSEManager
 
@@ -160,21 +224,35 @@ Manages Server-Sent Event connections:
 - Session-scoped event broadcasting
 - Connection lifecycle management
 - Automatic reconnection handling
+- Event type registration
+
+Implementation:
+```typescript
+class SSEManager {
+  private sessionStreams = new Map<string, Set<ReadableStreamDefaultController>>();
+  
+  broadcast(sessionId: string, event: SessionEvent): void {
+    // Send to all connections for session
+  }
+}
+```
 
 ### ApprovalManager
 
 Handles tool approval workflow:
 - Tracks pending approval requests
 - Manages session-wide approvals
-- Implements timeout mechanism
+- Implements 30-second timeout
 - Routes decisions to agents
+- Risk level assessment
 
-### Type Imports
+### Provider Integration
 
-Backend types imported via `lace-imports.ts`:
-- Runtime imports from `dist/` directory
-- Type-only imports from `src/` directory
-- Constants imported from built code
+Dynamic provider/model discovery:
+- `ProviderRegistry.getAvailableProviders()`
+- Each provider implements metadata methods
+- Configuration status checking
+- Model capability reporting
 
 ## UI Components
 
@@ -184,190 +262,283 @@ Backend types imported via `lace-imports.ts`:
    - Create/select sessions
    - Display session list
    - Show agent count
+   - Real-time status updates
 
-2. **Agent Spawner**
-   - Agent naming
-   - Provider/model selection
-   - Spawn button with loading state
+2. **AgentSpawner**
+   - Dynamic provider/model dropdown
+   - Fetches available models from API
+   - Shows configuration status
+   - Handles unconfigured providers gracefully
 
-3. **Conversation Display**
+3. **ConversationDisplay**
    - Terminal-like message rendering
    - Tool execution visibility
    - Agent status indicators
    - Color-coded by message type
+   - Markdown support for formatting
 
-4. **Tool Approval Modal**
-   - Risk level indicators
+4. **ToolApprovalModal**
+   - Risk level indicators (safe/moderate/destructive)
    - Tool metadata display
-   - Parameter visualization
-   - Keyboard shortcuts
-   - Timeout countdown
+   - Parameter JSON visualization
+   - Keyboard shortcuts (Y/A/S/N/D/ESC)
+   - 30-second timeout countdown
+   - Session-wide approval option
 
-### Design Patterns
+### Custom Hooks
 
-1. **Real-time Updates**
-   - SSE connection per session
-   - Automatic UI updates on events
-   - Connection status indicators
+1. **useSSEStream**
+   - Manages SSE connection lifecycle
+   - Handles reconnection logic
+   - Parses and routes events
+   - Connection status tracking
 
-2. **Optimistic UI**
-   - Immediate feedback on actions
-   - Loading states during operations
-   - Error recovery flows
+2. **useSessionAPI**
+   - Wraps all API calls
+   - Loading/error state management
+   - Type-safe request/response handling
+   - Optimistic updates
 
-3. **Terminal Aesthetic**
-   - Dark theme with high contrast
-   - Monospace fonts for code
-   - Color-coded message types
-   - Minimal, focused interface
+## Testing Strategy
 
-## Current Limitations
+### Test Coverage
 
-### Metadata Persistence
-- Thread type doesn't support metadata
-- Session names stored in memory only
-- Agent metadata not persisted
-- Requires backend enhancement
+1. **API Route Tests** (100% coverage)
+   - All endpoints have comprehensive tests
+   - Mock service layer dependencies
+   - Test error scenarios
+   - Validate response formats
 
-### Fixed Configuration
-- Provider lists hardcoded in UI
-- No dynamic provider discovery yet
-- Credentials via environment only
-- No web-based configuration
+2. **Hook Tests**
+   - `useSSEStream` - Connection management
+   - `useSessionAPI` - API client behavior
+   - Mock EventSource and fetch
+   - Test state transitions
 
-### Single User
-- No authentication system
-- No session isolation
-- No access control
-- Development-focused
+3. **Integration Tests**
+   - Full conversation flow
+   - Multi-agent scenarios
+   - Session isolation
+   - Event ordering
+
+### Test Environment
+
+- Vitest with environment-specific config
+- `jsdom` for React components/hooks
+- `node` for API routes
+- Mock implementations for Agent class
+- Type-safe test utilities
+
+## Current State (January 2025)
+
+### What's Working
+
+1. **Complete API Implementation**
+   - All endpoints functional
+   - Real Agent integration
+   - SSE event streaming
+   - Tool approval system
+
+2. **Full Web UI**
+   - Session management
+   - Agent spawning with dynamic models
+   - Real-time conversation display
+   - Interactive tool approvals
+
+3. **Provider Discovery**
+   - Dynamic model listing
+   - Configuration status
+   - Support for all providers
+
+4. **Comprehensive Testing**
+   - 67 tests passing
+   - API routes fully tested
+   - React hooks tested
+   - Integration test coverage
+
+### Known Limitations
+
+1. **Metadata Persistence**
+   - Session/agent names in memory only
+   - Lost on server restart
+   - Needs ThreadManager enhancement
+
+2. **Development Only**
+   - No production build config
+   - No authentication
+   - Single-user focused
+
+3. **UI Polish**
+   - Basic styling only
+   - No syntax highlighting
+   - Limited error handling UI
+
+## Development Workflow
+
+### Setup
+```bash
+# From repository root
+npm install
+npm run build
+
+# Run web interface
+npm run web:dev
+```
+
+### Environment Variables
+```bash
+# Required for providers
+ANTHROPIC_API_KEY=your-key
+OPENAI_API_KEY=your-key
+
+# Optional
+LACE_DIR=/path/to/data
+```
+
+### Running Tests
+```bash
+cd packages/web
+npm test              # Watch mode
+npm test -- --run     # Single run
+```
+
+### Common Tasks
+
+**Adding a New API Endpoint:**
+1. Create route in `app/api/`
+2. Add types to `types/api.ts`
+3. Write tests first
+4. Implement handler
+5. Update SessionService if needed
+
+**Adding UI Components:**
+1. Create component in `components/`
+2. Use existing hooks for API calls
+3. Follow terminal aesthetic
+4. Add to main page.tsx
+
+**Updating Provider Models:**
+1. Update provider's `getAvailableModels()`
+2. No UI changes needed
+3. Models appear automatically
+
+## Best Practices
+
+### Type Safety
+- Always import types from backend
+- Use branded types (ThreadId)
+- Avoid type duplication
+- Validate at boundaries
+
+### Event Handling
+- Use EVENT_TYPES constants
+- Handle all event types
+- Log unknown events
+- Maintain event ordering
+
+### Error Handling
+- Graceful degradation
+- User-friendly messages
+- Retry mechanisms
+- Timeout handling
+
+### Performance
+- Minimize re-renders
+- Use React.memo where appropriate
+- Batch API calls
+- Efficient event processing
+
+## Security Considerations
+
+1. **Tool Approvals**
+   - All tools require explicit approval
+   - Risk level assessment and display
+   - Session-wide approval policies
+   - 30-second timeout auto-deny
+
+2. **Input Validation**
+   - ThreadId format validation
+   - Message content sanitization
+   - Request body validation
+   - Event payload verification
+
+3. **Connection Security**
+   - Session-scoped SSE streams
+   - No cross-session event leakage
+   - Graceful disconnection handling
+   - Connection limit per session
 
 ## Future Enhancements
 
 ### Near Term
-1. **Provider Discovery API**
-   - Dynamic model lists
-   - Configuration status
-   - Provider testing
+1. **Metadata Persistence**
+   - Extend Thread type with metadata
+   - Persist session/agent names
+   - Store UI preferences
 
-2. **Metadata Persistence**
-   - Add metadata to Thread type
-   - Store session/agent names
-   - Persist UI preferences
+2. **Production Build**
+   - Optimize for deployment
+   - Environment configuration
+   - Error tracking
 
-3. **Testing Coverage**
-   - Unit tests for components
-   - Integration tests for APIs
-   - E2E test scenarios
+3. **UI Improvements**
+   - Syntax highlighting
+   - Better error display
+   - Loading skeletons
 
 ### Long Term
 1. **Multi-User Support**
    - Authentication system
    - Session ownership
    - Access control
+   - User preferences
 
-2. **Dynamic Configuration**
-   - Web-based credentials
-   - Provider management
-   - Model preferences
+2. **Enhanced Features**
+   - File preview/editing
+   - Image display
+   - Code diff visualization
+   - Export conversations
 
-3. **Enhanced UI**
-   - Code syntax highlighting
-   - File preview
-   - Image support
-   - Markdown rendering
-
-4. **Collaboration**
+3. **Collaboration**
    - Shared sessions
-   - Real-time cursors
-   - Presence indicators
+   - Real-time presence
+   - Commenting system
 
-## Development Workflow
+## Migration Notes
 
-### Setup
-```bash
-cd packages/web
-npm install
-npm run dev
-```
+### From src/interfaces/web to packages/web
+- Moved to monorepo structure
+- Updated all import paths
+- Fixed @ alias configuration
+- Preserved all functionality
 
-### Building
-```bash
-# Build Lace first
-npm run build
+### Key Changes in Implementation
+1. Real Agent usage from start
+2. Dynamic provider discovery
+3. Comprehensive test coverage
+4. Tool approval system
+5. Type imports from backend
 
-# Then run web UI
-cd packages/web
-npm run dev
-```
+## Troubleshooting
 
-### Type Safety
-- Always import types from backend
-- Use branded types (ThreadId)
-- Avoid type duplication
-- Keep types co-located
+### Common Issues
 
-### Event Handling
-- Use EVENT_TYPES from backend
-- Separate UI events clearly
-- Handle all event types
-- Log unknown events
+**"Cannot find module" errors:**
+- Ensure `npm run build` in root
+- Check import paths
+- Verify @ alias in tsconfig
 
-### Testing
-- Test with real Agent instances
-- Verify SSE connections
-- Check event ordering
-- Test error scenarios
+**SSE Connection Issues:**
+- Check session ID format
+- Verify agent is started
+- Look for event handler setup
 
-## Security Considerations
+**Type Errors:**
+- Import types from backend
+- Don't duplicate type definitions
+- Use type assertions sparingly
 
-1. **Tool Approvals**
-   - All tools require approval
-   - Risk level assessment
-   - Session-wide approval option
-   - Timeout auto-deny
-
-2. **Input Validation**
-   - Validate thread ID formats
-   - Sanitize user messages
-   - Check request bodies
-   - Handle malformed events
-
-3. **Connection Security**
-   - SSE connections authenticated
-   - Session isolation enforced
-   - No cross-session leakage
-   - Graceful disconnection
-
-## Performance Considerations
-
-1. **Event Streaming**
-   - One SSE per session (not per agent)
-   - Event filtering by session
-   - Efficient broadcast mechanism
-   - Connection pooling
-
-2. **State Management**
-   - Event-based updates only
-   - No polling mechanisms
-   - Minimal re-renders
-   - Efficient event processing
-
-3. **Scalability**
-   - Stateless API design
-   - Session affinity not required
-   - Horizontal scaling ready
-   - Event store bottleneck
-
-## Deployment
-
-Currently development-only:
-- Requires built Lace dist/
-- Uses Next.js dev server
-- Hot module reload support
-- No production build yet
-
-Future production needs:
-- Static asset optimization
-- API route caching
-- CDN integration
-- Load balancing
+**Test Failures:**
+- Run `npm run build` first
+- Check mock implementations
+- Verify environment setup

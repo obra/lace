@@ -16,18 +16,13 @@ export async function POST(
 
     // Parse request body
     const body: CreateAgentRequest = await request.json();
-    
+
     if (!body.name) {
       return NextResponse.json({ error: 'Agent name is required' }, { status: 400 });
     }
 
-    const agent = await sessionService.spawnAgent(
-      sessionId,
-      body.name,
-      body.provider,
-      body.model
-    );
-    
+    const agent = await sessionService.spawnAgent(sessionId, body.name, body.provider, body.model);
+
     // Test SSE broadcast
     const { SSEManager } = await import('@/lib/sse-manager');
     const sseManager = SSEManager.getInstance();
@@ -35,22 +30,19 @@ export async function POST(
       type: 'LOCAL_SYSTEM_MESSAGE' as const,
       threadId: agent.threadId,
       timestamp: new Date().toISOString(),
-      data: { message: `Agent "${agent.name}" spawned successfully` }
+      data: { message: `Agent "${agent.name}" spawned successfully` },
     };
     sseManager.broadcast(sessionId, testEvent);
 
     return NextResponse.json({ agent }, { status: 201 });
   } catch (error) {
     console.error('Error in POST /api/sessions/[sessionId]/agents:', error);
-    
+
     if (error instanceof Error && error.message === 'Session not found') {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
-    
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -64,7 +56,7 @@ export async function GET(
     const sessionId = sessionIdParam as ThreadId;
 
     const session = await sessionService.getSession(sessionId);
-    
+
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
@@ -72,9 +64,6 @@ export async function GET(
     return NextResponse.json({ agents: session.agents || [] });
   } catch (error) {
     console.error('Error in GET /api/sessions/[sessionId]/agents:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

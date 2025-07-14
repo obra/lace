@@ -38,12 +38,12 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
       const res = await fetch('/api/providers');
       const data: ProvidersResponse = await res.json();
       setProviders(data.providers);
-      
+
       // Build model options
       const options: ModelOption[] = [];
       let defaultOption: string | null = null;
-      
-      data.providers.forEach(provider => {
+
+      data.providers.forEach((provider) => {
         if (!provider.configured) {
           // Add disabled option for unconfigured provider
           options.push({
@@ -54,7 +54,7 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
           });
         } else {
           // Add all models from configured provider
-          provider.models.forEach(model => {
+          provider.models.forEach((model) => {
             const value = `${provider.name}/${model.id}`;
             options.push({
               value,
@@ -63,16 +63,16 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
               isDefault: model.isDefault,
               disabled: false,
             });
-            
+
             if (model.isDefault && !defaultOption) {
               defaultOption = value;
             }
           });
         }
       });
-      
+
       setModelOptions(options);
-      
+
       // Set default selection
       if (defaultOption) {
         setSelectedModel(defaultOption);
@@ -86,7 +86,7 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!agentName.trim() || !selectedModel) return;
 
     const [provider, model] = selectedModel.split('/');
@@ -104,7 +104,7 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
     }
   };
 
-  const selectedOption = modelOptions.find(opt => opt.value === selectedModel);
+  const selectedOption = modelOptions.find((opt) => opt.value === selectedModel);
 
   return (
     <div className="mb-4">
@@ -129,31 +129,23 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
             disabled={loading}
             autoFocus
           />
-          
+
           <select
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
             className="w-full px-3 py-1 bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-terminal-green text-sm"
             disabled={loading || modelOptions.length === 0}
           >
-            {modelOptions.length === 0 && (
-              <option value="">Loading providers...</option>
-            )}
+            {modelOptions.length === 0 && <option value="">Loading providers...</option>}
             {modelOptions.map((option, idx) => (
-              <option 
-                key={idx} 
-                value={option.value} 
-                disabled={option.disabled}
-              >
+              <option key={idx} value={option.value} disabled={option.disabled}>
                 {option.label}
               </option>
             ))}
           </select>
 
           {selectedOption?.description && (
-            <p className="text-xs text-gray-500 px-1">
-              {selectedOption.description}
-            </p>
+            <p className="text-xs text-gray-500 px-1">{selectedOption.description}</p>
           )}
 
           <button
@@ -164,9 +156,7 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
             {loading ? 'Spawning...' : 'Spawn Agent'}
           </button>
 
-          {error && (
-            <p className="text-terminal-red text-xs">{error}</p>
-          )}
+          {error && <p className="text-terminal-red text-xs">{error}</p>}
         </form>
       )}
 
@@ -177,9 +167,7 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
             className="px-3 py-1 bg-gray-800 rounded text-sm flex items-center gap-2"
           >
             <span className="font-medium">{agent.name}</span>
-            <span className={`text-xs ${getStatusColor(agent.status)}`}>
-              {agent.status}
-            </span>
+            <span className={`text-xs ${getStatusColor(agent.status)}`}>{agent.status}</span>
           </div>
         ))}
       </div>
@@ -189,10 +177,15 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
 
 function getStatusColor(status: Agent['status']): string {
   switch (status) {
-    case 'idle': return 'status-idle';
-    case 'thinking': return 'status-thinking';
-    case 'streaming': return 'status-streaming';
-    case 'tool_execution': return 'status-tool-execution';
-    default: return 'text-gray-500';
+    case 'idle':
+      return 'status-idle';
+    case 'thinking':
+      return 'status-thinking';
+    case 'streaming':
+      return 'status-streaming';
+    case 'tool_execution':
+      return 'status-tool-execution';
+    default:
+      return 'text-gray-500';
   }
 }

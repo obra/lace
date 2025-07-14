@@ -15,7 +15,7 @@ export async function GET(
     const sessionId = sessionIdParam as ThreadId;
 
     const session = await sessionService.getSession(sessionId);
-    
+
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
@@ -23,9 +23,6 @@ export async function GET(
     return NextResponse.json({ session });
   } catch (error) {
     console.error('Error in GET /api/sessions/[sessionId]:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -1,8 +1,16 @@
 // ABOUTME: Server-side session management service
 // ABOUTME: Provides high-level API for managing sessions and agents using the Agent class
 
-import { Agent, ThreadManager, ProviderRegistry, ToolExecutor, getLaceDbPath, getEnvVar, DelegateTool } from './lace-imports';
-import type { ThreadId, AgentState } from './lace-imports';
+import {
+  Agent,
+  ThreadManager,
+  ProviderRegistry,
+  ToolExecutor,
+  getLaceDbPath,
+  getEnvVar,
+  DelegateTool,
+} from '~/../lib/server/lace-imports';
+import type { ThreadId, AgentState } from '~/../lib/server/lace-imports';
 import { Session, Agent as AgentType, SessionEvent } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
 import { getApprovalManager } from '@/lib/server/approval-manager';
@@ -27,8 +35,11 @@ export class SessionService {
     try {
       // Ensure environment variables are available
       const apiKey = process.env.ANTHROPIC_API_KEY;
-      console.log(`Creating provider ${providerType} with API key:`, apiKey ? 'present' : 'missing');
-      
+      console.log(
+        `Creating provider ${providerType} with API key:`,
+        apiKey ? 'present' : 'missing'
+      );
+
       const registry = await ProviderRegistry.createWithAutoDiscovery();
       const provider = await registry.createProvider(providerType, { model });
       console.log(`Created provider: ${providerType} with model: ${model}`);
@@ -43,18 +54,18 @@ export class SessionService {
     // Get default provider and model from environment
     const defaultProvider = getEnvVar('ANTHROPIC_API_KEY') ? 'anthropic' : 'openai';
     const defaultModel = 'claude-3-haiku-20240307';
-    
+
     // Generate thread ID for the session
     const threadId = this.threadManager.generateThreadId();
     this.threadManager.createThread(threadId);
-    
+
     // Create tool executor
     const toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
-    
+
     // Create provider
     const provider = await this.createProvider(defaultProvider, defaultModel);
-    
+
     // Create a new agent for the session
     const agent = new Agent({
       provider,
@@ -63,53 +74,53 @@ export class SessionService {
       threadId,
       tools: toolExecutor.getAllTools(),
     });
-    
+
     // Set up delegate tool dependencies
     const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
     if (delegateTool) {
       delegateTool.setDependencies(agent, toolExecutor);
     }
-    
+
     // Store session metadata
     const session: Session = {
       id: threadId,
       name: name || 'Untitled Session',
       createdAt: new Date().toISOString(),
-      agents: []
+      agents: [],
     };
-    
+
     sessionMetadata.set(threadId, {
       name: session.name,
       createdAt: session.createdAt,
-      isSession: true
+      isSession: true,
     });
-    
+
     // Store the agent instance
     activeAgents.set(threadId, agent);
-    
+
     // Start the agent
     await agent.start();
-    
+
     // Set up event handlers for SSE broadcasting
     this.setupAgentEventHandlers(agent, threadId);
-    
+
     return session;
   }
 
   async listSessions(): Promise<Session[]> {
     // Return sessions from our metadata store
     const sessions: Session[] = [];
-    
+
     for (const [threadId, metadata] of sessionMetadata.entries()) {
       const agents = this.getSessionAgents(threadId);
       sessions.push({
         id: threadId,
         name: metadata.name,
         createdAt: metadata.createdAt,
-        agents
+        agents,
       });
     }
-    
+
     return sessions;
   }
 
@@ -118,14 +129,14 @@ export class SessionService {
     if (!metadata) {
       return null;
     }
-    
+
     const agents = this.getSessionAgents(sessionId);
-    
+
     return {
       id: sessionId,
       name: metadata.name,
       createdAt: metadata.createdAt,
-      agents
+      agents,
     };
   }
 
@@ -142,53 +153,50 @@ export class SessionService {
       console.error('Active agents:', Array.from(activeAgents.keys()));
       throw new Error('Session not found');
     }
-    
+
     // Create tool executor for delegate
     const toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
-    
+
     // Create provider - default to anthropic if not specified
     const providerType = provider || 'anthropic';
     const modelName = model || 'claude-3-5-sonnet-20241022';
     const delegateProvider = await this.createProvider(providerType, modelName);
-    
+
     // Create delegate agent
-    const delegateAgent = parentAgent.createDelegateAgent(
-      toolExecutor,
-      delegateProvider
-    );
-    
+    const delegateAgent = parentAgent.createDelegateAgent(toolExecutor, delegateProvider);
+
     // Set up delegate tool dependencies
     const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
     if (delegateTool) {
       delegateTool.setDependencies(delegateAgent, toolExecutor);
     }
-    
+
     // Store the agent
     activeAgents.set(delegateAgent.threadId as ThreadId, delegateAgent);
-    
+
     // Start the delegate agent
     await delegateAgent.start();
-    
+
     // Set up event handlers for SSE broadcasting
     this.setupAgentEventHandlers(delegateAgent, sessionId);
-    
+
     // Store agent metadata
     agentMetadata.set(delegateAgent.threadId as ThreadId, {
       name,
       provider: providerType,
-      model: modelName
+      model: modelName,
     });
-    
+
     const agentData: AgentType = {
       threadId: delegateAgent.threadId as ThreadId,
       name,
       provider: providerType,
       model: modelName,
       status: 'idle',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
-    
+
     return agentData;
   }
 
@@ -199,20 +207,20 @@ export class SessionService {
   private setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
     const sseManager = SSEManager.getInstance();
     const threadId = agent.threadId as ThreadId;
-    
+
     console.log(`Setting up SSE event handlers for agent ${threadId} in session ${sessionId}`);
-    
+
     // Check if agent is started
     const isRunning = (agent as any)._isRunning;
     console.log(`Agent ${threadId} running state:`, isRunning);
-    
+
     agent.on('agent_thinking_start', () => {
       console.log(`Agent ${threadId} started thinking`);
       const event: SessionEvent = {
         type: 'THINKING',
         threadId,
         timestamp: new Date().toISOString(),
-        data: { status: 'start' }
+        data: { status: 'start' },
       };
       sseManager.broadcast(sessionId, event);
     });
@@ -222,7 +230,7 @@ export class SessionService {
         type: 'THINKING',
         threadId,
         timestamp: new Date().toISOString(),
-        data: { status: 'complete' }
+        data: { status: 'complete' },
       };
       sseManager.broadcast(sessionId, event);
     });
@@ -233,11 +241,11 @@ export class SessionService {
         type: 'AGENT_MESSAGE',
         threadId,
         timestamp: new Date().toISOString(),
-        data: { content }
+        data: { content },
       };
       sseManager.broadcast(sessionId, event);
     });
-    
+
     // Also listen for streaming tokens if needed
     agent.on('agent_token', ({ token }: { token: string }) => {
       // For now, we'll just log this to see if tokens are being emitted
@@ -250,7 +258,7 @@ export class SessionService {
         type: 'TOOL_CALL',
         threadId,
         timestamp: new Date().toISOString(),
-        data: { toolName, input }
+        data: { toolName, input },
       };
       sseManager.broadcast(sessionId, event);
     });
@@ -260,16 +268,16 @@ export class SessionService {
         type: 'TOOL_RESULT',
         threadId,
         timestamp: new Date().toISOString(),
-        data: { toolName, result }
+        data: { toolName, result },
       };
       sseManager.broadcast(sessionId, event);
     });
-    
+
     // Listen for state changes to debug
     agent.on('state_change', ({ from, to }: { from: string; to: string }) => {
       console.log(`Agent ${threadId} state changed: ${from} -> ${to}`);
     });
-    
+
     // Listen for any errors
     agent.on('error', ({ error }: { error: Error }) => {
       console.error(`Agent ${threadId} error:`, error);
@@ -277,28 +285,30 @@ export class SessionService {
         type: 'LOCAL_SYSTEM_MESSAGE',
         threadId,
         timestamp: new Date().toISOString(),
-        data: { message: `Agent error: ${error.message}` }
+        data: { message: `Agent error: ${error.message}` },
       };
       sseManager.broadcast(sessionId, event);
     });
-    
+
     // Listen for conversation complete
     agent.on('conversation_complete', () => {
       console.log(`Agent ${threadId} conversation complete`);
     });
-    
+
     // Handle tool approval requests
     agent.on('approval_request', async ({ toolName, input, isReadOnly, requestId, resolve }) => {
-      console.log(`Tool approval requested for ${toolName} (${isReadOnly ? 'read-only' : 'destructive'})`);
-      
+      console.log(
+        `Tool approval requested for ${toolName} (${isReadOnly ? 'read-only' : 'destructive'})`
+      );
+
       const approvalManager = getApprovalManager();
-      
+
       try {
         // Get tool metadata from the tool executor
         const tool = (agent as any)._toolExecutor?.getTool(toolName);
         const toolDescription = tool?.description;
         const toolAnnotations = tool?.annotations;
-        
+
         // Request approval through the manager
         const decision = await approvalManager.requestApproval(
           threadId,
@@ -309,21 +319,21 @@ export class SessionService {
           input,
           isReadOnly
         );
-        
+
         resolve(decision);
       } catch (error) {
         // On timeout or error, deny the request
         console.error(`Approval request failed for ${toolName}:`, error);
         resolve(ApprovalDecision.DENY);
-        
+
         // Notify UI about the timeout/error
         const event: SessionEvent = {
           type: 'LOCAL_SYSTEM_MESSAGE',
           threadId,
           timestamp: new Date().toISOString(),
-          data: { 
-            message: `Tool "${toolName}" was denied (${error instanceof Error ? error.message : 'approval failed'})`
-          }
+          data: {
+            message: `Tool "${toolName}" was denied (${error instanceof Error ? error.message : 'approval failed'})`,
+          },
         };
         sseManager.broadcast(sessionId, event);
       }
@@ -338,7 +348,7 @@ export class SessionService {
 
   private getSessionAgents(sessionId: ThreadId): AgentType[] {
     const agents: AgentType[] = [];
-    
+
     // Find all agents that are children of this session
     for (const [threadId, metadata] of agentMetadata.entries()) {
       if (threadId.startsWith(`${sessionId}.`)) {
@@ -349,18 +359,17 @@ export class SessionService {
           provider: metadata.provider,
           model: metadata.model,
           status: agent ? this.getAgentStatus(agent) : 'inactive',
-          createdAt: new Date().toISOString() // Would need to track this properly
+          createdAt: new Date().toISOString(), // Would need to track this properly
         });
       }
     }
-    
+
     return agents;
   }
 }
 
 // Use global to persist across HMR in development
 declare global {
-  // eslint-disable-next-line no-var
   var sessionService: SessionService | undefined;
 }
 

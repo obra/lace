@@ -24,7 +24,7 @@ export function SessionManager({
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const request: CreateSessionRequest = {
       name: sessionName.trim() || undefined,
     };
@@ -69,9 +69,7 @@ export function SessionManager({
               {loading ? 'Creating...' : 'Create'}
             </button>
           </div>
-          {error && (
-            <p className="text-terminal-red text-sm mt-1">{error}</p>
-          )}
+          {error && <p className="text-terminal-red text-sm mt-1">{error}</p>}
         </form>
       )}
 

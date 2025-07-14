@@ -2,23 +2,17 @@
 // ABOUTME: Sets up global styles and metadata
 
 import type { Metadata } from 'next';
-import './globals.css';
+import '~/../app/globals.css';
 
 export const metadata: Metadata = {
   title: 'Lace Web Terminal',
   description: 'AI coding assistant with multi-agent support',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="antialiased">
-        {children}
-      </body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

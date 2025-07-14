@@ -16,38 +16,41 @@ export function useSessionAPI() {
   });
 
   const setLoading = (loading: boolean) => {
-    setState(prev => ({ ...prev, loading }));
+    setState((prev) => ({ ...prev, loading }));
   };
 
   const setError = (error: string | null) => {
-    setState(prev => ({ ...prev, error }));
+    setState((prev) => ({ ...prev, error }));
   };
 
-  const createSession = useCallback(async (request: CreateSessionRequest): Promise<Session | null> => {
-    setLoading(true);
-    setError(null);
+  const createSession = useCallback(
+    async (request: CreateSessionRequest): Promise<Session | null> => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const response = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
-      });
+      try {
+        const response = await fetch('/api/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(request),
+        });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create session');
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to create session');
+        }
+
+        const data = await response.json();
+        return data.session;
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'Unknown error');
+        return null;
+      } finally {
+        setLoading(false);
       }
-
-      const data = await response.json();
-      return data.session;
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Unknown error');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   const listSessions = useCallback(async (): Promise<Session[]> => {
     setLoading(true);
@@ -55,7 +58,7 @@ export function useSessionAPI() {
 
     try {
       const response = await fetch('/api/sessions');
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Failed to list sessions');
@@ -77,7 +80,7 @@ export function useSessionAPI() {
 
     try {
       const response = await fetch(`/api/sessions/${sessionId}`);
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Failed to get session');
@@ -93,34 +96,34 @@ export function useSessionAPI() {
     }
   }, []);
 
-  const spawnAgent = useCallback(async (
-    sessionId: ThreadId,
-    request: CreateAgentRequest
-  ): Promise<Agent | null> => {
-    setLoading(true);
-    setError(null);
+  const spawnAgent = useCallback(
+    async (sessionId: ThreadId, request: CreateAgentRequest): Promise<Agent | null> => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const response = await fetch(`/api/sessions/${sessionId}/agents`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
-      });
+      try {
+        const response = await fetch(`/api/sessions/${sessionId}/agents`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(request),
+        });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to spawn agent');
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to spawn agent');
+        }
+
+        const data = await response.json();
+        return data.agent;
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'Unknown error');
+        return null;
+      } finally {
+        setLoading(false);
       }
-
-      const data = await response.json();
-      return data.agent;
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Unknown error');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   const listAgents = useCallback(async (sessionId: ThreadId): Promise<Agent[]> => {
     setLoading(true);
@@ -128,7 +131,7 @@ export function useSessionAPI() {
 
     try {
       const response = await fetch(`/api/sessions/${sessionId}/agents`);
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Failed to list agents');
@@ -144,10 +147,7 @@ export function useSessionAPI() {
     }
   }, []);
 
-  const sendMessage = useCallback(async (
-    threadId: ThreadId,
-    message: string
-  ): Promise<boolean> => {
+  const sendMessage = useCallback(async (threadId: ThreadId, message: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
 

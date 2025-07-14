@@ -28,18 +28,18 @@ export function useSSEStream(sessionId: ThreadId | null) {
       eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
-        setState(prev => ({ ...prev, connected: true, error: null }));
+        setState((prev) => ({ ...prev, connected: true, error: null }));
         console.log('SSE connection established');
       };
 
       eventSource.onerror = (error) => {
         console.error('SSE connection error:', error);
-        setState(prev => ({ ...prev, connected: false, error: 'Connection lost' }));
-        
+        setState((prev) => ({ ...prev, connected: false, error: 'Connection lost' }));
+
         // Attempt reconnection after delay
         eventSource.close();
         eventSourceRef.current = null;
-        
+
         reconnectTimeoutRef.current = setTimeout(() => {
           connect();
         }, 3000);
@@ -59,25 +59,24 @@ export function useSSEStream(sessionId: ThreadId | null) {
         'TOOL_RESULT',
         'THINKING',
         'SYSTEM_MESSAGE',
-        'LOCAL_SYSTEM_MESSAGE'
+        'LOCAL_SYSTEM_MESSAGE',
       ];
 
-      eventTypes.forEach(eventType => {
+      eventTypes.forEach((eventType) => {
         eventSource.addEventListener(eventType, (event) => {
           const eventData: SessionEvent = JSON.parse(event.data);
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
-            events: [...prev.events, eventData]
+            events: [...prev.events, eventData],
           }));
         });
       });
-
     } catch (error) {
       console.error('Failed to create SSE connection:', error);
-      setState(prev => ({ 
-        ...prev, 
-        connected: false, 
-        error: 'Failed to connect' 
+      setState((prev) => ({
+        ...prev,
+        connected: false,
+        error: 'Failed to connect',
       }));
     }
   }, [sessionId]);
@@ -93,11 +92,11 @@ export function useSSEStream(sessionId: ThreadId | null) {
       eventSourceRef.current = null;
     }
 
-    setState(prev => ({ ...prev, connected: false }));
+    setState((prev) => ({ ...prev, connected: false }));
   }, []);
 
   const clearEvents = useCallback(() => {
-    setState(prev => ({ ...prev, events: [] }));
+    setState((prev) => ({ ...prev, events: [] }));
   }, []);
 
   useEffect(() => {

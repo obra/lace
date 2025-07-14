@@ -11,16 +11,12 @@ interface ToolApprovalModalProps {
   onTimeout: () => void;
 }
 
-export function ToolApprovalModal({ 
-  request, 
-  onDecision, 
-  onTimeout 
-}: ToolApprovalModalProps) {
+export function ToolApprovalModal({ request, onDecision, onTimeout }: ToolApprovalModalProps) {
   const [timeLeft, setTimeLeft] = useState(request.timeout || 30);
-  
+
   useEffect(() => {
     const timer = setInterval(() => {
-      setTimeLeft(prev => {
+      setTimeLeft((prev) => {
         if (prev <= 1) {
           onTimeout();
           return 0;
@@ -28,7 +24,7 @@ export function ToolApprovalModal({
         return prev - 1;
       });
     }, 1000);
-    
+
     return () => clearInterval(timer);
   }, [onTimeout]);
 
@@ -63,17 +59,23 @@ export function ToolApprovalModal({
 
   const getRiskColor = () => {
     switch (request.riskLevel) {
-      case 'safe': return 'text-green-400 border-green-400';
-      case 'moderate': return 'text-yellow-400 border-yellow-400';
-      case 'destructive': return 'text-red-400 border-red-400';
+      case 'safe':
+        return 'text-green-400 border-green-400';
+      case 'moderate':
+        return 'text-yellow-400 border-yellow-400';
+      case 'destructive':
+        return 'text-red-400 border-red-400';
     }
   };
 
   const getRiskEmoji = () => {
     switch (request.riskLevel) {
-      case 'safe': return '🟢';
-      case 'moderate': return '🟡';
-      case 'destructive': return '🔴';
+      case 'safe':
+        return '🟢';
+      case 'moderate':
+        return '🟡';
+      case 'destructive':
+        return '🔴';
     }
   };
 
@@ -104,7 +106,7 @@ export function ToolApprovalModal({
             <div className="text-xs text-gray-500">until auto-deny</div>
           </div>
         </div>
-        
+
         {/* Tool Info */}
         <div className={`border rounded-lg p-4 mb-4 ${getRiskColor().split(' ')[1]}`}>
           <div className="flex items-start justify-between mb-2">
@@ -118,7 +120,7 @@ export function ToolApprovalModal({
               )}
             </div>
           </div>
-          
+
           {/* Tool Annotations */}
           {request.toolAnnotations && (
             <div className="flex gap-2 mt-3 flex-wrap">
@@ -145,17 +147,15 @@ export function ToolApprovalModal({
             </div>
           )}
         </div>
-        
+
         {/* Parameters */}
         <div className="flex-1 overflow-auto mb-4">
           <h4 className="text-sm font-semibold text-gray-400 mb-2">Parameters:</h4>
           <div className="bg-gray-900 rounded p-3 overflow-x-auto">
-            <pre className="text-sm text-gray-300 font-mono">
-              {formatInput(request.input)}
-            </pre>
+            <pre className="text-sm text-gray-300 font-mono">{formatInput(request.input)}</pre>
           </div>
         </div>
-        
+
         {/* Action Buttons */}
         <div className="flex gap-2">
           <button
@@ -180,12 +180,18 @@ export function ToolApprovalModal({
             <span className="text-xs text-red-200 ml-2">[N/D]</span>
           </button>
         </div>
-        
+
         {/* Help Text */}
         <div className="mt-4 text-xs text-gray-500 space-y-1">
-          <div>• <strong>Allow Once:</strong> Approve this specific call only</div>
-          <div>• <strong>Allow Session:</strong> Approve all calls to {request.toolName} this session</div>
-          <div>• <strong>Deny:</strong> Reject this tool call</div>
+          <div>
+            • <strong>Allow Once:</strong> Approve this specific call only
+          </div>
+          <div>
+            • <strong>Allow Session:</strong> Approve all calls to {request.toolName} this session
+          </div>
+          <div>
+            • <strong>Deny:</strong> Reject this tool call
+          </div>
         </div>
       </div>
     </div>

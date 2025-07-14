@@ -13,7 +13,7 @@ interface ConversationDisplayProps {
 export function ConversationDisplay({ events, agents, className = '' }: ConversationDisplayProps) {
   const renderEvent = (event: SessionEvent, index: number) => {
     const timestamp = new Date(event.timestamp).toLocaleTimeString();
-    
+
     switch (event.type) {
       case 'USER_MESSAGE':
         return (
@@ -28,7 +28,7 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
             </div>
           </div>
         );
-        
+
       case 'THINKING':
         return event.data?.status === 'start' ? (
           <div key={index} className="mb-2 text-gray-400 italic">
@@ -39,7 +39,7 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
             </div>
           </div>
         ) : null;
-        
+
       case 'AGENT_MESSAGE':
         return (
           <div key={index} className="mb-3">
@@ -47,13 +47,15 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
             <div className="flex items-start gap-2">
               <span className="text-2xl">🤖</span>
               <div className="flex-1">
-                <span className="text-green-400 font-semibold">{getAgentName(event.threadId)}: </span>
+                <span className="text-green-400 font-semibold">
+                  {getAgentName(event.threadId)}:{' '}
+                </span>
                 <span className="text-gray-100 whitespace-pre-wrap">{event.data?.content}</span>
               </div>
             </div>
           </div>
         );
-        
+
       case 'TOOL_CALL':
         return (
           <div key={index} className="mb-2 ml-8">
@@ -69,7 +71,7 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
             </div>
           </div>
         );
-        
+
       case 'TOOL_RESULT':
         return (
           <div key={index} className="mb-2 ml-8">
@@ -80,7 +82,7 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
             </div>
           </div>
         );
-        
+
       case 'LOCAL_SYSTEM_MESSAGE':
         return (
           <div key={index} className="mb-2 text-center">
@@ -88,40 +90,38 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
             <div className="text-gray-400 italic">— {event.data?.message} —</div>
           </div>
         );
-        
+
       default:
         return (
           <div key={index} className="mb-2 text-gray-500 text-sm">
             <div className="text-xs">[{timestamp}]</div>
-            <div className="font-mono">{event.type}: {JSON.stringify(event.data)}</div>
+            <div className="font-mono">
+              {event.type}: {JSON.stringify(event.data)}
+            </div>
           </div>
         );
     }
   };
-  
+
   // Helper to extract agent name from threadId
   const getAgentName = (threadId: string): string => {
     // Try to find agent in the provided list
-    const agent = agents?.find(a => a.threadId === threadId);
+    const agent = agents?.find((a) => a.threadId === threadId);
     if (agent) {
       return agent.name;
     }
-    
+
     // Fallback to extracting from threadId
     const match = threadId.match(/\.(\d+)$/);
     return match ? `Agent ${match[1]}` : 'Agent';
   };
-  
+
   return (
     <div className={`bg-gray-900 rounded-lg p-4 overflow-y-auto ${className}`}>
       {events.length === 0 ? (
-        <div className="text-gray-500 text-center py-8">
-          No messages yet. Start a conversation!
-        </div>
+        <div className="text-gray-500 text-center py-8">No messages yet. Start a conversation!</div>
       ) : (
-        <div className="space-y-1">
-          {events.map((event, index) => renderEvent(event, index))}
-        </div>
+        <div className="space-y-1">{events.map((event, index) => renderEvent(event, index))}</div>
       )}
     </div>
   );

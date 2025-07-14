@@ -22,7 +22,7 @@ const mockSessionService = {
 
 // Mock the session service
 vi.mock('@/lib/server/session-service', () => ({
-  getSessionService: () => mockSessionService
+  getSessionService: () => mockSessionService,
 }));
 
 // Mock SSE manager
@@ -30,13 +30,13 @@ const mockSSEManager = {
   addConnection: vi.fn(),
   removeConnection: vi.fn(),
   broadcast: vi.fn(),
-  sessionStreams: new Map()
+  sessionStreams: new Map(),
 };
 
 vi.mock('@/lib/sse-manager', () => ({
   SSEManager: {
-    getInstance: () => mockSSEManager
-  }
+    getInstance: () => mockSSEManager,
+  },
 }));
 
 describe('Full Conversation Flow', () => {
@@ -53,7 +53,7 @@ describe('Full Conversation Flow', () => {
       id: sessionId,
       name: sessionName,
       createdAt: new Date().toISOString(),
-      agents: []
+      agents: [],
     };
 
     mockSessionService.createSession.mockResolvedValue(mockSession);
@@ -61,7 +61,7 @@ describe('Full Conversation Flow', () => {
     const createSessionRequest = new NextRequest('http://localhost:3000/api/sessions', {
       method: 'POST',
       body: JSON.stringify({ name: sessionName }),
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
     });
 
     const sessionResponse = await createSession(createSessionRequest);
@@ -78,27 +78,30 @@ describe('Full Conversation Flow', () => {
       provider: 'anthropic',
       model: 'claude-3-haiku-20240307',
       status: 'idle' as const,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     mockSessionService.getSession.mockResolvedValue({
       ...mockSession,
-      agents: []
+      agents: [],
     });
     mockSessionService.spawnAgent.mockResolvedValue(mockAgent);
 
-    const spawnAgentRequest = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
-      method: 'POST',
-      body: JSON.stringify({ 
-        name: agentName,
-        provider: 'anthropic',
-        model: 'claude-3-haiku-20240307'
-      }),
-      headers: { 'Content-Type': 'application/json' }
-    });
+    const spawnAgentRequest = new NextRequest(
+      `http://localhost:3000/api/sessions/${sessionId}/agents`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          name: agentName,
+          provider: 'anthropic',
+          model: 'claude-3-haiku-20240307',
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
-    const agentResponse = await spawnAgent(spawnAgentRequest, { 
-      params: Promise.resolve({ sessionId }) 
+    const agentResponse = await spawnAgent(spawnAgentRequest, {
+      params: Promise.resolve({ sessionId }),
     });
     expect(agentResponse.status).toBe(201);
     const agentData = await agentResponse.json();
@@ -107,14 +110,16 @@ describe('Full Conversation Flow', () => {
     // 3. Connect to SSE stream
     mockSessionService.getSession.mockResolvedValue({
       ...mockSession,
-      agents: [mockAgent]
+      agents: [mockAgent],
     });
 
-    const streamRequest = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/events/stream`);
-    const streamResponse = await streamEvents(streamRequest, { 
-      params: Promise.resolve({ sessionId }) 
+    const streamRequest = new NextRequest(
+      `http://localhost:3000/api/sessions/${sessionId}/events/stream`
+    );
+    const streamResponse = await streamEvents(streamRequest, {
+      params: Promise.resolve({ sessionId }),
     });
-    
+
     expect(streamResponse.status).toBe(200);
     expect(streamResponse.headers.get('Content-Type')).toBe('text/event-stream');
     expect(mockSSEManager.addConnection).toHaveBeenCalledWith(sessionId, expect.any(Object));
@@ -128,18 +133,21 @@ describe('Full Conversation Flow', () => {
       model: 'claude-3-haiku-20240307',
       status: 'idle' as const,
       createdAt: new Date().toISOString(),
-      sendMessage: vi.fn().mockResolvedValue(undefined)
+      sendMessage: vi.fn().mockResolvedValue(undefined),
     };
     mockSessionService.getAgent.mockReturnValue(mockAgentWithMethods);
 
-    const messageRequest = new NextRequest(`http://localhost:3000/api/threads/${agentThreadId}/message`, {
-      method: 'POST',
-      body: JSON.stringify({ message }),
-      headers: { 'Content-Type': 'application/json' }
-    });
+    const messageRequest = new NextRequest(
+      `http://localhost:3000/api/threads/${agentThreadId}/message`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
-    const messageResponse = await sendMessage(messageRequest, { 
-      params: Promise.resolve({ threadId: agentThreadId }) 
+    const messageResponse = await sendMessage(messageRequest, {
+      params: Promise.resolve({ threadId: agentThreadId }),
     });
     expect(messageResponse.status).toBe(202);
     const messageData = await messageResponse.json();
@@ -161,7 +169,7 @@ describe('Full Conversation Flow', () => {
       id: sessionId,
       name: 'Multi-Agent Session',
       createdAt: new Date().toISOString(),
-      agents: []
+      agents: [],
     };
 
     // Create session
@@ -169,7 +177,7 @@ describe('Full Conversation Flow', () => {
     const createSessionRequest = new NextRequest('http://localhost:3000/api/sessions', {
       method: 'POST',
       body: JSON.stringify({ name: 'Multi-Agent Session' }),
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
     });
     await createSession(createSessionRequest);
 
@@ -180,16 +188,19 @@ describe('Full Conversation Flow', () => {
       provider: 'anthropic',
       model: 'claude-3-haiku-20240307',
       status: 'idle' as const,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
     mockSessionService.getSession.mockResolvedValue(mockSession);
     mockSessionService.spawnAgent.mockResolvedValue(agent1);
 
-    const spawnAgent1Request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
-      method: 'POST',
-      body: JSON.stringify({ name: 'pm' }),
-      headers: { 'Content-Type': 'application/json' }
-    });
+    const spawnAgent1Request = new NextRequest(
+      `http://localhost:3000/api/sessions/${sessionId}/agents`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ name: 'pm' }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
     await spawnAgent(spawnAgent1Request, { params: Promise.resolve({ sessionId }) });
 
     // Spawn second agent
@@ -199,36 +210,41 @@ describe('Full Conversation Flow', () => {
       provider: 'anthropic',
       model: 'claude-3-opus-20240229',
       status: 'idle' as const,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
     mockSessionService.getSession.mockResolvedValue({
       ...mockSession,
-      agents: [agent1]
+      agents: [agent1],
     });
     mockSessionService.spawnAgent.mockResolvedValue(agent2);
 
-    const spawnAgent2Request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
-      method: 'POST',
-      body: JSON.stringify({ 
-        name: 'architect',
-        provider: 'anthropic',
-        model: 'claude-3-opus-20240229'
-      }),
-      headers: { 'Content-Type': 'application/json' }
-    });
+    const spawnAgent2Request = new NextRequest(
+      `http://localhost:3000/api/sessions/${sessionId}/agents`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'architect',
+          provider: 'anthropic',
+          model: 'claude-3-opus-20240229',
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
     await spawnAgent(spawnAgent2Request, { params: Promise.resolve({ sessionId }) });
 
     // List agents
     mockSessionService.getSession.mockResolvedValue({
       ...mockSession,
-      agents: [agent1, agent2]
+      agents: [agent1, agent2],
     });
-    const listAgentsRequest = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`);
-    const listResponse = await listAgents(listAgentsRequest, { 
-      params: Promise.resolve({ sessionId }) 
+    const listAgentsRequest = new NextRequest(
+      `http://localhost:3000/api/sessions/${sessionId}/agents`
+    );
+    const listResponse = await listAgents(listAgentsRequest, {
+      params: Promise.resolve({ sessionId }),
     });
     const { agents } = await listResponse.json();
-    
+
     expect(agents).toHaveLength(2);
     expect(agents[0].name).toBe('pm');
     expect(agents[1].name).toBe('architect');
@@ -244,34 +260,38 @@ describe('Full Conversation Flow', () => {
         id: session1Id,
         name: 'Session 1',
         createdAt: new Date().toISOString(),
-        agents: []
+        agents: [],
       })
       .mockResolvedValueOnce({
         id: session2Id,
         name: 'Session 2',
         createdAt: new Date().toISOString(),
-        agents: []
+        agents: [],
       });
 
     // Create both sessions
-    await createSession(new NextRequest('http://localhost:3000/api/sessions', {
-      method: 'POST',
-      body: JSON.stringify({ name: 'Session 1' }),
-      headers: { 'Content-Type': 'application/json' }
-    }));
+    await createSession(
+      new NextRequest('http://localhost:3000/api/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'Session 1' }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
 
-    await createSession(new NextRequest('http://localhost:3000/api/sessions', {
-      method: 'POST',
-      body: JSON.stringify({ name: 'Session 2' }),
-      headers: { 'Content-Type': 'application/json' }
-    }));
+    await createSession(
+      new NextRequest('http://localhost:3000/api/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'Session 2' }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
 
     // Connect to streams
     mockSessionService.getSession.mockResolvedValue({
       id: session1Id,
       name: 'Session 1',
       createdAt: new Date().toISOString(),
-      agents: []
+      agents: [],
     });
 
     await streamEvents(
@@ -283,7 +303,7 @@ describe('Full Conversation Flow', () => {
       id: session2Id,
       name: 'Session 2',
       createdAt: new Date().toISOString(),
-      agents: []
+      agents: [],
     });
 
     await streamEvents(

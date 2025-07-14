@@ -5,12 +5,12 @@ import { SessionEvent, ThreadId } from '@/types/api';
 
 // Use global to persist across HMR in development
 declare global {
-  // eslint-disable-next-line no-var
   var sseManager: SSEManager | undefined;
 }
 
 export class SSEManager {
-  private sessionStreams: Map<ThreadId, Set<ReadableStreamDefaultController<Uint8Array>>> = new Map();
+  private sessionStreams: Map<ThreadId, Set<ReadableStreamDefaultController<Uint8Array>>> =
+    new Map();
   private encoder = new TextEncoder();
 
   private constructor() {}
@@ -22,14 +22,20 @@ export class SSEManager {
     return global.sseManager;
   }
 
-  addConnection(sessionId: ThreadId, controller: ReadableStreamDefaultController<Uint8Array>): void {
+  addConnection(
+    sessionId: ThreadId,
+    controller: ReadableStreamDefaultController<Uint8Array>
+  ): void {
     if (!this.sessionStreams.has(sessionId)) {
       this.sessionStreams.set(sessionId, new Set());
     }
     this.sessionStreams.get(sessionId)!.add(controller);
   }
 
-  removeConnection(sessionId: ThreadId, controller: ReadableStreamDefaultController<Uint8Array>): void {
+  removeConnection(
+    sessionId: ThreadId,
+    controller: ReadableStreamDefaultController<Uint8Array>
+  ): void {
     const controllers = this.sessionStreams.get(sessionId);
     if (controllers) {
       controllers.delete(controller);
@@ -41,7 +47,11 @@ export class SSEManager {
 
   broadcast(sessionId: ThreadId, event: SessionEvent): void {
     const controllers = this.sessionStreams.get(sessionId);
-    console.log(`Broadcasting to session ${sessionId}:`, event.type, `(${controllers?.size || 0} connections)`);
+    console.log(
+      `Broadcasting to session ${sessionId}:`,
+      event.type,
+      `(${controllers?.size || 0} connections)`
+    );
     if (!controllers || controllers.size === 0) {
       console.log('No active connections for session:', sessionId);
       return;
@@ -50,7 +60,7 @@ export class SSEManager {
     const sseData = this.formatSSEEvent(event);
     const deadControllers: ReadableStreamDefaultController<Uint8Array>[] = [];
 
-    controllers.forEach(controller => {
+    controllers.forEach((controller) => {
       try {
         controller.enqueue(this.encoder.encode(sseData));
       } catch (error) {
@@ -60,7 +70,7 @@ export class SSEManager {
     });
 
     // Clean up dead controllers
-    deadControllers.forEach(controller => {
+    deadControllers.forEach((controller) => {
       this.removeConnection(sessionId, controller);
     });
   }

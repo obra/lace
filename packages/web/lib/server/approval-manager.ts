@@ -4,7 +4,7 @@
 import { randomUUID } from 'crypto';
 import { ThreadId, SessionEvent, ToolApprovalRequestData } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
-import type { ApprovalDecision, ToolAnnotations } from './lace-imports';
+import type { ApprovalDecision, ToolAnnotations } from '~/../lib/server/lace-imports';
 
 interface PendingApproval {
   resolve: (decision: ApprovalDecision) => void;
@@ -37,7 +37,7 @@ class ApprovalManager {
     }
 
     const requestId = randomUUID();
-    
+
     return new Promise((resolve, reject) => {
       // Set timeout
       const timeout = setTimeout(() => {
@@ -53,7 +53,7 @@ class ApprovalManager {
         timeout,
         threadId,
         toolName,
-        sessionId
+        sessionId,
       });
 
       // Emit SSE event with full tool information
@@ -65,16 +65,16 @@ class ApprovalManager {
         toolDescription,
         toolAnnotations,
         riskLevel: this.getRiskLevel(toolName, isReadOnly, toolAnnotations),
-        timeout: Math.floor(timeoutMs / 1000)
+        timeout: Math.floor(timeoutMs / 1000),
       };
-      
+
       const event: SessionEvent = {
         type: 'TOOL_APPROVAL_REQUEST',
         threadId,
         timestamp: new Date().toISOString(),
-        data: approvalData
+        data: approvalData,
       };
-      
+
       console.log(`Sending approval request ${requestId} for tool ${toolName}`);
       SSEManager.getInstance().broadcast(sessionId, event);
     });
@@ -88,16 +88,18 @@ class ApprovalManager {
     }
 
     clearTimeout(pending.timeout);
-    
+
     // Handle session-wide approvals
     if (decision === ApprovalDecision.ALLOW_SESSION) {
       if (!this.sessionApprovals.has(pending.sessionId)) {
         this.sessionApprovals.set(pending.sessionId, new Set());
       }
       this.sessionApprovals.get(pending.sessionId)!.add(pending.toolName);
-      console.log(`Added session-wide approval for ${pending.toolName} in session ${pending.sessionId}`);
+      console.log(
+        `Added session-wide approval for ${pending.toolName} in session ${pending.sessionId}`
+      );
     }
-    
+
     pending.resolve(decision);
     this.pendingApprovals.delete(requestId);
     console.log(`Resolved approval ${requestId} with decision: ${decision}`);
@@ -117,7 +119,7 @@ class ApprovalManager {
   }
 
   private getRiskLevel(
-    toolName: string, 
+    toolName: string,
     isReadOnly: boolean,
     annotations?: ToolAnnotations
   ): 'safe' | 'moderate' | 'destructive' {
@@ -125,20 +127,20 @@ class ApprovalManager {
     if (annotations?.safeInternal || annotations?.readOnlyHint || isReadOnly) {
       return 'safe';
     }
-    
+
     if (annotations?.destructiveHint) {
       return 'destructive';
     }
-    
+
     // Tool-specific risk assessment
     const safeTools = ['task-create', 'task-update', 'task-complete'];
     const moderateTools = ['file-write', 'file-edit', 'file-insert'];
     const destructiveTools = ['bash', 'delegate'];
-    
+
     if (safeTools.includes(toolName)) return 'safe';
     if (destructiveTools.includes(toolName)) return 'destructive';
     if (moderateTools.includes(toolName)) return 'moderate';
-    
+
     // Default to moderate for unknown tools
     return 'moderate';
   }
@@ -149,15 +151,14 @@ class ApprovalManager {
       sessionApprovalsCount: this.sessionApprovals.size,
       sessions: Array.from(this.sessionApprovals.entries()).map(([sessionId, tools]) => ({
         sessionId,
-        approvedTools: Array.from(tools)
-      }))
+        approvedTools: Array.from(tools),
+      })),
     };
   }
 }
 
 // Use global to persist across HMR in development
 declare global {
-  // eslint-disable-next-line no-var
   var approvalManager: ApprovalManager | undefined;
 }
 
