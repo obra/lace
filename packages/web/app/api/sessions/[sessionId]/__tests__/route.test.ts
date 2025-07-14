@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET } from '../route';
+import { GET } from '~/app/api/sessions/[sessionId]/route';
 import type { ThreadId } from '@/types/api';
 
 // Create the mock service outside so we can access it

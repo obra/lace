@@ -3,21 +3,21 @@
 
 // Import from built Lace dist directory
 // These paths assume the web app is run from packages/web
-export { Agent } from '../../../../dist/agents/agent.js';
-export { ThreadManager } from '../../../../dist/threads/thread-manager.js';
-export { ProviderRegistry } from '../../../../dist/providers/registry.js';
-export { ToolExecutor } from '../../../../dist/tools/executor.js';
-export { getLaceDbPath } from '../../../../dist/config/lace-dir.js';
-export { getEnvVar } from '../../../../dist/config/env-loader.js';
-export { DelegateTool } from '../../../../dist/tools/implementations/delegate.js';
+export { Agent } from '~/agents/agent';
+export { ThreadManager } from '~/threads/thread-manager';
+export { ProviderRegistry } from '~/providers/registry';
+export { ToolExecutor } from '~/tools/executor';
+export { getLaceDbPath } from '~/config/lace-dir';
+export { getEnvVar } from '~/config/env-loader';
+export { DelegateTool } from '~/tools/implementations/delegate';
 
 // Types can use source paths since they're compile-time only
-export type { ThreadId } from '../../../../src/types/threads';
-export type { ThreadEvent, EventType } from '../../../../src/threads/types';
-export type { ApprovalDecision } from '../../../../src/tools/approval-types';
-export type { ToolAnnotations } from '../../../../src/tools/types';
-export type { AgentState } from '../../../../src/agents/agent';
-export type { ProviderInfo, ModelInfo } from '../../../../src/providers/base-provider';
+export type { ThreadId } from '~/types/threads';
+export type { ThreadEvent, EventType } from '~/threads/types';
+export type { ApprovalDecision } from '~/tools/approval-types';
+export type { ToolAnnotations } from '~/tools/types';
+export type { AgentState } from '~/agents/agent';
+export type { ProviderInfo, ModelInfo } from '~/providers/base-provider';
 
 // Constants can be imported from built code
-export { EVENT_TYPES } from '../../../../dist/threads/types.js';
+export { EVENT_TYPES } from '~/threads/types';

@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { CreateSessionRequest } from '@/types/api';
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function GET(_request: NextRequest): Promise<NextResponse> {
   try {
     const sessionService = getSessionService();
     const sessions = await sessionService.listSessions();

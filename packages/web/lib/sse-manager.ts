@@ -47,13 +47,7 @@ export class SSEManager {
 
   broadcast(sessionId: ThreadId, event: SessionEvent): void {
     const controllers = this.sessionStreams.get(sessionId);
-    console.log(
-      `Broadcasting to session ${sessionId}:`,
-      event.type,
-      `(${controllers?.size || 0} connections)`
-    );
     if (!controllers || controllers.size === 0) {
-      console.log('No active connections for session:', sessionId);
       return;
     }
 
@@ -63,7 +57,7 @@ export class SSEManager {
     controllers.forEach((controller) => {
       try {
         controller.enqueue(this.encoder.encode(sseData));
-      } catch (error) {
+      } catch (_error) {
         // Controller is closed or errored
         deadControllers.push(controller);
       }
