@@ -175,7 +175,7 @@ describe('Thread Messaging API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Message cannot be empty');
+      expect(data.error).toBe('Message is required');
     });
 
     it('should handle missing message field', async () => {
