@@ -117,6 +117,12 @@ export type SessionEvent =
       threadId: ThreadId;
       timestamp: string;
       data: { content: string };
+    }
+  | {
+      type: 'TOOL_APPROVAL_REQUEST';
+      threadId: ThreadId;
+      timestamp: string;
+      data: ToolApprovalRequestData;
     };
 
 // Tool approval event data - extends what the agent emits
