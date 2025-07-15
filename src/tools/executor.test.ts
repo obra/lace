@@ -4,12 +4,18 @@
 import { describe, it, expect } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
 import { FileReadTool } from '~/tools/implementations/file-read';
+import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { createTestTempDir } from '~/tools/__tests__/test-utils';
 
 describe('ToolExecutor with new schema-based tools', () => {
   const tempDir = createTestTempDir();
+
+  // Create an approval callback that auto-approves for tests
+  const autoApprovalCallback: ApprovalCallback = {
+    requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
+  };
 
   it('executes new schema-based tools correctly', async () => {
     const testDir = await tempDir.getPath();
@@ -19,6 +25,7 @@ describe('ToolExecutor with new schema-based tools', () => {
     const executor = new ToolExecutor();
     const tool = new FileReadTool();
     executor.registerTool('file_read', tool);
+    executor.setApprovalCallback(autoApprovalCallback);
 
     const result = await executor.executeTool({
       id: 'test-1',
@@ -37,6 +44,7 @@ describe('ToolExecutor with new schema-based tools', () => {
     const executor = new ToolExecutor();
     const tool = new FileReadTool();
     executor.registerTool('file_read', tool);
+    executor.setApprovalCallback(autoApprovalCallback);
 
     const result = await executor.executeTool({
       id: 'test-2',
@@ -58,6 +66,7 @@ describe('ToolExecutor with new schema-based tools', () => {
     const executor = new ToolExecutor();
     const tool = new FileReadTool();
     executor.registerTool('file_read', tool);
+    executor.setApprovalCallback(autoApprovalCallback);
 
     const result = await executor.executeTool({
       id: 'test-3',
