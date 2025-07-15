@@ -62,8 +62,8 @@ class ApprovalManager {
         toolName,
         input,
         isReadOnly,
-        toolDescription,
-        toolAnnotations,
+        ...(toolDescription && { toolDescription }),
+        ...(toolAnnotations && { toolAnnotations }),
         riskLevel: this.getRiskLevel(toolName, isReadOnly, toolAnnotations),
         timeout: Math.floor(timeoutMs / 1000),
       };

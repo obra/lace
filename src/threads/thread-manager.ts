@@ -5,7 +5,7 @@ import { DatabasePersistence } from '~/persistence/database';
 import { Thread, ThreadEvent, EventType } from '~/threads/types';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { logger } from '~/utils/logger';
-import { SummarizeStrategy } from '~/threads/compaction/index';
+import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy';
 import { estimateTokens } from '~/utils/token-estimation';
 import { AIProvider } from '~/providers/base-provider';
 
