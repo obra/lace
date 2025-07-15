@@ -1,7 +1,7 @@
 // ABOUTME: Tests for provider discovery API endpoint (GET /api/providers)
 // ABOUTME: Verifies provider listing with models and configuration status
 
-import { describe, it, expect, beforeEach, vi, MockedFunction } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, MockedFunction } from 'vitest';
 import { GET, type ProviderWithModels } from '@/app/api/providers/route';
 import type { ProviderInfo, ModelInfo } from '@/lib/server/lace-imports';
 // ProviderRegistry is mocked but not directly used in tests
@@ -25,6 +25,8 @@ describe('Provider Discovery API', () => {
       () => Promise<Array<{ info: ProviderInfo; models: ModelInfo[]; configured: boolean }>>
     >;
   };
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -32,8 +34,17 @@ describe('Provider Discovery API', () => {
       getAvailableProviders: vi.fn(),
     };
     
+    // Mock console methods to prevent stderr pollution during tests
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    
     const { ProviderRegistry } = await import('@/lib/server/lace-imports');
     vi.mocked(ProviderRegistry.createWithAutoDiscovery).mockResolvedValue(mockRegistry);
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   describe('GET /api/providers', () => {

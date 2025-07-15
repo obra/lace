@@ -1,7 +1,7 @@
 // ABOUTME: Tests for agent spawning API endpoints (POST/GET /api/sessions/{sessionId}/agents)
 // ABOUTME: Agents are child threads within a session, identified by threadId like sessionId.N
 
-import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockedFunction } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
 import type { ThreadId, Agent, Session } from '@/types/api';
@@ -76,9 +76,21 @@ vi.mock('@/lib/server/session-service', () => ({
 }));
 
 describe('Agent Spawning API', () => {
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetAllMocks();
+    
+    // Mock console methods to prevent stderr pollution during tests
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   describe('POST /api/sessions/{sessionId}/agents', () => {

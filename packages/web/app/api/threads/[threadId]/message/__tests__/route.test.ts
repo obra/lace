@@ -1,7 +1,7 @@
 // ABOUTME: Tests for thread messaging API endpoint (POST /api/threads/{threadId}/message)
 // ABOUTME: Handles sending messages to specific agent threads and emitting events via SSE
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/threads/[threadId]/message/route';
 import type { ThreadId, MessageResponse } from '@/types/api';
@@ -51,8 +51,20 @@ vi.mock('@/lib/server/session-service', () => ({
 }));
 
 describe('Thread Messaging API', () => {
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let consoleLogSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Mock console methods to prevent stderr/stdout pollution during tests
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    consoleLogSpy.mockRestore();
   });
 
   describe('POST /api/threads/{threadId}/message', () => {

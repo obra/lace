@@ -1,7 +1,7 @@
 // ABOUTME: Unit tests for session management API endpoints
 // ABOUTME: Tests session creation and listing functionality
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/api/sessions/route';
 import type { Session } from '@/types/api';
@@ -23,8 +23,20 @@ vi.mock('@/lib/server/session-service', () => ({
 }));
 
 describe('Session API Routes', () => {
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Mock console methods to prevent stderr pollution during tests
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   describe('POST /api/sessions', () => {

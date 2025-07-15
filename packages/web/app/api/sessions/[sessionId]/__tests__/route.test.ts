@@ -1,7 +1,7 @@
 // ABOUTME: Unit tests for session detail API endpoint
 // ABOUTME: Tests getting specific session information
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/[sessionId]/route';
 import type { ThreadId, Session } from '@/types/api';
@@ -21,8 +21,20 @@ vi.mock('@/lib/server/session-service', () => ({
 }));
 
 describe('Session Detail API Route', () => {
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Mock console methods to prevent stderr pollution during tests
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   describe('GET /api/sessions/[sessionId]', () => {
