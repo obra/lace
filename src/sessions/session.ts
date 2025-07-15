@@ -108,6 +108,9 @@ export class Session {
       tools: toolExecutor.getAllTools(),
     });
 
+    // Start the session agent
+    await sessionAgent.start();
+
     // Set this as the current thread for delegate creation
     threadManager.setCurrentThread(sessionId);
 
@@ -128,8 +131,11 @@ export class Session {
           tools: toolExecutor.getAllTools(),
         });
 
+        // Start the delegate agent
+        await delegateAgent.start();
+
         // Add to session's agents map
-        (session as any)._agents.set(asThreadId(delegateThreadId), delegateAgent);
+        session._agents.set(asThreadId(delegateThreadId), delegateAgent);
       }
     }
 

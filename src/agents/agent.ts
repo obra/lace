@@ -1363,8 +1363,8 @@ export class Agent extends EventEmitter {
       thread.metadata = { ...thread.metadata, ...metadata };
       // Update timestamp
       thread.updatedAt = new Date();
-      // Save through persistence layer
-      (this._threadManager as any)._persistence.saveThread(thread);
+      // Save through ThreadManager
+      this._threadManager.saveThread(thread);
     }
   }
 

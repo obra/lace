@@ -305,6 +305,14 @@ export class ThreadManager {
     this._persistence.saveThread(this._currentThread);
   }
 
+  saveThread(thread: Thread): void {
+    try {
+      this._persistence.saveThread(thread);
+    } catch (error) {
+      logger.error('Failed to save thread', { threadId: thread.id, error });
+    }
+  }
+
   setCurrentThread(threadId: string): void {
     // Save current thread before switching
     this.saveCurrentThread();

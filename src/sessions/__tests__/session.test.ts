@@ -19,8 +19,29 @@ vi.mock('~/config/lace-dir', () => ({
 }));
 
 describe('Session', () => {
-  let mockAgent: any;
-  let mockDelegateAgents: any[];
+  let mockAgent: {
+    threadId: string;
+    providerName: string;
+    getCurrentState: ReturnType<typeof vi.fn>;
+    toolExecutor: { mock: string };
+    updateThreadMetadata: ReturnType<typeof vi.fn>;
+    getThreadMetadata: ReturnType<typeof vi.fn>;
+    createDelegateAgent: ReturnType<typeof vi.fn>;
+    start: ReturnType<typeof vi.fn>;
+    stop: ReturnType<typeof vi.fn>;
+    sendMessage: ReturnType<typeof vi.fn>;
+  };
+  let mockDelegateAgents: Array<{
+    threadId: string;
+    providerName: string;
+    getCurrentState: ReturnType<typeof vi.fn>;
+    toolExecutor: { mock: string };
+    updateThreadMetadata: ReturnType<typeof vi.fn>;
+    getThreadMetadata: ReturnType<typeof vi.fn>;
+    start: ReturnType<typeof vi.fn>;
+    stop: ReturnType<typeof vi.fn>;
+    sendMessage: ReturnType<typeof vi.fn>;
+  }>;
   let delegateAgentCounter: number;
 
   beforeEach(() => {
@@ -48,6 +69,12 @@ describe('Session', () => {
           providerName: 'anthropic',
           getCurrentState: vi.fn().mockReturnValue('idle'),
           toolExecutor: { mock: 'toolExecutor' },
+          updateThreadMetadata: vi.fn(),
+          getThreadMetadata: vi.fn().mockReturnValue({
+            name: `Agent test-session.${delegateAgentCounter}`,
+            model: 'unknown',
+            isAgent: true,
+          }),
           start: vi.fn(),
           stop: vi.fn(),
           sendMessage: vi.fn(),
@@ -60,7 +87,7 @@ describe('Session', () => {
       sendMessage: vi.fn(),
     };
 
-    (Agent.createSession as any).mockReturnValue(mockAgent);
+    (Agent.createSession as ReturnType<typeof vi.fn>).mockReturnValue(mockAgent);
   });
 
   describe('create', () => {
@@ -107,7 +134,7 @@ describe('Session', () => {
       expect(info).toEqual({
         id: asThreadId('test-session'),
         name: 'Test Session',
-        createdAt: expect.any(Date),
+        createdAt: expect.any(Date) as Date,
         provider: 'anthropic',
         model: 'claude-3-haiku-20240307',
         agents: [],
@@ -119,7 +146,8 @@ describe('Session', () => {
     it('should spawn an agent using the session agent', () => {
       const session = Session.create('Test Session');
 
-      const agent = session.spawnAgent('Test Agent');
+      const agent: ReturnType<typeof mockAgent.createDelegateAgent> =
+        session.spawnAgent('Test Agent');
 
       expect(mockAgent.createDelegateAgent).toHaveBeenCalledWith(mockAgent.toolExecutor);
       expect(agent).toBe(mockDelegateAgents[0]);
@@ -190,7 +218,7 @@ describe('Session', () => {
 
       await session.startAgent(asThreadId('test-session.1'));
 
-      expect(mockDelegateAgents[0].start).toHaveBeenCalled();
+      expect(mockDelegateAgents[0]?.start).toHaveBeenCalled();
     });
 
     it('should throw error for non-existent agent', async () => {
@@ -209,7 +237,7 @@ describe('Session', () => {
 
       session.stopAgent(asThreadId('test-session.1'));
 
-      expect(mockDelegateAgents[0].stop).toHaveBeenCalled();
+      expect(mockDelegateAgents[0]?.stop).toHaveBeenCalled();
     });
 
     it('should throw error for non-existent agent', () => {
@@ -228,7 +256,7 @@ describe('Session', () => {
 
       await session.sendMessage(asThreadId('test-session.1'), 'Hello');
 
-      expect(mockDelegateAgents[0].sendMessage).toHaveBeenCalledWith('Hello');
+      expect(mockDelegateAgents[0]?.sendMessage).toHaveBeenCalledWith('Hello');
     });
 
     it('should throw error for non-existent agent', async () => {
@@ -248,8 +276,8 @@ describe('Session', () => {
 
       session.destroy();
 
-      expect(mockDelegateAgents[0].stop).toHaveBeenCalledTimes(1);
-      expect(mockDelegateAgents[1].stop).toHaveBeenCalledTimes(1);
+      expect(mockDelegateAgents[0]?.stop).toHaveBeenCalledTimes(1);
+      expect(mockDelegateAgents[1]?.stop).toHaveBeenCalledTimes(1);
       expect(session.getAgents()).toEqual([]);
     });
   });

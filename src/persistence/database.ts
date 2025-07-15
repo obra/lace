@@ -72,6 +72,10 @@ export class DatabasePersistence {
     if (currentVersion < 3) {
       this.migrateToV3();
     }
+
+    if (currentVersion < 4) {
+      this.migrateToV4();
+    }
   }
 
   private getSchemaVersion(): number {
@@ -192,6 +196,17 @@ export class DatabasePersistence {
     this.setSchemaVersion(3);
   }
 
+  private migrateToV4(): void {
+    if (!this.db) return;
+
+    // Add metadata column to threads table for session persistence
+    this.db.exec(`
+      ALTER TABLE threads ADD COLUMN metadata TEXT DEFAULT NULL;
+    `);
+
+    this.setSchemaVersion(4);
+  }
+
   // ===============================
   // Thread-related methods
   // ===============================
@@ -200,11 +215,17 @@ export class DatabasePersistence {
     if (this._closed || this._disabled || !this.db) return;
 
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO threads (id, created_at, updated_at)
-      VALUES (?, ?, ?)
+      INSERT OR REPLACE INTO threads (id, created_at, updated_at, metadata)
+      VALUES (?, ?, ?, ?)
     `);
 
-    stmt.run(thread.id, thread.createdAt.toISOString(), thread.updatedAt.toISOString());
+    const metadataJson = thread.metadata ? JSON.stringify(thread.metadata) : null;
+    stmt.run(
+      thread.id,
+      thread.createdAt.toISOString(),
+      thread.updatedAt.toISOString(),
+      metadataJson
+    );
   }
 
   loadThread(threadId: string): Thread | null {
@@ -219,17 +240,27 @@ export class DatabasePersistence {
     `);
 
     const threadRow = threadStmt.get(actualThreadId) as
-      | { id: string; created_at: string; updated_at: string }
+      | { id: string; created_at: string; updated_at: string; metadata: string | null }
       | undefined;
     if (!threadRow) return null;
 
     const events = this.loadEvents(actualThreadId);
+
+    let metadata: Thread['metadata'] = undefined;
+    if (threadRow.metadata) {
+      try {
+        metadata = JSON.parse(threadRow.metadata) as Record<string, unknown>;
+      } catch (error) {
+        logger.warn('Failed to parse thread metadata', { threadId: actualThreadId, error });
+      }
+    }
 
     return {
       id: threadRow.id,
       createdAt: new Date(threadRow.created_at),
       updatedAt: new Date(threadRow.updated_at),
       events,
+      metadata,
     };
   }
 
@@ -315,6 +346,41 @@ export class DatabasePersistence {
     const pattern = `${parentThreadId}.%`;
     const rows = stmt.all(pattern) as Array<{ thread_id: string }>;
     return rows.map((row) => row.thread_id);
+  }
+
+  getAllThreadsWithMetadata(): Thread[] {
+    if (this._disabled || !this.db) return [];
+
+    const stmt = this.db.prepare(`
+      SELECT id, created_at, updated_at, metadata FROM threads
+      ORDER BY updated_at DESC
+    `);
+
+    const rows = stmt.all() as Array<{
+      id: string;
+      created_at: string;
+      updated_at: string;
+      metadata: string | null;
+    }>;
+
+    return rows.map((row) => {
+      let metadata: Thread['metadata'] = undefined;
+      if (row.metadata) {
+        try {
+          metadata = JSON.parse(row.metadata) as Record<string, unknown>;
+        } catch (error) {
+          logger.warn('Failed to parse thread metadata', { threadId: row.id, error });
+        }
+      }
+
+      return {
+        id: row.id,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at),
+        events: [], // Don't load events for listing operations
+        metadata,
+      };
+    });
   }
 
   getCurrentVersion(canonicalId: string): string | null {

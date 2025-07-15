@@ -21,7 +21,7 @@ export class SessionService {
     // No need for direct ThreadManager access - use Agent methods instead
   }
 
-  async createSession(name?: string): Promise<SessionType> {
+  createSession(name?: string): Promise<SessionType> {
     // Get default provider and model from environment
     const defaultProvider =
       process.env.ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai';
@@ -37,12 +37,12 @@ export class SessionService {
     // Store the session instance
     activeSessions.set(sessionId, session);
 
-    return {
+    return Promise.resolve({
       id: sessionId,
       name: sessionName,
       createdAt: new Date().toISOString(),
       agents: [],
-    };
+    });
   }
 
   async listSessions(): Promise<SessionType[]> {
@@ -376,6 +376,11 @@ export class SessionService {
   }
 
   // These methods are now handled by the Session class
+
+  // Test helper method to clear active sessions
+  clearActiveSessions(): void {
+    activeSessions.clear();
+  }
 }
 
 // Use global to persist across HMR in development
