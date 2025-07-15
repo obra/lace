@@ -40,12 +40,72 @@ type SessionEventType =
   | 'THINKING'
   | 'LOCAL_SYSTEM_MESSAGE';
 
-export interface SessionEvent {
-  type: SessionEventType;
-  threadId: ThreadId;
-  timestamp: string;
-  data: unknown;
+// Specific event data types
+export interface UserMessageEventData {
+  content: string;
+  message?: string;
 }
+
+export interface AgentMessageEventData {
+  content: string;
+}
+
+export interface ToolCallEventData {
+  toolName: string;
+  input: unknown;
+}
+
+export interface ToolResultEventData {
+  toolName: string;
+  result: unknown;
+}
+
+export interface ThinkingEventData {
+  status: 'start' | 'complete';
+}
+
+export interface LocalSystemMessageEventData {
+  message: string;
+}
+
+// Discriminated union for session events
+export type SessionEvent =
+  | {
+      type: 'USER_MESSAGE';
+      threadId: ThreadId;
+      timestamp: string;
+      data: UserMessageEventData;
+    }
+  | {
+      type: 'AGENT_MESSAGE';
+      threadId: ThreadId;
+      timestamp: string;
+      data: AgentMessageEventData;
+    }
+  | {
+      type: 'TOOL_CALL';
+      threadId: ThreadId;
+      timestamp: string;
+      data: ToolCallEventData;
+    }
+  | {
+      type: 'TOOL_RESULT';
+      threadId: ThreadId;
+      timestamp: string;
+      data: ToolResultEventData;
+    }
+  | {
+      type: 'THINKING';
+      threadId: ThreadId;
+      timestamp: string;
+      data: ThinkingEventData;
+    }
+  | {
+      type: 'LOCAL_SYSTEM_MESSAGE';
+      threadId: ThreadId;
+      timestamp: string;
+      data: LocalSystemMessageEventData;
+    };
 
 // Tool approval event data - extends what the agent emits
 export interface ToolApprovalRequestData {
@@ -91,4 +151,58 @@ export interface MessageResponse {
   status: 'accepted';
   threadId: ThreadId;
   messageId: string;
+}
+
+// API response types for proper error handling
+export interface ApiSuccessResponse<T> {
+  data?: T;
+  [key: string]: unknown;
+}
+
+export interface ApiErrorResponse {
+  error: string;
+  details?: unknown;
+}
+
+export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
+
+// Helper type guards for API responses
+export function isApiError(response: unknown): response is ApiErrorResponse {
+  return typeof response === 'object' && response !== null && 'error' in response;
+}
+
+export function isApiSuccess<T>(response: unknown): response is ApiSuccessResponse<T> {
+  return typeof response === 'object' && response !== null && !('error' in response);
+}
+
+// Specific API response types
+export interface SessionsResponse {
+  sessions: Session[];
+}
+
+export interface SessionResponse {
+  session: Session;
+}
+
+export interface AgentResponse {
+  agent: Agent;
+}
+
+export interface ProvidersResponse {
+  providers: ProviderInfo[];
+}
+
+export interface ProviderInfo {
+  type: string;
+  name: string;
+  models: ModelInfo[];
+  available: boolean;
+}
+
+export interface ModelInfo {
+  name: string;
+  displayName: string;
+  contextWindow: number;
+  supportsFunctionCalling: boolean;
+  supportsStreaming: boolean;
 }

@@ -4,8 +4,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId, MessageRequest, MessageResponse, SessionEvent } from '@/types/api';
+import { ThreadId, MessageRequest, MessageResponse, SessionEvent, ApiErrorResponse } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
+
+// Type guard for ThreadId
+function isValidThreadId(threadId: string): threadId is ThreadId {
+  return typeof threadId === 'string' && threadId.length > 0;
+}
+
+// Type guard for unknown error values
+function isError(error: unknown): error is Error {
+  return error instanceof Error;
+}
 
 export async function POST(
   request: NextRequest,
@@ -14,11 +24,18 @@ export async function POST(
   try {
     const sessionService = getSessionService();
     const { threadId: threadIdParam } = await params;
-    const threadId = threadIdParam as ThreadId;
+    
+    if (!isValidThreadId(threadIdParam)) {
+      const errorResponse: ApiErrorResponse = { error: 'Invalid thread ID' };
+      return NextResponse.json(errorResponse, { status: 400 });
+    }
+    
+    const threadId = threadIdParam;
 
     // Validate thread ID format
     if (!threadId.match(/^lace_\d{8}_[a-z0-9]+(\.\d+)?$/)) {
-      return NextResponse.json({ error: 'Invalid thread ID format' }, { status: 400 });
+      const errorResponse: ApiErrorResponse = { error: 'Invalid thread ID format' };
+      return NextResponse.json(errorResponse, { status: 400 });
     }
 
     // Parse request body
@@ -26,17 +43,20 @@ export async function POST(
 
     // Type-safe body validation
     if (!bodyRaw || typeof bodyRaw !== 'object' || !('message' in bodyRaw)) {
-      return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+      const errorResponse: ApiErrorResponse = { error: 'Message is required' };
+      return NextResponse.json(errorResponse, { status: 400 });
     }
 
     const body = bodyRaw as MessageRequest;
 
     if (!body.message) {
-      return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+      const errorResponse: ApiErrorResponse = { error: 'Message is required' };
+      return NextResponse.json(errorResponse, { status: 400 });
     }
 
     if (typeof body.message === 'string' && body.message.trim() === '') {
-      return NextResponse.json({ error: 'Message cannot be empty' }, { status: 400 });
+      const errorResponse: ApiErrorResponse = { error: 'Message cannot be empty' };
+      return NextResponse.json(errorResponse, { status: 400 });
     }
 
     // Determine session ID (parent thread for agents, or self for sessions)
@@ -46,7 +66,8 @@ export async function POST(
     const agent = sessionService.getAgent(threadId);
 
     if (!agent) {
-      return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
+      const errorResponse: ApiErrorResponse = { error: 'Agent not found' };
+      return NextResponse.json(errorResponse, { status: 404 });
     }
 
     // Broadcast user message event via SSE
@@ -93,6 +114,9 @@ export async function POST(
     return NextResponse.json(response, { status: 202 });
   } catch (error: unknown) {
     console.error('Error in POST /api/threads/[threadId]/message:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    
+    const errorMessage = isError(error) ? error.message : 'Internal server error';
+    const errorResponse: ApiErrorResponse = { error: errorMessage };
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }

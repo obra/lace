@@ -3,7 +3,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { CreateSessionRequest } from '@/types/api';
+import { CreateSessionRequest, ApiErrorResponse } from '@/types/api';
+
+// Type guard for unknown error values
+function isError(error: unknown): error is Error {
+  return error instanceof Error;
+}
 
 export async function GET(_request: NextRequest): Promise<NextResponse> {
   try {
@@ -11,9 +16,12 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
     const sessions = await sessionService.listSessions();
 
     return NextResponse.json({ sessions });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in GET /api/sessions:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    
+    const errorMessage = isError(error) ? error.message : 'Internal server error';
+    const errorResponse: ApiErrorResponse = { error: errorMessage };
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }
 
@@ -25,8 +33,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const session = await sessionService.createSession(body.name);
 
     return NextResponse.json({ session }, { status: 201 });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in POST /api/sessions:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    
+    const errorMessage = isError(error) ? error.message : 'Internal server error';
+    const errorResponse: ApiErrorResponse = { error: errorMessage };
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }

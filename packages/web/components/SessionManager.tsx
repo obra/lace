@@ -4,6 +4,12 @@
 import React, { useState } from 'react';
 import { Session, CreateSessionRequest, ThreadId } from '@/types/api';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
+import { isThreadId } from '@/lib/server/lace-imports';
+
+// Type guard to ensure session has proper ThreadId
+function isValidSession(session: Session): session is Session & { id: ThreadId } {
+  return typeof session.id === 'string' && isThreadId(session.id);
+}
 
 interface SessionManagerProps {
   sessions: Session[];
@@ -77,27 +83,30 @@ export function SessionManager({
         {sessions.length === 0 ? (
           <p className="text-gray-500 text-sm">No active sessions</p>
         ) : (
-          sessions.map((session) => (
-            <button
-              key={session.id}
-              onClick={() => onSessionSelect(session.id)}
-              className={`w-full text-left px-3 py-2 rounded transition-colors ${
-                currentSessionId === session.id
-                  ? 'bg-gray-700 text-terminal-fg'
-                  : 'hover:bg-gray-800 text-gray-400'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{session.name}</span>
-                <span className="text-xs text-gray-500">
-                  {session.agents.length} agent{session.agents.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-              <div className="text-xs text-gray-600 mt-1">
-                {new Date(session.createdAt).toLocaleString()}
-              </div>
-            </button>
-          ))
+          sessions.filter(isValidSession).map((session) => {
+            const sessionId = session.id as ThreadId;
+            return (
+              <button
+                key={sessionId}
+                onClick={() => onSessionSelect(sessionId)}
+                className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                  currentSessionId === sessionId
+                    ? 'bg-gray-700 text-terminal-fg'
+                    : 'hover:bg-gray-800 text-gray-400'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{session.name}</span>
+                  <span className="text-xs text-gray-500">
+                    {session.agents.length} agent{session.agents.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-600 mt-1">
+                  {new Date(session.createdAt).toLocaleString()}
+                </div>
+              </button>
+            );
+          })
         )}
       </div>
     </div>

@@ -2,7 +2,7 @@
 // ABOUTME: Renders conversation events in a structured, color-coded terminal interface style
 
 import React from 'react';
-import type { SessionEvent, Agent } from '@/types/api';
+import type { SessionEvent, Agent, ThreadId } from '@/types/api';
 
 interface ConversationDisplayProps {
   events: SessionEvent[];
@@ -23,19 +23,19 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
               <span className="text-2xl">👤</span>
               <div className="flex-1">
                 <span className="text-blue-400 font-semibold">User: </span>
-                <span className="text-gray-100">{event.data?.content}</span>
+                <span className="text-gray-100">{event.data.content || event.data.message}</span>
               </div>
             </div>
           </div>
         );
 
       case 'THINKING':
-        return event.data?.status === 'start' ? (
+        return event.data.status === 'start' ? (
           <div key={index} className="mb-2 text-gray-400 italic">
             <div className="text-xs text-gray-500">[{timestamp}]</div>
             <div className="flex items-start gap-2">
               <span className="text-xl animate-pulse">🤔</span>
-              <span>{getAgentName(event.threadId)}: Thinking...</span>
+              <span>{getAgentName(event.threadId as ThreadId)}: Thinking...</span>
             </div>
           </div>
         ) : null;
@@ -48,9 +48,9 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
               <span className="text-2xl">🤖</span>
               <div className="flex-1">
                 <span className="text-green-400 font-semibold">
-                  {getAgentName(event.threadId)}:{' '}
+                  {getAgentName(event.threadId as ThreadId)}:{' '}
                 </span>
-                <span className="text-gray-100 whitespace-pre-wrap">{event.data?.content}</span>
+                <span className="text-gray-100 whitespace-pre-wrap">{event.data.content}</span>
               </div>
             </div>
           </div>
@@ -62,8 +62,8 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
             <div className="text-xs text-gray-500">[{timestamp}]</div>
             <div className="bg-gray-800 rounded p-2 text-sm font-mono">
               <span className="text-yellow-400">🔧 Tool Call: </span>
-              <span className="text-cyan-400">{event.data?.toolName}</span>
-              {event.data?.input && (
+              <span className="text-cyan-400">{event.data.toolName}</span>
+              {event.data.input && (
                 <pre className="text-xs text-gray-400 mt-1">
                   {JSON.stringify(event.data.input, null, 2)}
                 </pre>
@@ -78,7 +78,7 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
             <div className="text-xs text-gray-500">[{timestamp}]</div>
             <div className="bg-gray-800 rounded p-2 text-sm">
               <span className="text-green-400">✅ Tool Result: </span>
-              <span className="text-gray-300">{event.data?.toolName} completed</span>
+              <span className="text-gray-300">{event.data.toolName} completed</span>
             </div>
           </div>
         );
@@ -87,7 +87,7 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
         return (
           <div key={index} className="mb-2 text-center">
             <div className="text-xs text-gray-500">[{timestamp}]</div>
-            <div className="text-gray-400 italic">— {event.data?.message} —</div>
+            <div className="text-gray-400 italic">— {event.data.message} —</div>
           </div>
         );
 
@@ -104,7 +104,7 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
   };
 
   // Helper to extract agent name from threadId
-  const getAgentName = (threadId: string): string => {
+  const getAgentName = (threadId: ThreadId): string => {
     // Try to find agent in the provided list
     const agent = agents?.find((a) => a.threadId === threadId);
     if (agent) {
@@ -112,7 +112,8 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
     }
 
     // Fallback to extracting from threadId
-    const match = threadId.match(/\.(\d+)$/);
+    const threadIdStr = String(threadId);
+    const match = threadIdStr.match(/\.(\d+)$/);
     return match ? `Agent ${match[1]}` : 'Agent';
   };
 

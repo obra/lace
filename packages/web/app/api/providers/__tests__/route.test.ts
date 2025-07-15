@@ -2,7 +2,6 @@
 // ABOUTME: Verifies provider listing with models and configuration status
 
 import { describe, it, expect, beforeEach, vi, MockedFunction } from 'vitest';
-import { NextRequest } from 'next/server';
 import { GET, type ProviderWithModels } from '@/app/api/providers/route';
 import type { ProviderInfo, ModelInfo } from '@/lib/server/lace-imports';
 // ProviderRegistry is mocked but not directly used in tests
@@ -99,8 +98,7 @@ describe('Provider Discovery API', () => {
 
       mockRegistry.getAvailableProviders.mockResolvedValue(mockProviders);
 
-      const request = new NextRequest('http://localhost:3000/api/providers');
-      const response = await GET(request);
+      const response = await GET();
       const data = (await response.json()) as ProvidersResponse;
 
       expect(response.status).toBe(200);
@@ -135,8 +133,7 @@ describe('Provider Discovery API', () => {
     it('should handle empty provider list', async () => {
       mockRegistry.getAvailableProviders.mockResolvedValue([]);
 
-      const request = new NextRequest('http://localhost:3000/api/providers');
-      const response = await GET(request);
+      const response = await GET();
       const data = (await response.json()) as ProvidersResponse;
 
       expect(response.status).toBe(200);
@@ -166,8 +163,7 @@ describe('Provider Discovery API', () => {
 
       mockRegistry.getAvailableProviders.mockResolvedValue(mockProviders);
 
-      const request = new NextRequest('http://localhost:3000/api/providers');
-      const response = await GET(request);
+      const response = await GET();
       const data = (await response.json()) as ProvidersResponse;
 
       expect(response.status).toBe(200);
@@ -183,8 +179,7 @@ describe('Provider Discovery API', () => {
         new Error('Failed to discover providers')
       );
 
-      const request = new NextRequest('http://localhost:3000/api/providers');
-      const response = await GET(request);
+      const response = await GET();
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(500);
@@ -223,8 +218,7 @@ describe('Provider Discovery API', () => {
 
       mockRegistry.getAvailableProviders.mockResolvedValue(mockProviders);
 
-      const request = new NextRequest('http://localhost:3000/api/providers');
-      const response = await GET(request);
+      const response = await GET();
       const data = (await response.json()) as ProvidersResponse;
 
       expect(response.status).toBe(200);
@@ -258,8 +252,7 @@ describe('Provider Discovery API', () => {
 
       mockRegistry.getAvailableProviders.mockResolvedValue(mockProviders);
 
-      const request = new NextRequest('http://localhost:3000/api/providers');
-      const response = await GET(request);
+      const response = await GET();
       const data = (await response.json()) as ProvidersResponse;
 
       expect(response.status).toBe(200);

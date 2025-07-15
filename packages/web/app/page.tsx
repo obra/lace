@@ -8,7 +8,10 @@ import type {
   ToolApprovalRequestData,
   ApprovalDecision,
   Agent,
+  SessionsResponse,
+  SessionResponse,
 } from '@/types/api';
+import { isApiError } from '@/types/api';
 import { ConversationDisplay } from '@/components/ConversationDisplay';
 import { ToolApprovalModal } from '@/components/ToolApprovalModal';
 import { AgentSpawner } from '@/components/AgentSpawner';
@@ -46,13 +49,18 @@ export default function Home() {
     eventTypes.forEach((eventType) => {
       eventSource.addEventListener(eventType, (event: MessageEvent) => {
         try {
-          const data = JSON.parse(event.data);
+          const data: unknown = JSON.parse(String(event.data));
 
-          // Handle approval requests separately
-          if (data.type === 'TOOL_APPROVAL_REQUEST') {
-            setApprovalRequest(data.data as ToolApprovalRequestData);
-          } else {
-            setEvents((prev) => [...prev, data as SessionEvent]);
+          // Type guard for event structure
+          if (typeof data === 'object' && data !== null && 'type' in data) {
+            const eventData = data as { type: string; data: unknown };
+            
+            // Handle approval requests separately
+            if (eventData.type === 'TOOL_APPROVAL_REQUEST') {
+              setApprovalRequest(eventData.data as ToolApprovalRequestData);
+            } else {
+              setEvents((prev) => [...prev, data as SessionEvent]);
+            }
           }
         } catch (error) {
           console.error('Failed to parse event:', error);
@@ -89,8 +97,15 @@ export default function Home() {
   async function loadSessions() {
     try {
       const res = await fetch('/api/sessions');
-      const data = await res.json();
-      setSessions(data.sessions || []);
+      const data: unknown = await res.json();
+      
+      if (isApiError(data)) {
+        console.error('Failed to load sessions:', data.error);
+        return;
+      }
+      
+      const sessionsData = data as SessionsResponse;
+      setSessions(sessionsData.sessions || []);
     } catch (error) {
       console.error('Failed to load sessions:', error);
     }
@@ -108,8 +123,15 @@ export default function Home() {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        setSelectedSession(data.session.id);
+        const data: unknown = await res.json();
+        
+        if (isApiError(data)) {
+          console.error('Failed to create session:', data.error);
+          return;
+        }
+        
+        const sessionData = data as SessionResponse;
+        setSelectedSession(sessionData.session.id as ThreadId);
         setSessionName('');
         await loadSessions();
       }
@@ -122,9 +144,7 @@ export default function Home() {
   const handleAgentSpawn = async (agent: Agent) => {
     await loadSessions();
     // Select the new agent
-    if (agent.threadId) {
-      setSelectedAgent(agent.threadId);
-    }
+    setSelectedAgent(agent.threadId as ThreadId);
   };
 
   async function handleApprovalDecision(decision: ApprovalDecision) {
@@ -211,8 +231,8 @@ export default function Home() {
             <div className="space-y-2">
               {sessions.map((session) => (
                 <div
-                  key={session.id}
-                  onClick={() => setSelectedSession(session.id)}
+                  key={String(session.id)}
+                  onClick={() => setSelectedSession(session.id as ThreadId)}
                   className={`p-3 rounded cursor-pointer ${
                     selectedSession === session.id ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'
                   }`}
@@ -245,8 +265,8 @@ export default function Home() {
                   .find((s) => s.id === selectedSession)
                   ?.agents.map((agent) => (
                     <div
-                      key={agent.threadId}
-                      onClick={() => setSelectedAgent(agent.threadId)}
+                      key={String(agent.threadId)}
+                      onClick={() => setSelectedAgent(agent.threadId as ThreadId)}
                       className={`p-3 mb-2 rounded cursor-pointer ${
                         selectedAgent === agent.threadId
                           ? 'bg-green-600'

@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { Agent, CreateAgentRequest, ThreadId } from '@/types/api';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
-import type { ProviderWithModels, ProvidersResponse } from '@/app/api/providers/route';
+import type { ProviderWithModels, ProvidersResponse, ErrorResponse } from '@/app/api/providers/route';
 
 interface AgentSpawnerProps {
   sessionId: ThreadId;
@@ -18,6 +18,26 @@ interface ModelOption {
   description?: string;
   isDefault?: boolean;
   disabled?: boolean;
+}
+
+// Type guard for ProvidersResponse
+function isProvidersResponse(data: unknown): data is ProvidersResponse {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'providers' in data &&
+    Array.isArray((data as ProvidersResponse).providers)
+  );
+}
+
+// Type guard for ErrorResponse
+function isErrorResponse(data: unknown): data is ErrorResponse {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'error' in data &&
+    typeof (data as ErrorResponse).error === 'string'
+  );
 }
 
 export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerProps) {
@@ -36,7 +56,22 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
   async function loadProviders() {
     try {
       const res = await fetch('/api/providers');
-      const data: ProvidersResponse = await res.json();
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
+      const data: unknown = await res.json();
+      
+      // Type guard to check if response is an error
+      if (isErrorResponse(data)) {
+        throw new Error(data.error);
+      }
+      
+      // Type guard to check if response is valid providers response
+      if (!isProvidersResponse(data)) {
+        throw new Error('Invalid response format from providers API');
+      }
+      
       setProviders(data.providers);
 
       // Build model options
@@ -163,7 +198,7 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
       <div className="flex flex-wrap gap-2">
         {agents.map((agent) => (
           <div
-            key={agent.threadId}
+            key={String(agent.threadId)}
             className="px-3 py-1 bg-gray-800 rounded text-sm flex items-center gap-2"
           >
             <span className="font-medium">{agent.name}</span>

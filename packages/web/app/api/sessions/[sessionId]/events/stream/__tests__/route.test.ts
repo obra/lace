@@ -57,7 +57,7 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      } as const);
+      });
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
@@ -77,7 +77,7 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      } as const);
+      });
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
@@ -103,7 +103,7 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      } as const);
+      });
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
@@ -126,7 +126,7 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      } as const);
+      });
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
@@ -152,7 +152,7 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      } as const);
+      });
 
       const abortController = new AbortController();
       const request = new NextRequest(
@@ -177,7 +177,7 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      } as const);
+      });
 
       // Create multiple connections
       const request1 = new NextRequest(
@@ -208,7 +208,7 @@ describe('Session SSE Stream API', () => {
     });
 
     it('should return 404 for non-existent session', async () => {
-      mockSessionService.getSession.mockResolvedValue(null as const);
+      mockSessionService.getSession.mockResolvedValue(null);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/invalid/events/stream`);
       const response = await GET(request, { params: Promise.resolve({ sessionId: 'invalid' }) });
@@ -224,7 +224,7 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      } as const);
+      });
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
@@ -241,7 +241,7 @@ describe('Session SSE Stream API', () => {
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      } as const);
+      });
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`

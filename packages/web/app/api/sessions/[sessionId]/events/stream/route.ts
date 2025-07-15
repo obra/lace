@@ -3,8 +3,18 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId } from '@/types/api';
+import { ThreadId, ApiErrorResponse } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
+
+// Type guard for ThreadId
+function isValidThreadId(sessionId: string): sessionId is ThreadId {
+  return typeof sessionId === 'string' && sessionId.length > 0;
+}
+
+// Type guard for unknown error values
+function isError(error: unknown): error is Error {
+  return error instanceof Error;
+}
 
 export async function GET(
   request: NextRequest,
@@ -13,21 +23,28 @@ export async function GET(
   try {
     const sessionService = getSessionService();
     const { sessionId: sessionIdParam } = await params;
-    const sessionId = sessionIdParam as ThreadId;
+    
+    if (!isValidThreadId(sessionIdParam)) {
+      const errorResponse: ApiErrorResponse = { error: 'Invalid session ID' };
+      return NextResponse.json(errorResponse, { status: 400 });
+    }
+    
+    const sessionId = sessionIdParam;
 
     // Verify session exists
     const session = await sessionService.getSession(sessionId);
 
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      const errorResponse: ApiErrorResponse = { error: 'Session not found' };
+      return NextResponse.json(errorResponse, { status: 404 });
     }
 
     // Create SSE stream
     const encoder = new TextEncoder();
     const sseManager = SSEManager.getInstance();
 
-    const stream = new ReadableStream({
-      start(controller) {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller: ReadableStreamDefaultController<Uint8Array>) {
         // Send initial connection event
         const connectionEvent = {
           event: 'connection',
@@ -76,8 +93,11 @@ export async function GET(
         'X-Accel-Buffering': 'no', // Disable nginx buffering
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in GET /api/sessions/[sessionId]/events/stream:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    
+    const errorMessage = isError(error) ? error.message : 'Internal server error';
+    const errorResponse: ApiErrorResponse = { error: errorMessage };
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }

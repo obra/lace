@@ -3,8 +3,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getApprovalManager } from '@/lib/server/approval-manager';
-import { ToolApprovalResponse } from '@/types/api';
+import { ToolApprovalResponse, ApiErrorResponse } from '@/types/api';
 import { ApprovalDecision } from '@/types/api';
+import { ApprovalDecision as LaceApprovalDecision } from '~/tools/approval-types';
+
+// Type guard for unknown error values
+function isError(error: unknown): error is Error {
+  return error instanceof Error;
+}
 
 export async function POST(
   request: NextRequest,
@@ -18,23 +24,31 @@ export async function POST(
     const validDecisions = [ApprovalDecision.ALLOW_ONCE, ApprovalDecision.ALLOW_SESSION, ApprovalDecision.DENY];
 
     if (!validDecisions.includes(body.decision)) {
-      return NextResponse.json(
-        { error: 'Invalid decision. Must be: allow_once, allow_session, or deny' },
-        { status: 400 }
-      );
+      const errorResponse: ApiErrorResponse = { 
+        error: 'Invalid decision. Must be: allow_once, allow_session, or deny' 
+      };
+      return NextResponse.json(errorResponse, { status: 400 });
     }
 
     const approvalManager = getApprovalManager();
-    const success = approvalManager.resolveApproval(requestId, body.decision);
+    // Convert API decision to Lace enum
+    const laceDecision = body.decision as LaceApprovalDecision;
+    const success = approvalManager.resolveApproval(requestId, laceDecision);
 
     if (!success) {
-      return NextResponse.json({ error: 'Approval request not found or expired' }, { status: 404 });
+      const errorResponse: ApiErrorResponse = { 
+        error: 'Approval request not found or expired' 
+      };
+      return NextResponse.json(errorResponse, { status: 404 });
     }
 
     console.warn(`Approval decision for ${requestId}: ${body.decision}`);
     return NextResponse.json({ status: 'resolved', decision: body.decision });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in POST /api/approvals/[requestId]:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    
+    const errorMessage = isError(error) ? error.message : 'Internal server error';
+    const errorResponse: ApiErrorResponse = { error: errorMessage };
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }
