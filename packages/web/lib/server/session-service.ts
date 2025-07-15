@@ -136,7 +136,7 @@ export class SessionService {
 
     // Create provider for delegate agent
     const registry = ProviderRegistry.createWithAutoDiscovery();
-    const delegateProvider = await registry.createProvider(providerType, { model: modelName });
+    const delegateProvider = registry.createProvider(providerType, { model: modelName });
 
     // Create delegate agent
     const delegateAgent = parentAgent.createDelegateAgent(toolExecutor, delegateProvider);

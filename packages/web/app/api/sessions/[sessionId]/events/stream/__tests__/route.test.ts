@@ -145,7 +145,7 @@ describe('Session SSE Stream API', () => {
       expect(mockSSEManager.broadcast).toHaveBeenCalledWith(otherSessionId, expect.any(Object));
     });
 
-    it.skip('should handle client disconnection gracefully', () => {
+    it.skip('should handle client disconnection gracefully', async () => {
       // Skip: AbortController signal handling is complex in test environment
       mockSessionService.getSession.mockResolvedValue({
         id: sessionId,
