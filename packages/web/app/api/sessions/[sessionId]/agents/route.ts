@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId, CreateAgentRequest, Agent } from '@/types/api';
+import { ThreadId, CreateAgentRequest } from '@/types/api';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {

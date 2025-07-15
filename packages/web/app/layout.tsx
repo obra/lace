@@ -2,7 +2,7 @@
 // ABOUTME: Sets up global styles and metadata
 
 import type { Metadata } from 'next';
-import '~/../app/globals.css';
+import '@/app/globals.css';
 
 export const metadata: Metadata = {
   title: 'Lace Web Terminal',

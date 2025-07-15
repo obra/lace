@@ -24,7 +24,7 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
   const [showForm, setShowForm] = useState(false);
   const [agentName, setAgentName] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
-  const [providers, setProviders] = useState<ProviderWithModels[]>([]);
+  const [_providers, setProviders] = useState<ProviderWithModels[]>([]);
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const { spawnAgent, loading, error } = useSessionAPI();
 

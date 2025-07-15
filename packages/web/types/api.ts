@@ -3,7 +3,15 @@
 
 // Import core types from Lace
 export type { ThreadId } from '@/lib/server/lace-imports';
-import type { ApprovalDecision } from '@/lib/server/lace-imports';
+
+// Define ApprovalDecision locally to avoid import issues
+export const ApprovalDecision = {
+  ALLOW_ONCE: 'allow_once',
+  ALLOW_SESSION: 'allow_session',
+  DENY: 'deny',
+} as const;
+
+export type ApprovalDecision = (typeof ApprovalDecision)[keyof typeof ApprovalDecision];
 
 export interface Session {
   id: ThreadId; // sessionId (parent threadId)

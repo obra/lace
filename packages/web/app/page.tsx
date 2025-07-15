@@ -60,7 +60,7 @@ export default function Home() {
       });
     });
 
-    eventSource.addEventListener('connection', (event) => {
+    eventSource.addEventListener('connection', (_event) => {
       const connectionEvent: SessionEvent = {
         type: 'LOCAL_SYSTEM_MESSAGE',
         threadId: selectedSession,

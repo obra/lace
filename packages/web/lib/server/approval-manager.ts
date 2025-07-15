@@ -4,7 +4,7 @@
 import { randomUUID } from 'crypto';
 import { ThreadId, SessionEvent, ToolApprovalRequestData } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
-import type { ApprovalDecision, ToolAnnotations } from '~/../lib/server/lace-imports';
+import { ApprovalDecision, type ToolAnnotations } from '@/lib/server/lace-imports';
 
 interface PendingApproval {
   resolve: (decision: ApprovalDecision) => void;

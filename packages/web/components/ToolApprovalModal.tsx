@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { ToolApprovalRequestData } from '@/types/api';
-import { ApprovalDecision } from '@/lib/server/lace-imports';
+import { ApprovalDecision } from '@/types/api';
 
 interface ToolApprovalModalProps {
   request: ToolApprovalRequestData;

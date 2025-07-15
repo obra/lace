@@ -64,11 +64,11 @@ export async function POST(
     const messageId = randomUUID();
 
     // Process message asynchronously
-    console.info(`Processing message for agent ${threadId}: "${body.message}"`);
+    console.warn(`Processing message for agent ${threadId}: "${body.message}"`);
     agent
       .sendMessage(body.message)
       .then(() => {
-        console.info(`Message processing started for agent ${threadId}`);
+        console.warn(`Message processing started for agent ${threadId}`);
       })
       .catch((error: unknown) => {
         console.error('Error processing message:', error);

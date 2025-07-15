@@ -2,7 +2,7 @@
 // ABOUTME: Displays messages, handles input, and manages real-time updates
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Session, Agent, SessionEvent, ThreadId } from '@/types/api';
+import { Session, Agent, ThreadId } from '@/types/api';
 import { useSSEStream } from '@/hooks/useSSEStream';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
 import { AgentSpawner } from '@/components/AgentSpawner';

@@ -9,15 +9,14 @@ import {
   getLaceDbPath,
   getEnvVar,
   DelegateTool,
-  ApprovalDecision,
 } from '~/../packages/web/lib/server/lace-imports';
 import type {
   ThreadId,
   AgentState,
-  ToolAnnotations,
+  _ToolAnnotations,
 } from '~/../packages/web/lib/server/lace-imports';
-import { createThreadId, asThreadId } from '~/../packages/web/lib/server/lace-imports';
-import { Session, Agent as AgentType, SessionEvent } from '@/types/api';
+import { asThreadId } from '~/../packages/web/lib/server/lace-imports';
+import { Session, Agent as AgentType, SessionEvent, ApprovalDecision } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
 import { getApprovalManager } from '@/lib/server/approval-manager';
 
@@ -41,14 +40,14 @@ export class SessionService {
     try {
       // Ensure environment variables are available
       const apiKey = process.env.ANTHROPIC_API_KEY;
-      console.log(
+      console.warn(
         `Creating provider ${providerType} with API key:`,
         apiKey ? 'present' : 'missing'
       );
 
       const registry = await ProviderRegistry.createWithAutoDiscovery();
       const provider = await registry.createProvider(providerType, model ? { model } : undefined);
-      console.log(`Created provider: ${providerType} with model: ${model}`);
+      console.warn(`Created provider: ${providerType} with model: ${model}`);
       return provider;
     } catch (error) {
       console.error(`Failed to create provider ${providerType}:`, error);
@@ -215,14 +214,14 @@ export class SessionService {
     const sseManager = SSEManager.getInstance();
     const threadId = asThreadId(agent.threadId);
 
-    console.log(`Setting up SSE event handlers for agent ${threadId} in session ${sessionId}`);
+    console.warn(`Setting up SSE event handlers for agent ${threadId} in session ${sessionId}`);
 
     // Check if agent is started
     const isRunning = (agent as unknown as { _isRunning?: boolean })._isRunning;
-    console.log(`Agent ${threadId} running state:`, isRunning);
+    console.warn(`Agent ${threadId} running state:`, isRunning);
 
     agent.on('agent_thinking_start', () => {
-      console.log(`Agent ${threadId} started thinking`);
+      console.warn(`Agent ${threadId} started thinking`);
       const event: SessionEvent = {
         type: 'THINKING',
         threadId,
@@ -243,7 +242,7 @@ export class SessionService {
     });
 
     agent.on('agent_response_complete', ({ content }: { content: string }) => {
-      console.log(`Agent ${threadId} response complete:`, content.substring(0, 100) + '...');
+      console.warn(`Agent ${threadId} response complete:`, content.substring(0, 100) + '...');
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
         threadId,
@@ -285,7 +284,7 @@ export class SessionService {
 
     // Listen for state changes to debug
     agent.on('state_change', ({ from, to }: { from: string; to: string }) => {
-      console.log(`Agent ${threadId} state changed: ${from} -> ${to}`);
+      console.warn(`Agent ${threadId} state changed: ${from} -> ${to}`);
     });
 
     // Listen for any errors
@@ -302,7 +301,7 @@ export class SessionService {
 
     // Listen for conversation complete
     agent.on('conversation_complete', () => {
-      console.log(`Agent ${threadId} conversation complete`);
+      console.warn(`Agent ${threadId} conversation complete`);
     });
 
     // Handle tool approval requests
@@ -312,7 +311,7 @@ export class SessionService {
         toolName,
         input,
         isReadOnly,
-        requestId,
+        _requestId,
         resolve,
       }: {
         toolName: string;
@@ -321,7 +320,7 @@ export class SessionService {
         requestId: string;
         resolve: (decision: ApprovalDecision) => void;
       }) => {
-        console.log(
+        console.warn(
           `Tool approval requested for ${toolName} (${isReadOnly ? 'read-only' : 'destructive'})`
         );
 
