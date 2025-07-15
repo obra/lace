@@ -275,7 +275,10 @@ export default function Home() {
                     >
                       <div className="font-semibold">{agent.name}</div>
                       <div className="text-sm text-gray-300">
-                        {agent.threadId} • {agent.status}
+                        {agent.model} • {agent.status}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {agent.threadId}
                       </div>
                     </div>
                   ))}
@@ -310,11 +313,20 @@ export default function Home() {
             {/* Conversation Display */}
             <div className="bg-gray-800 rounded-lg p-4">
               <h2 className="text-xl mb-4">Conversation</h2>
-              <ConversationDisplay
-                events={events}
-                agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
-                className="h-96"
-              />
+              {selectedAgent ? (
+                <ConversationDisplay
+                  events={events}
+                  agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
+                  selectedAgent={selectedAgent}
+                  className="h-96"
+                />
+              ) : (
+                <ConversationDisplay
+                  events={events}
+                  agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
+                  className="h-96"
+                />
+              )}
             </div>
           </>
         )}

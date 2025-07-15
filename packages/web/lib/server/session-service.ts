@@ -1,9 +1,9 @@
 // ABOUTME: Server-side session management service
 // ABOUTME: Provides high-level API for managing sessions and agents using the Session class
 
-import { Agent, Session } from '~/../packages/web/lib/server/lace-imports';
-import type { ThreadId, _ToolAnnotations } from '~/../packages/web/lib/server/lace-imports';
-import { asThreadId } from '~/../packages/web/lib/server/lace-imports';
+import { Agent, Session } from '@/lib/server/lace-imports';
+import type { ThreadId, _ToolAnnotations } from '@/lib/server/lace-imports';
+import { asThreadId } from '@/lib/server/lace-imports';
 import {
   Session as SessionType,
   Agent as AgentType,
@@ -70,9 +70,24 @@ export class SessionService {
 
       if (!session) {
         // Reconstruct session from database
+        console.warn(`[DEBUG] Reconstructing session from database: ${sessionInfo.id}`);
         session = await Session.getById(sessionInfo.id, dbPath);
         if (session) {
+          console.warn(`[DEBUG] Session reconstructed successfully: ${sessionInfo.id}`);
           activeSessions.set(sessionInfo.id, session);
+          
+          // Set up event handlers for all agents in the reconstructed session
+          const agents = session.getAgents();
+          console.warn(`[DEBUG] Setting up event handlers for ${agents.length} agents`);
+          for (const agentInfo of agents) {
+            const agent = session.getAgent(agentInfo.threadId);
+            if (agent) {
+              console.warn(`[DEBUG] Setting up event handlers for agent: ${agentInfo.threadId}`);
+              this.setupAgentEventHandlers(agent, sessionInfo.id);
+            }
+          }
+        } else {
+          console.warn(`[DEBUG] Failed to reconstruct session: ${sessionInfo.id}`);
         }
       }
 
@@ -118,18 +133,35 @@ export class SessionService {
   }
 
   async getSession(sessionId: ThreadId): Promise<SessionType | null> {
+    console.warn(`[DEBUG] getSession called for sessionId: ${sessionId}`);
+    
     const dbPath = process.env.LACE_DB_PATH || './lace.db';
 
     // Try to get from active sessions first
     let session = activeSessions.get(sessionId);
+    console.warn(`[DEBUG] Session found in active sessions: ${session ? 'yes' : 'no'}`);
 
     if (!session) {
       // Try to load from database by reconstructing the session
+      console.warn(`[DEBUG] Reconstructing session from database: ${sessionId}`);
       session = await Session.getById(sessionId, dbPath);
       if (!session) {
+        console.warn(`[DEBUG] Failed to reconstruct session: ${sessionId}`);
         return null;
       }
+      console.warn(`[DEBUG] Session reconstructed successfully: ${sessionId}`);
       activeSessions.set(sessionId, session);
+      
+      // Set up event handlers for all agents in the reconstructed session
+      const agents = session.getAgents();
+      console.warn(`[DEBUG] Setting up event handlers for ${agents.length} agents`);
+      for (const agentInfo of agents) {
+        const agent = session.getAgent(agentInfo.threadId);
+        if (agent) {
+          console.warn(`[DEBUG] Setting up event handlers for agent: ${agentInfo.threadId}`);
+          this.setupAgentEventHandlers(agent, sessionId);
+        }
+      }
     }
 
     const sessionInfo = session.getInfo();
@@ -212,13 +244,46 @@ export class SessionService {
   }
 
   getAgent(threadId: ThreadId): Agent | null {
+    console.warn(`[DEBUG] getAgent called for threadId: ${threadId}`);
+    console.warn(`[DEBUG] Active sessions count: ${activeSessions.size}`);
+    console.warn(`[DEBUG] Active session IDs: ${Array.from(activeSessions.keys()).join(', ')}`);
+    
     // Find session that contains this agent
     for (const session of activeSessions.values()) {
+      console.warn(`[DEBUG] Checking session ${session.getId()} for agent ${threadId}`);
       const agent = session.getAgent(threadId);
       if (agent) {
+        console.warn(`[DEBUG] Found agent in session ${session.getId()}`);
+        console.warn(`[DEBUG] Agent state: ${agent.getCurrentState()}`);
+        console.warn(`[DEBUG] Agent started: ${agent.getCurrentState() !== 'idle'}`);
         return agent;
       }
     }
+
+    // If not found in active sessions, try to load the session from database
+    // First check if this looks like a coordinator agent (session thread ID)
+    if (threadId.match(/^lace_\d{8}_[a-z0-9]+$/)) {
+      // This is a coordinator agent, load its session
+      const dbPath = process.env.LACE_DB_PATH || './lace.db';
+      Session.getById(threadId, dbPath)
+        .then((session) => {
+          if (session) {
+            activeSessions.set(threadId, session);
+            // Set up event handlers for the coordinator agent
+            const coordinatorAgent = session.getAgent(threadId);
+            if (coordinatorAgent) {
+              this.setupAgentEventHandlers(coordinatorAgent, threadId);
+            }
+          }
+        })
+        .catch((error) => {
+          console.error(`Failed to load session ${threadId}:`, error);
+        });
+
+      // Return null for now, the session will be loaded asynchronously
+      return null;
+    }
+
     return null;
   }
 

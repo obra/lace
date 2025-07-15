@@ -218,6 +218,7 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
             className="px-3 py-1 bg-gray-800 rounded text-sm flex items-center gap-2"
           >
             <span className="font-medium">{agent.name}</span>
+            <span className="text-xs text-gray-400">{agent.model}</span>
             <span className={`text-xs ${getStatusColor(agent.status)}`}>{agent.status}</span>
           </div>
         ))}

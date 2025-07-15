@@ -223,7 +223,7 @@ export function LaceTerminal({ session, onAgentSpawn }: LaceTerminalProps) {
               <option value={session.id as string}>Session</option>
               {session.agents.map((agent) => (
                 <option key={agent.threadId as string} value={agent.threadId as string}>
-                  {agent.name} ({agent.status})
+                  {agent.name} - {agent.model} ({agent.status})
                 </option>
               ))}
             </select>

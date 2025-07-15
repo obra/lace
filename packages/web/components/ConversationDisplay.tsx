@@ -7,16 +7,33 @@ import type { SessionEvent, Agent, ThreadId } from '@/types/api';
 interface ConversationDisplayProps {
   events: SessionEvent[];
   agents?: Agent[];
+  selectedAgent?: ThreadId;
   className?: string;
 }
 
-export function ConversationDisplay({ events, agents, className = '' }: ConversationDisplayProps) {
+export function ConversationDisplay({ events, agents, selectedAgent, className = '' }: ConversationDisplayProps) {
+  // Filter events by selected agent if provided
+  const filteredEvents = useMemo(() => {
+    if (!selectedAgent) return events;
+    
+    // Include events from the selected agent and USER_MESSAGE events sent to that agent
+    return events.filter(event => {
+      // Always include user messages directed to the selected agent
+      if (event.type === 'USER_MESSAGE' && event.threadId === selectedAgent) {
+        return true;
+      }
+      
+      // Include all other events from the selected agent
+      return event.threadId === selectedAgent;
+    });
+  }, [events, selectedAgent]);
+
   // Process events to merge streaming tokens into complete messages
   const processedEvents = useMemo(() => {
     const processed: SessionEvent[] = [];
     const streamingMessages = new Map<string, { content: string; timestamp: string }>();
     
-    for (const event of events) {
+    for (const event of filteredEvents) {
       if (event.type === 'AGENT_TOKEN') {
         // Accumulate streaming tokens
         const key = `${event.threadId}-streaming`;
@@ -51,7 +68,7 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
     }
     
     return processed;
-  }, [events]);
+  }, [filteredEvents]);
 
   const renderEvent = (event: SessionEvent, index: number) => {
     const timestamp = new Date(event.timestamp).toLocaleTimeString();
