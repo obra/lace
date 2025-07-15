@@ -264,7 +264,10 @@ export default function Home() {
                     >
                       <div className="font-semibold">{session.name}</div>
                       <div className="text-xs text-gray-300">
-                        {session.agents.length} agents
+                        {session.agents.length} agents • {new Date(session.createdAt).toLocaleDateString()}
+                      </div>
+                      <div className="text-xs text-gray-400 font-mono">
+                        {session.id}
                       </div>
                     </div>
                   ))}
@@ -298,11 +301,19 @@ export default function Home() {
                       >
                         <div className="font-semibold">{agent.name}</div>
                         <div className="text-xs text-gray-300">
-                          {agent.model}
+                          {agent.provider} • {agent.model}
                         </div>
                         <div className="text-xs text-gray-400">
-                          {agent.status}
+                          Status: {agent.status}
                         </div>
+                        <div className="text-xs text-gray-400 font-mono">
+                          {agent.threadId}
+                        </div>
+                        {agent.createdAt && (
+                          <div className="text-xs text-gray-500">
+                            {new Date(agent.createdAt).toLocaleString()}
+                          </div>
+                        )}
                       </div>
                     ))}
                 </div>

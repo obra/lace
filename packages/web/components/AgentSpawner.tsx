@@ -213,34 +213,6 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
           {error && <p className="text-terminal-red text-xs">{error}</p>}
         </form>
       )}
-
-      <div className="flex flex-wrap gap-2">
-        {agents.map((agent) => (
-          <div
-            key={String(agent.threadId)}
-            className="px-3 py-1 bg-gray-800 rounded text-sm flex items-center gap-2"
-          >
-            <span className="font-medium">{agent.name}</span>
-            <span className="text-xs text-gray-400">{agent.model}</span>
-            <span className={`text-xs ${getStatusColor(agent.status)}`}>{agent.status}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
-}
-
-function getStatusColor(status: Agent['status']): string {
-  switch (status) {
-    case 'idle':
-      return 'status-idle';
-    case 'thinking':
-      return 'status-thinking';
-    case 'streaming':
-      return 'status-streaming';
-    case 'tool_execution':
-      return 'status-tool-execution';
-    default:
-      return 'text-gray-500';
-  }
 }

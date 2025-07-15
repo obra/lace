@@ -21,7 +21,7 @@ export class SessionService {
     // No need for direct ThreadManager access - use Agent methods instead
   }
 
-  createSession(name?: string): Promise<SessionType> {
+  async createSession(name?: string): Promise<SessionType> {
     // Get default provider and model from environment
     const defaultProvider =
       process.env.ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai';
@@ -34,6 +34,18 @@ export class SessionService {
     const session = Session.create(sessionName, defaultProvider, defaultModel, dbPath);
     const sessionId = session.getId();
 
+    // Start the coordinator agent (this was missing!)
+    const coordinatorAgent = session.getAgent(sessionId);
+    if (!coordinatorAgent) {
+      throw new Error('Failed to get coordinator agent');
+    }
+
+    // Start the coordinator agent
+    await coordinatorAgent.start();
+
+    // Set up event handlers for the coordinator agent
+    this.setupAgentEventHandlers(coordinatorAgent, sessionId);
+
     // Store the session instance
     activeSessions.set(sessionId, session);
 
@@ -43,7 +55,7 @@ export class SessionService {
       throw new Error('Failed to get session info');
     }
 
-    return Promise.resolve({
+    return {
       id: sessionId,
       name: sessionName,
       createdAt: new Date().toISOString(),
@@ -55,7 +67,7 @@ export class SessionService {
         status: agent.status,
         createdAt: new Date().toISOString(),
       })),
-    });
+    };
   }
 
   async listSessions(): Promise<SessionType[]> {
@@ -75,7 +87,7 @@ export class SessionService {
         if (session) {
           console.warn(`[DEBUG] Session reconstructed successfully: ${sessionInfo.id}`);
           activeSessions.set(sessionInfo.id, session);
-          
+
           // Set up event handlers for all agents in the reconstructed session
           const agents = session.getAgents();
           console.warn(`[DEBUG] Setting up event handlers for ${agents.length} agents`);
@@ -134,7 +146,7 @@ export class SessionService {
 
   async getSession(sessionId: ThreadId): Promise<SessionType | null> {
     console.warn(`[DEBUG] getSession called for sessionId: ${sessionId}`);
-    
+
     const dbPath = process.env.LACE_DB_PATH || './lace.db';
 
     // Try to get from active sessions first
@@ -151,7 +163,7 @@ export class SessionService {
       }
       console.warn(`[DEBUG] Session reconstructed successfully: ${sessionId}`);
       activeSessions.set(sessionId, session);
-      
+
       // Set up event handlers for all agents in the reconstructed session
       const agents = session.getAgents();
       console.warn(`[DEBUG] Setting up event handlers for ${agents.length} agents`);
@@ -247,7 +259,7 @@ export class SessionService {
     console.warn(`[DEBUG] getAgent called for threadId: ${threadId}`);
     console.warn(`[DEBUG] Active sessions count: ${activeSessions.size}`);
     console.warn(`[DEBUG] Active session IDs: ${Array.from(activeSessions.keys()).join(', ')}`);
-    
+
     // Find session that contains this agent
     for (const session of activeSessions.values()) {
       console.warn(`[DEBUG] Checking session ${session.getId()} for agent ${threadId}`);
