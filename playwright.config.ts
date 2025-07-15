@@ -5,7 +5,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './packages/web/__tests__/e2e',
-  testMatch: '**/*.playwright.test.ts',
+  testMatch: '**/*.e2e.ts',
   
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

@@ -81,7 +81,7 @@ export class Session {
 
   static async getById(sessionId: ThreadId, dbPath?: string): Promise<Session | null> {
     console.warn(`[DEBUG] Session.getById called for sessionId: ${sessionId}`);
-    
+
     const actualDbPath = dbPath || getLaceDbPath();
     const threadManager = new ThreadManager(actualDbPath);
     const thread = threadManager.getThread(sessionId);
@@ -125,13 +125,15 @@ export class Session {
 
     // Load delegate threads (child agents) for this session
     const delegateThreadIds = threadManager.getThreadsForSession(sessionId);
-    console.warn(`[DEBUG] Found ${delegateThreadIds.length} delegate threads: ${delegateThreadIds.join(', ')}`);
+    console.warn(
+      `[DEBUG] Found ${delegateThreadIds.length} delegate threads: ${delegateThreadIds.join(', ')}`
+    );
 
     for (const delegateThreadId of delegateThreadIds) {
       const delegateThread = threadManager.getThread(delegateThreadId);
       if (delegateThread) {
         console.warn(`[DEBUG] Creating delegate agent for ${delegateThreadId}`);
-        
+
         // Create agent for this delegate thread
         const delegateAgent = new Agent({
           provider: providerInstance,
@@ -225,21 +227,13 @@ export class Session {
   }
 
   getAgent(threadId: ThreadId): Agent | null {
-    console.warn(`[DEBUG] Session.getAgent called for threadId: ${threadId}, sessionId: ${this._sessionId}`);
-    
     // Check if it's the coordinator agent
     if (threadId === this._sessionId) {
-      console.warn(`[DEBUG] Found coordinator agent, state: ${this._sessionAgent.getCurrentState()}`);
       return this._sessionAgent;
     }
-    
+
     // Check delegate agents
     const delegateAgent = this._agents.get(threadId);
-    console.warn(`[DEBUG] Delegate agent found: ${delegateAgent ? 'yes' : 'no'}`);
-    if (delegateAgent) {
-      console.warn(`[DEBUG] Delegate agent state: ${delegateAgent.getCurrentState()}`);
-    }
-    
     return delegateAgent || null;
   }
 

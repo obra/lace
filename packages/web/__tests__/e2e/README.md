@@ -9,8 +9,10 @@ This directory contains both unit/integration tests and true end-to-end tests us
 - `api-endpoints.test.ts` - Tests API endpoints
 - `sse-integration.test.ts` - Tests server-sent events
 
-### True E2E Tests (Playwright)
-- `web-ui.playwright.test.ts` - Tests the complete web UI through a real browser
+### Playwright Tests (Separate Test Runner)
+- `web-ui.e2e.ts` - End-to-end browser tests with Playwright
+  - **Note**: This test is excluded from the regular Vitest test suite
+  - Run with: `npx playwright test` (requires web server to be running)
 
 ## Running Tests
 

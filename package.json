@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "npm run typecheck && eslint src",
     "lint:fix": "npm run typecheck && eslint src --fix",
-    "format": "prettier --write \"src/**/*.ts\"",
+    "format": "prettier --write \"src\"",
     "prepare": "husky",
     "docker:build": "docker build -t lace-test .",
     "docker:run": "docker run -it --rm lace-test",
