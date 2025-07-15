@@ -26,13 +26,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // Import our actual organism components to showcase them
 import {
-  Sidebar,
-  Header,
-  Footer,
-  CommandPalette,
   Modal,
-  Notification,
-  Card,
+  AnimatedModal,
+  MessageBubble,
+  NavigationItem,
+  SidebarSection,
 } from '~/components/ui';
 
 export default function OrganismsDesign() {
