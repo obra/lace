@@ -20,12 +20,10 @@ const iconSizes = {
 
 export default function Avatar({ role, size = 'md' }: AvatarProps) {
   return (
-    <div className="chat-image avatar">
-      <div
-        className={`${sizeClasses[size]} rounded-full bg-neutral text-neutral-content flex items-center justify-center`}
-      >
-        <FontAwesomeIcon icon={role === 'user' ? faUser : faRobot} className={iconSizes[size]} />
-      </div>
+    <div
+      className={`${sizeClasses[size]} rounded-md bg-neutral text-neutral-content flex items-center justify-center flex-shrink-0`}
+    >
+      <FontAwesomeIcon icon={role === 'user' ? faUser : faRobot} className={iconSizes[size]} />
     </div>
   );
 }

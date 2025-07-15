@@ -1,161 +1,29 @@
 'use client';
 
 import { TimelineEntry } from '~/types';
-import { formatTime } from '~/utils/format';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faInfoCircle,
-  faUser,
-  faRobot,
-  faTerminal,
-  faExternalLinkAlt,
-  faImages,
-} from '~/lib/fontawesome';
+import { MessageDisplay } from '~/components/ui';
 import { IntegrationEntry } from '~/components/timeline/IntegrationEntry';
 import GoogleDocChatMessage from '~/components/chat/GoogleDocChatMessage';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faImages, faExternalLinkAlt, faUser, faRobot } from '~/lib/fontawesome';
+import { formatTime } from '~/utils/format';
 
 interface TimelineMessageProps {
   entry: TimelineEntry;
 }
 
 export function TimelineMessage({ entry }: TimelineMessageProps) {
-  const renderMessage = (content: string) => {
-    // Code block formatting
-    let formatted = content.replace(
-      /```(\w+)?\n([\s\S]*?)```/g,
-      (_match, lang: string, code: string) => {
-        return `<div class="bg-base-300 border border-base-content/20 rounded-lg p-3 my-2 overflow-x-auto">
-        <div class="text-xs text-base-content/60 mb-2">${lang || 'code'}</div>
-        <pre class="text-accent text-sm"><code>${escapeHtml(code.trim())}</code></pre>
-      </div>`;
-      }
-    );
-
-    // Inline code formatting
-    formatted = formatted.replace(
-      /`([^`]+)`/g,
-      '<code class="bg-base-300 px-2 py-1 rounded text-accent text-sm">$1</code>'
-    );
-
-    // Newline formatting
-    formatted = formatted.replace(/\n/g, '<br>');
-
-    return formatted;
-  };
-
-  const escapeHtml = (text: string) => {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  };
-
-  // Admin Messages
-  if (entry.type === 'admin') {
+  // Handle basic message types with MessageDisplay molecule
+  if (entry.type === 'admin' || entry.type === 'human' || entry.type === 'ai' || entry.type === 'tool') {
     return (
-      <div className="flex justify-center">
-        <div className="bg-base-200 border border-base-300 rounded-full px-4 py-2 text-sm text-base-content/70">
-          <div className="flex items-center gap-2">
-            <FontAwesomeIcon icon={faInfoCircle} className="w-4 h-4 text-info" />
-            <span>{entry.content}</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Human Messages
-  if (entry.type === 'human') {
-    return (
-      <div className="flex gap-3">
-        <div className="flex-shrink-0">
-          <div className="w-8 h-8 rounded-md bg-teal-600 text-white flex items-center justify-center text-sm font-medium">
-            <FontAwesomeIcon icon={faUser} className="text-xs" />
-          </div>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="font-medium text-sm text-base-content">You</span>
-            <span className="text-xs text-base-content/50">{formatTime(entry.timestamp)}</span>
-          </div>
-          <div
-            className="text-sm leading-relaxed text-base-content"
-            dangerouslySetInnerHTML={{ __html: renderMessage(entry.content || '') }}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // AI Messages
-  if (entry.type === 'ai') {
-    const agentColors = {
-      Claude: 'bg-orange-500 text-white',
-      'GPT-4': 'bg-green-600 text-white',
-      Gemini: 'bg-blue-600 text-white',
-    };
-
-    const agentBadgeColors = {
-      Claude: 'bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400',
-      'GPT-4': 'bg-green-900/20 text-green-600 dark:bg-green-900/30 dark:text-green-400',
-      Gemini: 'bg-blue-900/20 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-    };
-
-    return (
-      <div className="flex gap-3">
-        <div className="flex-shrink-0">
-          <div
-            className={`w-8 h-8 rounded-md flex items-center justify-center text-sm font-medium ${
-              agentColors[entry.agent as keyof typeof agentColors] || 'bg-gray-600 text-white'
-            }`}
-          >
-            <FontAwesomeIcon icon={faRobot} className="text-xs" />
-          </div>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="font-medium text-sm text-base-content">{entry.agent}</span>
-            <span className="text-xs text-base-content/50">{formatTime(entry.timestamp)}</span>
-            <span
-              className={`text-xs px-1.5 py-0.5 rounded ${
-                agentBadgeColors[entry.agent as keyof typeof agentBadgeColors] ||
-                'bg-base-content/10 text-base-content/60'
-              }`}
-            >
-              {entry.agent}
-            </span>
-          </div>
-          <div
-            className="text-sm leading-relaxed text-base-content"
-            dangerouslySetInnerHTML={{ __html: renderMessage(entry.content || '') }}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // Tool Call
-  if (entry.type === 'tool') {
-    return (
-      <div className="flex gap-3">
-        <div className="flex-shrink-0">
-          <div className="w-8 h-8 rounded-md bg-teal-100 text-teal-700 flex items-center justify-center text-sm">
-            <FontAwesomeIcon icon={faTerminal} className="text-xs" />
-          </div>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="font-medium text-sm text-base-content">Tool</span>
-            <span className="text-xs text-base-content/50">{formatTime(entry.timestamp)}</span>
-            <span className="text-xs px-1.5 py-0.5 rounded bg-base-content/10 text-base-content/60">
-              {entry.tool}
-            </span>
-          </div>
-          <div className="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300">
-            <div className="text-base-content/80 mb-2">$ {entry.content}</div>
-            <div className="text-base-content/60 text-xs whitespace-pre-wrap">{entry.result}</div>
-          </div>
-        </div>
-      </div>
+      <MessageDisplay
+        type={entry.type}
+        content={entry.content || ''}
+        timestamp={entry.timestamp}
+        agent={entry.agent}
+        tool={entry.tool}
+        result={entry.result}
+      />
     );
   }
 

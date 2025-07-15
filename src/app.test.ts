@@ -335,7 +335,7 @@ describe('App Initialization (run function)', () => {
       createErrorResult: vi.fn(),
       setDependencies: vi.fn(),
     };
-    vi.mocked(ToolExecutor.prototype.getTool).mockReturnValue(mockDelegateTool as Tool);
+    vi.mocked(ToolExecutor.prototype.getTool).mockReturnValue(mockDelegateTool as unknown as Tool);
     await run(mockCliOptions);
     expect(mockDelegateTool.setDependencies).toHaveBeenCalledWith(
       expect.any(Agent),

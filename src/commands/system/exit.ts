@@ -7,7 +7,8 @@ export const exitCommand: Command = {
   name: 'exit',
   description: 'Exit the application',
 
-  execute(args: string, ui: UserInterface): void {
+  execute(args: string, ui: UserInterface): Promise<void> {
     ui.exit();
+    return Promise.resolve();
   },
 };

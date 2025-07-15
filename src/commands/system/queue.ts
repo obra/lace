@@ -7,7 +7,7 @@ export const queueCommand: Command = {
   name: 'queue',
   description: 'View message queue or clear queued messages',
 
-  execute(args: string, ui: UserInterface): void {
+  execute(args: string, ui: UserInterface): Promise<void> {
     const trimmedArgs = args.trim();
 
     if (trimmedArgs === 'clear') {
@@ -16,7 +16,7 @@ export const queueCommand: Command = {
       ui.displayMessage(
         `📬 Cleared ${clearedCount} user message${clearedCount === 1 ? '' : 's'} from queue`
       );
-      return;
+      return Promise.resolve();
     }
 
     if (trimmedArgs === '') {
@@ -25,7 +25,7 @@ export const queueCommand: Command = {
 
       if (stats.queueLength === 0) {
         ui.displayMessage('📬 Message queue is empty');
-        return;
+        return Promise.resolve();
       }
 
       // Get queue contents using the proper Agent method
@@ -50,12 +50,13 @@ export const queueCommand: Command = {
       ].filter(Boolean);
 
       ui.displayMessage(messages.join('\n'));
-      return;
+      return Promise.resolve();
     }
 
     // Invalid subcommand
     ui.displayMessage(
       'Usage: /queue [clear]\n  /queue      - Show queue contents\n  /queue clear - Clear user messages from queue'
     );
+    return Promise.resolve();
   },
 };

@@ -7,7 +7,7 @@ export const debugUiPerformanceCommand: Command = {
   name: 'debug-ui-performance',
   description: 'Display timeline processing performance metrics',
 
-  execute(args: string, ui: UserInterface): void {
+  execute(args: string, ui: UserInterface): Promise<void> {
     // Check if the UI supports performance metrics display
     if ('getPerformanceMetrics' in ui && typeof ui.getPerformanceMetrics === 'function') {
       const metrics = (
@@ -17,5 +17,6 @@ export const debugUiPerformanceCommand: Command = {
     } else {
       ui.displayMessage('Performance metrics not supported in this interface');
     }
+    return Promise.resolve();
   },
 };

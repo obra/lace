@@ -9,7 +9,7 @@ export function createHelpCommand(registry: CommandRegistry): Command {
     name: 'help',
     description: 'Show available commands',
 
-    execute(args: string, ui: UserInterface): void {
+    execute(args: string, ui: UserInterface): Promise<void> {
       const trimmedArgs = args.trim();
 
       if (trimmedArgs) {
@@ -17,7 +17,7 @@ export function createHelpCommand(registry: CommandRegistry): Command {
         const command = registry.get(trimmedArgs);
         if (!command) {
           ui.displayMessage(`Unknown command: ${trimmedArgs}`);
-          return;
+          return Promise.resolve();
         }
 
         let helpText = `/${command.name} - ${command.description}`;
@@ -31,7 +31,7 @@ export function createHelpCommand(registry: CommandRegistry): Command {
         const commands = registry.getAllCommands();
         if (commands.length === 0) {
           ui.displayMessage('No commands available');
-          return;
+          return Promise.resolve();
         }
 
         const helpText = [
@@ -41,6 +41,7 @@ export function createHelpCommand(registry: CommandRegistry): Command {
 
         ui.displayMessage(helpText);
       }
+      return Promise.resolve();
     },
   };
 }

@@ -7,11 +7,11 @@ export const compactCommand: Command = {
   name: 'compact',
   description: 'Compress thread history to save tokens',
 
-  execute(args: string, ui: UserInterface): void {
+  execute(args: string, ui: UserInterface): Promise<void> {
     const threadId = ui.agent.getCurrentThreadId();
     if (!threadId) {
       ui.displayMessage('❌ No active thread to compact');
-      return;
+      return Promise.resolve();
     }
 
     ui.agent.compact(threadId);
@@ -30,5 +30,6 @@ export const compactCommand: Command = {
     } else {
       ui.displayMessage(`✅ Compacted thread ${threadId}`);
     }
+    return Promise.resolve();
   },
 };

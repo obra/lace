@@ -1,5 +1,8 @@
 'use client';
 
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faRobot } from '~/lib/fontawesome';
+
 interface TypingIndicatorProps {
   agent: string;
 }
@@ -21,7 +24,7 @@ export function TypingIndicator({ agent }: TypingIndicatorProps) {
             agentColors[agent as keyof typeof agentColors] || 'bg-gray-600'
           } text-white`}
         >
-          <i className="fas fa-robot"></i>
+          <FontAwesomeIcon icon={faRobot} className="text-xs" />
         </div>
       </div>
       <div className="bg-base-100 border border-base-300 rounded-2xl px-4 py-3">

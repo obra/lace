@@ -48,6 +48,14 @@ Good naming is VERY VERY important. Think hard about naming things. It's always 
 - This makes imports more readable and prevents breakage when moving files
 - The `~` prefix maps to the `src/` directory via TypeScript path mapping
 
+### Next.js App Router
+
+- Use the Next.js App Router for server components
+- Use the Next.js Client Router for client components
+- Use the Next.js Server Actions for server actions
+- Use the Next.js Server Components for server components
+- Use the Next.js Server Components for server components
+
 ## Core Architecture
 
 ### Event-Sourcing Foundation
@@ -116,6 +124,7 @@ TOOL_RESULT events → Agent continues or responds
 
 - **ChatInterface**: React-based UI with real-time updates and tool approval modals
 - **Frontend**: Next.js 15 App Router, TypeScript, Tailwind CSS 4.x
+- **Design System**: See `src/app/admin/design/` for more
 
 **Compaction System (`src/threads/compaction/`)**
 

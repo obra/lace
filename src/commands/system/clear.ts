@@ -7,8 +7,9 @@ export const clearCommand: Command = {
   name: 'clear',
   description: 'Clear conversation back to system prompt',
 
-  execute(args: string, ui: UserInterface): void {
+  execute(args: string, ui: UserInterface): Promise<void> {
     ui.clearSession();
     ui.displayMessage('Conversation cleared');
+    return Promise.resolve();
   },
 };
