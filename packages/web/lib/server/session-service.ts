@@ -37,11 +37,24 @@ export class SessionService {
     // Store the session instance
     activeSessions.set(sessionId, session);
 
+    // Get the full session info including coordinator agent
+    const sessionInfo = session.getInfo();
+    if (!sessionInfo) {
+      throw new Error('Failed to get session info');
+    }
+
     return Promise.resolve({
       id: sessionId,
       name: sessionName,
       createdAt: new Date().toISOString(),
-      agents: [],
+      agents: sessionInfo.agents.map((agent) => ({
+        threadId: agent.threadId,
+        name: agent.name,
+        provider: agent.provider,
+        model: agent.model,
+        status: agent.status,
+        createdAt: new Date().toISOString(),
+      })),
     });
   }
 

@@ -137,7 +137,15 @@ describe('Session', () => {
         createdAt: expect.any(Date) as Date,
         provider: 'anthropic',
         model: 'claude-3-haiku-20240307',
-        agents: [],
+        agents: [
+          {
+            threadId: asThreadId('test-session'),
+            name: 'Test Session',
+            provider: 'anthropic',
+            model: 'claude-3-haiku-20240307',
+            status: 'idle',
+          },
+        ],
       });
     });
   });
@@ -159,8 +167,8 @@ describe('Session', () => {
       session.spawnAgent('Test Agent');
 
       const agents = session.getAgents();
-      expect(agents).toHaveLength(1);
-      expect(agents[0]).toEqual({
+      expect(agents).toHaveLength(2); // Coordinator + 1 spawned agent
+      expect(agents[1]).toEqual({
         threadId: asThreadId('test-session.1'),
         name: 'Agent test-session.1',
         provider: 'anthropic',
@@ -171,12 +179,19 @@ describe('Session', () => {
   });
 
   describe('getAgents', () => {
-    it('should return empty array when no agents spawned', () => {
+    it('should return coordinator agent when no agents spawned', () => {
       const session = Session.create('Test Session');
 
       const agents = session.getAgents();
 
-      expect(agents).toEqual([]);
+      expect(agents).toHaveLength(1);
+      expect(agents[0]).toEqual({
+        threadId: asThreadId('test-session'),
+        name: 'Test Session',
+        provider: 'anthropic',
+        model: 'claude-3-haiku-20240307',
+        status: 'idle',
+      });
     });
 
     it('should return spawned agents', () => {
@@ -186,9 +201,10 @@ describe('Session', () => {
 
       const agents = session.getAgents();
 
-      expect(agents).toHaveLength(2);
-      expect(agents[0].threadId).toBe(asThreadId('test-session.1'));
-      expect(agents[1].threadId).toBe(asThreadId('test-session.2'));
+      expect(agents).toHaveLength(3); // Coordinator + 2 spawned agents
+      expect(agents[0].threadId).toBe(asThreadId('test-session')); // Coordinator
+      expect(agents[1].threadId).toBe(asThreadId('test-session.1'));
+      expect(agents[2].threadId).toBe(asThreadId('test-session.2'));
     });
   });
 
@@ -208,6 +224,14 @@ describe('Session', () => {
       const agent = session.getAgent(asThreadId('test-session.1'));
 
       expect(agent).toBe(mockDelegateAgents[0]);
+    });
+
+    it('should return coordinator agent', () => {
+      const session = Session.create('Test Session');
+
+      const agent = session.getAgent(asThreadId('test-session'));
+
+      expect(agent).toBe(mockAgent);
     });
   });
 
@@ -276,9 +300,10 @@ describe('Session', () => {
 
       session.destroy();
 
+      expect(mockAgent.stop).toHaveBeenCalledTimes(1); // Coordinator
       expect(mockDelegateAgents[0]?.stop).toHaveBeenCalledTimes(1);
       expect(mockDelegateAgents[1]?.stop).toHaveBeenCalledTimes(1);
-      expect(session.getAgents()).toEqual([]);
+      expect(session.getAgents()).toHaveLength(1); // Only coordinator remains
     });
   });
 

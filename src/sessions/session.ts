@@ -185,24 +185,44 @@ export class Session {
     model: string;
     status: string;
   }> {
-    return Array.from(this._agents.values()).map((agent) => {
+    const agents = [];
+
+    // Add the coordinator agent first
+    const coordinatorMetadata = this._sessionAgent.getThreadMetadata();
+    agents.push({
+      threadId: asThreadId(this._sessionAgent.threadId),
+      name: (coordinatorMetadata?.name as string) || 'Coordinator',
+      provider: this._sessionAgent.providerName,
+      model: (coordinatorMetadata?.model as string) || 'unknown',
+      status: this._sessionAgent.getCurrentState(),
+    });
+
+    // Add delegate agents
+    Array.from(this._agents.values()).forEach((agent) => {
       const metadata = agent.getThreadMetadata();
-      return {
+      agents.push({
         threadId: asThreadId(agent.threadId),
         name: (metadata?.name as string) || 'Agent ' + agent.threadId,
         provider: agent.providerName,
         model: (metadata?.model as string) || 'unknown',
         status: agent.getCurrentState(),
-      };
+      });
     });
+
+    return agents;
   }
 
   getAgent(threadId: ThreadId): Agent | null {
+    // Check if it's the coordinator agent
+    if (threadId === this._sessionId) {
+      return this._sessionAgent;
+    }
+    // Check delegate agents
     return this._agents.get(threadId) || null;
   }
 
   async startAgent(threadId: ThreadId): Promise<void> {
-    const agent = this._agents.get(threadId);
+    const agent = this.getAgent(threadId);
     if (!agent) {
       throw new Error(`Agent not found: ${threadId}`);
     }
@@ -210,7 +230,7 @@ export class Session {
   }
 
   stopAgent(threadId: ThreadId): void {
-    const agent = this._agents.get(threadId);
+    const agent = this.getAgent(threadId);
     if (!agent) {
       throw new Error(`Agent not found: ${threadId}`);
     }
@@ -218,7 +238,7 @@ export class Session {
   }
 
   async sendMessage(threadId: ThreadId, message: string): Promise<void> {
-    const agent = this._agents.get(threadId);
+    const agent = this.getAgent(threadId);
     if (!agent) {
       throw new Error(`Agent not found: ${threadId}`);
     }
@@ -226,7 +246,10 @@ export class Session {
   }
 
   destroy(): void {
-    // Stop all agents
+    // Stop the coordinator agent
+    this._sessionAgent.stop();
+
+    // Stop all delegate agents
     for (const agent of this._agents.values()) {
       agent.stop();
     }
