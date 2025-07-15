@@ -87,23 +87,28 @@ export class ToolExecutor {
       return createErrorResult(`Tool '${call.name}' not found`, call.id);
     }
 
-    // 2. Check approval if callback is configured
-    if (this.approvalCallback) {
-      try {
-        const approval = await this.approvalCallback.requestApproval(call.name, call.arguments);
+    // 2. Check approval - fail safe if no callback is configured
+    if (!this.approvalCallback) {
+      return createErrorResult(
+        'Tool execution requires approval but no approval callback is configured',
+        call.id
+      );
+    }
 
-        if (approval === ApprovalDecision.DENY) {
-          return createErrorResult('Tool execution denied by approval policy', call.id);
-        }
+    try {
+      const approval = await this.approvalCallback.requestApproval(call.name, call.arguments);
 
-        // ALLOW_ONCE and ALLOW_SESSION both proceed to execution
-      } catch (error) {
-        // Approval system failure
-        return createErrorResult(
-          error instanceof Error ? error.message : 'Approval system error',
-          call.id
-        );
+      if (approval === ApprovalDecision.DENY) {
+        return createErrorResult('Tool execution denied by approval policy', call.id);
       }
+
+      // ALLOW_ONCE and ALLOW_SESSION both proceed to execution
+    } catch (error) {
+      // Approval system failure
+      return createErrorResult(
+        error instanceof Error ? error.message : 'Approval system error',
+        call.id
+      );
     }
 
     // 3. Execute the tool

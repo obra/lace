@@ -70,6 +70,31 @@ export class SessionService {
     // Store the agent instance
     activeAgents.set(threadId, agent);
 
+    // Set up tool approval callback
+    const toolExecutor = agent.toolExecutor;
+    const approvalManager = getApprovalManager();
+
+    toolExecutor.setApprovalCallback({
+      requestApproval: async (toolName: string, input: unknown): Promise<ApprovalDecision> => {
+        // Get tool metadata
+        const tool = toolExecutor.getTool(toolName);
+        const toolDescription = tool?.description;
+        const toolAnnotations = tool?.annotations;
+        const isReadOnly = toolAnnotations?.readOnlyHint === true;
+
+        // Request approval through the manager
+        return await approvalManager.requestApproval(
+          threadId,
+          threadId, // Use threadId as sessionId for now
+          toolName,
+          toolDescription,
+          toolAnnotations,
+          input,
+          isReadOnly
+        );
+      },
+    });
+
     // Start the agent
     await agent.start();
 
@@ -149,6 +174,31 @@ export class SessionService {
 
     // Store the agent
     activeAgents.set(asThreadId(delegateAgent.threadId), delegateAgent);
+
+    // Set up tool approval callback for delegate
+    const approvalManager = getApprovalManager();
+    const delegateThreadId = asThreadId(delegateAgent.threadId);
+
+    toolExecutor.setApprovalCallback({
+      requestApproval: async (toolName: string, input: unknown): Promise<ApprovalDecision> => {
+        // Get tool metadata
+        const tool = toolExecutor.getTool(toolName);
+        const toolDescription = tool?.description;
+        const toolAnnotations = tool?.annotations;
+        const isReadOnly = toolAnnotations?.readOnlyHint === true;
+
+        // Request approval through the manager
+        return await approvalManager.requestApproval(
+          delegateThreadId,
+          sessionId, // Use sessionId for approval context
+          toolName,
+          toolDescription,
+          toolAnnotations,
+          input,
+          isReadOnly
+        );
+      },
+    });
 
     // Start the delegate agent
     await delegateAgent.start();
@@ -284,11 +334,11 @@ export class SessionService {
     // Handle tool approval requests
     agent.on(
       'approval_request',
-      async ({
+      ({
         toolName,
         input,
         isReadOnly,
-        _requestId,
+        requestId: _requestId,
         resolve,
       }: {
         toolName: string;
@@ -303,41 +353,44 @@ export class SessionService {
 
         const approvalManager = getApprovalManager();
 
-        try {
-          // Get tool metadata from the tool executor
-          // Use the public toolExecutor property instead of unsafe casting
-          const tool = agent.toolExecutor?.getTool(toolName);
-          const toolDescription = tool?.description;
-          const toolAnnotations = tool?.annotations;
+        // Handle async approval in a separate function
+        void (async () => {
+          try {
+            // Get tool metadata from the tool executor
+            // Use the public toolExecutor property instead of unsafe casting
+            const tool = agent.toolExecutor?.getTool(toolName);
+            const toolDescription = tool?.description;
+            const toolAnnotations = tool?.annotations;
 
-          // Request approval through the manager
-          const decision = await approvalManager.requestApproval(
-            threadId,
-            sessionId,
-            toolName,
-            toolDescription,
-            toolAnnotations,
-            input,
-            isReadOnly
-          );
+            // Request approval through the manager
+            const decision = await approvalManager.requestApproval(
+              threadId,
+              sessionId,
+              toolName,
+              toolDescription,
+              toolAnnotations,
+              input,
+              isReadOnly
+            );
 
-          resolve(decision);
-        } catch (error) {
-          // On timeout or error, deny the request
-          console.error(`Approval request failed for ${toolName}:`, error);
-          resolve(ApprovalDecision.DENY);
+            resolve(decision);
+          } catch (error) {
+            // On timeout or error, deny the request
+            console.error(`Approval request failed for ${toolName}:`, error);
+            resolve(ApprovalDecision.DENY);
 
-          // Notify UI about the timeout/error
-          const event: SessionEvent = {
-            type: 'LOCAL_SYSTEM_MESSAGE',
-            threadId,
-            timestamp: new Date().toISOString(),
-            data: {
-              message: `Tool "${toolName}" was denied (${error instanceof Error ? error.message : 'approval failed'})`,
-            },
-          };
-          sseManager.broadcast(sessionId, event);
-        }
+            // Notify UI about the timeout/error
+            const event: SessionEvent = {
+              type: 'LOCAL_SYSTEM_MESSAGE',
+              threadId,
+              timestamp: new Date().toISOString(),
+              data: {
+                message: `Tool "${toolName}" was denied (${error instanceof Error ? error.message : 'approval failed'})`,
+              },
+            };
+            sseManager.broadcast(sessionId, event);
+          }
+        })();
       }
     );
   }

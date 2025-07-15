@@ -132,12 +132,29 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
         );
 
       case 'TOOL_RESULT':
+        const formatToolResult = (result: unknown): string => {
+          if (typeof result === 'string') {
+            return result;
+          }
+          if (result && typeof result === 'object' && 'content' in result) {
+            const content = (result as { content: unknown }).content;
+            if (typeof content === 'string') {
+              return content;
+            }
+            return JSON.stringify(content, null, 2);
+          }
+          return JSON.stringify(result, null, 2);
+        };
+
         return (
           <div key={index} className="mb-2 ml-8">
             <div className="text-xs text-gray-500">[{timestamp}]</div>
             <div className="bg-gray-800 rounded p-2 text-sm">
               <span className="text-green-400">✅ Tool Result: </span>
-              <span className="text-gray-300">{event.data.toolName} completed</span>
+              <span className="text-blue-400">{event.data.toolName}</span>
+              <div className="mt-2 text-gray-300 whitespace-pre-wrap font-mono text-xs">
+                {formatToolResult(event.data.result)}
+              </div>
             </div>
           </div>
         );

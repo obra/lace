@@ -13,6 +13,7 @@ export { DelegateTool } from '~/tools/implementations/delegate';
 export type { ThreadId } from '~/threads/types';
 export type { ThreadEvent, EventType } from '~/threads/types';
 export { ApprovalDecision } from '~/tools/approval-types';
+export type { ApprovalCallback } from '~/tools/approval-types';
 export type { ToolAnnotations } from '~/tools/types';
 export type { AgentState } from '~/agents/agent';
 export type { ProviderInfo, ModelInfo } from '~/providers/base-provider';
