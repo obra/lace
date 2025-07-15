@@ -93,8 +93,8 @@ describe('ProviderRegistry', () => {
   });
 
   describe('createWithAutoDiscovery', () => {
-    it('should discover and register all existing provider files', async () => {
-      const registry = await ProviderRegistry.createWithAutoDiscovery();
+    it('should discover and register all existing provider files', () => {
+      const registry = ProviderRegistry.createWithAutoDiscovery();
       const providerNames = registry.getProviderNames();
 
       expect(providerNames).toContain('anthropic');
@@ -104,8 +104,8 @@ describe('ProviderRegistry', () => {
       expect(providerNames).toHaveLength(4);
     });
 
-    it('should register providers with correct instances', async () => {
-      const registry = await ProviderRegistry.createWithAutoDiscovery();
+    it('should register providers with correct instances', () => {
+      const registry = ProviderRegistry.createWithAutoDiscovery();
 
       const anthropicProvider = registry.getProvider('anthropic');
       const openaiProvider = registry.getProvider('openai');
@@ -123,8 +123,8 @@ describe('ProviderRegistry', () => {
       expect(ollamaProvider!.providerName).toBe('ollama');
     });
 
-    it('should only discover files matching *-provider.ts pattern', async () => {
-      const registry = await ProviderRegistry.createWithAutoDiscovery();
+    it('should only discover files matching *-provider.ts pattern', () => {
+      const registry = ProviderRegistry.createWithAutoDiscovery();
       const providerNames = registry.getProviderNames();
 
       // Should not include non-provider files like types.ts, registry.ts, etc.
@@ -133,10 +133,10 @@ describe('ProviderRegistry', () => {
       expect(providerNames).not.toContain('format-converters');
     });
 
-    it('should handle provider files with missing exports gracefully', async () => {
+    it('should handle provider files with missing exports gracefully', () => {
       // This test ensures auto-discovery doesn't crash on malformed files
       // We don't need to create malformed files - just verify it doesn't throw
-      await expect(ProviderRegistry.createWithAutoDiscovery()).resolves.toBeDefined();
+      expect(ProviderRegistry.createWithAutoDiscovery()).toBeDefined();
     });
   });
 

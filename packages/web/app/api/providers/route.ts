@@ -22,8 +22,8 @@ export interface ProvidersResponse {
 
 export async function GET(): Promise<NextResponse<ProvidersResponse | ApiErrorResponse>> {
   try {
-    const registry = await ProviderRegistry.createWithAutoDiscovery();
-    const providerData = await registry.getAvailableProviders();
+    const registry = ProviderRegistry.createWithAutoDiscovery();
+    const providerData = registry.getAvailableProviders();
 
     const providers: ProviderWithModels[] = providerData.map(
       (data): ProviderWithModels => ({
@@ -36,7 +36,7 @@ export async function GET(): Promise<NextResponse<ProvidersResponse | ApiErrorRe
     return NextResponse.json({ providers });
   } catch (error: unknown) {
     console.error('Failed to get providers:', error);
-    
+
     const errorMessage = isError(error) ? error.message : 'Failed to retrieve providers';
     const errorResponse: ApiErrorResponse = { error: errorMessage };
     return NextResponse.json(errorResponse, { status: 500 });

@@ -107,7 +107,7 @@ function listToolsAndExit(toolExecutor: ToolExecutor): void {
   process.exit(0);
 }
 
-export async function parseArgs(args: string[] = process.argv.slice(2)): Promise<CLIOptions> {
+export function parseArgs(args: string[] = process.argv.slice(2)): CLIOptions {
   const program = new Command();
 
   program
@@ -223,7 +223,7 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
 
   // Handle --help (exits after showing help)
   if (result.help) {
-    await showHelp();
+    showHelp();
     process.exit(0);
   }
 
@@ -238,8 +238,8 @@ export async function parseArgs(args: string[] = process.argv.slice(2)): Promise
   return result;
 }
 
-async function getProviderHelpText(): Promise<string> {
-  const registry = await ProviderRegistry.createWithAutoDiscovery();
+function getProviderHelpText(): string {
+  const registry = ProviderRegistry.createWithAutoDiscovery();
   const providers = registry.getProviderNames().sort();
 
   return `Choose AI provider: ${providers.join(', ')}`;
@@ -255,8 +255,8 @@ export function validateProvider(provider: string, registry: ProviderRegistry): 
   }
 }
 
-export async function showHelp(): Promise<void> {
-  const providerHelpText = await getProviderHelpText();
+export function showHelp(): void {
+  const providerHelpText = getProviderHelpText();
 
   // Commander generates help automatically, just trigger it
   const program = new Command();

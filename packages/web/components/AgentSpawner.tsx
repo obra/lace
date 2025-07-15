@@ -82,27 +82,37 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
       data.providers.forEach((provider) => {
         if (!provider.configured) {
           // Add disabled option for unconfigured provider
-          options.push({
+          const option: ModelOption = {
             value: '',
             label: `${provider.displayName} (Not Configured)`,
-            description: provider.configurationHint || undefined,
             disabled: true,
-          });
+          };
+          if (provider.configurationHint) {
+            option.description = provider.configurationHint;
+          }
+          options.push(option);
         } else {
           // Add all models from configured provider
           provider.models.forEach((model) => {
             const value = `${provider.name}/${model.id}`;
-            options.push({
+            const option: ModelOption = {
               value,
               label: `${provider.displayName} - ${model.displayName}`,
-              description: model.description,
-              isDefault: model.isDefault,
               disabled: false,
-            });
-
-            if (model.isDefault && !defaultOption) {
-              defaultOption = value;
+            };
+            
+            if (model.description) {
+              option.description = model.description;
             }
+            
+            if (model.isDefault) {
+              option.isDefault = model.isDefault;
+              if (!defaultOption) {
+                defaultOption = value;
+              }
+            }
+            
+            options.push(option);
           });
         }
       });
@@ -112,8 +122,8 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
       // Set default selection
       if (defaultOption) {
         setSelectedModel(defaultOption);
-      } else if (options.length > 0 && !options[0].disabled) {
-        setSelectedModel(options[0].value);
+      } else if (options.length > 0 && !options[0]?.disabled) {
+        setSelectedModel(options[0]?.value || '');
       }
     } catch (error) {
       console.error('Failed to load providers:', error);
@@ -126,6 +136,11 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
     if (!agentName.trim() || !selectedModel) return;
 
     const [provider, model] = selectedModel.split('/');
+    if (!provider || !model) {
+      console.error('Invalid model selection');
+      return;
+    }
+    
     const request: CreateAgentRequest = {
       name: agentName.trim(),
       provider,

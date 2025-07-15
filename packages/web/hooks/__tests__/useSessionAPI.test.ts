@@ -361,7 +361,7 @@ describe('useSessionAPI', () => {
       expect(result.current.loading).toBe(false);
 
       // Start operation
-      act(() => {
+      await act(async () => {
         void result.current.createSession({ name: 'Test Session' });
       });
 

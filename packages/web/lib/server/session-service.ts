@@ -3,11 +3,8 @@
 
 import {
   Agent,
-  ThreadManager,
   ProviderRegistry,
   ToolExecutor,
-  getLaceDbPath,
-  getEnvVar,
   DelegateTool,
 } from '~/../packages/web/lib/server/lace-imports';
 import type {
@@ -30,61 +27,30 @@ const sessionMetadata = new Map<ThreadId, { name: string; createdAt: string; isS
 const agentMetadata = new Map<ThreadId, { name: string; provider: string; model: string }>();
 
 export class SessionService {
-  private threadManager: ThreadManager;
-
   constructor() {
-    this.threadManager = new ThreadManager(getLaceDbPath());
-  }
-
-  async createProvider(providerType: string, model?: string) {
-    try {
-      // Ensure environment variables are available
-      const apiKey = process.env.ANTHROPIC_API_KEY;
-      console.warn(
-        `Creating provider ${providerType} with API key:`,
-        apiKey ? 'present' : 'missing'
-      );
-
-      const registry = await ProviderRegistry.createWithAutoDiscovery();
-      const provider = await registry.createProvider(providerType, model ? { model } : undefined);
-      console.warn(`Created provider: ${providerType} with model: ${model}`);
-      return provider;
-    } catch (error) {
-      console.error(`Failed to create provider ${providerType}:`, error);
-      throw error;
-    }
+    // No need for direct ThreadManager access - use Agent methods instead
   }
 
   async createSession(name?: string): Promise<Session> {
     // Get default provider and model from environment
-    const defaultProvider = getEnvVar('ANTHROPIC_API_KEY') ? 'anthropic' : 'openai';
+    const defaultProvider = process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai';
     const defaultModel = 'claude-3-haiku-20240307';
 
-    // Generate thread ID for the session
-    const threadIdString = this.threadManager.generateThreadId();
-    const threadId = asThreadId(threadIdString);
-    this.threadManager.createThread(threadIdString);
-
-    // Create tool executor
-    const toolExecutor = new ToolExecutor();
-    toolExecutor.registerAllAvailableTools();
-
-    // Create provider
-    const provider = await this.createProvider(defaultProvider, defaultModel);
-
-    // Create a new agent for the session
-    const agent = new Agent({
-      provider,
-      toolExecutor,
-      threadManager: this.threadManager,
-      threadId,
-      tools: toolExecutor.getAllTools(),
+    // Create agent using the clean factory method
+    const dbPath = process.env.LACE_DB_PATH || './lace.db';
+    const agent = Agent.createSession({
+      providerType: defaultProvider,
+      model: defaultModel,
+      name,
+      dbPath,
     });
 
+    const threadId = asThreadId(agent.threadId);
+
     // Set up delegate tool dependencies
-    const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
+    const delegateTool = agent.toolExecutor.getTool('delegate') as DelegateTool;
     if (delegateTool) {
-      delegateTool.setDependencies(agent, toolExecutor);
+      delegateTool.setDependencies(agent, agent.toolExecutor);
     }
 
     // Store session metadata
@@ -113,7 +79,7 @@ export class SessionService {
     return session;
   }
 
-  async listSessions(): Promise<Session[]> {
+  listSessions(): Session[] {
     // Return sessions from our metadata store
     const sessions: Session[] = [];
 
@@ -130,7 +96,7 @@ export class SessionService {
     return sessions;
   }
 
-  async getSession(sessionId: ThreadId): Promise<Session | null> {
+  getSession(sessionId: ThreadId): Session | null {
     const metadata = sessionMetadata.get(sessionId);
     if (!metadata) {
       return null;
@@ -167,7 +133,10 @@ export class SessionService {
     // Create provider - default to anthropic if not specified
     const providerType = provider || 'anthropic';
     const modelName = model || 'claude-3-5-sonnet-20241022';
-    const delegateProvider = await this.createProvider(providerType, modelName);
+
+    // Create provider for delegate agent
+    const registry = ProviderRegistry.createWithAutoDiscovery();
+    const delegateProvider = await registry.createProvider(providerType, { model: modelName });
 
     // Create delegate agent
     const delegateAgent = parentAgent.createDelegateAgent(toolExecutor, delegateProvider);
@@ -252,11 +221,19 @@ export class SessionService {
       sseManager.broadcast(sessionId, event);
     });
 
-    // Also listen for streaming tokens if needed
+    // Handle streaming tokens
     agent.on('agent_token', ({ token }: { token: string }) => {
-      // For now, we'll just log this to see if tokens are being emitted
-      // Later we could stream these to the UI for real-time display
+      // Keep console output for development
       process.stdout.write(token);
+
+      // Broadcast token to UI for real-time display
+      const event: SessionEvent = {
+        type: 'AGENT_TOKEN',
+        threadId,
+        timestamp: new Date().toISOString(),
+        data: { token },
+      };
+      sseManager.broadcast(sessionId, event);
     });
 
     agent.on('tool_call_start', ({ toolName, input }: { toolName: string; input: unknown }) => {

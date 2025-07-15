@@ -1,7 +1,7 @@
 // ABOUTME: Terminal-like conversation display component that shows messages, tool calls, and agent status
 // ABOUTME: Renders conversation events in a structured, color-coded terminal interface style
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { SessionEvent, Agent, ThreadId } from '@/types/api';
 
 interface ConversationDisplayProps {
@@ -11,6 +11,48 @@ interface ConversationDisplayProps {
 }
 
 export function ConversationDisplay({ events, agents, className = '' }: ConversationDisplayProps) {
+  // Process events to merge streaming tokens into complete messages
+  const processedEvents = useMemo(() => {
+    const processed: SessionEvent[] = [];
+    const streamingMessages = new Map<string, { content: string; timestamp: string }>();
+    
+    for (const event of events) {
+      if (event.type === 'AGENT_TOKEN') {
+        // Accumulate streaming tokens
+        const key = `${event.threadId}-streaming`;
+        const existing = streamingMessages.get(key);
+        if (existing) {
+          existing.content += event.data.token;
+        } else {
+          streamingMessages.set(key, {
+            content: event.data.token,
+            timestamp: event.timestamp,
+          });
+        }
+      } else if (event.type === 'AGENT_MESSAGE') {
+        // Complete message received, remove streaming version
+        const key = `${event.threadId}-streaming`;
+        streamingMessages.delete(key);
+        processed.push(event);
+      } else {
+        processed.push(event);
+      }
+    }
+    
+    // Add any remaining streaming messages
+    for (const [key, streamingData] of streamingMessages.entries()) {
+      const threadId = key.replace('-streaming', '');
+      processed.push({
+        type: 'AGENT_STREAMING',
+        threadId: threadId as ThreadId,
+        timestamp: streamingData.timestamp,
+        data: { content: streamingData.content },
+      } as SessionEvent);
+    }
+    
+    return processed;
+  }, [events]);
+
   const renderEvent = (event: SessionEvent, index: number) => {
     const timestamp = new Date(event.timestamp).toLocaleTimeString();
 
@@ -56,6 +98,23 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
           </div>
         );
 
+      case 'AGENT_STREAMING':
+        return (
+          <div key={index} className="mb-3">
+            <div className="text-xs text-gray-500">[{timestamp}]</div>
+            <div className="flex items-start gap-2">
+              <span className="text-2xl">🤖</span>
+              <div className="flex-1">
+                <span className="text-green-400 font-semibold">
+                  {getAgentName(event.threadId as ThreadId)}:{' '}
+                </span>
+                <span className="text-gray-100 whitespace-pre-wrap">{event.data.content}</span>
+                <span className="text-green-400 animate-pulse">▌</span>
+              </div>
+            </div>
+          </div>
+        );
+
       case 'TOOL_CALL':
         return (
           <div key={index} className="mb-2 ml-8">
@@ -63,7 +122,7 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
             <div className="bg-gray-800 rounded p-2 text-sm font-mono">
               <span className="text-yellow-400">🔧 Tool Call: </span>
               <span className="text-cyan-400">{event.data.toolName}</span>
-              {event.data.input && (
+              {event.data.input != null && (
                 <pre className="text-xs text-gray-400 mt-1">
                   {JSON.stringify(event.data.input, null, 2)}
                 </pre>
@@ -119,10 +178,10 @@ export function ConversationDisplay({ events, agents, className = '' }: Conversa
 
   return (
     <div className={`bg-gray-900 rounded-lg p-4 overflow-y-auto ${className}`}>
-      {events.length === 0 ? (
+      {processedEvents.length === 0 ? (
         <div className="text-gray-500 text-center py-8">No messages yet. Start a conversation!</div>
       ) : (
-        <div className="space-y-1">{events.map((event, index) => renderEvent(event, index))}</div>
+        <div className="space-y-1">{processedEvents.map((event, index) => renderEvent(event, index))}</div>
       )}
     </div>
   );

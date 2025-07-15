@@ -5,11 +5,8 @@ import 'server-only';
 
 // Import from main project source using ~ alias
 export { Agent } from '~/agents/agent';
-export { ThreadManager } from '~/threads/thread-manager';
 export { ProviderRegistry } from '~/providers/registry';
 export { ToolExecutor } from '~/tools/executor';
-export { getLaceDbPath } from '~/config/lace-dir';
-export { getEnvVar } from '~/config/env-loader';
 export { DelegateTool } from '~/tools/implementations/delegate';
 
 // Types and constants

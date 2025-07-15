@@ -2,7 +2,18 @@
 // ABOUTME: Provides methods for CRUD operations on sessions and agents
 
 import { useState, useCallback } from 'react';
-import { Session, Agent, CreateSessionRequest, CreateAgentRequest, ThreadId, SessionResponse, SessionsResponse, AgentResponse, isApiError, isApiSuccess } from '@/types/api';
+import {
+  Session,
+  Agent,
+  CreateSessionRequest,
+  CreateAgentRequest,
+  ThreadId,
+  SessionResponse,
+  SessionsResponse,
+  AgentResponse,
+  isApiError,
+  isApiSuccess,
+} from '@/types/api';
 
 interface APIState {
   loading: boolean;
@@ -45,7 +56,7 @@ export function useSessionAPI() {
 
         const data: unknown = await response.json();
         if (isApiSuccess<SessionResponse>(data) && 'session' in data) {
-          return data.session as Session;
+          return data['session'] as Session;
         }
         throw new Error('Invalid response format');
       } catch (error) {
@@ -75,7 +86,7 @@ export function useSessionAPI() {
 
       const data: unknown = await response.json();
       if (isApiSuccess<SessionsResponse>(data) && 'sessions' in data) {
-        return data.sessions as Session[];
+        return data['sessions'] as Session[];
       }
       throw new Error('Invalid response format');
     } catch (error) {
@@ -103,7 +114,7 @@ export function useSessionAPI() {
 
       const data: unknown = await response.json();
       if (isApiSuccess<SessionResponse>(data) && 'session' in data) {
-        return data.session as Session;
+        return data['session'] as Session;
       }
       throw new Error('Invalid response format');
     } catch (error) {
@@ -136,7 +147,7 @@ export function useSessionAPI() {
 
         const data: unknown = await response.json();
         if (isApiSuccess<AgentResponse>(data) && 'agent' in data) {
-          return data.agent as Agent;
+          return data['agent'] as Agent;
         }
         throw new Error('Invalid response format');
       } catch (error) {
@@ -165,8 +176,8 @@ export function useSessionAPI() {
       }
 
       const data: unknown = await response.json();
-      if (isApiSuccess<{agents: Agent[]}>(data) && 'agents' in data) {
-        return data.agents as Agent[];
+      if (isApiSuccess<{ agents: Agent[] }>(data) && 'agents' in data) {
+        return data['agents'] as Agent[];
       }
       throw new Error('Invalid response format');
     } catch (error) {

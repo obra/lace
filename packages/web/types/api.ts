@@ -32,7 +32,7 @@ export interface Agent {
 }
 
 // Types for session events
-type SessionEventType =
+type _SessionEventType =
   | 'USER_MESSAGE'
   | 'AGENT_MESSAGE'
   | 'TOOL_CALL'
@@ -105,6 +105,18 @@ export type SessionEvent =
       threadId: ThreadId;
       timestamp: string;
       data: LocalSystemMessageEventData;
+    }
+  | {
+      type: 'AGENT_TOKEN';
+      threadId: ThreadId;
+      timestamp: string;
+      data: { token: string };
+    }
+  | {
+      type: 'AGENT_STREAMING';
+      threadId: ThreadId;
+      timestamp: string;
+      data: { content: string };
     };
 
 // Tool approval event data - extends what the agent emits

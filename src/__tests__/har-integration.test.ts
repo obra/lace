@@ -39,21 +39,21 @@ describe('HAR Integration', () => {
   });
 
   describe('CLI argument parsing', () => {
-    it('should parse --har flag correctly', async () => {
+    it('should parse --har flag correctly', () => {
       const args = ['--har', TEST_HAR_FILE, '--prompt', 'test'];
-      const options = await parseArgs(args);
+      const options = parseArgs(args);
 
       expect(options.harFile).toBe(TEST_HAR_FILE);
     });
 
-    it('should handle missing --har value', async () => {
+    it('should handle missing --har value', () => {
       const args = ['--prompt', 'test'];
-      const options = await parseArgs(args);
+      const options = parseArgs(args);
 
       expect(options.harFile).toBeUndefined();
     });
 
-    it('should work with other CLI flags', async () => {
+    it('should work with other CLI flags', () => {
       const args = [
         '--provider',
         'anthropic',
@@ -67,7 +67,7 @@ describe('HAR Integration', () => {
         'test request',
       ];
 
-      const options = await parseArgs(args);
+      const options = parseArgs(args);
 
       expect(options).toMatchObject({
         provider: 'anthropic',

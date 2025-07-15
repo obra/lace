@@ -32,14 +32,14 @@ describe('Provider Discovery API', () => {
     vi.clearAllMocks();
     mockRegistry = {
       getAvailableProviders: vi.fn(),
-    };
-    
+    } as any;
+
     // Mock console methods to prevent stderr pollution during tests
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    
+
     const { ProviderRegistry } = await import('@/lib/server/lace-imports');
-    vi.mocked(ProviderRegistry.createWithAutoDiscovery).mockResolvedValue(mockRegistry);
+    vi.mocked(ProviderRegistry.createWithAutoDiscovery).mockReturnValue(mockRegistry);
   });
 
   afterEach(() => {
@@ -104,7 +104,7 @@ describe('Provider Discovery API', () => {
         },
       ];
 
-      mockRegistry.getAvailableProviders.mockResolvedValue(mockProviders);
+      mockRegistry.getAvailableProviders.mockReturnValue(mockProviders);
 
       const response = await GET();
       const data = (await response.json()) as ProvidersResponse;
@@ -139,7 +139,7 @@ describe('Provider Discovery API', () => {
     });
 
     it('should handle empty provider list', async () => {
-      mockRegistry.getAvailableProviders.mockResolvedValue([]);
+      mockRegistry.getAvailableProviders.mockReturnValue([]);
 
       const response = await GET();
       const data = (await response.json()) as ProvidersResponse;
@@ -169,7 +169,7 @@ describe('Provider Discovery API', () => {
         },
       ];
 
-      mockRegistry.getAvailableProviders.mockResolvedValue(mockProviders);
+      mockRegistry.getAvailableProviders.mockReturnValue(mockProviders);
 
       const response = await GET();
       const data = (await response.json()) as ProvidersResponse;
@@ -183,9 +183,9 @@ describe('Provider Discovery API', () => {
     });
 
     it('should handle provider discovery errors gracefully', async () => {
-      mockRegistry.getAvailableProviders.mockRejectedValue(
-        new Error('Failed to discover providers')
-      );
+      mockRegistry.getAvailableProviders.mockImplementation(() => {
+        throw new Error('Failed to discover providers');
+      });
 
       const response = await GET();
       const data = (await response.json()) as { error: string };
@@ -224,7 +224,7 @@ describe('Provider Discovery API', () => {
         },
       ];
 
-      mockRegistry.getAvailableProviders.mockResolvedValue(mockProviders);
+      mockRegistry.getAvailableProviders.mockReturnValue(mockProviders);
 
       const response = await GET();
       const data = (await response.json()) as ProvidersResponse;
@@ -258,7 +258,7 @@ describe('Provider Discovery API', () => {
         },
       ];
 
-      mockRegistry.getAvailableProviders.mockResolvedValue(mockProviders);
+      mockRegistry.getAvailableProviders.mockReturnValue(mockProviders);
 
       const response = await GET();
       const data = (await response.json()) as ProvidersResponse;

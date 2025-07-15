@@ -75,7 +75,7 @@ describe('useSSEStream', () => {
     eventSourceInstances = [];
   });
 
-  it('should initialize with disconnected state', () => {
+  it('should initialize with disconnected state', async () => {
     const { result } = renderHook(() => useSSEStream(null));
 
     expect(result.current.connected).toBe(false);

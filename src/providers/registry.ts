@@ -1,11 +1,12 @@
 // ABOUTME: Provider registry for managing available AI providers and their discovery
 // ABOUTME: Handles provider registration and provides providers for agent execution
 
-import { glob } from 'glob';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import { AIProvider, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
+import { AIProvider, ProviderConfig } from '~/providers/base-provider';
 import { getEnvVar } from '~/config/env-loader';
+import { AnthropicProvider } from '~/providers/anthropic-provider';
+import { OpenAIProvider } from '~/providers/openai-provider';
+import { LMStudioProvider } from '~/providers/lmstudio-provider';
+import { OllamaProvider } from '~/providers/ollama-provider';
 
 export class ProviderRegistry {
   private _providers = new Map<string, AIProvider>();
@@ -27,20 +28,18 @@ export class ProviderRegistry {
   }
 
   // Get all available provider metadata
-  async getAvailableProviders(): Promise<
-    Array<{
-      info: import('./base-provider').ProviderInfo;
-      models: import('./base-provider').ModelInfo[];
-      configured: boolean;
-    }>
-  > {
+  getAvailableProviders(): Array<{
+    info: import('./base-provider').ProviderInfo;
+    models: import('./base-provider').ModelInfo[];
+    configured: boolean;
+  }> {
     const providers = ['anthropic', 'openai', 'lmstudio', 'ollama'];
     const results = [];
 
     for (const providerName of providers) {
       try {
         // Try to create provider instance to check configuration
-        const provider = await this.createProvider(providerName);
+        const provider = this.createProvider(providerName);
         const info = provider.getProviderInfo();
         const models = provider.getAvailableModels();
         const configured = provider.isConfigured();
@@ -51,7 +50,7 @@ export class ProviderRegistry {
         results.push({ info, models, configured });
       } catch {
         // Provider not configured - still return info
-        const tempProvider = await this.getProviderClass(providerName);
+        const tempProvider = this.getProviderClass(providerName);
         if (tempProvider) {
           const info = tempProvider.getProviderInfo();
           const models = tempProvider.getAvailableModels();
@@ -64,24 +63,20 @@ export class ProviderRegistry {
   }
 
   // Helper to get provider class without full instantiation
-  private async getProviderClass(providerName: string): Promise<AIProvider | null> {
+  private getProviderClass(providerName: string): AIProvider | null {
     try {
       switch (providerName.toLowerCase()) {
         case 'anthropic': {
-          const { AnthropicProvider } = await import('./anthropic-provider');
           return new AnthropicProvider({ apiKey: 'dummy' });
         }
         case 'openai': {
-          const { OpenAIProvider } = await import('./openai-provider');
           return new OpenAIProvider({ apiKey: 'dummy' });
         }
         case 'lmstudio': {
-          const { LMStudioProvider } = await import('./lmstudio-provider');
-          return new LMStudioProvider({});
+          return new LMStudioProvider({ baseURL: 'http://localhost:1234' });
         }
         case 'ollama': {
-          const { OllamaProvider } = await import('./ollama-provider');
-          return new OllamaProvider({});
+          return new OllamaProvider({ baseURL: 'http://localhost:11434' });
         }
         default:
           return null;
@@ -91,11 +86,10 @@ export class ProviderRegistry {
     }
   }
 
-  async createProvider(providerName: string, config: ProviderConfig = {}): Promise<AIProvider> {
-    // Use dynamic imports with environment variable handling
+  createProvider(providerName: string, config: ProviderConfig = {}): AIProvider {
+    // Use static imports for better build performance
     switch (providerName.toLowerCase()) {
       case 'anthropic': {
-        const { AnthropicProvider } = await import('./anthropic-provider');
         const apiKey = (config.apiKey as string) || getEnvVar('ANTHROPIC_KEY');
         if (!apiKey) {
           throw new Error('ANTHROPIC_KEY environment variable required for Anthropic provider');
@@ -103,7 +97,6 @@ export class ProviderRegistry {
         return new AnthropicProvider({ ...config, apiKey });
       }
       case 'openai': {
-        const { OpenAIProvider } = await import('./openai-provider');
         const apiKey =
           (config.apiKey as string) || getEnvVar('OPENAI_API_KEY') || getEnvVar('OPENAI_KEY');
         if (!apiKey) {
@@ -114,16 +107,14 @@ export class ProviderRegistry {
         return new OpenAIProvider({ ...config, apiKey });
       }
       case 'lmstudio': {
-        const { LMStudioProvider } = await import('./lmstudio-provider');
         return new LMStudioProvider(config);
       }
       case 'ollama': {
-        const { OllamaProvider } = await import('./ollama-provider');
         return new OllamaProvider(config);
       }
       case 'test-provider': {
-        const { createMockProvider } = await import('../__tests__/utils/mock-provider');
-        return createMockProvider();
+        // Mock provider needs to be handled differently for tests
+        throw new Error('Test provider not supported in production builds');
       }
       default:
         throw new Error(
@@ -132,95 +123,44 @@ export class ProviderRegistry {
     }
   }
 
-  static async createWithAutoDiscovery(): Promise<ProviderRegistry> {
+  static createWithAutoDiscovery(): ProviderRegistry {
     const registry = new ProviderRegistry();
 
-    // Get the directory path for the providers folder
-    const currentFile = fileURLToPath(import.meta.url);
-    const providersDir = dirname(currentFile);
+    // Static list of known providers - no dynamic imports needed
+    const providerClasses = [AnthropicProvider, OpenAIProvider, LMStudioProvider, OllamaProvider];
 
-    // Find all provider files matching *-provider.ts pattern
-    const providerFiles = await glob('*-provider.js', {
-      cwd: providersDir.replace('/src/', '/dist/'),
-      absolute: true,
-      ignore: 'base-provider.js',
-    });
-
-    // Also check for TypeScript files in development
-    const tsProviderFiles = await glob('*-provider.ts', {
-      cwd: providersDir,
-      absolute: true,
-      ignore: '**/base-provider.ts',
-    });
-
-    // Use TS files if available (development), otherwise use JS files (production)
-    const filesToProcess = tsProviderFiles.length > 0 ? tsProviderFiles : providerFiles;
-
-    for (const file of filesToProcess) {
+    for (const ProviderClass of providerClasses) {
       try {
-        const module = (await import(file)) as Record<string, unknown>;
-
-        // Check all exports in the module
-        for (const exportedValue of Object.values(module)) {
-          if (ProviderRegistry.isProviderClass(exportedValue)) {
-            const ProviderClass = exportedValue as new (...args: unknown[]) => AIProvider;
-
-            // Create instance with default configuration
-            let provider: AIProvider;
-            try {
-              // Try with empty config first
-              provider = new ProviderClass({});
-            } catch {
-              // Some providers might need specific config, create with minimal config
-              try {
-                // For providers that require API keys, use placeholder values for discovery
-                const defaultConfig = {
-                  apiKey: 'discovery-mode-placeholder',
-                  baseURL: 'https://api.placeholder.com',
-                };
-                provider = new ProviderClass(defaultConfig);
-              } catch {
-                // Create a minimal placeholder provider for discovery purposes
-                class PlaceholderProvider extends AIProvider {
-                  get providerName() {
-                    return ProviderClass.name.toLowerCase().replace('provider', '');
-                  }
-                  get defaultModel() {
-                    return 'discovery-model';
-                  }
-                  get supportsStreaming() {
-                    return true;
-                  }
-                  createResponse(): Promise<ProviderResponse> {
-                    return Promise.reject(new Error('Provider not properly configured'));
-                  }
-                  getProviderInfo(): import('./base-provider').ProviderInfo {
-                    return {
-                      name: this.providerName,
-                      displayName: this.providerName,
-                      requiresApiKey: true,
-                      configurationHint: 'Provider not properly configured',
-                    };
-                  }
-                  getAvailableModels(): import('./base-provider').ModelInfo[] {
-                    return [];
-                  }
-                  isConfigured(): boolean {
-                    return false;
-                  }
-                }
-
-                const placeholderProvider = new PlaceholderProvider({});
-                registry.registerProvider(placeholderProvider);
-                continue;
-              }
-            }
-
-            registry.registerProvider(provider);
+        // Create instance with minimal config for discovery
+        let provider: AIProvider;
+        try {
+          // Try with minimal config for each provider type
+          if (ProviderClass === AnthropicProvider) {
+            provider = new ProviderClass({ apiKey: 'discovery-mode-placeholder' });
+          } else if (ProviderClass === OpenAIProvider) {
+            provider = new ProviderClass({ apiKey: 'discovery-mode-placeholder' });
+          } else if (ProviderClass === LMStudioProvider) {
+            provider = new ProviderClass({ baseURL: 'http://localhost:1234' });
+          } else if (ProviderClass === OllamaProvider) {
+            provider = new ProviderClass({ baseURL: 'http://localhost:11434' });
+          } else {
+            // Fallback for unknown providers
+            provider = new ProviderClass({ apiKey: 'discovery-mode-placeholder' });
+          }
+        } catch {
+          // Skip providers that can't be instantiated
+          try {
+            // Last resort fallback
+            provider = new ProviderClass({ apiKey: 'discovery-mode-placeholder' });
+          } catch {
+            // Skip providers that can't be instantiated even with placeholder config
+            continue;
           }
         }
+
+        registry.registerProvider(provider);
       } catch {
-        // Skip files that can't be imported or have errors
+        // Skip providers that can't be registered
       }
     }
 

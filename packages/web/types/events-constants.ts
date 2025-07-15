@@ -20,6 +20,8 @@ export type EventType = (typeof EVENT_TYPES)[number];
 export const UI_EVENT_TYPES = [
   'THINKING', // Agent state change, not persisted
   'TOOL_APPROVAL_REQUEST', // Approval flow, not persisted
+  'AGENT_TOKEN', // Streaming token, not persisted
+  'AGENT_STREAMING', // Accumulated streaming content, not persisted
 ] as const;
 
 export type UIEventType = (typeof UI_EVENT_TYPES)[number];

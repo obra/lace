@@ -31,9 +31,11 @@ export function SessionManager({
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const request: CreateSessionRequest = {
-      name: sessionName.trim() || undefined,
-    };
+    const request: CreateSessionRequest = {};
+    const trimmedName = sessionName.trim();
+    if (trimmedName) {
+      request.name = trimmedName;
+    }
 
     const session = await createSession(request);
     if (session) {
