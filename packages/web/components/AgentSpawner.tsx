@@ -9,7 +9,6 @@ import type { ApiErrorResponse } from '@/types/api';
 
 interface AgentSpawnerProps {
   sessionId: ThreadId;
-  agents: Agent[];
   onAgentSpawn: (agent: Agent) => void;
 }
 
@@ -41,7 +40,7 @@ function isErrorResponse(data: unknown): data is ApiErrorResponse {
   );
 }
 
-export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerProps) {
+export function AgentSpawner({ sessionId, onAgentSpawn }: AgentSpawnerProps) {
   const [showForm, setShowForm] = useState(false);
   const [agentName, setAgentName] = useState('');
   const [selectedModel, setSelectedModel] = useState('');

@@ -166,7 +166,7 @@ export function LaceTerminal({ session, onAgentSpawn }: LaceTerminalProps) {
             {sseError && <span className="ml-2 text-terminal-red">{sseError}</span>}
           </p>
         </div>
-        <AgentSpawner sessionId={session.id as ThreadId} agents={session.agents} onAgentSpawn={onAgentSpawn} />
+        <AgentSpawner sessionId={session.id as ThreadId} onAgentSpawn={onAgentSpawn} />
       </div>
 
       <div className="terminal-content scrollbar-terminal flex-1">

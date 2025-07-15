@@ -7,8 +7,13 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET } from '../route';
+import { GET } from '@/app/api/sessions/[sessionId]/history/route';
 import { Session } from '@/lib/server/lace-imports';
+import type { SessionEvent, ApiErrorResponse } from '@/types/api';
+
+interface HistoryResponse {
+  events: SessionEvent[];
+}
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -43,10 +48,10 @@ describe('Session History API', () => {
     // Reset all mocks
     vi.clearAllMocks();
     process.env.LACE_DB_PATH = ':memory:';
-    
+
     // Reset mock implementations
     mockSessionService.getSession.mockReset();
-    (Session.getById as any).mockReset();
+    vi.mocked(Session.getById).mockReset();
     mockSession.getAgent.mockReset();
     mockAgent.getMainAndDelegateEvents.mockReset();
   });
@@ -66,7 +71,7 @@ describe('Session History API', () => {
 
       // Mock Session.getById returns a session with coordinator agent
       mockSession.getAgent.mockReturnValue(mockAgent);
-      (Session.getById as any).mockResolvedValue(mockSession);
+      vi.mocked(Session.getById).mockResolvedValue(mockSession);
 
       // Mock conversation history
       const mockThreadEvents = [
@@ -89,11 +94,13 @@ describe('Session History API', () => {
       mockAgent.getMainAndDelegateEvents.mockReturnValue(mockThreadEvents);
 
       const request = new NextRequest('http://localhost/api/sessions/lace_20240101_test1/history');
-      const response = await GET(request, { params: Promise.resolve({ sessionId: 'lace_20240101_test1' }) });
+      const response = await GET(request, {
+        params: Promise.resolve({ sessionId: 'lace_20240101_test1' }),
+      });
 
       expect(response.status).toBe(200);
-      const data = await response.json();
-      
+      const data = (await response.json()) as HistoryResponse;
+
       expect(data.events).toHaveLength(2);
       expect(data.events[0]).toEqual({
         threadId: 'lace_20240101_test1',
@@ -117,7 +124,7 @@ describe('Session History API', () => {
       });
 
       mockSession.getAgent.mockReturnValue(mockAgent);
-      (Session.getById as any).mockResolvedValue(mockSession);
+      vi.mocked(Session.getById).mockResolvedValue(mockSession);
 
       const mockThreadEvents = [
         {
@@ -145,11 +152,13 @@ describe('Session History API', () => {
       mockAgent.getMainAndDelegateEvents.mockReturnValue(mockThreadEvents);
 
       const request = new NextRequest('http://localhost/api/sessions/lace_20240101_test1/history');
-      const response = await GET(request, { params: Promise.resolve({ sessionId: 'lace_20240101_test1' }) });
+      const response = await GET(request, {
+        params: Promise.resolve({ sessionId: 'lace_20240101_test1' }),
+      });
 
       expect(response.status).toBe(200);
-      const data = await response.json();
-      
+      const data = (await response.json()) as HistoryResponse;
+
       expect(data.events).toHaveLength(2);
       expect(data.events[0]).toEqual({
         threadId: 'lace_20240101_test1',
@@ -174,20 +183,26 @@ describe('Session History API', () => {
     it('should return 404 for non-existent session', async () => {
       mockSessionService.getSession.mockResolvedValue(null);
 
-      const request = new NextRequest('http://localhost/api/sessions/lace_20240101_notfound/history');
-      const response = await GET(request, { params: Promise.resolve({ sessionId: 'lace_20240101_notfound' }) });
+      const request = new NextRequest(
+        'http://localhost/api/sessions/lace_20240101_notfound/history'
+      );
+      const response = await GET(request, {
+        params: Promise.resolve({ sessionId: 'lace_20240101_notfound' }),
+      });
 
       expect(response.status).toBe(404);
-      const data = await response.json();
+      const data = (await response.json()) as ApiErrorResponse;
       expect(data.error).toBe('Session not found');
     });
 
     it('should return 400 for invalid session ID format', async () => {
       const request = new NextRequest('http://localhost/api/sessions/invalid-format/history');
-      const response = await GET(request, { params: Promise.resolve({ sessionId: 'invalid-format' }) });
+      const response = await GET(request, {
+        params: Promise.resolve({ sessionId: 'invalid-format' }),
+      });
 
       expect(response.status).toBe(400);
-      const data = await response.json();
+      const data = (await response.json()) as ApiErrorResponse;
       expect(data.error).toBe('Invalid session ID format');
     });
 
@@ -199,14 +214,16 @@ describe('Session History API', () => {
       });
 
       mockSession.getAgent.mockReturnValue(mockAgent);
-      (Session.getById as any).mockResolvedValue(mockSession);
+      vi.mocked(Session.getById).mockResolvedValue(mockSession);
       mockAgent.getMainAndDelegateEvents.mockReturnValue([]);
 
       const request = new NextRequest('http://localhost/api/sessions/lace_20240101_test1/history');
-      const response = await GET(request, { params: Promise.resolve({ sessionId: 'lace_20240101_test1' }) });
+      const response = await GET(request, {
+        params: Promise.resolve({ sessionId: 'lace_20240101_test1' }),
+      });
 
       expect(response.status).toBe(200);
-      const data = await response.json();
+      const data = (await response.json()) as HistoryResponse;
       expect(data.events).toEqual([]);
     });
 
@@ -218,7 +235,7 @@ describe('Session History API', () => {
       });
 
       mockSession.getAgent.mockReturnValue(mockAgent);
-      (Session.getById as any).mockResolvedValue(mockSession);
+      vi.mocked(Session.getById).mockResolvedValue(mockSession);
 
       const mockThreadEvents = [
         {
@@ -233,11 +250,13 @@ describe('Session History API', () => {
       mockAgent.getMainAndDelegateEvents.mockReturnValue(mockThreadEvents);
 
       const request = new NextRequest('http://localhost/api/sessions/lace_20240101_test1/history');
-      const response = await GET(request, { params: Promise.resolve({ sessionId: 'lace_20240101_test1' }) });
+      const response = await GET(request, {
+        params: Promise.resolve({ sessionId: 'lace_20240101_test1' }),
+      });
 
       expect(response.status).toBe(200);
-      const data = await response.json();
-      
+      const data = (await response.json()) as HistoryResponse;
+
       expect(data.events).toHaveLength(1);
       expect(data.events[0]).toEqual({
         threadId: 'lace_20240101_test1',

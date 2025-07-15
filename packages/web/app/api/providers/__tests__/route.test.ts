@@ -22,7 +22,7 @@ vi.mock('@/lib/server/lace-imports', () => ({
 describe('Provider Discovery API', () => {
   let mockRegistry: {
     getAvailableProviders: MockedFunction<
-      () => Promise<Array<{ info: ProviderInfo; models: ModelInfo[]; configured: boolean }>>
+      () => Array<{ info: ProviderInfo; models: ModelInfo[]; configured: boolean }>
     >;
   };
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
@@ -32,7 +32,7 @@ describe('Provider Discovery API', () => {
     vi.clearAllMocks();
     mockRegistry = {
       getAvailableProviders: vi.fn(),
-    } as unknown as ProviderRegistry;
+    };
 
     // Mock console methods to prevent stderr pollution during tests
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

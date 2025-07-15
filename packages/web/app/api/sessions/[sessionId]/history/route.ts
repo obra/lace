@@ -26,43 +26,55 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
         type: 'USER_MESSAGE',
         data: { content: threadEvent.data as string },
       };
-    
+
     case 'AGENT_MESSAGE':
       return {
         ...baseEvent,
         type: 'AGENT_MESSAGE',
         data: { content: threadEvent.data as string },
       };
-    
-    case 'TOOL_CALL':
-      const toolCall = threadEvent.data as any;
+
+    case 'TOOL_CALL': {
+      const toolCall = threadEvent.data as {
+        toolName?: string;
+        name?: string;
+        input?: unknown;
+        args?: unknown;
+      };
       return {
         ...baseEvent,
         type: 'TOOL_CALL',
         data: {
-          toolName: toolCall.toolName || toolCall.name,
-          input: toolCall.input || toolCall.args,
+          toolName: toolCall.toolName || toolCall.name || '',
+          input: toolCall.input || toolCall.args || {},
         },
       };
-    
-    case 'TOOL_RESULT':
-      const toolResult = threadEvent.data as any;
+    }
+
+    case 'TOOL_RESULT': {
+      const toolResult = threadEvent.data as {
+        toolName?: string;
+        name?: string;
+        result?: unknown;
+        content?: unknown;
+      };
       return {
         ...baseEvent,
         type: 'TOOL_RESULT',
         data: {
-          toolName: toolResult.toolName || toolResult.name,
-          result: toolResult.result || toolResult.content,
+          toolName: toolResult.toolName || toolResult.name || '',
+          result: toolResult.result || toolResult.content || '',
         },
       };
-    
+    }
+
     case 'LOCAL_SYSTEM_MESSAGE':
       return {
         ...baseEvent,
         type: 'LOCAL_SYSTEM_MESSAGE',
         data: { message: threadEvent.data as string },
       };
-    
+
     default:
       // For unknown event types, return a generic system message
       return {
@@ -79,12 +91,12 @@ export async function GET(
 ): Promise<NextResponse> {
   try {
     const { sessionId: sessionIdParam } = await params;
-    
+
     if (!isValidThreadId(sessionIdParam)) {
       const errorResponse: ApiErrorResponse = { error: 'Invalid session ID' };
       return NextResponse.json(errorResponse, { status: 400 });
     }
-    
+
     const sessionId = sessionIdParam;
 
     // Validate session ID format
@@ -95,7 +107,7 @@ export async function GET(
 
     const sessionService = getSessionService();
     const session = await sessionService.getSession(sessionId);
-    
+
     if (!session) {
       const errorResponse: ApiErrorResponse = { error: 'Session not found' };
       return NextResponse.json(errorResponse, { status: 404 });
@@ -104,29 +116,29 @@ export async function GET(
     // Get conversation history through the Session's coordinator agent
     const dbPath = process.env.LACE_DB_PATH || './lace.db';
     const laceSession = await Session.getById(sessionId, dbPath);
-    
+
     if (!laceSession) {
       const errorResponse: ApiErrorResponse = { error: 'Could not load session history' };
       return NextResponse.json(errorResponse, { status: 500 });
     }
-    
+
     // Get the coordinator agent and load events through it (proper architecture)
     const coordinatorAgent = laceSession.getAgent(sessionId);
     if (!coordinatorAgent) {
       const errorResponse: ApiErrorResponse = { error: 'Could not access session coordinator' };
       return NextResponse.json(errorResponse, { status: 500 });
     }
-    
+
     // Load all events from the session and its delegates through the Agent layer
     const threadEvents = coordinatorAgent.getMainAndDelegateEvents(sessionId);
-    
+
     // Convert ThreadEvent to SessionEvent
     const events: SessionEvent[] = threadEvents.map(convertThreadEventToSessionEvent);
-    
+
     return NextResponse.json({ events }, { status: 200 });
   } catch (error: unknown) {
     console.error('Error in GET /api/sessions/[sessionId]/history:', error);
-    
+
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     const errorResponse: ApiErrorResponse = { error: errorMessage };
     return NextResponse.json(errorResponse, { status: 500 });

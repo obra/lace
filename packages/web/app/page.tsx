@@ -281,7 +281,6 @@ export default function Home() {
                 <h2 className="text-lg font-semibold mb-3">Agents</h2>
                 <AgentSpawner
                   sessionId={selectedSession}
-                  agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
                   onAgentSpawn={handleAgentSpawn}
                 />
 
