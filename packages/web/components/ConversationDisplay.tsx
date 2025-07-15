@@ -76,7 +76,7 @@ export function ConversationDisplay({ events, agents, selectedAgent, className =
     switch (event.type) {
       case 'USER_MESSAGE':
         return (
-          <div key={index} className="mb-3">
+          <div key={index} className="mb-3" data-testid="message">
             <div className="text-xs text-gray-500">[{timestamp}]</div>
             <div className="flex items-start gap-2">
               <span className="text-2xl">👤</span>
@@ -90,7 +90,7 @@ export function ConversationDisplay({ events, agents, selectedAgent, className =
 
       case 'THINKING':
         return event.data.status === 'start' ? (
-          <div key={index} className="mb-2 text-gray-400 italic">
+          <div key={index} className="mb-2 text-gray-400 italic" data-testid="thinking-indicator">
             <div className="text-xs text-gray-500">[{timestamp}]</div>
             <div className="flex items-start gap-2">
               <span className="text-xl animate-pulse">🤔</span>
@@ -101,7 +101,7 @@ export function ConversationDisplay({ events, agents, selectedAgent, className =
 
       case 'AGENT_MESSAGE':
         return (
-          <div key={index} className="mb-3">
+          <div key={index} className="mb-3" data-testid="agent-response">
             <div className="text-xs text-gray-500">[{timestamp}]</div>
             <div className="flex items-start gap-2">
               <span className="text-2xl">🤖</span>
@@ -117,7 +117,7 @@ export function ConversationDisplay({ events, agents, selectedAgent, className =
 
       case 'AGENT_STREAMING':
         return (
-          <div key={index} className="mb-3">
+          <div key={index} className="mb-3" data-testid="streaming-response">
             <div className="text-xs text-gray-500">[{timestamp}]</div>
             <div className="flex items-start gap-2">
               <span className="text-2xl">🤖</span>
@@ -178,7 +178,7 @@ export function ConversationDisplay({ events, agents, selectedAgent, className =
 
       case 'LOCAL_SYSTEM_MESSAGE':
         return (
-          <div key={index} className="mb-2 text-center">
+          <div key={index} className="mb-2 text-center" data-testid="error-message">
             <div className="text-xs text-gray-500">[{timestamp}]</div>
             <div className="text-gray-400 italic">— {event.data.message} —</div>
           </div>

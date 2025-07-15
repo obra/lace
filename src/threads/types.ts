@@ -30,6 +30,13 @@ export interface Thread {
   createdAt: Date;
   updatedAt: Date;
   events: ThreadEvent[];
+  metadata?: {
+    name?: string;
+    isSession?: boolean;
+    provider?: string;
+    model?: string;
+    [key: string]: unknown;
+  };
 }
 
 export interface VersionHistoryEntry {

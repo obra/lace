@@ -41,6 +41,9 @@ export default function Home() {
     setEvents([]);
     setSelectedAgent(null);
 
+    // Load conversation history first
+    loadConversationHistory(selectedSession);
+
     const eventSource = new EventSource(`/api/sessions/${selectedSession}/events/stream`);
 
     // Listen to all event types
@@ -108,6 +111,23 @@ export default function Home() {
       setSessions(sessionsData.sessions || []);
     } catch (error) {
       console.error('Failed to load sessions:', error);
+    }
+  }
+
+  async function loadConversationHistory(sessionId: ThreadId) {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/history`);
+      const data: unknown = await res.json();
+      
+      if (isApiError(data)) {
+        console.error('Failed to load conversation history:', data.error);
+        return;
+      }
+      
+      const historyData = data as { events: SessionEvent[] };
+      setEvents(historyData.events || []);
+    } catch (error) {
+      console.error('Failed to load conversation history:', error);
     }
   }
 
@@ -196,140 +216,145 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 p-4">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Lace Web Interface</h1>
+    <div className="min-h-screen bg-gray-900 text-gray-100 flex">
+      <div className="h-screen flex w-full">
+        {/* Sidebar */}
+        <div className="w-80 bg-gray-800 h-full overflow-y-auto border-r border-gray-700">
+          <div className="p-4">
+            <h1 className="text-2xl font-bold mb-6">Lace</h1>
 
-        {/* Session Creation */}
-        <div className="bg-gray-800 rounded-lg p-4 mb-6">
-          <h2 className="text-xl mb-4">Create New Session</h2>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={sessionName}
-              onChange={(e) => setSessionName(e.target.value)}
-              placeholder="Session name..."
-              className="flex-1 px-3 py-2 bg-gray-700 rounded text-white"
-              onKeyDown={(e) => e.key === 'Enter' && createSession()}
-            />
-            <button
-              onClick={createSession}
-              disabled={loading || !sessionName.trim()}
-              className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-            >
-              Create
-            </button>
-          </div>
-        </div>
-
-        {/* Sessions List */}
-        <div className="bg-gray-800 rounded-lg p-4 mb-6">
-          <h2 className="text-xl mb-4">Sessions</h2>
-          {sessions.length === 0 ? (
-            <p className="text-gray-400">No sessions yet</p>
-          ) : (
-            <div className="space-y-2">
-              {sessions.map((session) => (
-                <div
-                  key={String(session.id)}
-                  onClick={() => setSelectedSession(session.id as ThreadId)}
-                  className={`p-3 rounded cursor-pointer ${
-                    selectedSession === session.id ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'
-                  }`}
+            {/* Session Creation */}
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold mb-3">New Session</h2>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={sessionName}
+                  onChange={(e) => setSessionName(e.target.value)}
+                  placeholder="Session name..."
+                  className="flex-1 px-3 py-2 bg-gray-700 rounded text-white text-sm"
+                  onKeyDown={(e) => e.key === 'Enter' && createSession()}
+                  data-testid="session-name-input"
+                />
+                <button
+                  onClick={createSession}
+                  disabled={loading || !sessionName.trim()}
+                  className="px-3 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+                  data-testid="create-session-button"
                 >
-                  <div className="font-semibold">{session.name}</div>
-                  <div className="text-sm text-gray-300">
-                    {session.agents.length} agents • {new Date(session.createdAt).toLocaleString()}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Selected Session Details */}
-        {selectedSession && (
-          <>
-            {/* Agent Management */}
-            <div className="bg-gray-800 rounded-lg p-4 mb-6">
-              <h2 className="text-xl mb-4">Agents</h2>
-              <AgentSpawner
-                sessionId={selectedSession}
-                agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
-                onAgentSpawn={handleAgentSpawn}
-              />
-
-              {/* Agent List */}
-              <div className="mt-4">
-                {sessions
-                  .find((s) => s.id === selectedSession)
-                  ?.agents.map((agent) => (
-                    <div
-                      key={String(agent.threadId)}
-                      onClick={() => setSelectedAgent(agent.threadId as ThreadId)}
-                      className={`p-3 mb-2 rounded cursor-pointer ${
-                        selectedAgent === agent.threadId
-                          ? 'bg-green-600'
-                          : 'bg-gray-700 hover:bg-gray-600'
-                      }`}
-                    >
-                      <div className="font-semibold">{agent.name}</div>
-                      <div className="text-sm text-gray-300">
-                        {agent.model} • {agent.status}
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        {agent.threadId}
-                      </div>
-                    </div>
-                  ))}
+                  Create
+                </button>
               </div>
             </div>
 
-            {/* Message Input */}
-            {selectedAgent && (
-              <div className="bg-gray-800 rounded-lg p-4 mb-6">
-                <h2 className="text-xl mb-4">Send Message</h2>
+            {/* Sessions List */}
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold mb-3">Sessions</h2>
+              {sessions.length === 0 ? (
+                <p className="text-gray-400 text-sm">No sessions yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {sessions.map((session) => (
+                    <div
+                      key={String(session.id)}
+                      onClick={() => setSelectedSession(session.id as ThreadId)}
+                      className={`p-3 rounded cursor-pointer text-sm ${
+                        selectedSession === session.id ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'
+                      }`}
+                    >
+                      <div className="font-semibold">{session.name}</div>
+                      <div className="text-xs text-gray-300">
+                        {session.agents.length} agents
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Agent Management */}
+            {selectedSession && (
+              <div>
+                <h2 className="text-lg font-semibold mb-3">Agents</h2>
+                <AgentSpawner
+                  sessionId={selectedSession}
+                  agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
+                  onAgentSpawn={handleAgentSpawn}
+                />
+
+                {/* Agent List */}
+                <div className="mt-4 space-y-2">
+                  {sessions
+                    .find((s) => s.id === selectedSession)
+                    ?.agents.map((agent) => (
+                      <div
+                        key={String(agent.threadId)}
+                        onClick={() => setSelectedAgent(agent.threadId as ThreadId)}
+                        className={`p-3 rounded cursor-pointer text-sm ${
+                          selectedAgent === agent.threadId
+                            ? 'bg-green-600'
+                            : 'bg-gray-700 hover:bg-gray-600'
+                        }`}
+                      >
+                        <div className="font-semibold">{agent.name}</div>
+                        <div className="text-xs text-gray-300">
+                          {agent.model}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {agent.status}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col h-full">
+          {selectedSession && selectedAgent ? (
+            <>
+              {/* Conversation Display */}
+              <div className="flex-1 overflow-hidden">
+                <ConversationDisplay
+                  events={events}
+                  agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
+                  selectedAgent={selectedAgent}
+                  className="h-full p-4"
+                />
+              </div>
+
+              {/* Message Input at Bottom */}
+              <div className="border-t border-gray-700 p-4 bg-gray-800">
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Type your message..."
-                    className="flex-1 px-3 py-2 bg-gray-700 rounded text-white"
+                    className="flex-1 px-4 py-2 bg-gray-700 rounded text-white"
                     onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
                     disabled={sendingMessage}
+                    data-testid="message-input"
                   />
                   <button
                     onClick={sendMessage}
                     disabled={sendingMessage || !message.trim()}
-                    className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+                    className="px-6 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+                    data-testid="send-message-button"
                   >
                     Send
                   </button>
                 </div>
               </div>
-            )}
-
-            {/* Conversation Display */}
-            <div className="bg-gray-800 rounded-lg p-4">
-              <h2 className="text-xl mb-4">Conversation</h2>
-              {selectedAgent ? (
-                <ConversationDisplay
-                  events={events}
-                  agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
-                  selectedAgent={selectedAgent}
-                  className="h-96"
-                />
-              ) : (
-                <ConversationDisplay
-                  events={events}
-                  agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
-                  className="h-96"
-                />
-              )}
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-gray-400">
+              {!selectedSession ? 'Select a session to get started' : 'Select an agent to start chatting'}
             </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Tool Approval Modal */}

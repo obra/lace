@@ -32,7 +32,7 @@ describe('Provider Discovery API', () => {
     vi.clearAllMocks();
     mockRegistry = {
       getAvailableProviders: vi.fn(),
-    } as any;
+    } as unknown as ProviderRegistry;
 
     // Mock console methods to prevent stderr pollution during tests
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

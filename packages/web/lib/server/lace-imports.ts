@@ -8,6 +8,7 @@ export { Agent } from '~/agents/agent';
 export { ProviderRegistry } from '~/providers/registry';
 export { ToolExecutor } from '~/tools/executor';
 export { DelegateTool } from '~/tools/implementations/delegate';
+export { Session } from '~/sessions/session';
 
 // Types and constants
 export type { ThreadId } from '~/threads/types';

@@ -5,6 +5,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/*.playwright.test.ts',
+    ],
     environmentMatchGlobs: [
       // Use jsdom for component and hook tests
       ['**/*.{test,spec}.{ts,tsx}', 'jsdom'],

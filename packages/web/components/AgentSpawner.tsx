@@ -164,6 +164,7 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
         <button
           onClick={() => setShowForm(!showForm)}
           className="text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 transition-colors"
+          data-testid="spawn-agent-button"
         >
           {showForm ? 'Cancel' : '+ Add Agent'}
         </button>
@@ -179,6 +180,7 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
             className="w-full px-3 py-1 bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-terminal-green text-sm"
             disabled={loading}
             autoFocus
+            data-testid="agent-name-input"
           />
 
           <select
@@ -203,6 +205,7 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
             type="submit"
             disabled={loading || !agentName.trim() || !selectedModel}
             className="w-full px-3 py-1 bg-terminal-purple text-black rounded hover:bg-terminal-purple/80 transition-colors disabled:opacity-50 text-sm"
+            data-testid="confirm-spawn-agent"
           >
             {loading ? 'Spawning...' : 'Spawn Agent'}
           </button>

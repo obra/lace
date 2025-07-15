@@ -12,6 +12,7 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@playwright/test": "^1.54.1",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
