@@ -1,6 +1,8 @@
 // ABOUTME: Server-side imports for Lace core modules
 // ABOUTME: Uses ~ path aliases to reference main project source
 
+import 'server-only';
+
 // Import from main project source using ~ alias
 export { Agent } from '~/agents/agent';
 export { ThreadManager } from '~/threads/thread-manager';

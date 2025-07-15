@@ -4,7 +4,8 @@
 import React, { useState, useEffect } from 'react';
 import { Agent, CreateAgentRequest, ThreadId } from '@/types/api';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
-import type { ProviderWithModels, ProvidersResponse, ErrorResponse } from '@/app/api/providers/route';
+import type { ProviderWithModels, ProvidersResponse } from '@/app/api/providers/route';
+import type { ApiErrorResponse } from '@/types/api';
 
 interface AgentSpawnerProps {
   sessionId: ThreadId;
@@ -30,13 +31,13 @@ function isProvidersResponse(data: unknown): data is ProvidersResponse {
   );
 }
 
-// Type guard for ErrorResponse
-function isErrorResponse(data: unknown): data is ErrorResponse {
+// Type guard for ApiErrorResponse
+function isErrorResponse(data: unknown): data is ApiErrorResponse {
   return (
     typeof data === 'object' &&
     data !== null &&
     'error' in data &&
-    typeof (data as ErrorResponse).error === 'string'
+    typeof (data as ApiErrorResponse).error === 'string'
   );
 }
 
@@ -84,7 +85,7 @@ export function AgentSpawner({ sessionId, agents, onAgentSpawn }: AgentSpawnerPr
           options.push({
             value: '',
             label: `${provider.displayName} (Not Configured)`,
-            description: provider.configurationHint,
+            description: provider.configurationHint || undefined,
             disabled: true,
           });
         } else {

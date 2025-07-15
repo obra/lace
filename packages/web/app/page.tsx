@@ -312,7 +312,7 @@ export default function Home() {
               <h2 className="text-xl mb-4">Conversation</h2>
               <ConversationDisplay
                 events={events}
-                agents={sessions.find((s) => s.id === selectedSession)?.agents}
+                agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
                 className="h-96"
               />
             </div>

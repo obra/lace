@@ -16,18 +16,18 @@ function isError(error: unknown): error is Error {
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ): Promise<NextResponse> {
   try {
     const sessionService = getSessionService();
     const { sessionId: sessionIdParam } = await params;
-    
+
     if (!isValidThreadId(sessionIdParam)) {
       const errorResponse: ApiErrorResponse = { error: 'Invalid session ID' };
       return NextResponse.json(errorResponse, { status: 400 });
     }
-    
+
     const sessionId = sessionIdParam;
 
     const session = await sessionService.getSession(sessionId);
@@ -40,7 +40,7 @@ export async function GET(
     return NextResponse.json({ session });
   } catch (error: unknown) {
     console.error('Error in GET /api/sessions/[sessionId]:', error);
-    
+
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     const errorResponse: ApiErrorResponse = { error: errorMessage };
     return NextResponse.json(errorResponse, { status: 500 });

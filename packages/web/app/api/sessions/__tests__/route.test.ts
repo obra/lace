@@ -6,7 +6,10 @@ import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/api/sessions/route';
 import type { Session } from '@/types/api';
 import type { SessionService } from '@/lib/server/session-service';
-import { createThreadId } from '@/lib/server/lace-imports';
+// Helper function for tests to avoid server-only imports
+function createThreadId(id: string) {
+  return id as import('@/types/api').ThreadId;
+}
 
 // Create the properly typed mock service
 const mockSessionService = {
@@ -28,7 +31,7 @@ describe('Session API Routes', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Mock console methods to prevent stderr pollution during tests
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
