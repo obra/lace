@@ -1,91 +1,176 @@
 // ABOUTME: Server-side session management service
-// ABOUTME: Provides high-level API for managing sessions and agents using the Agent class
+// ABOUTME: Provides high-level API for managing sessions and agents using the Session class
 
-import {
-  Agent,
-  ProviderRegistry,
-  ToolExecutor,
-  DelegateTool,
-} from '~/../packages/web/lib/server/lace-imports';
-import type {
-  ThreadId,
-  AgentState,
-  _ToolAnnotations,
-} from '~/../packages/web/lib/server/lace-imports';
+import { Agent, Session } from '~/../packages/web/lib/server/lace-imports';
+import type { ThreadId, _ToolAnnotations } from '~/../packages/web/lib/server/lace-imports';
 import { asThreadId } from '~/../packages/web/lib/server/lace-imports';
-import { Session, Agent as AgentType, SessionEvent, ApprovalDecision } from '@/types/api';
+import {
+  Session as SessionType,
+  Agent as AgentType,
+  SessionEvent,
+  ApprovalDecision,
+} from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
 import { getApprovalManager } from '@/lib/server/approval-manager';
 
-// Active agent instances
-const activeAgents = new Map<ThreadId, InstanceType<typeof Agent>>();
-
-// Session metadata storage (temporary until we have proper DB support)
-const sessionMetadata = new Map<ThreadId, { name: string; createdAt: string; isSession: true }>();
-
-// Agent metadata storage
-const agentMetadata = new Map<ThreadId, { name: string; provider: string; model: string }>();
+// Active session instances
+const activeSessions = new Map<ThreadId, Session>();
 
 export class SessionService {
   constructor() {
     // No need for direct ThreadManager access - use Agent methods instead
   }
 
-  async createSession(name?: string): Promise<Session> {
+  async createSession(name?: string): Promise<SessionType> {
     // Get default provider and model from environment
-    const defaultProvider = process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai';
+    const defaultProvider =
+      process.env.ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai';
     const defaultModel = 'claude-3-haiku-20240307';
 
-    // Create agent using the clean factory method
+    const sessionName = name || 'Untitled Session';
     const dbPath = process.env.LACE_DB_PATH || './lace.db';
-    const agent = Agent.createSession({
-      providerType: defaultProvider,
-      model: defaultModel,
-      name,
-      dbPath,
-    });
 
-    const threadId = asThreadId(agent.threadId);
+    // Create session using Session class
+    const session = Session.create(sessionName, defaultProvider, defaultModel, dbPath);
+    const sessionId = session.getId();
 
-    // Set up delegate tool dependencies
-    const delegateTool = agent.toolExecutor.getTool('delegate') as DelegateTool;
-    if (delegateTool) {
-      delegateTool.setDependencies(agent, agent.toolExecutor);
-    }
+    // Store the session instance
+    activeSessions.set(sessionId, session);
 
-    // Store session metadata
-    const session: Session = {
-      id: threadId,
-      name: name || 'Untitled Session',
+    return {
+      id: sessionId,
+      name: sessionName,
       createdAt: new Date().toISOString(),
       agents: [],
     };
+  }
 
-    sessionMetadata.set(threadId, {
-      name: session.name,
-      createdAt: session.createdAt,
-      isSession: true,
+  async listSessions(): Promise<SessionType[]> {
+    const dbPath = process.env.LACE_DB_PATH || './lace.db';
+    const sessionInfos = Session.getAll(dbPath);
+
+    // Create a map of persisted sessions
+    const persistedSessions = new Map<string, SessionType>();
+
+    for (const sessionInfo of sessionInfos) {
+      let session = activeSessions.get(sessionInfo.id);
+
+      if (!session) {
+        // Reconstruct session from database
+        session = await Session.getById(sessionInfo.id, dbPath);
+        if (session) {
+          activeSessions.set(sessionInfo.id, session);
+        }
+      }
+
+      const agents = session ? session.getAgents() : [];
+
+      persistedSessions.set(sessionInfo.id, {
+        id: sessionInfo.id,
+        name: sessionInfo.name,
+        createdAt: sessionInfo.createdAt.toISOString(),
+        agents: agents.map((agent) => ({
+          threadId: agent.threadId,
+          name: agent.name,
+          provider: agent.provider,
+          model: agent.model,
+          status: agent.status,
+        })),
+      });
+    }
+
+    // Add any active sessions that aren't in the persisted list
+    activeSessions.forEach((session, sessionId) => {
+      if (!persistedSessions.has(sessionId)) {
+        const sessionInfo = session.getInfo();
+        if (sessionInfo) {
+          const agents = session.getAgents();
+          persistedSessions.set(sessionId, {
+            id: sessionId,
+            name: sessionInfo.name,
+            createdAt: sessionInfo.createdAt.toISOString(),
+            agents: agents.map((agent) => ({
+              threadId: agent.threadId,
+              name: agent.name,
+              provider: agent.provider,
+              model: agent.model,
+              status: agent.status,
+            })),
+          });
+        }
+      }
     });
 
-    // Store the agent instance
-    activeAgents.set(threadId, agent);
+    return Array.from(persistedSessions.values());
+  }
+
+  async getSession(sessionId: ThreadId): Promise<SessionType | null> {
+    const dbPath = process.env.LACE_DB_PATH || './lace.db';
+
+    // Try to get from active sessions first
+    let session = activeSessions.get(sessionId);
+
+    if (!session) {
+      // Try to load from database by reconstructing the session
+      session = await Session.getById(sessionId, dbPath);
+      if (!session) {
+        return null;
+      }
+      activeSessions.set(sessionId, session);
+    }
+
+    const sessionInfo = session.getInfo();
+    if (!sessionInfo) {
+      return null;
+    }
+
+    const agents = session.getAgents();
+
+    return {
+      id: sessionId,
+      name: sessionInfo.name,
+      createdAt: sessionInfo.createdAt.toISOString(),
+      agents: agents.map((agent) => ({
+        threadId: agent.threadId,
+        name: agent.name,
+        provider: agent.provider,
+        model: agent.model,
+        status: agent.status,
+      })),
+    };
+  }
+
+  async spawnAgent(
+    sessionId: ThreadId,
+    name: string,
+    provider?: string,
+    model?: string
+  ): Promise<AgentType> {
+    // Get the session
+    const session = activeSessions.get(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    // Spawn agent using Session class
+    const agent = session.spawnAgent(name, provider, model);
 
     // Set up tool approval callback
-    const toolExecutor = agent.toolExecutor;
     const approvalManager = getApprovalManager();
+    const agentThreadId = asThreadId(agent.threadId);
 
-    toolExecutor.setApprovalCallback({
+    agent.toolExecutor.setApprovalCallback({
       requestApproval: async (toolName: string, input: unknown): Promise<ApprovalDecision> => {
         // Get tool metadata
-        const tool = toolExecutor.getTool(toolName);
+        const tool = agent.toolExecutor.getTool(toolName);
         const toolDescription = tool?.description;
         const toolAnnotations = tool?.annotations;
         const isReadOnly = toolAnnotations?.readOnlyHint === true;
 
         // Request approval through the manager
         return await approvalManager.requestApproval(
-          threadId,
-          threadId, // Use threadId as sessionId for now
+          agentThreadId,
+          sessionId, // Use sessionId for approval context
           toolName,
           toolDescription,
           toolAnnotations,
@@ -99,125 +184,13 @@ export class SessionService {
     await agent.start();
 
     // Set up event handlers for SSE broadcasting
-    this.setupAgentEventHandlers(agent, threadId);
-
-    return session;
-  }
-
-  listSessions(): Session[] {
-    // Return sessions from our metadata store
-    const sessions: Session[] = [];
-
-    for (const [threadId, metadata] of Array.from(sessionMetadata.entries())) {
-      const agents = this.getSessionAgents(threadId);
-      sessions.push({
-        id: threadId,
-        name: metadata.name,
-        createdAt: metadata.createdAt,
-        agents,
-      });
-    }
-
-    return sessions;
-  }
-
-  getSession(sessionId: ThreadId): Session | null {
-    const metadata = sessionMetadata.get(sessionId);
-    if (!metadata) {
-      return null;
-    }
-
-    const agents = this.getSessionAgents(sessionId);
-
-    return {
-      id: sessionId,
-      name: metadata.name,
-      createdAt: metadata.createdAt,
-      agents,
-    };
-  }
-
-  async spawnAgent(
-    sessionId: ThreadId,
-    name: string,
-    provider?: string,
-    model?: string
-  ): Promise<AgentType> {
-    // Get the parent agent to access thread manager
-    const parentAgent = activeAgents.get(sessionId);
-    if (!parentAgent) {
-      console.error('Session not found:', sessionId);
-      console.error('Active agents:', Array.from(activeAgents.keys()));
-      throw new Error('Session not found');
-    }
-
-    // Create tool executor for delegate
-    const toolExecutor = new ToolExecutor();
-    toolExecutor.registerAllAvailableTools();
-
-    // Create provider - default to anthropic if not specified
-    const providerType = provider || 'anthropic';
-    const modelName = model || 'claude-3-5-sonnet-20241022';
-
-    // Create provider for delegate agent
-    const registry = ProviderRegistry.createWithAutoDiscovery();
-    const delegateProvider = registry.createProvider(providerType, { model: modelName });
-
-    // Create delegate agent
-    const delegateAgent = parentAgent.createDelegateAgent(toolExecutor, delegateProvider);
-
-    // Set up delegate tool dependencies
-    const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
-    if (delegateTool) {
-      delegateTool.setDependencies(delegateAgent, toolExecutor);
-    }
-
-    // Store the agent
-    activeAgents.set(asThreadId(delegateAgent.threadId), delegateAgent);
-
-    // Set up tool approval callback for delegate
-    const approvalManager = getApprovalManager();
-    const delegateThreadId = asThreadId(delegateAgent.threadId);
-
-    toolExecutor.setApprovalCallback({
-      requestApproval: async (toolName: string, input: unknown): Promise<ApprovalDecision> => {
-        // Get tool metadata
-        const tool = toolExecutor.getTool(toolName);
-        const toolDescription = tool?.description;
-        const toolAnnotations = tool?.annotations;
-        const isReadOnly = toolAnnotations?.readOnlyHint === true;
-
-        // Request approval through the manager
-        return await approvalManager.requestApproval(
-          delegateThreadId,
-          sessionId, // Use sessionId for approval context
-          toolName,
-          toolDescription,
-          toolAnnotations,
-          input,
-          isReadOnly
-        );
-      },
-    });
-
-    // Start the delegate agent
-    await delegateAgent.start();
-
-    // Set up event handlers for SSE broadcasting
-    this.setupAgentEventHandlers(delegateAgent, sessionId);
-
-    // Store agent metadata
-    agentMetadata.set(asThreadId(delegateAgent.threadId), {
-      name,
-      provider: providerType,
-      model: modelName,
-    });
+    this.setupAgentEventHandlers(agent, sessionId);
 
     const agentData: AgentType = {
-      threadId: asThreadId(delegateAgent.threadId),
+      threadId: agentThreadId,
       name,
-      provider: providerType,
-      model: modelName,
+      provider: agent.providerName,
+      model: model || 'claude-3-haiku-20240307',
       status: 'idle',
       createdAt: new Date().toISOString(),
     };
@@ -226,7 +199,14 @@ export class SessionService {
   }
 
   getAgent(threadId: ThreadId): Agent | null {
-    return activeAgents.get(threadId) || null;
+    // Find session that contains this agent
+    for (const session of activeSessions.values()) {
+      const agent = session.getAgent(threadId);
+      if (agent) {
+        return agent;
+      }
+    }
+    return null;
   }
 
   private setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
@@ -236,7 +216,7 @@ export class SessionService {
     console.warn(`Setting up SSE event handlers for agent ${threadId} in session ${sessionId}`);
 
     // Check if agent is started
-    const isRunning = (agent as unknown as { _isRunning?: boolean })._isRunning;
+    const isRunning = agent.getCurrentState() !== 'idle';
     console.warn(`Agent ${threadId} running state:`, isRunning);
 
     agent.on('agent_thinking_start', () => {
@@ -395,38 +375,7 @@ export class SessionService {
     );
   }
 
-  private getAgentStatus(agent: Agent): AgentState {
-    // Check if agent has a public method to get state
-    if (agent && typeof agent === 'object' && 'getState' in agent) {
-      const state = (agent as { getState(): AgentState }).getState();
-      return state;
-    }
-
-    // Fallback to checking known properties safely
-    const agentWithState = agent as unknown as { _state?: AgentState };
-    return agentWithState._state || 'idle';
-  }
-
-  private getSessionAgents(sessionId: ThreadId): AgentType[] {
-    const agents: AgentType[] = [];
-
-    // Find all agents that are children of this session
-    for (const [threadId, metadata] of Array.from(agentMetadata.entries())) {
-      if (threadId.startsWith(`${sessionId}.`)) {
-        const agent = activeAgents.get(threadId);
-        agents.push({
-          threadId,
-          name: metadata.name,
-          provider: metadata.provider,
-          model: metadata.model,
-          status: agent ? this.getAgentStatus(agent) : 'inactive',
-          createdAt: new Date().toISOString(), // Would need to track this properly
-        });
-      }
-    }
-
-    return agents;
-  }
+  // These methods are now handled by the Session class
 }
 
 // Use global to persist across HMR in development

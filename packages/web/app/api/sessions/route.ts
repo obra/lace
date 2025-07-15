@@ -18,7 +18,7 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ sessions });
   } catch (error: unknown) {
     console.error('Error in GET /api/sessions:', error);
-    
+
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     const errorResponse: ApiErrorResponse = { error: errorMessage };
     return NextResponse.json(errorResponse, { status: 500 });
@@ -28,14 +28,23 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const sessionService = getSessionService();
-    const body = (await request.json()) as CreateSessionRequest;
+
+    // Parse JSON with proper error handling
+    let body: CreateSessionRequest;
+    try {
+      body = (await request.json()) as CreateSessionRequest;
+    } catch (jsonError: unknown) {
+      console.error('JSON parsing error:', jsonError);
+      const errorResponse: ApiErrorResponse = { error: 'Invalid JSON in request body' };
+      return NextResponse.json(errorResponse, { status: 400 });
+    }
 
     const session = await sessionService.createSession(body.name);
 
     return NextResponse.json({ session }, { status: 201 });
   } catch (error: unknown) {
     console.error('Error in POST /api/sessions:', error);
-    
+
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     const errorResponse: ApiErrorResponse = { error: errorMessage };
     return NextResponse.json(errorResponse, { status: 500 });

@@ -1357,6 +1357,22 @@ export class Agent extends EventEmitter {
     this._threadManager.createThread(threadId);
   }
 
+  updateThreadMetadata(metadata: Record<string, unknown>): void {
+    const thread = this._threadManager.getThread(this._threadId);
+    if (thread) {
+      thread.metadata = { ...thread.metadata, ...metadata };
+      // Update timestamp
+      thread.updatedAt = new Date();
+      // Save through persistence layer
+      (this._threadManager as any)._persistence.saveThread(thread);
+    }
+  }
+
+  getThreadMetadata(): Record<string, unknown> | undefined {
+    const thread = this._threadManager.getThread(this._threadId);
+    return thread?.metadata;
+  }
+
   resumeOrCreateThread(threadId?: string): ThreadSessionInfo {
     const result = this._threadManager.resumeOrCreate(threadId);
 
