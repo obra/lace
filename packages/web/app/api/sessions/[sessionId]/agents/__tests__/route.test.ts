@@ -324,6 +324,31 @@ describe('Agent Spawning API', () => {
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
+      expect(data.error).toBe('Invalid request body');
+    });
+
+    it('should validate agent name is not empty', async () => {
+      const sessionId: ThreadId = createThreadId('lace_20250113_session1');
+      
+      mockSessionService.getSession.mockResolvedValueOnce(
+        Promise.resolve({
+          id: sessionId,
+          name: 'Test Session',
+          createdAt: new Date().toISOString(),
+          agents: [],
+        })
+      );
+
+      const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        body: JSON.stringify({ name: '' }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const response = await POST(request, { params: Promise.resolve({ sessionId }) });
+      const data = await parseResponse<ErrorResponse>(response);
+
+      expect(response.status).toBe(400);
       expect(data.error).toBe('Agent name is required');
     });
   });

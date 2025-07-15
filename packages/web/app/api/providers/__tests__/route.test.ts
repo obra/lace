@@ -13,16 +13,11 @@ interface ProvidersResponse {
 }
 
 // Mock the module
-const mockProviderRegistry = {
-  createWithAutoDiscovery: vi.fn(),
-};
-
 vi.mock('@/lib/server/lace-imports', () => ({
-  ProviderRegistry: mockProviderRegistry,
+  ProviderRegistry: {
+    createWithAutoDiscovery: vi.fn(),
+  },
 }));
-
-// Get typed reference to the mock
-const mockCreateWithAutoDiscovery = mockProviderRegistry.createWithAutoDiscovery;
 
 describe('Provider Discovery API', () => {
   let mockRegistry: {
@@ -31,12 +26,14 @@ describe('Provider Discovery API', () => {
     >;
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     mockRegistry = {
       getAvailableProviders: vi.fn(),
     };
-    mockCreateWithAutoDiscovery.mockResolvedValue(mockRegistry);
+    
+    const { ProviderRegistry } = await import('@/lib/server/lace-imports');
+    vi.mocked(ProviderRegistry.createWithAutoDiscovery).mockResolvedValue(mockRegistry);
   });
 
   describe('GET /api/providers', () => {
@@ -184,7 +181,7 @@ describe('Provider Discovery API', () => {
 
       expect(response.status).toBe(500);
       expect(data).toMatchObject({
-        error: 'Failed to retrieve providers',
+        error: 'Failed to discover providers',
       });
     });
 

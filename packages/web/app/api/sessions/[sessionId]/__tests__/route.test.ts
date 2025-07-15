@@ -76,7 +76,7 @@ describe('Session Detail API Route', () => {
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(500);
-      expect(data.error).toBe('Internal server error');
+      expect(data.error).toBe('Database error');
     });
   });
 });

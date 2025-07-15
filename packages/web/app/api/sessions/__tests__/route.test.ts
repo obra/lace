@@ -90,7 +90,7 @@ describe('Session API Routes', () => {
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(500);
-      expect(data.error).toBe('Internal server error');
+      expect(data.error).toBe('Database error');
     });
   });
 
@@ -150,7 +150,7 @@ describe('Session API Routes', () => {
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(500);
-      expect(data.error).toBe('Internal server error');
+      expect(data.error).toBe('Database error');
     });
   });
 });
