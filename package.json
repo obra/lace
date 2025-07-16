@@ -21,6 +21,7 @@
     "lint:fix": "npm run typecheck && eslint src --fix",
     "format": "prettier --write \"src\"",
     "prepare": "husky",
+    "postinstall": "npm run web:install",
     "docker:build": "docker build -t lace-test .",
     "docker:run": "docker run -it --rm lace-test",
     "docker:shell": "docker run -it --rm lace-test /bin/bash",
