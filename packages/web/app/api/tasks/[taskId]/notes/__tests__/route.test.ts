@@ -29,31 +29,31 @@ const mockTaskManager = {
   getTask: vi.fn(),
 };
 
-// Create the properly typed mock service
-const mockSessionService = {
-  createSession: vi.fn<SessionService['createSession']>(),
-  listSessions: vi.fn<SessionService['listSessions']>(),
-  getSession: vi.fn<SessionService['getSession']>().mockResolvedValue({
+// Create a mock Session instance
+const mockSession = {
+  getId: vi.fn().mockReturnValue(createThreadId('lace_20240101_session')),
+  getInfo: vi.fn().mockReturnValue({
     id: createThreadId('lace_20240101_session'),
     name: 'Test Session',
     createdAt: '2024-01-01T00:00:00Z',
     agents: [],
   }),
+  getAgents: vi.fn().mockReturnValue([]),
+  getTaskManager: vi.fn().mockReturnValue(mockTaskManager),
+};
+
+// Create the properly typed mock service
+const mockSessionService = {
+  createSession: vi.fn<SessionService['createSession']>(),
+  listSessions: vi.fn<SessionService['listSessions']>(),
+  getSession: vi.fn<SessionService['getSession']>().mockResolvedValue(mockSession),
   spawnAgent: vi.fn<SessionService['spawnAgent']>(),
   getAgent: vi.fn<SessionService['getAgent']>(),
 };
 
-// Mock the session service and TaskManager
+// Mock the session service
 vi.mock('@/lib/server/session-service', () => ({
   getSessionService: () => mockSessionService,
-}));
-
-vi.mock('@/lib/server/lace-imports', () => ({
-  Session: {
-    getById: vi.fn().mockResolvedValue({
-      getTaskManager: () => mockTaskManager,
-    }),
-  },
 }));
 
 describe('Task Notes API Routes', () => {

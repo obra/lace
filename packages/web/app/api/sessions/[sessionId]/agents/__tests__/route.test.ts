@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi, type MockedFunction } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
-import type { ThreadId, Agent, Session } from '@/types/api';
+import type { ThreadId, Agent } from '@/types/api';
 import type { SessionService } from '@/lib/server/session-service';
 
 // Response types
@@ -34,15 +34,28 @@ function createAgent(props: Partial<Agent> & { threadId: ThreadId }): Agent {
   return agent;
 }
 
-function createSession(props: Partial<Session> & { id: ThreadId }): Session {
-  const session: Session = {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    id: props.id,
-    name: props.name || 'Test Session',
-    createdAt: props.createdAt || new Date().toISOString(),
-    agents: props.agents || [],
+// Helper to create a mock Session instance with required methods
+function createMockSession(props: { id: ThreadId; name?: string; agents?: Agent[] }) {
+  const agents = props.agents || [];
+  return {
+    getId: () => props.id,
+    getInfo: () => ({
+      id: props.id,
+      name: props.name || 'Test Session',
+      createdAt: new Date(),
+      provider: 'anthropic',
+      model: 'claude-3-haiku',
+      agents,
+    }),
+    getAgents: () => agents,
+    getAgent: vi.fn(),
+    getTaskManager: vi.fn(),
+    spawnAgent: vi.fn(),
+    startAgent: vi.fn(),
+    stopAgent: vi.fn(),
+    sendMessage: vi.fn(),
+    destroy: vi.fn(),
   };
-  return session;
 }
 
 // Type-safe response parsing
@@ -82,7 +95,7 @@ describe('Agent Spawning API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetAllMocks();
-    
+
     // Mock console methods to prevent stderr pollution during tests
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -118,7 +131,7 @@ describe('Agent Spawning API', () => {
       ];
 
       mockSessionService.getSession.mockResolvedValueOnce(
-        createSession({
+        createMockSession({
           id: sessionId,
           name: 'Test Session',
           createdAt: new Date().toISOString(),
@@ -168,7 +181,7 @@ describe('Agent Spawning API', () => {
 
     it('should support provider/model specification', async () => {
       mockSessionService.getSession.mockResolvedValueOnce(
-        createSession({
+        createMockSession({
           id: sessionId,
           name: 'Test Session',
           createdAt: new Date().toISOString(),
@@ -206,7 +219,7 @@ describe('Agent Spawning API', () => {
     it('should return agent threadId and metadata', async () => {
       const threadId: ThreadId = createThreadId(`${sessionId}.1`);
       mockSessionService.getSession.mockResolvedValueOnce(
-        createSession({
+        createMockSession({
           id: sessionId,
           name: 'Test Session',
           createdAt: new Date().toISOString(),
@@ -243,7 +256,7 @@ describe('Agent Spawning API', () => {
     it('should increment agent numbers sequentially', async () => {
       // First call - no existing agents
       mockSessionService.getSession.mockResolvedValueOnce(
-        createSession({
+        createMockSession({
           id: sessionId,
           name: 'Test Session',
           createdAt: new Date().toISOString(),
@@ -272,7 +285,7 @@ describe('Agent Spawning API', () => {
 
       // Second call - one existing agent
       mockSessionService.getSession.mockResolvedValueOnce(
-        createSession({
+        createMockSession({
           id: sessionId,
           name: 'Test Session',
           createdAt: new Date().toISOString(),
@@ -318,7 +331,7 @@ describe('Agent Spawning API', () => {
 
     it('should validate required agent name', async () => {
       mockSessionService.getSession.mockResolvedValueOnce(
-        createSession({
+        createMockSession({
           id: sessionId,
           name: 'Test Session',
           createdAt: new Date().toISOString(),
@@ -341,12 +354,11 @@ describe('Agent Spawning API', () => {
 
     it('should validate agent name is not empty', async () => {
       const sessionId: ThreadId = createThreadId('lace_20250113_session1');
-      
+
       mockSessionService.getSession.mockResolvedValueOnce(
-        Promise.resolve({
+        createMockSession({
           id: sessionId,
           name: 'Test Session',
-          createdAt: new Date().toISOString(),
           agents: [],
         })
       );
@@ -389,7 +401,7 @@ describe('Agent Spawning API', () => {
       ];
 
       mockSessionService.getSession.mockResolvedValueOnce(
-        createSession({
+        createMockSession({
           id: sessionId,
           name: 'Test Session',
           createdAt: new Date().toISOString(),
@@ -428,7 +440,7 @@ describe('Agent Spawning API', () => {
       });
 
       mockSessionService.getSession.mockResolvedValueOnce(
-        createSession({
+        createMockSession({
           id: sessionId,
           name: 'Test Session',
           createdAt: new Date().toISOString(),
@@ -452,7 +464,7 @@ describe('Agent Spawning API', () => {
 
     it('should return empty array for session with no agents', async () => {
       mockSessionService.getSession.mockResolvedValueOnce(
-        createSession({
+        createMockSession({
           id: sessionId,
           name: 'Test Session',
           createdAt: new Date().toISOString(),

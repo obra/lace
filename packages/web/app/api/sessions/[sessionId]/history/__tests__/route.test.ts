@@ -32,10 +32,33 @@ const mockAgent = {
   getMainAndDelegateEvents: vi.fn(),
 };
 
-// Mock Session
-const mockSession = {
-  getAgent: vi.fn(),
-};
+// Helper to create a mock Session instance with required methods
+function createMockSession(props: { id: string; name?: string; agent?: typeof mockAgent }) {
+  return {
+    getId: () => props.id,
+    getInfo: () => ({
+      id: props.id,
+      name: props.name || 'Test Session',
+      createdAt: new Date(),
+      provider: 'anthropic',
+      model: 'claude-3-haiku',
+      agents: [],
+    }),
+    getAgents: () => [],
+    getAgent: vi.fn((threadId: string) => {
+      if (threadId === props.id && props.agent) {
+        return props.agent;
+      }
+      return null;
+    }),
+    getTaskManager: vi.fn(),
+    spawnAgent: vi.fn(),
+    startAgent: vi.fn(),
+    stopAgent: vi.fn(),
+    sendMessage: vi.fn(),
+    destroy: vi.fn(),
+  };
+}
 
 vi.mock('@/lib/server/lace-imports', () => ({
   Session: {
@@ -52,7 +75,6 @@ describe('Session History API', () => {
     // Reset mock implementations
     mockSessionService.getSession.mockReset();
     vi.mocked(Session.getById).mockReset();
-    mockSession.getAgent.mockReset();
     mockAgent.getMainAndDelegateEvents.mockReset();
   });
 
@@ -63,15 +85,12 @@ describe('Session History API', () => {
   describe('GET /api/sessions/[sessionId]/history', () => {
     it('should return conversation history for valid session', async () => {
       // Mock session exists
-      mockSessionService.getSession.mockResolvedValue({
+      const mockSession = createMockSession({
         id: 'lace_20240101_test1',
         name: 'Test Session',
-        agents: [],
+        agent: mockAgent,
       });
-
-      // Mock Session.getById returns a session with coordinator agent
-      mockSession.getAgent.mockReturnValue(mockAgent);
-      vi.mocked(Session.getById).mockResolvedValue(mockSession);
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       // Mock conversation history
       const mockThreadEvents = [
@@ -117,14 +136,12 @@ describe('Session History API', () => {
     });
 
     it('should handle tool call events', async () => {
-      mockSessionService.getSession.mockResolvedValue({
+      const mockSession = createMockSession({
         id: 'lace_20240101_test1',
         name: 'Test Session',
-        agents: [],
+        agent: mockAgent,
       });
-
-      mockSession.getAgent.mockReturnValue(mockAgent);
-      vi.mocked(Session.getById).mockResolvedValue(mockSession);
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       const mockThreadEvents = [
         {
@@ -207,14 +224,12 @@ describe('Session History API', () => {
     });
 
     it('should return empty array when no history exists', async () => {
-      mockSessionService.getSession.mockResolvedValue({
+      const mockSession = createMockSession({
         id: 'lace_20240101_test1',
         name: 'Test Session',
-        agents: [],
+        agent: mockAgent,
       });
-
-      mockSession.getAgent.mockReturnValue(mockAgent);
-      vi.mocked(Session.getById).mockResolvedValue(mockSession);
+      mockSessionService.getSession.mockResolvedValue(mockSession);
       mockAgent.getMainAndDelegateEvents.mockReturnValue([]);
 
       const request = new NextRequest('http://localhost/api/sessions/lace_20240101_test1/history');
@@ -228,14 +243,12 @@ describe('Session History API', () => {
     });
 
     it('should handle unknown event types gracefully', async () => {
-      mockSessionService.getSession.mockResolvedValue({
+      const mockSession = createMockSession({
         id: 'lace_20240101_test1',
         name: 'Test Session',
-        agents: [],
+        agent: mockAgent,
       });
-
-      mockSession.getAgent.mockReturnValue(mockAgent);
-      vi.mocked(Session.getById).mockResolvedValue(mockSession);
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       const mockThreadEvents = [
         {
