@@ -2,8 +2,8 @@
 // ABOUTME: Tests task detail viewing, editing, and note functionality
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TaskDetailModal } from '@/components/TaskDetailModal';
 import type { Task } from '@/types/api';
 
@@ -30,6 +30,10 @@ const mockTask: Task = {
 };
 
 describe('TaskDetailModal', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it('should render task details when open', () => {
     render(
       <TaskDetailModal
@@ -95,8 +99,12 @@ describe('TaskDetailModal', () => {
       />
     );
 
-    const editButton = screen.getByText('Edit');
-    fireEvent.click(editButton);
+    // Find all buttons and filter for the Edit button
+    const buttons = screen.getAllByRole('button');
+    const editButton = buttons.find(btn => btn.textContent === 'Edit');
+    if (editButton) {
+      fireEvent.click(editButton);
+    }
 
     expect(screen.getByText('Edit Task')).toBeTruthy();
     expect(screen.getByDisplayValue('Test Task')).toBeTruthy();

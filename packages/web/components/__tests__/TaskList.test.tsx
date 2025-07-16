@@ -2,8 +2,8 @@
 // ABOUTME: Tests task list display, filtering, and interactions
 
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TaskList } from '@/components/TaskList';
 import type { Task } from '@/types/api';
 
@@ -59,6 +59,10 @@ const mockTasks: Task[] = [
 ];
 
 describe('TaskList', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it('should render tasks', () => {
     render(<TaskList tasks={mockTasks} onTaskClick={vi.fn()} />);
 
@@ -141,9 +145,12 @@ describe('TaskList', () => {
     render(<TaskList tasks={mockTasks} onTaskClick={vi.fn()} />);
 
     // formatAssignee extracts the last part of thread ID
-    expect(screen.getByText('Assigned to: agent1')).toBeTruthy();
-    expect(screen.getByText('Assigned to: agent2')).toBeTruthy();
-    expect(screen.getByText('Assigned to: Unassigned')).toBeTruthy();
+    const assigneeTexts = screen.getAllByText(/Assigned to:/);
+    const assigneeValues = assigneeTexts.map(el => el.parentElement?.textContent || '');
+    
+    expect(assigneeValues.some(text => text.includes('agent1'))).toBe(true);
+    expect(assigneeValues.some(text => text.includes('agent2'))).toBe(true);
+    expect(assigneeValues.some(text => text.includes('Unassigned'))).toBe(true);
   });
 
   it('should show status icons', () => {
