@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { ThreadId } from '@/lib/server/lace-imports';
 import type { Task } from '@/types/api';
+import { UpdateTaskRequestSchema, ThreadIdSchema } from '@/lib/validation/schemas';
 
 interface RouteContext {
   params: {
@@ -60,25 +61,42 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
-    const body = (await request.json()) as {
-      sessionId?: string;
-      status?: string;
-      assignedTo?: string;
-      priority?: string;
-      title?: string;
-      description?: string;
-      prompt?: string;
-    };
-    const { sessionId, status, assignedTo, priority, title, description, prompt } = body;
     const { taskId } = context.params;
 
-    if (!sessionId) {
+    // Parse and validate request body
+    const bodyRaw: unknown = await request.json();
+
+    // Extract sessionId first for validation
+    if (!bodyRaw || typeof bodyRaw !== 'object' || !('sessionId' in bodyRaw)) {
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
     }
 
+    const { sessionId: sessionIdRaw, ...updateFields } = bodyRaw as Record<string, unknown>;
+
+    // Validate session ID
+    const sessionIdResult = ThreadIdSchema.safeParse(sessionIdRaw);
+    if (!sessionIdResult.success) {
+      return NextResponse.json({ error: 'Invalid session ID format' }, { status: 400 });
+    }
+
+    const sessionId = sessionIdResult.data;
+
+    // Validate update fields
+    const updateResult = UpdateTaskRequestSchema.safeParse(updateFields);
+    if (!updateResult.success) {
+      return NextResponse.json(
+        {
+          error: updateResult.error.errors[0]?.message || 'Invalid update fields',
+        },
+        { status: 400 }
+      );
+    }
+
+    const updates = updateResult.data;
+
     // Get session
     const sessionService = getSessionService();
-    const session = await sessionService.getSession(sessionId as ThreadId);
+    const session = await sessionService.getSession(sessionId);
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
@@ -86,25 +104,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const taskManager = session.getTaskManager();
 
-    // Build updates object - only include defined fields
-    const updates = {
-      ...(status !== undefined && { status }),
-      ...(assignedTo !== undefined && { assignedTo }),
-      ...(priority !== undefined && { priority }),
-      ...(title !== undefined && { title }),
-      ...(description !== undefined && { description }),
-      ...(prompt !== undefined && { prompt }),
-    };
-
     // Update task with human context
-    const task = await taskManager.updateTask(
-      taskId,
-      updates as Parameters<typeof taskManager.updateTask>[1],
-      {
-        actor: 'human',
-        isHuman: true,
-      }
-    );
+    const task = await taskManager.updateTask(taskId, updates, {
+      actor: 'human',
+      isHuman: true,
+    });
 
     // Convert dates to strings for JSON serialization
     const serializedTask: Task = {

@@ -366,6 +366,7 @@ export default function Home() {
                             agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
                             selectedAgent={selectedAgent}
                             className="h-full p-4"
+                            isLoading={loading}
                           />
                         </div>
 

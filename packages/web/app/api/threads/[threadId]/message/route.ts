@@ -4,13 +4,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId, MessageRequest, MessageResponse, SessionEvent, ApiErrorResponse } from '@/types/api';
+import { MessageResponse, SessionEvent, ApiErrorResponse } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
-
-// Type guard for ThreadId
-function isValidThreadId(threadId: string): threadId is ThreadId {
-  return typeof threadId === 'string' && threadId.length > 0;
-}
+import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -24,43 +20,38 @@ export async function POST(
   try {
     const sessionService = getSessionService();
     const { threadId: threadIdParam } = await params;
-    
-    if (!isValidThreadId(threadIdParam)) {
-      const errorResponse: ApiErrorResponse = { error: 'Invalid thread ID' };
-      return NextResponse.json(errorResponse, { status: 400 });
-    }
-    
-    const threadId = threadIdParam;
 
-    // Validate thread ID format
-    if (!threadId.match(/^lace_\d{8}_[a-z0-9]+(\.\d+)?$/)) {
-      const errorResponse: ApiErrorResponse = { error: 'Invalid thread ID format' };
+    // Validate thread ID with Zod
+    const threadIdResult = ThreadIdSchema.safeParse(threadIdParam);
+    if (!threadIdResult.success) {
+      const errorResponse: ApiErrorResponse = {
+        error: threadIdResult.error.errors[0]?.message || 'Invalid thread ID format',
+      };
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
-    // Parse request body
+    const threadId = threadIdResult.data;
+
+    // Parse and validate request body with Zod
     const bodyRaw: unknown = await request.json();
+    const bodyResult = MessageRequestSchema.safeParse(bodyRaw);
 
-    // Type-safe body validation
-    if (!bodyRaw || typeof bodyRaw !== 'object' || !('message' in bodyRaw)) {
-      const errorResponse: ApiErrorResponse = { error: 'Message is required' };
+    if (!bodyResult.success) {
+      const errorResponse: ApiErrorResponse = {
+        error: bodyResult.error.errors[0]?.message || 'Invalid request body',
+      };
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
-    const body = bodyRaw as MessageRequest;
-
-    if (!body.message) {
-      const errorResponse: ApiErrorResponse = { error: 'Message is required' };
-      return NextResponse.json(errorResponse, { status: 400 });
-    }
-
-    if (typeof body.message === 'string' && body.message.trim() === '') {
-      const errorResponse: ApiErrorResponse = { error: 'Message cannot be empty' };
-      return NextResponse.json(errorResponse, { status: 400 });
-    }
+    const body = bodyResult.data;
 
     // Determine session ID (parent thread for agents, or self for sessions)
-    const sessionId = threadId.includes('.') ? (threadId.split('.')[0] as ThreadId) : threadId;
+    const sessionIdStr = threadId.includes('.') ? threadId.split('.')[0] : threadId;
+    const sessionIdResult = ThreadIdSchema.safeParse(sessionIdStr);
+    if (!sessionIdResult.success) {
+      throw new Error('Invalid session ID derived from thread ID');
+    }
+    const sessionId = sessionIdResult.data;
 
     // Get agent instance
     const agent = sessionService.getAgent(threadId);
@@ -114,7 +105,7 @@ export async function POST(
     return NextResponse.json(response, { status: 202 });
   } catch (error: unknown) {
     console.error('Error in POST /api/threads/[threadId]/message:', error);
-    
+
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     const errorResponse: ApiErrorResponse = { error: errorMessage };
     return NextResponse.json(errorResponse, { status: 500 });

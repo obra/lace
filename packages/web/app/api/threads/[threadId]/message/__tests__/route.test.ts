@@ -56,7 +56,7 @@ describe('Thread Messaging API', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Mock console methods to prevent stderr/stdout pollution during tests
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -154,7 +154,7 @@ describe('Thread Messaging API', () => {
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid thread ID format');
+      expect(data.error).toContain('Invalid thread ID format');
     });
 
     it('should handle non-existent threadId', async () => {
@@ -218,7 +218,7 @@ describe('Thread Messaging API', () => {
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Message is required');
+      expect(data.error).toBe('Message cannot be empty');
     });
 
     it('should handle missing message field', async () => {
@@ -244,7 +244,7 @@ describe('Thread Messaging API', () => {
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Message is required');
+      expect(data.error).toBe('Required');
     });
 
     it('should handle agent processing errors gracefully', async () => {
