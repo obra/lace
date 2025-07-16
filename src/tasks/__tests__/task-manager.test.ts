@@ -370,7 +370,7 @@ describe('TaskManager', () => {
         { actor: 'lace_20250714_abc123.1', isHuman: false }
       );
 
-      manager.deleteTask(task.id, { actor: 'lace_20250714_abc123.1', isHuman: false });
+      await manager.deleteTask(task.id, { actor: 'lace_20250714_abc123.1', isHuman: false });
 
       const deleted = manager.getTaskById(task.id);
       expect(deleted).toBeNull();

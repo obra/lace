@@ -298,3 +298,35 @@ The conversation builder (`buildConversationFromEvents`) is critical for debuggi
 - DEBUG: LLM payloads, tool details; INFO: Operations; WARN: Fallbacks; ERROR: Failures
 - Never log API keys or sensitive content
 - Use structured data objects with relevant metadata
+
+## Linting Rules to Follow
+
+### TypeScript ESLint Rules
+- **@typescript-eslint/no-floating-promises**: Always await promises or explicitly use `void` operator
+  - ❌ `manager.deleteTask(taskId, context);`
+  - ✅ `await manager.deleteTask(taskId, context);`
+  - ✅ `void manager.deleteTask(taskId, context);`
+
+- **@typescript-eslint/no-unsafe-assignment**: Never use `any` type without proper typing
+  - ❌ `const data = await response.json();`
+  - ✅ `const data = (await response.json()) as { error: string };`
+
+- **@typescript-eslint/no-unused-vars**: Remove unused imports and variables
+  - ❌ `import type { SessionService } from '@/lib/server/session-service';` (if not used)
+  - ✅ Only import what you actually use
+
+- **@typescript-eslint/no-explicit-any**: Avoid using `any` type
+  - ❌ `} as any;`
+  - ✅ `} as typeof TextEncoder;`
+
+### Next.js Specific Rules
+- **no-relative-import-paths**: Use absolute imports with @ prefix
+  - ❌ `import { GET } from '../route';`
+  - ✅ `import { GET } from '@/app/api/tasks/stream/route';`
+
+### Best Practices
+- Always type your JSON responses: `(await response.json()) as ResponseType`
+- Use proper type assertions instead of `any`
+- Await all async operations or mark with `void` if intentionally not awaited
+- Use absolute imports for all project files
+- Remove unused imports immediately
