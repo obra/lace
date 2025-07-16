@@ -12,6 +12,7 @@ export class SSEManager {
   private sessionStreams: Map<ThreadId, Set<ReadableStreamDefaultController<Uint8Array>>> =
     new Map();
   private encoder = new TextEncoder();
+  private readonly MAX_CONNECTIONS_PER_SESSION = 10;
 
   private constructor() {}
 
@@ -29,7 +30,17 @@ export class SSEManager {
     if (!this.sessionStreams.has(sessionId)) {
       this.sessionStreams.set(sessionId, new Set());
     }
-    this.sessionStreams.get(sessionId)!.add(controller);
+
+    const controllers = this.sessionStreams.get(sessionId)!;
+
+    // Check connection limit
+    if (controllers.size >= this.MAX_CONNECTIONS_PER_SESSION) {
+      throw new Error(
+        `Maximum connections (${this.MAX_CONNECTIONS_PER_SESSION}) reached for session`
+      );
+    }
+
+    controllers.add(controller);
   }
 
   removeConnection(

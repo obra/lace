@@ -173,7 +173,7 @@ export function ToolApprovalModal({ request, onDecision, onTimeout }: ToolApprov
             <span className="text-xs text-blue-200 ml-2">[S]</span>
           </button>
           <button
-            onClick={() => onDecision('deny')}
+            onClick={() => onDecision(ApprovalDecision.DENY)}
             className="flex-1 px-4 py-3 bg-red-600 rounded hover:bg-red-700 font-medium transition-colors"
           >
             Deny

@@ -23,12 +23,12 @@ export async function GET(
   try {
     const sessionService = getSessionService();
     const { sessionId: sessionIdParam } = await params;
-    
+
     if (!isValidThreadId(sessionIdParam)) {
       const errorResponse: ApiErrorResponse = { error: 'Invalid session ID' };
       return NextResponse.json(errorResponse, { status: 400 });
     }
-    
+
     const sessionId = sessionIdParam;
 
     // Verify session exists
@@ -64,7 +64,17 @@ export async function GET(
         );
 
         // Register this stream with SSE manager
-        sseManager.addConnection(sessionId, controller);
+        try {
+          sseManager.addConnection(sessionId, controller);
+        } catch (error) {
+          // Connection limit reached
+          const errorMsg = error instanceof Error ? error.message : 'Connection limit reached';
+          controller.enqueue(
+            encoder.encode(`event: error\ndata: ${JSON.stringify({ error: errorMsg })}\n\n`)
+          );
+          controller.close();
+          return;
+        }
 
         // Send heartbeat every 30 seconds
         const heartbeat = setInterval(() => {
@@ -95,7 +105,7 @@ export async function GET(
     });
   } catch (error: unknown) {
     console.error('Error in GET /api/sessions/[sessionId]/events/stream:', error);
-    
+
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     const errorResponse: ApiErrorResponse = { error: errorMessage };
     return NextResponse.json(errorResponse, { status: 500 });

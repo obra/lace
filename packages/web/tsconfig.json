@@ -1,5 +1,4 @@
 {
-  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "plugins": [
       {
@@ -9,8 +8,12 @@
     "baseUrl": ".",
     "rootDir": ".",
     "paths": {
-      "@/*": ["./*"],
-      "~/*": ["../../src/*"]
+      "@/*": [
+        "./*"
+      ],
+      "~/*": [
+        "../../src/*"
+      ]
     },
     "lib": [
       "dom",
@@ -31,7 +34,12 @@
     "noPropertyAccessFromIndexSignature": true,
     "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    "target": "ES2017",
+    "skipLibCheck": true,
+    "module": "esnext",
+    "esModuleInterop": true,
+    "moduleResolution": "node"
   },
   "include": [
     "next-env.d.ts",

@@ -29,11 +29,9 @@ export function useSSEStream(sessionId: ThreadId | null) {
 
       eventSource.onopen = () => {
         setState((prev) => ({ ...prev, connected: true, error: null }));
-        console.log('SSE connection established');
       };
 
-      eventSource.onerror = (error) => {
-        console.error('SSE connection error:', error);
+      eventSource.onerror = () => {
         setState((prev) => ({ ...prev, connected: false, error: 'Connection lost' }));
 
         // Attempt reconnection after delay
@@ -46,9 +44,8 @@ export function useSSEStream(sessionId: ThreadId | null) {
       };
 
       // Handle connection event
-      eventSource.addEventListener('connection', (event) => {
-        const data = JSON.parse(event.data);
-        console.log('Connection event:', data);
+      eventSource.addEventListener('connection', () => {
+        // Connection established, no action needed
       });
 
       // Handle all event types
@@ -63,16 +60,15 @@ export function useSSEStream(sessionId: ThreadId | null) {
       ];
 
       eventTypes.forEach((eventType) => {
-        eventSource.addEventListener(eventType, (event) => {
-          const eventData: SessionEvent = JSON.parse(event.data);
+        eventSource.addEventListener(eventType, (event: MessageEvent) => {
+          const eventData = JSON.parse(event.data as string) as SessionEvent;
           setState((prev) => ({
             ...prev,
             events: [...prev.events, eventData],
           }));
         });
       });
-    } catch (error) {
-      console.error('Failed to create SSE connection:', error);
+    } catch (_error) {
       setState((prev) => ({
         ...prev,
         connected: false,
