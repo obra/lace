@@ -42,13 +42,13 @@ export default [
       'no-console': ['error', { allow: ['warn', 'error'] }],
       'no-relative-import-paths/no-relative-import-paths': [
         'error',
-        { allowSameFolder: false, rootDir: '.', prefix: '~' }
+        { allowSameFolder: false, rootDir: '.', prefix: '@' }
       ],
       'no-restricted-imports': ['error', {
         patterns: [
           {
             group: ['../*'],
-            message: 'Use ~ alias instead of relative parent imports'
+            message: 'Use @ alias instead of relative parent imports'
           }
         ]
       }],

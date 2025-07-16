@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start -p 3005",
     "lint": "next lint",
+    "format": "prettier --write",
     "test": "vitest",
     "test:run": "vitest run"
   },

@@ -5,11 +5,13 @@ This directory contains both unit/integration tests and true end-to-end tests us
 ## Test Files
 
 ### Unit/Integration Tests (Vitest)
+
 - `web-ui.test.ts` - Tests SessionService and backend logic
 - `api-endpoints.test.ts` - Tests API endpoints
 - `sse-integration.test.ts` - Tests server-sent events
 
 ### Playwright Tests (Separate Test Runner)
+
 - `web-ui.e2e.ts` - End-to-end browser tests with Playwright
   - **Note**: This test is excluded from the regular Vitest test suite
   - Run with: `npx playwright test` (requires web server to be running)
@@ -17,6 +19,7 @@ This directory contains both unit/integration tests and true end-to-end tests us
 ## Running Tests
 
 ### Unit/Integration Tests
+
 ```bash
 # Run all tests
 npm test
@@ -26,6 +29,7 @@ npm test web-ui.test.ts
 ```
 
 ### Playwright E2E Tests
+
 ```bash
 # Run E2E tests headless
 npm run test:e2e
@@ -45,30 +49,35 @@ npm run test:e2e:debug
 The Playwright tests cover the complete user workflow:
 
 ### Session Management
+
 - Create new sessions
 - List existing sessions
 - Session persistence across page refreshes
 - Session restoration from database
 
 ### Agent Management
+
 - Coordinator agent creation (automatic)
 - Agent spawning
 - Agent switching
 - Agent state management
 
 ### Conversation Flow
+
 - Send messages to agents
 - Receive agent responses
 - Real-time updates via SSE
 - Conversation history display
 
 ### Session Restoration
+
 - Load conversation history after page refresh
 - Continue conversations from where they left off
 - Proper agent state restoration
 - Full conversational context loading
 
 ### Error Handling
+
 - Agent startup errors
 - Network failures
 - Graceful degradation
