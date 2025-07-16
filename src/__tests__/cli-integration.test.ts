@@ -71,8 +71,8 @@ describe('CLI Orchestration', () => {
   });
 
   describe('argument parsing integration', () => {
-    it('should parse all CLI arguments correctly', async () => {
-      const result = await parseArgs([
+    it('should parse all CLI arguments correctly', () => {
+      const result = parseArgs([
         '--provider',
         'lmstudio',
         '--log-level',

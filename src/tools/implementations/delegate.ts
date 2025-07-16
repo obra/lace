@@ -87,7 +87,7 @@ Examples:
 
     try {
       // Create provider for subagent
-      const provider = await this.createProvider(providerName, modelName, expected_response);
+      const provider = this.createProvider(providerName, modelName, expected_response);
       if (!provider) {
         return this.createError(`Unknown provider: ${providerName}`);
       }
@@ -200,11 +200,11 @@ Examples:
     }
   }
 
-  private async createProvider(
+  private createProvider(
     providerName: string,
     modelName: string,
     expectedResponse: string
-  ): Promise<AIProvider | null> {
+  ): AIProvider | null {
     // Create system prompt for subagent
     const systemPrompt = `You are a focused task assistant. You have been delegated a specific task by another agent.
 
@@ -221,8 +221,8 @@ Expected response format: ${expectedResponse}
 IMPORTANT: Once you have gathered enough information to provide the expected response, STOP using tools and give your final answer. Do not continue exploring or gathering more data indefinitely.`;
 
     try {
-      const registry = await ProviderRegistry.createWithAutoDiscovery();
-      return await registry.createProvider(providerName, {
+      const registry = ProviderRegistry.createWithAutoDiscovery();
+      return registry.createProvider(providerName, {
         model: modelName,
         systemPrompt,
         maxTokens: 4000,

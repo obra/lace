@@ -30,6 +30,23 @@ export interface ProviderResponse {
   };
 }
 
+export interface ModelInfo {
+  id: string; // Model identifier
+  displayName: string; // Human-friendly name
+  description?: string; // Model description
+  contextWindow: number; // Max context size
+  maxOutputTokens: number; // Max completion tokens
+  capabilities?: string[]; // e.g., ['vision', 'function-calling']
+  isDefault?: boolean; // Default model for this provider
+}
+
+export interface ProviderInfo {
+  name: string; // Provider identifier
+  displayName: string; // Human-friendly name
+  requiresApiKey: boolean; // Needs API key vs local
+  configurationHint?: string; // How to configure
+}
+
 export abstract class AIProvider extends EventEmitter {
   protected readonly _config: ProviderConfig;
   protected _systemPrompt: string = '';
@@ -160,6 +177,13 @@ export abstract class AIProvider extends EventEmitter {
   get modelName(): string {
     return this._config.model || this.defaultModel;
   }
+
+  // Provider metadata - must be implemented by each provider
+  abstract getProviderInfo(): ProviderInfo;
+  abstract getAvailableModels(): ModelInfo[];
+
+  // Check if provider is properly configured
+  abstract isConfigured(): boolean;
 
   // Model capability getters - providers should override based on their models
   get contextWindow(): number {

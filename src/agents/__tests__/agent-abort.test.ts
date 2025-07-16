@@ -3,14 +3,14 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, AgentConfig, CurrentTurnMetrics } from '~/agents/agent';
-import { AIProvider } from '~/providers/base-provider';
+import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 
 // Mock provider for testing that can simulate abort behavior
-class MockAbortableProvider extends AIProvider {
+class MockAbortableProvider extends BaseMockProvider {
   private mockResponse: ProviderResponse;
   private delay: number;
 

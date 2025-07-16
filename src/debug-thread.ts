@@ -42,7 +42,7 @@ interface ThreadDebugInfo {
   rawEvents: unknown[];
 }
 
-async function debugThread(options: DebugOptions): Promise<ThreadDebugInfo> {
+function debugThread(options: DebugOptions): ThreadDebugInfo {
   // Load environment variables
   loadEnvFile();
 
@@ -61,7 +61,7 @@ async function debugThread(options: DebugOptions): Promise<ThreadDebugInfo> {
   const canonicalId = threadManager.getCanonicalId(options.threadId);
 
   // Initialize provider registry and get provider
-  const registry = await ProviderRegistry.createWithAutoDiscovery();
+  const registry = ProviderRegistry.createWithAutoDiscovery();
   const provider = registry.getProvider(options.provider);
   if (!provider) {
     throw new Error(`Provider ${options.provider} not found`);
@@ -315,7 +315,7 @@ async function main() {
   const options = program.opts();
 
   try {
-    const debugInfo = await debugThread(options as DebugOptions);
+    const debugInfo = debugThread(options as DebugOptions);
 
     let output: string;
     if (options.format === 'json') {

@@ -8,12 +8,13 @@ import * as os from 'os';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
-import { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { Tool } from '~/tools/tool';
 import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy';
 
 // Mock provider for testing
-class MockProvider extends AIProvider {
+class MockProvider extends BaseMockProvider {
   private mockResponse: ProviderResponse = {
     content: 'I understand.',
     toolCalls: [],

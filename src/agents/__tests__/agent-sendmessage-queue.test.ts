@@ -3,7 +3,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Agent } from '~/agents/agent';
-import { AIProvider } from '~/providers/base-provider';
+import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
@@ -16,7 +16,7 @@ type AgentWithPrivateMethods = {
 };
 
 // Mock provider for testing
-class MockProvider extends AIProvider {
+class MockProvider extends BaseMockProvider {
   constructor() {
     super({});
   }

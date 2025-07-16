@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { z } from 'zod';
 import { Agent, AgentConfig, CurrentTurnMetrics } from '~/agents/agent';
-import { AIProvider } from '~/providers/base-provider';
+import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolResult } from '~/tools/types';
@@ -12,7 +12,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 
 // Mock provider with configurable token usage
-class MockTokenProvider extends AIProvider {
+class MockTokenProvider extends BaseMockProvider {
   private mockResponse: ProviderResponse;
   private delay: number;
   private shouldReturnUsage: boolean;

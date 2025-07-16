@@ -3,14 +3,14 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent';
-import { AIProvider } from '~/providers/base-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
+import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 
 // Mock provider with configurable delay for testing long operations
-class LongOperationProvider extends AIProvider {
+class LongOperationProvider extends BaseMockProvider {
   constructor(private delayMs: number = 1000) {
     super({});
   }

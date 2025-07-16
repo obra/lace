@@ -3,7 +3,13 @@
 
 import { Ollama, ChatResponse, Tool as OllamaTool } from 'ollama';
 import { AIProvider } from '~/providers/base-provider';
-import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
+import {
+  ProviderMessage,
+  ProviderResponse,
+  ProviderConfig,
+  ProviderInfo,
+  ModelInfo,
+} from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 
@@ -456,5 +462,66 @@ export class OllamaProvider extends AIProvider {
     finalMessage: OllamaMessage | null
   ): { tokensPerSecond?: number; timeToFirstToken?: number; totalDuration?: number } | undefined {
     return finalMessage ? this._extractPerformance(finalMessage) : undefined;
+  }
+
+  getProviderInfo(): ProviderInfo {
+    return {
+      name: 'ollama',
+      displayName: 'Ollama',
+      requiresApiKey: false,
+      configurationHint: 'Ensure Ollama is running on localhost:11434',
+    };
+  }
+
+  getAvailableModels(): ModelInfo[] {
+    // Common Ollama models - actual list depends on what's pulled
+    return [
+      {
+        id: 'llama3.1:latest',
+        displayName: 'Llama 3.1',
+        description: "Meta's latest Llama model",
+        contextWindow: 128000,
+        maxOutputTokens: 4096,
+        capabilities: ['function-calling'],
+        isDefault: true,
+      },
+      {
+        id: 'qwen2.5-coder:latest',
+        displayName: 'Qwen 2.5 Coder',
+        description: "Alibaba's coding-focused model",
+        contextWindow: 32768,
+        maxOutputTokens: 4096,
+        capabilities: ['function-calling'],
+      },
+      {
+        id: 'deepseek-coder-v2:latest',
+        displayName: 'DeepSeek Coder V2',
+        description: 'Specialized coding model',
+        contextWindow: 16384,
+        maxOutputTokens: 4096,
+        capabilities: ['function-calling'],
+      },
+      {
+        id: 'mistral:latest',
+        displayName: 'Mistral',
+        description: 'Efficient open model',
+        contextWindow: 8192,
+        maxOutputTokens: 4096,
+        capabilities: [],
+      },
+      {
+        id: 'codellama:latest',
+        displayName: 'Code Llama',
+        description: "Meta's code-specialized model",
+        contextWindow: 16384,
+        maxOutputTokens: 4096,
+        capabilities: [],
+      },
+    ];
+  }
+
+  isConfigured(): boolean {
+    // Ollama just needs to be running - no API key required
+    return true;
   }
 }

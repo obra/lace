@@ -3,15 +3,16 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, AgentConfig, AgentState } from '~/agents/agent';
-import { AIProvider } from '~/providers/base-provider';
+import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
 import { ToolCall, ToolResult, ToolContext } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
+import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
 import { ThreadManager } from '~/threads/thread-manager';
 
 // Mock provider for testing
-class MockProvider extends AIProvider {
+class MockProvider extends BaseMockProvider {
   private mockResponse: ProviderResponse;
 
   constructor(mockResponse: ProviderResponse) {
@@ -67,8 +68,14 @@ describe('Enhanced Agent', () => {
       toolCalls: [],
     });
 
+    // Create approval callback that auto-approves for tests
+    const autoApprovalCallback: ApprovalCallback = {
+      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
+    };
+
     toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
+    toolExecutor.setApprovalCallback(autoApprovalCallback);
     threadManager = new ThreadManager(':memory:');
     threadId = 'test_thread_123';
     threadManager.createThread(threadId);
@@ -1052,6 +1059,9 @@ describe('Enhanced Agent', () => {
 
       const toolExecutor = new ToolExecutor();
       toolExecutor.registerTool(mockTool.name, mockTool);
+      toolExecutor.setApprovalCallback({
+        requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
+      });
 
       agent = createAgent({ provider: mockProvider, tools: [mockTool], toolExecutor });
       await agent.start();

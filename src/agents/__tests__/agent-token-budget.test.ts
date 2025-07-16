@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Agent, AgentConfig } from '~/agents/agent';
-import { AIProvider } from '~/providers/base-provider';
+import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
@@ -11,7 +11,7 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { BudgetStatus, BudgetRecommendations } from '~/token-management/types';
 
 // Mock provider for testing token budget integration
-class MockProvider extends AIProvider {
+class MockProvider extends BaseMockProvider {
   private mockResponse: ProviderResponse;
 
   constructor() {

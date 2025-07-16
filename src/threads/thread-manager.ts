@@ -1,11 +1,11 @@
-// ABOUTME: Enhanced thread management with SQLite persistence support
+// ABOUTME: Tthread management with SQLite persistence support - PRIVATE AND INTERNAL. ONLY ACCESS THROUGH AGENT
 // ABOUTME: Maintains backward compatibility with immediate event persistence
 
 import { DatabasePersistence } from '~/persistence/database';
 import { Thread, ThreadEvent, EventType } from '~/threads/types';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { logger } from '~/utils/logger';
-import { SummarizeStrategy } from '~/threads/compaction/index';
+import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy';
 import { estimateTokens } from '~/utils/token-estimation';
 import { AIProvider } from '~/providers/base-provider';
 
@@ -96,6 +96,28 @@ export class ThreadManager {
     return thread;
   }
 
+  // Create thread with metadata for session management
+  createThreadWithMetadata(threadId: string, metadata: Thread['metadata']): Thread {
+    const thread: Thread = {
+      id: threadId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      events: [],
+      metadata,
+    };
+
+    this._currentThread = thread;
+
+    // Save thread to database immediately
+    try {
+      this._persistence.saveThread(thread);
+    } catch (error) {
+      logger.error('Failed to save thread with metadata', { threadId, error });
+    }
+
+    return thread;
+  }
+
   // Create a delegate thread for the given parent without making it current
   createDelegateThreadFor(parentThreadId: string): Thread {
     const delegateThreadId = this.generateDelegateThreadId(parentThreadId);
@@ -172,7 +194,7 @@ export class ThreadManager {
     allEvents.push(...this.getEvents(mainThreadId));
 
     // Get delegate thread events
-    const delegateThreads = this.getDelegateThreadsFor(mainThreadId);
+    const delegateThreads = this.getThreadsForSession(mainThreadId);
     for (const delegateThreadId of delegateThreads) {
       const delegateEvents = this._persistence.loadEvents(delegateThreadId);
       allEvents.push(...delegateEvents);
@@ -182,9 +204,14 @@ export class ThreadManager {
     return allEvents.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
   }
 
-  private getDelegateThreadsFor(mainThreadId: string): string[] {
+  getThreadsForSession(sessionId: string): string[] {
     // Use the persistence layer's SQL-based filtering instead
-    return this._persistence.getDelegateThreadsFor(mainThreadId);
+    return this._persistence.getDelegateThreadsFor(sessionId);
+  }
+
+  // Get all threads with metadata for session management
+  getAllThreadsWithMetadata(): Thread[] {
+    return this._persistence.getAllThreadsWithMetadata();
   }
 
   compact(threadId: string): void {
@@ -276,6 +303,14 @@ export class ThreadManager {
     if (!this._currentThread) return;
 
     this._persistence.saveThread(this._currentThread);
+  }
+
+  saveThread(thread: Thread): void {
+    try {
+      this._persistence.saveThread(thread);
+    } catch (error) {
+      logger.error('Failed to save thread', { threadId: thread.id, error });
+    }
   }
 
   setCurrentThread(threadId: string): void {

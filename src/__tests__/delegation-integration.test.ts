@@ -8,6 +8,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { BashTool } from '~/tools/implementations/bash';
 import { TestProvider } from '~/__tests__/utils/test-provider';
+import { logger } from '~/utils/logger';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -170,7 +171,7 @@ describe('Delegation Integration Tests', () => {
     // Mock the DelegateTool's createProvider method to return our test provider
     const createProviderSpy = vi
       .spyOn(delegateToolInstance as any, 'createProvider')
-      .mockResolvedValue(mockProvider);
+      .mockReturnValue(mockProvider);
 
     await agent.start();
 
@@ -193,6 +194,9 @@ describe('Delegation Integration Tests', () => {
     };
     const result = await delegateToolInstance.execute(toolCall.arguments);
 
+    if (result.isError) {
+      logger.error('Delegation failed', { content: result.content });
+    }
     expect(result.isError).toBe(false);
 
     // Check that delegate thread was created

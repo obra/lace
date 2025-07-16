@@ -5,8 +5,8 @@ import { describe, it, expect } from 'vitest';
 import { ProviderRegistry } from '~/providers/registry';
 
 describe('Dynamic Help Text Generation', () => {
-  it('should generate help text with all auto-discovered providers', async () => {
-    const registry = await ProviderRegistry.createWithAutoDiscovery();
+  it('should generate help text with all auto-discovered providers', () => {
+    const registry = ProviderRegistry.createWithAutoDiscovery();
     const availableProviders = registry.getProviderNames();
 
     // Function to generate dynamic help text for provider option
@@ -28,8 +28,8 @@ describe('Dynamic Help Text Generation', () => {
     expect(helpText).toContain('(default)');
   });
 
-  it('should handle dynamic provider lists in help generation', async () => {
-    const registry = await ProviderRegistry.createWithAutoDiscovery();
+  it('should handle dynamic provider lists in help generation', () => {
+    const registry = ProviderRegistry.createWithAutoDiscovery();
     const providers = registry.getProviderNames();
 
     // Test that help text adapts to provider list changes
@@ -54,8 +54,8 @@ describe('Dynamic Help Text Generation', () => {
     expect(extendedHelpText).toContain('anthropic');
   });
 
-  it('should format provider list consistently', async () => {
-    const registry = await ProviderRegistry.createWithAutoDiscovery();
+  it('should format provider list consistently', () => {
+    const registry = ProviderRegistry.createWithAutoDiscovery();
     const providers = registry.getProviderNames();
 
     const formatProviderList = (providerList: string[]): string => {
@@ -81,10 +81,10 @@ describe('Dynamic Help Text Generation', () => {
     expect(formatProviderList(['a', 'b', 'c'])).toBe('"a", "b", or "c"');
   });
 
-  it('should generate dynamic help text in showHelp function', async () => {
+  it('should generate dynamic help text in showHelp function', () => {
     // The actual showHelp function works correctly as seen in test output
     // This test verifies the getProviderHelpText functionality works
-    const registry = await ProviderRegistry.createWithAutoDiscovery();
+    const registry = ProviderRegistry.createWithAutoDiscovery();
     const providers = registry.getProviderNames().sort();
     const defaultProvider = 'anthropic';
     const otherProviders = providers.filter((p) => p !== defaultProvider);

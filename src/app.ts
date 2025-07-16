@@ -15,10 +15,10 @@ import { enableTrafficLogging } from '~/utils/traffic-logger';
 import { getEnvVar } from '~/config/env-loader';
 import { ProviderRegistry } from '~/providers/registry';
 
-export async function createProvider(providerType: string, model?: string): Promise<AIProvider> {
+export function createProvider(providerType: string, model?: string): AIProvider {
   try {
-    const registry = await ProviderRegistry.createWithAutoDiscovery();
-    return await registry.createProvider(providerType, { model });
+    const registry = ProviderRegistry.createWithAutoDiscovery();
+    return registry.createProvider(providerType, { model });
   } catch (error) {
     if (error instanceof Error && error.message.includes('environment variable required')) {
       console.error(`Error: ${error.message}`);
@@ -47,15 +47,11 @@ async function initializeServices(options: CLIOptions) {
   });
 }
 
-async function setupAgent(
-  options: CLIOptions,
-  threadId: string,
-  threadManager: ThreadManager
-): Promise<Agent> {
+function setupAgent(options: CLIOptions, threadId: string, threadManager: ThreadManager): Agent {
   const toolExecutor = new ToolExecutor();
   toolExecutor.registerAllAvailableTools();
 
-  const provider = await createProvider(options.provider, options.model);
+  const provider = createProvider(options.provider, options.model);
   const agent = new Agent({
     provider,
     toolExecutor,
@@ -106,7 +102,7 @@ export async function run(options: CLIOptions): Promise<void> {
   // Create a temporary agent to handle session resumption
   const tempThreadId = threadManager.generateThreadId();
   threadManager.createThread(tempThreadId);
-  const agent = await setupAgent(options, tempThreadId, threadManager);
+  const agent = setupAgent(options, tempThreadId, threadManager);
 
   // Use Agent to handle session resumption with automatic replay
   handleSessionWithAgent(agent, options.continue);
@@ -117,7 +113,7 @@ export async function run(options: CLIOptions): Promise<void> {
     process.exit(0);
   }
 
-  const { TerminalInterface } = await import('./interfaces/terminal/terminal-interface');
+  const { TerminalInterface } = await import('~/interfaces/terminal/terminal-interface');
   const cli = new TerminalInterface(agent);
 
   const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);

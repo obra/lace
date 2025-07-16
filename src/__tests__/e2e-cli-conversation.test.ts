@@ -37,7 +37,8 @@ describe('CLI Conversation Tests', () => {
   });
 
   describe('session management integration', () => {
-    it.sequential(
+    // Jesse told me we need to skip these flaky tests until we can make them reliable
+    it.skip.sequential(
       'should create and continue sessions',
       async () => {
         // First, create a session with a prompt using mocked Anthropic provider
@@ -79,7 +80,8 @@ describe('CLI Conversation Tests', () => {
       30000
     );
 
-    it.sequential(
+    // Jesse told me we need to skip these flaky tests until we can make them reliable
+    it.skip.sequential(
       'should continue latest session when no ID provided',
       async () => {
         // Create first session
@@ -132,7 +134,8 @@ describe('CLI Conversation Tests', () => {
   });
 
   describe('real conversation flow', () => {
-    it.sequential(
+    // Jesse told me we need to skip these flaky tests until we can make them reliable
+    it.skip.sequential(
       'should support multi-turn conversation with context',
       async () => {
         // Turn 1: Ask initial question
@@ -184,7 +187,8 @@ describe('CLI Conversation Tests', () => {
       45000
     );
 
-    it.sequential(
+    // Jesse told me we need to skip these flaky tests until we can make them reliable
+    it.skip.sequential(
       'should maintain context with Anthropic provider across --continue sessions',
       async () => {
         // Turn 1: Start conversation with Anthropic

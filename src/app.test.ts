@@ -12,48 +12,82 @@ import { getEnvVar } from '~/config/env-loader';
 import { enableTrafficLogging } from '~/utils/traffic-logger';
 import { logger } from '~/utils/logger';
 import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
-import { TerminalInterface } from '~/interfaces/terminal/terminal-interface';
+// Don't import TerminalInterface at top level - it loads React/Ink
 import { createGlobalPolicyCallback } from '~/tools/policy-wrapper';
 import { OllamaProvider } from '~/providers/ollama-provider';
 import { withConsoleCapture } from '~/__tests__/setup/console-capture';
 
 // Mock external dependencies at the module level
-vi.mock('./agents/agent.js');
-vi.mock('./threads/thread-manager.js');
-vi.mock('./tools/executor.js');
-vi.mock('./config/lace-dir.js', () => ({
+vi.mock('~/agents/agent');
+vi.mock('~/threads/thread-manager');
+vi.mock('~/tools/executor');
+vi.mock('~/config/lace-dir', () => ({
   getLaceDbPath: vi.fn(() => '/mock/db/path'),
 }));
-vi.mock('./config/env-loader.js');
-vi.mock('./utils/logger.js');
-vi.mock('./utils/traffic-logger.js');
-vi.mock('./interfaces/non-interactive-interface.js');
-vi.mock('./interfaces/terminal/terminal-interface.js');
-vi.mock('./tools/policy-wrapper.js');
+vi.mock('~/config/env-loader');
+vi.mock('~/utils/logger');
+vi.mock('~/utils/traffic-logger');
+vi.mock('~/interfaces/non-interactive-interface', () => ({
+  NonInteractiveInterface: vi.fn(() => ({
+    executePrompt: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
+vi.mock('~/interfaces/terminal/terminal-interface', () => ({
+  TerminalInterface: vi.fn(() => ({
+    startInteractive: vi.fn().mockResolvedValue(undefined),
+    stop: vi.fn().mockResolvedValue(undefined),
+    requestApproval: vi.fn(),
+  })),
+}));
+vi.mock('~/tools/policy-wrapper');
 
 // Mock providers - these need to be dynamic imports for the app.ts to work
-vi.mock('./providers/anthropic-provider.js', () => ({
+vi.mock('~/providers/anthropic-provider', () => ({
   AnthropicProvider: vi.fn(() => ({
     providerName: 'anthropic',
     cleanup: vi.fn(),
+    getProviderInfo: vi.fn(() => ({
+      name: 'anthropic',
+      displayName: 'Anthropic',
+      requiresApiKey: true,
+    })),
+    getAvailableModels: vi.fn(() => []),
+    isConfigured: vi.fn(() => true),
   })),
 }));
-vi.mock('./providers/openai-provider.js', () => ({
+vi.mock('~/providers/openai-provider', () => ({
   OpenAIProvider: vi.fn(() => ({
     providerName: 'openai',
     cleanup: vi.fn(),
+    getProviderInfo: vi.fn(() => ({ name: 'openai', displayName: 'OpenAI', requiresApiKey: true })),
+    getAvailableModels: vi.fn(() => []),
+    isConfigured: vi.fn(() => true),
   })),
 }));
-vi.mock('./providers/lmstudio-provider.js', () => ({
+vi.mock('~/providers/lmstudio-provider', () => ({
   LMStudioProvider: vi.fn(() => ({
     providerName: 'lmstudio',
     cleanup: vi.fn(),
+    getProviderInfo: vi.fn(() => ({
+      name: 'lmstudio',
+      displayName: 'LM Studio',
+      requiresApiKey: false,
+    })),
+    getAvailableModels: vi.fn(() => []),
+    isConfigured: vi.fn(() => true),
   })),
 }));
-vi.mock('./providers/ollama-provider.js', () => ({
+vi.mock('~/providers/ollama-provider', () => ({
   OllamaProvider: vi.fn(() => ({
     providerName: 'ollama',
     cleanup: vi.fn(),
+    getProviderInfo: vi.fn(() => ({
+      name: 'ollama',
+      displayName: 'Ollama',
+      requiresApiKey: false,
+    })),
+    getAvailableModels: vi.fn(() => []),
+    isConfigured: vi.fn(() => true),
   })),
 }));
 
@@ -154,8 +188,7 @@ describe('App Initialization (run function)', () => {
       // Mock process.exit to prevent actual exit during tests
     }) as never);
 
-    // Mock TerminalInterface.prototype.startInteractive
-    vi.mocked(TerminalInterface.prototype.startInteractive).mockResolvedValue(undefined);
+    // TerminalInterface is already mocked at module level
 
     // Mock createGlobalPolicyCallback
     vi.mocked(createGlobalPolicyCallback).mockReturnValue({
@@ -175,7 +208,7 @@ describe('App Initialization (run function)', () => {
   });
 
   it('should create an Anthropic provider with API key from env', async () => {
-    const { AnthropicProvider } = await import('./providers/anthropic-provider');
+    const { AnthropicProvider } = await import('~/providers/anthropic-provider');
     await run(mockCliOptions);
     expect(AnthropicProvider).toHaveBeenCalledWith({
       apiKey: 'mock-anthropic-key',
@@ -185,7 +218,7 @@ describe('App Initialization (run function)', () => {
 
   it('should create an OpenAI provider with API key from env', async () => {
     const options = { ...mockCliOptions, provider: 'openai', model: 'gpt-4' };
-    const { OpenAIProvider } = await import('./providers/openai-provider');
+    const { OpenAIProvider } = await import('~/providers/openai-provider');
     await run(options);
     expect(OpenAIProvider).toHaveBeenCalledWith({
       apiKey: 'mock-openai-key',
@@ -195,7 +228,7 @@ describe('App Initialization (run function)', () => {
 
   it('should create an LMstudio provider without API key', async () => {
     const options = { ...mockCliOptions, provider: 'lmstudio', model: 'local-model' };
-    const { LMStudioProvider } = await import('./providers/lmstudio-provider');
+    const { LMStudioProvider } = await import('~/providers/lmstudio-provider');
     await run(options);
     expect(LMStudioProvider).toHaveBeenCalledWith({
       model: 'local-model',
@@ -409,17 +442,21 @@ describe('App Initialization (run function)', () => {
     const options = { ...mockCliOptions, prompt: 'test prompt' };
     await run(options);
     expect(NonInteractiveInterface).toHaveBeenCalledWith(expect.any(Agent));
-    expect(vi.mocked(NonInteractiveInterface.prototype.executePrompt)).toHaveBeenCalledWith(
-      'test prompt'
-    );
+    const mockNonInteractive = vi.mocked(NonInteractiveInterface).mock.results[0]?.value as {
+      executePrompt: ReturnType<typeof vi.fn>;
+    };
+    expect(mockNonInteractive.executePrompt).toHaveBeenCalledWith('test prompt');
     expect(process.exit).toHaveBeenCalledWith(0);
   });
 
   it('should start interactive mode if no prompt is given', async () => {
-    const { TerminalInterface } = await import('./interfaces/terminal/terminal-interface');
+    const { TerminalInterface } = await import('~/interfaces/terminal/terminal-interface');
     await run(mockCliOptions);
     expect(TerminalInterface).toHaveBeenCalledWith(expect.any(Agent));
-    expect(vi.mocked(TerminalInterface.prototype.startInteractive)).toHaveBeenCalledTimes(1);
+    const mockInstance = vi.mocked(TerminalInterface).mock.results[0]?.value as {
+      startInteractive: ReturnType<typeof vi.fn>;
+    };
+    expect(mockInstance.startInteractive).toHaveBeenCalledTimes(1);
   });
 
   it('should set global policy callback on tool executor', async () => {

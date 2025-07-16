@@ -5,14 +5,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, CurrentTurnMetrics } from '~/agents/agent';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import { AIProvider } from '~/providers/base-provider';
+import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
 import { z } from 'zod';
 
 // Mock provider for controlled testing
-class MockIntegrationProvider extends AIProvider {
+class MockIntegrationProvider extends BaseMockProvider {
   private mockResponse: ProviderResponse;
   private shouldSimulateStreaming: boolean;
   private simulateSlowResponse: boolean;

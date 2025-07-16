@@ -16,6 +16,8 @@ import { TokenBudgetConfig, BudgetStatus, BudgetRecommendations } from '~/token-
 import { loadPromptConfig } from '~/config/prompts';
 import { estimateTokens } from '~/utils/token-estimation';
 import { QueuedMessage, MessageQueueStats } from '~/agents/types';
+import { ProviderRegistry } from '~/providers/registry';
+import { getLaceDbPath } from '~/config/lace-dir';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -24,6 +26,13 @@ export interface AgentConfig {
   threadId: string;
   tools: Tool[];
   tokenBudget?: TokenBudgetConfig;
+}
+
+export interface SessionConfig {
+  providerType: string;
+  model?: string;
+  name?: string;
+  dbPath?: string;
 }
 
 export interface AgentResponse {
@@ -96,6 +105,39 @@ export class Agent extends EventEmitter {
   private readonly _threadManager: ThreadManager;
   private readonly _threadId: string;
   private readonly _tools: Tool[];
+
+  /**
+   * Static factory method to create a new Agent with session infrastructure
+   * This encapsulates all the infrastructure setup (ThreadManager, ToolExecutor, etc.)
+   */
+  static createSession(config: SessionConfig): Agent {
+    // Create provider
+    const registry = ProviderRegistry.createWithAutoDiscovery();
+    const provider = registry.createProvider(config.providerType, { model: config.model });
+
+    // Create tool executor
+    const toolExecutor = new ToolExecutor();
+    toolExecutor.registerAllAvailableTools();
+
+    // Create thread manager
+    const dbPath = config.dbPath || getLaceDbPath();
+    const threadManager = new ThreadManager(dbPath);
+
+    // Create new thread
+    const sessionInfo = threadManager.resumeOrCreate();
+    const threadId = sessionInfo.threadId;
+
+    // Create agent
+    const agent = new Agent({
+      provider,
+      toolExecutor,
+      threadManager,
+      threadId,
+      tools: toolExecutor.getAllTools(),
+    });
+
+    return agent;
+  }
 
   // Public access to tool executor for interfaces
   get toolExecutor(): ToolExecutor {
@@ -1313,6 +1355,27 @@ export class Agent extends EventEmitter {
 
   createThread(threadId: string): void {
     this._threadManager.createThread(threadId);
+  }
+
+  updateThreadMetadata(metadata: Record<string, unknown>): void {
+    const thread = this._threadManager.getThread(this._threadId);
+    if (thread) {
+      thread.metadata = { ...thread.metadata, ...metadata };
+      // Update timestamp
+      thread.updatedAt = new Date();
+      // Save through ThreadManager
+      this._threadManager.saveThread(thread);
+    }
+  }
+
+  getThreadMetadata(): Record<string, unknown> | undefined {
+    const thread = this._threadManager.getThread(this._threadId);
+    return thread?.metadata;
+  }
+
+  getThreadCreatedAt(): Date | undefined {
+    const thread = this._threadManager.getThread(this._threadId);
+    return thread?.createdAt;
   }
 
   resumeOrCreateThread(threadId?: string): ThreadSessionInfo {

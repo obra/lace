@@ -11,8 +11,8 @@ describe('CLI Provider Validation', () => {
     vi.clearAllMocks();
   });
 
-  it('should accept valid providers from auto-discovery', async () => {
-    const registry = await ProviderRegistry.createWithAutoDiscovery();
+  it('should accept valid providers from auto-discovery', () => {
+    const registry = ProviderRegistry.createWithAutoDiscovery();
 
     // Should not throw for valid providers
     expect(() => validateProvider('anthropic', registry)).not.toThrow();
@@ -21,8 +21,8 @@ describe('CLI Provider Validation', () => {
     expect(() => validateProvider('ollama', registry)).not.toThrow();
   });
 
-  it('should reject invalid providers with helpful error message', async () => {
-    const registry = await ProviderRegistry.createWithAutoDiscovery();
+  it('should reject invalid providers with helpful error message', () => {
+    const registry = ProviderRegistry.createWithAutoDiscovery();
     const { error } = withConsoleCapture();
 
     const mockProcessExit = vi.spyOn(process, 'exit').mockImplementation(() => {
@@ -40,8 +40,8 @@ describe('CLI Provider Validation', () => {
     mockProcessExit.mockRestore();
   });
 
-  it('should list all available providers in error message', async () => {
-    const registry = await ProviderRegistry.createWithAutoDiscovery();
+  it('should list all available providers in error message', () => {
+    const registry = ProviderRegistry.createWithAutoDiscovery();
     const { error } = withConsoleCapture();
 
     const mockProcessExit = vi.spyOn(process, 'exit').mockImplementation(() => {
@@ -59,8 +59,8 @@ describe('CLI Provider Validation', () => {
     mockProcessExit.mockRestore();
   });
 
-  it('should validate against dynamic provider list', async () => {
-    const registry = await ProviderRegistry.createWithAutoDiscovery();
+  it('should validate against dynamic provider list', () => {
+    const registry = ProviderRegistry.createWithAutoDiscovery();
     const availableProviders = registry.getProviderNames();
 
     // All discovered providers should be valid

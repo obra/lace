@@ -7,13 +7,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, CurrentTurnMetrics } from '~/agents/agent';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import { AIProvider } from '~/providers/base-provider';
+import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { TerminalInterfaceComponent } from '~/interfaces/terminal/terminal-interface';
 
 // Mock provider for testing progress updates
-class MockProgressProvider extends AIProvider {
+class MockProgressProvider extends BaseMockProvider {
   private mockResponse: ProviderResponse;
   private shouldEmitProgressUpdates: boolean;
 

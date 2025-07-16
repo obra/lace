@@ -96,14 +96,16 @@ describe('Tool Approval System Integration', () => {
       expect(mockInterface.callLog).toHaveLength(1);
     });
 
-    it('should execute tool without approval when no callback is set', async () => {
-      // No approval callback set
+    it('should fail safely when no approval callback is set', async () => {
+      // No approval callback set - should fail safely
       const result = await toolExecutor.executeTool(
         createToolCall('bash', { command: 'echo "no approval"' })
       );
 
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('no approval');
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain(
+        'Tool execution requires approval but no approval callback is configured'
+      );
       expect(mockInterface.callLog).toHaveLength(0);
     });
   });

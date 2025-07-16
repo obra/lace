@@ -5,11 +5,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
-import { AIProvider, ProviderResponse } from '~/providers/base-provider';
+import { ProviderResponse } from '~/providers/base-provider';
 import { logger } from '~/utils/logger';
+import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 
 // Mock provider that returns predictable responses for stable testing
-class MockConversationProvider extends AIProvider {
+class MockConversationProvider extends BaseMockProvider {
   private responseMap = new Map<string, ProviderResponse>();
 
   constructor() {

@@ -3,6 +3,7 @@
 ## Key Example Patterns
 
 ### Bug Fix - Understand Root Cause First
+
 ```
 user: The tests are failing after the last commit
 
@@ -17,6 +18,7 @@ The UserService tests fail because the new validation expects email format. Upda
 ```
 
 ### Feature Implementation - Follow Existing Patterns
+
 ```
 user: Add a new API endpoint for products
 
@@ -30,6 +32,7 @@ Creating products endpoint matching your structure:
 ```
 
 ### Performance Issue - Measure and Fix
+
 ```
 user: The dashboard is loading slowly
 
@@ -44,6 +47,7 @@ Found N+1 query issue. Adding eager loading:
 ```
 
 ## Remember
+
 - Explore before acting
 - Fix the specific issue asked
 - Follow project conventions
