@@ -133,12 +133,12 @@ describe('App Initialization (run function)', () => {
         eventNames: vi.fn(),
         once: vi.fn(),
         // Agent API methods
-        resumeOrCreateThread: vi.fn().mockResolvedValue({
+        resumeOrCreateThread: vi.fn().mockReturnValue({
           threadId: 'new-thread-123',
           isResumed: false,
           resumeError: undefined,
         }),
-        getLatestThreadId: vi.fn().mockResolvedValue('latest-thread-123'),
+        getLatestThreadId: vi.fn().mockReturnValue('latest-thread-123'),
         getCurrentThreadId: vi.fn().mockReturnValue('current-thread-123'),
         generateThreadId: vi.fn().mockReturnValue('generated-thread-123'),
         createThread: vi.fn(),
@@ -280,12 +280,12 @@ describe('App Initialization (run function)', () => {
         eventNames: vi.fn(),
         once: vi.fn(),
         // Agent API methods - override for this test
-        resumeOrCreateThread: vi.fn().mockResolvedValue({
+        resumeOrCreateThread: vi.fn().mockReturnValue({
           threadId: 'specific-thread-789',
           isResumed: true,
           resumeError: undefined,
         }),
-        getLatestThreadId: vi.fn().mockResolvedValue('latest-thread-123'),
+        getLatestThreadId: vi.fn().mockReturnValue('latest-thread-123'),
         getCurrentThreadId: vi.fn().mockReturnValue('current-thread-123'),
         generateThreadId: vi.fn().mockReturnValue('generated-thread-123'),
         createThread: vi.fn(),
