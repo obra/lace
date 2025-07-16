@@ -112,7 +112,7 @@ export function TaskDashboard({ sessionId }: TaskDashboardProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Task Management</h1>
+        <h1 className="text-2xl font-bold text-gray-100">Task Management</h1>
         <button
           onClick={() => setShowCreateModal(true)}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -136,7 +136,7 @@ export function TaskDashboard({ sessionId }: TaskDashboardProps) {
       />
 
       {/* Task List */}
-      <div className="bg-white rounded-lg border p-4">
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
         <TaskList
           tasks={filteredTasks}
           onTaskClick={handleTaskClick}

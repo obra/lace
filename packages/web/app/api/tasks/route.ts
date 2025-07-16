@@ -105,19 +105,22 @@ export async function POST(request: NextRequest) {
     const taskManager = session.getTaskManager();
 
     // Create task with human context
-    const task = await taskManager.createTask(
-      {
-        title,
-        description,
-        prompt,
-        priority: priority || 'medium',
-        assignedTo,
-      },
-      {
-        actor: 'human',
-        isHuman: true,
-      }
-    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const createRequest: any = {
+      title,
+      prompt,
+      priority: priority || 'medium',
+    };
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (description) createRequest.description = description;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (assignedTo) createRequest.assignedTo = assignedTo;
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    const task = await taskManager.createTask(createRequest, {
+      actor: 'human',
+      isHuman: true,
+    });
 
     // Convert dates to strings for JSON serialization
     const serializedTask: Task = {

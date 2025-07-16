@@ -42,15 +42,15 @@ export function TaskList({
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <p className="text-red-600">Error: {error}</p>
+      <div className="p-4 bg-red-900 border border-red-700 rounded-lg">
+        <p className="text-red-400">Error: {error}</p>
       </div>
     );
   }
 
   if (sortedTasks.length === 0) {
     return (
-      <div className="text-center p-8 text-gray-500">
+      <div className="text-center p-8 text-gray-400">
         <p>No tasks found</p>
       </div>
     );

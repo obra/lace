@@ -15,6 +15,7 @@ import { isApiError } from '@/types/api';
 import { ConversationDisplay } from '@/components/ConversationDisplay';
 import { ToolApprovalModal } from '@/components/ToolApprovalModal';
 import { AgentSpawner } from '@/components/AgentSpawner';
+import { TaskDashboard } from '@/components/TaskDashboard';
 import { getAllEventTypes } from '@/types/events';
 
 export default function Home() {
@@ -27,6 +28,7 @@ export default function Home() {
   const [selectedAgent, setSelectedAgent] = useState<ThreadId | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [approvalRequest, setApprovalRequest] = useState<ToolApprovalRequestData | null>(null);
+  const [activeTab, setActiveTab] = useState<'conversation' | 'tasks'>('conversation');
 
   // Load sessions on mount
   useEffect(() => {
@@ -323,45 +325,93 @@ export default function Home() {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col h-full">
-          {selectedSession && selectedAgent ? (
+          {selectedSession ? (
             <>
-              {/* Conversation Display */}
-              <div className="flex-1 overflow-hidden">
-                <ConversationDisplay
-                  events={events}
-                  agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
-                  selectedAgent={selectedAgent}
-                  className="h-full p-4"
-                />
+              {/* Tab Navigation */}
+              <div className="bg-gray-800 border-b border-gray-700">
+                <nav className="flex space-x-8 px-6">
+                  <button
+                    onClick={() => setActiveTab('conversation')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'conversation'
+                        ? 'border-blue-500 text-blue-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300'
+                    }`}
+                  >
+                    Conversation
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('tasks')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'tasks'
+                        ? 'border-blue-500 text-blue-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300'
+                    }`}
+                  >
+                    Tasks
+                  </button>
+                </nav>
               </div>
 
-              {/* Message Input at Bottom */}
-              <div className="border-t border-gray-700 p-4 bg-gray-800">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Type your message..."
-                    className="flex-1 px-4 py-2 bg-gray-700 rounded text-white"
-                    onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                    disabled={sendingMessage}
-                    data-testid="message-input"
-                  />
-                  <button
-                    onClick={sendMessage}
-                    disabled={sendingMessage || !message.trim()}
-                    className="px-6 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-                    data-testid="send-message-button"
-                  >
-                    Send
-                  </button>
-                </div>
+              {/* Tab Content */}
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {activeTab === 'conversation' ? (
+                  <>
+                    {selectedAgent ? (
+                      <>
+                        {/* Conversation Display */}
+                        <div className="flex-1 overflow-hidden">
+                          <ConversationDisplay
+                            events={events}
+                            agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
+                            selectedAgent={selectedAgent}
+                            className="h-full p-4"
+                          />
+                        </div>
+
+                        {/* Message Input at Bottom */}
+                        <div className="border-t border-gray-700 p-4 bg-gray-800">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={message}
+                              onChange={(e) => setMessage(e.target.value)}
+                              placeholder="Type your message..."
+                              className="flex-1 px-4 py-2 bg-gray-700 rounded text-white"
+                              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                              disabled={sendingMessage}
+                              data-testid="message-input"
+                            />
+                            <button
+                              onClick={sendMessage}
+                              disabled={sendingMessage || !message.trim()}
+                              className="px-6 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+                              data-testid="send-message-button"
+                            >
+                              Send
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center text-gray-400">
+                        Select an agent to start chatting
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  // Tasks Tab
+                  <div className="flex-1 overflow-y-auto bg-gray-900">
+                    <div className="max-w-7xl mx-auto p-6">
+                      <TaskDashboard sessionId={String(selectedSession)} />
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-gray-400">
-              {!selectedSession ? 'Select a session to get started' : 'Select an agent to start chatting'}
+              Select a session to get started
             </div>
           )}
         </div>

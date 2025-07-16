@@ -86,7 +86,7 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ): Promise<NextResponse> {
   try {
@@ -114,7 +114,7 @@ export async function GET(
     }
 
     // Get conversation history through the Session's coordinator agent
-    const dbPath = process.env.LACE_DB_PATH || './lace.db';
+    const dbPath = process.env['LACE_DB_PATH'] || './lace.db';
     const laceSession = await Session.getById(sessionId, dbPath);
 
     if (!laceSession) {

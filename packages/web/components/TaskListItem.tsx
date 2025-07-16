@@ -53,14 +53,14 @@ export function TaskListItem({ task, onClick, onStatusChange }: TaskListItemProp
 
   return (
     <div
-      className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+      className="border border-gray-700 rounded-lg p-4 hover:bg-gray-700 cursor-pointer transition-colors"
       onClick={() => onClick(task)}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg">{getStatusIcon(task.status)}</span>
-            <h3 className="font-medium text-gray-900">{task.title}</h3>
+            <h3 className="font-medium text-gray-100">{task.title}</h3>
             <span
               className={`px-2 py-1 rounded text-xs font-medium ${getPriorityColor(
                 task.priority
@@ -71,10 +71,10 @@ export function TaskListItem({ task, onClick, onStatusChange }: TaskListItemProp
           </div>
 
           {task.description && (
-            <p className="text-sm text-gray-600 mb-2">{task.description}</p>
+            <p className="text-sm text-gray-400 mb-2">{task.description}</p>
           )}
 
-          <div className="flex items-center gap-4 text-xs text-gray-500">
+          <div className="flex items-center gap-4 text-xs text-gray-400">
             <span>Assigned to: {formatAssignee(task.assignedTo ? String(task.assignedTo) : undefined)}</span>
             <span>Created: {formatDate(task.createdAt)}</span>
             {task.notes.length > 0 && <span>{task.notes.length} notes</span>}
@@ -91,7 +91,7 @@ export function TaskListItem({ task, onClick, onStatusChange }: TaskListItemProp
               }
             }}
             onClick={(e) => e.stopPropagation()}
-            className="ml-4 px-2 py-1 border rounded text-sm"
+            className="ml-4 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-gray-100"
           >
             <option value="pending">Pending</option>
             <option value="in_progress">In Progress</option>

@@ -26,14 +26,14 @@ export function TaskFilters({
   const hasFilters = statusFilter !== 'all' || priorityFilter !== 'all' || assigneeFilter;
 
   return (
-    <div className="bg-white rounded-lg border p-4">
+    <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Status:</label>
+          <label className="text-sm font-medium text-gray-300">Status:</label>
           <select
             value={statusFilter}
             onChange={(e) => onStatusChange(e.target.value as Task['status'] | 'all')}
-            className="px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All</option>
             <option value="pending">Pending</option>
@@ -44,11 +44,11 @@ export function TaskFilters({
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Priority:</label>
+          <label className="text-sm font-medium text-gray-300">Priority:</label>
           <select
             value={priorityFilter}
             onChange={(e) => onPriorityChange(e.target.value as Task['priority'] | 'all')}
-            className="px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All</option>
             <option value="high">High</option>
@@ -58,20 +58,20 @@ export function TaskFilters({
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Assignee:</label>
+          <label className="text-sm font-medium text-gray-300">Assignee:</label>
           <input
             type="text"
             value={assigneeFilter}
             onChange={(e) => onAssigneeChange(e.target.value)}
             placeholder="Thread ID or agent name"
-            className="px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
         {hasFilters && (
           <button
             onClick={onClearFilters}
-            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+            className="px-3 py-1 text-sm text-gray-300 hover:text-gray-200 border border-gray-600 rounded hover:bg-gray-700"
           >
             Clear Filters
           </button>
