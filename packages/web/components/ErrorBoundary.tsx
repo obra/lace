@@ -1,6 +1,8 @@
 // ABOUTME: Error boundary component to catch and display React errors gracefully
 // ABOUTME: Prevents entire app crashes and provides user-friendly error messages
 
+'use client';
+
 import React, { Component, ReactNode } from 'react';
 
 interface Props {

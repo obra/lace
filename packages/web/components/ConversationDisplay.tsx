@@ -216,7 +216,7 @@ export function ConversationDisplay({ events, agents, selectedAgent, className =
           </div>
         );
     }
-  }, [agents, selectedAgent, getAgentName]);
+  }, [getAgentName]);
 
   // Loading skeleton component
   const LoadingSkeleton = () => (

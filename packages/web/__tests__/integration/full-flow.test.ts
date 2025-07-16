@@ -60,7 +60,11 @@ describe('Full Conversation Flow', () => {
 
     const createSessionRequest = new NextRequest('http://localhost:3000/api/sessions', {
       method: 'POST',
-      body: JSON.stringify({ name: sessionName }),
+      body: JSON.stringify({
+        name: sessionName,
+        provider: 'anthropic',
+        model: 'claude-3-haiku-20240307',
+      }),
       headers: { 'Content-Type': 'application/json' },
     });
 
@@ -195,7 +199,11 @@ describe('Full Conversation Flow', () => {
     mockSessionService.createSession.mockResolvedValue(mockSession);
     const createSessionRequest = new NextRequest('http://localhost:3000/api/sessions', {
       method: 'POST',
-      body: JSON.stringify({ name: 'Multi-Agent Session' }),
+      body: JSON.stringify({
+        name: 'Multi-Agent Session',
+        provider: 'anthropic',
+        model: 'claude-3-haiku-20240307',
+      }),
       headers: { 'Content-Type': 'application/json' },
     });
     await createSession(createSessionRequest);
@@ -238,7 +246,11 @@ describe('Full Conversation Flow', () => {
       `http://localhost:3000/api/sessions/${sessionId}/agents`,
       {
         method: 'POST',
-        body: JSON.stringify({ name: 'pm' }),
+        body: JSON.stringify({
+          name: 'pm',
+          provider: 'anthropic',
+          model: 'claude-3-haiku-20240307',
+        }),
         headers: { 'Content-Type': 'application/json' },
       }
     );
@@ -319,7 +331,11 @@ describe('Full Conversation Flow', () => {
     await createSession(
       new NextRequest('http://localhost:3000/api/sessions', {
         method: 'POST',
-        body: JSON.stringify({ name: 'Session 1' }),
+        body: JSON.stringify({
+          name: 'Session 1',
+          provider: 'anthropic',
+          model: 'claude-3-haiku-20240307',
+        }),
         headers: { 'Content-Type': 'application/json' },
       })
     );
@@ -327,7 +343,11 @@ describe('Full Conversation Flow', () => {
     await createSession(
       new NextRequest('http://localhost:3000/api/sessions', {
         method: 'POST',
-        body: JSON.stringify({ name: 'Session 2' }),
+        body: JSON.stringify({
+          name: 'Session 2',
+          provider: 'anthropic',
+          model: 'claude-3-haiku-20240307',
+        }),
         headers: { 'Content-Type': 'application/json' },
       })
     );

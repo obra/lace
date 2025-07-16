@@ -82,6 +82,8 @@ describe('Session', () => {
     toolExecutor: { mock: string };
     updateThreadMetadata: ReturnType<typeof vi.fn>;
     getThreadMetadata: ReturnType<typeof vi.fn>;
+    getThreadCreatedAt: ReturnType<typeof vi.fn>;
+    removeAllListeners: ReturnType<typeof vi.fn>;
     createDelegateAgent: ReturnType<typeof vi.fn>;
     start: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
@@ -100,6 +102,7 @@ describe('Session', () => {
     start: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
     sendMessage: ReturnType<typeof vi.fn>;
+    removeAllListeners: ReturnType<typeof vi.fn>;
   }>;
   let delegateAgentCounter: number;
 
@@ -121,6 +124,8 @@ describe('Session', () => {
         provider: 'anthropic',
         isSession: true,
       }),
+      getThreadCreatedAt: vi.fn().mockReturnValue(new Date('2024-01-01')),
+      removeAllListeners: vi.fn(),
       createDelegateAgent: vi.fn().mockImplementation(() => {
         delegateAgentCounter++;
         const delegateAgent = {
@@ -137,6 +142,7 @@ describe('Session', () => {
           start: vi.fn(),
           stop: vi.fn(),
           sendMessage: vi.fn(),
+          removeAllListeners: vi.fn(),
         };
         mockDelegateAgents.push(delegateAgent);
         return delegateAgent;
