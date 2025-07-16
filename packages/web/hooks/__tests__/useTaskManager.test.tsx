@@ -11,6 +11,15 @@ import type { Task } from '@/types/api';
 // Mock the TaskAPIClient
 vi.mock('@/lib/client/task-api');
 
+// Mock EventSource for tests
+global.EventSource = vi.fn(() => ({
+  onmessage: null,
+  onerror: null,
+  close: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+})) as any;
+
 describe('useTaskManager', () => {
   let mockClient: {
     listTasks: ReturnType<typeof vi.fn>;

@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { Session, ThreadId } from '@/lib/server/lace-imports';
+import { ThreadId } from '@/lib/server/lace-imports';
 import type { TaskFilters } from '@/lib/server/lace-imports';
 import type { Task, TaskStatus, TaskPriority } from '@/types/api';
 
@@ -16,16 +16,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
     }
 
-    // Get session to verify it exists
+    // Get session
     const sessionService = getSessionService();
-    const sessionData = await sessionService.getSession(sessionId as ThreadId);
+    const session = await sessionService.getSession(sessionId as ThreadId);
 
-    if (!sessionData) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    }
-
-    // Get the actual Session instance to access TaskManager
-    const session = await Session.getById(sessionId as ThreadId);
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
@@ -88,16 +82,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Title and prompt are required' }, { status: 400 });
     }
 
-    // Get session to verify it exists
+    // Get session
     const sessionService = getSessionService();
-    const sessionData = await sessionService.getSession(sessionId as ThreadId);
+    const session = await sessionService.getSession(sessionId as ThreadId);
 
-    if (!sessionData) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    }
-
-    // Get the actual Session instance to access TaskManager
-    const session = await Session.getById(sessionId as ThreadId);
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
@@ -105,22 +93,21 @@ export async function POST(request: NextRequest) {
     const taskManager = session.getTaskManager();
 
     // Create task with human context
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const createRequest: any = {
+    const createRequest = {
       title,
       prompt,
       priority: priority || 'medium',
+      ...(description && { description }),
+      ...(assignedTo && { assignedTo }),
     };
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (description) createRequest.description = description;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (assignedTo) createRequest.assignedTo = assignedTo;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const task = await taskManager.createTask(createRequest, {
-      actor: 'human',
-      isHuman: true,
-    });
+    const task = await taskManager.createTask(
+      createRequest as Parameters<typeof taskManager.createTask>[0],
+      {
+        actor: 'human',
+        isHuman: true,
+      }
+    );
 
     // Convert dates to strings for JSON serialization
     const serializedTask: Task = {

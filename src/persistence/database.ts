@@ -860,6 +860,22 @@ export class DatabasePersistence {
     return notesMap;
   }
 
+  async deleteTask(taskId: string): Promise<void> {
+    return this.withRetry(() => {
+      if (this._closed || this._disabled || !this.db) return;
+
+      const stmt = this.db.prepare(`
+        DELETE FROM tasks WHERE id = ?
+      `);
+
+      const result = stmt.run(taskId);
+
+      if (result.changes === 0) {
+        throw new Error(`Task ${taskId} not found`);
+      }
+    });
+  }
+
   // Retry wrapper for write operations to handle SQLITE_BUSY
   private async withRetry<T>(operation: () => T, maxRetries = 3): Promise<T> {
     let lastError: unknown;

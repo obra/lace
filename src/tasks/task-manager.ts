@@ -1,15 +1,18 @@
 // ABOUTME: Core task management system for session-scoped task operations
 // ABOUTME: Provides CRUD operations, filtering, and note management for tasks
 
+import { EventEmitter } from 'events';
 import { DatabasePersistence } from '~/persistence/database';
 import { Task, CreateTaskRequest, TaskFilters, TaskContext, TaskSummary } from '~/tasks/types';
 import { ThreadId, AssigneeId, asThreadId } from '~/threads/types';
 
-export class TaskManager {
+export class TaskManager extends EventEmitter {
   constructor(
     private sessionId: ThreadId,
     private persistence: DatabasePersistence
-  ) {}
+  ) {
+    super();
+  }
 
   async createTask(request: CreateTaskRequest, context: TaskContext): Promise<Task> {
     // Validate request
@@ -38,6 +41,14 @@ export class TaskManager {
 
     // Save to database
     await this.persistence.saveTask(task);
+
+    // Emit event for real-time updates
+    this.emit('task:created', {
+      type: 'task:created',
+      task,
+      context,
+      timestamp: new Date().toISOString(),
+    });
 
     return task;
   }
@@ -78,7 +89,7 @@ export class TaskManager {
     return null;
   }
 
-  async updateTask(taskId: string, updates: Partial<Task>, _context: TaskContext): Promise<Task> {
+  async updateTask(taskId: string, updates: Partial<Task>, context: TaskContext): Promise<Task> {
     // Load existing task
     const existingTask = this.getTaskById(taskId);
     if (!existingTask) {
@@ -100,6 +111,14 @@ export class TaskManager {
     // Save to database
     await this.persistence.updateTask(taskId, updates);
 
+    // Emit event for real-time updates
+    this.emit('task:updated', {
+      type: 'task:updated',
+      task: updatedTask,
+      context,
+      timestamp: new Date().toISOString(),
+    });
+
     return updatedTask;
   }
 
@@ -120,11 +139,23 @@ export class TaskManager {
     // Save to database
     await this.persistence.addNote(taskId, noteData);
 
+    // Get updated task with new note
+    const updatedTask = this.getTaskById(taskId);
+    if (updatedTask) {
+      // Emit event for real-time updates
+      this.emit('task:note_added', {
+        type: 'task:note_added',
+        task: updatedTask,
+        context,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     // Update task timestamp
     await this.updateTask(taskId, { updatedAt: new Date() }, context);
   }
 
-  deleteTask(taskId: string, _context: TaskContext): void {
+  async deleteTask(taskId: string, context: TaskContext): Promise<void> {
     // Verify task exists and belongs to this session
     const task = this.getTaskById(taskId);
     if (!task) {
@@ -132,8 +163,16 @@ export class TaskManager {
     }
 
     // Delete from database
-    // TODO: Implement deleteTask in DatabasePersistence
-    throw new Error('Delete not implemented yet');
+    await this.persistence.deleteTask(taskId);
+
+    // Emit event for real-time updates
+    this.emit('task:deleted', {
+      type: 'task:deleted',
+      taskId,
+      task,
+      context,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   getTaskSummary(): TaskSummary {

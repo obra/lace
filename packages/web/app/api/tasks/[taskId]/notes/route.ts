@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { Session, ThreadId } from '@/lib/server/lace-imports';
+import { ThreadId } from '@/lib/server/lace-imports';
 import type { Task } from '@/types/api';
 
 interface RouteContext {
@@ -30,16 +30,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Note content is required' }, { status: 400 });
     }
 
-    // Get session to verify it exists
+    // Get session
     const sessionService = getSessionService();
-    const sessionData = await sessionService.getSession(sessionId as ThreadId);
+    const session = await sessionService.getSession(sessionId as ThreadId);
 
-    if (!sessionData) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    }
-
-    // Get the actual Session instance to access TaskManager
-    const session = await Session.getById(sessionId as ThreadId);
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }

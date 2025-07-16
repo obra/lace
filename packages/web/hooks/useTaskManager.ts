@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { TaskAPIClient } from '@/lib/client/task-api';
+import { useTaskStream } from '~/../packages/web/hooks/useTaskStream';
 import type { Task } from '@/types/api';
 import type { TaskFilters, CreateTaskRequest, UpdateTaskRequest } from '@/lib/client/task-api';
 
@@ -52,6 +53,34 @@ export function useTaskManager(sessionId: string) {
       }
     }, 100);
   }, [fetchTasks]);
+
+  // Subscribe to real-time task updates
+  useTaskStream({
+    sessionId,
+    onTaskCreated: useCallback((event) => {
+      if (event.task) {
+        setTasks((prev) => [...prev, event.task]);
+      }
+    }, []),
+    onTaskUpdated: useCallback((event) => {
+      if (event.task) {
+        setTasks((prev) => prev.map((task) => (task.id === event.task.id ? event.task : task)));
+      }
+    }, []),
+    onTaskDeleted: useCallback((event) => {
+      if (event.taskId) {
+        setTasks((prev) => prev.filter((task) => task.id !== event.taskId));
+      }
+    }, []),
+    onTaskNoteAdded: useCallback((event) => {
+      if (event.task) {
+        setTasks((prev) => prev.map((task) => (task.id === event.task.id ? event.task : task)));
+      }
+    }, []),
+    onError: useCallback((error) => {
+      console.error('Task stream error:', error);
+    }, []),
+  });
 
   // Initial fetch
   useEffect(() => {

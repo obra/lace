@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { Session, ThreadId } from '@/lib/server/lace-imports';
+import { ThreadId } from '@/lib/server/lace-imports';
 import type { Task } from '@/types/api';
 
 interface RouteContext {
@@ -22,16 +22,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
     }
 
-    // Get session to verify it exists
+    // Get session
     const sessionService = getSessionService();
-    const sessionData = await sessionService.getSession(sessionId as ThreadId);
+    const session = await sessionService.getSession(sessionId as ThreadId);
 
-    if (!sessionData) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    }
-
-    // Get the actual Session instance to access TaskManager
-    const session = await Session.getById(sessionId as ThreadId);
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
@@ -82,16 +76,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
     }
 
-    // Get session to verify it exists
+    // Get session
     const sessionService = getSessionService();
-    const sessionData = await sessionService.getSession(sessionId as ThreadId);
+    const session = await sessionService.getSession(sessionId as ThreadId);
 
-    if (!sessionData) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    }
-
-    // Get the actual Session instance to access TaskManager
-    const session = await Session.getById(sessionId as ThreadId);
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
@@ -99,27 +87,24 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const taskManager = session.getTaskManager();
 
     // Build updates object - only include defined fields
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const updates: any = {};
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (status !== undefined) updates.status = status;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (assignedTo !== undefined) updates.assignedTo = assignedTo;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (priority !== undefined) updates.priority = priority;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (title !== undefined) updates.title = title;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (description !== undefined) updates.description = description;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (prompt !== undefined) updates.prompt = prompt;
+    const updates = {
+      ...(status !== undefined && { status }),
+      ...(assignedTo !== undefined && { assignedTo }),
+      ...(priority !== undefined && { priority }),
+      ...(title !== undefined && { title }),
+      ...(description !== undefined && { description }),
+      ...(prompt !== undefined && { prompt }),
+    };
 
     // Update task with human context
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const task = await taskManager.updateTask(taskId, updates, {
-      actor: 'human',
-      isHuman: true,
-    });
+    const task = await taskManager.updateTask(
+      taskId,
+      updates as Parameters<typeof taskManager.updateTask>[1],
+      {
+        actor: 'human',
+        isHuman: true,
+      }
+    );
 
     // Convert dates to strings for JSON serialization
     const serializedTask: Task = {
@@ -152,16 +137,10 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
     }
 
-    // Get session to verify it exists
+    // Get session
     const sessionService = getSessionService();
-    const sessionData = await sessionService.getSession(sessionId as ThreadId);
+    const session = await sessionService.getSession(sessionId as ThreadId);
 
-    if (!sessionData) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    }
-
-    // Get the actual Session instance to access TaskManager
-    const session = await Session.getById(sessionId as ThreadId);
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
@@ -169,7 +148,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     const taskManager = session.getTaskManager();
 
     try {
-      taskManager.deleteTask(taskId, {
+      await taskManager.deleteTask(taskId, {
         actor: 'human',
         isHuman: true,
       });

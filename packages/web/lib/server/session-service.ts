@@ -40,7 +40,7 @@ export class SessionService {
       try {
         // Start the coordinator agent
         await coordinatorAgent.start();
-        
+
         // Set up event handlers for the coordinator agent
         this.setupAgentEventHandlers(coordinatorAgent, sessionId);
       } catch (error) {
@@ -56,25 +56,8 @@ export class SessionService {
     // Store the session instance
     activeSessions.set(sessionId, session);
 
-    // Get the full session info including coordinator agent
-    const sessionInfo = session.getInfo();
-    if (!sessionInfo) {
-      throw new Error('Failed to get session info');
-    }
-
-    return {
-      id: sessionId,
-      name: sessionName,
-      createdAt: new Date().toISOString(),
-      agents: sessionInfo.agents.map((agent) => ({
-        threadId: agent.threadId,
-        name: agent.name,
-        provider: agent.provider,
-        model: agent.model,
-        status: agent.status,
-        createdAt: new Date().toISOString(),
-      })),
-    };
+    // Return metadata for API response
+    return this.sessionToMetadata(session);
   }
 
   async listSessions(): Promise<SessionType[]> {
@@ -110,40 +93,18 @@ export class SessionService {
         }
       }
 
-      const agents = session ? session.getAgents() : [];
-
-      persistedSessions.set(sessionInfo.id, {
-        id: sessionInfo.id,
-        name: sessionInfo.name,
-        createdAt: sessionInfo.createdAt.toISOString(),
-        agents: agents.map((agent) => ({
-          threadId: agent.threadId,
-          name: agent.name,
-          provider: agent.provider,
-          model: agent.model,
-          status: agent.status,
-        })),
-      });
+      if (session) {
+        persistedSessions.set(sessionInfo.id, this.sessionToMetadata(session));
+      }
     }
 
     // Add any active sessions that aren't in the persisted list
     activeSessions.forEach((session, sessionId) => {
       if (!persistedSessions.has(sessionId)) {
-        const sessionInfo = session.getInfo();
-        if (sessionInfo) {
-          const agents = session.getAgents();
-          persistedSessions.set(sessionId, {
-            id: sessionId,
-            name: sessionInfo.name,
-            createdAt: sessionInfo.createdAt.toISOString(),
-            agents: agents.map((agent) => ({
-              threadId: agent.threadId,
-              name: agent.name,
-              provider: agent.provider,
-              model: agent.model,
-              status: agent.status,
-            })),
-          });
+        try {
+          persistedSessions.set(sessionId, this.sessionToMetadata(session));
+        } catch (error) {
+          console.error(`Failed to get metadata for session ${sessionId}:`, error);
         }
       }
     });
@@ -151,7 +112,7 @@ export class SessionService {
     return Array.from(persistedSessions.values());
   }
 
-  async getSession(sessionId: ThreadId): Promise<SessionType | null> {
+  async getSession(sessionId: ThreadId): Promise<Session | null> {
     console.warn(`[DEBUG] getSession called for sessionId: ${sessionId}`);
 
     const dbPath = process.env.LACE_DB_PATH || './lace.db';
@@ -183,25 +144,7 @@ export class SessionService {
       }
     }
 
-    const sessionInfo = session.getInfo();
-    if (!sessionInfo) {
-      return null;
-    }
-
-    const agents = session.getAgents();
-
-    return {
-      id: sessionId,
-      name: sessionInfo.name,
-      createdAt: sessionInfo.createdAt.toISOString(),
-      agents: agents.map((agent) => ({
-        threadId: agent.threadId,
-        name: agent.name,
-        provider: agent.provider,
-        model: agent.model,
-        status: agent.status,
-      })),
-    };
+    return session;
   }
 
   async spawnAgent(
@@ -472,11 +415,33 @@ export class SessionService {
     );
   }
 
-  // These methods are now handled by the Session class
-
   // Test helper method to clear active sessions
   clearActiveSessions(): void {
     activeSessions.clear();
+  }
+
+  // Helper to convert Session instance to SessionType for API responses
+  private sessionToMetadata(session: Session): SessionType {
+    const sessionInfo = session.getInfo();
+    if (!sessionInfo) {
+      throw new Error('Failed to get session info');
+    }
+
+    const agents = session.getAgents();
+
+    return {
+      id: session.getId(),
+      name: sessionInfo.name,
+      createdAt: sessionInfo.createdAt.toISOString(),
+      agents: agents.map((agent) => ({
+        threadId: agent.threadId,
+        name: agent.name,
+        provider: agent.provider,
+        model: agent.model,
+        status: agent.status,
+        createdAt: (agent as { createdAt?: string }).createdAt ?? new Date().toISOString(),
+      })),
+    };
   }
 }
 

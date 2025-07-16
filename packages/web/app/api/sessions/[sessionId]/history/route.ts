@@ -4,7 +4,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { ThreadId, SessionEvent, ApiErrorResponse } from '@/types/api';
-import { Session } from '@/lib/server/lace-imports';
 import type { ThreadEvent } from '@/lib/server/lace-imports';
 
 // Type guard for ThreadId
@@ -113,17 +112,8 @@ export async function GET(
       return NextResponse.json(errorResponse, { status: 404 });
     }
 
-    // Get conversation history through the Session's coordinator agent
-    const dbPath = process.env['LACE_DB_PATH'] || './lace.db';
-    const laceSession = await Session.getById(sessionId, dbPath);
-
-    if (!laceSession) {
-      const errorResponse: ApiErrorResponse = { error: 'Could not load session history' };
-      return NextResponse.json(errorResponse, { status: 500 });
-    }
-
     // Get the coordinator agent and load events through it (proper architecture)
-    const coordinatorAgent = laceSession.getAgent(sessionId);
+    const coordinatorAgent = session.getAgent(sessionId);
     if (!coordinatorAgent) {
       const errorResponse: ApiErrorResponse = { error: 'Could not access session coordinator' };
       return NextResponse.json(errorResponse, { status: 500 });

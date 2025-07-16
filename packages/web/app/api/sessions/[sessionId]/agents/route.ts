@@ -98,7 +98,18 @@ export async function GET(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ agents: session.agents || [] });
+    // Get agents from Session instance
+    const agents = session.getAgents();
+    return NextResponse.json({
+      agents: agents.map((agent) => ({
+        threadId: agent.threadId,
+        name: agent.name,
+        provider: agent.provider,
+        model: agent.model,
+        status: agent.status,
+        createdAt: (agent as { createdAt?: string }).createdAt ?? new Date().toISOString(),
+      })),
+    });
   } catch (error: unknown) {
     console.error('Error in GET /api/sessions/[sessionId]/agents:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

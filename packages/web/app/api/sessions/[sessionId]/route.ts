@@ -37,7 +37,25 @@ export async function GET(
       return NextResponse.json(errorResponse, { status: 404 });
     }
 
-    return NextResponse.json({ session });
+    // Convert Session instance to metadata for JSON response
+    const sessionInfo = session.getInfo();
+    const agents = session.getAgents();
+
+    const sessionData = {
+      id: session.getId(),
+      name: sessionInfo?.name ?? 'Unknown',
+      createdAt: sessionInfo?.createdAt.toISOString() ?? new Date().toISOString(),
+      agents: agents.map((agent) => ({
+        threadId: agent.threadId,
+        name: agent.name,
+        provider: agent.provider,
+        model: agent.model,
+        status: agent.status,
+        createdAt: (agent as { createdAt?: string }).createdAt ?? new Date().toISOString(),
+      })),
+    };
+
+    return NextResponse.json({ session: sessionData });
   } catch (error: unknown) {
     console.error('Error in GET /api/sessions/[sessionId]:', error);
 
