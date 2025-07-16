@@ -11,9 +11,12 @@ export const ThreadIdSchema = z
     'Invalid thread ID format. Expected: lace_YYYYMMDD_randomId or lace_YYYYMMDD_randomId.number'
   );
 
-// Message request schema
+// Message request schema with size limits
 export const MessageRequestSchema = z.object({
-  message: z.string().min(1, 'Message cannot be empty'),
+  message: z
+    .string()
+    .min(1, 'Message cannot be empty')
+    .max(10000, 'Message too long (max 10000 characters)'),
   metadata: z
     .object({
       source: z.enum(['web', 'cli', 'api']).optional(),
@@ -22,35 +25,49 @@ export const MessageRequestSchema = z.object({
     .optional(),
 });
 
-// Task request schemas
+// Task request schemas with proper validation
 export const CreateTaskRequestSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().optional().default(''),
-  prompt: z.string().min(1, 'Prompt is required'),
+  title: z.string().min(1, 'Title is required').max(200, 'Title too long (max 200 characters)'),
+  description: z
+    .string()
+    .max(1000, 'Description too long (max 1000 characters)')
+    .optional()
+    .default(''),
+  prompt: z
+    .string()
+    .min(1, 'Prompt is required')
+    .max(5000, 'Prompt too long (max 5000 characters)'),
   priority: z.enum(['high', 'medium', 'low']).optional().default('medium'),
-  assignedTo: z.string().optional(),
+  assignedTo: z
+    .string()
+    .regex(/^lace_\d{8}_[a-z0-9]+(\.\d+)?$/, 'Invalid assignee ID format')
+    .optional(),
 });
 
 export const UpdateTaskRequestSchema = z.object({
-  title: z.string().min(1).optional(),
-  description: z.string().optional(),
-  prompt: z.string().min(1).optional(),
+  title: z.string().min(1).max(200, 'Title too long').optional(),
+  description: z.string().max(1000, 'Description too long').optional(),
+  prompt: z.string().min(1).max(5000, 'Prompt too long').optional(),
   status: z.enum(['pending', 'in_progress', 'completed', 'blocked']).optional(),
   priority: z.enum(['high', 'medium', 'low']).optional(),
-  assignedTo: z.string().nullable().optional(),
+  assignedTo: z
+    .string()
+    .regex(/^lace_\d{8}_[a-z0-9]+(\.\d+)?$/, 'Invalid assignee ID')
+    .nullable()
+    .optional(),
 });
 
-// Session request schema
+// Session request schema with validation
 export const CreateSessionRequestSchema = z.object({
-  name: z.string().optional(),
-  provider: z.string().min(1, 'Provider is required'),
-  model: z.string().min(1, 'Model is required'),
+  name: z.string().max(100, 'Name too long (max 100 characters)').optional(),
+  provider: z.string().min(1, 'Provider is required').max(50, 'Provider name too long'),
+  model: z.string().min(1, 'Model is required').max(100, 'Model name too long'),
 });
 
-// Agent spawn request schema
+// Agent spawn request schema with validation
 export const SpawnAgentRequestSchema = z.object({
-  provider: z.string().min(1, 'Provider is required'),
-  model: z.string().min(1, 'Model is required'),
+  provider: z.string().min(1, 'Provider is required').max(50, 'Provider name too long'),
+  model: z.string().min(1, 'Model is required').max(100, 'Model name too long'),
   isCoordinator: z.boolean().optional().default(false),
 });
 

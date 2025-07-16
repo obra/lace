@@ -1,7 +1,7 @@
 // ABOUTME: Terminal-like conversation display component that shows messages, tool calls, and agent status
 // ABOUTME: Renders conversation events in a structured, color-coded terminal interface style
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import type { SessionEvent, Agent, ThreadId } from '@/types/api';
 
 interface ConversationDisplayProps {
@@ -33,6 +33,7 @@ export function ConversationDisplay({ events, agents, selectedAgent, className =
   const processedEvents = useMemo(() => {
     const processed: SessionEvent[] = [];
     const streamingMessages = new Map<string, { content: string; timestamp: string }>();
+    const MAX_STREAMING_MESSAGES = 100; // Prevent unbounded growth
     
     for (const event of filteredEvents) {
       if (event.type === 'AGENT_TOKEN') {
@@ -42,6 +43,12 @@ export function ConversationDisplay({ events, agents, selectedAgent, className =
         if (existing) {
           existing.content += event.data.token;
         } else {
+          // Limit map size to prevent memory issues
+          if (streamingMessages.size >= MAX_STREAMING_MESSAGES) {
+            // Remove oldest entry
+            const firstKey = streamingMessages.keys().next().value;
+            if (firstKey) streamingMessages.delete(firstKey);
+          }
           streamingMessages.set(key, {
             content: event.data.token,
             timestamp: event.timestamp,
@@ -71,7 +78,21 @@ export function ConversationDisplay({ events, agents, selectedAgent, className =
     return processed;
   }, [filteredEvents]);
 
-  const renderEvent = (event: SessionEvent, index: number) => {
+  // Helper to extract agent name from threadId
+  const getAgentName = useCallback((threadId: ThreadId): string => {
+    // Try to find agent in the provided list
+    const agent = agents?.find((a) => a.threadId === threadId);
+    if (agent) {
+      return agent.name;
+    }
+
+    // Fallback to extracting from threadId
+    const threadIdStr = String(threadId);
+    const match = threadIdStr.match(/\.(\d+)$/);
+    return match ? `Agent ${match[1]}` : 'Agent';
+  }, [agents]);
+
+  const renderEvent = useCallback((event: SessionEvent, index: number) => {
     const timestamp = new Date(event.timestamp).toLocaleTimeString();
 
     switch (event.type) {
@@ -195,21 +216,7 @@ export function ConversationDisplay({ events, agents, selectedAgent, className =
           </div>
         );
     }
-  };
-
-  // Helper to extract agent name from threadId
-  const getAgentName = (threadId: ThreadId): string => {
-    // Try to find agent in the provided list
-    const agent = agents?.find((a) => a.threadId === threadId);
-    if (agent) {
-      return agent.name;
-    }
-
-    // Fallback to extracting from threadId
-    const threadIdStr = String(threadId);
-    const match = threadIdStr.match(/\.(\d+)$/);
-    return match ? `Agent ${match[1]}` : 'Agent';
-  };
+  }, [agents, selectedAgent, getAgentName]);
 
   // Loading skeleton component
   const LoadingSkeleton = () => (

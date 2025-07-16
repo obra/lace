@@ -32,7 +32,7 @@ export default function Home() {
 
   // Load sessions on mount
   useEffect(() => {
-    loadSessions();
+    void loadSessions();
   }, []);
 
   // Connect to SSE when session selected
@@ -44,15 +44,18 @@ export default function Home() {
     setSelectedAgent(null);
 
     // Load conversation history first
-    loadConversationHistory(selectedSession);
+    void loadConversationHistory(selectedSession);
 
     const eventSource = new EventSource(`/api/sessions/${selectedSession}/events/stream`);
+    
+    // Store event listeners for cleanup
+    const eventListeners = new Map<string, (event: MessageEvent) => void>();
 
     // Listen to all event types
     const eventTypes = getAllEventTypes();
 
     eventTypes.forEach((eventType) => {
-      eventSource.addEventListener(eventType, (event: MessageEvent) => {
+      const listener = (event: MessageEvent) => {
         try {
           const data: unknown = JSON.parse(String(event.data));
 
@@ -70,10 +73,13 @@ export default function Home() {
         } catch (error) {
           console.error('Failed to parse event:', error);
         }
-      });
+      };
+      
+      eventListeners.set(eventType, listener);
+      eventSource.addEventListener(eventType, listener);
     });
 
-    eventSource.addEventListener('connection', (_event) => {
+    const connectionListener = (_event: Event) => {
       const connectionEvent: SessionEvent = {
         type: 'LOCAL_SYSTEM_MESSAGE',
         threadId: selectedSession,
@@ -81,7 +87,9 @@ export default function Home() {
         data: { message: 'Connected to session stream' },
       };
       setEvents((prev) => [...prev, connectionEvent]);
-    });
+    };
+    
+    eventSource.addEventListener('connection', connectionListener);
 
     eventSource.onerror = (error) => {
       console.error('SSE error:', error);
@@ -95,6 +103,11 @@ export default function Home() {
     };
 
     return () => {
+      // Remove all event listeners before closing
+      eventListeners.forEach((listener, eventType) => {
+        eventSource.removeEventListener(eventType, listener);
+      });
+      eventSource.removeEventListener('connection', connectionListener);
       eventSource.close();
     };
   }, [selectedSession]);

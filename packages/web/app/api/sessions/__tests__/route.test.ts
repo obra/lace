@@ -57,7 +57,11 @@ describe('Session API Routes', () => {
       const request = new NextRequest('http://localhost:3005/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: sessionName }),
+        body: JSON.stringify({
+          name: sessionName,
+          provider: 'anthropic',
+          model: 'claude-3-haiku-20240307',
+        }),
       });
 
       const response = await POST(request);
@@ -81,7 +85,10 @@ describe('Session API Routes', () => {
       const request = new NextRequest('http://localhost:3005/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          provider: 'anthropic',
+          model: 'claude-3-haiku-20240307',
+        }),
       });
 
       const response = await POST(request);
@@ -98,7 +105,11 @@ describe('Session API Routes', () => {
       const request = new NextRequest('http://localhost:3005/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Test Session' }),
+        body: JSON.stringify({
+          name: 'Test Session',
+          provider: 'anthropic',
+          model: 'claude-3-haiku-20240307',
+        }),
       });
 
       const response = await POST(request);

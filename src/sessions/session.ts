@@ -20,6 +20,7 @@ import { RipgrepSearchTool } from '~/tools/implementations/ripgrep-search';
 import { FileFindTool } from '~/tools/implementations/file-find';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url-fetch';
+import { logger } from '~/utils/logger';
 
 export interface SessionInfo {
   id: ThreadId;
@@ -42,6 +43,7 @@ export class Session {
   private _agents: Map<ThreadId, Agent> = new Map();
   private _dbPath: string;
   private _taskManager: TaskManager;
+  private _destroyed = false;
 
   constructor(sessionAgent: Agent) {
     this._sessionAgent = sessionAgent;
@@ -76,26 +78,7 @@ export class Session {
 
     // Create tool executor with TaskManager injection
     const toolExecutor = new ToolExecutor();
-
-    // Register non-task tools
-    const nonTaskTools = [
-      new BashTool(),
-      new FileReadTool(),
-      new FileWriteTool(),
-      new FileEditTool(),
-      new FileInsertTool(),
-      new FileListTool(),
-      new RipgrepSearchTool(),
-      new FileFindTool(),
-      new DelegateTool(),
-      new UrlFetchTool(),
-    ];
-
-    toolExecutor.registerTools(nonTaskTools);
-
-    // Register task tools with TaskManager injection
-    const taskTools = createTaskManagerTools(() => taskManager);
-    toolExecutor.registerTools(taskTools);
+    Session.initializeTools(toolExecutor, taskManager);
 
     // Create agent
     const sessionAgent = new Agent({
@@ -139,18 +122,18 @@ export class Session {
   }
 
   static async getById(sessionId: ThreadId, dbPath?: string): Promise<Session | null> {
-    console.warn(`[DEBUG] Session.getById called for sessionId: ${sessionId}`);
+    logger.debug(`Session.getById called for sessionId: ${sessionId}`);
 
     const actualDbPath = dbPath || getLaceDbPath();
     const threadManager = new ThreadManager(actualDbPath);
     const thread = threadManager.getThread(sessionId);
 
     if (!thread || !thread.metadata?.isSession) {
-      console.warn(`[DEBUG] Thread not found or not a session: ${sessionId}`);
+      logger.warn(`Thread not found or not a session: ${sessionId}`);
       return null;
     }
 
-    console.warn(`[DEBUG] Reconstructing session agent for ${sessionId}`);
+    logger.debug(`Reconstructing session agent for ${sessionId}`);
 
     // Reconstruct the session agent from the existing thread
     const provider = (thread.metadata.provider as string) || 'anthropic';
@@ -166,26 +149,7 @@ export class Session {
 
     // Create tool executor with TaskManager injection
     const toolExecutor = new ToolExecutor();
-
-    // Register non-task tools
-    const nonTaskTools = [
-      new BashTool(),
-      new FileReadTool(),
-      new FileWriteTool(),
-      new FileEditTool(),
-      new FileInsertTool(),
-      new FileListTool(),
-      new RipgrepSearchTool(),
-      new FileFindTool(),
-      new DelegateTool(),
-      new UrlFetchTool(),
-    ];
-
-    toolExecutor.registerTools(nonTaskTools);
-
-    // Register task tools with TaskManager injection
-    const taskTools = createTaskManagerTools(() => taskManager);
-    toolExecutor.registerTools(taskTools);
+    Session.initializeTools(toolExecutor, taskManager);
 
     // Create agent with existing thread
     const sessionAgent = new Agent({
@@ -196,10 +160,10 @@ export class Session {
       tools: toolExecutor.getAllTools(),
     });
 
-    console.warn(`[DEBUG] Starting session agent for ${sessionId}`);
+    logger.debug(`Starting session agent for ${sessionId}`);
     // Start the session agent
     await sessionAgent.start();
-    console.warn(`[DEBUG] Session agent started, state: ${sessionAgent.getCurrentState()}`);
+    logger.debug(`Session agent started, state: ${sessionAgent.getCurrentState()}`);
 
     // Set this as the current thread for delegate creation
     threadManager.setCurrentThread(sessionId);
@@ -208,14 +172,20 @@ export class Session {
 
     // Load delegate threads (child agents) for this session
     const delegateThreadIds = threadManager.getThreadsForSession(sessionId);
-    console.warn(
-      `[DEBUG] Found ${delegateThreadIds.length} delegate threads: ${delegateThreadIds.join(', ')}`
+    logger.debug(
+      `Found ${delegateThreadIds.length} delegate threads: ${delegateThreadIds.join(', ')}`
     );
 
-    for (const delegateThreadId of delegateThreadIds) {
-      const delegateThread = threadManager.getThread(delegateThreadId);
-      if (delegateThread) {
-        console.warn(`[DEBUG] Creating delegate agent for ${delegateThreadId}`);
+    // Load delegate agents with proper error handling
+    const delegateStartPromises = delegateThreadIds.map(async (delegateThreadId) => {
+      try {
+        const delegateThread = threadManager.getThread(delegateThreadId);
+        if (!delegateThread) {
+          logger.warn(`Delegate thread not found: ${delegateThreadId}`);
+          return;
+        }
+
+        logger.debug(`Creating delegate agent for ${delegateThreadId}`);
 
         // Create agent for this delegate thread
         const delegateAgent = new Agent({
@@ -228,17 +198,23 @@ export class Session {
 
         // Start the delegate agent
         await delegateAgent.start();
-        console.warn(`[DEBUG] Delegate agent started, state: ${delegateAgent.getCurrentState()}`);
+        logger.debug(`Delegate agent started, state: ${delegateAgent.getCurrentState()}`);
 
         // Add to session's agents map
         session._agents.set(asThreadId(delegateThreadId), delegateAgent);
+      } catch (error) {
+        logger.error(`Failed to start delegate agent ${delegateThreadId}:`, error);
+        // Continue loading other agents even if one fails
       }
-    }
+    });
+
+    // Wait for all delegate agents to start (with error handling)
+    await Promise.all(delegateStartPromises);
 
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
 
-    console.warn(`[DEBUG] Session reconstruction complete for ${sessionId}`);
+    logger.debug(`Session reconstruction complete for ${sessionId}`);
     return session;
   }
 
@@ -253,7 +229,7 @@ export class Session {
     return {
       id: this._sessionId,
       name: (metadata?.name as string) || 'Session ' + this._sessionId,
-      createdAt: new Date(), // TODO: Store creation date properly
+      createdAt: this._sessionAgent.getThreadCreatedAt() || new Date(),
       provider: this._sessionAgent.providerName,
       model: (metadata?.model as string) || 'unknown',
       agents,
@@ -351,9 +327,7 @@ export class Session {
     return this._taskManager;
   }
 
-  private createToolExecutor(): ToolExecutor {
-    const toolExecutor = new ToolExecutor();
-
+  private static initializeTools(toolExecutor: ToolExecutor, taskManager: TaskManager): void {
     // Register non-task tools
     const nonTaskTools = [
       new BashTool(),
@@ -371,19 +345,25 @@ export class Session {
     toolExecutor.registerTools(nonTaskTools);
 
     // Register task tools with TaskManager injection
-    const taskTools = createTaskManagerTools(() => this._taskManager);
+    const taskTools = createTaskManagerTools(() => taskManager);
     toolExecutor.registerTools(taskTools);
-
-    return toolExecutor;
   }
 
   destroy(): void {
-    // Stop the coordinator agent
-    this._sessionAgent.stop();
+    if (this._destroyed) {
+      return;
+    }
 
-    // Stop all delegate agents
+    this._destroyed = true;
+
+    // Stop and cleanup the coordinator agent
+    this._sessionAgent.stop();
+    this._sessionAgent.removeAllListeners();
+
+    // Stop and cleanup all delegate agents
     for (const agent of this._agents.values()) {
       agent.stop();
+      agent.removeAllListeners();
     }
     this._agents.clear();
   }

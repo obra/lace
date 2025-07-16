@@ -7,6 +7,7 @@ import { getSessionService } from '@/lib/server/session-service';
 import { MessageResponse, SessionEvent, ApiErrorResponse } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
 import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
+import { messageLimiter } from '@/lib/middleware/rate-limiter';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -17,6 +18,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ threadId: string }> }
 ): Promise<NextResponse> {
+  // Apply rate limiting
+  const rateLimitResponse = messageLimiter(request);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   try {
     const sessionService = getSessionService();
     const { threadId: threadIdParam } = await params;
@@ -76,11 +83,11 @@ export async function POST(
     const messageId = randomUUID();
 
     // Process message asynchronously
-    console.warn(`Processing message for agent ${threadId}: "${body.message}"`);
+    // Log message processing (could use structured logging if available)
     agent
       .sendMessage(body.message)
       .then(() => {
-        console.warn(`Message processing started for agent ${threadId}`);
+        // Message processing started
       })
       .catch((error: unknown) => {
         console.error('Error processing message:', error);

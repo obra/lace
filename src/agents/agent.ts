@@ -1373,6 +1373,11 @@ export class Agent extends EventEmitter {
     return thread?.metadata;
   }
 
+  getThreadCreatedAt(): Date | undefined {
+    const thread = this._threadManager.getThread(this._threadId);
+    return thread?.createdAt;
+  }
+
   resumeOrCreateThread(threadId?: string): ThreadSessionInfo {
     const result = this._threadManager.resumeOrCreate(threadId);
 
