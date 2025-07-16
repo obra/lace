@@ -9,6 +9,7 @@ export { ProviderRegistry } from '~/providers/registry';
 export { ToolExecutor } from '~/tools/executor';
 export { DelegateTool } from '~/tools/implementations/delegate';
 export { Session } from '~/sessions/session';
+export type { TaskFilters } from '~/tasks/types';
 
 // Types and constants
 export type { ThreadId } from '~/threads/types';

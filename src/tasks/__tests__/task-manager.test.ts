@@ -318,19 +318,17 @@ describe('TaskManager', () => {
     });
 
     it('should add note to task', async () => {
-      const note = await manager.addNote(testTask.id, 'This is a test note', {
+      await manager.addNote(testTask.id, 'This is a test note', {
         actor: 'lace_20250714_abc123.2',
         isHuman: false,
       });
 
-      expect(note.content).toBe('This is a test note');
-      expect(note.author).toBe('lace_20250714_abc123.2');
-      expect(note.id).toBeDefined();
-
       // Verify note is added to task
       const updatedTask = manager.getTaskById(testTask.id);
       expect(updatedTask?.notes).toHaveLength(1);
-      expect(updatedTask?.notes[0].id).toBe(note.id);
+      expect(updatedTask?.notes[0].content).toBe('This is a test note');
+      expect(updatedTask?.notes[0].author).toBe('lace_20250714_abc123.2');
+      expect(updatedTask?.notes[0].id).toBeDefined();
     });
 
     it('should add multiple notes', async () => {

@@ -2,14 +2,7 @@
 // ABOUTME: Provides CRUD operations, filtering, and note management for tasks
 
 import { DatabasePersistence } from '~/persistence/database';
-import {
-  Task,
-  TaskNote,
-  CreateTaskRequest,
-  TaskFilters,
-  TaskContext,
-  TaskSummary,
-} from '~/tasks/types';
+import { Task, CreateTaskRequest, TaskFilters, TaskContext, TaskSummary } from '~/tasks/types';
 import { ThreadId, AssigneeId, asThreadId } from '~/threads/types';
 
 export class TaskManager {
@@ -110,7 +103,7 @@ export class TaskManager {
     return updatedTask;
   }
 
-  async addNote(taskId: string, content: string, context: TaskContext): Promise<TaskNote> {
+  async addNote(taskId: string, noteContent: string, context: TaskContext): Promise<void> {
     // Verify task exists and belongs to this session
     const task = this.getTaskById(taskId);
     if (!task) {
@@ -120,7 +113,7 @@ export class TaskManager {
     // Create note without ID (database will assign it)
     const noteData = {
       author: asThreadId(context.actor),
-      content: content.trim(),
+      content: noteContent.trim(),
       timestamp: new Date(),
     };
 
@@ -129,16 +122,6 @@ export class TaskManager {
 
     // Update task timestamp
     await this.updateTask(taskId, { updatedAt: new Date() }, context);
-
-    // Reload task to get the note with its database-assigned ID
-    const updatedTask = this.getTaskById(taskId);
-    const newNote = updatedTask?.notes[updatedTask.notes.length - 1];
-
-    if (!newNote) {
-      throw new Error('Failed to retrieve created note');
-    }
-
-    return newNote;
   }
 
   deleteTask(taskId: string, _context: TaskContext): void {
@@ -179,5 +162,54 @@ export class TaskManager {
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
     const random = Math.random().toString(36).substring(2, 8);
     return `note_${dateStr}_${random}`;
+  }
+
+  getTask(taskId: string, _context: TaskContext): Task | null {
+    return this.getTaskById(taskId);
+  }
+
+  listTasks(
+    filter: 'mine' | 'created' | 'thread' | 'all',
+    includeCompleted: boolean,
+    context: TaskContext
+  ): Task[] {
+    let tasks: Task[] = [];
+
+    switch (filter) {
+      case 'mine':
+        // Tasks assigned to the actor
+        tasks = this.persistence
+          .loadTasksByAssignee(context.actor as AssigneeId)
+          .filter((t) => t.threadId === this.sessionId);
+        break;
+
+      case 'created':
+        // Tasks created by the actor in this session
+        tasks = this.persistence
+          .loadTasksByThread(this.sessionId)
+          .filter((t) => t.createdBy === context.actor);
+        break;
+
+      case 'thread':
+      case 'all':
+        // All tasks in this session
+        tasks = this.persistence.loadTasksByThread(this.sessionId);
+        break;
+    }
+
+    // Filter completed if needed
+    if (!includeCompleted) {
+      tasks = tasks.filter((t) => t.status !== 'completed');
+    }
+
+    // Sort by priority and creation date
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    tasks.sort((a, b) => {
+      const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (priorityDiff !== 0) return priorityDiff;
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    });
+
+    return tasks;
   }
 }

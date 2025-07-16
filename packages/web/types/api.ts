@@ -31,6 +31,32 @@ export interface Agent {
   createdAt: string;
 }
 
+// Task management types
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked';
+export type TaskPriority = 'high' | 'medium' | 'low';
+
+export interface TaskNote {
+  id: string;
+  author: ThreadId;
+  content: string;
+  timestamp: Date | string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  prompt: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assignedTo?: ThreadId;
+  createdBy: ThreadId;
+  threadId: ThreadId;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  notes: TaskNote[];
+}
+
 // Types for session events
 type _SessionEventType =
   | 'USER_MESSAGE'

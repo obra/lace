@@ -7,6 +7,19 @@ import { getLaceDbPath } from '~/config/lace-dir';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderRegistry } from '~/providers/registry';
 import { ToolExecutor } from '~/tools/executor';
+import { TaskManager } from '~/tasks/task-manager';
+import { DatabasePersistence } from '~/persistence/database';
+import { createTaskManagerTools } from '~/tools/implementations/task-manager';
+import { BashTool } from '~/tools/implementations/bash';
+import { FileReadTool } from '~/tools/implementations/file-read';
+import { FileWriteTool } from '~/tools/implementations/file-write';
+import { FileEditTool } from '~/tools/implementations/file-edit';
+import { FileInsertTool } from '~/tools/implementations/file-insert';
+import { FileListTool } from '~/tools/implementations/file-list';
+import { RipgrepSearchTool } from '~/tools/implementations/ripgrep-search';
+import { FileFindTool } from '~/tools/implementations/file-find';
+import { DelegateTool } from '~/tools/implementations/delegate';
+import { UrlFetchTool } from '~/tools/implementations/url-fetch';
 
 export interface SessionInfo {
   id: ThreadId;
@@ -28,11 +41,16 @@ export class Session {
   private _sessionId: ThreadId;
   private _agents: Map<ThreadId, Agent> = new Map();
   private _dbPath: string;
+  private _taskManager: TaskManager;
 
   constructor(sessionAgent: Agent) {
     this._sessionAgent = sessionAgent;
     this._sessionId = asThreadId(sessionAgent.threadId);
     this._dbPath = getLaceDbPath();
+
+    // Initialize TaskManager for this session
+    const persistence = new DatabasePersistence(this._dbPath);
+    this._taskManager = new TaskManager(this._sessionId, persistence);
   }
 
   static create(
@@ -43,12 +61,49 @@ export class Session {
   ): Session {
     const actualDbPath = dbPath || getLaceDbPath();
 
-    // Create session agent using the regular Agent.createSession method
-    const sessionAgent = Agent.createSession({
-      providerType: provider,
-      model,
-      name,
-      dbPath: actualDbPath,
+    // Create provider
+    const registry = ProviderRegistry.createWithAutoDiscovery();
+    const providerInstance = registry.createProvider(provider, { model });
+
+    // Create thread manager
+    const threadManager = new ThreadManager(actualDbPath);
+    const sessionInfo = threadManager.resumeOrCreate();
+    const threadId = sessionInfo.threadId;
+
+    // Create a temporary session to get TaskManager
+    const tempPersistence = new DatabasePersistence(actualDbPath);
+    const taskManager = new TaskManager(asThreadId(threadId), tempPersistence);
+
+    // Create tool executor with TaskManager injection
+    const toolExecutor = new ToolExecutor();
+
+    // Register non-task tools
+    const nonTaskTools = [
+      new BashTool(),
+      new FileReadTool(),
+      new FileWriteTool(),
+      new FileEditTool(),
+      new FileInsertTool(),
+      new FileListTool(),
+      new RipgrepSearchTool(),
+      new FileFindTool(),
+      new DelegateTool(),
+      new UrlFetchTool(),
+    ];
+
+    toolExecutor.registerTools(nonTaskTools);
+
+    // Register task tools with TaskManager injection
+    const taskTools = createTaskManagerTools(() => taskManager);
+    toolExecutor.registerTools(taskTools);
+
+    // Create agent
+    const sessionAgent = new Agent({
+      provider: providerInstance,
+      toolExecutor,
+      threadManager,
+      threadId,
+      tools: toolExecutor.getAllTools(),
     });
 
     // Mark the agent's thread as a session thread
@@ -59,7 +114,11 @@ export class Session {
       model,
     });
 
-    return new Session(sessionAgent);
+    const session = new Session(sessionAgent);
+    // Update the session's task manager to use the one we created
+    session._taskManager = taskManager;
+
+    return session;
   }
 
   static getAll(dbPath?: string): SessionInfo[] {
@@ -101,8 +160,32 @@ export class Session {
     const registry = ProviderRegistry.createWithAutoDiscovery();
     const providerInstance = registry.createProvider(provider, { model });
 
+    // Create TaskManager first
+    const persistence = new DatabasePersistence(actualDbPath);
+    const taskManager = new TaskManager(sessionId, persistence);
+
+    // Create tool executor with TaskManager injection
     const toolExecutor = new ToolExecutor();
-    toolExecutor.registerAllAvailableTools();
+
+    // Register non-task tools
+    const nonTaskTools = [
+      new BashTool(),
+      new FileReadTool(),
+      new FileWriteTool(),
+      new FileEditTool(),
+      new FileInsertTool(),
+      new FileListTool(),
+      new RipgrepSearchTool(),
+      new FileFindTool(),
+      new DelegateTool(),
+      new UrlFetchTool(),
+    ];
+
+    toolExecutor.registerTools(nonTaskTools);
+
+    // Register task tools with TaskManager injection
+    const taskTools = createTaskManagerTools(() => taskManager);
+    toolExecutor.registerTools(taskTools);
 
     // Create agent with existing thread
     const sessionAgent = new Agent({
@@ -151,6 +234,9 @@ export class Session {
         session._agents.set(asThreadId(delegateThreadId), delegateAgent);
       }
     }
+
+    // Update the session's task manager to use the one we created
+    session._taskManager = taskManager;
 
     console.warn(`[DEBUG] Session reconstruction complete for ${sessionId}`);
     return session;
@@ -259,6 +345,36 @@ export class Session {
       throw new Error(`Agent not found: ${threadId}`);
     }
     await agent.sendMessage(message);
+  }
+
+  getTaskManager(): TaskManager {
+    return this._taskManager;
+  }
+
+  private createToolExecutor(): ToolExecutor {
+    const toolExecutor = new ToolExecutor();
+
+    // Register non-task tools
+    const nonTaskTools = [
+      new BashTool(),
+      new FileReadTool(),
+      new FileWriteTool(),
+      new FileEditTool(),
+      new FileInsertTool(),
+      new FileListTool(),
+      new RipgrepSearchTool(),
+      new FileFindTool(),
+      new DelegateTool(),
+      new UrlFetchTool(),
+    ];
+
+    toolExecutor.registerTools(nonTaskTools);
+
+    // Register task tools with TaskManager injection
+    const taskTools = createTaskManagerTools(() => this._taskManager);
+    toolExecutor.registerTools(taskTools);
+
+    return toolExecutor;
   }
 
   destroy(): void {
