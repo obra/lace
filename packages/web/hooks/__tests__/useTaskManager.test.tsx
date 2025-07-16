@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { act } from 'react';
-import { useTaskManager } from '../useTaskManager';
+import { useTaskManager } from '@/hooks/useTaskManager';
 import { TaskAPIClient } from '@/lib/client/task-api';
 import type { Task } from '@/types/api';
 
@@ -12,13 +12,17 @@ import type { Task } from '@/types/api';
 vi.mock('@/lib/client/task-api');
 
 // Mock EventSource for tests
-global.EventSource = vi.fn(() => ({
-  onmessage: null,
-  onerror: null,
-  close: vi.fn(),
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-})) as any;
+class MockEventSource {
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  close = vi.fn();
+  addEventListener = vi.fn();
+  removeEventListener = vi.fn();
+  
+  constructor(public url: string) {}
+}
+
+global.EventSource = MockEventSource as unknown as typeof EventSource;
 
 describe('useTaskManager', () => {
   let mockClient: {
@@ -65,12 +69,18 @@ describe('useTaskManager', () => {
     vi.clearAllMocks();
   });
 
-  it('should initialize with loading state', () => {
+  it('should initialize with loading state', async () => {
     const { result } = renderHook(() => useTaskManager(mockSessionId));
 
+    // Initial state should be loading
     expect(result.current.isLoading).toBe(true);
     expect(result.current.tasks).toEqual([]);
     expect(result.current.error).toBeNull();
+
+    // Wait for the initial fetch to complete
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
   });
 
   it('should fetch tasks on mount', async () => {

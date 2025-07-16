@@ -1,19 +1,26 @@
 // ABOUTME: Playwright E2E tests for web UI functionality
 // ABOUTME: Tests the complete user workflow through a real browser
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
-// Mock environment for testing
-const TEST_ENV = {
-  ANTHROPIC_KEY: 'test-key',
-  LACE_DB_PATH: ':memory:',
-};
+// Define the test environment type
+interface TestEnvironment {
+  ANTHROPIC_KEY: string;
+  LACE_DB_PATH: string;
+}
+
+// Extend the Window interface to include our test environment
+declare global {
+  interface Window {
+    testEnv?: TestEnvironment;
+  }
+}
 
 test.describe('Web UI End-to-End Tests', () => {
   test.beforeEach(async ({ page }) => {
     // Set up test environment
     await page.addInitScript(() => {
-      (window as any).testEnv = {
+      window.testEnv = {
         ANTHROPIC_KEY: 'test-key',
         LACE_DB_PATH: ':memory:',
       };

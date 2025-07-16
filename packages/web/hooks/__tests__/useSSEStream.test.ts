@@ -47,7 +47,7 @@ class MockEventSource {
     }
   }
 
-  dispatchEvent(type: string, data: any) {
+  dispatchEvent(type: string, data: unknown) {
     const listeners = this.listeners.get(type);
     if (listeners) {
       const event = new MessageEvent(type, { data: JSON.stringify(data) });
@@ -60,22 +60,39 @@ class MockEventSource {
   }
 }
 
-// Replace global EventSource
-const originalEventSource = global.EventSource;
-
 describe('useSSEStream', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     eventSourceInstances = [];
-    (global as any).EventSource = MockEventSource;
+    // Mock EventSource on both global and window
+    (global as typeof globalThis & { EventSource?: typeof EventSource }).EventSource =
+      MockEventSource as unknown as typeof EventSource;
+    if (typeof window !== 'undefined') {
+      (window as typeof window & { EventSource?: typeof EventSource }).EventSource =
+        MockEventSource as unknown as typeof EventSource;
+    }
   });
 
   afterEach(() => {
-    (global as any).EventSource = originalEventSource;
+    // Clean up mocks
+    const globalWithEventSource = global as typeof globalThis & {
+      EventSource?: typeof EventSource;
+    };
+    if (globalWithEventSource.EventSource === (MockEventSource as unknown as typeof EventSource)) {
+      delete globalWithEventSource.EventSource;
+    }
+    if (typeof window !== 'undefined') {
+      const windowWithEventSource = window as typeof window & { EventSource?: typeof EventSource };
+      if (
+        windowWithEventSource.EventSource === (MockEventSource as unknown as typeof EventSource)
+      ) {
+        delete windowWithEventSource.EventSource;
+      }
+    }
     eventSourceInstances = [];
   });
 
-  it('should initialize with disconnected state', async () => {
+  it('should initialize with disconnected state', () => {
     const { result } = renderHook(() => useSSEStream(null));
 
     expect(result.current.connected).toBe(false);
@@ -180,7 +197,12 @@ describe('useSSEStream', () => {
       }
     }
 
-    (global as any).EventSource = ErrorEventSource;
+    (global as typeof globalThis & { EventSource?: typeof EventSource }).EventSource =
+      ErrorEventSource as unknown as typeof EventSource;
+    if (typeof window !== 'undefined') {
+      (window as typeof window & { EventSource?: typeof EventSource }).EventSource =
+        ErrorEventSource as unknown as typeof EventSource;
+    }
 
     const { result } = renderHook(() => useSSEStream(sessionId));
 

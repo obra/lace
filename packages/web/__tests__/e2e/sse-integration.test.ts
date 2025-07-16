@@ -8,8 +8,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { SessionEvent } from '@/types/api';
 
+// Mock types for SSE controller
+interface MockController {
+  enqueue: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn>;
+  error: ReturnType<typeof vi.fn>;
+}
+
 // Mock ReadableStream and related APIs for testing
-const createMockController = () => ({
+const createMockController = (): MockController => ({
   enqueue: vi.fn(),
   close: vi.fn(),
   error: vi.fn(),
@@ -17,32 +24,40 @@ const createMockController = () => ({
 
 global.ReadableStream = class MockReadableStream {
   constructor() {}
-} as any;
+} as typeof ReadableStream;
 
 global.TextEncoder = class MockTextEncoder {
   encode(text: string) {
     return new Uint8Array(Buffer.from(text));
   }
-} as any;
+} as typeof TextEncoder;
 
 // Mock the real SSEManager to avoid implementation dependencies
-const mockSessions = new Map<string, Set<any>>();
+const mockSessions = new Map<string, Set<MockController>>();
+
+// Define the mock SSEManager interface
+interface MockSSEManager {
+  sessionStreams: Map<string, Set<MockController>>;
+  addConnection: (sessionId: string, controller: MockController) => void;
+  removeConnection: (sessionId: string, controller: MockController) => void;
+  broadcast: (targetSessionId: string, event: SessionEvent) => void;
+}
 
 // Create a single mock instance
-const mockSSEManagerInstance = {
+const mockSSEManagerInstance: MockSSEManager = {
   sessionStreams: mockSessions,
-  addConnection: (sessionId: string, controller: any) => {
+  addConnection: (sessionId: string, controller: MockController) => {
     if (!mockSessions.has(sessionId)) {
       mockSessions.set(sessionId, new Set());
     }
     mockSessions.get(sessionId)!.add(controller);
   },
-  removeConnection: (sessionId: string, controller: any) => {
+  removeConnection: (sessionId: string, controller: MockController) => {
     if (mockSessions.has(sessionId)) {
       mockSessions.get(sessionId)!.delete(controller);
     }
   },
-  broadcast: (targetSessionId: string, event: any) => {
+  broadcast: (targetSessionId: string, event: SessionEvent) => {
     // Only broadcast to the specific session
     if (mockSessions.has(targetSessionId)) {
       const connections = mockSessions.get(targetSessionId)!;
@@ -51,7 +66,7 @@ const mockSSEManagerInstance = {
       connections.forEach((controller) => {
         try {
           controller.enqueue(bytes);
-        } catch (error) {
+        } catch {
           // Remove failed connection
           connections.delete(controller);
         }
@@ -69,12 +84,12 @@ vi.mock('@/lib/sse-manager', () => ({
 import { SSEManager } from '@/lib/sse-manager';
 
 describe('SSE Integration E2E Tests', () => {
-  let sseManager: any;
+  let sseManager: MockSSEManager;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockSessions.clear();
-    sseManager = SSEManager.getInstance();
+    sseManager = SSEManager.getInstance() as MockSSEManager;
   });
 
   afterEach(() => {
@@ -88,7 +103,7 @@ describe('SSE Integration E2E Tests', () => {
       const controller = createMockController();
 
       // Add connection
-      sseManager.addConnection(sessionId, controller as any);
+      sseManager.addConnection(sessionId, controller);
 
       // Verify connection was added
       const connections = mockSessions.get(sessionId);
@@ -97,7 +112,7 @@ describe('SSE Integration E2E Tests', () => {
       expect(connections!.has(controller)).toBe(true);
 
       // Remove connection
-      sseManager.removeConnection(sessionId, controller as any);
+      sseManager.removeConnection(sessionId, controller);
 
       // Verify connection was removed
       const updatedConnections = mockSessions.get(sessionId);
@@ -110,8 +125,8 @@ describe('SSE Integration E2E Tests', () => {
       const controller2 = createMockController();
 
       // Add multiple connections
-      sseManager.addConnection(sessionId, controller1 as any);
-      sseManager.addConnection(sessionId, controller2 as any);
+      sseManager.addConnection(sessionId, controller1);
+      sseManager.addConnection(sessionId, controller2);
 
       // Verify both connections exist
       const connections = mockSessions.get(sessionId);
@@ -127,8 +142,8 @@ describe('SSE Integration E2E Tests', () => {
       const controller2 = createMockController();
 
       // Add connections for different sessions
-      sseManager.addConnection(sessionId1, controller1 as any);
-      sseManager.addConnection(sessionId2, controller2 as any);
+      sseManager.addConnection(sessionId1, controller1);
+      sseManager.addConnection(sessionId2, controller2);
 
       // Verify sessions are separate
       expect(mockSessions.get(sessionId1)!.size).toBe(1);
@@ -143,8 +158,8 @@ describe('SSE Integration E2E Tests', () => {
       const controller2 = createMockController();
 
       // Add connections
-      sseManager.addConnection(sessionId, controller1 as any);
-      sseManager.addConnection(sessionId, controller2 as any);
+      sseManager.addConnection(sessionId, controller1);
+      sseManager.addConnection(sessionId, controller2);
 
       // Broadcast event
       const event: SessionEvent = {
@@ -168,8 +183,8 @@ describe('SSE Integration E2E Tests', () => {
       const controller2 = createMockController();
 
       // Add connections for different sessions
-      sseManager.addConnection(sessionId1, controller1 as any);
-      sseManager.addConnection(sessionId2, controller2 as any);
+      sseManager.addConnection(sessionId1, controller1);
+      sseManager.addConnection(sessionId2, controller2);
 
       // Broadcast to session 1 only
       const event: SessionEvent = {
@@ -206,7 +221,7 @@ describe('SSE Integration E2E Tests', () => {
       const sessionId = 'format-session';
       const controller = createMockController();
 
-      sseManager.addConnection(sessionId, controller as any);
+      sseManager.addConnection(sessionId, controller);
 
       const event: SessionEvent = {
         type: 'TOOL_CALL',
@@ -221,7 +236,7 @@ describe('SSE Integration E2E Tests', () => {
       expect(controller.enqueue).toHaveBeenCalledWith(expect.any(Uint8Array));
 
       // The exact format would be: "event: TYPE\ndata: {JSON}\n\n"
-      const call = controller.enqueue.mock.calls[0][0];
+      const call = controller.enqueue.mock.calls[0][0] as Uint8Array;
       const eventText = Buffer.from(call).toString();
 
       expect(eventText).toMatch(/^event: TOOL_CALL\n/);
@@ -234,7 +249,7 @@ describe('SSE Integration E2E Tests', () => {
   describe('Error Handling', () => {
     it('should handle controller errors gracefully', () => {
       const sessionId = 'error-session';
-      const faultyController = {
+      const faultyController: MockController = {
         enqueue: vi.fn().mockImplementation(() => {
           throw new Error('Controller error');
         }),
@@ -242,7 +257,7 @@ describe('SSE Integration E2E Tests', () => {
         error: vi.fn(),
       };
 
-      sseManager.addConnection(sessionId, faultyController as any);
+      sseManager.addConnection(sessionId, faultyController);
 
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
@@ -259,7 +274,7 @@ describe('SSE Integration E2E Tests', () => {
 
     it('should clean up failed connections', () => {
       const sessionId = 'cleanup-session';
-      const faultyController = {
+      const faultyController: MockController = {
         enqueue: vi.fn().mockImplementation(() => {
           throw new Error('Connection closed');
         }),
@@ -267,7 +282,7 @@ describe('SSE Integration E2E Tests', () => {
         error: vi.fn(),
       };
 
-      sseManager.addConnection(sessionId, faultyController as any);
+      sseManager.addConnection(sessionId, faultyController);
 
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',

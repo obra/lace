@@ -8,7 +8,7 @@ import type { ThreadId } from '@/types/api';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
-global.fetch = mockFetch as any;
+global.fetch = mockFetch as unknown as typeof fetch;
 
 describe('useSessionAPI', () => {
   beforeEach(() => {
@@ -50,7 +50,7 @@ describe('useSessionAPI', () => {
     it('should handle session creation errors', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
-        json: async () => ({ error: 'Failed to create session' }),
+        json: () => Promise.resolve({ error: 'Failed to create session' }),
       });
 
       const { result } = renderHook(() => useSessionAPI());
@@ -100,7 +100,7 @@ describe('useSessionAPI', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ sessions: mockSessions }),
+        json: () => Promise.resolve({ sessions: mockSessions }),
       });
 
       const { result } = renderHook(() => useSessionAPI());
@@ -119,7 +119,7 @@ describe('useSessionAPI', () => {
     it('should return empty array on error', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
-        json: async () => ({ error: 'Failed to list sessions' }),
+        json: () => Promise.resolve({ error: 'Failed to list sessions' }),
       });
 
       const { result } = renderHook(() => useSessionAPI());
@@ -155,7 +155,7 @@ describe('useSessionAPI', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ session: mockSession }),
+        json: () => Promise.resolve({ session: mockSession }),
       });
 
       const { result } = renderHook(() => useSessionAPI());
@@ -174,7 +174,7 @@ describe('useSessionAPI', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: false,
-        json: async () => ({ error: 'Session not found' }),
+        json: () => Promise.resolve({ error: 'Session not found' }),
       });
 
       const { result } = renderHook(() => useSessionAPI());
@@ -203,7 +203,7 @@ describe('useSessionAPI', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ agent: mockAgent }),
+        json: () => Promise.resolve({ agent: mockAgent }),
       });
 
       const { result } = renderHook(() => useSessionAPI());
@@ -234,7 +234,7 @@ describe('useSessionAPI', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: false,
-        json: async () => ({ error: 'Failed to spawn agent' }),
+        json: () => Promise.resolve({ error: 'Failed to spawn agent' }),
       });
 
       const { result } = renderHook(() => useSessionAPI());
@@ -275,7 +275,7 @@ describe('useSessionAPI', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ agents: mockAgents }),
+        json: () => Promise.resolve({ agents: mockAgents }),
       });
 
       const { result } = renderHook(() => useSessionAPI());
@@ -296,11 +296,12 @@ describe('useSessionAPI', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          status: 'accepted',
-          threadId,
-          messageId: 'msg123',
-        }),
+        json: () =>
+          Promise.resolve({
+            status: 'accepted',
+            threadId,
+            messageId: 'msg123',
+          }),
       });
 
       const { result } = renderHook(() => useSessionAPI());
@@ -325,7 +326,7 @@ describe('useSessionAPI', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: false,
-        json: async () => ({ error: 'Failed to send message' }),
+        json: () => Promise.resolve({ error: 'Failed to send message' }),
       });
 
       const { result } = renderHook(() => useSessionAPI());
@@ -349,7 +350,7 @@ describe('useSessionAPI', () => {
         agents: [],
       };
 
-      let resolvePromise: (value: any) => void;
+      let resolvePromise: (value: unknown) => void;
       const promise = new Promise((resolve) => {
         resolvePromise = resolve;
       });
@@ -361,7 +362,7 @@ describe('useSessionAPI', () => {
       expect(result.current.loading).toBe(false);
 
       // Start operation
-      await act(async () => {
+      act(() => {
         void result.current.createSession({ name: 'Test Session' });
       });
 
@@ -371,7 +372,7 @@ describe('useSessionAPI', () => {
       await act(async () => {
         resolvePromise!({
           ok: true,
-          json: async () => ({ session: mockSession }),
+          json: () => Promise.resolve({ session: mockSession }),
         });
         await promise;
       });
