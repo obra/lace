@@ -66,7 +66,7 @@ describe('Full Conversation Flow', () => {
 
     const sessionResponse = await createSession(createSessionRequest);
     expect(sessionResponse.status).toBe(201);
-    const sessionData = await sessionResponse.json();
+    const sessionData = (await sessionResponse.json()) as { session: { id: string } };
     expect(sessionData.session.id).toBe(sessionId);
 
     // 2. Spawn agent
@@ -81,10 +81,28 @@ describe('Full Conversation Flow', () => {
       createdAt: new Date().toISOString(),
     };
 
-    mockSessionService.getSession.mockResolvedValue({
-      ...mockSession,
-      agents: [],
-    });
+    // Mock Session instance for getSession
+    const mockSessionInstance = {
+      getId: () => sessionId,
+      getInfo: () => ({
+        id: sessionId,
+        name: sessionName,
+        createdAt: new Date(),
+        provider: 'anthropic',
+        model: 'claude-3-haiku',
+        agents: [],
+      }),
+      getAgents: () => [],
+      getAgent: vi.fn(),
+      getTaskManager: vi.fn(),
+      spawnAgent: vi.fn(),
+      startAgent: vi.fn(),
+      stopAgent: vi.fn(),
+      sendMessage: vi.fn(),
+      destroy: vi.fn(),
+    };
+
+    mockSessionService.getSession.mockResolvedValue(mockSessionInstance);
     mockSessionService.spawnAgent.mockResolvedValue(mockAgent);
 
     const spawnAgentRequest = new NextRequest(
@@ -104,14 +122,15 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ sessionId }),
     });
     expect(agentResponse.status).toBe(201);
-    const agentData = await agentResponse.json();
+    const agentData = (await agentResponse.json()) as { agent: { threadId: string } };
     expect(agentData.agent.threadId).toBe(agentThreadId);
 
     // 3. Connect to SSE stream
-    mockSessionService.getSession.mockResolvedValue({
-      ...mockSession,
-      agents: [mockAgent],
-    });
+    const mockSessionWithAgent = {
+      ...mockSessionInstance,
+      getAgents: () => [mockAgent],
+    };
+    mockSessionService.getSession.mockResolvedValue(mockSessionWithAgent);
 
     const streamRequest = new NextRequest(
       `http://localhost:3000/api/sessions/${sessionId}/events/stream`
@@ -150,7 +169,7 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ threadId: agentThreadId }),
     });
     expect(messageResponse.status).toBe(202);
-    const messageData = await messageResponse.json();
+    const messageData = (await messageResponse.json()) as { status: string };
     expect(messageData.status).toBe('accepted');
 
     // 5. Verify events flow correctly
@@ -190,7 +209,29 @@ describe('Full Conversation Flow', () => {
       status: 'idle' as const,
       createdAt: new Date().toISOString(),
     };
-    mockSessionService.getSession.mockResolvedValue(mockSession);
+
+    // Mock Session instance for multi-agent scenario
+    const mockMultiSession = {
+      getId: () => sessionId,
+      getInfo: () => ({
+        id: sessionId,
+        name: 'Multi-Agent Session',
+        createdAt: new Date(),
+        provider: 'anthropic',
+        model: 'claude-3-haiku',
+        agents: [],
+      }),
+      getAgents: () => [],
+      getAgent: vi.fn(),
+      getTaskManager: vi.fn(),
+      spawnAgent: vi.fn(),
+      startAgent: vi.fn(),
+      stopAgent: vi.fn(),
+      sendMessage: vi.fn(),
+      destroy: vi.fn(),
+    };
+
+    mockSessionService.getSession.mockResolvedValue(mockMultiSession);
     mockSessionService.spawnAgent.mockResolvedValue(agent1);
 
     const spawnAgent1Request = new NextRequest(
@@ -212,10 +253,13 @@ describe('Full Conversation Flow', () => {
       status: 'idle' as const,
       createdAt: new Date().toISOString(),
     };
-    mockSessionService.getSession.mockResolvedValue({
-      ...mockSession,
-      agents: [agent1],
-    });
+
+    // Update mock session to include first agent
+    const mockMultiSessionWithAgent1 = {
+      ...mockMultiSession,
+      getAgents: () => [agent1],
+    };
+    mockSessionService.getSession.mockResolvedValue(mockMultiSessionWithAgent1);
     mockSessionService.spawnAgent.mockResolvedValue(agent2);
 
     const spawnAgent2Request = new NextRequest(
@@ -233,17 +277,19 @@ describe('Full Conversation Flow', () => {
     await spawnAgent(spawnAgent2Request, { params: Promise.resolve({ sessionId }) });
 
     // List agents
-    mockSessionService.getSession.mockResolvedValue({
-      ...mockSession,
-      agents: [agent1, agent2],
-    });
+    const mockMultiSessionWithBothAgents = {
+      ...mockMultiSession,
+      getAgents: () => [agent1, agent2],
+    };
+    mockSessionService.getSession.mockResolvedValue(mockMultiSessionWithBothAgents);
     const listAgentsRequest = new NextRequest(
       `http://localhost:3000/api/sessions/${sessionId}/agents`
     );
     const listResponse = await listAgents(listAgentsRequest, {
       params: Promise.resolve({ sessionId }),
     });
-    const { agents } = await listResponse.json();
+    const listData = (await listResponse.json()) as { agents: Array<{ name: string }> };
+    const { agents } = listData;
 
     expect(agents).toHaveLength(2);
     expect(agents[0].name).toBe('pm');
@@ -287,24 +333,52 @@ describe('Full Conversation Flow', () => {
     );
 
     // Connect to streams
-    mockSessionService.getSession.mockResolvedValue({
-      id: session1Id,
-      name: 'Session 1',
-      createdAt: new Date().toISOString(),
-      agents: [],
-    });
+    const mockSession1Instance = {
+      getId: () => session1Id,
+      getInfo: () => ({
+        id: session1Id,
+        name: 'Session 1',
+        createdAt: new Date(),
+        provider: 'anthropic',
+        model: 'claude-3-haiku',
+        agents: [],
+      }),
+      getAgents: () => [],
+      getAgent: vi.fn(),
+      getTaskManager: vi.fn(),
+      spawnAgent: vi.fn(),
+      startAgent: vi.fn(),
+      stopAgent: vi.fn(),
+      sendMessage: vi.fn(),
+      destroy: vi.fn(),
+    };
+    mockSessionService.getSession.mockResolvedValue(mockSession1Instance);
 
     await streamEvents(
       new NextRequest(`http://localhost:3000/api/sessions/${session1Id}/events/stream`),
       { params: Promise.resolve({ sessionId: session1Id }) }
     );
 
-    mockSessionService.getSession.mockResolvedValue({
-      id: session2Id,
-      name: 'Session 2',
-      createdAt: new Date().toISOString(),
-      agents: [],
-    });
+    const mockSession2Instance = {
+      getId: () => session2Id,
+      getInfo: () => ({
+        id: session2Id,
+        name: 'Session 2',
+        createdAt: new Date(),
+        provider: 'anthropic',
+        model: 'claude-3-haiku',
+        agents: [],
+      }),
+      getAgents: () => [],
+      getAgent: vi.fn(),
+      getTaskManager: vi.fn(),
+      spawnAgent: vi.fn(),
+      startAgent: vi.fn(),
+      stopAgent: vi.fn(),
+      sendMessage: vi.fn(),
+      destroy: vi.fn(),
+    };
+    mockSessionService.getSession.mockResolvedValue(mockSession2Instance);
 
     await streamEvents(
       new NextRequest(`http://localhost:3000/api/sessions/${session2Id}/events/stream`),

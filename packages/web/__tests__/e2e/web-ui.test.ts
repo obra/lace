@@ -28,7 +28,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 import { getSessionService } from '@/lib/server/session-service';
-import { Session as SessionType } from '@/types/api';
+import type { Session as SessionType } from '@/types/api';
 
 describe('Web UI E2E Tests', () => {
   let sessionService: ReturnType<typeof getSessionService>;
@@ -79,8 +79,9 @@ describe('Web UI E2E Tests', () => {
       const retrieved = await sessionService.getSession(created.id as string);
 
       expect(retrieved).toBeDefined();
-      expect(retrieved!.name).toBe('Retrieve Test');
-      expect(retrieved!.id).toBe(created.id);
+      const retrievedInfo = retrieved!.getInfo();
+      expect(retrievedInfo?.name).toBe('Retrieve Test');
+      expect(retrieved!.getId()).toBe(created.id);
     });
   });
 
@@ -112,10 +113,11 @@ describe('Web UI E2E Tests', () => {
       const updatedSession = await sessionService.getSession(session.id as string);
 
       expect(updatedSession).toBeDefined();
-      expect(updatedSession!.agents).toHaveLength(3); // Coordinator + 2 agents
-      expect(updatedSession!.agents.map((a) => a.name)).toContain('Agent Test Session');
-      expect(updatedSession!.agents.map((a) => a.name)).toContain('Agent 1');
-      expect(updatedSession!.agents.map((a) => a.name)).toContain('Agent 2');
+      const updatedAgents = updatedSession!.getAgents();
+      expect(updatedAgents).toHaveLength(3); // Coordinator + 2 agents
+      expect(updatedAgents.map((a) => a.name)).toContain('Agent Test Session');
+      expect(updatedAgents.map((a) => a.name)).toContain('Agent 1');
+      expect(updatedAgents.map((a) => a.name)).toContain('Agent 2');
     });
 
     it('should generate correct agent thread IDs', async () => {
@@ -139,10 +141,12 @@ describe('Web UI E2E Tests', () => {
       // Should be able to retrieve the session
       const retrievedSession = await newSessionService.getSession(session1.id as string);
       expect(retrievedSession).toBeDefined();
-      expect(retrievedSession!.name).toBe('Persistence Test');
-      expect(retrievedSession!.agents).toHaveLength(2); // Coordinator + 1 agent
-      expect(retrievedSession!.agents.map((a) => a.name)).toContain('Persistence Test');
-      expect(retrievedSession!.agents.map((a) => a.name)).toContain('Persistent Agent');
+      const retrievedInfo = retrievedSession!.getInfo();
+      expect(retrievedInfo?.name).toBe('Persistence Test');
+      const retrievedAgents = retrievedSession!.getAgents();
+      expect(retrievedAgents).toHaveLength(2); // Coordinator + 1 agent
+      expect(retrievedAgents.map((a) => a.name)).toContain('Persistence Test');
+      expect(retrievedAgents.map((a) => a.name)).toContain('Persistent Agent');
     });
 
     it('should list persisted sessions after restart', async () => {
