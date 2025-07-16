@@ -4,13 +4,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Session } from '~/sessions/session';
 import { Agent } from '~/agents/agent';
-import { asThreadId } from '~/threads/types';
+import { asThreadId, type ThreadId } from '~/threads/types';
 
 // Mock Agent
 vi.mock('~/agents/agent', () => ({
-  Agent: {
-    createSession: vi.fn(),
-  },
+  Agent: vi.fn(() => ({
+    threadId: asThreadId('mock-thread-id'),
+    stop: vi.fn(),
+    sendMessage: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
+    emit: vi.fn(),
+  })),
 }));
 
 // Mock getLaceDbPath
@@ -18,9 +23,60 @@ vi.mock('~/config/lace-dir', () => ({
   getLaceDbPath: vi.fn().mockReturnValue('/test/db/path'),
 }));
 
+// Mock ProviderRegistry
+vi.mock('~/providers/registry', () => ({
+  ProviderRegistry: {
+    createWithAutoDiscovery: vi.fn().mockReturnValue({
+      createProvider: vi.fn().mockReturnValue({
+        type: 'openai',
+        model: 'gpt-4',
+      }),
+    }),
+  },
+}));
+
+// Mock ThreadManager
+vi.mock('~/threads/thread-manager', () => ({
+  ThreadManager: vi.fn(() => ({
+    resumeOrCreate: vi.fn().mockReturnValue({
+      threadId: 'test-thread-id',
+      isNew: true,
+    }),
+    getAllThreadsWithMetadata: vi.fn().mockReturnValue([]),
+    getThread: vi.fn().mockReturnValue(null),
+  })),
+}));
+
+// Mock DatabasePersistence
+vi.mock('~/persistence/database', () => ({
+  DatabasePersistence: vi.fn(() => ({
+    // Mock any needed methods
+  })),
+}));
+
+// Mock ToolExecutor
+vi.mock('~/tools/executor', () => ({
+  ToolExecutor: vi.fn(() => ({
+    registerTools: vi.fn(),
+    getAllTools: vi.fn().mockReturnValue([]),
+  })),
+}));
+
+// Mock TaskManager
+vi.mock('~/tasks/task-manager', () => ({
+  TaskManager: vi.fn(() => ({
+    // Mock any needed methods
+  })),
+}));
+
+// Mock tool implementations
+vi.mock('~/tools/implementations/task-manager', () => ({
+  createTaskManagerTools: vi.fn(() => []),
+}));
+
 describe('Session', () => {
   let mockAgent: {
-    threadId: string;
+    threadId: ThreadId;
     providerName: string;
     getCurrentState: ReturnType<typeof vi.fn>;
     toolExecutor: { mock: string };
@@ -30,9 +86,12 @@ describe('Session', () => {
     start: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
     sendMessage: ReturnType<typeof vi.fn>;
+    on: ReturnType<typeof vi.fn>;
+    off: ReturnType<typeof vi.fn>;
+    emit: ReturnType<typeof vi.fn>;
   };
   let mockDelegateAgents: Array<{
-    threadId: string;
+    threadId: ThreadId;
     providerName: string;
     getCurrentState: ReturnType<typeof vi.fn>;
     toolExecutor: { mock: string };
@@ -51,7 +110,7 @@ describe('Session', () => {
 
     // Mock main session agent
     mockAgent = {
-      threadId: 'test-session',
+      threadId: asThreadId('test-session'),
       providerName: 'anthropic',
       getCurrentState: vi.fn().mockReturnValue('idle'),
       toolExecutor: { mock: 'toolExecutor' },
@@ -65,7 +124,7 @@ describe('Session', () => {
       createDelegateAgent: vi.fn().mockImplementation(() => {
         delegateAgentCounter++;
         const delegateAgent = {
-          threadId: `test-session.${delegateAgentCounter}`,
+          threadId: asThreadId(`test-session.${delegateAgentCounter}`),
           providerName: 'anthropic',
           getCurrentState: vi.fn().mockReturnValue('idle'),
           toolExecutor: { mock: 'toolExecutor' },
@@ -85,21 +144,28 @@ describe('Session', () => {
       start: vi.fn(),
       stop: vi.fn(),
       sendMessage: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+      emit: vi.fn(),
     };
 
-    (Agent.createSession as ReturnType<typeof vi.fn>).mockReturnValue(mockAgent);
+    // Set the mock to return our mock agent when instantiated
+    (Agent as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockAgent);
   });
 
   describe('create', () => {
     it('should create a session with default parameters', () => {
       const session = Session.create('Test Session');
 
-      expect(Agent.createSession).toHaveBeenCalledWith({
-        providerType: 'anthropic',
-        model: 'claude-3-haiku-20240307',
-        name: 'Test Session',
-        dbPath: '/test/db/path',
-      });
+      expect(Agent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: expect.any(Object) as object,
+          toolExecutor: expect.any(Object) as object,
+          threadManager: expect.any(Object) as object,
+          threadId: expect.any(String) as string,
+          tools: expect.any(Array) as unknown[],
+        })
+      );
 
       expect(session).toBeInstanceOf(Session);
     });
@@ -107,12 +173,15 @@ describe('Session', () => {
     it('should create a session with custom parameters', () => {
       const session = Session.create('Custom Session', 'openai', 'gpt-4', '/custom/path');
 
-      expect(Agent.createSession).toHaveBeenCalledWith({
-        providerType: 'openai',
-        model: 'gpt-4',
-        name: 'Custom Session',
-        dbPath: '/custom/path',
-      });
+      expect(Agent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: expect.any(Object) as object,
+          toolExecutor: expect.any(Object) as object,
+          threadManager: expect.any(Object) as object,
+          threadId: expect.any(String) as string,
+          tools: expect.any(Array) as unknown[],
+        })
+      );
 
       expect(session).toBeInstanceOf(Session);
     });
