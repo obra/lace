@@ -69,7 +69,11 @@ describe('Session API Routes', () => {
 
       expect(response.status).toBe(201);
       expect(data.session).toEqual(mockSession);
-      expect(mockSessionService.createSession).toHaveBeenCalledWith(sessionName);
+      expect(mockSessionService.createSession).toHaveBeenCalledWith(
+        sessionName,
+        'anthropic',
+        'claude-3-haiku-20240307'
+      );
     });
 
     it('should create session with default name when name not provided', async () => {
@@ -96,7 +100,11 @@ describe('Session API Routes', () => {
 
       expect(response.status).toBe(201);
       expect(data.session.name).toBe('Untitled Session');
-      expect(mockSessionService.createSession).toHaveBeenCalledWith(undefined);
+      expect(mockSessionService.createSession).toHaveBeenCalledWith(
+        undefined,
+        'anthropic',
+        'claude-3-haiku-20240307'
+      );
     });
 
     it('should handle session creation errors', async () => {

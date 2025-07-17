@@ -49,7 +49,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const body = bodyResult.data;
-    const session = await sessionService.createSession(body.name, body.provider, body.model);
+    const session = await sessionService.createSession(
+      body.name,
+      body.provider || 'anthropic',
+      body.model || 'claude-3-haiku-20240307'
+    );
 
     return NextResponse.json({ session }, { status: 201 });
   } catch (error: unknown) {
