@@ -861,6 +861,7 @@ export class Agent extends EventEmitter {
         const result = await this._toolExecutor.executeTool(toolCall, {
           threadId: asThreadId(this._threadId),
           parentThreadId: asThreadId(this._getParentThreadId()),
+          workingDirectory: this._getWorkingDirectory(),
         });
 
         const outputText = result.content[0]?.text || '';
@@ -1539,6 +1540,38 @@ export class Agent extends EventEmitter {
     } finally {
       this._isProcessingQueue = false;
       this.emit('queue_processing_complete');
+    }
+  }
+
+  private _getWorkingDirectory(): string | undefined {
+    try {
+      // Get the current thread to find its session and project
+      const thread = this._threadManager.getThread(this._threadId);
+      if (!thread) return undefined;
+
+      // If thread has a sessionId, get the session to find the project
+      if (thread.sessionId) {
+        const session = this._threadManager.getSession(thread.sessionId);
+        if (session?.projectId) {
+          const project = this._threadManager.getProject(session.projectId);
+          return project?.workingDirectory;
+        }
+      }
+
+      // If thread has a direct projectId, use that
+      if (thread.projectId) {
+        const project = this._threadManager.getProject(thread.projectId);
+        return project?.workingDirectory;
+      }
+
+      // Fallback to current working directory
+      return process.cwd();
+    } catch (error) {
+      logger.warn('Failed to get working directory from session/project', {
+        threadId: this._threadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return process.cwd();
     }
   }
 }
