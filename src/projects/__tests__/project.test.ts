@@ -119,8 +119,8 @@ describe('Project', () => {
           description: 'A test project',
           workingDirectory: '/test/path',
           isArchived: false,
-          createdAt: expect.any(Date),
-          lastUsedAt: expect.any(Date),
+          createdAt: expect.any(Date) as Date,
+          lastUsedAt: expect.any(Date) as Date,
           sessionCount: 0,
         });
       });

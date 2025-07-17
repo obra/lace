@@ -5,7 +5,6 @@ import { randomUUID } from 'crypto';
 import { getPersistence, ProjectData, DatabasePersistence } from '~/persistence/database';
 import { logger } from '~/utils/logger';
 import { Session } from '~/sessions/session';
-// import { getLaceDbPath } from '~/config/lace-dir'; // Keep for potential future use
 import { asThreadId } from '~/threads/types';
 
 export interface ProjectInfo {
