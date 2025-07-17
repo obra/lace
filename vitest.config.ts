@@ -27,4 +27,29 @@ export default defineConfig({
       FORCE_COLOR: '0',
     },
   },
+  projects: [
+    {
+      // Main project (CLI tests)
+      test: {
+        include: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+        exclude: ['packages/**'],
+        environment: 'jsdom',
+        setupFiles: ['./src/__tests__/setup.ts'],
+      },
+    },
+    {
+      // Web package tests
+      test: {
+        include: ['packages/web/**/*.test.{ts,tsx}', 'packages/web/**/*.spec.{ts,tsx}'],
+        environment: 'jsdom',
+        setupFiles: ['./packages/web/test-setup.ts'],
+      },
+      resolve: {
+        alias: {
+          '~': resolve(__dirname, 'src'),
+          '@': resolve(__dirname, 'packages/web'),
+        },
+      },
+    },
+  ],
 });
