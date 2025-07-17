@@ -24,12 +24,20 @@ export class DatabasePersistence {
   private _closed: boolean = false;
   private _disabled: boolean = false;
 
-  constructor(dbPath: string) {
+  get database(): Database.Database | null {
+    return this.db;
+  }
+
+  constructor(dbPath: string | Database.Database) {
     try {
-      this.db = new Database(dbPath);
-      // Enable WAL mode for better concurrency
-      this.db.pragma('journal_mode = WAL');
-      this.db.pragma('busy_timeout = 5000');
+      if (typeof dbPath === 'string') {
+        this.db = new Database(dbPath);
+        // Enable WAL mode for better concurrency
+        this.db.pragma('journal_mode = WAL');
+        this.db.pragma('busy_timeout = 5000');
+      } else {
+        this.db = dbPath;
+      }
       this.initializeSchema();
     } catch (error) {
       logger.error('Failed to initialize database', {
@@ -75,6 +83,14 @@ export class DatabasePersistence {
 
     if (currentVersion < 4) {
       this.migrateToV4();
+    }
+
+    if (currentVersion < 5) {
+      this.migrateToV5();
+    }
+
+    if (currentVersion < 6) {
+      this.migrateToV6();
     }
   }
 
@@ -205,6 +221,137 @@ export class DatabasePersistence {
     `);
 
     this.setSchemaVersion(4);
+  }
+
+  private migrateToV5(): void {
+    if (!this.db) return;
+
+    // Create projects table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        working_directory TEXT NOT NULL,
+        configuration TEXT DEFAULT '{}',
+        is_archived BOOLEAN DEFAULT FALSE,
+        created_at TEXT DEFAULT (datetime('now')),
+        last_used_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    // Create "Historical" project for migration
+    this.db
+      .prepare(
+        `
+      INSERT OR IGNORE INTO projects (id, name, description, working_directory, configuration, is_archived, created_at, last_used_at)
+      VALUES ('historical', 'Historical', 'Legacy sessions before project support', ?, '{}', FALSE, datetime('now'), datetime('now'))
+    `
+      )
+      .run(process.cwd());
+
+    this.setSchemaVersion(5);
+  }
+
+  private migrateToV6(): void {
+    if (!this.db) return;
+
+    // Create sessions table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        configuration TEXT DEFAULT '{}',
+        status TEXT CHECK(status IN ('active', 'archived', 'completed')) DEFAULT 'active',
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (project_id) REFERENCES projects(id)
+      )
+    `);
+
+    // Add session_id to threads table
+    const hasSessionId =
+      (
+        this.db
+          .prepare(
+            "SELECT COUNT(*) as count FROM pragma_table_info('threads') WHERE name='session_id'"
+          )
+          .get() as { count: number }
+      ).count > 0;
+
+    if (!hasSessionId) {
+      this.db.exec('ALTER TABLE threads ADD COLUMN session_id TEXT');
+    }
+
+    // Migrate existing session threads to sessions table
+    const sessionThreads = this.db
+      .prepare(
+        `
+      SELECT id, created_at, updated_at, metadata
+      FROM threads 
+      WHERE metadata IS NOT NULL 
+      AND json_extract(metadata, '$.isSession') = 1
+    `
+      )
+      .all() as Array<{
+      id: string;
+      created_at: string;
+      updated_at: string;
+      metadata: string;
+    }>;
+
+    for (const sessionThread of sessionThreads) {
+      const metadata = JSON.parse(sessionThread.metadata) as {
+        isSession?: boolean;
+        name?: string;
+        description?: string;
+        configuration?: Record<string, unknown>;
+        [key: string]: unknown;
+      };
+
+      // Create session record
+      this.db
+        .prepare(
+          `
+        INSERT OR IGNORE INTO sessions (id, project_id, name, description, configuration, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+        )
+        .run(
+          sessionThread.id,
+          'historical',
+          metadata.name || 'Untitled Session',
+          metadata.description || '',
+          JSON.stringify(metadata.configuration || {}),
+          sessionThread.created_at,
+          sessionThread.updated_at
+        );
+
+      // Update thread to reference session and remove isSession metadata
+      const cleanMetadata = { ...metadata };
+      delete cleanMetadata.isSession;
+      delete cleanMetadata.name;
+      delete cleanMetadata.description;
+      delete cleanMetadata.configuration;
+
+      this.db
+        .prepare(
+          `
+        UPDATE threads 
+        SET session_id = ?, metadata = ?
+        WHERE id = ?
+      `
+        )
+        .run(
+          sessionThread.id,
+          Object.keys(cleanMetadata).length > 0 ? JSON.stringify(cleanMetadata) : null,
+          sessionThread.id
+        );
+    }
+
+    this.setSchemaVersion(6);
   }
 
   // ===============================
