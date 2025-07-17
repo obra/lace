@@ -12,19 +12,30 @@ export default function DesignLayout({ children }: { children: React.ReactNode }
               Lace
             </Link>
             <ChevronRightIcon className="w-4 h-4 text-base-content/40" />
-            <span className="text-base-content/60">Admin</span>
+            <Link href="/admin" className="text-base-content/60 hover:text-base-content">
+              Admin
+            </Link>
             <ChevronRightIcon className="w-4 h-4 text-base-content/40" />
             <span className="text-base-content/60">Design System</span>
           </div>
 
           <div className="flex gap-4 mt-4">
-            <Link href="/admin/design" className="btn btn-sm btn-ghost">
+            <Link href="/admin/instructions" className="btn btn-sm btn-ghost">
+              Instructions
+            </Link>
+            <Link href="/admin/design" className="btn btn-sm btn-ghost btn-active">
+              Design System
+            </Link>
+          </div>
+          
+          <div className="flex gap-2 mt-3 ml-4">
+            <Link href="/admin/design" className="btn btn-xs btn-ghost">
               Overview
             </Link>
-            <Link href="/admin/design/components" className="btn btn-sm btn-ghost">
+            <Link href="/admin/design/components" className="btn btn-xs btn-ghost">
               Implemented
             </Link>
-            <Link href="/admin/design/missing" className="btn btn-sm btn-ghost">
+            <Link href="/admin/design/missing" className="btn btn-xs btn-ghost">
               Missing Components
             </Link>
           </div>

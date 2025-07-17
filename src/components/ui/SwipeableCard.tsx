@@ -308,20 +308,24 @@ export function LongPress({
   className = '',
 }: LongPressProps) {
   const [isPressed, setIsPressed] = useState(false);
+  const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null);
 
   const handlePressStart = () => {
     setIsPressed(true);
     if (onLongPress) {
-      setTimeout(() => {
-        if (isPressed) {
-          onLongPress();
-        }
+      const id = setTimeout(() => {
+        onLongPress();
       }, duration);
+      setTimeoutId(id);
     }
   };
 
   const handlePressEnd = () => {
     setIsPressed(false);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      setTimeoutId(null);
+    }
   };
 
   return (

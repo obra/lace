@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import GoogleDocChatMessage from '~/components/chat/GoogleDocChatMessage';
+import GoogleDocChatMessage from '~/components/organisms/GoogleDocChatMessage';
 import type { Message } from '~/types';
 
 interface GoogleDocAttachment {

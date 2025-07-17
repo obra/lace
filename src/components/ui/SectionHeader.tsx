@@ -12,6 +12,7 @@ interface SectionHeaderProps {
   rightContent?: ReactNode;
   className?: string;
   disabled?: boolean;
+  asButton?: boolean; // Whether to render as a button (default true)
 }
 
 export default function SectionHeader({
@@ -22,6 +23,7 @@ export default function SectionHeader({
   rightContent,
   className = '',
   disabled = false,
+  asButton = true,
 }: SectionHeaderProps) {
   const getBadgeClasses = (variant: string = 'primary') => {
     const baseClasses = 'badge badge-sm border-0';
@@ -48,17 +50,8 @@ export default function SectionHeader({
     }
   };
 
-  return (
-    <button
-      onClick={onToggle}
-      disabled={disabled}
-      className={`
-        flex items-center justify-between w-full text-left p-3 
-        hover:bg-base-200 rounded-lg transition-colors
-        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-        ${className}
-      `}
-    >
+  const content = (
+    <>
       <span className="text-sm font-medium text-base-content">{title}</span>
       
       <div className="flex items-center gap-2">
@@ -77,6 +70,34 @@ export default function SectionHeader({
           <ChevronRightIcon className="w-4 h-4 transition-transform text-base-content/60" />
         )}
       </div>
-    </button>
+    </>
+  );
+
+  const baseClasses = `
+    flex items-center justify-between w-full text-left p-3 
+    hover:bg-base-200 rounded-lg transition-colors
+    ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+    ${className}
+  `;
+
+  if (asButton) {
+    return (
+      <button
+        onClick={onToggle}
+        disabled={disabled}
+        className={baseClasses}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      onClick={disabled ? undefined : onToggle}
+      className={`${baseClasses} ${disabled ? '' : 'cursor-pointer'}`}
+    >
+      {content}
+    </div>
   );
 }

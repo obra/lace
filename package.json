@@ -30,7 +30,11 @@
     "prepare": "husky",
     "docker:build": "docker build -t lace-test .",
     "docker:run": "docker run -it --rm lace-test",
-    "docker:shell": "docker run -it --rm lace-test /bin/bash"
+    "docker:shell": "docker run -it --rm lace-test /bin/bash",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "chromatic": "chromatic --exit-zero-on-changes",
+    "chromatic:ci": "chromatic --exit-zero-on-changes --skip='dependabot/**'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
@@ -81,6 +85,13 @@
     "zod-to-json-schema": "^3.24.6"
   },
   "devDependencies": {
+    "@mdx-js/react": "^3.1.0",
+    "@storybook/addon-a11y": "^9.0.17",
+    "@storybook/addon-docs": "^9.0.0-alpha.12",
+    "@storybook/addon-essentials": "^9.0.0-alpha.12",
+    "@storybook/addon-onboarding": "^9.0.17",
+    "@storybook/addon-vitest": "^9.0.17",
+    "@storybook/nextjs-vite": "^9.0.17",
     "@testing-library/react": "^16.3.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/marked-terminal": "^6.1.1",
@@ -89,13 +100,16 @@
     "@types/turndown": "^5.0.5",
     "@typescript-eslint/eslint-plugin": "^8.34.0",
     "@typescript-eslint/parser": "^8.34.0",
-    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/browser": "3.2.4",
+    "@vitest/coverage-v8": "3.2.4",
+    "chromatic": "^13.1.2",
     "daisyui": "^5.0.46",
     "eslint": "^9.29.0",
     "eslint-config-prettier": "^10.1.5",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-no-relative-import-paths": "^1.6.1",
     "eslint-plugin-prettier": "^5.4.1",
+    "eslint-plugin-storybook": "^9.0.17",
     "eslint-plugin-vitest": "^0.5.4",
     "execa": "^9.6.0",
     "globals": "^16.2.0",
@@ -104,11 +118,21 @@
     "jsdom": "^26.1.0",
     "lint-staged": "^16.1.1",
     "node-pty": "^1.0.0",
+    "playwright": "^1.54.1",
     "prettier": "3.6.2",
     "react-devtools-core": "^4.28.5",
+    "storybook": "^9.0.17",
     "tsc-alias": "^1.8.16",
     "typescript": "^5.6.0",
     "typescript-eslint": "^8.36.0",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "vite": "^6.0.0"
+  },
+  "eslintConfig": {
+    "extends": [
+      "plugin:storybook/recommended"
+    ]
   }
 }

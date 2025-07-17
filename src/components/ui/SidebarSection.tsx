@@ -44,6 +44,7 @@ export default function SidebarSection({
         badge={badge}
         rightContent={rightContent}
         disabled={disabled}
+        asButton={!rightContent || typeof rightContent === 'string'}
       />
 
       {isExpanded && <div className={`mt-2 space-y-1 ${contentClassName}`}>{children}</div>}

@@ -105,7 +105,7 @@ export default function GoogleDocChatMessage({ message }: GoogleDocChatMessagePr
                       </h4>
                       <p className="text-xs text-base-content/70">
                         By {message.document.owner} •{' '}
-                        {message.document.lastModified.toLocaleDateString()}
+                        {new Date(message.document.lastModified).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="flex items-center gap-1">

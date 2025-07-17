@@ -522,8 +522,8 @@ function FileContentModal({ file, content }: FileContentModalProps) {
             className="max-w-full h-auto rounded-lg border border-base-300"
           />
         ) : content ? (
-          <pre className="text-sm bg-base-200 p-4 rounded-lg overflow-x-auto">
-            <code>{content}</code>
+          <pre className="text-sm bg-base-200 p-4 rounded-lg overflow-x-auto font-mono">
+            <code className="font-mono">{content}</code>
           </pre>
         ) : (
           <div className="text-center py-8 text-base-content/60">

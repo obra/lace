@@ -210,7 +210,6 @@ export default function DesignSystemPage() {
 
         <DesignSystemClient
           atomicLevels={atomicLevels}
-          designPrinciples={designPrinciples}
         />
 
         {/* Quick Navigation */}

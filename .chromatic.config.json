@@ -1,0 +1,45 @@
+{
+  "projectId": "PROJECT_ID_PLACEHOLDER",
+  "buildScriptName": "build-storybook",
+  "storybookBuildDir": "storybook-static",
+  "exitZeroOnChanges": true,
+  "exitOnceUploaded": true,
+  "allowConsoleErrors": true,
+  "ignoreLastBuildOnBranch": "main",
+  "skip": [
+    "dependabot/**"
+  ],
+  "externals": [
+    "public/**"
+  ],
+  "fileHashing": true,
+  "zip": true,
+  "diagnostics": true,
+  "debug": false,
+  "onlyChanged": true,
+  "traceChanged": "expanded",
+  "junitReport": true,
+  "cypressTimeout": 120000,
+  "playwright": {
+    "timeout": 120000
+  },
+  "modes": {
+    "light": {
+      "disable": false,
+      "globals": {
+        "theme": "light"
+      }
+    },
+    "dark": {
+      "disable": false,
+      "globals": {
+        "theme": "dark"
+      }
+    }
+  },
+  "threshold": {
+    "anti-aliasing": 0.1,
+    "color": 0.1,
+    "layout": 0.1
+  }
+}

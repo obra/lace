@@ -53,9 +53,9 @@ export default function MessageDisplay({
             badge={tool ? { text: tool, variant: 'info' } : undefined}
           />
           <div className="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300">
-            <div className="text-base-content/80 mb-2">$ {content}</div>
+            <div className="text-base-content/80 mb-2 font-mono">$ {content}</div>
             {result && (
-              <div className="text-base-content/60 text-xs whitespace-pre-wrap">{result}</div>
+              <div className="text-base-content/60 text-xs whitespace-pre-wrap font-mono">{result}</div>
             )}
           </div>
         </div>

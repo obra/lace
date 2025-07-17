@@ -1,18 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faSearch,
-  faTerminal,
-  faTasks,
-  faUser,
-  faRobot,
-  faCog,
-  faPlus,
-  faCheck,
-} from '~/lib/fontawesome';
-import { ChevronRightIcon, Bars3Icon } from '@heroicons/react/24/outline';
+import { ChevronRightIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
 interface MissingComponent {
@@ -56,7 +45,7 @@ export function MissingClient({ missingComponents }: MissingClientProps) {
             onClick={() => setActiveTab(tab.id)}
             className={`flex-1 p-4 text-left transition-colors ${
               activeTab === tab.id
-                ? 'bg-teal/10 text-teal-600 border-b-2 border-teal-600'
+                ? 'bg-teal-500/10 text-teal-600 border-b-2 border-teal-600'
                 : 'hover:bg-base-200'
             }`}
           >
@@ -84,35 +73,38 @@ export function MissingClient({ missingComponents }: MissingClientProps) {
                 </div>
 
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {Object.entries(missingComponents).flatMap(([level, components]) =>
-                    components
-                      .filter((comp: MissingComponent) => comp.priority === priority)
-                      .map((component: MissingComponent, index: number) => (
-                        <div
-                          key={`${level}-${index}`}
-                          className="border border-base-300 rounded-lg p-4 hover:border-teal-300 transition-colors"
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <h3 className="font-semibold text-base-content">{component.name}</h3>
-                            {component.teal && (
-                              <div
-                                className="w-3 h-3 bg-teal-500 rounded-full"
-                                title="Uses teal branding"
-                              ></div>
-                            )}
+                  {Object.entries(missingComponents).flatMap(
+                    ([level, components]: [string, MissingComponent[]]) =>
+                      components
+                        .filter((comp: MissingComponent) => comp.priority === priority)
+                        .map((component: MissingComponent, index: number) => (
+                          <div
+                            key={`${level}-${index}`}
+                            className="border border-base-300 rounded-lg p-4 hover:border-teal-300 transition-colors"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <h3 className="font-semibold text-base-content">{component.name}</h3>
+                              {component.teal && (
+                                <div
+                                  className="w-3 h-3 bg-teal-500 rounded-full"
+                                  title="Uses teal branding"
+                                ></div>
+                              )}
+                            </div>
+                            <p className="text-sm text-base-content/70 mb-2">{component.usage}</p>
+                            <div className="flex items-center justify-between">
+                              <span className="badge badge-outline badge-sm capitalize">
+                                {level}
+                              </span>
+                              <Link
+                                href={`/admin/design/${level}`}
+                                className="text-xs text-teal-600 hover:text-teal-700"
+                              >
+                                View {level} →
+                              </Link>
+                            </div>
                           </div>
-                          <p className="text-sm text-base-content/70 mb-2">{component.usage}</p>
-                          <div className="flex items-center justify-between">
-                            <span className="badge badge-outline badge-sm capitalize">{level}</span>
-                            <Link
-                              href={`/admin/design/${level}`}
-                              className="text-xs text-teal-600 hover:text-teal-700"
-                            >
-                              View {level} →
-                            </Link>
-                          </div>
-                        </div>
-                      ))
+                        ))
                   )}
                 </div>
 
@@ -134,11 +126,12 @@ export function MissingClient({ missingComponents }: MissingClientProps) {
         {/* Atomic Level View */}
         {activeTab === 'atomic' && (
           <div className="space-y-8">
-            {Object.entries(missingComponents).map(([level, components]) => (
-              <div key={level}>
-                <div className="flex items-center gap-3 mb-4">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
+            {Object.entries(missingComponents).map(
+              ([level, components]: [string, MissingComponent[]]) => (
+                <div key={level}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
                     ${
                       level === 'atoms'
                         ? 'bg-primary/10 text-primary'
@@ -148,49 +141,51 @@ export function MissingClient({ missingComponents }: MissingClientProps) {
                             ? 'bg-accent/10 text-accent'
                             : 'bg-info/10 text-info'
                     }`}
-                  >
-                    {level[0].toUpperCase()}
-                  </div>
-                  <h2 className="text-xl font-bold text-base-content capitalize">{level}</h2>
-                  <Link href={`/admin/design/${level}`} className="btn btn-sm btn-outline">
-                    View Current {level}
-                  </Link>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  {components.map((component: MissingComponent, index: number) => (
-                    <div key={index} className="border border-base-300 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold text-base-content">{component.name}</h3>
-                        <div className="flex items-center gap-2">
-                          {component.teal && (
-                            <div
-                              className="w-3 h-3 bg-teal-500 rounded-full"
-                              title="Uses teal branding"
-                            ></div>
-                          )}
-                          <span
-                            className={`px-2 py-1 text-xs font-medium rounded border ${priorityColors[component.priority as keyof typeof priorityColors]}`}
-                          >
-                            {component.priority}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-base-content/70">{component.usage}</p>
+                    >
+                      {level[0].toUpperCase()}
                     </div>
-                  ))}
-                </div>
+                    <h2 className="text-xl font-bold text-base-content capitalize">{level}</h2>
+                    <Link href={`/admin/design/${level}`} className="btn btn-sm btn-outline">
+                      View Current {level}
+                    </Link>
+                  </div>
 
-                <div className="mt-4 p-3 bg-base-200 rounded-lg text-sm">
-                  <strong>Level Purpose:</strong>
-                  {level === 'atoms' && " Basic building blocks that can't be broken down further"}
-                  {level === 'molecules' &&
-                    ' Simple combinations of atoms for specific UI patterns'}
-                  {level === 'organisms' && ' Complex, standalone sections with business logic'}
-                  {level === 'templates' && ' Layout patterns and structural arrangements'}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {components.map((component: MissingComponent, index: number) => (
+                      <div key={index} className="border border-base-300 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-semibold text-base-content">{component.name}</h3>
+                          <div className="flex items-center gap-2">
+                            {component.teal && (
+                              <div
+                                className="w-3 h-3 bg-teal-500 rounded-full"
+                                title="Uses teal branding"
+                              ></div>
+                            )}
+                            <span
+                              className={`px-2 py-1 text-xs font-medium rounded border ${priorityColors[component.priority]}`}
+                            >
+                              {component.priority}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-sm text-base-content/70">{component.usage}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 p-3 bg-base-200 rounded-lg text-sm">
+                    <strong>Level Purpose:</strong>
+                    {level === 'atoms' &&
+                      " Basic building blocks that can't be broken down further"}
+                    {level === 'molecules' &&
+                      ' Simple combinations of atoms for specific UI patterns'}
+                    {level === 'organisms' && ' Complex, standalone sections with business logic'}
+                    {level === 'templates' && ' Layout patterns and structural arrangements'}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            )}
           </div>
         )}
 

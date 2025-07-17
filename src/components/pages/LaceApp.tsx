@@ -125,6 +125,8 @@ export function LaceApp() {
     { id: 3, name: 'Research', agent: 'Gemini' },
     { id: 4, name: 'Testing', agent: 'Claude' },
     { id: 5, name: 'Data Analysis', agent: 'GPT-4' },
+    { id: 6, name: 'Tennis Commentary Demo', agent: 'Claude' },
+    { id: 7, name: 'Design System Demo', agent: 'Claude' },
   ]);
 
   const [recentFiles] = useState<RecentFile[]>([
@@ -171,13 +173,13 @@ export function LaceApp() {
     {
       id: 2,
       type: 'human',
-      content: 'Help me analyze the recent code changes',
+      content: 'Can you help me create a React component with TypeScript that uses our new syntax highlighting system?',
       timestamp: new Date(Date.now() - 1800000),
     },
     {
       id: 3,
       type: 'ai',
-      content: "I'll analyze the codebase changes for you. Let me examine the recent commits.",
+      content: "I'll help you create a React component with TypeScript that demonstrates our syntax highlighting capabilities. Here's a complete example:\n\n```typescript\nimport React, { useState, useEffect } from 'react';\nimport { syntaxHighlighting } from '~/lib/syntax-highlighting';\n\ninterface CodeDisplayProps {\n  code: string;\n  language?: string;\n  fileName?: string;\n  showLineNumbers?: boolean;\n}\n\nexport const CodeDisplay: React.FC<CodeDisplayProps> = ({\n  code,\n  language = 'javascript',\n  fileName,\n  showLineNumbers = true\n}) => {\n  const [highlighted, setHighlighted] = useState<string>('');\n  const [isLoading, setIsLoading] = useState(true);\n\n  useEffect(() => {\n    const highlightCode = async () => {\n      try {\n        const result = await syntaxHighlighting.highlightCode(\n          code,\n          language,\n          fileName\n        );\n        setHighlighted(result.highlighted);\n      } catch (error) {\n        console.error('Syntax highlighting failed:', error);\n        setHighlighted(code); // Fallback to plain text\n      } finally {\n        setIsLoading(false);\n      }\n    };\n\n    highlightCode();\n  }, [code, language, fileName]);\n\n  if (isLoading) {\n    return <div className=\"animate-pulse\">Loading...</div>;\n  }\n\n  return (\n    <div className=\"bg-base-300 rounded-lg p-4 font-mono\">\n      {fileName && (\n        <div className=\"text-sm text-base-content/60 mb-2\">\n          {fileName}\n        </div>\n      )}\n      <pre\n        className=\"text-sm overflow-x-auto\"\n        dangerouslySetInnerHTML={{ __html: highlighted }}\n      />\n    </div>\n  );\n};\n```\n\nThis component uses our new syntax highlighting system with these features:\n\n- **Language Detection**: Automatically detects the language if not specified\n- **File Name Support**: Can use the filename for better language detection\n- **Async Highlighting**: Uses the `syntaxHighlighting` service asynchronously\n- **Error Handling**: Falls back to plain text if highlighting fails\n- **Loading States**: Shows a loading indicator while processing\n- **Responsive Design**: Uses Tailwind classes for consistent styling\n\nYou can also use inline code like `const result = await api.getData()` which will be highlighted appropriately.",
       agent: 'Claude',
       timestamp: new Date(Date.now() - 1790000),
     },
@@ -292,6 +294,288 @@ export function LaceApp() {
   const handleTimelineChange = (timeline: Timeline) => {
     setCurrentTimeline(timeline);
     setShowMobileNav(false);
+    
+    // Show tennis commentary demo when that timeline is selected
+    if (timeline.id === 6) {
+      setTimelineEntries([
+        {
+          id: 1,
+          type: 'admin',
+          content: 'Tennis Commentary Demo Timeline - Experience the contextual feedback system in action!',
+          timestamp: new Date(Date.now() - 1800000),
+        },
+        {
+          id: 2,
+          type: 'human',
+          content: 'Show me how the tennis commentary system works with our contextual feedback',
+          timestamp: new Date(Date.now() - 1600000),
+        },
+        {
+          id: 3,
+          type: 'ai',
+          content: `Here's how our tennis commentary system provides engaging feedback during development sessions:
+
+## 🎾 Tennis Commentary Features
+
+The contextual feedback system provides **tennis-style commentary** on development activities:
+
+### Tool Execution Commentary
+When tools are executed, you'll see commentary like:
+- *"A powerful file-read execution is underway - precision is key here!"*
+- *"Excellent execution! The bash tool delivered exactly what was needed."*
+- *"Watch this syntax-highlighting execution - timing and accuracy are everything."*
+
+### Turn-Based Commentary
+For conversation turns:
+- *"A new turn begins - the agent is ready to tackle the next challenge!"*
+- *"What a magnificent turn! The agent has delivered exceptional results."*
+- *"Fresh turn, fresh possibilities - let's see what strategic moves unfold."*
+
+### Error Handling Commentary
+When errors occur:
+- *"A minor setback, but watch how the agent adapts and recovers gracefully."*
+- *"Every champion faces challenges - it's the recovery that defines greatness."*
+- *"An unexpected twist! Let's see how the agent handles this curveball."*
+
+### Performance Insights
+The system tracks:
+- **Response times** and performance trends
+- **Tool usage patterns** and efficiency
+- **Error patterns** and recovery strategies
+- **Token usage** and context optimization
+
+## 🎯 How to Enable Tennis Commentary
+
+To enable tennis commentary in your development session:
+
+\`\`\`typescript
+import { FeedbackFactory } from '~/feedback/feedback-factory';
+
+// Create with tennis commentary preset
+const feedback = FeedbackFactory.createWithPreset(
+  'tennis-commentary',
+  { threadId: 'your-thread-id' }
+);
+
+// Or enable in existing config
+const config = {
+  enableTennisBanter: true,
+  verbosity: 'commentary',
+  timing: 'immediate'
+};
+\`\`\`
+
+This creates an engaging, sports-commentary-style experience that makes development sessions more fun and informative!`,
+          agent: 'Claude',
+          timestamp: new Date(Date.now() - 1500000),
+        },
+        {
+          id: 4,
+          type: 'admin',
+          content: '🎾 Tennis Commentary: "And here we see the agent entering deep thought mode - the mental preparation phase! Notice the contemplative pause - this is where the magic happens in AI reasoning."',
+          timestamp: new Date(Date.now() - 1400000),
+        },
+        {
+          id: 5,
+          type: 'human',
+          content: 'That\'s awesome! Can you show me a code example of how the diff viewer works?',
+          timestamp: new Date(Date.now() - 1200000),
+        },
+        {
+          id: 6,
+          type: 'ai',
+          content: `Absolutely! Here's how our FileDiffViewer component works with syntax highlighting:
+
+\`\`\`typescript
+import React from 'react';
+import { FileDiffViewer } from '~/components/files/FileDiffViewer';
+
+// Example usage showing before/after code changes
+const ExampleDiffUsage = () => {
+  const oldCode = \`function calculateTotal(items) {
+  let total = 0;
+  for (let i = 0; i < items.length; i++) {
+    total += items[i].price;
+  }
+  return total;
+}\`;
+
+  const newCode = \`function calculateTotal(items: Item[]): number {
+  return items.reduce((total, item) => total + item.price, 0);
+}\`;
+
+  return (
+    <FileDiffViewer
+      oldContent={oldCode}
+      newContent={newCode}
+      oldTitle="Original Implementation"
+      newTitle="Refactored Implementation"
+      language="typescript"
+      viewMode="side-by-side"
+      showLineNumbers={true}
+      highlightChanges={true}
+    />
+  );
+};
+\`\`\`
+
+The diff viewer features:
+- **Side-by-side** and **unified** view modes
+- **Syntax highlighting** with 30+ language support
+- **Line numbers** and **change highlighting**
+- **Responsive design** that works on all screen sizes
+- **Performance optimized** with caching and lazy loading
+
+Try it out by selecting different timelines or creating file changes!`,
+          agent: 'Claude',
+          timestamp: new Date(Date.now() - 1100000),
+        },
+        {
+          id: 7,
+          type: 'admin',
+          content: '🎾 Tennis Commentary: "Beautiful work! The FileDiffViewer operation was executed with precision. That\'s a clean completion - the component performed flawlessly with syntax highlighting and responsive design working in perfect harmony!"',
+          timestamp: new Date(Date.now() - 1000000),
+        },
+      ]);
+    }
+    
+    // Show design system demo when that timeline is selected
+    if (timeline.id === 7) {
+      setTimelineEntries([
+        {
+          id: 1,
+          type: 'admin',
+          content: 'Design System Demo Timeline - Explore the atomic design system components!',
+          timestamp: new Date(Date.now() - 1800000),
+        },
+        {
+          id: 2,
+          type: 'human',
+          content: 'Show me the design system components we\'ve built',
+          timestamp: new Date(Date.now() - 1600000),
+        },
+        {
+          id: 3,
+          type: 'ai',
+          content: `Here's our comprehensive atomic design system built with React, TypeScript, and Tailwind CSS:
+
+## 🎨 Design System Components
+
+### Atoms (Basic Building Blocks)
+- **AgentBadge**: Displays agent status with color coding
+- **Badge**: Flexible status and category indicators
+- **StatusDot**: Visual status indicators
+- **IconButton**: Consistent icon-based buttons
+- **SendButton**: Specialized send/submit actions
+- **VoiceButton**: Voice input controls
+
+### Molecules (Component Groups)
+- **ChatInputComposer**: Advanced text input with features
+- **ChatTextarea**: Multi-line text input
+- **FileAttachButton**: File attachment handling
+- **MessageBubble**: Chat message containers
+- **MessageDisplay**: Message content rendering
+- **MessageHeader**: Message metadata display
+- **MessageText**: Text processing with syntax highlighting
+- **TimestampDisplay**: Consistent time formatting
+
+### Organisms (Complex Components)
+- **FileDiffViewer**: Side-by-side code comparison
+- **InstructionsEditor**: Rich text editing interface
+- **UserInstructionsEditor**: User preference management
+- **SidebarSection**: Navigation and organization
+- **NavigationButton**: Complex navigation controls
+- **NavigationItem**: Structured navigation elements
+
+### Templates & Pages
+- **Design System Admin**: Component showcase and documentation
+- **Instructions Management**: User and project instructions
+- **Feedback System**: Tennis commentary and insights
+
+## 🔧 Key Features
+
+### Syntax Highlighting System
+\`\`\`typescript
+// 30+ programming languages supported
+const languages = [
+  'javascript', 'typescript', 'python', 'java', 'cpp',
+  'rust', 'go', 'php', 'ruby', 'swift', 'kotlin',
+  'html', 'css', 'scss', 'json', 'yaml', 'xml',
+  'bash', 'powershell', 'sql', 'dockerfile', 'markdown'
+];
+
+// Automatic language detection
+const result = await syntaxHighlighting.highlightCode(code, 'auto', 'app.tsx');
+\`\`\`
+
+### Monospace Typography
+- Applied to code blocks, inline code, and terminal interfaces
+- Font stack: ui-monospace, JetBrains Mono, Fira Code, SF Mono
+- Consistent sizing and spacing across all code contexts
+
+### Responsive Design
+- Mobile-first approach with Tailwind CSS
+- Adaptive layouts for different screen sizes
+- Touch-friendly interactions on mobile devices
+
+Visit \`/admin/design\` to explore the full design system showcase!`,
+          agent: 'Claude',
+          timestamp: new Date(Date.now() - 1500000),
+        },
+        {
+          id: 4,
+          type: 'admin',
+          content: '🎾 Tennis Commentary: "What a magnificent demonstration! The design system components are working in perfect harmony - atoms, molecules, and organisms all performing flawlessly together!"',
+          timestamp: new Date(Date.now() - 1400000),
+        },
+        {
+          id: 5,
+          type: 'human',
+          content: 'Can you show me how to access the admin design system?',
+          timestamp: new Date(Date.now() - 1200000),
+        },
+        {
+          id: 6,
+          type: 'ai',
+          content: `You can access the design system admin interface at:
+
+**URL**: \`http://localhost:3001/admin/design\`
+
+The admin interface includes:
+
+### 📱 Component Categories
+- **Atoms**: Basic building blocks like badges, buttons, and status indicators
+- **Molecules**: Component groups like chat inputs and message displays  
+- **Organisms**: Complex components like diff viewers and editors
+- **Templates**: Page-level layouts and structures
+- **Pages**: Complete page implementations
+
+### 🎯 Interactive Features
+- **Live component previews** with real code examples
+- **Props documentation** for each component
+- **Usage examples** showing best practices
+- **Responsive testing** across different screen sizes
+
+### 🔍 Component Analysis
+- **Missing components** identified for future development
+- **Component mapping** showing relationships
+- **Atomic design principles** documentation
+- **Reorganization plans** for optimization
+
+The design system follows atomic design methodology and provides a consistent, scalable foundation for the entire application.
+
+Try visiting \`/admin/design\` to explore all the components we've built!`,
+          agent: 'Claude',
+          timestamp: new Date(Date.now() - 1100000),
+        },
+        {
+          id: 7,
+          type: 'admin',
+          content: '🎾 Tennis Commentary: "Excellent navigation guidance! The admin design system is perfectly accessible and well-organized. That\'s a clean completion - users can now explore the complete component library!"',
+          timestamp: new Date(Date.now() - 1000000),
+        },
+      ]);
+    }
   };
 
   const handleNewTimeline = () => {

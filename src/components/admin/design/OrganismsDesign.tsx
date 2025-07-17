@@ -1,45 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faSearch,
-  faTerminal,
-  faTasks,
-  faUser,
-  faRobot,
-  faCog,
-  faPlus,
-  faCheck,
-  faStop,
-  faFolder,
-} from '~/lib/fontawesome';
-import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  HomeIcon,
-  UserIcon,
-  CogIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline';
-import { motion, AnimatePresence } from 'framer-motion';
-
-// Import our actual organism components to showcase them
-import {
-  Modal,
-  AnimatedModal,
-  MessageBubble,
-  NavigationItem,
-  SidebarSection,
-} from '~/components/ui';
 
 export default function OrganismsDesign() {
   const [activeTab, setActiveTab] = useState('organisms');
-  const [searchValue, setSearchValue] = useState('');
-  const [selectedTheme, setSelectedTheme] = useState('dark');
-  const [showModal, setShowModal] = useState(false);
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [showNotification, setShowNotification] = useState(false);
 
   return (
     <div className="min-h-screen bg-base-200 p-4">
@@ -124,10 +88,7 @@ export default function OrganismsDesign() {
                       <h3 className="card-title">Modal Dialog</h3>
                       <p>Overlay dialog for focused user interaction and forms.</p>
                       <div className="card-actions justify-end mt-4">
-                        <button
-                          className="btn btn-primary btn-sm"
-                          onClick={() => setShowModal(true)}
-                        >
+                        <button className="btn btn-primary btn-sm" onClick={() => {}}>
                           Open Example
                         </button>
                       </div>
@@ -139,10 +100,7 @@ export default function OrganismsDesign() {
                       <h3 className="card-title">Command Palette</h3>
                       <p>Quick command interface for power users.</p>
                       <div className="card-actions justify-end mt-4">
-                        <button
-                          className="btn btn-primary btn-sm"
-                          onClick={() => setShowCommandPalette(true)}
-                        >
+                        <button className="btn btn-primary btn-sm" onClick={() => {}}>
                           Open Example
                         </button>
                       </div>

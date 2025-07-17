@@ -2,7 +2,16 @@
 
 import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faCheck, faSearch, faTerminal, faTable, faFile, faCheckCircle, faInfoCircle, faStop } from '~/lib/fontawesome';
+import {
+  faPlus,
+  faSearch,
+  faTerminal,
+  faTable,
+  faFile,
+  faCheckCircle,
+  faInfoCircle,
+  faStop,
+} from '~/lib/fontawesome';
 import { ChevronRightIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
@@ -15,16 +24,8 @@ interface AtomicLevel {
   count: number;
 }
 
-interface DesignPrinciple {
-  title: string;
-  description: string;
-  implementation: string;
-  icon: any;
-}
-
 interface DesignSystemClientProps {
   atomicLevels: AtomicLevel[];
-  designPrinciples: DesignPrinciple[];
 }
 
 export function DesignSystemClient({ atomicLevels }: DesignSystemClientProps) {
@@ -87,7 +88,7 @@ export function DesignSystemClient({ atomicLevels }: DesignSystemClientProps) {
     <>
       {/* Atomic Levels Overview */}
       <div className="space-y-4">
-        {atomicLevels.map((level, index) => (
+        {atomicLevels.map((level) => (
           <div
             key={level.id}
             className="bg-base-100 rounded-lg border border-base-300 overflow-hidden"
@@ -98,10 +99,7 @@ export function DesignSystemClient({ atomicLevels }: DesignSystemClientProps) {
             >
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3">
-                  <FontAwesomeIcon 
-                    icon={getLevelIcon(level.id)} 
-                    className="w-6 h-6 text-primary"
-                  />
+                  <FontAwesomeIcon icon={getLevelIcon(level.id)} className="w-6 h-6 text-primary" />
                   <div>
                     <h3 className="text-xl font-bold text-base-content">{level.name}</h3>
                     <div className="flex items-center gap-3 mt-1">
@@ -111,9 +109,7 @@ export function DesignSystemClient({ atomicLevels }: DesignSystemClientProps) {
                         <FontAwesomeIcon icon={getStatusIcon(level.status)} className="w-3 h-3" />
                         {level.status}
                       </span>
-                      <span className="text-sm text-base-content/60">
-                        {level.count} components
-                      </span>
+                      <span className="text-sm text-base-content/60">{level.count} components</span>
                     </div>
                   </div>
                 </div>
@@ -140,9 +136,7 @@ export function DesignSystemClient({ atomicLevels }: DesignSystemClientProps) {
                   <p className="text-base-content/80 mb-4">{level.description}</p>
 
                   <div>
-                    <h4 className="font-medium text-base-content mb-3">
-                      Examples in this level:
-                    </h4>
+                    <h4 className="font-medium text-base-content mb-3">Examples in this level:</h4>
                     <div className="grid md:grid-cols-2 gap-2">
                       {level.examples.map((example, idx) => (
                         <div
@@ -183,17 +177,17 @@ export function DesignSystemClient({ atomicLevels }: DesignSystemClientProps) {
       {/* Component Stats Summary */}
       <div className="bg-base-100 rounded-lg border border-base-300 p-6">
         <h2 className="text-2xl font-bold text-base-content mb-4">Component System Status</h2>
-        
+
         <div className="grid md:grid-cols-3 gap-6">
           <div className="text-center">
             <div className="text-3xl font-bold text-success mb-2">
-              {atomicLevels.filter(l => l.status === 'complete').length}
+              {atomicLevels.filter((l) => l.status === 'complete').length}
             </div>
             <div className="text-sm text-base-content/60">Complete Levels</div>
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-warning mb-2">
-              {atomicLevels.filter(l => l.status === 'partial').length}
+              {atomicLevels.filter((l) => l.status === 'partial').length}
             </div>
             <div className="text-sm text-base-content/60">In Progress</div>
           </div>
@@ -211,7 +205,7 @@ export function DesignSystemClient({ atomicLevels }: DesignSystemClientProps) {
             Foundation Complete
           </h3>
           <p className="text-sm text-teal-700">
-            Our component system follows atomic design principles with clean separation between 
+            Our component system follows atomic design principles with clean separation between
             presentation (atoms/molecules) and business logic (organisms/pages).
           </p>
         </div>

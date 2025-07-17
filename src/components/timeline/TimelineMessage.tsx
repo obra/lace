@@ -3,15 +3,29 @@
 import { TimelineEntry } from '~/types';
 import { MessageDisplay } from '~/components/ui';
 import { IntegrationEntry } from '~/components/timeline/IntegrationEntry';
-import GoogleDocChatMessage from '~/components/chat/GoogleDocChatMessage';
+import GoogleDocChatMessage from '~/components/organisms/GoogleDocChatMessage';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faImages, faExternalLinkAlt, faUser, faRobot } from '~/lib/fontawesome';
 import { formatTime } from '~/utils/format';
 
 interface TimelineMessageProps {
+  /** The timeline entry data to display with type discrimination for different message types */
   entry: TimelineEntry;
 }
 
+/**
+ * TimelineMessage is a complex organism that renders different types of timeline entries
+ * in a conversation interface. It handles multiple message types (human, AI, tool, 
+ * integration, carousel, Google Doc) with appropriate styling and interactions.
+ * 
+ * @component
+ * @example
+ * ```tsx
+ * <TimelineMessage entry={humanMessageEntry} />
+ * <TimelineMessage entry={aiMessageEntry} />
+ * <TimelineMessage entry={toolMessageEntry} />
+ * ```
+ */
 export function TimelineMessage({ entry }: TimelineMessageProps) {
   // Handle basic message types with MessageDisplay molecule
   if (entry.type === 'admin' || entry.type === 'human' || entry.type === 'ai' || entry.type === 'tool') {

@@ -12,7 +12,7 @@ import {
   faExternalLinkAlt,
   faImages,
 } from '~/lib/fontawesome';
-import { Carousel } from '~/components/timeline/Carousel';
+import { Carousel } from '~/components/ui/Carousel';
 import { IntegrationEntry } from '~/components/timeline/IntegrationEntry';
 import {
   messageVariants,
@@ -35,15 +35,15 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
     // Code block formatting
     let formatted = content.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
       return `<div class="bg-base-300 border border-base-content/20 rounded-lg p-3 my-2 overflow-x-auto">
-        <div class="text-xs text-base-content/60 mb-2">${lang || 'code'}</div>
-        <pre class="text-accent text-sm"><code>${escapeHtml(code.trim())}</code></pre>
+        <div class="text-xs text-base-content/60 mb-2 font-mono">${lang || 'code'}</div>
+        <pre class="text-accent text-sm font-mono"><code class="font-mono">${escapeHtml(code.trim())}</code></pre>
       </div>`;
     });
 
     // Inline code formatting
     formatted = formatted.replace(
       /`([^`]+)`/g,
-      '<code class="bg-base-300 px-2 py-1 rounded text-accent text-sm">$1</code>'
+      '<code class="bg-base-300 px-2 py-1 rounded text-accent text-sm font-mono">$1</code>'
     );
 
     // Newline formatting

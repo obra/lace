@@ -1,6 +1,6 @@
 @import 'tailwindcss';
-@plugin 'daisyui';
 @import '@fortawesome/fontawesome-svg-core/styles.css';
+@plugin 'daisyui';
 
 /* Mobile-specific improvements */
 @supports (padding: max(0px)) {
@@ -91,4 +91,167 @@ select {
 
 .hide-scrollbar::-webkit-scrollbar {
   display: none;  /* Chrome, Safari and Opera */
+}
+
+/* Monospace font utilities for code, terminal, and technical content */
+.font-mono {
+  font-variant-ligatures: common-ligatures;
+  font-feature-settings: 'liga' 1, 'calt' 1;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ensure proper spacing for monospace content */
+.font-mono code,
+.font-mono pre {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+/* Syntax highlighting overrides for DaisyUI integration */
+.hljs {
+  background: transparent !important;
+  padding: 0 !important;
+  overflow-x: visible !important;
+}
+
+/* Code block styling */
+.code-block {
+  @apply bg-base-300 border border-base-content/20 rounded-lg overflow-hidden;
+}
+
+.code-block-header {
+  @apply bg-base-200 px-4 py-2 border-b border-base-content/20 flex items-center justify-between;
+}
+
+.code-block-content {
+  @apply p-4 overflow-x-auto;
+}
+
+.code-block-language {
+  @apply text-xs text-base-content/60 font-mono;
+}
+
+.code-block-copy {
+  @apply text-xs text-base-content/60 hover:text-base-content cursor-pointer;
+}
+
+/* Inline code styling */
+.inline-code {
+  @apply bg-base-300 px-2 py-1 rounded text-accent font-mono text-sm;
+}
+
+/* Diff styling for syntax highlighted code */
+.diff-line {
+  @apply flex items-start;
+}
+
+.diff-line.added {
+  @apply bg-green-50 border-l-2 border-green-500;
+}
+
+.diff-line.removed {
+  @apply bg-red-50 border-l-2 border-red-500;
+}
+
+.diff-line.highlighted {
+  @apply bg-yellow-50;
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .diff-line.added {
+  @apply bg-green-900/20 border-green-400;
+}
+
+[data-theme="dark"] .diff-line.removed {
+  @apply bg-red-900/20 border-red-400;
+}
+
+[data-theme="dark"] .diff-line.highlighted {
+  @apply bg-yellow-900/20;
+}
+
+/* Terminal syntax highlighting colors for fallback */
+.terminal-syntax {
+  @apply font-mono text-sm;
+}
+
+.terminal-syntax .hljs-string {
+  @apply text-green-500;
+}
+
+.terminal-syntax .hljs-number {
+  @apply text-yellow-500;
+}
+
+.terminal-syntax .hljs-keyword {
+  @apply text-blue-500;
+}
+
+.terminal-syntax .hljs-literal {
+  @apply text-cyan-500;
+}
+
+.terminal-syntax .hljs-comment {
+  @apply text-gray-500;
+}
+
+.terminal-syntax .hljs-attr {
+  @apply text-cyan-500;
+}
+
+.terminal-syntax .hljs-title {
+  @apply text-purple-500;
+}
+
+.terminal-syntax .hljs-built_in {
+  @apply text-blue-500;
+}
+
+.terminal-syntax .hljs-variable {
+  @apply text-yellow-500;
+}
+
+/* Scrollbar styling for code blocks */
+.code-block-content::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.code-block-content::-webkit-scrollbar-track {
+  @apply bg-base-200;
+}
+
+.code-block-content::-webkit-scrollbar-thumb {
+  @apply bg-base-content/20 rounded-full;
+}
+
+.code-block-content::-webkit-scrollbar-thumb:hover {
+  @apply bg-base-content/40;
+}
+
+/* Line numbers styling */
+.line-numbers {
+  @apply text-base-content/40 select-none pr-4 text-right;
+  min-width: 2.5rem;
+}
+
+/* Code line wrapper */
+.code-line {
+  @apply flex items-start;
+}
+
+.code-line-content {
+  @apply flex-1 min-w-0;
+}
+
+/* Performance optimizations */
+.code-block-content {
+  contain: layout style paint;
+}
+
+/* Ensure proper word breaking for long lines */
+.code-line-content code {
+  word-break: break-all;
+  white-space: pre-wrap;
 }

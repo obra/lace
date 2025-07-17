@@ -43,7 +43,9 @@ import {
   NavigationButton,
   MessageDisplay,
   SidebarSection,
+  FileDiffViewer,
 } from '~/components/ui';
+import FileDiffViewerDemo from '~/components/files/FileDiffViewer.demo';
 
 interface AtomsClientProps {
   designTokens: any;
@@ -606,6 +608,17 @@ function ComponentsTab() {
               </SidebarSection>
               <div className="text-sm text-base-content/60 text-center mt-3">
                 ⚛️ Built from: SectionHeader + NavigationButton atoms
+              </div>
+            </div>
+          </div>
+
+          {/* FileDiffViewer */}
+          <div>
+            <h4 className="font-semibold text-base-content mb-3">FileDiffViewer Molecule</h4>
+            <div className="p-4 border border-base-300 rounded bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
+              <FileDiffViewerDemo />
+              <div className="text-sm text-base-content/60 text-center mt-3">
+                ⚛️ Professional diff viewer with side-by-side and unified views
               </div>
             </div>
           </div>

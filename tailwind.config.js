@@ -8,7 +8,23 @@ export default {
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        mono: [
+          'ui-monospace',
+          'JetBrains Mono',
+          'Fira Code',
+          'SF Mono',
+          'SFMono-Regular',
+          'Monaco',
+          'Consolas',
+          'Liberation Mono',
+          'Menlo',
+          'Courier New',
+          'monospace'
+        ],
+      },
+    },
   },
   plugins: [daisyui],
   daisyui: {

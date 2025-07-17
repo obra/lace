@@ -14,6 +14,9 @@ export { default as MessageText } from './MessageText';
 export { default as AgentBadge } from './AgentBadge';
 export { default as TimestampDisplay } from './TimestampDisplay';
 export { default as NavigationButton } from './NavigationButton';
+export { default as FileDiffViewer } from '../files/FileDiffViewer';
+export { default as CodeBlock } from './CodeBlock';
+export { default as InlineCode } from './InlineCode';
 
 // MOLECULES - Simple compositions
 export { default as ExpandableHeader } from './ExpandableHeader';

@@ -62,3 +62,6 @@ lace-memory.db
 # Model output files
 anthropic-*.txt
 anthropic-*.json
+
+*storybook.log
+storybook-static
