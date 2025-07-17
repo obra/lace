@@ -1,11 +1,15 @@
 // ABOUTME: Unit tests for CommandExecutor with command parsing and execution flow
 // ABOUTME: Tests command parsing, error handling, and UserInterface integration
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { CommandExecutor } from '~/commands/executor';
 import { CommandRegistry } from '~/commands/registry';
 import type { Command, UserInterface } from '~/commands/types';
 import type { Agent } from '~/agents/agent';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 describe('CommandExecutor', () => {
   let registry: CommandRegistry;
@@ -14,6 +18,7 @@ describe('CommandExecutor', () => {
   let mockAgent: Partial<Agent>;
 
   beforeEach(() => {
+    setupTestPersistence();
     registry = new CommandRegistry();
     executor = new CommandExecutor(registry);
 
@@ -32,6 +37,10 @@ describe('CommandExecutor', () => {
       clearSession: vi.fn(),
       exit: vi.fn(),
     } as UserInterface;
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
   });
 
   describe('command parsing', () => {

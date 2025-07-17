@@ -9,7 +9,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/tasks/[taskId]/notes/route';
 import type { SessionService } from '@/lib/server/session-service';
-import type { TaskManager } from '@/lib/server/lace-imports';
+import type { Session } from '@/types/api';
+import type { Session as CoreSession } from '@/lib/server/lace-imports';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Helper function for tests to avoid server-only imports
 function createThreadId(id: string) {
@@ -30,7 +35,7 @@ const mockTaskManager = {
 };
 
 // Create a mock Session instance
-const mockSession = {
+const mockSession: Partial<Session> = {
   getId: vi.fn().mockReturnValue(createThreadId('lace_20240101_session')),
   getInfo: vi.fn().mockReturnValue({
     id: createThreadId('lace_20240101_session'),
@@ -46,7 +51,9 @@ const mockSession = {
 const mockSessionService = {
   createSession: vi.fn<SessionService['createSession']>(),
   listSessions: vi.fn<SessionService['listSessions']>(),
-  getSession: vi.fn<SessionService['getSession']>().mockResolvedValue(mockSession),
+  getSession: vi
+    .fn<SessionService['getSession']>()
+    .mockResolvedValue(mockSession as unknown as CoreSession),
   spawnAgent: vi.fn<SessionService['spawnAgent']>(),
   getAgent: vi.fn<SessionService['getAgent']>(),
 };
@@ -61,6 +68,7 @@ describe('Task Notes API Routes', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
 
     // Mock console methods to prevent stderr pollution during tests
@@ -71,6 +79,7 @@ describe('Task Notes API Routes', () => {
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
+    teardownTestPersistence();
   });
 
   describe('POST /api/tasks/[taskId]/notes', () => {

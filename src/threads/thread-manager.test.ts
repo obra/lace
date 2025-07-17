@@ -1,16 +1,24 @@
 // ABOUTME: Test suite for ThreadManager session support functionality
 // ABOUTME: Tests session creation, thread management, and project integration
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
 import { SessionData } from '~/persistence/database';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
+import { Project } from '~/projects/project';
+import { Session } from '~/sessions/session';
 
 describe('ThreadManager session support', () => {
   let manager: ThreadManager;
   let sessionId: string;
+  let projectId: string;
 
   beforeEach(() => {
-    manager = new ThreadManager(':memory:');
+    setupTestPersistence();
+    manager = new ThreadManager();
 
     // Ensure migrations have completed by checking the database
     const db = manager['_persistence'].database;
@@ -33,22 +41,14 @@ describe('ThreadManager session support', () => {
       );
     }
 
-    // Create a project first
-    manager.createProject({
-      id: 'project1',
-      name: 'Test Project',
-      description: 'A test project',
-      workingDirectory: '/project/path',
-      configuration: {},
-      isArchived: false,
-      createdAt: new Date(),
-      lastUsedAt: new Date(),
-    });
+    // Create a project first using Project.create
+    const project = Project.create('Test Project', '/project/path', 'A test project', {});
+    projectId = project.getId();
 
     // Create a session first
     const session: SessionData = {
       id: 'session1',
-      projectId: 'project1',
+      projectId: projectId,
       name: 'Test Session',
       description: 'A test session',
       configuration: {},
@@ -57,8 +57,13 @@ describe('ThreadManager session support', () => {
       updatedAt: new Date(),
     };
 
-    manager.createSession(session);
+    Session.createSession(session);
     sessionId = session.id;
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
+    vi.restoreAllMocks();
   });
 
   it('should create thread with session_id', () => {
@@ -83,7 +88,7 @@ describe('ThreadManager session support', () => {
   it('should get sessions by project', () => {
     const session2: SessionData = {
       id: 'session2',
-      projectId: 'project1',
+      projectId: projectId,
       name: 'Session 2',
       description: '',
       configuration: {},
@@ -92,13 +97,13 @@ describe('ThreadManager session support', () => {
       updatedAt: new Date(),
     };
 
-    manager.createSession(session2);
+    Session.createSession(session2);
 
-    const sessions = manager.getSessionsByProject('project1');
+    const sessions = Session.getSessionsByProject(projectId);
 
     expect(sessions).toHaveLength(2);
-    expect(sessions.map((s) => s.id)).toContain('session1');
-    expect(sessions.map((s) => s.id)).toContain('session2');
+    expect(sessions.map((s: SessionData) => s.id)).toContain('session1');
+    expect(sessions.map((s: SessionData) => s.id)).toContain('session2');
   });
 
   it('should not return threads marked as sessions (legacy)', () => {

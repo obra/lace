@@ -8,6 +8,10 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock provider for testing that can simulate abort behavior
 class MockAbortableProvider extends BaseMockProvider {
@@ -73,6 +77,8 @@ describe('Agent Abort Functionality', () => {
   let threadId: string;
 
   beforeEach(async () => {
+    setupTestPersistence();
+
     // Create mock response
     const mockResponse: ProviderResponse = {
       content: 'Test response',
@@ -86,7 +92,7 @@ describe('Agent Abort Functionality', () => {
 
     provider = new MockAbortableProvider(mockResponse, 100); // 100ms delay
     toolExecutor = new ToolExecutor();
-    threadManager = new ThreadManager(':memory:'); // Use in-memory SQLite for tests
+    threadManager = new ThreadManager(); // Use in-memory SQLite for tests
     threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
 
@@ -103,6 +109,7 @@ describe('Agent Abort Functionality', () => {
   });
 
   afterEach(() => {
+    teardownTestPersistence();
     vi.clearAllTimers();
     vi.useRealTimers();
   });

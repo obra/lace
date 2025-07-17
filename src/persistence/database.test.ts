@@ -1,13 +1,27 @@
 // ABOUTME: Test suite for database persistence layer schema and migrations
 // ABOUTME: Tests database schema creation, migrations, and data integrity
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { DatabasePersistence } from '~/persistence/database';
+import { DatabasePersistence, getPersistence } from '~/persistence/database';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
+import { vi } from 'vitest';
 
 describe('Project and Session database schema', () => {
+  beforeEach(() => {
+    setupTestPersistence();
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
+    vi.restoreAllMocks();
+  });
+
   it('should create projects table on initialization', () => {
-    const db = new DatabasePersistence(':memory:');
+    const db = getPersistence();
 
     const tables = db
       .database!.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='projects'")
@@ -17,7 +31,7 @@ describe('Project and Session database schema', () => {
   });
 
   it('should create sessions table on initialization', () => {
-    const db = new DatabasePersistence(':memory:');
+    const db = getPersistence();
 
     const tables = db
       .database!.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
@@ -27,7 +41,7 @@ describe('Project and Session database schema', () => {
   });
 
   it('should have correct projects table schema', () => {
-    const db = new DatabasePersistence(':memory:');
+    const db = getPersistence();
 
     const columns = db.database!.prepare('PRAGMA table_info(projects)').all() as { name: string }[];
     const columnNames = columns.map((c) => c.name);
@@ -43,7 +57,7 @@ describe('Project and Session database schema', () => {
   });
 
   it('should have correct sessions table schema', () => {
-    const db = new DatabasePersistence(':memory:');
+    const db = getPersistence();
 
     const columns = db.database!.prepare('PRAGMA table_info(sessions)').all() as { name: string }[];
     const columnNames = columns.map((c) => c.name);
@@ -59,7 +73,7 @@ describe('Project and Session database schema', () => {
   });
 
   it('should add session_id to threads table', () => {
-    const db = new DatabasePersistence(':memory:');
+    const db = getPersistence();
 
     const columns = db.database!.prepare('PRAGMA table_info(threads)').all() as { name: string }[];
     const sessionIdColumn = columns.find((c) => c.name === 'session_id');
@@ -68,7 +82,7 @@ describe('Project and Session database schema', () => {
   });
 
   it('should create Historical project for migration', () => {
-    const db = new DatabasePersistence(':memory:');
+    const db = getPersistence();
 
     const project = db
       .database!.prepare("SELECT * FROM projects WHERE id = 'historical'")
@@ -116,8 +130,8 @@ describe('Project and Session database schema', () => {
       .prepare('INSERT INTO schema_version (version, applied_at) VALUES (4, ?)')
       .run(new Date().toISOString());
 
-    // Run migration by creating DatabasePersistence
-    new DatabasePersistence(migrationDb);
+    // Run migration by creating DatabasePersistence with the migration database
+    const migrationPersistence = new DatabasePersistence(migrationDb);
 
     // Check session was created in sessions table
     const session = migrationDb
@@ -139,6 +153,9 @@ describe('Project and Session database schema', () => {
     if (thread.metadata) {
       expect(JSON.parse(thread.metadata)).not.toHaveProperty('isSession');
     }
+
+    // Clean up migration database
+    migrationPersistence.close();
   });
 });
 
@@ -146,7 +163,7 @@ describe('Session persistence', () => {
   let db: DatabasePersistence;
 
   beforeEach(() => {
-    db = new DatabasePersistence(':memory:');
+    db = setupTestPersistence();
 
     // Create projects first to satisfy foreign key constraints
     db.database!.prepare(
@@ -162,6 +179,11 @@ describe('Session persistence', () => {
       VALUES ('project2', 'Test Project 2', 'Another test project', '/test/path2', '{}', FALSE, datetime('now'), datetime('now'))
     `
     ).run();
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
+    vi.restoreAllMocks();
   });
 
   it('should save session', () => {

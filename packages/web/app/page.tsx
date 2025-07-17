@@ -47,7 +47,7 @@ export default function Home() {
     void loadConversationHistory(selectedSession);
 
     const eventSource = new EventSource(`/api/sessions/${selectedSession}/events/stream`);
-    
+
     // Store event listeners for cleanup
     const eventListeners = new Map<string, (event: MessageEvent) => void>();
 
@@ -62,7 +62,7 @@ export default function Home() {
           // Type guard for event structure
           if (typeof data === 'object' && data !== null && 'type' in data) {
             const eventData = data as { type: string; data: unknown };
-            
+
             // Handle approval requests separately
             if (eventData.type === 'TOOL_APPROVAL_REQUEST') {
               setApprovalRequest(eventData.data as ToolApprovalRequestData);
@@ -74,7 +74,7 @@ export default function Home() {
           console.error('Failed to parse event:', error);
         }
       };
-      
+
       eventListeners.set(eventType, listener);
       eventSource.addEventListener(eventType, listener);
     });
@@ -88,7 +88,7 @@ export default function Home() {
       };
       setEvents((prev) => [...prev, connectionEvent]);
     };
-    
+
     eventSource.addEventListener('connection', connectionListener);
 
     eventSource.onerror = (error) => {
@@ -116,12 +116,12 @@ export default function Home() {
     try {
       const res = await fetch('/api/sessions');
       const data: unknown = await res.json();
-      
+
       if (isApiError(data)) {
         console.error('Failed to load sessions:', data.error);
         return;
       }
-      
+
       const sessionsData = data as SessionsResponse;
       setSessions(sessionsData.sessions || []);
     } catch (error) {
@@ -133,12 +133,12 @@ export default function Home() {
     try {
       const res = await fetch(`/api/sessions/${sessionId}/history`);
       const data: unknown = await res.json();
-      
+
       if (isApiError(data)) {
         console.error('Failed to load conversation history:', data.error);
         return;
       }
-      
+
       const historyData = data as { events: SessionEvent[] };
       setEvents(historyData.events || []);
     } catch (error) {
@@ -159,12 +159,12 @@ export default function Home() {
 
       if (res.ok) {
         const data: unknown = await res.json();
-        
+
         if (isApiError(data)) {
           console.error('Failed to create session:', data.error);
           return;
         }
-        
+
         const sessionData = data as SessionResponse;
         setSelectedSession(sessionData.session.id as ThreadId);
         setSessionName('');
@@ -274,16 +274,17 @@ export default function Home() {
                       key={String(session.id)}
                       onClick={() => setSelectedSession(session.id as ThreadId)}
                       className={`p-3 rounded cursor-pointer text-sm ${
-                        selectedSession === session.id ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'
+                        selectedSession === session.id
+                          ? 'bg-blue-600'
+                          : 'bg-gray-700 hover:bg-gray-600'
                       }`}
                     >
                       <div className="font-semibold">{session.name}</div>
                       <div className="text-xs text-gray-300">
-                        {session.agents.length} agents • {new Date(session.createdAt).toLocaleDateString()}
+                        {session.agents.length} agents •{' '}
+                        {new Date(session.createdAt).toLocaleDateString()}
                       </div>
-                      <div className="text-xs text-gray-400 font-mono">
-                        {session.id}
-                      </div>
+                      <div className="text-xs text-gray-400 font-mono">{session.id}</div>
                     </div>
                   ))}
                 </div>
@@ -294,10 +295,7 @@ export default function Home() {
             {selectedSession && (
               <div>
                 <h2 className="text-lg font-semibold mb-3">Agents</h2>
-                <AgentSpawner
-                  sessionId={selectedSession}
-                  onAgentSpawn={handleAgentSpawn}
-                />
+                <AgentSpawner sessionId={selectedSession} onAgentSpawn={handleAgentSpawn} />
 
                 {/* Agent List */}
                 <div className="mt-4 space-y-2">
@@ -317,12 +315,8 @@ export default function Home() {
                         <div className="text-xs text-gray-300">
                           {agent.provider} • {agent.model}
                         </div>
-                        <div className="text-xs text-gray-400">
-                          Status: {agent.status}
-                        </div>
-                        <div className="text-xs text-gray-400 font-mono">
-                          {agent.threadId}
-                        </div>
+                        <div className="text-xs text-gray-400">Status: {agent.status}</div>
+                        <div className="text-xs text-gray-400 font-mono">{agent.threadId}</div>
                         {agent.createdAt && (
                           <div className="text-xs text-gray-500">
                             {new Date(agent.createdAt).toLocaleString()}

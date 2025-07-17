@@ -250,3 +250,42 @@ export interface ModelInfo {
   supportsFunctionCalling: boolean;
   supportsStreaming: boolean;
 }
+
+// Project management types
+export interface ProjectInfo {
+  id: string;
+  name: string;
+  description: string;
+  workingDirectory: string;
+  isArchived: boolean;
+  createdAt: Date | string;
+  lastUsedAt: Date | string;
+  sessionCount?: number;
+}
+
+export interface ProjectsResponse {
+  projects: ProjectInfo[];
+}
+
+export interface ProjectResponse {
+  project: ProjectInfo;
+}
+
+export interface CreateProjectRequest {
+  name: string;
+  description?: string;
+  workingDirectory: string;
+  configuration?: Record<string, unknown>;
+}
+
+export interface UpdateProjectRequest {
+  name?: string;
+  description?: string;
+  workingDirectory?: string;
+  configuration?: Record<string, unknown>;
+  isArchived?: boolean;
+}
+
+export interface DeleteProjectResponse {
+  success: boolean;
+}

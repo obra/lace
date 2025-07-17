@@ -1,13 +1,17 @@
 // ABOUTME: Tests for Agent message queue methods
 // ABOUTME: Tests queueMessage, getQueueStats, clearQueue functionality
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -40,6 +44,7 @@ describe('Agent Queue Methods', () => {
   let mockThreadManager: ThreadManager;
 
   beforeEach(() => {
+    setupTestPersistence();
     mockProvider = new MockProvider();
 
     mockToolExecutor = {
@@ -69,6 +74,10 @@ describe('Agent Queue Methods', () => {
       threadId: 'test-thread',
       tools: [],
     });
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
   });
 
   describe('queueMessage', () => {

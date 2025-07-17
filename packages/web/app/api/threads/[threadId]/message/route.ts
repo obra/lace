@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { getSessionService } from '@/lib/server/session-service';
-import { MessageResponse, SessionEvent, ApiErrorResponse } from '@/types/api';
+import { MessageResponse, SessionEvent, ApiErrorResponse, ThreadId } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
 import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
 import { messageLimiter } from '@/lib/middleware/rate-limiter';
@@ -37,7 +37,7 @@ export async function POST(
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
-    const threadId = threadIdResult.data;
+    const threadId: ThreadId = threadIdResult.data;
 
     // Parse and validate request body with Zod
     const bodyRaw: unknown = await request.json();
@@ -58,7 +58,7 @@ export async function POST(
     if (!sessionIdResult.success) {
       throw new Error('Invalid session ID derived from thread ID');
     }
-    const sessionId = sessionIdResult.data;
+    const sessionId: ThreadId = sessionIdResult.data;
 
     // Get agent instance
     const agent = sessionService.getAgent(threadId);

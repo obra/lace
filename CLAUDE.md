@@ -114,28 +114,13 @@ Events include: USER_MESSAGE, AGENT_MESSAGE, TOOL_CALL, TOOL_RESULT, THINKING, S
 
 **Critical**: Events must be processed in sequence for conversation reconstruction.
 
-## CLI Usage
-
-```bash
-# Basic usage
-lace                          # Interactive mode
-lace --prompt "your request"  # Single prompt mode
-lace --continue              # Resume latest conversation
-lace --provider openai       # Choose AI provider
-
-# Tool approval
---allow-non-destructive-tools    # Auto-approve read-only tools
---auto-approve-tools bash,file-read  # Auto-approve specific tools
---disable-tools file-write       # Disable specific tools
-```
-
 ## Technology Stack
 
 - **TypeScript 5.6+** with strict mode
 - **Node.js** with ES modules
 - **SQLite** (better-sqlite3) for persistence
-- **React + Ink** for terminal interface
-- **Vitest** for testing
+- **React 19 + NextJS 15 ** for web interface
+- **Vitest ans Playwright** for testing
 - **ESLint + Prettier** for code quality
 
 ## Tool Development
@@ -242,19 +227,12 @@ Generic `ProviderMessage[]` format converts to provider-specific APIs. Each prov
 - **Fail fast** on unknown event types - don't silently drop data
 - **No system crashes** on tool failures or provider errors
 
-**Recovery Mechanisms:**
-- Clean abort functionality and state reset on errors
-- Graceful database fallback to memory-only operation
-- Provider errors captured and displayed, conversation continues
 
 ### Critical Architecture Patterns
 - **YAGNI** - Don't add features we don't need right now
 - **Stateless operation** - Any component should be able to rebuild state from events
 - **Event ordering** - Events must be processed in sequence for conversation reconstruction
 - **Provider abstraction** - Clean separation between generic and provider-specific formats
-
-### Thinking Block Processing
-Dual-path: Agent layer stores raw content for model context, UI layer extracts thinking blocks for display.
 
 ### Data Flow
 User Input → Events → Agent Processing → Provider API → Tool Execution → Response Complete
@@ -281,7 +259,7 @@ ThreadProcessor caches processed events for performance.
 
 Because the UI is a full terminal application, it's hard for you to debug it interactively. Sometimes, it's better to refactor components into smaller, more easily testable pieces. Sometimes, it's better to ask your human partner to test something for you. 
 
-You never use console.log for debugging. Instead, you use the logger system and inspect the logs after runs.
+You MUST NEVER use console.log for debugging. Instead, you use the logger system and inspect the logs after runs.
 
 ### Event Inspection
 The conversation builder (`buildConversationFromEvents`) is critical for debugging. If conversations behave unexpectedly:
@@ -324,9 +302,70 @@ The conversation builder (`buildConversationFromEvents`) is critical for debuggi
   - ❌ `import { GET } from '../route';`
   - ✅ `import { GET } from '@/app/api/tasks/stream/route';`
 
-### Best Practices
-- Always type your JSON responses: `(await response.json()) as ResponseType`
-- Use proper type assertions instead of `any`
-- Await all async operations or mark with `void` if intentionally not awaited
-- Use absolute imports for all project files
-- Remove unused imports immediately
+
+ **Prefer `unknown` to `any`**  
+   ```ts
+   function parseJSON(input: string): unknown {
+     return JSON.parse(input);
+   }
+   ```
+
+ **Use generics & utility types**  
+   ```ts
+   // Generic instead of any[]
+   function first<T>(arr: T[]): T | undefined { … }
+
+   // Utility types
+   type PartialUser = Partial<User>;
+   type UserMap     = Record<string, User>;
+   type FetchRet    = ReturnType<typeof fetchUser>;
+   ```
+
+ **Write runtime type-guards**  
+   ```ts
+   function isUser(u: any): u is User {
+     return u && typeof u.id === "number" && typeof u.name === "string";
+   }
+   ```
+
+---
+
+# Testing-Specific Rules
+
+ **Import real types**  
+   Always reference your production interfaces/classes in test files.
+
+ **Use typed mocks**  
+   ```ts
+   import type { ServiceClient } from "../clients";
+
+   const mockClient: jest.Mocked<ServiceClient> = {
+     fetch: jest.fn().mockResolvedValue({ /* typed payload */ }),
+     // …
+   };
+   ```
+
+ **Factory fixtures with `Partial<T>`**  
+   ```ts
+   function makeUser(overrides?: Partial<User>): User {
+     return {
+       id: 1,
+       name: "Alice",
+       email: "alice@example.com",
+       ...overrides,
+     };
+   }
+   ```
+
+ **Assert via `unknown` → cast**  
+   ```ts
+   const raw: unknown = JSON.parse(jsonString);
+   // perform runtime checks…
+   const user = raw as User;
+   ```
+
+ **Ban test `any` / `@ts-ignore`**  
+   Localize any bypass to a single line and document it with `// TODO:`.
+
+ **Use type-aware tools**  
+   Employ `ts-jest` or similar to verify snapshots and mocks against your TS types.

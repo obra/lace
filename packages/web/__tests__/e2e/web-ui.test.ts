@@ -28,7 +28,12 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 import { getSessionService } from '@/lib/server/session-service';
-import type { Session as SessionType } from '@/types/api';
+import { asThreadId } from '@/lib/server/lace-imports';
+import type { Session as SessionType, ThreadId } from '@/types/api';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 describe('Web UI E2E Tests', () => {
   let sessionService: ReturnType<typeof getSessionService>;
@@ -36,6 +41,8 @@ describe('Web UI E2E Tests', () => {
   // Mock environment variables and external dependencies
   const originalEnv = process.env;
   beforeEach(() => {
+    setupTestPersistence();
+
     process.env = {
       ...originalEnv,
       ANTHROPIC_KEY: 'test-key',
@@ -46,6 +53,7 @@ describe('Web UI E2E Tests', () => {
 
   afterEach(() => {
     process.env = originalEnv;
+    teardownTestPersistence();
     // Clear active sessions to ensure test isolation
     sessionService.clearActiveSessions();
     // Clear global singleton
@@ -76,7 +84,7 @@ describe('Web UI E2E Tests', () => {
       const created = await sessionService.createSession('Retrieve Test');
 
       // Retrieve it
-      const retrieved = await sessionService.getSession(created.id as string);
+      const retrieved = await sessionService.getSession(created.id as ThreadId);
 
       expect(retrieved).toBeDefined();
       const retrievedInfo = retrieved!.getInfo();
@@ -94,7 +102,7 @@ describe('Web UI E2E Tests', () => {
 
     it('should spawn an agent in a session', async () => {
       const agent = await sessionService.spawnAgent(
-        session.id as string,
+        session.id as ThreadId,
         'Test Agent',
         'anthropic'
       );
@@ -106,11 +114,11 @@ describe('Web UI E2E Tests', () => {
 
     it('should list agents in a session', async () => {
       // Spawn multiple agents
-      await sessionService.spawnAgent(session.id as string, 'Agent 1', 'anthropic');
-      await sessionService.spawnAgent(session.id as string, 'Agent 2', 'anthropic');
+      await sessionService.spawnAgent(session.id as ThreadId, 'Agent 1', 'anthropic');
+      await sessionService.spawnAgent(session.id as ThreadId, 'Agent 2', 'anthropic');
 
       // Check session includes agents
-      const updatedSession = await sessionService.getSession(session.id as string);
+      const updatedSession = await sessionService.getSession(session.id as ThreadId);
 
       expect(updatedSession).toBeDefined();
       const updatedAgents = updatedSession!.getAgents();
@@ -121,8 +129,16 @@ describe('Web UI E2E Tests', () => {
     });
 
     it('should generate correct agent thread IDs', async () => {
-      const agent1 = await sessionService.spawnAgent(session.id as string, 'Agent 1', 'anthropic');
-      const agent2 = await sessionService.spawnAgent(session.id as string, 'Agent 2', 'anthropic');
+      const agent1 = await sessionService.spawnAgent(
+        session.id as ThreadId,
+        'Agent 1',
+        'anthropic'
+      );
+      const agent2 = await sessionService.spawnAgent(
+        session.id as ThreadId,
+        'Agent 2',
+        'anthropic'
+      );
 
       expect(agent1.threadId).toBe(`${session.id}.1`);
       expect(agent2.threadId).toBe(`${session.id}.2`);
@@ -133,13 +149,13 @@ describe('Web UI E2E Tests', () => {
     it('should persist session data across service instances', async () => {
       // Create session with first service instance
       const session1 = await sessionService.createSession('Persistence Test');
-      await sessionService.spawnAgent(session1.id as string, 'Persistent Agent', 'anthropic');
+      await sessionService.spawnAgent(session1.id as ThreadId, 'Persistent Agent', 'anthropic');
 
       // Create new service instance (simulating app restart)
       const newSessionService = getSessionService();
 
       // Should be able to retrieve the session
-      const retrievedSession = await newSessionService.getSession(session1.id as string);
+      const retrievedSession = await newSessionService.getSession(session1.id as ThreadId);
       expect(retrievedSession).toBeDefined();
       const retrievedInfo = retrievedSession!.getInfo();
       expect(retrievedInfo?.name).toBe('Persistence Test');
@@ -167,14 +183,14 @@ describe('Web UI E2E Tests', () => {
 
   describe('Error Handling', () => {
     it('should handle invalid session ID gracefully', async () => {
-      const invalidSession = await sessionService.getSession('invalid-thread-id');
+      const invalidSession = await sessionService.getSession(asThreadId('invalid-thread-id'));
       expect(invalidSession).toBeNull();
     });
 
     it('should handle spawning agent in non-existent session', async () => {
-      await expect(sessionService.spawnAgent('non-existent-session', 'Test Agent')).rejects.toThrow(
-        'Session not found'
-      );
+      await expect(
+        sessionService.spawnAgent(asThreadId('non-existent-session'), 'Test Agent')
+      ).rejects.toThrow('Session not found');
     });
   });
 });

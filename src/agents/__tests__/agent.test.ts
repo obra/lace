@@ -10,6 +10,10 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
 import { ThreadManager } from '~/threads/thread-manager';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -63,6 +67,8 @@ describe('Enhanced Agent', () => {
   let agent: Agent;
 
   beforeEach(() => {
+    setupTestPersistence();
+
     mockProvider = new MockProvider({
       content: 'Test response',
       toolCalls: [],
@@ -76,7 +82,7 @@ describe('Enhanced Agent', () => {
     toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
     toolExecutor.setApprovalCallback(autoApprovalCallback);
-    threadManager = new ThreadManager(':memory:');
+    threadManager = new ThreadManager();
     threadId = 'test_thread_123';
     threadManager.createThread(threadId);
   });
@@ -86,11 +92,11 @@ describe('Enhanced Agent', () => {
       agent.removeAllListeners(); // Prevent EventEmitter memory leaks
       agent.stop();
     }
+    threadManager.close();
+    teardownTestPersistence();
     // Clear mock references to prevent circular references
     mockProvider = null as unknown as MockProvider;
     toolExecutor = null as unknown as ToolExecutor;
-
-    threadManager.close();
   });
 
   function createAgent(config?: Partial<AgentConfig>): Agent {

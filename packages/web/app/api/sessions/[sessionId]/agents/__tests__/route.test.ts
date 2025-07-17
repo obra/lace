@@ -6,6 +6,11 @@ import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
 import type { ThreadId, Agent } from '@/types/api';
 import type { SessionService } from '@/lib/server/session-service';
+import type { Session as CoreSession } from '@/lib/server/lace-imports';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Response types
 interface AgentResponse {
@@ -21,28 +26,44 @@ interface ErrorResponse {
 }
 
 // Helper functions to create typed objects without unsafe assignments
-function createAgent(props: Partial<Agent> & { threadId: ThreadId }): Agent {
-  const agent: Agent = {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+function createAgent(props: {
+  threadId: ThreadId;
+  name?: string;
+  provider?: string;
+  model?: string;
+  status?: Agent['status'];
+  createdAt?: string;
+}): Agent {
+  // Explicit type construction to avoid unsafe assignment from Partial<Agent> intersection
+  return {
     threadId: props.threadId,
-    name: props.name || 'default',
-    provider: props.provider || 'anthropic',
-    model: props.model || 'claude-3-haiku',
-    status: props.status || 'idle',
-    createdAt: props.createdAt || new Date().toISOString(),
+    name: props.name ?? 'default',
+    provider: props.provider ?? 'anthropic',
+    model: props.model ?? 'claude-3-haiku',
+    status: props.status ?? 'idle',
+    createdAt: props.createdAt ?? new Date().toISOString(),
   };
-  return agent;
 }
 
 // Helper to create a mock Session instance with required methods
-function createMockSession(props: { id: ThreadId; name?: string; agents?: Agent[] }) {
+function createMockSession(props: {
+  id: ThreadId;
+  name?: string;
+  agents?: Agent[];
+  createdAt?: Date | string;
+}) {
   const agents = props.agents || [];
+  const createdAt = props.createdAt
+    ? typeof props.createdAt === 'string'
+      ? new Date(props.createdAt)
+      : props.createdAt
+    : new Date();
   return {
     getId: () => props.id,
     getInfo: () => ({
       id: props.id,
       name: props.name || 'Test Session',
-      createdAt: new Date(),
+      createdAt,
       provider: 'anthropic',
       model: 'claude-3-haiku',
       agents,
@@ -93,6 +114,7 @@ describe('Agent Spawning API', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
     vi.resetAllMocks();
 
@@ -104,6 +126,7 @@ describe('Agent Spawning API', () => {
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
+    teardownTestPersistence();
   });
 
   describe('POST /api/sessions/{sessionId}/agents', () => {
@@ -136,7 +159,7 @@ describe('Agent Spawning API', () => {
           name: 'Test Session',
           createdAt: new Date().toISOString(),
           agents: existingAgents,
-        })
+        }) as unknown as CoreSession
       );
 
       const newThreadId: ThreadId = createThreadId(`${sessionId}.3`);
@@ -186,7 +209,7 @@ describe('Agent Spawning API', () => {
           name: 'Test Session',
           createdAt: new Date().toISOString(),
           agents: [],
-        })
+        }) as unknown as CoreSession
       );
       const newAgent: Agent = createAgent({
         threadId: createThreadId(`${sessionId}.1`),
@@ -224,7 +247,7 @@ describe('Agent Spawning API', () => {
           name: 'Test Session',
           createdAt: new Date().toISOString(),
           agents: [],
-        })
+        }) as unknown as CoreSession
       );
       const newAgent: Agent = createAgent({
         threadId,
@@ -261,7 +284,7 @@ describe('Agent Spawning API', () => {
           name: 'Test Session',
           createdAt: new Date().toISOString(),
           agents: [],
-        })
+        }) as unknown as CoreSession
       );
       const firstAgent: Agent = createAgent({
         threadId: createThreadId(`${sessionId}.1`),
@@ -290,7 +313,7 @@ describe('Agent Spawning API', () => {
           name: 'Test Session',
           createdAt: new Date().toISOString(),
           agents: [firstAgent],
-        })
+        }) as unknown as CoreSession
       );
       const secondAgent: Agent = createAgent({
         threadId: createThreadId(`${sessionId}.2`),
@@ -336,7 +359,7 @@ describe('Agent Spawning API', () => {
           name: 'Test Session',
           createdAt: new Date().toISOString(),
           agents: [],
-        })
+        }) as unknown as CoreSession
       );
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
@@ -360,7 +383,7 @@ describe('Agent Spawning API', () => {
           id: sessionId,
           name: 'Test Session',
           agents: [],
-        })
+        }) as unknown as CoreSession
       );
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
@@ -406,7 +429,7 @@ describe('Agent Spawning API', () => {
           name: 'Test Session',
           createdAt: new Date().toISOString(),
           agents,
-        })
+        }) as unknown as CoreSession
       );
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`);
@@ -445,7 +468,7 @@ describe('Agent Spawning API', () => {
           name: 'Test Session',
           createdAt: new Date().toISOString(),
           agents: [testAgent],
-        })
+        }) as unknown as CoreSession
       );
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`);
@@ -469,7 +492,7 @@ describe('Agent Spawning API', () => {
           name: 'Test Session',
           createdAt: new Date().toISOString(),
           agents: [],
-        })
+        }) as unknown as CoreSession
       );
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`);

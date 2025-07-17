@@ -1,7 +1,7 @@
 // ABOUTME: Tests for Agent integration with TokenBudgetManager
 // ABOUTME: Verifies token budget tracking, warnings, and request blocking work correctly
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Agent, AgentConfig } from '~/agents/agent';
 import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
@@ -9,6 +9,10 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { BudgetStatus, BudgetRecommendations } from '~/token-management/types';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock provider for testing token budget integration
 class MockProvider extends BaseMockProvider {
@@ -55,10 +59,11 @@ describe('Agent Token Budget Integration', () => {
   const threadId = 'test-thread-budget';
 
   beforeEach(async () => {
+    setupTestPersistence();
     mockProvider = new MockProvider();
     toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
-    threadManager = new ThreadManager(':memory:');
+    threadManager = new ThreadManager();
     threadManager.createThread(threadId);
 
     const config: AgentConfig = {
@@ -76,6 +81,10 @@ describe('Agent Token Budget Integration', () => {
 
     agent = new Agent(config);
     await agent.start();
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
   });
 
   it('should track token usage from provider responses', async () => {

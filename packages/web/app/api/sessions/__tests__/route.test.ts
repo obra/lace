@@ -6,6 +6,10 @@ import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/api/sessions/route';
 import type { Session } from '@/types/api';
 import type { SessionService } from '@/lib/server/session-service';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 // Helper function for tests to avoid server-only imports
 function createThreadId(id: string) {
   return id as import('@/types/api').ThreadId;
@@ -30,6 +34,7 @@ describe('Session API Routes', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
 
     // Mock console methods to prevent stderr pollution during tests
@@ -40,12 +45,13 @@ describe('Session API Routes', () => {
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
+    teardownTestPersistence();
   });
 
   describe('POST /api/sessions', () => {
     it('should create a new session with provided name', async () => {
       const sessionName = 'Test Session';
-      const mockSession: Session = {
+      const mockSession: Partial<Session> = {
         id: createThreadId('lace_20240101_abcd12'),
         name: sessionName,
         createdAt: '2024-01-01T12:00:00Z',
@@ -77,7 +83,7 @@ describe('Session API Routes', () => {
     });
 
     it('should create session with default name when name not provided', async () => {
-      const mockSession: Session = {
+      const mockSession: Partial<Session> = {
         id: createThreadId('lace_20240101_abcd12'),
         name: 'Untitled Session',
         createdAt: '2024-01-01T12:00:00Z',
@@ -130,7 +136,7 @@ describe('Session API Routes', () => {
 
   describe('GET /api/sessions', () => {
     it('should list all sessions', async () => {
-      const mockSessions: Session[] = [
+      const mockSessions: Partial<Session>[] = [
         {
           id: createThreadId('lace_20240101_abcd12'),
           name: 'Session 1',

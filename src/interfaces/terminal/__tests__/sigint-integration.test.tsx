@@ -76,7 +76,7 @@ describe('SIGINT Integration Tests', () => {
 
     provider = new MockProvider(mockResponse, 100); // 100ms delay for testing
     toolExecutor = new ToolExecutor();
-    threadManager = new ThreadManager(':memory:');
+    threadManager = new ThreadManager();
     threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
 

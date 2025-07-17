@@ -1,15 +1,16 @@
 // ABOUTME: Unit tests for individual task operations API endpoints
 // ABOUTME: Tests GET, PATCH, DELETE operations on specific tasks
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, PATCH, DELETE } from '@/app/api/tasks/[taskId]/route';
 import type { SessionService } from '@/lib/server/session-service';
-import type { TaskManager } from '@/lib/server/lace-imports';
+import type { Session } from '@/types/api';
+import type { Session as CoreSession } from '@/lib/server/lace-imports';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Helper function for tests to avoid server-only imports
 function createThreadId(id: string) {
@@ -30,7 +31,7 @@ const mockTaskManager = {
 };
 
 // Create a mock Session instance
-const mockSession = {
+const mockSession: Partial<Session> = {
   getId: vi.fn().mockReturnValue(createThreadId('lace_20240101_session')),
   getInfo: vi.fn().mockReturnValue({
     id: createThreadId('lace_20240101_session'),
@@ -46,7 +47,9 @@ const mockSession = {
 const mockSessionService = {
   createSession: vi.fn<SessionService['createSession']>(),
   listSessions: vi.fn<SessionService['listSessions']>(),
-  getSession: vi.fn<SessionService['getSession']>().mockResolvedValue(mockSession),
+  getSession: vi
+    .fn<SessionService['getSession']>()
+    .mockResolvedValue(mockSession as unknown as CoreSession),
   spawnAgent: vi.fn<SessionService['spawnAgent']>(),
   getAgent: vi.fn<SessionService['getAgent']>(),
 };
@@ -61,6 +64,7 @@ describe('Task [taskId] API Routes', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
 
     // Mock console methods to prevent stderr pollution during tests
@@ -71,13 +75,14 @@ describe('Task [taskId] API Routes', () => {
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
+    teardownTestPersistence();
   });
 
   describe('GET /api/tasks/[taskId]', () => {
     it('should return 400 if sessionId is missing', async () => {
       const request = new NextRequest('http://localhost:3000/api/tasks/task_20240101_abc123');
       const response = await GET(request, { params: { taskId: 'task_20240101_abc123' } });
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Session ID is required');
@@ -90,7 +95,7 @@ describe('Task [taskId] API Routes', () => {
         'http://localhost:3000/api/tasks/task_20240101_notfound?sessionId=lace_20240101_session'
       );
       const response = await GET(request, { params: { taskId: 'task_20240101_notfound' } });
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Task not found');
@@ -125,18 +130,19 @@ describe('Task [taskId] API Routes', () => {
         'http://localhost:3000/api/tasks/task_20240101_abc123?sessionId=lace_20240101_session'
       );
       const response = await GET(request, { params: { taskId: 'task_20240101_abc123' } });
-      const data = await response.json();
+      const data = (await response.json()) as { task: unknown };
 
       expect(response.status).toBe(200);
       expect(data.task).toMatchObject({
         id: 'task_20240101_abc123',
         title: 'Test Task',
         status: 'in_progress',
+        // TODO: expect.arrayContaining returns any by design in test utilities
         notes: expect.arrayContaining([
           expect.objectContaining({
             content: 'Working on this',
           }),
-        ]),
+        ]) as unknown,
       });
     });
   });
@@ -149,7 +155,7 @@ describe('Task [taskId] API Routes', () => {
       });
 
       const response = await PATCH(request, { params: { taskId: 'task_20240101_abc123' } });
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Session ID is required');
@@ -179,7 +185,7 @@ describe('Task [taskId] API Routes', () => {
       });
 
       const response = await PATCH(request, { params: { taskId: 'task_20240101_abc123' } });
-      const data = await response.json();
+      const data = (await response.json()) as { task: { status: string } };
 
       expect(response.status).toBe(200);
       expect(data.task.status).toBe('completed');
@@ -215,7 +221,7 @@ describe('Task [taskId] API Routes', () => {
       });
 
       const response = await PATCH(request, { params: { taskId: 'task_20240101_abc123' } });
-      const data = await response.json();
+      const data = (await response.json()) as { task: { assignedTo: string } };
 
       expect(response.status).toBe(200);
       expect(data.task.assignedTo).toBe('lace_20240101_agent2');
@@ -249,7 +255,7 @@ describe('Task [taskId] API Routes', () => {
       });
 
       const response = await PATCH(request, { params: { taskId: 'task_20240101_abc123' } });
-      const data = await response.json();
+      const data = (await response.json()) as { task: unknown };
 
       expect(response.status).toBe(200);
       expect(data.task).toMatchObject({
@@ -268,7 +274,7 @@ describe('Task [taskId] API Routes', () => {
       });
 
       const response = await DELETE(request, { params: { taskId: 'task_20240101_abc123' } });
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Session ID is required');
@@ -285,7 +291,7 @@ describe('Task [taskId] API Routes', () => {
       );
 
       const response = await DELETE(request, { params: { taskId: 'task_20240101_abc123' } });
-      const data = await response.json();
+      const data = (await response.json()) as { message: string };
 
       expect(response.status).toBe(200);
       expect(data.message).toBe('Task deleted successfully');
@@ -308,7 +314,7 @@ describe('Task [taskId] API Routes', () => {
       );
 
       const response = await DELETE(request, { params: { taskId: 'task_20240101_notfound' } });
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Task not found');

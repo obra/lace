@@ -12,6 +12,10 @@ import {
 import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 describe('Multi-Agent Task Manager Integration', () => {
   const _tempDirContext = useTempLaceDir();
@@ -31,11 +35,13 @@ describe('Multi-Agent Task Manager Integration', () => {
     parentThreadId,
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
+    setupTestPersistence();
     // No special setup needed - tools and tests use same database via LACE_DIR
   });
 
   afterEach(() => {
+    teardownTestPersistence();
     vi.clearAllMocks();
   });
 

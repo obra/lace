@@ -36,13 +36,14 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit }: CreateTaskModalPr
 
     setSubmitting(true);
     try {
-      await onSubmit({
+      const submitData = {
         title: form.title.trim(),
-        description: form.description?.trim() || undefined,
         prompt: form.prompt.trim(),
-        priority: form.priority,
-        assignedTo: form.assignedTo?.trim() || undefined,
-      });
+        ...(form.description?.trim() && { description: form.description.trim() }),
+        ...(form.priority && { priority: form.priority }),
+        ...(form.assignedTo?.trim() && { assignedTo: form.assignedTo.trim() }),
+      };
+      await onSubmit(submitData);
       // Reset form and close modal
       setForm({
         title: '',
@@ -83,12 +84,7 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit }: CreateTaskModalPr
               className="text-gray-400 hover:text-gray-600"
               aria-label="Close"
             >
-              <svg
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -115,14 +111,10 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit }: CreateTaskModalPr
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea
                 value={form.description}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, description: e.target.value }))
-                }
+                onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 rows={3}
               />
@@ -144,9 +136,7 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit }: CreateTaskModalPr
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Priority
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
                 <select
                   value={form.priority}
                   onChange={(e) =>
@@ -164,15 +154,11 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit }: CreateTaskModalPr
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Assign To
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
                 <input
                   type="text"
                   value={form.assignedTo}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, assignedTo: e.target.value }))
-                  }
+                  onChange={(e) => setForm((prev) => ({ ...prev, assignedTo: e.target.value }))}
                   placeholder="Thread ID or new:provider/model"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />

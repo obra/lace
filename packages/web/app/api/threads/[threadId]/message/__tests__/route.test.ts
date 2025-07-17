@@ -6,6 +6,10 @@ import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/threads/[threadId]/message/route';
 import type { ThreadId, MessageResponse } from '@/types/api';
 import type { Agent } from '@/lib/server/lace-imports';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock Agent interface
 interface MockAgent {
@@ -55,6 +59,7 @@ describe('Thread Messaging API', () => {
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
 
     // Mock console methods to prevent stderr/stdout pollution during tests
@@ -65,6 +70,7 @@ describe('Thread Messaging API', () => {
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     consoleLogSpy.mockRestore();
+    teardownTestPersistence();
   });
 
   describe('POST /api/threads/{threadId}/message', () => {

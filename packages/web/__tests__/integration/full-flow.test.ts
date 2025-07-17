@@ -1,13 +1,17 @@
 // ABOUTME: Integration tests for complete conversation flow through web API
 // ABOUTME: Tests session creation, agent spawning, messaging, and event streaming
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST as createSession } from '@/app/api/sessions/route';
 import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessionId]/agents/route';
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { GET as streamEvents } from '@/app/api/sessions/[sessionId]/events/stream/route';
 import type { ThreadId } from '@/types/api';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Create the mock service outside so we can access it
 const mockSessionService = {
@@ -41,8 +45,13 @@ vi.mock('@/lib/sse-manager', () => ({
 
 describe('Full Conversation Flow', () => {
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
     mockSSEManager.sessionStreams.clear();
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
   });
 
   it('should complete full session workflow', async () => {
@@ -304,7 +313,9 @@ describe('Full Conversation Flow', () => {
     const { agents } = listData;
 
     expect(agents).toHaveLength(2);
+    expect(agents[0]).toBeDefined();
     expect(agents[0].name).toBe('pm');
+    expect(agents[1]).toBeDefined();
     expect(agents[1].name).toBe('architect');
   });
 

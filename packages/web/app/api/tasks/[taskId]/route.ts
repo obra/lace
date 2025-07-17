@@ -104,8 +104,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const taskManager = session.getTaskManager();
 
+    // Filter out undefined properties for exactOptionalPropertyTypes
+    const filteredUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, value]) => value !== undefined)
+    );
+
     // Update task with human context
-    const task = await taskManager.updateTask(taskId, updates, {
+    const task = await taskManager.updateTask(taskId, filteredUpdates, {
       actor: 'human',
       isHuman: true,
     });

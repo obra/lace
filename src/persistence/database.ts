@@ -19,6 +19,17 @@ import {
 } from '~/tools/implementations/task-manager/types';
 import { logger } from '~/utils/logger';
 
+export interface ProjectData {
+  id: string;
+  name: string;
+  description: string;
+  workingDirectory: string;
+  configuration: Record<string, unknown>;
+  isArchived: boolean;
+  createdAt: Date;
+  lastUsedAt: Date;
+}
+
 export interface SessionData {
   id: string;
   projectId: string;
@@ -1224,6 +1235,149 @@ export class DatabasePersistence {
     const result = stmt.run(sessionId);
     if (result.changes === 0) {
       throw new Error(`Session ${sessionId} not found`);
+    }
+  }
+
+  // Project persistence methods
+  saveProject(project: ProjectData): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO projects (id, name, description, working_directory, configuration, is_archived, created_at, last_used_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      project.id,
+      project.name,
+      project.description,
+      project.workingDirectory,
+      JSON.stringify(project.configuration),
+      project.isArchived ? 1 : 0,
+      project.createdAt.toISOString(),
+      project.lastUsedAt.toISOString()
+    );
+  }
+
+  loadProject(projectId: string): ProjectData | null {
+    if (this._disabled || !this.db) return null;
+
+    const stmt = this.db.prepare(`
+      SELECT * FROM projects WHERE id = ?
+    `);
+
+    const row = stmt.get(projectId) as
+      | {
+          id: string;
+          name: string;
+          description: string;
+          working_directory: string;
+          configuration: string;
+          is_archived: number;
+          created_at: string;
+          last_used_at: string;
+        }
+      | undefined;
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      workingDirectory: row.working_directory,
+      configuration: JSON.parse(row.configuration),
+      isArchived: Boolean(row.is_archived),
+      createdAt: new Date(row.created_at),
+      lastUsedAt: new Date(row.last_used_at),
+    };
+  }
+
+  loadAllProjects(): ProjectData[] {
+    if (this._disabled || !this.db) return [];
+
+    const stmt = this.db.prepare(`
+      SELECT * FROM projects ORDER BY last_used_at DESC
+    `);
+
+    const rows = stmt.all() as Array<{
+      id: string;
+      name: string;
+      description: string;
+      working_directory: string;
+      configuration: string;
+      is_archived: number;
+      created_at: string;
+      last_used_at: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      workingDirectory: row.working_directory,
+      configuration: JSON.parse(row.configuration),
+      isArchived: Boolean(row.is_archived),
+      createdAt: new Date(row.created_at),
+      lastUsedAt: new Date(row.last_used_at),
+    }));
+  }
+
+  updateProject(projectId: string, updates: Partial<ProjectData>): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const updateFields: string[] = [];
+    const values: (string | number)[] = [];
+
+    if (updates.name !== undefined) {
+      updateFields.push('name = ?');
+      values.push(updates.name);
+    }
+    if (updates.description !== undefined) {
+      updateFields.push('description = ?');
+      values.push(updates.description);
+    }
+    if (updates.workingDirectory !== undefined) {
+      updateFields.push('working_directory = ?');
+      values.push(updates.workingDirectory);
+    }
+    if (updates.configuration !== undefined) {
+      updateFields.push('configuration = ?');
+      values.push(JSON.stringify(updates.configuration));
+    }
+    if (updates.isArchived !== undefined) {
+      updateFields.push('is_archived = ?');
+      values.push(updates.isArchived ? 1 : 0);
+    }
+
+    // Always update last_used_at
+    updateFields.push('last_used_at = ?');
+    values.push(new Date().toISOString());
+
+    values.push(projectId);
+
+    const stmt = this.db.prepare(`
+      UPDATE projects 
+      SET ${updateFields.join(', ')}
+      WHERE id = ?
+    `);
+
+    const result = stmt.run(...values);
+    if (result.changes === 0) {
+      throw new Error(`Project ${projectId} not found`);
+    }
+  }
+
+  deleteProject(projectId: string): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const stmt = this.db.prepare(`
+      DELETE FROM projects WHERE id = ?
+    `);
+
+    const result = stmt.run(projectId);
+    if (result.changes === 0) {
+      throw new Error(`Project ${projectId} not found`);
     }
   }
 

@@ -9,6 +9,10 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/__tests__/utils/test-provider';
 import { TerminalInterfaceComponent } from '~/interfaces/terminal/terminal-interface';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -19,8 +23,9 @@ describe('TerminalInterface Agent Events', () => {
   let testDir: string;
 
   beforeEach(async () => {
+    setupTestPersistence();
     testDir = await mkdtemp(join(tmpdir(), 'lace-terminal-test-'));
-    threadManager = new ThreadManager(join(testDir, 'test.db'));
+    threadManager = new ThreadManager();
 
     const provider = new TestProvider();
     const toolExecutor = new ToolExecutor();
@@ -45,6 +50,7 @@ describe('TerminalInterface Agent Events', () => {
 
   afterEach(async () => {
     threadManager.close();
+    teardownTestPersistence();
     await rm(testDir, { recursive: true, force: true });
   });
 

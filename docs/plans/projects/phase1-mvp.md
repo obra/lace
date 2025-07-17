@@ -2169,11 +2169,11 @@ export default function Home() {
 3. **✅ Task 1.3**: ThreadManager Session Support - *DONE*
 4. **✅ Task 1.4**: Working Directory in ToolContext - *DONE*
 5. **✅ Task 1.5**: Update Tools to Use Working Directory - *DONE*
-6. **✅ Task 1.7**: Agent Working Directory Support - *DONE*
+6. **✅ Task 1.6**: Session Class Project Support - *DONE*
+7. **✅ Task 1.7**: Agent Working Directory Support - *DONE*
 
 ### 🔄 REMAINING TASKS:
-7. **🔄 Task 1.6**: Session Class Project Support *(Next Priority)*
-8. **🔄 Task 1.8**: Web API - Project Endpoints *(Can parallelize)*  
+8. **🔄 Task 1.8**: Web API - Project Endpoints *(Next Priority)*  
 9. **🔄 Task 1.9**: Session API Endpoints *(Depends on 1.8)*
 10. **🔄 Task 1.10**: Basic Web UI for Projects *(Depends on 1.8, 1.9)*
 

@@ -3,16 +3,16 @@
 
 import { Agent } from '~/agents/agent';
 import { ThreadId, asThreadId } from '~/threads/types';
-import { getLaceDbPath } from '~/config/lace-dir';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderRegistry } from '~/providers/registry';
 import { ToolExecutor } from '~/tools/executor';
 import { TaskManager } from '~/tasks/task-manager';
-import { DatabasePersistence } from '~/persistence/database';
+import { getPersistence, SessionData } from '~/persistence/database';
 import { createTaskManagerTools } from '~/tools/implementations/task-manager';
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { FileWriteTool } from '~/tools/implementations/file-write';
+import { Project } from '~/projects/project';
 import { FileEditTool } from '~/tools/implementations/file-edit';
 import { FileInsertTool } from '~/tools/implementations/file-insert';
 import { FileListTool } from '~/tools/implementations/file-list';
@@ -43,7 +43,6 @@ export class Session {
   private _sessionAgent: Agent;
   private _sessionId: ThreadId;
   private _agents: Map<ThreadId, Agent> = new Map();
-  private _dbPath: string;
   private _taskManager: TaskManager;
   private _destroyed = false;
   private _projectId?: string;
@@ -51,29 +50,24 @@ export class Session {
   constructor(sessionAgent: Agent, projectId?: string) {
     this._sessionAgent = sessionAgent;
     this._sessionId = asThreadId(sessionAgent.threadId);
-    this._dbPath = getLaceDbPath();
     this._projectId = projectId;
 
     // Initialize TaskManager for this session
-    const persistence = new DatabasePersistence(this._dbPath);
-    this._taskManager = new TaskManager(this._sessionId, persistence);
+    this._taskManager = new TaskManager(this._sessionId, getPersistence());
   }
 
   static create(
     name: string,
     provider = 'anthropic',
     model = 'claude-3-haiku-20240307',
-    dbPath?: string,
     projectId?: string // NEW: Add project support
   ): Session {
-    const actualDbPath = dbPath || getLaceDbPath();
-
     // Create provider
     const registry = ProviderRegistry.createWithAutoDiscovery();
     const providerInstance = registry.createProvider(provider, { model });
 
     // Create thread manager
-    const threadManager = new ThreadManager(actualDbPath);
+    const threadManager = new ThreadManager();
 
     // Create session record in sessions table if projectId provided
     let threadId: string;
@@ -89,7 +83,7 @@ export class Session {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      threadManager.createSession(sessionData);
+      Session.createSession(sessionData);
 
       // Create thread for this session
       threadId = threadManager.createThread(sessionData.id, projectId);
@@ -99,9 +93,8 @@ export class Session {
       threadId = sessionInfo.threadId;
     }
 
-    // Create a temporary session to get TaskManager
-    const tempPersistence = new DatabasePersistence(actualDbPath);
-    const taskManager = new TaskManager(asThreadId(threadId), tempPersistence);
+    // Create TaskManager using global persistence
+    const taskManager = new TaskManager(asThreadId(threadId), getPersistence());
 
     // Create tool executor with TaskManager injection
     const toolExecutor = new ToolExecutor();
@@ -133,11 +126,9 @@ export class Session {
     return session;
   }
 
-  static getAll(dbPath?: string): SessionInfo[] {
-    const threadManager = new ThreadManager(dbPath || getLaceDbPath());
-
+  static getAll(): SessionInfo[] {
     // NEW: Get sessions from sessions table
-    const sessions = threadManager.getAllSessions();
+    const sessions = Session.getAllSessionData();
     return sessions.map((session) => ({
       id: asThreadId(session.id),
       name: session.name,
@@ -148,11 +139,10 @@ export class Session {
     }));
   }
 
-  static async getById(sessionId: ThreadId, dbPath?: string): Promise<Session | null> {
+  static async getById(sessionId: ThreadId): Promise<Session | null> {
     logger.debug(`Session.getById called for sessionId: ${sessionId}`);
 
-    const actualDbPath = dbPath || getLaceDbPath();
-    const threadManager = new ThreadManager(actualDbPath);
+    const threadManager = new ThreadManager();
     const thread = threadManager.getThread(sessionId);
 
     if (!thread || !thread.metadata?.isSession) {
@@ -170,9 +160,8 @@ export class Session {
     const registry = ProviderRegistry.createWithAutoDiscovery();
     const providerInstance = registry.createProvider(provider, { model });
 
-    // Create TaskManager first
-    const persistence = new DatabasePersistence(actualDbPath);
-    const taskManager = new TaskManager(sessionId, persistence);
+    // Create TaskManager using global persistence
+    const taskManager = new TaskManager(sessionId, getPersistence());
 
     // Create tool executor with TaskManager injection
     const toolExecutor = new ToolExecutor();
@@ -245,6 +234,73 @@ export class Session {
     return session;
   }
 
+  // ===============================
+  // Session management static methods
+  // ===============================
+
+  static createSession(session: SessionData): void {
+    getPersistence().saveSession(session);
+    logger.info('Session created', { sessionId: session.id, projectId: session.projectId });
+  }
+
+  static getSession(sessionId: string): SessionData | null {
+    return getPersistence().loadSession(sessionId);
+  }
+
+  static getSessionsByProject(projectId: string): SessionData[] {
+    return getPersistence().loadSessionsByProject(projectId);
+  }
+
+  static getAllSessionData(): SessionData[] {
+    // Get all sessions from the database
+    const persistence = getPersistence();
+    if (!persistence.database) return [];
+
+    const stmt = persistence.database.prepare(`
+      SELECT * FROM sessions ORDER BY updated_at DESC
+    `);
+
+    const rows = stmt.all() as Array<{
+      id: string;
+      project_id: string;
+      name: string;
+      description: string;
+      configuration: string;
+      status: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      projectId: row.project_id,
+      name: row.name,
+      description: row.description,
+      configuration: JSON.parse(row.configuration) as Record<string, unknown>,
+      status: row.status as 'active' | 'archived' | 'completed',
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    }));
+  }
+
+  static updateSession(sessionId: string, updates: Partial<SessionData>): void {
+    getPersistence().updateSession(sessionId, updates);
+    logger.info('Session updated', { sessionId, updates });
+  }
+
+  static deleteSession(sessionId: string): void {
+    // First delete all threads in this session
+    const threadManager = new ThreadManager();
+    const threads = threadManager.getThreadsBySession(sessionId);
+    for (const thread of threads) {
+      threadManager.deleteThread(thread.id);
+    }
+
+    // Then delete the session
+    getPersistence().deleteSession(sessionId);
+    logger.info('Session deleted', { sessionId });
+  }
+
   getId(): ThreadId {
     return this._sessionId;
   }
@@ -261,10 +317,9 @@ export class Session {
     }
 
     if (sessionData?.projectId) {
-      const threadManager = new ThreadManager(this._dbPath);
-      const project = threadManager.getProject(sessionData.projectId);
+      const project = Project.getById(sessionData.projectId);
       if (project) {
-        return project.workingDirectory;
+        return project.getWorkingDirectory();
       }
     }
 
@@ -272,8 +327,7 @@ export class Session {
   }
 
   private getSessionData() {
-    const threadManager = new ThreadManager(this._dbPath);
-    return threadManager.getSession(this._sessionId);
+    return Session.getSession(this._sessionId);
   }
 
   getInfo(): SessionInfo | null {
@@ -428,17 +482,15 @@ export class Session {
       provider?: string;
       model?: string;
       approvalCallback?: ApprovalCallback;
-      dbPath?: string;
     } = {}
   ): Promise<Session> {
     // Use existing logic for provider/model detection
     const provider = options.provider || Session.detectDefaultProvider();
     const model = options.model || Session.getDefaultModel(provider);
-    const dbPath = options.dbPath || getLaceDbPath();
     const name = options.name || Session.generateSessionName();
 
     // Create session using existing create method
-    const session = Session.create(name, provider, model, dbPath);
+    const session = Session.create(name, provider, model);
 
     // Set up coordinator agent with approval callback if provided
     const coordinatorAgent = session.getAgent(session.getId());

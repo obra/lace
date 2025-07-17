@@ -17,7 +17,8 @@ import { loadPromptConfig } from '~/config/prompts';
 import { estimateTokens } from '~/utils/token-estimation';
 import { QueuedMessage, MessageQueueStats } from '~/agents/types';
 import { ProviderRegistry } from '~/providers/registry';
-import { getLaceDbPath } from '~/config/lace-dir';
+import { Project } from '~/projects/project';
+import { Session } from '~/sessions/session';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -120,8 +121,7 @@ export class Agent extends EventEmitter {
     toolExecutor.registerAllAvailableTools();
 
     // Create thread manager
-    const dbPath = config.dbPath || getLaceDbPath();
-    const threadManager = new ThreadManager(dbPath);
+    const threadManager = new ThreadManager();
 
     // Create new thread
     const sessionInfo = threadManager.resumeOrCreate();
@@ -1551,16 +1551,16 @@ export class Agent extends EventEmitter {
 
       // If thread has a sessionId, get the session to find the project
       if (thread.sessionId) {
-        const session = this._threadManager.getSession(thread.sessionId);
+        const session = Session.getSession(thread.sessionId);
         if (session?.projectId) {
-          const project = this._threadManager.getProject(session.projectId);
+          const project = Project.getProjectData(session.projectId);
           return project?.workingDirectory;
         }
       }
 
       // If thread has a direct projectId, use that
       if (thread.projectId) {
-        const project = this._threadManager.getProject(thread.projectId);
+        const project = Project.getProjectData(thread.projectId);
         return project?.workingDirectory;
       }
 

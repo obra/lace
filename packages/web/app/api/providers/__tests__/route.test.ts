@@ -4,6 +4,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi, MockedFunction } from 'vitest';
 import { GET, type ProviderWithModels } from '@/app/api/providers/route';
 import type { ProviderInfo, ModelInfo } from '@/lib/server/lace-imports';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 // ProviderRegistry is mocked but not directly used in tests
 
 // Response type for tests
@@ -24,14 +28,27 @@ describe('Provider Discovery API', () => {
     getAvailableProviders: MockedFunction<
       () => Array<{ info: ProviderInfo; models: ModelInfo[]; configured: boolean }>
     >;
+    _providers: Map<string, unknown>;
+    registerProvider: MockedFunction<(name: string, provider: unknown) => void>;
+    getProvider: MockedFunction<(name: string) => unknown>;
+    getAllProviders: MockedFunction<() => unknown[]>;
+    getAvailableModelsByProvider: MockedFunction<(providerName: string) => unknown[]>;
+    isProviderConfigured: MockedFunction<(providerName: string) => boolean>;
   };
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
+    setupTestPersistence();
     vi.clearAllMocks();
     mockRegistry = {
       getAvailableProviders: vi.fn(),
+      _providers: new Map(),
+      registerProvider: vi.fn(),
+      getProvider: vi.fn(),
+      getAllProviders: vi.fn(),
+      getAvailableModelsByProvider: vi.fn(),
+      isProviderConfigured: vi.fn(),
     };
 
     // Mock console methods to prevent stderr pollution during tests
@@ -39,12 +56,15 @@ describe('Provider Discovery API', () => {
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const { ProviderRegistry } = await import('@/lib/server/lace-imports');
-    vi.mocked(ProviderRegistry.createWithAutoDiscovery).mockReturnValue(mockRegistry);
+    vi.mocked(ProviderRegistry.createWithAutoDiscovery).mockReturnValue(
+      mockRegistry as unknown as typeof ProviderRegistry.prototype
+    );
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
+    teardownTestPersistence();
   });
 
   describe('GET /api/providers', () => {
@@ -230,7 +250,7 @@ describe('Provider Discovery API', () => {
       const data = (await response.json()) as ProvidersResponse;
 
       expect(response.status).toBe(200);
-      const provider = data.providers[0] as ProviderWithModels;
+      const provider = data.providers[0];
       expect(provider).toBeDefined();
       const defaultModel = provider.models.find((m) => m.isDefault);
       expect(defaultModel).toBeDefined();
@@ -264,7 +284,7 @@ describe('Provider Discovery API', () => {
       const data = (await response.json()) as ProvidersResponse;
 
       expect(response.status).toBe(200);
-      const provider = data.providers[0] as ProviderWithModels;
+      const provider = data.providers[0];
       expect(provider).toBeDefined();
       const model = provider.models[0];
       expect(model).toBeDefined();

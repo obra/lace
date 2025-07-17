@@ -16,6 +16,11 @@ import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface'
 import { createGlobalPolicyCallback } from '~/tools/policy-wrapper';
 import { OllamaProvider } from '~/providers/ollama-provider';
 import { withConsoleCapture } from '~/__tests__/setup/console-capture';
+import { resetPersistence } from '~/persistence/database';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock external dependencies at the module level
 vi.mock('~/agents/agent');
@@ -111,7 +116,9 @@ describe('App Initialization (run function)', () => {
   };
 
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
+    resetPersistence();
 
     // Mock implementations for imported modules
     vi.mocked(getEnvVar).mockImplementation((key) => {
@@ -192,6 +199,8 @@ describe('App Initialization (run function)', () => {
   });
 
   afterEach(() => {
+    teardownTestPersistence();
+    resetPersistence();
     vi.restoreAllMocks();
   });
 
@@ -270,7 +279,7 @@ describe('App Initialization (run function)', () => {
   it('should initialize ThreadManager and handle new session', async () => {
     const { log } = withConsoleCapture();
     await run(mockCliOptions);
-    expect(ThreadManager).toHaveBeenCalledWith('/mock/db/path');
+    expect(ThreadManager).toHaveBeenCalledWith();
     // Session handling now goes through Agent.resumeOrCreateThread
     expect(log).toHaveBeenCalledWith('🆕 Starting conversation new-thread-123');
   });

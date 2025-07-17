@@ -1,7 +1,7 @@
 // ABOUTME: Tthread management with SQLite persistence support - PRIVATE AND INTERNAL. ONLY ACCESS THROUGH AGENT
 // ABOUTME: Maintains backward compatibility with immediate event persistence
 
-import { DatabasePersistence, SessionData } from '~/persistence/database';
+import { DatabasePersistence, SessionData, ProjectData } from '~/persistence/database';
 import { Thread, ThreadEvent, EventType } from '~/threads/types';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { logger } from '~/utils/logger';
@@ -86,64 +86,12 @@ export class ThreadManager {
   }
 
   // ===============================
-  // Project management methods
+  // Project coordination methods (minimal)
   // ===============================
 
-  createProject(project: ProjectData): void {
-    // Create project in database
-    this._persistence
-      .database!.prepare(
-        `
-      INSERT INTO projects (id, name, description, working_directory, configuration, is_archived, created_at, last_used_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `
-      )
-      .run(
-        project.id,
-        project.name,
-        project.description,
-        project.workingDirectory,
-        JSON.stringify(project.configuration),
-        project.isArchived ? 1 : 0,
-        project.createdAt.toISOString(),
-        project.lastUsedAt.toISOString()
-      );
-
-    logger.info('Project created', { projectId: project.id });
-  }
-
+  // Only keep project methods that ThreadManager actually needs for coordination
   getProject(projectId: string): ProjectData | null {
-    const row = this._persistence
-      .database!.prepare(
-        `
-      SELECT * FROM projects WHERE id = ?
-    `
-      )
-      .get(projectId) as
-      | {
-          id: string;
-          name: string;
-          description: string;
-          working_directory: string;
-          configuration: string;
-          is_archived: number;
-          created_at: string;
-          last_used_at: string;
-        }
-      | undefined;
-
-    if (!row) return null;
-
-    return {
-      id: row.id,
-      name: row.name,
-      description: row.description,
-      workingDirectory: row.working_directory,
-      configuration: JSON.parse(row.configuration) as Record<string, unknown>,
-      isArchived: Boolean(row.is_archived),
-      createdAt: new Date(row.created_at),
-      lastUsedAt: new Date(row.last_used_at),
-    };
+    return this._persistence.loadProject(projectId);
   }
 
   // ===============================

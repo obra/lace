@@ -1,9 +1,13 @@
 // ABOUTME: Tests for enhanced task manager with multi-agent support
 // ABOUTME: Validates extended data model, thread scoping, and note management
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Task, TaskNote } from '~/tools/implementations/task-manager/types';
 import { createThreadId, createNewAgentSpec, isAssigneeId } from '~/threads/types';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 describe('Enhanced Task Data Model', () => {
   let testTask: Task;
@@ -11,6 +15,7 @@ describe('Enhanced Task Data Model', () => {
   const parentThreadId = createThreadId('lace_20250703_abc123');
 
   beforeEach(() => {
+    setupTestPersistence();
     testTask = {
       id: 'task_20250703_test01',
       title: 'Implement authentication',
@@ -25,6 +30,10 @@ describe('Enhanced Task Data Model', () => {
       updatedAt: new Date(),
       notes: [],
     };
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
   });
 
   describe('Task creation', () => {
