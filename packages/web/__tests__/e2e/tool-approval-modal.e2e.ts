@@ -22,25 +22,6 @@ test.describe('Tool Approval Modal E2E Tests', () => {
   });
 
   test('should display tool approval modal when tool requires approval', async ({ page }) => {
-    // Listen for console logs to debug
-    page.on('console', (msg) => console.log('BROWSER:', msg.text()));
-
-    // Listen for API requests/responses
-    page.on('request', (request) => {
-      if (request.url().includes('/api/')) {
-        console.log('REQUEST:', request.method(), request.url());
-        if (request.method() === 'POST') {
-          console.log('REQUEST BODY:', request.postData());
-        }
-      }
-    });
-
-    page.on('response', (response) => {
-      if (response.url().includes('/api/')) {
-        console.log('RESPONSE:', response.status(), response.url());
-      }
-    });
-
     // Create a new session with unique name
     const sessionName = `Tool Approval Test ${Date.now()}`;
     await page.fill('[data-testid="session-name-input"]', sessionName);
