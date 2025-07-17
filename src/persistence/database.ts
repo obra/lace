@@ -19,6 +19,17 @@ import {
 } from '~/tools/implementations/task-manager/types';
 import { logger } from '~/utils/logger';
 
+export interface SessionData {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  configuration: Record<string, unknown>;
+  status: 'active' | 'archived' | 'completed';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export class DatabasePersistence {
   private db: Database.Database | null = null;
   private _closed: boolean = false;
@@ -1041,6 +1052,150 @@ export class DatabasePersistence {
       }
     }
     throw lastError;
+  }
+
+  // ===============================
+  // Session-related methods
+  // ===============================
+
+  saveSession(session: SessionData): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO sessions (id, project_id, name, description, configuration, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      session.id,
+      session.projectId,
+      session.name,
+      session.description,
+      JSON.stringify(session.configuration),
+      session.status,
+      session.createdAt.toISOString(),
+      session.updatedAt.toISOString()
+    );
+  }
+
+  loadSession(sessionId: string): SessionData | null {
+    if (this._disabled || !this.db) return null;
+
+    const stmt = this.db.prepare(`
+      SELECT * FROM sessions WHERE id = ?
+    `);
+
+    const row = stmt.get(sessionId) as
+      | {
+          id: string;
+          project_id: string;
+          name: string;
+          description: string;
+          configuration: string;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        }
+      | undefined;
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      name: row.name,
+      description: row.description,
+      configuration: JSON.parse(row.configuration) as Record<string, unknown>,
+      status: row.status as 'active' | 'archived' | 'completed',
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    };
+  }
+
+  loadSessionsByProject(projectId: string): SessionData[] {
+    if (this._disabled || !this.db) return [];
+
+    const stmt = this.db.prepare(`
+      SELECT * FROM sessions 
+      WHERE project_id = ? 
+      ORDER BY updated_at DESC
+    `);
+
+    const rows = stmt.all(projectId) as Array<{
+      id: string;
+      project_id: string;
+      name: string;
+      description: string;
+      configuration: string;
+      status: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      projectId: row.project_id,
+      name: row.name,
+      description: row.description,
+      configuration: JSON.parse(row.configuration) as Record<string, unknown>,
+      status: row.status as 'active' | 'archived' | 'completed',
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    }));
+  }
+
+  updateSession(sessionId: string, updates: Partial<SessionData>): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const updateFields: string[] = [];
+    const values: (string | number)[] = [];
+
+    if (updates.name !== undefined) {
+      updateFields.push('name = ?');
+      values.push(updates.name);
+    }
+    if (updates.description !== undefined) {
+      updateFields.push('description = ?');
+      values.push(updates.description);
+    }
+    if (updates.configuration !== undefined) {
+      updateFields.push('configuration = ?');
+      values.push(JSON.stringify(updates.configuration));
+    }
+    if (updates.status !== undefined) {
+      updateFields.push('status = ?');
+      values.push(updates.status);
+    }
+
+    // Update timestamp - use provided updatedAt or current time
+    updateFields.push('updated_at = ?');
+    values.push(updates.updatedAt ? updates.updatedAt.toISOString() : new Date().toISOString());
+
+    values.push(sessionId);
+
+    const stmt = this.db.prepare(`
+      UPDATE sessions 
+      SET ${updateFields.join(', ')}
+      WHERE id = ?
+    `);
+
+    const result = stmt.run(...values);
+    if (result.changes === 0) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+  }
+
+  deleteSession(sessionId: string): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const stmt = this.db.prepare(`
+      DELETE FROM sessions WHERE id = ?
+    `);
+
+    const result = stmt.run(sessionId);
+    if (result.changes === 0) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
   }
 
   close(): void {
