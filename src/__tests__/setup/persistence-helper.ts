@@ -4,6 +4,7 @@
 import {
   resetPersistence,
   initializePersistence,
+  getPersistence,
   type DatabasePersistence,
 } from '~/persistence/database';
 import * as path from 'path';
@@ -22,7 +23,8 @@ export function setupTestPersistence(): DatabasePersistence {
     `lace-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.db`
   );
   resetPersistence();
-  return initializePersistence(currentTempDbPath);
+  initializePersistence(currentTempDbPath);
+  return getPersistence();
 }
 
 /**

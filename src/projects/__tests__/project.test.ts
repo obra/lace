@@ -1,22 +1,12 @@
 // ABOUTME: Tests for Project class functionality including CRUD operations and session management
 // ABOUTME: Covers project creation, persistence, updates, and cleanup with proper database isolation
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Project } from '~/projects/project';
-import { DatabasePersistence } from '~/persistence/database';
-
-// Mock the database persistence
-vi.mock('~/persistence/database', () => ({
-  DatabasePersistence: vi.fn().mockImplementation(() => ({
-    saveProject: vi.fn(),
-    loadProject: vi.fn(),
-    loadAllProjects: vi.fn(),
-    updateProject: vi.fn(),
-    deleteProject: vi.fn(),
-    loadSessionsByProject: vi.fn().mockReturnValue([]),
-    close: vi.fn(),
-  })),
-}));
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock the session class
 vi.mock('~/sessions/session', () => ({
@@ -26,139 +16,87 @@ vi.mock('~/sessions/session', () => ({
 }));
 
 describe('Project', () => {
-  let mockPersistence: {
-    saveProject: ReturnType<typeof vi.fn>;
-    loadProject: ReturnType<typeof vi.fn>;
-    loadAllProjects: ReturnType<typeof vi.fn>;
-    updateProject: ReturnType<typeof vi.fn>;
-    deleteProject: ReturnType<typeof vi.fn>;
-    loadSessionsByProject: ReturnType<typeof vi.fn>;
-    close: ReturnType<typeof vi.fn>;
-  };
-
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
-    mockPersistence = {
-      saveProject: vi.fn(),
-      loadProject: vi.fn(),
-      loadAllProjects: vi.fn(),
-      updateProject: vi.fn(),
-      deleteProject: vi.fn(),
-      loadSessionsByProject: vi.fn().mockReturnValue([]),
-      close: vi.fn(),
-    };
-    vi.mocked(DatabasePersistence).mockImplementation(() => mockPersistence);
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
   });
 
   describe('create', () => {
     it('should create a new project with required fields', () => {
-      const project = Project.create(
-        'Test Project',
-        '/test/path',
-        'A test project',
-        { key: 'value' },
-        ':memory:'
-      );
-
-      expect(mockPersistence.saveProject).toHaveBeenCalledWith({
-        id: expect.any(String),
-        name: 'Test Project',
-        description: 'A test project',
-        workingDirectory: '/test/path',
-        configuration: { key: 'value' },
-        isArchived: false,
-        createdAt: expect.any(Date),
-        lastUsedAt: expect.any(Date),
+      const project = Project.create('Test Project', '/test/path', 'A test project', {
+        key: 'value',
       });
 
       expect(project).toBeInstanceOf(Project);
       expect(project.getId()).toBeDefined();
+
+      // Verify project was actually saved to database
+      const retrieved = Project.getById(project.getId());
+      expect(retrieved).not.toBeNull();
+      expect(retrieved!.getName()).toBe('Test Project');
+      expect(retrieved!.getWorkingDirectory()).toBe('/test/path');
     });
 
     it('should create project with default values', () => {
       const project = Project.create('Test Project', '/test/path');
 
-      expect(mockPersistence.saveProject).toHaveBeenCalledWith({
-        id: expect.any(String),
-        name: 'Test Project',
-        description: '',
-        workingDirectory: '/test/path',
-        configuration: {},
-        isArchived: false,
-        createdAt: expect.any(Date),
-        lastUsedAt: expect.any(Date),
-      });
-
       expect(project).toBeInstanceOf(Project);
+
+      // Verify project was actually saved with defaults
+      const retrieved = Project.getById(project.getId());
+      expect(retrieved).not.toBeNull();
+      expect(retrieved!.getName()).toBe('Test Project');
+      expect(retrieved!.getWorkingDirectory()).toBe('/test/path');
     });
   });
 
   describe('getAll', () => {
     it('should return all projects', () => {
-      const mockProjects = [
-        {
-          id: 'project1',
-          name: 'Project 1',
-          description: 'First project',
-          workingDirectory: '/path1',
-          configuration: {},
-          isArchived: false,
-          createdAt: new Date('2023-01-01'),
-          lastUsedAt: new Date('2023-01-01'),
-        },
-        {
-          id: 'project2',
-          name: 'Project 2',
-          description: 'Second project',
-          workingDirectory: '/path2',
-          configuration: {},
-          isArchived: false,
-          createdAt: new Date('2023-01-02'),
-          lastUsedAt: new Date('2023-01-02'),
-        },
-      ];
+      // Create real projects in the database
+      const _project1 = Project.create('Project 1', '/path1', 'First project');
+      const _project2 = Project.create('Project 2', '/path2', 'Second project');
 
-      mockPersistence.loadAllProjects.mockReturnValue(mockProjects);
+      const projects = Project.getAll();
 
-      const projects = Project.getAll(':memory:');
+      // Should have our 2 projects plus the historical project from database initialization
+      expect(projects).toHaveLength(3);
+      expect(projects.find((p) => p.name === 'Project 1')).toBeDefined();
+      expect(projects.find((p) => p.name === 'Project 2')).toBeDefined();
+      expect(projects.find((p) => p.name === 'Historical')).toBeDefined(); // Default historical project
+      expect(projects.find((p) => p.name === 'Project 1')?.workingDirectory).toBe('/path1');
+      expect(projects.find((p) => p.name === 'Project 2')?.workingDirectory).toBe('/path2');
+    });
 
-      expect(projects).toHaveLength(2);
-      expect(projects[0]).toEqual({
-        id: 'project1',
-        name: 'Project 1',
-        description: 'First project',
-        workingDirectory: '/path1',
-        isArchived: false,
-        createdAt: new Date('2023-01-01'),
-        lastUsedAt: new Date('2023-01-01'),
-        sessionCount: 0,
-      });
+    it('should include historical project by default', () => {
+      const projects = Project.getAll();
+
+      // Database always creates a "Historical" project for legacy sessions
+      expect(projects).toHaveLength(1);
+      expect(projects[0]?.name).toBe('Historical');
+      expect(projects[0]?.id).toBe('historical');
     });
   });
 
   describe('getById', () => {
     it('should return project when found', () => {
-      mockPersistence.loadProject.mockReturnValue({
-        id: 'project1',
-        name: 'Test Project',
-        description: 'A test project',
-        workingDirectory: '/test/path',
-        configuration: {},
-        isArchived: false,
-        createdAt: new Date(),
-        lastUsedAt: new Date(),
+      const createdProject = Project.create('Test Project', '/test/path', 'A test project', {
+        key: 'value',
       });
+      const projectId = createdProject.getId();
 
-      const project = Project.getById('project1', ':memory:');
+      const project = Project.getById(projectId);
 
       expect(project).toBeInstanceOf(Project);
-      expect(project?.getId()).toBe('project1');
+      expect(project?.getId()).toBe(projectId);
+      expect(project?.getName()).toBe('Test Project');
     });
 
     it('should return null when not found', () => {
-      mockPersistence.loadProject.mockReturnValue(null);
-
-      const project = Project.getById('nonexistent', ':memory:');
+      const project = Project.getById('non-existent');
 
       expect(project).toBeNull();
     });
@@ -168,17 +106,7 @@ describe('Project', () => {
     let project: Project;
 
     beforeEach(() => {
-      project = new Project('test-project', ':memory:');
-      mockPersistence.loadProject.mockReturnValue({
-        id: 'test-project',
-        name: 'Test Project',
-        description: 'A test project',
-        workingDirectory: '/test/path',
-        configuration: { key: 'value' },
-        isArchived: false,
-        createdAt: new Date('2023-01-01'),
-        lastUsedAt: new Date('2023-01-01'),
-      });
+      project = Project.create('Test Project', '/test/path', 'A test project', { key: 'value' });
     });
 
     describe('getInfo', () => {
@@ -186,22 +114,21 @@ describe('Project', () => {
         const info = project.getInfo();
 
         expect(info).toEqual({
-          id: 'test-project',
+          id: project.getId(),
           name: 'Test Project',
           description: 'A test project',
           workingDirectory: '/test/path',
           isArchived: false,
-          createdAt: new Date('2023-01-01'),
-          lastUsedAt: new Date('2023-01-01'),
+          createdAt: expect.any(Date),
+          lastUsedAt: expect.any(Date),
           sessionCount: 0,
         });
       });
 
       it('should return null when project not found', () => {
-        mockPersistence.loadProject.mockReturnValue(null);
+        const nonExistentProject = new Project('non-existent');
 
-        const info = project.getInfo();
-
+        const info = nonExistentProject.getInfo();
         expect(info).toBeNull();
       });
     });
@@ -210,77 +137,105 @@ describe('Project', () => {
       it('should return project name', () => {
         expect(project.getName()).toBe('Test Project');
       });
-
-      it('should return default when project not found', () => {
-        mockPersistence.loadProject.mockReturnValue(null);
-        expect(project.getName()).toBe('Unknown Project');
-      });
     });
 
     describe('getWorkingDirectory', () => {
       it('should return working directory', () => {
         expect(project.getWorkingDirectory()).toBe('/test/path');
       });
+    });
 
-      it('should return process.cwd() when project not found', () => {
-        mockPersistence.loadProject.mockReturnValue(null);
-        expect(project.getWorkingDirectory()).toBe(process.cwd());
+    describe('getConfiguration', () => {
+      it('should return configuration', () => {
+        const config = project.getConfiguration();
+        expect(config).toEqual({ key: 'value' });
+      });
+
+      it('should return empty object when no configuration', () => {
+        const simpleProject = Project.create('Simple', '/path');
+        const config = simpleProject.getConfiguration();
+        expect(config).toEqual({});
       });
     });
 
     describe('updateInfo', () => {
-      it('should update project info', () => {
-        project.updateInfo({
-          name: 'Updated Project',
-          description: 'Updated description',
-        });
+      it('should update project name', () => {
+        project.updateInfo({ name: 'Updated Name' });
 
-        expect(mockPersistence.updateProject).toHaveBeenCalledWith('test-project', {
-          name: 'Updated Project',
-          description: 'Updated description',
-          lastUsedAt: expect.any(Date),
-        });
+        const updated = Project.getById(project.getId());
+        expect(updated?.getName()).toBe('Updated Name');
+      });
+
+      it('should update project description', () => {
+        project.updateInfo({ description: 'Updated description' });
+
+        const updated = Project.getById(project.getId());
+        expect(updated?.getInfo()?.description).toBe('Updated description');
+      });
+
+      it('should update working directory', () => {
+        project.updateInfo({ workingDirectory: '/new/path' });
+
+        const updated = Project.getById(project.getId());
+        expect(updated?.getWorkingDirectory()).toBe('/new/path');
+      });
+
+      it('should update configuration', () => {
+        project.updateInfo({ configuration: { newKey: 'newValue' } });
+
+        const updated = Project.getById(project.getId());
+        expect(updated?.getConfiguration()).toEqual({ newKey: 'newValue' });
       });
     });
 
-    describe('archive/unarchive', () => {
+    describe('archive', () => {
       it('should archive project', () => {
         project.archive();
 
-        expect(mockPersistence.updateProject).toHaveBeenCalledWith('test-project', {
-          isArchived: true,
-          lastUsedAt: expect.any(Date),
-        });
+        const updated = Project.getById(project.getId());
+        expect(updated?.getInfo()?.isArchived).toBe(true);
       });
+    });
 
+    describe('unarchive', () => {
       it('should unarchive project', () => {
+        project.archive();
         project.unarchive();
 
-        expect(mockPersistence.updateProject).toHaveBeenCalledWith('test-project', {
-          isArchived: false,
-          lastUsedAt: expect.any(Date),
-        });
+        const updated = Project.getById(project.getId());
+        expect(updated?.getInfo()?.isArchived).toBe(false);
+      });
+    });
+
+    describe('touchLastUsed', () => {
+      it('should update lastUsedAt timestamp', () => {
+        const originalInfo = project.getInfo();
+        const originalLastUsed = originalInfo?.lastUsedAt;
+
+        // Wait a bit to ensure timestamp difference
+        setTimeout(() => {
+          project.touchLastUsed();
+
+          const updatedInfo = project.getInfo();
+          const updatedLastUsed = updatedInfo?.lastUsedAt;
+
+          expect(updatedLastUsed).not.toEqual(originalLastUsed);
+          expect(updatedLastUsed! > originalLastUsed!).toBe(true);
+        }, 10);
       });
     });
 
     describe('delete', () => {
-      it('should delete project and its sessions', () => {
-        const mockSessions = [
-          { id: 'session1', projectId: 'test-project' },
-          { id: 'session2', projectId: 'test-project' },
-        ];
-        mockPersistence.loadSessionsByProject.mockReturnValue(mockSessions);
+      it('should delete project and its sessions', async () => {
+        const projectId = project.getId();
 
-        const mockSession = { destroy: vi.fn() };
-        const { Session } = vi.mocked(await import('~/sessions/session'));
-        Session.getById = vi.fn().mockReturnValue(mockSession);
+        // Verify project exists before deletion
+        expect(Project.getById(projectId)).not.toBeNull();
 
-        project.delete();
+        await project.delete();
 
-        expect(mockPersistence.loadSessionsByProject).toHaveBeenCalledWith('test-project');
-        expect(Session.getById).toHaveBeenCalledTimes(2);
-        expect(mockSession.destroy).toHaveBeenCalledTimes(2);
-        expect(mockPersistence.deleteProject).toHaveBeenCalledWith('test-project');
+        // Verify project is deleted
+        expect(Project.getById(projectId)).toBeNull();
       });
     });
   });

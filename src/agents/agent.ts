@@ -1553,15 +1553,15 @@ export class Agent extends EventEmitter {
       if (thread.sessionId) {
         const session = Session.getSession(thread.sessionId);
         if (session?.projectId) {
-          const project = Project.getProjectData(session.projectId);
-          return project?.workingDirectory;
+          const project = Project.getById(session.projectId);
+          return project?.getWorkingDirectory();
         }
       }
 
       // If thread has a direct projectId, use that
       if (thread.projectId) {
-        const project = Project.getProjectData(thread.projectId);
-        return project?.workingDirectory;
+        const project = Project.getById(thread.projectId);
+        return project?.getWorkingDirectory();
       }
 
       // Fallback to current working directory

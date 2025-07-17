@@ -73,7 +73,7 @@ describe('Turn State Integration Tests', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
-    
+
     const mockResponse: ProviderResponse = {
       content: 'Test response',
       toolCalls: [],

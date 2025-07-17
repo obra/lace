@@ -6,10 +6,15 @@ import {
   setupTestPersistence,
   teardownTestPersistence,
 } from '~/__tests__/setup/persistence-helper';
+import type { ThreadManager } from '~/threads/thread-manager';
 
 // Track whether persistence is needed for current test
 let persistenceNeeded = false;
-let originalThreadManager: any;
+let originalThreadManager: typeof ThreadManager | undefined;
+
+interface ThreadManagerModule {
+  ThreadManager: typeof ThreadManager;
+}
 
 // Auto-detect tests that need persistence by hooking into ThreadManager imports
 beforeEach(() => {
@@ -20,18 +25,19 @@ beforeEach(() => {
   if (typeof global !== 'undefined') {
     try {
       // Try to get ThreadManager module if it's been imported
-      const threadManagerModule = require('~/threads/thread-manager');
+      const threadManagerModule = (globalThis as Record<string, unknown>)
+        .__THREAD_MANAGER_MODULE__ as ThreadManagerModule | undefined;
       if (threadManagerModule?.ThreadManager) {
         originalThreadManager = threadManagerModule.ThreadManager;
 
         // Wrap ThreadManager constructor to auto-setup persistence
         threadManagerModule.ThreadManager = class extends originalThreadManager {
-          constructor(...args: any[]) {
+          constructor() {
             if (!persistenceNeeded) {
               persistenceNeeded = true;
               setupTestPersistence();
             }
-            super(...args);
+            super();
           }
         };
       }
@@ -50,7 +56,8 @@ afterEach(() => {
   // Restore original ThreadManager
   if (originalThreadManager) {
     try {
-      const threadManagerModule = require('~/threads/thread-manager');
+      const threadManagerModule = (globalThis as Record<string, unknown>)
+        .__THREAD_MANAGER_MODULE__ as ThreadManagerModule | undefined;
       if (threadManagerModule) {
         threadManagerModule.ThreadManager = originalThreadManager;
       }

@@ -2,9 +2,11 @@
 // ABOUTME: Provides high-level interface for project CRUD operations and session management
 
 import { randomUUID } from 'crypto';
-import { getPersistence, ProjectData } from '~/persistence/database';
+import { getPersistence, ProjectData, DatabasePersistence } from '~/persistence/database';
 import { logger } from '~/utils/logger';
 import { Session } from '~/sessions/session';
+// import { getLaceDbPath } from '~/config/lace-dir'; // Keep for potential future use
+import { asThreadId } from '~/threads/types';
 
 export interface ProjectInfo {
   id: string;
@@ -44,16 +46,18 @@ export class Project {
     };
 
     persistence.saveProject(projectData);
-    persistence.close();
+    // Don't close the global persistence - it's managed by the persistence system
 
     logger.info('Project created', { projectId: projectData.id, name, workingDirectory });
-    return new Project(projectData.id, actualDbPath);
+    return new Project(projectData.id);
   }
 
   static getAll(dbPath?: string): ProjectInfo[] {
-    const persistence = new DatabasePersistence(dbPath || getLaceDbPath());
+    const persistence = dbPath ? new DatabasePersistence(dbPath) : getPersistence();
     const projects = persistence.loadAllProjects();
-    persistence.close();
+    if (dbPath) {
+      persistence.close();
+    }
 
     return projects.map((project) => ({
       id: project.id,
@@ -69,15 +73,17 @@ export class Project {
   }
 
   static getById(projectId: string, dbPath?: string): Project | null {
-    const persistence = new DatabasePersistence(dbPath || getLaceDbPath());
+    const persistence = dbPath ? new DatabasePersistence(dbPath) : getPersistence();
     const projectData = persistence.loadProject(projectId);
-    persistence.close();
+    if (dbPath) {
+      persistence.close();
+    }
 
     if (!projectData) {
       return null;
     }
 
-    return new Project(projectId, dbPath);
+    return new Project(projectId);
   }
 
   getId(): string {
@@ -85,9 +91,9 @@ export class Project {
   }
 
   getInfo(): ProjectInfo | null {
-    const persistence = new DatabasePersistence(this._dbPath);
+    const persistence = getPersistence();
     const projectData = persistence.loadProject(this._id);
-    persistence.close();
+    // Don't close the global persistence - it's managed by the persistence system
 
     if (!projectData) {
       return null;
@@ -117,9 +123,9 @@ export class Project {
   }
 
   getConfiguration(): Record<string, unknown> {
-    const persistence = new DatabasePersistence(this._dbPath);
+    const persistence = getPersistence();
     const projectData = persistence.loadProject(this._id);
-    persistence.close();
+    // Don't close the global persistence - it's managed by the persistence system
 
     return projectData?.configuration || {};
   }
@@ -131,7 +137,7 @@ export class Project {
     configuration?: Record<string, unknown>;
     isArchived?: boolean;
   }): void {
-    const persistence = new DatabasePersistence(this._dbPath);
+    const persistence = getPersistence();
 
     // Always update lastUsedAt when project is modified
     const updatesWithTimestamp = {
@@ -140,7 +146,7 @@ export class Project {
     };
 
     persistence.updateProject(this._id, updatesWithTimestamp);
-    persistence.close();
+    // Don't close the global persistence - it's managed by the persistence system
 
     logger.info('Project updated', { projectId: this._id, updates });
   }
@@ -155,13 +161,13 @@ export class Project {
     logger.info('Project unarchived', { projectId: this._id });
   }
 
-  delete(): void {
-    const persistence = new DatabasePersistence(this._dbPath);
+  async delete(): Promise<void> {
+    const persistence = getPersistence();
 
     // Delete all sessions in this project first using Session class
     const sessionData = persistence.loadSessionsByProject(this._id);
     for (const sessionInfo of sessionData) {
-      const session = Session.getById(sessionInfo.id as any, this._dbPath);
+      const session = await Session.getById(asThreadId(sessionInfo.id));
       if (session) {
         session.destroy();
       }
@@ -169,13 +175,13 @@ export class Project {
 
     // Then delete the project
     persistence.deleteProject(this._id);
-    persistence.close();
+    // Don't close the global persistence - it's managed by the persistence system
 
     logger.info('Project deleted', { projectId: this._id });
   }
 
   touchLastUsed(): void {
-    this.updateInfo({ lastUsedAt: new Date() });
+    this.updateInfo({});
   }
 
   // TODO: Add methods for session management when Session class is updated

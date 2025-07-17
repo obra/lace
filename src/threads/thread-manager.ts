@@ -1,24 +1,18 @@
 // ABOUTME: Tthread management with SQLite persistence support - PRIVATE AND INTERNAL. ONLY ACCESS THROUGH AGENT
 // ABOUTME: Maintains backward compatibility with immediate event persistence
 
-import { DatabasePersistence, SessionData, ProjectData } from '~/persistence/database';
+import {
+  DatabasePersistence,
+  SessionData,
+  ProjectData,
+  getPersistence,
+} from '~/persistence/database';
 import { Thread, ThreadEvent, EventType } from '~/threads/types';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { logger } from '~/utils/logger';
 import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy';
 import { estimateTokens } from '~/utils/token-estimation';
 import { AIProvider } from '~/providers/base-provider';
-
-export interface ProjectData {
-  id: string;
-  name: string;
-  description: string;
-  workingDirectory: string;
-  configuration: Record<string, unknown>;
-  isArchived: boolean;
-  createdAt: Date;
-  lastUsedAt: Date;
-}
 
 export interface ThreadSessionInfo {
   threadId: string;
@@ -32,8 +26,8 @@ export class ThreadManager {
   private _compactionStrategy: SummarizeStrategy;
   private _providerStrategyCache = new Map<string, SummarizeStrategy>();
 
-  constructor(dbPath: string) {
-    this._persistence = new DatabasePersistence(dbPath);
+  constructor() {
+    this._persistence = getPersistence();
     this._compactionStrategy = new SummarizeStrategy();
   }
 

@@ -2,6 +2,7 @@
 // ABOUTME: Handles database schema, CRUD operations, and data serialization for all entities
 
 import Database from 'better-sqlite3';
+import { getLaceDbPath } from '~/config/lace-dir';
 import {
   Thread,
   ThreadEvent,
@@ -1286,7 +1287,7 @@ export class DatabasePersistence {
       name: row.name,
       description: row.description,
       workingDirectory: row.working_directory,
-      configuration: JSON.parse(row.configuration),
+      configuration: JSON.parse(row.configuration) as Record<string, unknown>,
       isArchived: Boolean(row.is_archived),
       createdAt: new Date(row.created_at),
       lastUsedAt: new Date(row.last_used_at),
@@ -1316,7 +1317,7 @@ export class DatabasePersistence {
       name: row.name,
       description: row.description,
       workingDirectory: row.working_directory,
-      configuration: JSON.parse(row.configuration),
+      configuration: JSON.parse(row.configuration) as Record<string, unknown>,
       isArchived: Boolean(row.is_archived),
       createdAt: new Date(row.created_at),
       lastUsedAt: new Date(row.last_used_at),
@@ -1388,5 +1389,31 @@ export class DatabasePersistence {
         this.db.close();
       }
     }
+  }
+}
+
+// Global persistence instance
+let globalPersistence: DatabasePersistence | null = null;
+
+export function initializePersistence(dbPath?: string): void {
+  if (globalPersistence) {
+    globalPersistence.close();
+  }
+  globalPersistence = new DatabasePersistence(dbPath || getLaceDbPath());
+}
+
+export function getPersistence(): DatabasePersistence {
+  if (!globalPersistence) {
+    throw new Error(
+      'Global persistence not initialized. Call initializePersistence() first during application startup.'
+    );
+  }
+  return globalPersistence;
+}
+
+export function resetPersistence(): void {
+  if (globalPersistence) {
+    globalPersistence.close();
+    globalPersistence = null;
   }
 }

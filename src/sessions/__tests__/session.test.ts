@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { asThreadId, type ThreadId } from '~/threads/types';
+import { asThreadId } from '~/threads/types';
 import {
   setupTestPersistence,
   teardownTestPersistence,
@@ -30,7 +30,7 @@ vi.mock('~/providers/registry', () => ({
         }),
         createStreamingResponse: vi.fn().mockReturnValue({
           async *[Symbol.asyncIterator]() {
-            yield { type: 'content', content: 'Mock streaming response' };
+            yield await Promise.resolve({ type: 'content', content: 'Mock streaming response' });
           },
         }),
       }),
