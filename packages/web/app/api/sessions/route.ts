@@ -49,7 +49,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const body = bodyResult.data;
-    const session = await sessionService.createSession(body.name);
+    const session = await sessionService.createSession(body.name, body.provider, body.model);
 
     return NextResponse.json({ session }, { status: 201 });
   } catch (error: unknown) {

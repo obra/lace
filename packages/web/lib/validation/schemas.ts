@@ -60,8 +60,8 @@ export const UpdateTaskRequestSchema = z.object({
 // Session request schema with validation
 export const CreateSessionRequestSchema = z.object({
   name: z.string().max(100, 'Name too long (max 100 characters)').optional(),
-  provider: z.string().min(1, 'Provider is required').max(50, 'Provider name too long'),
-  model: z.string().min(1, 'Model is required').max(100, 'Model name too long'),
+  provider: z.string().min(1).max(50, 'Provider name too long').optional(),
+  model: z.string().min(1).max(100, 'Model name too long').optional(),
 });
 
 // Agent spawn request schema with validation

@@ -21,6 +21,7 @@ import { FileFindTool } from '~/tools/implementations/file-find';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url-fetch';
 import { logger } from '~/utils/logger';
+import type { ApprovalCallback } from '~/tools/approval-types';
 
 export interface SessionInfo {
   id: ThreadId;
@@ -366,5 +367,49 @@ export class Session {
       agent.removeAllListeners();
     }
     this._agents.clear();
+  }
+
+  static async createWithDefaults(
+    options: {
+      name?: string;
+      provider?: string;
+      model?: string;
+      approvalCallback?: ApprovalCallback;
+      dbPath?: string;
+    } = {}
+  ): Promise<Session> {
+    // Use existing logic for provider/model detection
+    const provider = options.provider || Session.detectDefaultProvider();
+    const model = options.model || Session.getDefaultModel(provider);
+    const dbPath = options.dbPath || getLaceDbPath();
+    const name = options.name || Session.generateSessionName();
+
+    // Create session using existing create method
+    const session = Session.create(name, provider, model, dbPath);
+
+    // Set up coordinator agent with approval callback if provided
+    const coordinatorAgent = session.getAgent(session.getId());
+    if (coordinatorAgent && options.approvalCallback) {
+      coordinatorAgent.toolExecutor.setApprovalCallback(options.approvalCallback);
+    }
+
+    // Start coordinator agent
+    if (coordinatorAgent) {
+      await coordinatorAgent.start();
+    }
+
+    return session;
+  }
+
+  private static detectDefaultProvider(): string {
+    return process.env.ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai';
+  }
+
+  private static getDefaultModel(provider: string): string {
+    return provider === 'anthropic' ? 'claude-3-haiku-20240307' : 'gpt-4';
+  }
+
+  private static generateSessionName(): string {
+    return `Session ${new Date().toLocaleString()}`;
   }
 }
