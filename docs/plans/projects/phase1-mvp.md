@@ -1010,6 +1010,14 @@ export class BashTool extends Tool {
 
 **Commit**: "feat: update tools to use working directory from context"
 
+**✅ COMPLETED**: All tools now use working directory from ToolContext:
+- ✅ Base Tool class implements `resolvePath()` method for DRY path resolution
+- ✅ File tools (read, write, edit, insert, list, find) use base class `resolvePath()`
+- ✅ System tools (bash, ripgrep) use `context.workingDirectory` for exec/search
+- ✅ All tools fall back to `process.cwd()` when no working directory provided  
+- ✅ Comprehensive working directory tests added (324 tool tests pass)
+- ✅ Removed problematic schema path transformations
+
 ## Task 1.6: Session Class Project Support
 
 **Goal**: Create Session class that works with sessions table
@@ -2249,17 +2257,36 @@ export default function Home() {
 
 **Commit**: "feat: add basic project/session web interface"
 
-## Phase 1 Summary
+## Phase 1 Progress Status
 
-Phase 1 establishes the foundation for multi-project support with:
+### ✅ COMPLETED TASKS:
+1. **✅ Task 1.1**: Database Schema for Projects and Sessions - *DONE*
+2. **✅ Task 1.2**: Session Persistence Layer - *DONE* 
+3. **✅ Task 1.3**: ThreadManager Session Support - *DONE*
+4. **✅ Task 1.4**: Working Directory in ToolContext - *DONE*
+5. **✅ Task 1.5**: Update Tools to Use Working Directory - *DONE*
+6. **✅ Task 1.7**: Agent Working Directory Support - *DONE*
 
-1. **Proper Database Schema**: Separate sessions table with foreign key relationships
-2. **Session Persistence**: Dedicated methods for session CRUD operations
-3. **ThreadManager Integration**: Updated to work with sessions table instead of metadata
-4. **Working Directory Support**: Tools use project/session working directories
-5. **Session Class**: Proper session management with project context
-6. **Agent Integration**: Working directory inheritance from session/project
-7. **REST API**: Complete endpoints for projects and sessions
-8. **Web Interface**: Basic UI for project/session selection
+### 🔄 REMAINING TASKS:
+7. **🔄 Task 1.6**: Session Class Project Support *(Next Priority)*
+8. **🔄 Task 1.8**: Web API - Project Endpoints *(Can parallelize)*  
+9. **🔄 Task 1.9**: Session API Endpoints *(Depends on 1.8)*
+10. **🔄 Task 1.10**: Basic Web UI for Projects *(Depends on 1.8, 1.9)*
 
-The architecture now correctly implements: **Projects → Sessions → Threads** with proper separation of concerns and foreign key relationships.
+### 🎯 PARALLELIZATION OPPORTUNITIES:
+**Can work in parallel:**
+- Task 1.6 (Session Class) + Task 1.8 (Project API) - *Independent implementations*
+- Task 1.8 (Project API) can start before Task 1.6 completes
+
+**Sequential dependencies:**
+- Task 1.9 (Session API) requires Task 1.8 (Project API) patterns
+- Task 1.10 (Web UI) requires both Task 1.8 + 1.9 (API endpoints)
+
+### 🏗️ ARCHITECTURE STATUS:
+**Projects → Sessions → Threads** hierarchy is **75% complete**:
+- ✅ Database schema with proper foreign keys
+- ✅ ThreadManager integration with sessions table  
+- ✅ Working directory inheritance through context
+- ✅ Tool ecosystem supports project working directories
+- 🔄 Session class implementation needed
+- 🔄 REST API and web interface needed
