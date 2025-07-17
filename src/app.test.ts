@@ -126,12 +126,7 @@ describe('App Initialization (run function)', () => {
       resumeError: undefined,
     });
     vi.mocked(ThreadManager.prototype.generateThreadId).mockReturnValue('temp-thread-456');
-    vi.mocked(ThreadManager.prototype.createThread).mockReturnValue({
-      id: 'temp-thread-456',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      events: [],
-    });
+    vi.mocked(ThreadManager.prototype.createThread).mockReturnValue('temp-thread-456');
 
     // Mock ToolExecutor methods
     vi.mocked(ToolExecutor.prototype.registerAllAvailableTools).mockReturnValue(undefined);

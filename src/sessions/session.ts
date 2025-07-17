@@ -22,6 +22,7 @@ import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url-fetch';
 import { logger } from '~/utils/logger';
 import type { ApprovalCallback } from '~/tools/approval-types';
+import { randomUUID } from 'crypto';
 
 export interface SessionInfo {
   id: ThreadId;
@@ -45,11 +46,13 @@ export class Session {
   private _dbPath: string;
   private _taskManager: TaskManager;
   private _destroyed = false;
+  private _projectId?: string;
 
-  constructor(sessionAgent: Agent) {
+  constructor(sessionAgent: Agent, projectId?: string) {
     this._sessionAgent = sessionAgent;
     this._sessionId = asThreadId(sessionAgent.threadId);
     this._dbPath = getLaceDbPath();
+    this._projectId = projectId;
 
     // Initialize TaskManager for this session
     const persistence = new DatabasePersistence(this._dbPath);
@@ -60,7 +63,8 @@ export class Session {
     name: string,
     provider = 'anthropic',
     model = 'claude-3-haiku-20240307',
-    dbPath?: string
+    dbPath?: string,
+    projectId?: string // NEW: Add project support
   ): Session {
     const actualDbPath = dbPath || getLaceDbPath();
 
@@ -70,8 +74,30 @@ export class Session {
 
     // Create thread manager
     const threadManager = new ThreadManager(actualDbPath);
-    const sessionInfo = threadManager.resumeOrCreate();
-    const threadId = sessionInfo.threadId;
+
+    // Create session record in sessions table if projectId provided
+    let threadId: string;
+    if (projectId) {
+      // Create session in sessions table first
+      const sessionData = {
+        id: randomUUID(),
+        projectId,
+        name,
+        description: '',
+        configuration: { provider, model },
+        status: 'active' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      threadManager.createSession(sessionData);
+
+      // Create thread for this session
+      threadId = threadManager.createThread(sessionData.id, projectId);
+    } else {
+      // Legacy behavior - use resumeOrCreate for non-project sessions
+      const sessionInfo = threadManager.resumeOrCreate();
+      threadId = sessionInfo.threadId;
+    }
 
     // Create a temporary session to get TaskManager
     const tempPersistence = new DatabasePersistence(actualDbPath);
@@ -90,15 +116,17 @@ export class Session {
       tools: toolExecutor.getAllTools(),
     });
 
-    // Mark the agent's thread as a session thread
-    sessionAgent.updateThreadMetadata({
-      isSession: true,
-      name,
-      provider,
-      model,
-    });
+    // Mark the agent's thread as a session thread (legacy for non-project sessions)
+    if (!projectId) {
+      sessionAgent.updateThreadMetadata({
+        isSession: true,
+        name,
+        provider,
+        model,
+      });
+    }
 
-    const session = new Session(sessionAgent);
+    const session = new Session(sessionAgent, projectId);
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
 
@@ -107,17 +135,15 @@ export class Session {
 
   static getAll(dbPath?: string): SessionInfo[] {
     const threadManager = new ThreadManager(dbPath || getLaceDbPath());
-    const allThreads = threadManager.getAllThreadsWithMetadata();
 
-    // Filter for session threads
-    const sessionThreads = allThreads.filter((thread) => thread.metadata?.isSession === true);
-
-    return sessionThreads.map((thread) => ({
-      id: asThreadId(thread.id),
-      name: thread.metadata?.name || 'Unnamed Session',
-      createdAt: thread.createdAt,
-      provider: thread.metadata?.provider || 'unknown',
-      model: thread.metadata?.model || 'unknown',
+    // NEW: Get sessions from sessions table
+    const sessions = threadManager.getAllSessions();
+    return sessions.map((session) => ({
+      id: asThreadId(session.id),
+      name: session.name,
+      createdAt: session.createdAt,
+      provider: (session.configuration?.provider as string) || 'unknown',
+      model: (session.configuration?.model as string) || 'unknown',
       agents: [], // Will be populated later if needed
     }));
   }
@@ -221,6 +247,33 @@ export class Session {
 
   getId(): ThreadId {
     return this._sessionId;
+  }
+
+  getProjectId(): string | undefined {
+    const sessionData = this.getSessionData();
+    return sessionData?.projectId;
+  }
+
+  getWorkingDirectory(): string {
+    const sessionData = this.getSessionData();
+    if (sessionData?.configuration?.workingDirectory) {
+      return sessionData.configuration.workingDirectory as string;
+    }
+
+    if (sessionData?.projectId) {
+      const threadManager = new ThreadManager(this._dbPath);
+      const project = threadManager.getProject(sessionData.projectId);
+      if (project) {
+        return project.workingDirectory;
+      }
+    }
+
+    return process.cwd();
+  }
+
+  private getSessionData() {
+    const threadManager = new ThreadManager(this._dbPath);
+    return threadManager.getSession(this._sessionId);
   }
 
   getInfo(): SessionInfo | null {

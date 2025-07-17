@@ -163,6 +163,37 @@ export class ThreadManager {
     return this._persistence.loadSessionsByProject(projectId);
   }
 
+  getAllSessions(): SessionData[] {
+    // Get all sessions from the database
+    if (!this._persistence.database) return [];
+
+    const stmt = this._persistence.database.prepare(`
+      SELECT * FROM sessions ORDER BY updated_at DESC
+    `);
+
+    const rows = stmt.all() as Array<{
+      id: string;
+      project_id: string;
+      name: string;
+      description: string;
+      configuration: string;
+      status: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      projectId: row.project_id,
+      name: row.name,
+      description: row.description,
+      configuration: JSON.parse(row.configuration) as Record<string, unknown>,
+      status: row.status as 'active' | 'archived' | 'completed',
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    }));
+  }
+
   updateSession(sessionId: string, updates: Partial<SessionData>): void {
     this._persistence.updateSession(sessionId, updates);
     logger.info('Session updated', { sessionId, updates });

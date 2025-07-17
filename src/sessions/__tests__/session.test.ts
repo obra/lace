@@ -44,6 +44,29 @@ vi.mock('~/threads/thread-manager', () => ({
     }),
     getAllThreadsWithMetadata: vi.fn().mockReturnValue([]),
     getThread: vi.fn().mockReturnValue(null),
+    createSession: vi.fn(),
+    getSession: vi.fn().mockReturnValue({
+      id: 'session1',
+      projectId: 'project1',
+      name: 'Test Session',
+      description: '',
+      configuration: { provider: 'anthropic', model: 'claude-3-haiku-20240307' },
+      status: 'active',
+      createdAt: new Date('2023-01-01'),
+      updatedAt: new Date('2023-01-01'),
+    }),
+    getProject: vi.fn().mockReturnValue({
+      id: 'project1',
+      name: 'Test Project',
+      description: 'A test project',
+      workingDirectory: '/project/path',
+      configuration: {},
+      isArchived: false,
+      createdAt: new Date('2023-01-01'),
+      lastUsedAt: new Date('2023-01-01'),
+    }),
+    getAllSessions: vi.fn().mockReturnValue([]),
+    createThread: vi.fn().mockReturnValue('test-thread-id'),
   })),
 }));
 
@@ -91,6 +114,7 @@ describe('Session', () => {
     on: ReturnType<typeof vi.fn>;
     off: ReturnType<typeof vi.fn>;
     emit: ReturnType<typeof vi.fn>;
+    getWorkingDirectory: ReturnType<typeof vi.fn>;
   };
   let mockDelegateAgents: Array<{
     threadId: ThreadId;
@@ -125,6 +149,7 @@ describe('Session', () => {
         isSession: true,
       }),
       getThreadCreatedAt: vi.fn().mockReturnValue(new Date('2024-01-01')),
+      getWorkingDirectory: vi.fn().mockReturnValue('/project/path'),
       removeAllListeners: vi.fn(),
       createDelegateAgent: vi.fn().mockImplementation(() => {
         delegateAgentCounter++;
@@ -379,6 +404,117 @@ describe('Session', () => {
       expect(mockDelegateAgents[0]?.stop).toHaveBeenCalledTimes(1);
       expect(mockDelegateAgents[1]?.stop).toHaveBeenCalledTimes(1);
       expect(session.getAgents()).toHaveLength(1); // Only coordinator remains
+    });
+  });
+
+  describe('Session class project support', () => {
+    beforeEach(() => {
+      // Set up environment for Anthropic
+      process.env.ANTHROPIC_KEY = 'test-key';
+    });
+
+    it('should create session with project context', () => {
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        ':memory:',
+        'project1' // Add projectId parameter
+      );
+
+      expect(session.getProjectId()).toBe('project1');
+      expect(session.getWorkingDirectory()).toBe('/project/path');
+    });
+
+    it('should spawn agents with project working directory', () => {
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        ':memory:',
+        'project1'
+      );
+
+      const _agent = session.spawnAgent('Worker Agent');
+      // The spawned agent should have access to the session's working directory
+      // This will be implemented when Agent class gets working directory support
+      expect(session.getWorkingDirectory()).toBe('/project/path');
+    });
+
+    it('should store session in sessions table not metadata', async () => {
+      Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        ':memory:',
+        'project1'
+      );
+
+      // Verify session is created in sessions table
+      const { ThreadManager: MockedThreadManager } = vi.mocked(
+        await import('~/threads/thread-manager')
+      );
+      const mockConstructor = MockedThreadManager as unknown as ReturnType<typeof vi.fn>;
+      const mockResults = mockConstructor.mock?.results;
+      if (!mockResults || mockResults.length === 0) {
+        throw new Error('Mock results not found');
+      }
+      const mockInstance = mockResults[mockResults.length - 1]?.value as {
+        createSession: ReturnType<typeof vi.fn>;
+      };
+      if (!mockInstance) {
+        throw new Error('Mock instance not found');
+      }
+      expect(mockInstance.createSession).toHaveBeenCalledWith({
+        id: expect.any(String) as string,
+        projectId: 'project1',
+        name: 'Test Session',
+        description: '',
+        configuration: { provider: 'anthropic', model: 'claude-3-haiku-20240307' },
+        status: 'active',
+        createdAt: expect.any(Date) as Date,
+        updatedAt: expect.any(Date) as Date,
+      });
+    });
+
+    it('should get sessions from table not metadata in getAll', async () => {
+      const { ThreadManager: _ThreadManager } = vi.mocked(await import('~/threads/thread-manager'));
+
+      // Mock return data for sessions table for the specific instance
+      const mockInstance = {
+        getAllSessions: vi.fn().mockReturnValue([
+          {
+            id: 'session1',
+            projectId: 'project1',
+            name: 'Session 1',
+            description: '',
+            configuration: { provider: 'anthropic', model: 'claude-3-haiku-20240307' },
+            status: 'active',
+            createdAt: new Date('2023-01-01'),
+            updatedAt: new Date('2023-01-01'),
+          },
+          {
+            id: 'session2',
+            projectId: 'project1',
+            name: 'Session 2',
+            description: '',
+            configuration: { provider: 'anthropic', model: 'claude-3-haiku-20240307' },
+            status: 'active',
+            createdAt: new Date('2023-01-02'),
+            updatedAt: new Date('2023-01-02'),
+          },
+        ]),
+      };
+
+      (_ThreadManager as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(
+        () => mockInstance
+      );
+
+      const sessions = Session.getAll(':memory:');
+      expect(sessions).toHaveLength(2);
+      expect(sessions[0].name).toBe('Session 1');
+      expect(sessions[1].name).toBe('Session 2');
+      expect(mockInstance.getAllSessions).toHaveBeenCalled();
     });
   });
 
