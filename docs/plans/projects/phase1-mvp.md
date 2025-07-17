@@ -1020,265 +1020,169 @@ export class BashTool extends Tool {
 
 ## Task 1.6: Session Class Project Support
 
-**Goal**: Create Session class that works with sessions table
+**Goal**: Update existing Session class to use sessions table instead of metadata
 
-**Test First** (`src/sessions/session.test.ts`):
+**Test First** (Update existing `src/sessions/__tests__/session.test.ts`):
 ```typescript
-describe('Session class', () => {
-  let threadManager: ThreadManager;
-  let sessionId: string;
-
-  beforeEach(() => {
-    threadManager = new ThreadManager(':memory:');
-    
-    // Create project first
-    const project = {
-      id: 'project1',
-      name: 'Test Project',
-      description: 'A test project',
-      workingDirectory: '/project/path',
-      configuration: {},
-      isArchived: false,
-      createdAt: new Date(),
-      lastUsedAt: new Date()
-    };
-    
-    threadManager.createProject(project);
-    sessionId = 'session1';
-  });
-
+describe('Session class project support', () => {
   it('should create session with project context', () => {
-    const session = Session.create({
-      id: sessionId,
-      projectId: 'project1',
-      name: 'Test Session',
-      threadManager
-    });
+    // Set up environment
+    process.env.ANTHROPIC_KEY = 'test-key';
     
-    expect(session.getId()).toBe(sessionId);
+    const session = Session.create(
+      'Test Session',
+      'anthropic',
+      'claude-3-haiku-20240307',
+      ':memory:',
+      'project1' // Add projectId parameter
+    );
+    
     expect(session.getProjectId()).toBe('project1');
-    expect(session.getName()).toBe('Test Session');
-  });
-
-  it('should get working directory from project', () => {
-    const session = Session.create({
-      id: sessionId,
-      projectId: 'project1',
-      name: 'Test Session',
-      threadManager
-    });
-    
     expect(session.getWorkingDirectory()).toBe('/project/path');
   });
 
-  it('should override working directory when specified', () => {
-    const session = Session.create({
-      id: sessionId,
-      projectId: 'project1',
-      name: 'Test Session',
-      workingDirectory: '/custom/path',
-      threadManager
-    });
+  it('should spawn agents with project working directory', () => {
+    process.env.ANTHROPIC_KEY = 'test-key';
     
-    expect(session.getWorkingDirectory()).toBe('/custom/path');
-  });
-
-  it('should create agent with session context', () => {
-    const session = Session.create({
-      id: sessionId,
-      projectId: 'project1',
-      name: 'Test Session',
-      threadManager
-    });
+    const session = Session.create(
+      'Test Session',
+      'anthropic', 
+      'claude-3-haiku-20240307',
+      ':memory:',
+      'project1'
+    );
     
-    const agent = session.createAgent();
-    
-    expect(agent.getSessionId()).toBe(sessionId);
-    expect(agent.getProjectId()).toBe('project1');
+    const agent = session.spawnAgent('Worker Agent');
     expect(agent.getWorkingDirectory()).toBe('/project/path');
   });
 
-  it('should list threads in session', () => {
-    const session = Session.create({
-      id: sessionId,
-      projectId: 'project1',
-      name: 'Test Session',
-      threadManager
-    });
+  it('should store session in sessions table not metadata', () => {
+    process.env.ANTHROPIC_KEY = 'test-key';
     
-    const agent1 = session.createAgent();
-    const agent2 = session.createAgent();
+    const session = Session.create(
+      'Test Session',
+      'anthropic',
+      'claude-3-haiku-20240307', 
+      ':memory:',
+      'project1'
+    );
     
-    const threads = session.getThreads();
-    expect(threads).toHaveLength(2);
-    expect(threads.map(t => t.id)).toContain(agent1.getThreadId());
-    expect(threads.map(t => t.id)).toContain(agent2.getThreadId());
+    // Verify session is in sessions table
+    const threadManager = new ThreadManager(':memory:');
+    const sessionData = threadManager.getSession(session.getId());
+    expect(sessionData).toBeDefined();
+    expect(sessionData.projectId).toBe('project1');
+    expect(sessionData.name).toBe('Test Session');
   });
 
-  it('should update session metadata', () => {
-    const session = Session.create({
-      id: sessionId,
-      projectId: 'project1',
-      name: 'Original Name',
-      threadManager
-    });
+  it('should get sessions from table not metadata in getAll', () => {
+    process.env.ANTHROPIC_KEY = 'test-key';
     
-    session.updateMetadata({ 
-      name: 'Updated Name',
-      description: 'Updated description'
-    });
+    Session.create('Session 1', 'anthropic', 'claude-3-haiku-20240307', ':memory:', 'project1');
+    Session.create('Session 2', 'anthropic', 'claude-3-haiku-20240307', ':memory:', 'project1'); 
     
-    expect(session.getName()).toBe('Updated Name');
-    expect(session.getDescription()).toBe('Updated description');
+    const sessions = Session.getAll(':memory:');
+    expect(sessions).toHaveLength(2);
+    expect(sessions[0].name).toBe('Session 1');
+    expect(sessions[1].name).toBe('Session 2');
   });
 });
 ```
 
-**Implementation** (`src/sessions/session.ts`):
-```typescript
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { SessionData } from '~/persistence/database';
-import { Thread } from '~/threads/types';
-import { logger } from '~/utils/logger';
+**Implementation Changes** (`src/sessions/session.ts`):
 
-export interface SessionConfig {
-  id: string;
-  projectId: string;
-  name: string;
-  description?: string;
-  workingDirectory?: string;
-  configuration?: Record<string, unknown>;
-  threadManager: ThreadManager;
+**Key Changes to Existing Session Class:**
+
+1. **Update `create()` method signature** - Add projectId parameter:
+```typescript
+static create(
+  name: string,
+  provider = 'anthropic',
+  model = 'claude-3-haiku-20240307',
+  dbPath?: string,
+  projectId?: string  // NEW: Add project support
+): Session
+```
+
+2. **Replace metadata approach with sessions table**:
+```typescript
+// OLD: Mark thread as session via metadata
+sessionAgent.updateThreadMetadata({
+  isSession: true,
+  name,
+  provider,
+  model,
+});
+
+// NEW: Create session record in sessions table  
+if (projectId) {
+  const sessionData = {
+    id: threadId,
+    projectId,
+    name,
+    description: '',
+    configuration: { provider, model },
+    status: 'active' as const,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+  threadManager.createSession(sessionData);
+}
+```
+
+3. **Add project support methods**:
+```typescript
+getProjectId(): string | undefined {
+  const sessionData = this.getSessionData();
+  return sessionData?.projectId;
 }
 
-export class Session {
-  private sessionData: SessionData;
-  private threadManager: ThreadManager;
-
-  private constructor(sessionData: SessionData, threadManager: ThreadManager) {
-    this.sessionData = sessionData;
-    this.threadManager = threadManager;
+getWorkingDirectory(): string {
+  const sessionData = this.getSessionData();
+  if (sessionData?.configuration?.workingDirectory) {
+    return sessionData.configuration.workingDirectory as string;
   }
-
-  static create(config: SessionConfig): Session {
-    const sessionData: SessionData = {
-      id: config.id,
-      projectId: config.projectId,
-      name: config.name,
-      description: config.description || '',
-      configuration: {
-        ...config.configuration,
-        workingDirectory: config.workingDirectory
-      },
-      status: 'active',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    config.threadManager.createSession(sessionData);
-    logger.info('Session created', { sessionId: config.id, projectId: config.projectId });
-
-    return new Session(sessionData, config.threadManager);
-  }
-
-  static load(sessionId: string, threadManager: ThreadManager): Session | null {
-    const sessionData = threadManager.getSession(sessionId);
-    if (!sessionData) {
-      return null;
-    }
-
-    return new Session(sessionData, threadManager);
-  }
-
-  getId(): string {
-    return this.sessionData.id;
-  }
-
-  getProjectId(): string {
-    return this.sessionData.projectId;
-  }
-
-  getName(): string {
-    return this.sessionData.name;
-  }
-
-  getDescription(): string {
-    return this.sessionData.description;
-  }
-
-  getStatus(): 'active' | 'archived' | 'completed' {
-    return this.sessionData.status;
-  }
-
-  getWorkingDirectory(): string {
-    // Check for session-level override
-    if (this.sessionData.configuration?.workingDirectory) {
-      return this.sessionData.configuration.workingDirectory as string;
-    }
-
-    // Fall back to project working directory
-    const project = this.threadManager.getProject(this.sessionData.projectId);
+  
+  if (sessionData?.projectId) {
+    const threadManager = new ThreadManager(this._dbPath);
+    const project = threadManager.getProject(sessionData.projectId);
     if (project) {
       return project.workingDirectory;
     }
-
-    return process.cwd();
   }
-
-  getConfiguration(): Record<string, unknown> {
-    return this.sessionData.configuration;
-  }
-
-  createAgent(): Agent {
-    const threadId = this.threadManager.createThread(this.sessionData.id, this.sessionData.projectId);
-    
-    const agent = new Agent({
-      threadId,
-      sessionId: this.sessionData.id,
-      projectId: this.sessionData.projectId,
-      threadManager: this.threadManager
-    });
-
-    logger.info('Agent created in session', { 
-      sessionId: this.sessionData.id, 
-      threadId,
-      projectId: this.sessionData.projectId 
-    });
-
-    return agent;
-  }
-
-  getThreads(): Thread[] {
-    return this.threadManager.getThreadsBySession(this.sessionData.id);
-  }
-
-  updateMetadata(updates: Partial<Pick<SessionData, 'name' | 'description' | 'configuration' | 'status'>>): void {
-    const updatedSession = {
-      ...this.sessionData,
-      ...updates,
-      updatedAt: new Date()
-    };
-
-    this.threadManager.updateSession(this.sessionData.id, updatedSession);
-    this.sessionData = updatedSession;
-
-    logger.info('Session metadata updated', { sessionId: this.sessionData.id, updates });
-  }
-
-  archive(): void {
-    this.updateMetadata({ status: 'archived' });
-  }
-
-  complete(): void {
-    this.updateMetadata({ status: 'completed' });
-  }
-
-  delete(): void {
-    this.threadManager.deleteSession(this.sessionData.id);
-    logger.info('Session deleted', { sessionId: this.sessionData.id });
-  }
+  
+  return process.cwd();
 }
+
+private getSessionData() {
+  const threadManager = new ThreadManager(this._dbPath);
+  return threadManager.getSession(this._sessionId);
+}
+```
+
+4. **Update `getAll()` to use sessions table**:
+```typescript
+// OLD: Filter threads by isSession metadata
+const sessionThreads = allThreads.filter((thread) => thread.metadata?.isSession === true);
+
+// NEW: Get sessions from sessions table
+const threadManager = new ThreadManager(dbPath || getLaceDbPath());
+const sessions = threadManager.getAllSessions();
+return sessions.map(session => ({
+  id: asThreadId(session.id),
+  name: session.name,
+  createdAt: session.createdAt,
+  provider: session.configuration?.provider || 'unknown',
+  model: session.configuration?.model || 'unknown',
+  agents: [], // Will be populated later if needed
+}));
+```
+
+5. **Update agent creation to pass working directory**:
+```typescript
+// In spawnAgent() and agent creation, ensure working directory context is passed
+const workingDirectory = this.getWorkingDirectory();
+// Pass workingDirectory to agent configuration
 ```
 
 **Commit**: "feat: implement Session class with sessions table support"
