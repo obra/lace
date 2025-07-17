@@ -2,14 +2,10 @@
 // ABOUTME: Reusable Zod schemas with consistent error messages
 
 import { z } from 'zod';
-import { resolve } from 'path';
 
 export const NonEmptyString = z.string().min(1, 'Cannot be empty');
 
-export const FilePath = z
-  .string()
-  .min(1, 'File path cannot be empty')
-  .transform((path) => resolve(path));
+export const FilePath = z.string().min(1, 'File path cannot be empty');
 
 export const LineNumber = z.number().int('Must be an integer').positive('Must be positive');
 

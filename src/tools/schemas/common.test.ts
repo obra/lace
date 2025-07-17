@@ -41,12 +41,12 @@ describe('Common schema patterns', () => {
   });
 
   describe('FilePath', () => {
-    it('normalizes relative paths to absolute', () => {
+    it('accepts relative paths without transformation', () => {
       const result = FilePath.parse('./test.txt');
-      expect(result).toMatch(/^\/.*test\.txt$/);
+      expect(result).toBe('./test.txt');
     });
 
-    it('keeps absolute paths unchanged', () => {
+    it('accepts absolute paths unchanged', () => {
       const absolutePath = '/some/absolute/path.txt';
       const result = FilePath.parse(absolutePath);
       expect(result).toBe(absolutePath);
@@ -56,9 +56,9 @@ describe('Common schema patterns', () => {
       expect(() => FilePath.parse('')).toThrow();
     });
 
-    it('handles complex relative paths', () => {
+    it('accepts complex relative paths without transformation', () => {
       const result = FilePath.parse('../parent/file.txt');
-      expect(result).toMatch(/^\/.*parent\/file\.txt$/);
+      expect(result).toBe('../parent/file.txt');
     });
   });
 

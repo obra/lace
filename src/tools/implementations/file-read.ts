@@ -41,12 +41,15 @@ export class FileReadTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof fileReadSchema>,
-    _context?: ToolContext
+    context?: ToolContext
   ): Promise<ToolResult> {
+    // Resolve path using working directory from context
+    const resolvedPath = this.resolvePath(args.path, context);
+
     try {
       // Check file size before reading (unless using line range)
       if (!args.startLine && !args.endLine) {
-        const sizeError = await this.validateFileSizeForWholeRead(args.path);
+        const sizeError = await this.validateFileSizeForWholeRead(resolvedPath);
         if (sizeError) {
           return this.createError(sizeError);
         }
@@ -63,7 +66,7 @@ export class FileReadTool extends Tool {
       }
 
       // Read file content
-      const content = await readFile(args.path, 'utf-8');
+      const content = await readFile(resolvedPath, 'utf-8');
       const lines = content.split('\n');
 
       // Validate line numbers against actual file content
@@ -104,7 +107,7 @@ export class FileReadTool extends Tool {
 
       // Handle file not found with helpful suggestions
       if (isNodeError(error) && error.code === 'ENOENT') {
-        const suggestions = await findSimilarPaths(args.path);
+        const suggestions = await findSimilarPaths(resolvedPath);
         const suggestionText =
           suggestions.length > 0 ? `\n\nSimilar files: ${suggestions.join(', ')}` : '';
 
