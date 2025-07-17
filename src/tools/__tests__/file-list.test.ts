@@ -406,4 +406,76 @@ describe('FileListTool with schema validation', () => {
       expect(tool.name).toBe('file_list');
     });
   });
+
+  describe('working directory support', () => {
+    it('should resolve relative paths using working directory from context', async () => {
+      // Create a subdirectory for the test
+      const relativeTestDir = 'relative-test-dir';
+      const absoluteTestDir = join(testDir, relativeTestDir);
+      await mkdir(absoluteTestDir, { recursive: true });
+      await writeFile(join(absoluteTestDir, 'relative-file.txt'), 'Relative file content');
+
+      const result = await tool.execute({ path: relativeTestDir }, { workingDirectory: testDir });
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toContain('relative-file.txt');
+    });
+
+    it('should use absolute paths directly even when working directory is provided', async () => {
+      const result = await tool.execute(
+        { path: testDir }, // absolute path
+        { workingDirectory: '/some/other/dir' }
+      );
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toContain('README.md');
+    });
+
+    it('should fall back to process.cwd() when no working directory in context', async () => {
+      // Create a temporary directory in the current working directory
+      const tempDirName = 'temp-cwd-test-dir';
+      const tempDirPath = join(process.cwd(), tempDirName);
+      await mkdir(tempDirPath, { recursive: true });
+      await writeFile(join(tempDirPath, 'cwd-test.txt'), 'CWD test content');
+
+      try {
+        const result = await tool.execute({ path: tempDirName });
+
+        expect(result.isError).toBe(false);
+        expect(result.content[0].text).toContain('cwd-test.txt');
+      } finally {
+        await mkdir(tempDirPath, { recursive: true }).catch(() => {});
+        await writeFile(join(tempDirPath, 'cleanup'), '').catch(() => {});
+        // Clean up
+        try {
+          const { rm } = await import('fs/promises');
+          await rm(tempDirPath, { recursive: true, force: true });
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    });
+
+    it('should handle non-existent relative paths with working directory context', async () => {
+      const result = await tool.execute(
+        { path: 'non-existent-relative-dir' },
+        { workingDirectory: testDir }
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Directory not found');
+      expect(result.content[0].text).toContain('non-existent-relative-dir');
+    });
+
+    it('should handle default path correctly with working directory context', async () => {
+      const result = await tool.execute(
+        {}, // No path provided, should use default '.'
+        { workingDirectory: testDir }
+      );
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toContain('README.md');
+      expect(result.content[0].text).toContain('src/');
+    });
+  });
 });

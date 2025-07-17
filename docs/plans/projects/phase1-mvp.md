@@ -775,9 +775,11 @@ saveThread(thread: Thread): void {
 
 **Commit**: "feat: add session support to ThreadManager"
 
-## Task 1.4: Working Directory in ToolContext
+## Task 1.4: Working Directory in ToolContext ✅
 
 **Goal**: Pass working directory through ToolContext to all tools
+
+**Status**: COMPLETED - Added workingDirectory field to ToolContext interface, Agent now resolves and passes working directory from session/project hierarchy
 
 **Test First** (`src/tools/tool-context.test.ts`):
 ```typescript

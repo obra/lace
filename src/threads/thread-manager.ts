@@ -1,13 +1,24 @@
 // ABOUTME: Tthread management with SQLite persistence support - PRIVATE AND INTERNAL. ONLY ACCESS THROUGH AGENT
 // ABOUTME: Maintains backward compatibility with immediate event persistence
 
-import { DatabasePersistence } from '~/persistence/database';
+import { DatabasePersistence, SessionData } from '~/persistence/database';
 import { Thread, ThreadEvent, EventType } from '~/threads/types';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { logger } from '~/utils/logger';
 import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy';
 import { estimateTokens } from '~/utils/token-estimation';
 import { AIProvider } from '~/providers/base-provider';
+
+export interface ProjectData {
+  id: string;
+  name: string;
+  description: string;
+  workingDirectory: string;
+  configuration: Record<string, unknown>;
+  isArchived: boolean;
+  createdAt: Date;
+  lastUsedAt: Date;
+}
 
 export interface ThreadSessionInfo {
   threadId: string;
@@ -74,12 +85,116 @@ export class ThreadManager {
     return { threadId: newThreadId, isResumed: false };
   }
 
+  // ===============================
+  // Project management methods
+  // ===============================
+
+  createProject(project: ProjectData): void {
+    // Create project in database
+    this._persistence
+      .database!.prepare(
+        `
+      INSERT INTO projects (id, name, description, working_directory, configuration, is_archived, created_at, last_used_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `
+      )
+      .run(
+        project.id,
+        project.name,
+        project.description,
+        project.workingDirectory,
+        JSON.stringify(project.configuration),
+        project.isArchived ? 1 : 0,
+        project.createdAt.toISOString(),
+        project.lastUsedAt.toISOString()
+      );
+
+    logger.info('Project created', { projectId: project.id });
+  }
+
+  getProject(projectId: string): ProjectData | null {
+    const row = this._persistence
+      .database!.prepare(
+        `
+      SELECT * FROM projects WHERE id = ?
+    `
+      )
+      .get(projectId) as
+      | {
+          id: string;
+          name: string;
+          description: string;
+          working_directory: string;
+          configuration: string;
+          is_archived: number;
+          created_at: string;
+          last_used_at: string;
+        }
+      | undefined;
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      workingDirectory: row.working_directory,
+      configuration: JSON.parse(row.configuration) as Record<string, unknown>,
+      isArchived: Boolean(row.is_archived),
+      createdAt: new Date(row.created_at),
+      lastUsedAt: new Date(row.last_used_at),
+    };
+  }
+
+  // ===============================
+  // Session management methods
+  // ===============================
+
+  createSession(session: SessionData): void {
+    this._persistence.saveSession(session);
+    logger.info('Session created', { sessionId: session.id, projectId: session.projectId });
+  }
+
+  getSession(sessionId: string): SessionData | null {
+    return this._persistence.loadSession(sessionId);
+  }
+
+  getSessionsByProject(projectId: string): SessionData[] {
+    return this._persistence.loadSessionsByProject(projectId);
+  }
+
+  updateSession(sessionId: string, updates: Partial<SessionData>): void {
+    this._persistence.updateSession(sessionId, updates);
+    logger.info('Session updated', { sessionId, updates });
+  }
+
+  deleteSession(sessionId: string): void {
+    // First delete all threads in this session
+    const threads = this.getThreadsBySession(sessionId);
+    for (const thread of threads) {
+      this.deleteThread(thread.id);
+    }
+
+    // Then delete the session
+    this._persistence.deleteSession(sessionId);
+    logger.info('Session deleted', { sessionId });
+  }
+
+  // ===============================
+  // Thread management methods (updated)
+  // ===============================
+
   // Existing API (preserved for backward compatibility)
-  createThread(threadId: string): Thread {
+  createThread(threadId?: string, sessionId?: string, projectId?: string): string {
+    const actualThreadId = threadId || this.generateThreadId();
+    const now = new Date();
+
     const thread: Thread = {
-      id: threadId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      id: actualThreadId,
+      sessionId,
+      projectId,
+      createdAt: now,
+      updatedAt: now,
       events: [],
     };
 
@@ -93,7 +208,8 @@ export class ThreadManager {
       logger.error('Failed to save thread', { error });
     }
 
-    return thread;
+    logger.info('Thread created', { threadId: actualThreadId, sessionId, projectId });
+    return actualThreadId;
   }
 
   // Create thread with metadata for session management
@@ -212,6 +328,87 @@ export class ThreadManager {
   // Get all threads with metadata for session management
   getAllThreadsWithMetadata(): Thread[] {
     return this._persistence.getAllThreadsWithMetadata();
+  }
+
+  getThreadsBySession(sessionId: string): Thread[] {
+    if (!this._persistence.database) return [];
+
+    const stmt = this._persistence.database.prepare(`
+      SELECT * FROM threads 
+      WHERE session_id = ?
+      ORDER BY updated_at DESC
+    `);
+
+    const rows = stmt.all(sessionId) as Array<{
+      id: string;
+      session_id: string;
+      project_id: string;
+      created_at: string;
+      updated_at: string;
+      metadata: string | null;
+    }>;
+
+    return rows.map((row) => {
+      const events = this._persistence.loadEvents(row.id);
+      let metadata: Thread['metadata'] = undefined;
+
+      if (row.metadata) {
+        try {
+          metadata = JSON.parse(row.metadata) as Record<string, unknown>;
+        } catch (error) {
+          logger.warn('Failed to parse thread metadata', { threadId: row.id, error });
+        }
+      }
+
+      return {
+        id: row.id,
+        sessionId: row.session_id,
+        projectId: row.project_id,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at),
+        events,
+        metadata,
+      };
+    });
+  }
+
+  // Update existing methods to not treat threads as sessions
+  getAllThreads(): Thread[] {
+    const threads = this._persistence.getAllThreadsWithMetadata();
+
+    // Filter out legacy session threads to avoid confusion
+    return threads.filter((thread) => !thread.metadata?.isSession);
+  }
+
+  updateThreadMetadata(threadId: string, metadata: Record<string, unknown>): void {
+    const thread = this.getThread(threadId);
+    if (!thread) {
+      throw new Error(`Thread ${threadId} not found`);
+    }
+
+    thread.metadata = metadata;
+    thread.updatedAt = new Date();
+
+    try {
+      this._persistence.saveThread(thread);
+    } catch (error) {
+      logger.error('Failed to update thread metadata', { threadId, error });
+    }
+  }
+
+  deleteThread(threadId: string): void {
+    // Delete all events for this thread
+    if (this._persistence.database) {
+      this._persistence.database.prepare('DELETE FROM events WHERE thread_id = ?').run(threadId);
+      this._persistence.database.prepare('DELETE FROM threads WHERE id = ?').run(threadId);
+    }
+
+    // Clear from current thread if it's the one being deleted
+    if (this._currentThread?.id === threadId) {
+      this._currentThread = null;
+    }
+
+    logger.info('Thread deleted', { threadId });
   }
 
   compact(threadId: string): void {

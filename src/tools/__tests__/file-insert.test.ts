@@ -57,7 +57,7 @@ describe('FileInsertTool with schema validation', () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
-      expect(result.content[0].text).toContain('Cannot be empty');
+      expect(result.content[0].text).toContain('File path cannot be empty');
     });
 
     it('should reject missing content', async () => {
@@ -353,6 +353,84 @@ describe('FileInsertTool with schema validation', () => {
       // This test would need a way to simulate disk space errors
       // For now, just verify the tool handles errors gracefully
       expect(tool.name).toBe('file_insert');
+    });
+  });
+
+  describe('working directory support', () => {
+    it('should resolve relative paths using working directory from context', async () => {
+      // Create a relative test file
+      const relativeTestFile = 'relative-insert-test.txt';
+      const absoluteTestFile = join(testDir, relativeTestFile);
+      await writeFile(absoluteTestFile, 'Original content\n', 'utf-8');
+
+      const result = await tool.execute(
+        {
+          path: relativeTestFile,
+          content: 'Inserted content',
+          line: 1,
+        },
+        { workingDirectory: testDir }
+      );
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toContain('Inserted after line 1');
+
+      const newContent = await readFile(absoluteTestFile, 'utf-8');
+      expect(newContent).toContain('Inserted content');
+    });
+
+    it('should use absolute paths directly even when working directory is provided', async () => {
+      const testFile = join(testDir, 'absolute-path-test.txt');
+      await writeFile(testFile, 'Original content\n', 'utf-8');
+
+      const result = await tool.execute(
+        {
+          path: testFile, // absolute path
+          content: 'Inserted content',
+        },
+        { workingDirectory: '/some/other/dir' }
+      );
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toContain('Appended to end of file');
+
+      const newContent = await readFile(testFile, 'utf-8');
+      expect(newContent).toContain('Inserted content');
+    });
+
+    it('should fall back to process.cwd() when no working directory in context', async () => {
+      // Create a file relative to current working directory
+      const relativeFile = 'temp-cwd-insert-test.txt';
+      const absoluteFile = join(process.cwd(), relativeFile);
+      await writeFile(absoluteFile, 'CWD test content\n', 'utf-8');
+
+      try {
+        const result = await tool.execute({
+          path: relativeFile,
+          content: 'Appended content',
+        });
+
+        expect(result.isError).toBe(false);
+        expect(result.content[0].text).toContain('Appended to end of file');
+
+        const newContent = await readFile(absoluteFile, 'utf-8');
+        expect(newContent).toContain('Appended content');
+      } finally {
+        await rm(absoluteFile, { force: true });
+      }
+    });
+
+    it('should handle non-existent relative paths with working directory context', async () => {
+      const result = await tool.execute(
+        {
+          path: 'nonexistent-relative-file.txt',
+          content: 'test content',
+        },
+        { workingDirectory: testDir }
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('File not found');
     });
   });
 });
