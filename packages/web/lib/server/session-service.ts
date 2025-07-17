@@ -21,33 +21,23 @@ export class SessionService {
     // No need for direct ThreadManager access - use Agent methods instead
   }
 
-  async createSession(name?: string): Promise<SessionType> {
-    // Get default provider and model from environment
-    const defaultProvider =
-      process.env.ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai';
-    const defaultModel = 'claude-3-haiku-20240307';
+  async createSession(name?: string, provider?: string, model?: string): Promise<SessionType> {
+    // Create session using shared logic with defaults
+    const session = await Session.createWithDefaults({
+      name,
+      provider,
+      model,
+    });
 
-    const sessionName = name || 'Untitled Session';
-    const dbPath = process.env.LACE_DB_PATH || './lace.db';
-
-    // Create session using Session class
-    const session = Session.create(sessionName, defaultProvider, defaultModel, dbPath);
     const sessionId = session.getId();
 
-    // Start the coordinator agent (this was missing!)
+    // Set up approval callback and event handlers for the coordinator agent
     const coordinatorAgent = session.getAgent(sessionId);
     if (coordinatorAgent) {
-      try {
-        // Start the coordinator agent
-        await coordinatorAgent.start();
-
-        // Set up event handlers for the coordinator agent
-        this.setupAgentEventHandlers(coordinatorAgent, sessionId);
-      } catch (error) {
-        console.error('Failed to start coordinator agent:', error);
-        // Don't throw here - let the session be created without starting the agent
-        // This can happen in test environments where agent startup might fail
-      }
+      // Set up approval callback for the coordinator agent
+      this.setupApprovalCallback(coordinatorAgent, sessionId);
+      // Set up web-specific event handlers
+      this.setupAgentEventHandlers(coordinatorAgent, sessionId);
     } else {
       console.warn('No coordinator agent found for session:', sessionId);
       // In test environments, this might be expected behavior
@@ -58,6 +48,32 @@ export class SessionService {
 
     // Return metadata for API response
     return this.sessionToMetadata(session);
+  }
+
+  private setupApprovalCallback(agent: Agent, sessionId: ThreadId): void {
+    const approvalManager = getApprovalManager();
+    const agentThreadId = asThreadId(agent.threadId);
+
+    agent.toolExecutor.setApprovalCallback({
+      requestApproval: async (toolName: string, input: unknown): Promise<ApprovalDecision> => {
+        // Get tool metadata from the agent's tool executor
+        const tool = agent.toolExecutor.getTool(toolName);
+        const toolDescription = tool?.description;
+        const toolAnnotations = tool?.annotations;
+        const isReadOnly = toolAnnotations?.readOnlyHint === true;
+
+        // Request approval through the manager with proper context
+        return await approvalManager.requestApproval(
+          agentThreadId,
+          sessionId,
+          toolName,
+          toolDescription,
+          toolAnnotations,
+          input,
+          isReadOnly
+        );
+      },
+    });
   }
 
   async listSessions(): Promise<SessionType[]> {
@@ -132,13 +148,18 @@ export class SessionService {
       console.warn(`[DEBUG] Session reconstructed successfully: ${sessionId}`);
       activeSessions.set(sessionId, session);
 
-      // Set up event handlers for all agents in the reconstructed session
+      // Set up approval callbacks and event handlers for all agents in the reconstructed session
       const agents = session.getAgents();
-      console.warn(`[DEBUG] Setting up event handlers for ${agents.length} agents`);
+      console.warn(
+        `[DEBUG] Setting up approval callbacks and event handlers for ${agents.length} agents`
+      );
       for (const agentInfo of agents) {
         const agent = session.getAgent(agentInfo.threadId);
         if (agent) {
-          console.warn(`[DEBUG] Setting up event handlers for agent: ${agentInfo.threadId}`);
+          console.warn(
+            `[DEBUG] Setting up approval callback and event handlers for agent: ${agentInfo.threadId}`
+          );
+          this.setupApprovalCallback(agent, sessionId);
           this.setupAgentEventHandlers(agent, sessionId);
         }
       }
@@ -162,30 +183,8 @@ export class SessionService {
     // Spawn agent using Session class
     const agent = session.spawnAgent(name, provider, model);
 
-    // Set up tool approval callback
-    const approvalManager = getApprovalManager();
-    const agentThreadId = asThreadId(agent.threadId);
-
-    agent.toolExecutor.setApprovalCallback({
-      requestApproval: async (toolName: string, input: unknown): Promise<ApprovalDecision> => {
-        // Get tool metadata
-        const tool = agent.toolExecutor.getTool(toolName);
-        const toolDescription = tool?.description;
-        const toolAnnotations = tool?.annotations;
-        const isReadOnly = toolAnnotations?.readOnlyHint === true;
-
-        // Request approval through the manager
-        return await approvalManager.requestApproval(
-          agentThreadId,
-          sessionId, // Use sessionId for approval context
-          toolName,
-          toolDescription,
-          toolAnnotations,
-          input,
-          isReadOnly
-        );
-      },
-    });
+    // Set up approval callback using shared helper
+    this.setupApprovalCallback(agent, sessionId);
 
     // Start the agent
     await agent.start();
@@ -194,7 +193,7 @@ export class SessionService {
     this.setupAgentEventHandlers(agent, sessionId);
 
     const agentData: AgentType = {
-      threadId: agentThreadId,
+      threadId: asThreadId(agent.threadId),
       name,
       provider: agent.providerName,
       model: model || 'claude-3-haiku-20240307',

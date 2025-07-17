@@ -28,27 +28,75 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 // Mock the provider registry to avoid API key requirements
-vi.mock('~/providers/provider-registry', () => ({
-  getProviderRegistry: () => ({
-    getProvider: () => ({
-      name: 'mock-provider',
-      models: ['mock-model'],
-      createAgent: vi.fn(),
+vi.mock('~/providers/registry', () => ({
+  ProviderRegistry: {
+    createWithAutoDiscovery: () => ({
+      createProvider: () => ({
+        name: 'mock-provider',
+        models: ['mock-model'],
+        model: 'mock-model',
+      }),
     }),
-  }),
+  },
 }));
 
 // Mock the Agent class
 vi.mock('~/agents/agent', () => ({
-  Agent: {
-    createSession: vi.fn().mockResolvedValue({
-      id: 'mock-agent-id',
-      threadId: 'mock-thread-id',
-      start: vi.fn(),
-      stop: vi.fn(),
-      sendMessage: vi.fn(),
-    }),
-  },
+  Agent: vi.fn().mockImplementation(() => ({
+    threadId: 'mock-thread-id',
+    start: vi.fn(),
+    stop: vi.fn(),
+    sendMessage: vi.fn(),
+    getCurrentState: () => 'idle',
+    getThreadMetadata: () => ({ name: 'mock-agent' }),
+    getThreadCreatedAt: () => new Date(),
+    providerName: 'mock-provider',
+    toolExecutor: {
+      setApprovalCallback: vi.fn(),
+      getAllTools: () => [],
+    },
+    updateThreadMetadata: vi.fn(),
+    removeAllListeners: vi.fn(),
+  })),
+}));
+
+// Mock ThreadManager
+vi.mock('~/threads/thread-manager', () => ({
+  ThreadManager: vi.fn().mockImplementation(() => ({
+    generateThreadId: () => 'lace_20240101_abcd12',
+    createThread: vi.fn(),
+    resumeOrCreate: () => ({ threadId: 'lace_20240101_abcd12' }),
+    getThread: () => ({ metadata: { isSession: true } }),
+    getAllThreadsWithMetadata: () => [],
+    getThreadsForSession: () => [],
+    setCurrentThread: vi.fn(),
+  })),
+}));
+
+// Mock ToolExecutor
+vi.mock('~/tools/executor', () => ({
+  ToolExecutor: vi.fn().mockImplementation(() => ({
+    registerAllAvailableTools: vi.fn(),
+    getAllTools: () => [],
+    setApprovalCallback: vi.fn(),
+  })),
+}));
+
+// Mock TaskManager and DatabasePersistence
+vi.mock('~/tasks/task-manager', () => ({
+  TaskManager: vi.fn().mockImplementation(() => ({
+    // mock implementation
+  })),
+}));
+
+vi.mock('~/persistence/database', () => ({
+  DatabasePersistence: vi.fn().mockImplementation(() => ({
+    // mock implementation
+  })),
+}));
+
+vi.mock('~/tools/implementations/task-manager', () => ({
+  createTaskManagerTools: () => [],
 }));
 
 // Mock the Session class with more dynamic behavior
@@ -158,6 +206,93 @@ vi.mock('~/sessions/session', () => ({
       .fn()
       .mockImplementation(() => Array.from(sessionStore.values()).map((s) => s.getInfo())),
     getById: vi.fn().mockImplementation((id: string) => sessionStore.get(id) || null),
+    createWithDefaults: vi
+      .fn()
+      .mockImplementation(
+        async (options: { name?: string; provider?: string; model?: string } = {}) => {
+          await Promise.resolve(); // Add explicit await to satisfy ESLint
+          sessionCounter++;
+          const sessionId = `lace_20240101_test${sessionCounter}`;
+          const session: MockSession = {
+            id: sessionId,
+            name: options.name || `Session ${sessionCounter}`,
+            createdAt: new Date(),
+            agents: [],
+            getId: () => sessionId,
+            getInfo: () => ({
+              id: sessionId,
+              name: options.name || `Session ${sessionCounter}`,
+              createdAt: new Date(),
+              provider: options.provider || 'anthropic',
+              model: options.model || 'claude-3-haiku-20240307',
+              agents: session.agents,
+            }),
+            spawnAgent: vi
+              .fn()
+              .mockImplementation(
+                (agentName: string, agentProvider?: string, agentModel?: string) => {
+                  const agentThreadId = `${sessionId}.${session.agents.length + 1}`;
+                  const agent: MockAgent = {
+                    threadId: agentThreadId,
+                    name: agentName,
+                    provider: agentProvider || options.provider || 'anthropic',
+                    model: agentModel || options.model || 'claude-3-haiku-20240307',
+                    status: 'idle',
+                    providerName: agentProvider || options.provider || 'anthropic',
+                    toolExecutor: {
+                      setApprovalCallback: vi.fn(),
+                      getTool: vi.fn().mockReturnValue({
+                        description: 'Mock tool',
+                        annotations: { readOnlyHint: true },
+                      }),
+                    },
+                    getCurrentState: vi.fn().mockReturnValue('idle'),
+                    start: vi.fn(),
+                    stop: vi.fn(),
+                    sendMessage: vi.fn().mockResolvedValue(undefined),
+                    on: vi.fn(),
+                    removeAllListeners: vi.fn(),
+                    getThreadCreatedAt: vi.fn().mockReturnValue(new Date()),
+                  };
+                  session.agents.push(agent);
+                  return agent;
+                }
+              ),
+            getAgents: () => session.agents,
+            getAgent: (threadId: string) => {
+              // Check if it's the coordinator agent (same as session ID)
+              if (threadId === sessionId) {
+                return {
+                  threadId: sessionId,
+                  name: 'Coordinator',
+                  provider: options.provider || 'anthropic',
+                  model: options.model || 'claude-3-haiku-20240307',
+                  status: 'idle',
+                  providerName: options.provider || 'anthropic',
+                  toolExecutor: {
+                    setApprovalCallback: vi.fn(),
+                    getTool: vi.fn(),
+                  },
+                  getCurrentState: vi.fn().mockReturnValue('idle'),
+                  start: vi.fn(),
+                  stop: vi.fn(),
+                  sendMessage: vi.fn(),
+                  on: vi.fn(),
+                  removeAllListeners: vi.fn(),
+                  getThreadCreatedAt: vi.fn().mockReturnValue(new Date()),
+                };
+              }
+              return session.agents.find((a) => a.threadId === threadId) || null;
+            },
+            startAgent: vi.fn(),
+            stopAgent: vi.fn(),
+            sendMessage: vi.fn(),
+            destroy: vi.fn(),
+          };
+          sessionStore.set(sessionId, session);
+          return session;
+        }
+      ),
   },
 }));
 
