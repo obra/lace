@@ -30,56 +30,62 @@ Lace is an AI coding assistant with:
 - **ToolContext**: Data passed to tools during execution
 
 ### Current State
-- Sessions exist globally (no project grouping)
-- Working directory is always `process.cwd()`
-- Basic configuration in thread metadata
-- No tool policies or restrictions
+- ✅ **Projects and Sessions implemented**: Full hierarchy with Projects → Sessions → Threads
+- ✅ **Global persistence**: All managers use centralized `getPersistence()` - no dbPath parameters
+- ✅ **Working directory support**: Project-level working directories with session overrides
+- ✅ **Database schema maturity**: 6 migrations implemented with proper foreign key relationships
+- ✅ **Entity classes**: Project and Session classes fully implemented with comprehensive APIs
+- 🔄 **Tool policies**: Not yet implemented (Phase 2 feature)
 
 ## Database Architecture
 
-### Current (Incorrect) Architecture
+### ✅ IMPLEMENTED: Current Database Architecture
+```
+projects (id, name, description, working_directory, configuration, is_archived, created_at, last_used_at)
+sessions (id, project_id, name, description, configuration, status, created_at, updated_at)
+threads (id, session_id, project_id, created_at, updated_at, metadata)
+events (id, thread_id, type, timestamp, data)
+tasks (id, title, description, status, priority, assignee_id, thread_id, created_at, updated_at)
+task_notes (id, task_id, author, content, timestamp)
+```
+
+### Legacy Architecture (Migrated)
 ```
 threads (id, created_at, updated_at, metadata) 
   - Sessions identified by metadata: { isSession: true }
   - Mixed session and thread data in same table
 ```
 
-### New (Correct) Architecture
-```
-projects (id, name, description, working_directory, configuration, is_archived, created_at, last_used_at)
-sessions (id, project_id, name, description, configuration, status, created_at, updated_at)
-threads (id, session_id, created_at, updated_at, metadata)
-events (id, thread_id, type, timestamp, data)
-```
-
-### Key Changes
-1. **Sessions Table**: Separate table for session persistence
-2. **Proper Foreign Keys**: sessions.project_id → projects.id, threads.session_id → sessions.id
-3. **Session-Thread Relationship**: One session can have multiple threads
-4. **Clean Separation**: Session data in sessions table, conversation data in threads table
+### ✅ IMPLEMENTED: Architecture Benefits
+1. **✅ Sessions Table**: Separate table for session persistence with proper relationships
+2. **✅ Proper Foreign Keys**: sessions.project_id → projects.id, threads.session_id → sessions.id
+3. **✅ Session-Thread Relationship**: One session can have multiple threads (agent delegation)
+4. **✅ Clean Separation**: Session data in sessions table, conversation data in threads table
+5. **✅ Task Management**: Integrated task system with notes and thread associations
+6. **✅ Global Persistence**: Single `DatabasePersistence` instance with `getPersistence()`
 
 ## Implementation Phases
 
-### Phase 1: MVP - Basic Project Support
-- Database schema with sessions table
-- Project and session persistence layers
-- Basic project/session CRUD operations
-- Working directory support in tools
-- Basic web API endpoints
+### ✅ Phase 1: MVP - Basic Project Support (COMPLETED)
+- ✅ Database schema with sessions table (6 migrations implemented)
+- ✅ Project and session persistence layers (`Project` and `Session` classes)
+- ✅ Basic project/session CRUD operations (full API implemented)
+- ✅ Working directory support in tools (`ToolContext` and global persistence)
+- 🔄 Basic web API endpoints (partially implemented)
 
-### Phase 2: Configuration & Policies
-- Project-level configuration management
-- Tool policy enforcement per project
-- Session working directory overrides
-- Configuration API endpoints
-- Session update endpoints
+### 🔄 Phase 2: Configuration & Policies (IN PROGRESS)
+- 🔄 Project-level configuration management
+- 🔄 Tool policy enforcement per project
+- ✅ Session working directory overrides (implemented)
+- 🔄 Configuration API endpoints
+- 🔄 Session update endpoints
 
-### Phase 3: Advanced Features
-- Token budget management per project
-- Custom prompt templates
-- Environment variables per project
-- Rich session/agent configuration
-- Project settings UI
+### 🔄 Phase 3: Advanced Features (PLANNED)
+- 🔄 Token budget management per project
+- 🔄 Custom prompt templates
+- 🔄 Environment variables per project
+- 🔄 Rich session/agent configuration
+- 🔄 Project settings UI
 
 ## Common Pitfalls to Avoid
 

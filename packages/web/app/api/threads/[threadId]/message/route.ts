@@ -37,7 +37,7 @@ export async function POST(
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
-    const threadId: ThreadId = threadIdResult.data;
+    const threadId: ThreadId = threadIdResult.data as ThreadId;
 
     // Parse and validate request body with Zod
     const bodyRaw: unknown = await request.json();
@@ -58,7 +58,7 @@ export async function POST(
     if (!sessionIdResult.success) {
       throw new Error('Invalid session ID derived from thread ID');
     }
-    const sessionId: ThreadId = sessionIdResult.data;
+    const sessionId: ThreadId = sessionIdResult.data as ThreadId;
 
     // Get agent instance
     const agent = sessionService.getAgent(threadId);

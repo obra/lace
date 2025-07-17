@@ -4,8 +4,7 @@
 import { randomUUID } from 'crypto';
 import { getPersistence, ProjectData, DatabasePersistence } from '~/persistence/database';
 import { logger } from '~/utils/logger';
-import { Session } from '~/sessions/session';
-import { asThreadId } from '~/threads/types';
+import { ThreadManager } from '~/threads/thread-manager';
 
 export interface ProjectInfo {
   id: string;
@@ -58,17 +57,20 @@ export class Project {
       persistence.close();
     }
 
-    return projects.map((project) => ({
-      id: project.id,
-      name: project.name,
-      description: project.description,
-      workingDirectory: project.workingDirectory,
-      isArchived: project.isArchived,
-      createdAt: project.createdAt,
-      lastUsedAt: project.lastUsedAt,
-      // TODO: Add session count when we implement session counting
-      sessionCount: 0,
-    }));
+    return projects.map((project) => {
+      // Create a temporary Project instance to get session count
+      const projectInstance = new Project(project.id);
+      return {
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        workingDirectory: project.workingDirectory,
+        isArchived: project.isArchived,
+        createdAt: project.createdAt,
+        lastUsedAt: project.lastUsedAt,
+        sessionCount: projectInstance.getSessionCount(),
+      };
+    });
   }
 
   static getById(projectId: string, dbPath?: string): Project | null {
@@ -106,8 +108,7 @@ export class Project {
       isArchived: projectData.isArchived,
       createdAt: projectData.createdAt,
       lastUsedAt: projectData.lastUsedAt,
-      // TODO: Add session count when we implement session counting
-      sessionCount: 0,
+      sessionCount: this.getSessionCount(),
     };
   }
 
@@ -160,16 +161,13 @@ export class Project {
     logger.info('Project unarchived', { projectId: this._id });
   }
 
-  async delete(): Promise<void> {
+  delete(): void {
     const persistence = getPersistence();
 
-    // Delete all sessions in this project first using Session class
+    // Delete all sessions in this project first using our deleteSession method
     const sessionData = persistence.loadSessionsByProject(this._id);
     for (const sessionInfo of sessionData) {
-      const session = await Session.getById(asThreadId(sessionInfo.id));
-      if (session) {
-        session.destroy();
-      }
+      this.deleteSession(sessionInfo.id);
     }
 
     // Then delete the project
@@ -183,8 +181,98 @@ export class Project {
     this.updateInfo({});
   }
 
-  // TODO: Add methods for session management when Session class is updated
-  // getSessions(): Session[]
-  // createSession(name: string, configuration?: Record<string, unknown>): Session
-  // getSessionCount(): number
+  getSessions(): import('~/persistence/database').SessionData[] {
+    const persistence = getPersistence();
+    return persistence.loadSessionsByProject(this._id);
+  }
+
+  createSession(
+    name: string,
+    description = '',
+    configuration: Record<string, unknown> = {}
+  ): import('~/persistence/database').SessionData {
+    const persistence = getPersistence();
+
+    const sessionData: import('~/persistence/database').SessionData = {
+      id: randomUUID(),
+      projectId: this._id,
+      name,
+      description,
+      configuration,
+      status: 'active',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    persistence.saveSession(sessionData);
+    logger.info('Session created', { sessionId: sessionData.id, projectId: this._id, name });
+
+    return sessionData;
+  }
+
+  getSession(sessionId: string): import('~/persistence/database').SessionData | null {
+    const persistence = getPersistence();
+    const session = persistence.loadSession(sessionId);
+
+    // Verify session belongs to this project
+    if (session && session.projectId !== this._id) {
+      return null;
+    }
+
+    return session;
+  }
+
+  updateSession(
+    sessionId: string,
+    updates: Partial<import('~/persistence/database').SessionData>
+  ): import('~/persistence/database').SessionData | null {
+    const persistence = getPersistence();
+
+    // Verify session belongs to this project
+    const existingSession = persistence.loadSession(sessionId);
+    if (!existingSession || existingSession.projectId !== this._id) {
+      return null;
+    }
+
+    // Always update the timestamp
+    const updatesWithTimestamp = {
+      ...updates,
+      updatedAt: new Date(),
+    };
+
+    persistence.updateSession(sessionId, updatesWithTimestamp);
+    logger.info('Session updated', { sessionId, projectId: this._id, updates });
+
+    return persistence.loadSession(sessionId);
+  }
+
+  deleteSession(sessionId: string): boolean {
+    const persistence = getPersistence();
+
+    // Verify session belongs to this project
+    const existingSession = persistence.loadSession(sessionId);
+    if (!existingSession || existingSession.projectId !== this._id) {
+      return false;
+    }
+
+    // Delete all threads in this session first using ThreadManager
+    const threadManager = new ThreadManager();
+    const threads = persistence.getAllThreadsWithMetadata();
+    const sessionThreads = threads.filter((thread) => thread.sessionId === sessionId);
+
+    for (const thread of sessionThreads) {
+      threadManager.deleteThread(thread.id);
+    }
+
+    // Then delete the session
+    persistence.deleteSession(sessionId);
+    logger.info('Session deleted', { sessionId, projectId: this._id });
+
+    return true;
+  }
+
+  getSessionCount(): number {
+    const sessions = this.getSessions();
+    return sessions.length;
+  }
 }

@@ -11,11 +11,6 @@ const __dirname = path.dirname(__filename);
 const nextConfig = {
   reactStrictMode: true,
   
-  // Enable instrumentation hook for server startup initialization
-  experimental: {
-    instrumentationHook: true,
-  },
-  
   // ESLint configuration
   eslint: {
     // Run ESLint on these directories during build

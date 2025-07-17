@@ -96,7 +96,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     // Get session
     const sessionService = getSessionService();
-    const session = await sessionService.getSession(sessionId);
+    const session = await sessionService.getSession(sessionId as ThreadId);
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });

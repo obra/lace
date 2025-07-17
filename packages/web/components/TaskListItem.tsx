@@ -11,7 +11,7 @@ interface TaskListItemProps {
 }
 
 export function TaskListItem({ task, onClick, onStatusChange }: TaskListItemProps) {
-  const formatDate = (date: string) => {
+  const formatDate = (date: string | Date) => {
     return new Date(date).toLocaleDateString();
   };
 

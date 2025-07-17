@@ -1,18 +1,32 @@
 # Phase 3: Advanced Features
 
+## ⚠️ ARCHITECTURE UPDATE REQUIRED
+
+**This document needs updating to reflect the current global persistence architecture:**
+
+- **Global Persistence**: All features will use `getPersistence()` instead of separate database connections
+- **Project Class**: Fully implemented foundation for advanced features
+- **Session Class**: Fully implemented foundation for advanced features
+- **ThreadManager**: Updated to use global persistence
+- **Agent System**: Updated to work with project/session hierarchy
+
+---
+
 ## Task 3.1: Token Budget Management
 
 **Goal**: Implement per-project token budget tracking and enforcement
 
+**Current Status**: 🔄 **PLANNED** - Foundation exists, needs implementation
+
 **Test First** (`src/projects/token-budget.test.ts`):
 ```typescript
 describe('Token budget management', () => {
-  let budgetManager: TokenBudgetManager;
+  let project: Project;
   let projectId: string;
 
   beforeEach(() => {
-    budgetManager = new TokenBudgetManager();
-    projectId = 'project1';
+    project = Project.create('Test Project', '/project/path');
+    projectId = project.getId();
   });
 
   it('should track token usage per project', () => {

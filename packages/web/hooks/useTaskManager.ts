@@ -59,7 +59,7 @@ export function useTaskManager(sessionId: string) {
     sessionId,
     onTaskCreated: useCallback((event: TaskEvent) => {
       if (event.task) {
-        setTasks((prev) => [...prev, event.task]);
+        setTasks((prev) => [...prev, event.task!]);
       }
     }, []),
     onTaskUpdated: useCallback((event: TaskEvent) => {
@@ -77,7 +77,7 @@ export function useTaskManager(sessionId: string) {
         setTasks((prev) => prev.map((task) => (task.id === event.task!.id ? event.task! : task)));
       }
     }, []),
-    onError: useCallback((error) => {
+    onError: useCallback((error: Error) => {
       console.error('Task stream error:', error);
     }, []),
   });

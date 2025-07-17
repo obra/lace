@@ -8,6 +8,10 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -64,6 +68,8 @@ describe('SIGINT Integration Tests', () => {
   let threadId: string;
 
   beforeEach(async () => {
+    setupTestPersistence();
+
     const mockResponse: ProviderResponse = {
       content: 'Test response',
       toolCalls: [],
@@ -94,6 +100,7 @@ describe('SIGINT Integration Tests', () => {
   afterEach(() => {
     vi.clearAllTimers();
     vi.useRealTimers();
+    teardownTestPersistence();
   });
 
   describe('Agent abort integration', () => {
