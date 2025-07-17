@@ -296,6 +296,20 @@ export class DatabasePersistence {
       this.db.exec('ALTER TABLE threads ADD COLUMN session_id TEXT');
     }
 
+    // Add project_id to threads table
+    const hasProjectId =
+      (
+        this.db
+          .prepare(
+            "SELECT COUNT(*) as count FROM pragma_table_info('threads') WHERE name='project_id'"
+          )
+          .get() as { count: number }
+      ).count > 0;
+
+    if (!hasProjectId) {
+      this.db.exec('ALTER TABLE threads ADD COLUMN project_id TEXT');
+    }
+
     // Migrate existing session threads to sessions table
     const sessionThreads = this.db
       .prepare(
@@ -373,13 +387,15 @@ export class DatabasePersistence {
     if (this._closed || this._disabled || !this.db) return;
 
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO threads (id, created_at, updated_at, metadata)
-      VALUES (?, ?, ?, ?)
+      INSERT OR REPLACE INTO threads (id, session_id, project_id, created_at, updated_at, metadata)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
 
     const metadataJson = thread.metadata ? JSON.stringify(thread.metadata) : null;
     stmt.run(
       thread.id,
+      thread.sessionId || null,
+      thread.projectId || null,
       thread.createdAt.toISOString(),
       thread.updatedAt.toISOString(),
       metadataJson
@@ -398,7 +414,14 @@ export class DatabasePersistence {
     `);
 
     const threadRow = threadStmt.get(actualThreadId) as
-      | { id: string; created_at: string; updated_at: string; metadata: string | null }
+      | {
+          id: string;
+          session_id: string | null;
+          project_id: string | null;
+          created_at: string;
+          updated_at: string;
+          metadata: string | null;
+        }
       | undefined;
     if (!threadRow) return null;
 
@@ -415,6 +438,8 @@ export class DatabasePersistence {
 
     return {
       id: threadRow.id,
+      sessionId: threadRow.session_id || undefined,
+      projectId: threadRow.project_id || undefined,
       createdAt: new Date(threadRow.created_at),
       updatedAt: new Date(threadRow.updated_at),
       events,
@@ -510,12 +535,14 @@ export class DatabasePersistence {
     if (this._disabled || !this.db) return [];
 
     const stmt = this.db.prepare(`
-      SELECT id, created_at, updated_at, metadata FROM threads
+      SELECT id, session_id, project_id, created_at, updated_at, metadata FROM threads
       ORDER BY updated_at DESC
     `);
 
     const rows = stmt.all() as Array<{
       id: string;
+      session_id: string | null;
+      project_id: string | null;
       created_at: string;
       updated_at: string;
       metadata: string | null;
@@ -533,6 +560,8 @@ export class DatabasePersistence {
 
       return {
         id: row.id,
+        sessionId: row.session_id || undefined,
+        projectId: row.project_id || undefined,
         createdAt: new Date(row.created_at),
         updatedAt: new Date(row.updated_at),
         events: [], // Don't load events for listing operations

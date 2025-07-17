@@ -474,12 +474,15 @@ describe('Enhanced ThreadManager', () => {
 
   describe('existing API compatibility', () => {
     it('should preserve createThread behavior', () => {
-      const thread = threadManager.createThread('test_123');
+      const threadId = threadManager.createThread('test_123');
+      const thread = threadManager.getThread(threadId);
 
-      expect(thread.id).toBe('test_123');
-      expect(thread.events).toEqual([]);
-      expect(thread.createdAt).toBeInstanceOf(Date);
-      expect(thread.updatedAt).toBeInstanceOf(Date);
+      expect(threadId).toBe('test_123');
+      expect(thread).toBeDefined();
+      expect(thread!.id).toBe('test_123');
+      expect(thread!.events).toEqual([]);
+      expect(thread!.createdAt).toBeInstanceOf(Date);
+      expect(thread!.updatedAt).toBeInstanceOf(Date);
     });
 
     it('should preserve getThread behavior', () => {
