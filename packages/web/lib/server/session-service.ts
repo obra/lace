@@ -21,15 +21,19 @@ export class SessionService {
     // No need for direct ThreadManager access - use Agent methods instead
   }
 
-  async createSession(name: string, provider: string, model: string, projectId: string): Promise<SessionType> {
-    
+  async createSession(
+    name: string,
+    provider: string,
+    model: string,
+    projectId: string
+  ): Promise<SessionType> {
     // Create project-based session
     const { Project } = await import('@/lib/server/lace-imports');
     const project = Project.getById(projectId);
     if (!project) {
       throw new Error('Project not found');
     }
-    
+
     // Create session using Session.createWithDefaults which handles both database and thread creation
     const session = await Session.createWithDefaults({
       name,
@@ -418,6 +422,82 @@ export class SessionService {
         })();
       }
     );
+  }
+
+  // Service layer methods to eliminate direct business logic calls from API routes
+  async getProjectForSession(
+    sessionId: ThreadId
+  ): Promise<InstanceType<(typeof import('@/lib/server/lace-imports'))['Project']> | null> {
+    const sessionData = Session.getSession(sessionId);
+    if (!sessionData) return null;
+
+    const projectId = (sessionData as { getProjectId(): string | undefined }).getProjectId();
+    if (!projectId) return null;
+
+    const { Project } = await import('@/lib/server/lace-imports');
+    return Project.getById(projectId) || null;
+  }
+
+  async getEffectiveConfiguration(sessionId: ThreadId): Promise<Record<string, unknown>> {
+    const sessionData = Session.getSession(sessionId);
+    if (!sessionData) {
+      throw new Error('Session not found');
+    }
+
+    const project = await this.getProjectForSession(sessionId);
+    const projectConfig = (project?.getConfiguration() as Record<string, unknown>) || {};
+    const sessionConfig =
+      (sessionData as { getConfiguration(): Record<string, unknown> }).getConfiguration() || {};
+
+    // Merge configurations with session taking precedence
+    const configuration: Record<string, unknown> = {
+      ...projectConfig,
+      ...sessionConfig,
+    };
+
+    // Merge toolPolicies separately to avoid overriding all policies
+    if (projectConfig.toolPolicies || sessionConfig.toolPolicies) {
+      configuration.toolPolicies = {
+        ...((projectConfig.toolPolicies as Record<string, string>) || {}),
+        ...((sessionConfig.toolPolicies as Record<string, string>) || {}),
+      };
+    }
+
+    return configuration;
+  }
+
+  async updateSessionConfiguration(
+    sessionId: ThreadId,
+    config: Record<string, unknown>
+  ): Promise<void> {
+    const sessionData = Session.getSession(sessionId);
+    if (!sessionData) {
+      throw new Error('Session not found');
+    }
+
+    const currentConfig =
+      (sessionData as { getConfiguration(): Record<string, unknown> }).getConfiguration() || {};
+    const newConfig: Record<string, unknown> = { ...currentConfig, ...config };
+
+    // Merge toolPolicies separately to avoid overriding all policies
+    if (currentConfig.toolPolicies || config.toolPolicies) {
+      newConfig.toolPolicies = {
+        ...((currentConfig.toolPolicies as Record<string, string>) || {}),
+        ...((config.toolPolicies as Record<string, string>) || {}),
+      };
+    }
+
+    const { getPersistence } = await import('~/persistence/database');
+    const persistence = getPersistence();
+
+    persistence.updateSession(sessionId, {
+      configuration: newConfig,
+      updatedAt: new Date(),
+    });
+  }
+
+  updateSession(sessionId: ThreadId, updates: Record<string, unknown>): void {
+    Session.updateSession(sessionId, updates);
   }
 
   // Test helper method to clear active sessions
