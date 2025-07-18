@@ -21,15 +21,15 @@ describe('Session.spawnAgent Method', () => {
 
   beforeEach(() => {
     setupTestPersistence();
-    
+
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
-    
+
     // Create a test project
     const project = Project.create('Test Project', '/test/path', 'Test project', {});
     projectId = project.getId();
-    
+
     // Create session
     session = Session.create('Test Session', 'anthropic', 'claude-3-haiku-20240307', projectId);
   });
@@ -42,16 +42,16 @@ describe('Session.spawnAgent Method', () => {
   it('should spawn agent and create delegate thread', () => {
     // Spawn agent
     const agent = session.spawnAgent('Test Agent', 'anthropic', 'claude-3-haiku-20240307');
-    
+
     // Verify agent properties
     expect(agent.threadId).toMatch(new RegExp(`^${session.getId()}\\.\\d+$`));
     expect(agent.threadId).toBe(`${session.getId()}.1`);
-    
+
     // Verify agent is in session's agents map
     const agents = session.getAgents();
     expect(agents).toHaveLength(2); // Coordinator + spawned agent
-    
-    const spawnedAgentInfo = agents.find(a => a.name === 'Test Agent');
+
+    const spawnedAgentInfo = agents.find((a) => a.name === 'Test Agent');
     expect(spawnedAgentInfo).toBeDefined();
     expect(spawnedAgentInfo?.threadId).toBe(agent.threadId);
   });
@@ -60,10 +60,10 @@ describe('Session.spawnAgent Method', () => {
     // Spawn agent
     const agent = session.spawnAgent('Retrievable Agent', 'anthropic', 'claude-3-haiku-20240307');
     const agentThreadId = agent.threadId;
-    
+
     // Retrieve agent from session
     const retrievedAgent = session.getAgent(agentThreadId);
-    
+
     // Verify agent was retrieved
     expect(retrievedAgent).toBeDefined();
     expect(retrievedAgent?.threadId).toBe(agentThreadId);
@@ -74,14 +74,14 @@ describe('Session.spawnAgent Method', () => {
     // Spawn agent
     const agent = session.spawnAgent('Persistent Agent', 'anthropic', 'claude-3-haiku-20240307');
     const agentThreadId = agent.threadId;
-    
+
     // Import ThreadManager and create new instance to test persistence
     const { ThreadManager } = await import('@/lib/server/lace-imports');
     const newThreadManager = new ThreadManager();
-    
+
     // Try to get the thread from the new ThreadManager instance
     const thread = newThreadManager.getThread(agentThreadId);
-    
+
     // Verify thread exists
     expect(thread).toBeDefined();
     expect(thread?.id).toBe(agentThreadId);
@@ -92,17 +92,17 @@ describe('Session.spawnAgent Method', () => {
     const agent1 = session.spawnAgent('Agent 1', 'anthropic', 'claude-3-haiku-20240307');
     const agent2 = session.spawnAgent('Agent 2', 'anthropic', 'claude-3-haiku-20240307');
     const agent3 = session.spawnAgent('Agent 3', 'anthropic', 'claude-3-haiku-20240307');
-    
+
     // Verify unique thread IDs
     expect(agent1.threadId).toBe(`${session.getId()}.1`);
     expect(agent2.threadId).toBe(`${session.getId()}.2`);
     expect(agent3.threadId).toBe(`${session.getId()}.3`);
-    
+
     // Verify all agents are retrievable
     expect(session.getAgent(agent1.threadId)).toBeDefined();
     expect(session.getAgent(agent2.threadId)).toBeDefined();
     expect(session.getAgent(agent3.threadId)).toBeDefined();
-    
+
     // Verify session reports correct number of agents
     const agents = session.getAgents();
     expect(agents).toHaveLength(4); // Coordinator + 3 spawned agents
@@ -112,17 +112,17 @@ describe('Session.spawnAgent Method', () => {
     // Spawn agent
     const agent = session.spawnAgent('Eventful Agent', 'anthropic', 'claude-3-haiku-20240307');
     const agentThreadId = agent.threadId;
-    
+
     // Start the agent
     await agent.start();
-    
+
     // Verify agent was started (state may be 'idle' if not processing, but it should be started)
     expect(agent.getCurrentState()).toBeDefined();
-    
+
     // Try to add an event to the agent's thread
     const { ThreadManager } = await import('@/lib/server/lace-imports');
     const threadManager = new ThreadManager();
-    
+
     // This should NOT throw an error
     const event = threadManager.addEvent(agentThreadId, 'USER_MESSAGE', 'Hello agent');
     expect(event.threadId).toBe(agentThreadId);
@@ -134,34 +134,45 @@ describe('Session.spawnAgent Method', () => {
     // Spawn agent
     const agent = session.spawnAgent('Cached Agent', 'anthropic', 'claude-3-haiku-20240307');
     const agentThreadId = agent.threadId;
-    
+
     // Get the session agent and its ThreadManager
     const sessionAgent = session.getAgent(session.getId());
     expect(sessionAgent).toBeDefined();
-    
-    const sessionThreadManager = (sessionAgent as { _threadManager: { getThread: (id: ThreadId) => unknown; getEvents: (id: ThreadId) => unknown[] } })._threadManager;
+
+    const sessionThreadManager = (
+      sessionAgent as {
+        _threadManager: {
+          getThread: (id: ThreadId) => unknown;
+          getEvents: (id: ThreadId) => unknown[];
+        };
+      }
+    )._threadManager;
     expect(sessionThreadManager).toBeDefined();
-    
+
     const threadFromSession = sessionThreadManager.getThread(agentThreadId);
     expect(threadFromSession).toBeDefined();
-    
+
     // Create a new ThreadManager instance
     const { ThreadManager } = await import('@/lib/server/lace-imports');
     const newThreadManager = new ThreadManager();
-    
+
     // Try to get the same thread from the new instance
     const threadFromNew = newThreadManager.getThread(agentThreadId);
     expect(threadFromNew).toBeDefined();
     expect(threadFromNew?.id).toBe(agentThreadId);
-    
+
     // Try to add an event using the new ThreadManager instance
-    const event = newThreadManager.addEvent(agentThreadId, 'USER_MESSAGE', 'Hello from new manager');
+    const event = newThreadManager.addEvent(
+      agentThreadId,
+      'USER_MESSAGE',
+      'Hello from new manager'
+    );
     expect(event.threadId).toBe(agentThreadId);
-    
+
     // Verify the event is visible from both ThreadManager instances
     const eventsFromSession = sessionThreadManager.getEvents(agentThreadId);
     const eventsFromNew = newThreadManager.getEvents(agentThreadId);
-    
+
     expect(eventsFromSession).toHaveLength(1);
     expect(eventsFromNew).toHaveLength(1);
     expect((eventsFromSession[0] as { id: string } | undefined)?.id).toBe(event.id);
@@ -172,45 +183,62 @@ describe('Session.spawnAgent Method', () => {
     // Spawn agent
     const agent = session.spawnAgent('Thread Switch Agent', 'anthropic', 'claude-3-haiku-20240307');
     const agentThreadId = agent.threadId;
-    
+
     // Get the session agent and its ThreadManager
     const sessionAgent = session.getAgent(session.getId());
     expect(sessionAgent).toBeDefined();
-    
-    const sessionThreadManager = (sessionAgent as { _threadManager: { createThread: () => unknown; setCurrentThread: (id: ThreadId) => void; getThread: (id: ThreadId) => unknown; addEvent: (id: ThreadId, type: string, data: string) => unknown } })._threadManager;
+
+    const sessionThreadManager = (
+      sessionAgent as {
+        _threadManager: {
+          createThread: () => unknown;
+          setCurrentThread: (id: ThreadId) => void;
+          getThread: (id: ThreadId) => unknown;
+          addEvent: (id: ThreadId, type: string, data: string) => unknown;
+        };
+      }
+    )._threadManager;
     expect(sessionThreadManager).toBeDefined();
-    
+
     // Create another thread and make it current
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const otherThreadId: ThreadId = sessionThreadManager.createThread() as ThreadId;
     sessionThreadManager.setCurrentThread(otherThreadId);
-    
+
     // Verify the delegate thread is still accessible
     const delegateThread = sessionThreadManager.getThread(agentThreadId);
     expect(delegateThread).toBeDefined();
     expect((delegateThread as { id: ThreadId } | undefined)?.id).toBe(agentThreadId);
-    
+
     // Try to add event to the delegate thread
-    const event = sessionThreadManager.addEvent(agentThreadId, 'USER_MESSAGE', 'Hello after switch');
+    const event = sessionThreadManager.addEvent(
+      agentThreadId,
+      'USER_MESSAGE',
+      'Hello after switch'
+    );
     expect((event as { threadId: ThreadId }).threadId).toBe(agentThreadId);
   });
 
   it('should handle session reconstruction after spawning agents', () => {
     // This test involves database persistence which may have timing issues
     // For now, let's simplify it to just verify the agent is accessible within the session
-    
+
     // Spawn agent
-    const agent = session.spawnAgent('Reconstructable Agent', 'anthropic', 'claude-3-haiku-20240307');
+    const agent = session.spawnAgent(
+      'Reconstructable Agent',
+      'anthropic',
+      'claude-3-haiku-20240307'
+    );
     const agentThreadId = agent.threadId;
-    
+
     // Verify agent is accessible in the current session
     const currentAgent = session.getAgent(agentThreadId);
     expect(currentAgent).toBeDefined();
     expect(currentAgent?.threadId).toBe(agentThreadId);
-    
+
     // Verify session reports correct agents
     const agents = session.getAgents();
     expect(agents).toHaveLength(2); // Coordinator + spawned agent
-    expect(agents.find(a => a.name === 'Reconstructable Agent')).toBeDefined();
+    expect(agents.find((a) => a.name === 'Reconstructable Agent')).toBeDefined();
   });
 });

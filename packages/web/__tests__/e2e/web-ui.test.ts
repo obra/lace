@@ -29,7 +29,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId, Project } from '@/lib/server/lace-imports';
-import type { Session as SessionType, ThreadId as _ThreadId } from '@/types/api';
+import type { Session as SessionType } from '@/types/api';
 import {
   setupTestPersistence,
   teardownTestPersistence,
@@ -62,9 +62,19 @@ describe('Web UI E2E Tests', () => {
 
   describe('Session Management Workflow', () => {
     it('should create a new session and persist it', async () => {
-      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
       const projectId = testProject.getId();
-      const session = await sessionService.createSession('Test Session', 'anthropic', 'claude-3-haiku-20240307', projectId);
+      const session = await sessionService.createSession(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
 
       expect(session).toBeDefined();
       expect(session.name).toBe('Test Session');
@@ -72,10 +82,25 @@ describe('Web UI E2E Tests', () => {
     });
 
     it('should list created sessions', async () => {
-      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
       const projectId = testProject.getId();
-      await sessionService.createSession('Session 1', 'anthropic', 'claude-3-haiku-20240307', projectId);
-      await sessionService.createSession('Session 2', 'anthropic', 'claude-3-haiku-20240307', projectId);
+      await sessionService.createSession(
+        'Session 1',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
+      await sessionService.createSession(
+        'Session 2',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
 
       const sessions = await sessionService.listSessions();
       expect(sessions).toHaveLength(2);
@@ -85,12 +110,22 @@ describe('Web UI E2E Tests', () => {
 
     it('should retrieve a specific session', async () => {
       // Create a session
-      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
       const projectId = testProject.getId();
-      const created = await sessionService.createSession('Retrieve Test', 'anthropic', 'claude-3-haiku-20240307', projectId);
+      const created = await sessionService.createSession(
+        'Retrieve Test',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
 
       // Retrieve it
-      const retrieved = await sessionService.getSession(created.id as ThreadId);
+      const retrieved = await sessionService.getSession(created.id);
 
       expect(retrieved).toBeDefined();
       const retrievedInfo = retrieved!.getInfo();
@@ -103,17 +138,23 @@ describe('Web UI E2E Tests', () => {
     let session: SessionType;
 
     beforeEach(async () => {
-      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
       const projectId = testProject.getId();
-      session = await sessionService.createSession('Agent Test Session', 'anthropic', 'claude-3-haiku-20240307', projectId);
+      session = await sessionService.createSession(
+        'Agent Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
     });
 
     it('should spawn an agent in a session', async () => {
-      const agent = await sessionService.spawnAgent(
-        session.id as ThreadId,
-        'Test Agent',
-        'anthropic'
-      );
+      const agent = await sessionService.spawnAgent(session.id, 'Test Agent', 'anthropic');
 
       expect(agent).toBeDefined();
       expect(agent.name).toBe('Test Agent');
@@ -122,11 +163,11 @@ describe('Web UI E2E Tests', () => {
 
     it('should list agents in a session', async () => {
       // Spawn multiple agents
-      await sessionService.spawnAgent(session.id as ThreadId, 'Agent 1', 'anthropic');
-      await sessionService.spawnAgent(session.id as ThreadId, 'Agent 2', 'anthropic');
+      await sessionService.spawnAgent(session.id, 'Agent 1', 'anthropic');
+      await sessionService.spawnAgent(session.id, 'Agent 2', 'anthropic');
 
       // Check session includes agents
-      const updatedSession = await sessionService.getSession(session.id as ThreadId);
+      const updatedSession = await sessionService.getSession(session.id);
 
       expect(updatedSession).toBeDefined();
       const updatedAgents = updatedSession!.getAgents();
@@ -137,16 +178,8 @@ describe('Web UI E2E Tests', () => {
     });
 
     it('should generate correct agent thread IDs', async () => {
-      const agent1 = await sessionService.spawnAgent(
-        session.id as ThreadId,
-        'Agent 1',
-        'anthropic'
-      );
-      const agent2 = await sessionService.spawnAgent(
-        session.id as ThreadId,
-        'Agent 2',
-        'anthropic'
-      );
+      const agent1 = await sessionService.spawnAgent(session.id, 'Agent 1', 'anthropic');
+      const agent2 = await sessionService.spawnAgent(session.id, 'Agent 2', 'anthropic');
 
       expect(agent1.threadId).toBe(`${session.id}.1`);
       expect(agent2.threadId).toBe(`${session.id}.2`);
@@ -156,16 +189,26 @@ describe('Web UI E2E Tests', () => {
   describe('Session Persistence', () => {
     it('should persist session data across service instances', async () => {
       // Create session with first service instance
-      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
       const projectId = testProject.getId();
-      const session1 = await sessionService.createSession('Persistence Test', 'anthropic', 'claude-3-haiku-20240307', projectId);
-      await sessionService.spawnAgent(session1.id as ThreadId, 'Persistent Agent', 'anthropic');
+      const session1 = await sessionService.createSession(
+        'Persistence Test',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
+      await sessionService.spawnAgent(session1.id, 'Persistent Agent', 'anthropic');
 
       // Create new service instance (simulating app restart)
       const newSessionService = getSessionService();
 
       // Should be able to retrieve the session
-      const retrievedSession = await newSessionService.getSession(session1.id as ThreadId);
+      const retrievedSession = await newSessionService.getSession(session1.id);
       expect(retrievedSession).toBeDefined();
       const retrievedInfo = retrievedSession!.getInfo();
       expect(retrievedInfo?.name).toBe('Persistence Test');
@@ -177,10 +220,25 @@ describe('Web UI E2E Tests', () => {
 
     it('should list persisted sessions after restart', async () => {
       // Create some sessions
-      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
       const projectId = testProject.getId();
-      await sessionService.createSession('Session A', 'anthropic', 'claude-3-haiku-20240307', projectId);
-      await sessionService.createSession('Session B', 'anthropic', 'claude-3-haiku-20240307', projectId);
+      await sessionService.createSession(
+        'Session A',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
+      await sessionService.createSession(
+        'Session B',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
 
       // Create new service instance
       const newSessionService = getSessionService();

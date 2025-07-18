@@ -4,16 +4,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, PATCH } from '@/app/api/sessions/[sessionId]/route';
-import type { ThreadId, Session } from '@/types/api';
+import type { Session } from '@/types/api';
 import {
   setupTestPersistence,
   teardownTestPersistence,
 } from '~/__tests__/setup/persistence-helper';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '~/projects/project';
-
-// Helper to create ThreadId safely for tests
-const createThreadId = (id: string): ThreadId => id as ThreadId;
+import { asThreadId } from '@/lib/server/lace-imports';
 
 // Mock external dependencies to avoid real API calls
 vi.mock('server-only', () => ({}));
@@ -138,7 +136,7 @@ describe('Session Detail API Route', () => {
         'claude-3-haiku-20240307',
         projectId
       );
-      const sessionId = session.id as ThreadId;
+      const sessionId = session.id;
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
       const response = await GET(request, {
@@ -167,7 +165,7 @@ describe('Session Detail API Route', () => {
     });
 
     it('should return 404 for non-existent session', async () => {
-      const sessionId: ThreadId = createThreadId('non_existent');
+      const sessionId = asThreadId('non_existent');
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
       const response = await GET(request, {
@@ -180,7 +178,7 @@ describe('Session Detail API Route', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      const sessionId: ThreadId = createThreadId('invalid_session_id');
+      const sessionId = asThreadId('invalid_session_id');
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
       const response = await GET(request, {
@@ -211,7 +209,7 @@ describe('Session Detail API Route', () => {
         'claude-3-haiku-20240307',
         projectId
       );
-      const sessionId = session.id as ThreadId;
+      const sessionId = session.id;
 
       const updates = {
         name: 'Updated Session Name',
@@ -249,7 +247,7 @@ describe('Session Detail API Route', () => {
     });
 
     it('should return 404 for non-existent session', async () => {
-      const sessionId: ThreadId = createThreadId('non_existent');
+      const sessionId = asThreadId('non_existent');
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`, {
         method: 'PATCH',
@@ -283,7 +281,7 @@ describe('Session Detail API Route', () => {
         'claude-3-haiku-20240307',
         projectId
       );
-      const sessionId = session.id as ThreadId;
+      const sessionId = session.id;
 
       const invalidUpdates = {
         name: '', // Empty name should be invalid
@@ -323,7 +321,7 @@ describe('Session Detail API Route', () => {
         'claude-3-haiku-20240307',
         projectId
       );
-      const sessionId = session.id as ThreadId;
+      const sessionId = session.id;
 
       // Only update name, leaving description and status unchanged
       const partialUpdates = {
@@ -352,7 +350,7 @@ describe('Session Detail API Route', () => {
     });
 
     it('should handle update errors gracefully', async () => {
-      const sessionId: ThreadId = createThreadId('invalid_session_id');
+      const sessionId = asThreadId('invalid_session_id');
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`, {
         method: 'PATCH',

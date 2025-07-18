@@ -2,8 +2,7 @@
 // ABOUTME: Defines interfaces for sessions, agents, and events
 
 // Import core types from Lace
-export type { ThreadId, AssigneeId } from '@/lib/server/lace-imports';
-import type { ThreadId, AssigneeId } from '@/lib/server/lace-imports';
+import type { AgentState, ThreadId, AssigneeId } from '@/lib/server/lace-imports';
 
 // Define ApprovalDecision locally to avoid import issues
 export const ApprovalDecision = {
@@ -20,8 +19,6 @@ export interface Session {
   createdAt: string;
   agents: Agent[];
 }
-
-import type { AgentState } from '@/lib/server/lace-imports';
 
 export interface Agent {
   threadId: ThreadId; // Full thread ID like sessionId.1
