@@ -251,15 +251,19 @@ describe('Project configuration', () => {
 
   it('should validate configuration schema', () => {
     expect(() => {
-      Session.create({
+      const sessionData = {
         id: 'session1',
         projectId,
         name: 'Test Session',
+        description: '',
         configuration: {
           maxTokens: 'invalid'  // Should be number
         },
-        threadManager
-      });
+        status: 'active' as const,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      Session.createSession(sessionData);
     }).toThrow('Invalid configuration');
   });
 });
@@ -315,10 +319,11 @@ export class Session {
     // Validate configuration
     const validatedConfig = ConfigurationSchema.parse(updates);
     
-    const currentConfig = this.sessionData.configuration || {};
+    const sessionData = Session.getSession(this.getId());
+    const currentConfig = sessionData?.configuration || {};
     const newConfig = { ...currentConfig, ...validatedConfig };
     
-    this.updateMetadata({ configuration: newConfig });
+    Session.updateSession(this.getId(), { configuration: newConfig });
   }
 
   getToolPolicy(toolName: string): 'allow' | 'require-approval' | 'deny' {
@@ -345,10 +350,8 @@ export class Project {
     });
   }
 
-  getConfiguration(): Configuration {
-    const info = this.getInfo();
-    return info?.configuration || {};
-  }
+  // Note: getConfiguration() already exists in current implementation
+  // It returns the configuration from the project's database record
 }
 ```
 
@@ -578,107 +581,91 @@ export class Agent {
 **Test First** (`src/sessions/session.test.ts`):
 ```typescript
 describe('Session working directory override', () => {
-  let threadManager: ThreadManager;
+  let project: Project;
   let projectId: string;
 
   beforeEach(() => {
-    threadManager = new ThreadManager(':memory:');
-    projectId = 'project1';
-    
-    const project = {
-      id: projectId,
-      name: 'Test Project',
-      description: 'A test project',
-      workingDirectory: '/project/default',
-      configuration: {},
-      isArchived: false,
-      createdAt: new Date(),
-      lastUsedAt: new Date()
-    };
-    
-    threadManager.createProject(project);
+    project = Project.create(
+      'Test Project',
+      '/project/default',
+      'A test project'
+    );
+    projectId = project.getId();
   });
 
   it('should use project working directory by default', () => {
-    const session = Session.create({
-      id: 'session1',
-      projectId,
-      name: 'Test Session',
-      threadManager
-    });
+    const session = Session.create(
+      'Test Session',
+      'anthropic',
+      'claude-3-sonnet',
+      projectId
+    );
     
     expect(session.getWorkingDirectory()).toBe('/project/default');
   });
 
-  it('should use session override when provided', () => {
-    const session = Session.create({
-      id: 'session1',
-      projectId,
-      name: 'Test Session',
-      workingDirectory: '/session/override',
-      threadManager
-    });
-    
-    expect(session.getWorkingDirectory()).toBe('/session/override');
-  });
-
   it('should use session override from configuration', () => {
-    const session = Session.create({
+    const sessionData = {
       id: 'session1',
       projectId,
       name: 'Test Session',
+      description: '',
       configuration: {
         workingDirectory: '/config/override'
       },
-      threadManager
-    });
+      status: 'active' as const,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
     
-    expect(session.getWorkingDirectory()).toBe('/config/override');
-  });
-
-  it('should prioritize constructor override over configuration', () => {
-    const session = Session.create({
-      id: 'session1',
-      projectId,
-      name: 'Test Session',
-      workingDirectory: '/constructor/override',
-      configuration: {
-        workingDirectory: '/config/override'
-      },
-      threadManager
-    });
+    Session.createSession(sessionData);
+    const session = Session.getById(sessionData.id);
     
-    expect(session.getWorkingDirectory()).toBe('/constructor/override');
+    expect(session?.getWorkingDirectory()).toBe('/config/override');
   });
 
   it('should validate working directory exists', () => {
     expect(() => {
-      Session.create({
+      const sessionData = {
         id: 'session1',
         projectId,
         name: 'Test Session',
-        workingDirectory: '/nonexistent/path',
-        threadManager
-      });
+        description: '',
+        configuration: {
+          workingDirectory: '/nonexistent/path'
+        },
+        status: 'active' as const,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      Session.createSession(sessionData);
     }).toThrow('Working directory does not exist');
   });
 
   it('should update working directory dynamically', () => {
-    const session = Session.create({
+    const sessionData = {
       id: 'session1',
       projectId,
       name: 'Test Session',
-      threadManager
-    });
+      description: '',
+      configuration: {},
+      status: 'active' as const,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
     
-    expect(session.getWorkingDirectory()).toBe('/project/default');
+    Session.createSession(sessionData);
+    const session = Session.getById(sessionData.id);
     
-    session.updateConfiguration({ workingDirectory: '/new/path' });
+    expect(session?.getWorkingDirectory()).toBe('/project/default');
     
     // Mock fs.existsSync to return true for test
     vi.mocked(fs.existsSync).mockReturnValue(true);
     
-    expect(session.getWorkingDirectory()).toBe('/new/path');
+    session?.updateConfiguration({ workingDirectory: '/new/path' });
+    
+    expect(session?.getWorkingDirectory()).toBe('/new/path');
   });
 });
 ```
@@ -692,23 +679,22 @@ export class Session {
   // ... existing methods ...
 
   getWorkingDirectory(): string {
-    // 1. Check constructor override (stored in session metadata)
-    if (this.sessionData.configuration?.workingDirectoryOverride) {
-      return this.sessionData.configuration.workingDirectoryOverride as string;
-    }
+    const sessionData = this.getSessionData();
     
-    // 2. Check session configuration
-    if (this.sessionData.configuration?.workingDirectory) {
-      return this.sessionData.configuration.workingDirectory as string;
+    // 1. Check session configuration
+    if (sessionData?.configuration?.workingDirectory) {
+      return sessionData.configuration.workingDirectory as string;
     }
 
-    // 3. Fall back to project working directory
-    const project = this.threadManager.getProject(this.sessionData.projectId);
-    if (project) {
-      return project.workingDirectory;
+    // 2. Fall back to project working directory
+    if (sessionData?.projectId) {
+      const project = Project.getById(sessionData.projectId);
+      if (project) {
+        return project.getWorkingDirectory();
+      }
     }
 
-    // 4. Final fallback to process.cwd()
+    // 3. Final fallback to process.cwd()
     return process.cwd();
   }
 
@@ -729,38 +715,8 @@ export class Session {
     this.updateConfiguration({ workingDirectory: absolutePath });
   }
 
-  // Update create method to handle workingDirectory parameter
-  static create(config: SessionConfig): Session {
-    const sessionData: SessionData = {
-      id: config.id,
-      projectId: config.projectId,
-      name: config.name,
-      description: config.description || '',
-      configuration: {
-        ...config.configuration,
-        ...(config.workingDirectory && { workingDirectoryOverride: config.workingDirectory })
-      },
-      status: 'active',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    // Validate working directory if provided
-    if (config.workingDirectory) {
-      if (!fs.existsSync(config.workingDirectory)) {
-        throw new Error(`Working directory does not exist: ${config.workingDirectory}`);
-      }
-      
-      if (!fs.statSync(config.workingDirectory).isDirectory()) {
-        throw new Error(`Path is not a directory: ${config.workingDirectory}`);
-      }
-    }
-
-    config.threadManager.createSession(sessionData);
-    logger.info('Session created', { sessionId: config.id, projectId: config.projectId });
-
-    return new Session(sessionData, config.threadManager);
-  }
+  // Note: The existing getWorkingDirectory() method already implements this logic
+  // This implementation shows the pattern for new methods
 }
 ```
 
@@ -773,7 +729,6 @@ const ConfigurationSchema = z.object({
   tools: z.array(z.string()).optional(),
   toolPolicies: z.record(z.enum(['allow', 'require-approval', 'deny'])).optional(),
   workingDirectory: z.string().optional(),
-  workingDirectoryOverride: z.string().optional(),  // Add this
   environmentVariables: z.record(z.string()).optional()
 });
 ```
@@ -932,7 +887,6 @@ export async function PATCH(
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
 import { Project, Session } from '@/lib/server/lace-imports';
-import { Session } from '@/lib/server/session';
 import { z } from 'zod';
 
 const SessionConfigurationSchema = z.object({
@@ -950,18 +904,31 @@ export async function GET(
   { params }: { params: { projectId: string; sessionId: string } }
 ) {
   try {
-    // Use Project and Session static methods with global persistence
-    const session = Session.load(params.sessionId, threadManager);
+    // Use Session static methods with global persistence
+    const sessionData = Session.getSession(params.sessionId);
     
-    if (!session || session.getProjectId() !== params.projectId) {
+    if (!sessionData || sessionData.projectId !== params.projectId) {
       return NextResponse.json(
         { error: 'Session not found in this project' },
         { status: 404 }
       );
     }
     
-    const sessionConfig = session.getConfiguration();
-    const effectiveConfig = session.getEffectiveConfiguration();
+    const sessionConfig = sessionData.configuration || {};
+    
+    // Get effective configuration by merging with project config
+    const project = Project.getById(sessionData.projectId);
+    const projectConfig = project?.getConfiguration() || {};
+    
+    const effectiveConfig = {
+      ...projectConfig,
+      ...sessionConfig,
+      // Special handling for toolPolicies - merge rather than replace
+      toolPolicies: {
+        ...projectConfig.toolPolicies,
+        ...sessionConfig.toolPolicies
+      }
+    };
     
     return NextResponse.json({ 
       sessionConfiguration: sessionConfig,
@@ -983,20 +950,36 @@ export async function PATCH(
     const body = await request.json();
     const validatedData = SessionConfigurationSchema.parse(body);
     
-    // Use Project and Session static methods with global persistence
-    const session = Session.load(params.sessionId, threadManager);
+    // Use Session static methods with global persistence
+    const sessionData = Session.getSession(params.sessionId);
     
-    if (!session || session.getProjectId() !== params.projectId) {
+    if (!sessionData || sessionData.projectId !== params.projectId) {
       return NextResponse.json(
         { error: 'Session not found in this project' },
         { status: 404 }
       );
     }
     
-    session.updateConfiguration(validatedData);
-    const updatedConfiguration = session.getEffectiveConfiguration();
+    // Update session configuration
+    const currentConfig = sessionData.configuration || {};
+    const newConfig = { ...currentConfig, ...validatedData };
     
-    return NextResponse.json({ configuration: updatedConfiguration });
+    Session.updateSession(params.sessionId, { configuration: newConfig });
+    
+    // Return effective configuration
+    const project = Project.getById(sessionData.projectId);
+    const projectConfig = project?.getConfiguration() || {};
+    
+    const effectiveConfig = {
+      ...projectConfig,
+      ...newConfig,
+      toolPolicies: {
+        ...projectConfig.toolPolicies,
+        ...newConfig.toolPolicies
+      }
+    };
+    
+    return NextResponse.json({ configuration: effectiveConfig });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -1141,7 +1124,6 @@ describe('Session update endpoints', () => {
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
 import { Project, Session } from '@/lib/server/lace-imports';
-import { Session } from '@/lib/server/session';
 import { z } from 'zod';
 
 const UpdateSessionSchema = z.object({
@@ -1158,24 +1140,28 @@ export async function PATCH(
     const body = await request.json();
     const validatedData = UpdateSessionSchema.parse(body);
     
-    // Use Project and Session static methods with global persistence
-    const session = Session.load(params.sessionId, threadManager);
+    // Use Session static methods with global persistence
+    const sessionData = Session.getSession(params.sessionId);
     
-    if (!session || session.getProjectId() !== params.projectId) {
+    if (!sessionData || sessionData.projectId !== params.projectId) {
       return NextResponse.json(
         { error: 'Session not found in this project' },
         { status: 404 }
       );
     }
     
-    session.updateMetadata(validatedData);
+    // Update session using static method
+    Session.updateSession(params.sessionId, validatedData);
+    
+    // Get updated session data
+    const updatedSessionData = Session.getSession(params.sessionId);
     
     const updatedSession = {
-      id: session.getId(),
-      name: session.getName(),
-      description: session.getDescription(),
-      status: session.getStatus(),
-      workingDirectory: session.getWorkingDirectory()
+      id: updatedSessionData?.id,
+      name: updatedSessionData?.name,
+      description: updatedSessionData?.description,
+      status: updatedSessionData?.status,
+      configuration: updatedSessionData?.configuration
     };
     
     return NextResponse.json({ session: updatedSession });
@@ -1199,8 +1185,9 @@ export async function PATCH(
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
 import { Project, Session } from '@/lib/server/lace-imports';
-import { Session } from '@/lib/server/session';
 import { z } from 'zod';
+import fs from 'fs';
+import path from 'path';
 
 const WorkingDirectorySchema = z.object({
   workingDirectory: z.string().min(1, 'Working directory path is required')
@@ -1214,20 +1201,40 @@ export async function POST(
     const body = await request.json();
     const validatedData = WorkingDirectorySchema.parse(body);
     
-    // Use Project and Session static methods with global persistence
-    const session = Session.load(params.sessionId, threadManager);
+    // Use Session static methods with global persistence
+    const sessionData = Session.getSession(params.sessionId);
     
-    if (!session || session.getProjectId() !== params.projectId) {
+    if (!sessionData || sessionData.projectId !== params.projectId) {
       return NextResponse.json(
         { error: 'Session not found in this project' },
         { status: 404 }
       );
     }
     
-    session.setWorkingDirectory(validatedData.workingDirectory);
+    // Validate working directory exists
+    const workingDirectory = path.resolve(validatedData.workingDirectory);
+    if (!fs.existsSync(workingDirectory)) {
+      return NextResponse.json(
+        { error: 'Working directory does not exist' },
+        { status: 400 }
+      );
+    }
+    
+    if (!fs.statSync(workingDirectory).isDirectory()) {
+      return NextResponse.json(
+        { error: 'Path is not a directory' },
+        { status: 400 }
+      );
+    }
+    
+    // Update session configuration
+    const currentConfig = sessionData.configuration || {};
+    const newConfig = { ...currentConfig, workingDirectory };
+    
+    Session.updateSession(params.sessionId, { configuration: newConfig });
     
     return NextResponse.json({ 
-      workingDirectory: session.getWorkingDirectory() 
+      workingDirectory 
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -1249,18 +1256,26 @@ export async function GET(
   { params }: { params: { projectId: string; sessionId: string } }
 ) {
   try {
-    // Use Project and Session static methods with global persistence
-    const session = Session.load(params.sessionId, threadManager);
+    // Use Session static methods with global persistence
+    const sessionData = Session.getSession(params.sessionId);
     
-    if (!session || session.getProjectId() !== params.projectId) {
+    if (!sessionData || sessionData.projectId !== params.projectId) {
       return NextResponse.json(
         { error: 'Session not found in this project' },
         { status: 404 }
       );
     }
     
+    // Get working directory (session override or project default)
+    let workingDirectory = sessionData.configuration?.workingDirectory as string;
+    
+    if (!workingDirectory) {
+      const project = Project.getById(sessionData.projectId);
+      workingDirectory = project?.getWorkingDirectory() || process.cwd();
+    }
+    
     return NextResponse.json({ 
-      workingDirectory: session.getWorkingDirectory() 
+      workingDirectory 
     });
   } catch (error) {
     return NextResponse.json(
@@ -1271,7 +1286,7 @@ export async function GET(
 }
 ```
 
-**Status**: 🚨 **BLOCKED** - Cannot implement until Project class session methods are available
+**Commit**: "feat: add session update endpoints with working directory support"
 
 ---
 
