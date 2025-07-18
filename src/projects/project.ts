@@ -6,6 +6,9 @@ import { getPersistence, ProjectData, DatabasePersistence } from '~/persistence/
 import { logger } from '~/utils/logger';
 import { ThreadManager } from '~/threads/thread-manager';
 import type { SessionConfiguration } from '~/sessions/session-config';
+import { PromptTemplateManager } from '~/projects/prompt-templates';
+import { ProjectEnvironmentManager } from '~/projects/environment-variables';
+import { TokenBudgetManager } from '~/token-management/token-budget-manager';
 
 export interface ProjectInfo {
   id: string;
@@ -20,9 +23,14 @@ export interface ProjectInfo {
 
 export class Project {
   private _id: string;
+  private _promptTemplateManager: PromptTemplateManager;
+  private _environmentManager: ProjectEnvironmentManager;
+  private _tokenBudgetManager: TokenBudgetManager | null = null;
 
   constructor(projectId: string) {
     this._id = projectId;
+    this._promptTemplateManager = new PromptTemplateManager();
+    this._environmentManager = new ProjectEnvironmentManager();
   }
 
   static create(
@@ -289,5 +297,65 @@ export class Project {
   getSessionCount(): number {
     const sessions = this.getSessions();
     return sessions.length;
+  }
+
+  // Advanced Feature Managers
+  getPromptTemplateManager(): PromptTemplateManager {
+    return this._promptTemplateManager;
+  }
+
+  getEnvironmentManager(): ProjectEnvironmentManager {
+    return this._environmentManager;
+  }
+
+  getTokenBudgetManager(): TokenBudgetManager | null {
+    return this._tokenBudgetManager;
+  }
+
+  setTokenBudgetManager(manager: TokenBudgetManager): void {
+    this._tokenBudgetManager = manager;
+  }
+
+  // Environment Variables Management
+  setEnvironmentVariables(
+    variables: Record<string, string>,
+    options?: { encrypt?: string[] }
+  ): void {
+    this._environmentManager.setEnvironmentVariables(this._id, variables, options);
+  }
+
+  getEnvironmentVariables(): Record<string, string> {
+    return this._environmentManager.getEnvironmentVariables(this._id);
+  }
+
+  getMergedEnvironment(): Record<string, string> {
+    return this._environmentManager.getMergedEnvironment(this._id);
+  }
+
+  deleteEnvironmentVariable(key: string): void {
+    this._environmentManager.deleteEnvironmentVariable(this._id, key);
+  }
+
+  // Prompt Templates Management
+  savePromptTemplate(template: import('~/projects/prompt-templates').PromptTemplate): void {
+    this._promptTemplateManager.saveTemplate(template);
+  }
+
+  getPromptTemplate(
+    templateId: string
+  ): import('~/projects/prompt-templates').PromptTemplate | undefined {
+    return this._promptTemplateManager.getTemplate(this._id, templateId);
+  }
+
+  getAllPromptTemplates(): import('~/projects/prompt-templates').PromptTemplate[] {
+    return this._promptTemplateManager.getTemplatesForProject(this._id);
+  }
+
+  renderPromptTemplate(templateId: string, variables: Record<string, string>): string {
+    return this._promptTemplateManager.renderTemplate(this._id, templateId, variables);
+  }
+
+  deletePromptTemplate(templateId: string): boolean {
+    return this._promptTemplateManager.deleteTemplate(this._id, templateId);
   }
 }

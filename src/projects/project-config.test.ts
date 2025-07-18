@@ -125,7 +125,7 @@ describe('Project configuration', () => {
       Session.validateConfiguration({
         maxTokens: 'invalid', // Should be number
       });
-    }).toThrow('Invalid configuration');
+    }).toThrow('Configuration validation failed');
   });
 
   it('should merge configurations with session overriding project', () => {
