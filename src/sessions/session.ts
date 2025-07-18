@@ -346,8 +346,8 @@ export class Session {
     // Special handling for toolPolicies - merge rather than replace
     if (projectConfig.toolPolicies || sessionConfig.toolPolicies) {
       merged.toolPolicies = {
-        ...projectConfig.toolPolicies,
-        ...sessionConfig.toolPolicies,
+        ...(projectConfig.toolPolicies || {}),
+        ...(sessionConfig.toolPolicies || {}),
       };
     }
 
@@ -407,8 +407,8 @@ export class Session {
     // Special handling for toolPolicies - merge rather than replace
     if (projectConfig.toolPolicies || sessionConfig.toolPolicies) {
       merged.toolPolicies = {
-        ...projectConfig.toolPolicies,
-        ...sessionConfig.toolPolicies,
+        ...(projectConfig.toolPolicies || {}),
+        ...(sessionConfig.toolPolicies || {}),
       };
     }
 
