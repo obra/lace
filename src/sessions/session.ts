@@ -23,19 +23,7 @@ import { UrlFetchTool } from '~/tools/implementations/url-fetch';
 import { logger } from '~/utils/logger';
 import type { ApprovalCallback } from '~/tools/approval-types';
 import { randomUUID } from 'crypto';
-import { z } from 'zod';
-
-const ConfigurationSchema = z.object({
-  provider: z.string().optional(),
-  model: z.string().optional(),
-  maxTokens: z.number().positive().optional(),
-  tools: z.array(z.string()).optional(),
-  toolPolicies: z.record(z.enum(['allow', 'require-approval', 'deny'])).optional(),
-  workingDirectory: z.string().optional(),
-  environmentVariables: z.record(z.string()).optional(),
-});
-
-export type Configuration = z.infer<typeof ConfigurationSchema>;
+import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 
 export interface SessionInfo {
   id: ThreadId;
@@ -317,40 +305,23 @@ export class Session {
   // Configuration management static methods
   // ===============================
 
-  static validateConfiguration(config: Record<string, unknown>): Configuration {
-    try {
-      return ConfigurationSchema.parse(config);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new Error(`Invalid configuration: ${error.errors.map((e) => e.message).join(', ')}`);
-      }
-      throw error;
-    }
+  static validateConfiguration(config: Record<string, unknown>): SessionConfiguration {
+    return ConfigurationValidator.validateSessionConfiguration(config);
   }
 
   static getEffectiveConfiguration(
     projectId: string,
     sessionConfig: Record<string, unknown> = {}
-  ): Configuration {
+  ): SessionConfiguration {
     // Get project configuration
     const project = Project.getById(projectId);
     const projectConfig = project?.getConfiguration() || {};
 
     // Merge configurations with session overriding project
-    const merged = {
-      ...projectConfig,
-      ...sessionConfig,
-    };
-
-    // Special handling for toolPolicies - merge rather than replace
-    if (projectConfig.toolPolicies || sessionConfig.toolPolicies) {
-      merged.toolPolicies = {
-        ...(projectConfig.toolPolicies || {}),
-        ...(sessionConfig.toolPolicies || {}),
-      };
-    }
-
-    return merged as Configuration;
+    return ConfigurationValidator.mergeConfigurations(
+      projectConfig as SessionConfiguration,
+      sessionConfig as Partial<SessionConfiguration>
+    );
   }
 
   getId(): ThreadId {
@@ -386,7 +357,7 @@ export class Session {
   // Configuration instance methods
   // ===============================
 
-  getEffectiveConfiguration(): Configuration {
+  getEffectiveConfiguration(): SessionConfiguration {
     const sessionData = this.getSessionData();
     if (!sessionData) {
       return {};
@@ -398,23 +369,13 @@ export class Session {
     const sessionConfig = sessionData.configuration || {};
 
     // Merge configurations with session overriding project
-    const merged = {
-      ...projectConfig,
-      ...sessionConfig,
-    };
-
-    // Special handling for toolPolicies - merge rather than replace
-    if (projectConfig.toolPolicies || sessionConfig.toolPolicies) {
-      merged.toolPolicies = {
-        ...(projectConfig.toolPolicies || {}),
-        ...(sessionConfig.toolPolicies || {}),
-      };
-    }
-
-    return merged as Configuration;
+    return ConfigurationValidator.mergeConfigurations(
+      projectConfig as SessionConfiguration,
+      sessionConfig as Partial<SessionConfiguration>
+    );
   }
 
-  updateConfiguration(updates: Partial<Configuration>): void {
+  updateConfiguration(updates: Partial<SessionConfiguration>): void {
     // Validate configuration
     const validatedConfig = Session.validateConfiguration(updates);
 

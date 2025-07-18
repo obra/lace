@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 import { getPersistence, ProjectData, DatabasePersistence } from '~/persistence/database';
 import { logger } from '~/utils/logger';
 import { ThreadManager } from '~/threads/thread-manager';
-import type { Configuration } from '~/sessions/session';
+import type { SessionConfiguration } from '~/sessions/session-config';
 
 export interface ProjectInfo {
   id: string;
@@ -152,10 +152,10 @@ export class Project {
     logger.info('Project updated', { projectId: this._id, updates });
   }
 
-  updateConfiguration(updates: Partial<Configuration>): void {
+  updateConfiguration(updates: Partial<SessionConfiguration>): void {
     // For now, we'll do basic validation here to avoid circular dependency
     // In a full implementation, this would use a shared validation schema
-    const validatedConfig = updates as Configuration;
+    const validatedConfig = updates as SessionConfiguration;
 
     const currentConfig = this.getConfiguration();
     const newConfig = { ...currentConfig, ...validatedConfig };
