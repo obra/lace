@@ -23,7 +23,7 @@ interface ErrorResponse {
   details?: unknown;
 }
 
-// Mock session data
+// Mock session data that matches what SessionService expects
 const mockSessionData = {
   id: 'session-1',
   projectId: 'project-1',
@@ -36,6 +36,11 @@ const mockSessionData = {
   status: 'active' as const,
   createdAt: new Date(),
   updatedAt: new Date(),
+  getProjectId: vi.fn().mockReturnValue('project-1'),
+  getConfiguration: vi.fn().mockReturnValue({
+    provider: 'openai',
+    model: 'gpt-4',
+  }),
 };
 
 // Mock project data
@@ -52,6 +57,7 @@ const mockProject = {
   }),
 };
 
+// Mock the business logic classes that SessionService depends on
 vi.mock('@/lib/server/lace-imports', () => ({
   Session: {
     getSession: vi.fn(),
@@ -61,6 +67,11 @@ vi.mock('@/lib/server/lace-imports', () => ({
   },
 }));
 
+// Mock persistence for SessionService
+vi.mock('~/persistence/database', () => ({
+  getPersistence: vi.fn(),
+}));
+
 describe('Session Configuration API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -68,12 +79,13 @@ describe('Session Configuration API', () => {
 
   describe('GET /api/sessions/:sessionId/configuration', () => {
     it('should return session effective configuration when found', async () => {
+      // Mock the dependencies that SessionService uses
       const { Session, Project } = vi.mocked(await import('@/lib/server/lace-imports'));
       Session.getSession = vi.fn().mockReturnValue(mockSessionData);
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
       const request = new NextRequest('http://localhost/api/sessions/session-1/configuration');
-      const response = GET(request, { params: { sessionId: 'session-1' } });
+      const response = await GET(request, { params: { sessionId: 'session-1' } });
       const data = (await response.json()) as ConfigurationResponse;
 
       expect(response.status).toBe(200);
@@ -89,6 +101,8 @@ describe('Session Configuration API', () => {
         workingDirectory: '/test/path',
         environmentVariables: { NODE_ENV: 'test' },
       });
+
+      // Verify the SessionService called the underlying dependencies
       expect(Session.getSession).toHaveBeenCalledWith('session-1');
       expect(Project.getById).toHaveBeenCalledWith('project-1');
     });
@@ -98,7 +112,7 @@ describe('Session Configuration API', () => {
       Session.getSession = vi.fn().mockReturnValue(null);
 
       const request = new NextRequest('http://localhost/api/sessions/nonexistent/configuration');
-      const response = GET(request, { params: { sessionId: 'nonexistent' } });
+      const response = await GET(request, { params: { sessionId: 'nonexistent' } });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);
@@ -112,7 +126,7 @@ describe('Session Configuration API', () => {
       });
 
       const request = new NextRequest('http://localhost/api/sessions/session-1/configuration');
-      const response = GET(request, { params: { sessionId: 'session-1' } });
+      const response = await GET(request, { params: { sessionId: 'session-1' } });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(500);
@@ -123,17 +137,15 @@ describe('Session Configuration API', () => {
   describe('PUT /api/sessions/:sessionId/configuration', () => {
     it('should update session configuration successfully', async () => {
       const { Session, Project } = vi.mocked(await import('@/lib/server/lace-imports'));
-      Session.getSession = vi.fn().mockReturnValue(mockSessionData);
-      Project.getById = vi.fn().mockReturnValue(mockProject);
+      const { getPersistence } = vi.mocked(await import('~/persistence/database'));
 
-      // Mock the database persistence
       const mockPersistence = {
         updateSession: vi.fn(),
       };
 
-      vi.doMock('~/persistence/database', () => ({
-        getPersistence: vi.fn().mockReturnValue(mockPersistence),
-      }));
+      Session.getSession = vi.fn().mockReturnValue(mockSessionData);
+      Project.getById = vi.fn().mockReturnValue(mockProject);
+      getPersistence.mockReturnValue(mockPersistence);
 
       const updates = {
         provider: 'anthropic',
@@ -156,6 +168,13 @@ describe('Session Configuration API', () => {
 
       expect(response.status).toBe(200);
       expect(data.configuration).toBeDefined();
+      expect(mockPersistence.updateSession).toHaveBeenCalledWith(
+        'session-1',
+        expect.objectContaining({
+          configuration: expect.objectContaining(updates) as Record<string, unknown>,
+          updatedAt: expect.any(Date) as Date,
+        }) as Record<string, unknown>
+      );
     });
 
     it('should return 404 when session not found', async () => {
@@ -202,6 +221,8 @@ describe('Session Configuration API', () => {
 
     it('should handle update errors', async () => {
       const { Session, Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { getPersistence } = vi.mocked(await import('~/persistence/database'));
+
       Session.getSession = vi.fn().mockReturnValue(mockSessionData);
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
@@ -212,9 +233,7 @@ describe('Session Configuration API', () => {
         }),
       };
 
-      vi.doMock('~/persistence/database', () => ({
-        getPersistence: vi.fn().mockReturnValue(mockPersistence),
-      }));
+      getPersistence.mockReturnValue(mockPersistence);
 
       const request = new NextRequest('http://localhost/api/sessions/session-1/configuration', {
         method: 'PUT',
