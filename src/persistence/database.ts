@@ -1404,11 +1404,11 @@ export function initializePersistence(dbPath?: string): void {
 
 export function getPersistence(): DatabasePersistence {
   if (!globalPersistence) {
-    throw new Error(
-      'Global persistence not initialized. Call initializePersistence() first during application startup.'
-    );
+    // Auto-initialize with default path if not already initialized
+    logger.info('Auto-initializing database persistence with default path');
+    initializePersistence();
   }
-  return globalPersistence;
+  return globalPersistence!;
 }
 
 export function resetPersistence(): void {
