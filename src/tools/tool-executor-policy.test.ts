@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
 import { ToolContext } from '~/tools/types';
 import { ApprovalDecision } from '~/tools/approval-types';
+import { asThreadId } from '~/threads/types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { BashTool } from '~/tools/implementations/bash';
@@ -58,8 +59,8 @@ describe('ToolExecutor policy enforcement', () => {
     } as unknown as Session;
 
     context = {
-      threadId: 'thread1',
-      parentThreadId: 'session1',
+      threadId: asThreadId('thread1'),
+      parentThreadId: asThreadId('session1'),
       workingDirectory: '/project/path',
       sessionId: 'session1',
       projectId: projectId,
@@ -128,7 +129,7 @@ describe('ToolExecutor policy enforcement', () => {
 
   it('should use default policy when session not available', async () => {
     const contextWithoutSession = {
-      threadId: 'thread1',
+      threadId: asThreadId('thread1'),
     };
 
     // Should fall back to default require-approval policy
