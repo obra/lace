@@ -87,7 +87,35 @@ export class ToolExecutor {
       return createErrorResult(`Tool '${call.name}' not found`, call.id);
     }
 
-    // 2. Check approval - fail safe if no callback is configured
+    // 2. Check tool policy if session is available
+    if (context?.session) {
+      // Check if tool is allowed in configuration
+      const config = context.session.getEffectiveConfiguration();
+      if (config.tools && !config.tools.includes(call.name)) {
+        return createErrorResult(
+          `Tool '${call.name}' not allowed in current configuration`,
+          call.id
+        );
+      }
+
+      // Check tool policy
+      const policy = context.session.getToolPolicy(call.name);
+
+      switch (policy) {
+        case 'deny':
+          return createErrorResult(`Tool '${call.name}' execution denied by policy`, call.id);
+
+        case 'require-approval':
+          // Fall through to approval system
+          break;
+
+        case 'allow':
+          // Skip approval system and execute directly
+          return this.executeToolDirect(tool, call, context);
+      }
+    }
+
+    // 3. Check approval - fail safe if no callback is configured
     if (!this.approvalCallback) {
       return createErrorResult(
         'Tool execution requires approval but no approval callback is configured',
@@ -111,7 +139,15 @@ export class ToolExecutor {
       );
     }
 
-    // 3. Execute the tool
+    // 4. Execute the tool
+    return this.executeToolDirect(tool, call, context);
+  }
+
+  private async executeToolDirect(
+    tool: Tool,
+    call: ToolCall,
+    context?: ToolContext
+  ): Promise<ToolResult> {
     try {
       const result = await tool.execute(call.arguments, context);
 
