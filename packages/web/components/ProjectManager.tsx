@@ -5,6 +5,19 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ProjectInfo } from '@/types/api';
 import { useProjectAPI } from '@/hooks/useProjectAPI';
 import { CreateProjectModal } from '@/components/CreateProjectModal';
+import { ProjectSettings } from '@/components/ProjectSettings';
+
+interface ProjectWithConfiguration extends ProjectInfo {
+  configuration: {
+    provider?: string;
+    model?: string;
+    maxTokens?: number;
+    temperature?: number;
+    tools?: string[];
+    toolPolicies?: Record<string, string>;
+    environmentVariables?: Record<string, string>;
+  };
+}
 
 interface ProjectManagerProps {
   selectedProjectId: string | null;
@@ -16,6 +29,9 @@ export function ProjectManager({ selectedProjectId, onProjectSelect, onProjectCr
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsProject, setSettingsProject] = useState<ProjectWithConfiguration | null>(null);
+  const [loadingSettings, setLoadingSettings] = useState(false);
   const { listProjects, deleteProject, updateProject, loading, error } = useProjectAPI();
 
   const loadProjects = useCallback(async () => {
@@ -49,6 +65,61 @@ export function ProjectManager({ selectedProjectId, onProjectSelect, onProjectCr
     const updated = await updateProject(project.id, { isArchived: !project.isArchived });
     if (updated) {
       setProjects(prev => prev.map(p => p.id === project.id ? updated : p));
+    }
+  };
+
+  const handleOpenSettings = async (project: ProjectInfo) => {
+    setLoadingSettings(true);
+    try {
+      // Load project configuration
+      const configResponse = await fetch(`/api/projects/${project.id}/configuration`);
+      if (configResponse.ok) {
+        const configData = (await configResponse.json()) as { configuration: Record<string, unknown> };
+        const projectWithConfig: ProjectWithConfiguration = {
+          ...project,
+          configuration: configData.configuration || {}
+        };
+        setSettingsProject(projectWithConfig);
+        setShowSettings(true);
+      } else {
+        console.error('Failed to load project configuration');
+      }
+    } catch (error) {
+      console.error('Failed to load project configuration:', error);
+    } finally {
+      setLoadingSettings(false);
+    }
+  };
+
+  const handleSaveSettings = async (updatedProject: ProjectWithConfiguration) => {
+    try {
+      // Update project basic info
+      const updated = await updateProject(updatedProject.id, {
+        name: updatedProject.name,
+        description: updatedProject.description,
+        workingDirectory: updatedProject.workingDirectory,
+        isArchived: updatedProject.isArchived
+      });
+
+      if (updated) {
+        // Update project configuration
+        const configResponse = await fetch(`/api/projects/${updatedProject.id}/configuration`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedProject.configuration)
+        });
+
+        if (configResponse.ok) {
+          setProjects(prev => prev.map(p => p.id === updatedProject.id ? { ...updated, configuration: updatedProject.configuration } : p));
+          setShowSettings(false);
+          setSettingsProject(null);
+        } else {
+          throw new Error('Failed to update project configuration');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to save project settings:', error);
+      // TODO: Show error message to user
     }
   };
 
@@ -130,6 +201,16 @@ export function ProjectManager({ selectedProjectId, onProjectSelect, onProjectCr
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      void handleOpenSettings(project);
+                    }}
+                    disabled={loadingSettings}
+                    className="text-xs px-2 py-1 bg-blue-600 rounded hover:bg-blue-500 transition-colors disabled:opacity-50"
+                  >
+                    {loadingSettings ? 'Loading...' : 'Settings'}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
                       void handleToggleArchive(project);
                     }}
                     className="text-xs px-2 py-1 bg-gray-600 rounded hover:bg-gray-500 transition-colors"
@@ -157,6 +238,22 @@ export function ProjectManager({ selectedProjectId, onProjectSelect, onProjectCr
         onClose={() => setShowCreateModal(false)}
         onProjectCreated={handleProjectCreated}
       />
+
+      {/* Project Settings Modal */}
+      {showSettings && settingsProject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <ProjectSettings
+              project={settingsProject}
+              onSave={handleSaveSettings}
+              onCancel={() => {
+                setShowSettings(false);
+                setSettingsProject(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

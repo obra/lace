@@ -77,17 +77,17 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
     onSave(result.data as ProjectWithConfiguration);
   };
 
-  const updateField = (path: string, value: any) => {
+  const updateField = (path: string, value: unknown) => {
     setFormData(prev => {
       const updated = { ...prev };
       const keys = path.split('.');
-      let current: any = updated;
+      let current: Record<string, unknown> = updated as Record<string, unknown>;
       
       for (let i = 0; i < keys.length - 1; i++) {
         if (!(keys[i] in current)) {
           current[keys[i]] = {};
         }
-        current = current[keys[i]];
+        current = current[keys[i]] as Record<string, unknown>;
       }
       
       current[keys[keys.length - 1]] = value;
@@ -128,7 +128,7 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as 'general' | 'configuration' | 'tools' | 'environment')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
