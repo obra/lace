@@ -3,14 +3,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
-import { TokenBudgetManager } from '@/lib/server/lace-imports';
 import { z } from 'zod';
 
 const TokenBudgetConfigSchema = z.object({
   maxTokens: z.number().positive(),
   warningThreshold: z.number().min(0).max(1).optional(),
-  resetPeriod: z.enum(['daily', 'weekly', 'monthly']).optional(),
-  estimationBuffer: z.number().min(0).max(1).optional(),
+  reserveTokens: z.number().min(0).optional(),
 });
 
 function isError(error: unknown): error is Error {
@@ -61,17 +59,14 @@ export async function PUT(
     const body: unknown = await request.json();
     const validatedData = TokenBudgetConfigSchema.parse(body);
 
-    const tokenBudgetManager = new TokenBudgetManager({
+    const tokenBudgetManager = project.createTokenBudgetManager({
       maxTokens: validatedData.maxTokens,
-      warningThreshold: validatedData.warningThreshold || 0.8,
-      resetPeriod: validatedData.resetPeriod || 'daily',
-      estimationBuffer: validatedData.estimationBuffer || 0.2,
+      warningThreshold: validatedData.warningThreshold,
+      reserveTokens: validatedData.reserveTokens,
     });
 
-    project.setTokenBudgetManager(tokenBudgetManager);
-
     const budgetStatus = tokenBudgetManager.getBudgetStatus();
-    
+
     return NextResponse.json({ budgetStatus });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {

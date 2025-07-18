@@ -6,7 +6,7 @@ import { getPersistence, ProjectData, DatabasePersistence } from '~/persistence/
 import { logger } from '~/utils/logger';
 import { ThreadManager } from '~/threads/thread-manager';
 import type { SessionConfiguration } from '~/sessions/session-config';
-import { PromptTemplateManager } from '~/projects/prompt-templates';
+import { PromptTemplateManager, PromptTemplate } from '~/projects/prompt-templates';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { TokenBudgetManager } from '~/token-management/token-budget-manager';
 
@@ -316,6 +316,20 @@ export class Project {
     this._tokenBudgetManager = manager;
   }
 
+  createTokenBudgetManager(config: {
+    maxTokens: number;
+    warningThreshold?: number;
+    reserveTokens?: number;
+  }): TokenBudgetManager {
+    const manager = new TokenBudgetManager({
+      maxTokens: config.maxTokens,
+      warningThreshold: config.warningThreshold || 0.8,
+      reserveTokens: config.reserveTokens || 0,
+    });
+    this._tokenBudgetManager = manager;
+    return manager;
+  }
+
   // Environment Variables Management
   setEnvironmentVariables(
     variables: Record<string, string>,
@@ -339,6 +353,25 @@ export class Project {
   // Prompt Templates Management
   savePromptTemplate(template: import('~/projects/prompt-templates').PromptTemplate): void {
     this._promptTemplateManager.saveTemplate(template);
+  }
+
+  createPromptTemplate(config: {
+    id: string;
+    name: string;
+    description?: string;
+    content: string;
+    variables?: string[];
+    parentTemplateId?: string;
+    isDefault?: boolean;
+  }): PromptTemplate {
+    const template = new PromptTemplate({
+      ...config,
+      description: config.description || '',
+      variables: config.variables || [],
+      projectId: this._id,
+    });
+    this._promptTemplateManager.saveTemplate(template);
+    return template;
   }
 
   getPromptTemplate(

@@ -3,7 +3,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
-import { PromptTemplate } from '@/lib/server/lace-imports';
 import { z } from 'zod';
 
 const CreateTemplateSchema = z.object({
@@ -31,7 +30,7 @@ export function GET(
     }
 
     const templates = project.getAllPromptTemplates();
-    
+
     return NextResponse.json({ templates });
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : 'Failed to fetch templates';
@@ -52,18 +51,15 @@ export async function POST(
     const body: unknown = await request.json();
     const validatedData = CreateTemplateSchema.parse(body);
 
-    const template = new PromptTemplate({
+    const template = project.createPromptTemplate({
       id: validatedData.id,
       name: validatedData.name,
-      description: validatedData.description || '',
+      description: validatedData.description,
       content: validatedData.content,
-      variables: validatedData.variables || [],
-      projectId: params.projectId,
+      variables: validatedData.variables,
       parentTemplateId: validatedData.parentTemplateId,
-      isDefault: validatedData.isDefault || false,
+      isDefault: validatedData.isDefault,
     });
-
-    project.savePromptTemplate(template);
 
     return NextResponse.json({ template: template.toJSON() }, { status: 201 });
   } catch (error: unknown) {
