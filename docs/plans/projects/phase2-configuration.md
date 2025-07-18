@@ -128,10 +128,10 @@ export class Project {
 - ✅ **COMPLETED** - Phase 1 Task 1.9 is complete
 - ✅ **READY** - All Phase 2 tasks can now proceed
 
-**Phase 2 Tasks (Ready to Begin):**
-1. **Task 2.1**: Project Configuration Management - *READY*
-2. **Task 2.2**: Tool Policy Enforcement - *READY*
-3. **Task 2.3**: Session Working Directory Overrides - *READY*
+**Phase 2 Tasks Status:**
+1. **Task 2.1**: Project Configuration Management - ✅ **COMPLETED**
+2. **Task 2.2**: Tool Policy Enforcement - ✅ **COMPLETED**
+3. **Task 2.3**: Session Working Directory Overrides - ✅ **COMPLETED** (already implemented)
 4. **Task 2.4**: Configuration API Endpoints - *READY*
 5. **Task 2.5**: Session Update Capabilities - *READY*
 
@@ -141,14 +141,23 @@ export class Project {
 
 **Goal**: Implement project-level configuration inheritance
 
-**Status**: ✅ **READY** - All prerequisites completed
+**Status**: ✅ **COMPLETED** - Full implementation with TDD approach
 
-**Available Capabilities**: Can now implement configuration inheritance with:
-- ✅ Get sessions for a project (`project.getSessions()`)
-- ✅ Create sessions with configuration (`project.createSession()`)
-- ✅ Update session configuration (`project.updateSession()`)
+### ✅ Implementation Summary:
+- **Configuration Schema**: Zod-based validation for type safety
+- **Static Methods**: `Session.validateConfiguration()` and `Session.getEffectiveConfiguration()`
+- **Instance Methods**: `session.getEffectiveConfiguration()`, `updateConfiguration()`, `getToolPolicy()`
+- **Project Support**: `Project.updateConfiguration()` with validation
+- **Tool Policy Merging**: Project policies + session overrides with special merge logic
+- **Test Coverage**: 5 comprehensive tests covering inheritance, overrides, and validation
+- **Files**: `src/projects/project-config.test.ts`, `src/sessions/session.ts`, `src/projects/project.ts`
 
-**Prerequisites**: ✅ **COMPLETED** - Phase 1 Task 1.9 is complete
+### ✅ Key Features:
+- Project → Session configuration inheritance
+- Session can override project configuration
+- Tool policies merge (don't replace entirely)
+- Configuration validation with helpful error messages
+- Type-safe configuration handling with TypeScript strict mode
 
 **Test First** (`src/projects/project-config.test.ts`):
 ```typescript
@@ -360,6 +369,25 @@ export class Project {
 ## Task 2.2: Tool Policy Enforcement
 
 **Goal**: Enforce tool policies at the ToolExecutor level
+
+**Status**: ✅ **COMPLETED** - Full implementation with TDD approach
+
+### ✅ Implementation Summary:
+- **ToolContext Extension**: Added session information to ToolContext interface
+- **Policy Enforcement**: Updated `ToolExecutor.executeTool()` to check session policies
+- **Tool Allowlist**: Configuration-based tool filtering before execution
+- **Policy Logic**: allow/require-approval/deny enforcement with proper flow control
+- **Approval Integration**: Seamless integration with existing approval system
+- **Test Coverage**: 6 comprehensive tests covering all policy scenarios
+- **Files**: `src/tools/tool-executor-policy.test.ts`, `src/tools/executor.ts`, `src/tools/types.ts`
+
+### ✅ Key Features:
+- **Allow Policy**: Tools execute directly, bypassing approval system
+- **Require-Approval Policy**: Tools go through approval system as expected  
+- **Deny Policy**: Tools are blocked entirely with clear error messages
+- **Tool Allowlist**: Tools not in configuration are rejected
+- **Graceful Fallback**: When session not available, defaults to approval system
+- **Proper Error Messages**: Clear, actionable error messages for policy violations
 
 **Test First** (`src/tools/tool-executor.test.ts`):
 ```typescript
@@ -577,6 +605,23 @@ export class Agent {
 ## Task 2.3: Session Working Directory Override
 
 **Goal**: Allow sessions to override project working directory
+
+**Status**: ✅ **COMPLETED** - Already implemented in Phase 1
+
+### ✅ Implementation Summary:
+- **Working Directory Inheritance**: Sessions inherit project working directory by default
+- **Configuration Override**: Sessions can override via `configuration.workingDirectory`
+- **Fallback Logic**: Session → Project → process.cwd()
+- **Validation**: Directory existence and permission checks
+- **Integration**: Works with ToolContext and tool execution
+- **Files**: `src/sessions/session.ts` (getWorkingDirectory method already exists)
+
+### ✅ Key Features:
+- Automatic inheritance from project working directory
+- Session-level working directory overrides
+- Validation of directory existence and permissions
+- Integration with tool execution context
+- Graceful fallback to process.cwd() when needed
 
 **Test First** (`src/sessions/session.test.ts`):
 ```typescript
@@ -1292,49 +1337,63 @@ export async function GET(
 
 ## Phase 2 Implementation Status
 
-### Overall Status: ✅ READY TO BEGIN
+### Overall Status: ✅ 60% COMPLETE
 
-**Phase 2 can now proceed - all prerequisites completed.**
+**Phase 2 core functionality implemented - API endpoints remaining.**
 
 ### Current Status:
 
-1. **✅ COMPLETED: Phase 1 Task 1.9**
-   - ✅ Implemented Project class session methods (`getSessions()`, `createSession()`, etc.)
-   - ✅ Unblocked Session API endpoints
-   - ✅ Completed Phase 1 MVP (90% → 100%)
+1. **✅ COMPLETED: Core Configuration System**
+   - ✅ **Task 2.1**: Project Configuration Management (TDD approach)
+   - ✅ **Task 2.2**: Tool Policy Enforcement (TDD approach)
+   - ✅ **Task 2.3**: Session Working Directory Overrides (already implemented)
 
-2. **✅ READY: Begin Phase 2 Tasks**
-   - Task 2.1: Project Configuration Management
-   - Task 2.2: Tool Policy Enforcement
-   - Task 2.3: Session Working Directory Overrides
-   - Task 2.4: Configuration API Endpoints
-   - Task 2.5: Session Update Capabilities
+2. **🔄 REMAINING: API Endpoints**
+   - 🔄 **Task 2.4**: Configuration API Endpoints
+   - 🔄 **Task 2.5**: Session Update Capabilities
+
+### ✅ Major Achievements:
+- **Configuration Inheritance**: Project → Session configuration working correctly
+- **Tool Policy Enforcement**: allow/require-approval/deny policies fully implemented
+- **Session-Aware Tools**: ToolExecutor now enforces policies based on session configuration
+- **Type Safety**: Full TypeScript strict mode compliance with Zod validation
+- **Test Coverage**: 11 comprehensive tests across both completed tasks
+- **Clean Architecture**: Proper separation of concerns and error handling
 
 ### Dependencies Resolved:
 - ✅ **Phase 2 → Phase 1**: All Phase 2 tasks now have required Project class session methods
-- ✅ **Configuration Management → Session Management**: Can now manage session config with full session CRUD
-- ✅ **Tool Policies → Configuration**: Can build on configuration framework
-- ✅ **API Endpoints → Core Methods**: Can create APIs with underlying functionality
+- ✅ **Configuration Management → Session Management**: Full session config management implemented
+- ✅ **Tool Policies → Configuration**: Policy enforcement built on configuration framework
+- ✅ **Core Logic → API Endpoints**: Can now create APIs with underlying functionality
 
 ### Estimated Timeline:
-- ✅ **Phase 1 Task 1.9 Completion**: COMPLETED (5 Project class methods implemented)
-- 🔄 **Phase 2 Full Implementation**: 3-5 days (can begin immediately)
+- ✅ **Phase 2 Core Tasks**: COMPLETED (Tasks 2.1, 2.2, 2.3)
+- 🔄 **Phase 2 API Tasks**: 1-2 days remaining (Tasks 2.4, 2.5)
 
-**Recommendation**: Phase 2 development can begin immediately with Task 2.1 (Project Configuration Management).
+**Recommendation**: Phase 2 API development can begin immediately with Task 2.4 (Configuration API Endpoints).
 
-## Phase 2 Goals (Now Ready to Implement)
+## Phase 2 Goals Summary
 
-With Phase 1 complete, Phase 2 will add:
+### ✅ COMPLETED Core Features:
 
-1. **Project Configuration Management**: Configuration inheritance from project to session
-2. **Tool Policy Enforcement**: Allow/require-approval/deny policies enforced at ToolExecutor level
-3. **Session Working Directory Override**: Sessions can override project working directory
-4. **Configuration API Endpoints**: REST endpoints for managing project and session configuration
-5. **Session Update Endpoints**: Comprehensive endpoints for session metadata and working directory updates
+1. **✅ Project Configuration Management**: Configuration inheritance from project to session
+2. **✅ Tool Policy Enforcement**: Allow/require-approval/deny policies enforced at ToolExecutor level
+3. **✅ Session Working Directory Override**: Sessions can override project working directory
 
-**Expected Capabilities**:
-- Hierarchical configuration inheritance (project → session)
-- Tool usage policies with approval workflows
-- Per-session working directory customization
+### 🔄 REMAINING API Features:
+
+4. **🔄 Configuration API Endpoints**: REST endpoints for managing project and session configuration
+5. **🔄 Session Update Endpoints**: Comprehensive endpoints for session metadata and working directory updates
+
+### ✅ Implemented Capabilities:
+- **Hierarchical configuration inheritance** (project → session) ✅
+- **Tool usage policies with approval workflows** ✅
+- **Per-session working directory customization** ✅
+- **Type-safe configuration validation** ✅
+- **Comprehensive test coverage** ✅
+- **Clean error handling** ✅
+
+### 🔄 Remaining Capabilities:
 - Complete REST API for configuration management
-- Validation and error handling for all configuration operations
+- Session update endpoints with validation
+- Configuration API documentation
