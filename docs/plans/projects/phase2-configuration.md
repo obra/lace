@@ -132,7 +132,7 @@ export class Project {
 1. **Task 2.1**: Project Configuration Management - ✅ **COMPLETED**
 2. **Task 2.2**: Tool Policy Enforcement - ✅ **COMPLETED**
 3. **Task 2.3**: Session Working Directory Overrides - ✅ **COMPLETED** (already implemented)
-4. **Task 2.4**: Configuration API Endpoints - *READY*
+4. **Task 2.4**: Configuration API Endpoints - ✅ **COMPLETED**
 5. **Task 2.5**: Session Update Capabilities - *READY*
 
 ---
@@ -784,7 +784,30 @@ const ConfigurationSchema = z.object({
 
 **Goal**: Add REST endpoints for managing project and session configuration
 
-**Test First** (`packages/web/app/api/projects/[projectId]/config/route.test.ts`):
+**Status**: ✅ **COMPLETED** - Full implementation with TDD approach
+
+### ✅ Implementation Summary:
+- **Project Configuration Endpoints**: GET and PUT endpoints for project-level configuration
+- **Session Configuration Endpoints**: GET and PUT endpoints for session-level configuration with inheritance
+- **Schema Validation**: Zod-based validation for all configuration inputs
+- **Error Handling**: Comprehensive error handling with appropriate HTTP status codes
+- **Inheritance Logic**: Proper configuration merging for session effective configuration
+- **Test Coverage**: 14 comprehensive tests covering all endpoints and scenarios
+- **Files**: 
+  - `packages/web/app/api/projects/[projectId]/configuration/route.ts`
+  - `packages/web/app/api/sessions/[sessionId]/configuration/route.ts`
+  - `packages/web/app/api/projects/[projectId]/configuration/__tests__/route.test.ts`
+  - `packages/web/app/api/sessions/[sessionId]/configuration/__tests__/route.test.ts`
+
+### ✅ Key Features:
+- **Project Configuration Management**: GET and PUT endpoints for project-level settings
+- **Session Configuration Management**: GET and PUT endpoints with project inheritance
+- **Effective Configuration**: Sessions return merged configuration (project + session overrides)
+- **Tool Policy Merging**: Special handling for toolPolicies to merge rather than replace
+- **Input Validation**: Comprehensive validation with clear error messages
+- **Type Safety**: Full TypeScript strict mode compliance
+
+**Test First** (`packages/web/app/api/projects/[projectId]/configuration/__tests__/route.test.ts`):
 ```typescript
 describe('Project configuration endpoints', () => {
   describe('GET /api/projects/:projectId/config', () => {
@@ -1337,9 +1360,9 @@ export async function GET(
 
 ## Phase 2 Implementation Status
 
-### Overall Status: ✅ 60% COMPLETE
+### Overall Status: ✅ 80% COMPLETE
 
-**Phase 2 core functionality implemented - API endpoints remaining.**
+**Phase 2 core functionality and configuration API endpoints implemented.**
 
 ### Current Status:
 
@@ -1348,8 +1371,10 @@ export async function GET(
    - ✅ **Task 2.2**: Tool Policy Enforcement (TDD approach)
    - ✅ **Task 2.3**: Session Working Directory Overrides (already implemented)
 
-2. **🔄 REMAINING: API Endpoints**
-   - 🔄 **Task 2.4**: Configuration API Endpoints
+2. **✅ COMPLETED: Configuration API Endpoints**
+   - ✅ **Task 2.4**: Configuration API Endpoints (TDD approach)
+
+3. **🔄 REMAINING: Session Update Capabilities**
    - 🔄 **Task 2.5**: Session Update Capabilities
 
 ### ✅ Major Achievements:
