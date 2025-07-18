@@ -39,8 +39,8 @@ export function GET(request: NextRequest, { params }: { params: { sessionId: str
     // Merge toolPolicies separately to avoid overriding all policies
     if (projectConfig.toolPolicies || sessionConfig.toolPolicies) {
       configuration.toolPolicies = {
-        ...((projectConfig.toolPolicies as Record<string, string>) || {}),
-        ...((sessionConfig.toolPolicies as Record<string, string>) || {}),
+        ...((projectConfig.toolPolicies as Record<string, 'allow' | 'require-approval' | 'deny'>) || {}),
+        ...((sessionConfig.toolPolicies as Record<string, 'allow' | 'require-approval' | 'deny'>) || {}),
       };
     }
 
@@ -71,8 +71,8 @@ export async function PUT(request: NextRequest, { params }: { params: { sessionI
     // Merge toolPolicies separately to avoid overriding all policies
     if (currentConfig.toolPolicies || validatedData.toolPolicies) {
       newConfig.toolPolicies = {
-        ...((currentConfig.toolPolicies as Record<string, string>) || {}),
-        ...((validatedData.toolPolicies as Record<string, string>) || {}),
+        ...((currentConfig.toolPolicies as Record<string, 'allow' | 'require-approval' | 'deny'>) || {}),
+        ...((validatedData.toolPolicies as Record<string, 'allow' | 'require-approval' | 'deny'>) || {}),
       };
     }
 
@@ -99,8 +99,8 @@ export async function PUT(request: NextRequest, { params }: { params: { sessionI
     // Merge toolPolicies for response
     if (projectConfig.toolPolicies || newConfig.toolPolicies) {
       configuration.toolPolicies = {
-        ...((projectConfig.toolPolicies as Record<string, string>) || {}),
-        ...((newConfig.toolPolicies as Record<string, string>) || {}),
+        ...((projectConfig.toolPolicies as Record<string, 'allow' | 'require-approval' | 'deny'>) || {}),
+        ...((newConfig.toolPolicies as Record<string, 'allow' | 'require-approval' | 'deny'>) || {}),
       };
     }
 

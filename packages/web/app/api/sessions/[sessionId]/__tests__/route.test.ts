@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET } from '@/app/api/sessions/[sessionId]/route';
+import { GET, PATCH } from '@/app/api/sessions/[sessionId]/route';
 import type { ThreadId, Session } from '@/types/api';
 import {
   setupTestPersistence,
@@ -34,7 +34,7 @@ vi.mock('~/providers/registry', () => ({
           usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
         }),
         createStreamingResponse: vi.fn().mockReturnValue({
-          async *[Symbol.asyncIterator]() {
+          *[Symbol.asyncIterator]() {
             yield { type: 'content', content: 'Mock streaming response' };
           },
         }),
@@ -188,6 +188,183 @@ describe('Session Detail API Route', () => {
       });
       const data = (await response.json()) as { error: string };
 
+      expect(response.status).toBe(404);
+      expect(data.error).toBe('Session not found');
+    });
+  });
+
+  describe('PATCH /api/sessions/[sessionId]', () => {
+    it('should update session metadata', async () => {
+      // Create a test project first
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
+      const projectId = testProject.getId();
+
+      // Create a real session using the session service
+      const session = await sessionService.createSession(
+        'Original Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
+      const sessionId = session.id as ThreadId;
+
+      const updates = {
+        name: 'Updated Session Name',
+        description: 'Updated description',
+        status: 'archived',
+      };
+
+      const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ sessionId: String(sessionId) }),
+      });
+
+      if (response.status !== 200) {
+        const errorData = (await response.json()) as { error: string };
+        console.error('PATCH failed with status:', response.status);
+        console.error('Error data:', errorData);
+        // Don't throw - let the test assertion handle the failure
+      }
+      expect(response.status).toBe(200);
+
+      const data = (await response.json()) as { session: Session };
+      expect(data.session).toEqual(
+        expect.objectContaining({
+          id: sessionId,
+          name: 'Updated Session Name',
+          description: 'Updated description',
+          status: 'archived',
+        })
+      );
+    });
+
+    it('should return 404 for non-existent session', async () => {
+      const sessionId: ThreadId = createThreadId('non_existent');
+
+      const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: 'Updated Name' }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ sessionId: String(sessionId) }),
+      });
+
+      const data = (await response.json()) as { error: string };
+      expect(response.status).toBe(404);
+      expect(data.error).toBe('Session not found');
+    });
+
+    it('should validate request data', async () => {
+      // Create a test project first
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
+      const projectId = testProject.getId();
+
+      // Create a real session using the session service
+      const session = await sessionService.createSession(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
+      const sessionId = session.id as ThreadId;
+
+      const invalidUpdates = {
+        name: '', // Empty name should be invalid
+        status: 'invalid-status', // Invalid status should be invalid
+      };
+
+      const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(invalidUpdates),
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ sessionId: String(sessionId) }),
+      });
+
+      const data = (await response.json()) as { error: string; details?: unknown };
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Invalid request data');
+      expect(data.details).toBeDefined();
+    });
+
+    it('should handle partial updates', async () => {
+      // Create a test project first
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
+      const projectId = testProject.getId();
+
+      // Create a real session using the session service
+      const session = await sessionService.createSession(
+        'Original Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
+      const sessionId = session.id as ThreadId;
+
+      // Only update name, leaving description and status unchanged
+      const partialUpdates = {
+        name: 'Partially Updated Session',
+      };
+
+      const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(partialUpdates),
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ sessionId: String(sessionId) }),
+      });
+
+      expect(response.status).toBe(200);
+
+      const data = (await response.json()) as { session: Session };
+      expect(data.session).toEqual(
+        expect.objectContaining({
+          id: sessionId,
+          name: 'Partially Updated Session',
+        })
+      );
+    });
+
+    it('should handle update errors gracefully', async () => {
+      const sessionId: ThreadId = createThreadId('invalid_session_id');
+
+      const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: 'Updated Name' }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ sessionId: String(sessionId) }),
+      });
+
+      const data = (await response.json()) as { error: string };
       expect(response.status).toBe(404);
       expect(data.error).toBe('Session not found');
     });

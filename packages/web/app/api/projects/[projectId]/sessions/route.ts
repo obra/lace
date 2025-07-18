@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
+import { getSessionService } from '@/lib/server/session-service';
 import { z } from 'zod';
 
 const CreateSessionSchema = z.object({
@@ -39,10 +40,13 @@ export async function POST(request: NextRequest, { params }: { params: { project
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const session = project.createSession(
+    // Use sessionService to create session, which handles both database and in-memory management
+    const sessionService = getSessionService();
+    const session = await sessionService.createSession(
       validatedData.name,
-      validatedData.description || '',
-      validatedData.configuration || {}
+      validatedData.configuration?.provider as string || 'anthropic',
+      validatedData.configuration?.model as string || 'claude-3-haiku-20240307',
+      params.projectId
     );
 
     return NextResponse.json({ session }, { status: 201 });

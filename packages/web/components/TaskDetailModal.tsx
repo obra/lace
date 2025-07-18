@@ -2,7 +2,7 @@
 // ABOUTME: Provides detailed view, editing capabilities, and note management
 
 import React, { useState } from 'react';
-import type { Task } from '@/types/api';
+import type { Task, AssigneeId } from '@/types/api';
 import { TaskNotes } from '@/components/TaskNotes';
 
 interface TaskDetailModalProps {
@@ -44,7 +44,7 @@ export function TaskDetailModal({
         priority: editForm.priority,
         status: editForm.status,
         ...(editForm.description && { description: editForm.description }),
-        ...(editForm.assignedTo && { assignedTo: editForm.assignedTo }),
+        ...(editForm.assignedTo && { assignedTo: editForm.assignedTo as AssigneeId }),
       };
       await onUpdate(task.id, updateData);
       setEditing(false);

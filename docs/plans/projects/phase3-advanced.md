@@ -12,7 +12,7 @@
 
 ---
 
-## Task 3.1: Token Budget Management
+## Task 3.1: Token Budget Management - DO NOT IMPLEMENT
 
 **Goal**: Implement per-project token budget tracking and enforcement
 

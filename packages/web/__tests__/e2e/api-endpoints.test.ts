@@ -5,7 +5,7 @@
  * @vitest-environment node
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import {
   setupTestPersistence,
@@ -33,11 +33,13 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 // Import the real API route handlers after mocks
-import { POST as createSession, GET as listSessions } from '@/app/api/sessions/route';
+import { GET as listSessions } from '@/app/api/sessions/route';
 import { GET as getSession } from '@/app/api/sessions/[sessionId]/route';
 import { POST as spawnAgent } from '@/app/api/sessions/[sessionId]/agents/route';
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
+import { POST as createProjectSession } from '@/app/api/projects/[projectId]/sessions/route';
 import { getSessionService } from '@/lib/server/session-service';
+import { Project } from '@/lib/server/lace-imports';
 import type { Session as SessionType, ThreadId } from '@/types/api';
 
 describe('API Endpoints E2E Tests', () => {
@@ -57,25 +59,42 @@ describe('API Endpoints E2E Tests', () => {
   });
 
   afterEach(() => {
-    sessionService.clearActiveSessions();
-    // Clear global singleton
-    global.sessionService = undefined;
+    // Clear active sessions to prevent test pollution
+    if (sessionService) {
+      sessionService.clearActiveSessions();
+    }
+    // Clear persistence to reset database state
     teardownTestPersistence();
+  });
+  
+  afterAll(() => {
+    // Clear everything after all tests are done
+    if (sessionService) {
+      sessionService.clearActiveSessions();
+    }
+    global.sessionService = undefined;
   });
 
   describe('Session Management API Flow', () => {
     it('should create session via API', async () => {
-      const request = new NextRequest('http://localhost/api/sessions', {
+      // First create a project
+      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const projectId = testProject.getId();
+
+      const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'API Test Session',
-          provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
+          description: 'Test session description',
+          configuration: {
+            provider: 'anthropic',
+            model: 'claude-3-haiku-20240307',
+          },
         }),
       });
 
-      const response = await createSession(request);
+      const response = await createProjectSession(request, { params: { projectId } });
       expect(response.status).toBe(201);
 
       const data = (await response.json()) as { session: SessionType };
@@ -89,8 +108,10 @@ describe('API Endpoints E2E Tests', () => {
     });
 
     it('should list sessions via API', async () => {
-      // Create a session first using the real service
-      await sessionService.createSession('Listable Session');
+      // Create a project and session first
+      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const projectId = testProject.getId();
+      await sessionService.createSession('Listable Session', 'anthropic', 'claude-3-haiku-20240307', projectId);
 
       // List sessions via API
       const listRequest = new NextRequest('http://localhost/api/sessions', {
@@ -106,8 +127,10 @@ describe('API Endpoints E2E Tests', () => {
     });
 
     it('should get specific session via API', async () => {
-      // Create a session using real service
-      const session = await sessionService.createSession('Specific Session');
+      // Create a project and session first
+      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const projectId = testProject.getId();
+      const session = await sessionService.createSession('Specific Session', 'anthropic', 'claude-3-haiku-20240307', projectId);
       const sessionId = session.id as ThreadId;
 
       // Get specific session via API
@@ -131,7 +154,9 @@ describe('API Endpoints E2E Tests', () => {
 
     beforeEach(async () => {
       // Create a session for agent tests using real service
-      const session = await sessionService.createSession('Agent Test Session');
+      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const projectId = testProject.getId();
+      const session = await sessionService.createSession('Agent Test Session', 'anthropic', 'claude-3-haiku-20240307', projectId);
       sessionId = session.id as string;
     });
 
@@ -192,8 +217,10 @@ describe('API Endpoints E2E Tests', () => {
     let agentThreadId: string;
 
     beforeEach(async () => {
-      // Create session and agent using real services
-      const session = await sessionService.createSession('Message Test Session');
+      // Create session and agent fresh for each test to avoid state pollution
+      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const projectId = testProject.getId();
+      const session = await sessionService.createSession('Message Test Session', 'anthropic', 'claude-3-haiku-20240307', projectId);
       sessionId = session.id as string;
 
       const agent = await sessionService.spawnAgent(
@@ -205,6 +232,17 @@ describe('API Endpoints E2E Tests', () => {
     });
 
     it('should accept message via API', async () => {
+      // Debug the session and agent state
+      
+      // Check if session exists
+      await sessionService.getSession(sessionId as ThreadId);
+      
+      // Ensure the agent is properly available
+      const agent = sessionService.getAgent(agentThreadId);
+      if (!agent) {
+        throw new Error(`Agent not found for threadId: ${agentThreadId}. Cannot proceed with message test.`);
+      }
+      
       const request = new NextRequest(`http://localhost/api/threads/${agentThreadId}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -214,6 +252,12 @@ describe('API Endpoints E2E Tests', () => {
       const response = await sendMessage(request, {
         params: Promise.resolve({ threadId: agentThreadId }),
       });
+      
+      if (response.status !== 202) {
+        const _errorData = (await response.json()) as { error: string };
+        // If agent not found, check if it's really there
+        const _agent = sessionService.getAgent(agentThreadId);
+      }
       expect(response.status).toBe(202);
 
       const data = (await response.json()) as { status: string; threadId: string };
@@ -248,13 +292,17 @@ describe('API Endpoints E2E Tests', () => {
     });
 
     it('should handle malformed JSON in createSession', async () => {
-      const request = new NextRequest('http://localhost/api/sessions', {
+      // Test the project-based session creation with malformed JSON
+      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const projectId = testProject.getId();
+      
+      const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: 'invalid json',
       });
 
-      const response = await createSession(request);
+      const response = await createProjectSession(request, { params: { projectId } });
       expect(response.status).toBe(500); // JSON parsing error is caught by outer try-catch
     });
 

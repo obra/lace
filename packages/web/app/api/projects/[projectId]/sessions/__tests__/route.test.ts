@@ -17,6 +17,15 @@ vi.mock('@/lib/server/lace-imports', () => ({
   },
 }));
 
+// Mock sessionService
+const mockSessionService = {
+  createSession: vi.fn(),
+};
+
+vi.mock('@/lib/server/session-service', () => ({
+  getSessionService: () => mockSessionService,
+}));
+
 // Mock generateId
 vi.mock('@/lib/utils/id-generator', () => ({
   generateId: vi.fn(() => 'test-session-id'),
@@ -126,16 +135,12 @@ describe('Session API endpoints under projects', () => {
     it('should create session in project', async () => {
       const mockSession = {
         id: 'test-session-id',
-        projectId: 'project1',
         name: 'New Session',
-        description: 'A new session',
-        configuration: { provider: 'anthropic' },
-        status: 'active',
-        createdAt: new Date('2023-01-01'),
-        updatedAt: new Date('2023-01-01'),
+        createdAt: '2023-01-01T00:00:00.000Z',
+        agents: [],
       };
 
-      mockProject.createSession.mockReturnValue(mockSession);
+      mockSessionService.createSession.mockResolvedValue(mockSession);
 
       const request = new NextRequest('http://localhost/api/projects/project1/sessions', {
         method: 'POST',
@@ -154,10 +159,12 @@ describe('Session API endpoints under projects', () => {
       expect(response.status).toBe(201);
       expect(data.session.id).toBe('test-session-id');
       expect(data.session.name).toBe('New Session');
-      expect(data.session.projectId).toBe('project1');
-      expect(mockProject.createSession).toHaveBeenCalledWith('New Session', 'A new session', {
-        provider: 'anthropic',
-      });
+      expect(mockSessionService.createSession).toHaveBeenCalledWith(
+        'New Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        'project1'
+      );
     });
 
     it('should return 404 when project not found', async () => {
@@ -210,16 +217,12 @@ describe('Session API endpoints under projects', () => {
     it('should use default values for optional fields', async () => {
       const mockSession = {
         id: 'test-session-id',
-        projectId: 'project1',
         name: 'Minimal Session',
-        description: '',
-        configuration: {},
-        status: 'active',
-        createdAt: new Date('2023-01-01'),
-        updatedAt: new Date('2023-01-01'),
+        createdAt: '2023-01-01T00:00:00.000Z',
+        agents: [],
       };
 
-      mockProject.createSession.mockReturnValue(mockSession);
+      mockSessionService.createSession.mockResolvedValue(mockSession);
 
       const request = new NextRequest('http://localhost/api/projects/project1/sessions', {
         method: 'POST',
@@ -230,18 +233,16 @@ describe('Session API endpoints under projects', () => {
 
       const response = await POST(request, { params: { projectId: 'project1' } });
       const data = (await response.json()) as {
-        session: { description: string; configuration: Record<string, unknown> };
+        session: { id: string; name: string };
       };
 
       expect(response.status).toBe(201);
-      expect(data.session.description).toBe('');
-      expect(data.session.configuration).toEqual({});
+      expect(data.session.id).toBe('test-session-id');
+      expect(data.session.name).toBe('Minimal Session');
     });
 
     it('should handle database errors during creation', async () => {
-      mockProject.createSession.mockImplementation(() => {
-        throw new Error('Database error');
-      });
+      mockSessionService.createSession.mockRejectedValue(new Error('Database error'));
 
       const request = new NextRequest('http://localhost/api/projects/project1/sessions', {
         method: 'POST',

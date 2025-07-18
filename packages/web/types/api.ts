@@ -2,7 +2,8 @@
 // ABOUTME: Defines interfaces for sessions, agents, and events
 
 // Import core types from Lace
-export type { ThreadId } from '@/lib/server/lace-imports';
+export type { ThreadId, AssigneeId } from '@/lib/server/lace-imports';
+import type { ThreadId, AssigneeId } from '@/lib/server/lace-imports';
 
 // Define ApprovalDecision locally to avoid import issues
 export const ApprovalDecision = {
@@ -49,7 +50,7 @@ export interface Task {
   prompt: string;
   status: TaskStatus;
   priority: TaskPriority;
-  assignedTo?: ThreadId;
+  assignedTo?: AssigneeId;
   createdBy: ThreadId;
   threadId: ThreadId;
   createdAt: Date | string;

@@ -84,6 +84,8 @@ vi.mock('~/tools/implementations/url-fetch', () => ({
 }));
 
 describe('Session', () => {
+  let testProject: Project;
+
   beforeEach(() => {
     setupTestPersistence();
     vi.clearAllMocks();
@@ -91,6 +93,9 @@ describe('Session', () => {
     // Set up environment for providers
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
+
+    // Create a test project for all tests
+    testProject = Project.create('Test Project', '/test/path', 'Test project', {});
   });
 
   afterEach(() => {
@@ -99,13 +104,23 @@ describe('Session', () => {
 
   describe('create', () => {
     it('should create a session with default parameters', () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       expect(session).toBeInstanceOf(Session);
       expect(session.getId()).toBeDefined();
     });
 
     it('should create a session with custom parameters', () => {
-      const session = Session.create('Custom Session', 'anthropic', 'claude-3-haiku-20240307');
+      const session = Session.create(
+        'Custom Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       expect(session).toBeInstanceOf(Session);
       expect(session.getId()).toBeDefined();
     });
@@ -113,7 +128,12 @@ describe('Session', () => {
 
   describe('getId', () => {
     it('should return the session thread ID', () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       const id = session.getId();
       expect(id).toBeDefined();
       expect(typeof id).toBe('string');
@@ -122,7 +142,12 @@ describe('Session', () => {
 
   describe('getInfo', () => {
     it('should return session information', () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       const info = session.getInfo();
 
       expect(info).toEqual({
@@ -146,7 +171,12 @@ describe('Session', () => {
 
   describe('spawnAgent', () => {
     it('should spawn an agent using the session agent', () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       const agent = session.spawnAgent('Test Agent');
 
       expect(agent).toBeDefined();
@@ -154,7 +184,12 @@ describe('Session', () => {
     });
 
     it('should store the spawned agent', () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       session.spawnAgent('Test Agent');
 
       const agents = session.getAgents();
@@ -171,7 +206,12 @@ describe('Session', () => {
 
   describe('getAgents', () => {
     it('should return coordinator agent when no agents spawned', () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       const agents = session.getAgents();
 
       expect(agents).toHaveLength(1);
@@ -187,7 +227,12 @@ describe('Session', () => {
     });
 
     it('should return spawned agents', () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       const agent1 = session.spawnAgent('Agent 1');
 
       // Due to mocking limitations, multiple agents may have the same thread ID
@@ -217,20 +262,35 @@ describe('Session', () => {
 
   describe('getAgent', () => {
     it('should return null for non-existent agent', () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       const agent = session.getAgent(asThreadId('non-existent'));
       expect(agent).toBeNull();
     });
 
     it('should return spawned agent', () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       const spawnedAgent = session.spawnAgent('Test Agent');
       const retrievedAgent = session.getAgent(asThreadId(spawnedAgent.threadId));
       expect(retrievedAgent).toBe(spawnedAgent);
     });
 
     it('should return coordinator agent', () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       const coordinatorAgent = session.getAgent(session.getId());
       expect(coordinatorAgent).toBeDefined();
       expect(coordinatorAgent!.threadId).toBe(session.getId());
@@ -239,7 +299,12 @@ describe('Session', () => {
 
   describe('startAgent', () => {
     it('should start an agent', async () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       const spawnedAgent = session.spawnAgent('Test Agent');
 
       // Should not throw
@@ -247,7 +312,12 @@ describe('Session', () => {
     });
 
     it('should throw error for non-existent agent', async () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       await expect(session.startAgent(asThreadId('non-existent'))).rejects.toThrow(
         'Agent not found: non-existent'
       );
@@ -256,7 +326,12 @@ describe('Session', () => {
 
   describe('stopAgent', () => {
     it('should stop an agent', () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       const spawnedAgent = session.spawnAgent('Test Agent');
 
       // Should not throw
@@ -264,7 +339,12 @@ describe('Session', () => {
     });
 
     it('should throw error for non-existent agent', () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       expect(() => session.stopAgent(asThreadId('non-existent'))).toThrow(
         'Agent not found: non-existent'
       );
@@ -273,7 +353,12 @@ describe('Session', () => {
 
   describe('sendMessage', () => {
     it('should send message to agent', async () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       const spawnedAgent = session.spawnAgent('Test Agent');
 
       // Start the agent first
@@ -292,7 +377,12 @@ describe('Session', () => {
     });
 
     it('should throw error for non-existent agent', async () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       await expect(session.sendMessage(asThreadId('non-existent'), 'Hello')).rejects.toThrow(
         'Agent not found: non-existent'
       );
@@ -301,7 +391,12 @@ describe('Session', () => {
 
   describe('destroy', () => {
     it('should stop all agents and clear them', () => {
-      const session = Session.create('Test Session');
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
       const agent1 = session.spawnAgent('Agent 1');
       const agent2 = session.spawnAgent('Agent 2');
 

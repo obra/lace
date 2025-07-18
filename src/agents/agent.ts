@@ -1342,7 +1342,7 @@ export class Agent extends EventEmitter {
 
   // Thread management API - proxies to ThreadManager
   getCurrentThreadId(): string | null {
-    return this._threadManager.getCurrentThreadId();
+    return this._threadId;
   }
 
   getThreadEvents(threadId?: string): ThreadEvent[] {
@@ -1407,8 +1407,8 @@ export class Agent extends EventEmitter {
     provider?: AIProvider,
     tokenBudget?: TokenBudgetConfig
   ): Agent {
-    // Get current thread as parent
-    const parentThreadId = this.getCurrentThreadId();
+    // Use this agent's thread ID as parent (not ThreadManager's current thread)
+    const parentThreadId = this._threadId;
     if (!parentThreadId) {
       throw new Error('No active thread for delegation');
     }
@@ -1435,7 +1435,7 @@ export class Agent extends EventEmitter {
    * Used for error messages, notifications, etc.
    */
   addSystemMessage(message: string, threadId?: string): ThreadEvent {
-    const targetThreadId = threadId || this.getCurrentThreadId();
+    const targetThreadId = threadId || this._threadId;
     if (!targetThreadId) {
       throw new Error('No active thread available for system message');
     }

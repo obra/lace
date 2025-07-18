@@ -21,12 +21,21 @@ export class SessionService {
     // No need for direct ThreadManager access - use Agent methods instead
   }
 
-  async createSession(name?: string, provider?: string, model?: string): Promise<SessionType> {
-    // Create session using shared logic with defaults
+  async createSession(name: string, provider: string, model: string, projectId: string): Promise<SessionType> {
+    
+    // Create project-based session
+    const { Project } = await import('@/lib/server/lace-imports');
+    const project = Project.getById(projectId);
+    if (!project) {
+      throw new Error('Project not found');
+    }
+    
+    // Create session using Session.createWithDefaults which handles both database and thread creation
     const session = await Session.createWithDefaults({
       name,
       provider,
       model,
+      projectId,
     });
 
     const sessionId = session.getId();

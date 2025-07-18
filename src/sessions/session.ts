@@ -73,7 +73,7 @@ export class Session {
     name: string,
     provider = 'anthropic',
     model = 'claude-3-haiku-20240307',
-    projectId?: string // NEW: Add project support
+    projectId: string // REQUIRED: All sessions must be project-based
   ): Session {
     // Create provider
     const registry = ProviderRegistry.createWithAutoDiscovery();
@@ -82,29 +82,21 @@ export class Session {
     // Create thread manager
     const threadManager = new ThreadManager();
 
-    // Create session record in sessions table if projectId provided
-    let threadId: string;
-    if (projectId) {
-      // Create session in sessions table first
-      const sessionData = {
-        id: randomUUID(),
-        projectId,
-        name,
-        description: '',
-        configuration: { provider, model },
-        status: 'active' as const,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      Session.createSession(sessionData);
+    // Create session record in sessions table
+    const sessionData = {
+      id: randomUUID(),
+      projectId,
+      name,
+      description: '',
+      configuration: { provider, model },
+      status: 'active' as const,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    Session.createSession(sessionData);
 
-      // Create thread for this session
-      threadId = threadManager.createThread(sessionData.id, projectId);
-    } else {
-      // Legacy behavior - use resumeOrCreate for non-project sessions
-      const sessionInfo = threadManager.resumeOrCreate();
-      threadId = sessionInfo.threadId;
-    }
+    // Create thread for this session
+    const threadId = threadManager.createThread(sessionData.id, projectId);
 
     // Create TaskManager using global persistence
     const taskManager = new TaskManager(asThreadId(threadId), getPersistence());
@@ -122,15 +114,13 @@ export class Session {
       tools: toolExecutor.getAllTools(),
     });
 
-    // Mark the agent's thread as a session thread (legacy for non-project sessions)
-    if (!projectId) {
-      sessionAgent.updateThreadMetadata({
-        isSession: true,
-        name,
-        provider,
-        model,
-      });
-    }
+    // Mark the agent's thread as a session thread
+    sessionAgent.updateThreadMetadata({
+      isSession: true,
+      name,
+      provider,
+      model,
+    });
 
     const session = new Session(sessionAgent, projectId);
     // Update the session's task manager to use the one we created
@@ -155,19 +145,28 @@ export class Session {
   static async getById(sessionId: ThreadId): Promise<Session | null> {
     logger.debug(`Session.getById called for sessionId: ${sessionId}`);
 
+    // Get session from the sessions table
+    const sessionData = Session.getSession(sessionId);
+    if (!sessionData) {
+      logger.warn(`Session not found in database: ${sessionId}`);
+      return null;
+    }
+
+    // Get the thread (which should exist since we created it)
     const threadManager = new ThreadManager();
     const thread = threadManager.getThread(sessionId);
 
-    if (!thread || !thread.metadata?.isSession) {
-      logger.warn(`Thread not found or not a session: ${sessionId}`);
+    if (!thread) {
+      logger.warn(`Thread not found for session: ${sessionId}`);
       return null;
     }
 
     logger.debug(`Reconstructing session agent for ${sessionId}`);
 
-    // Reconstruct the session agent from the existing thread
-    const provider = (thread.metadata.provider as string) || 'anthropic';
-    const model = (thread.metadata.model as string) || 'claude-3-haiku-20240307';
+    // Get provider and model from session configuration
+    const sessionConfig = sessionData.configuration || {};
+    const provider = (sessionConfig.provider as string) || 'anthropic';
+    const model = (sessionConfig.model as string) || 'claude-3-haiku-20240307';
 
     // Create provider and tool executor (same as Agent.createSession)
     const registry = ProviderRegistry.createWithAutoDiscovery();
@@ -197,7 +196,7 @@ export class Session {
     // Set this as the current thread for delegate creation
     threadManager.setCurrentThread(sessionId);
 
-    const session = new Session(sessionAgent);
+    const session = new Session(sessionAgent, sessionData.projectId);
 
     // Load delegate threads (child agents) for this session
     const delegateThreadIds = threadManager.getThreadsForSession(sessionId);
@@ -577,21 +576,20 @@ export class Session {
     this._agents.clear();
   }
 
-  static async createWithDefaults(
-    options: {
-      name?: string;
-      provider?: string;
-      model?: string;
-      approvalCallback?: ApprovalCallback;
-    } = {}
-  ): Promise<Session> {
+  static async createWithDefaults(options: {
+    name?: string;
+    provider?: string;
+    model?: string;
+    projectId: string; // REQUIRED: All sessions must be project-based
+    approvalCallback?: ApprovalCallback;
+  }): Promise<Session> {
     // Use existing logic for provider/model detection
     const provider = options.provider || Session.detectDefaultProvider();
     const model = options.model || Session.getDefaultModel(provider);
     const name = options.name || Session.generateSessionName();
 
     // Create session using existing create method
-    const session = Session.create(name, provider, model);
+    const session = Session.create(name, provider, model, options.projectId);
 
     // Set up coordinator agent with approval callback if provided
     const coordinatorAgent = session.getAgent(session.getId());

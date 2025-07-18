@@ -533,14 +533,14 @@ export class DatabasePersistence {
     if (this._disabled || !this.db) return [];
 
     const stmt = this.db.prepare(`
-      SELECT DISTINCT thread_id FROM events 
-      WHERE thread_id LIKE ? 
-      ORDER BY thread_id ASC
+      SELECT DISTINCT id FROM threads 
+      WHERE id LIKE ? 
+      ORDER BY id ASC
     `);
 
     const pattern = `${parentThreadId}.%`;
-    const rows = stmt.all(pattern) as Array<{ thread_id: string }>;
-    return rows.map((row) => row.thread_id);
+    const rows = stmt.all(pattern) as Array<{ id: string }>;
+    return rows.map((row) => row.id);
   }
 
   getAllThreadsWithMetadata(): Thread[] {

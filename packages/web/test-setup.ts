@@ -14,3 +14,6 @@ expect.extend(matchers);
 vi.mock('server-only', () => {
   return {};
 });
+
+// Ensure global expects are available for all tests
+(global as typeof globalThis & { expect: typeof expect }).expect = expect;

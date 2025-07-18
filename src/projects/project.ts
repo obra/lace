@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 import { getPersistence, ProjectData, DatabasePersistence } from '~/persistence/database';
 import { logger } from '~/utils/logger';
 import { ThreadManager } from '~/threads/thread-manager';
-import { Configuration } from '~/sessions/session';
+import type { Configuration } from '~/sessions/session';
 
 export interface ProjectInfo {
   id: string;
@@ -205,6 +205,7 @@ export class Project {
     description = '',
     configuration: Record<string, unknown> = {}
   ): import('~/persistence/database').SessionData {
+    // Create session directly in database only - threads will be created by SessionService
     const persistence = getPersistence();
 
     const sessionData: import('~/persistence/database').SessionData = {

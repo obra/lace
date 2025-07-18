@@ -10,10 +10,11 @@ export { ToolExecutor } from '~/tools/executor';
 export { DelegateTool } from '~/tools/implementations/delegate';
 export { Session } from '~/sessions/session';
 export { Project } from '~/projects/project';
+export { ThreadManager } from '~/threads/thread-manager';
 export type { TaskFilters } from '~/tasks/types';
 
 // Types and constants
-export type { ThreadId } from '~/threads/types';
+export type { ThreadId, AssigneeId } from '~/threads/types';
 export type { ThreadEvent, EventType } from '~/threads/types';
 export { ApprovalDecision } from '~/tools/approval-types';
 export type { ApprovalCallback } from '~/tools/approval-types';
