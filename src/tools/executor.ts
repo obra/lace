@@ -4,6 +4,7 @@
 import { ToolResult, ToolContext, ToolCall, createErrorResult } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
+import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { FileWriteTool } from '~/tools/implementations/file-write';
@@ -26,6 +27,11 @@ import { UrlFetchTool } from '~/tools/implementations/url-fetch';
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
   private approvalCallback?: ApprovalCallback;
+  private envManager: ProjectEnvironmentManager;
+
+  constructor() {
+    this.envManager = new ProjectEnvironmentManager();
+  }
 
   registerTool(name: string, tool: Tool): void {
     this.tools.set(name, tool);
@@ -55,6 +61,10 @@ export class ToolExecutor {
 
   getApprovalCallback(): ApprovalCallback | undefined {
     return this.approvalCallback;
+  }
+
+  getEnvironmentManager(): ProjectEnvironmentManager {
+    return this.envManager;
   }
 
   registerAllAvailableTools(): void {
@@ -148,7 +158,16 @@ export class ToolExecutor {
     call: ToolCall,
     context?: ToolContext
   ): Promise<ToolResult> {
+    // Set up environment for tool execution
+    const originalEnv = process.env;
+
     try {
+      // Apply project environment variables if projectId is available
+      if (context?.projectId) {
+        const projectEnv = this.envManager.getMergedEnvironment(context.projectId);
+        process.env = projectEnv;
+      }
+
       const result = await tool.execute(call.arguments, context);
 
       // Ensure the result has the call ID if it wasn't set by the tool
@@ -161,6 +180,9 @@ export class ToolExecutor {
         error instanceof Error ? error.message : 'Unknown error occurred',
         call.id
       );
+    } finally {
+      // Restore original environment
+      process.env = originalEnv;
     }
   }
 }
