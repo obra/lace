@@ -500,6 +500,10 @@ export class SessionService {
     Session.updateSession(sessionId, updates);
   }
 
+  async getSessionData(sessionId: ThreadId): Promise<Record<string, unknown> | null> {
+    return Session.getSession(sessionId);
+  }
+
   // Test helper method to clear active sessions
   clearActiveSessions(): void {
     activeSessions.clear();

@@ -25,13 +25,23 @@ test.describe('Web UI End-to-End Tests', () => {
         LACE_DB_PATH: ':memory:',
       };
     });
+
+    // Go to home page and create/select a project for all tests
+    await page.goto('/');
+
+    // Create a test project
+    await page.click('[data-testid="create-project-button"]');
+    await page.fill('[data-testid="project-name-input"]', 'E2E Test Project');
+    await page.fill('[data-testid="project-description-input"]', 'Project for E2E testing');
+    await page.click('[data-testid="confirm-create-project"]');
+
+    // Wait for project to be created and selected
+    await expect(page.getByText('E2E Test Project')).toBeVisible();
   });
 
   test.describe('Session Management', () => {
     test('should create a new session and display it in the UI', async ({ page }) => {
-      await page.goto('/');
-
-      // Test session creation
+      // Test session creation (project already selected in beforeEach)
       await page.fill('[data-testid="session-name-input"]', 'E2E Test Session');
       await page.click('[data-testid="create-session-button"]');
 

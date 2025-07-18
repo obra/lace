@@ -125,9 +125,8 @@ export async function PATCH(
       return NextResponse.json(errorResponse, { status: 500 });
     }
 
-    // Get updated session info directly from the Session class to ensure we have the latest database values
-    const { Session } = await import('@/lib/server/lace-imports');
-    const updatedSessionData = Session.getSession(sessionId);
+    // Get updated session data directly from database to ensure we have the latest values
+    const updatedSessionData = await sessionService.getSessionData(sessionId);
     if (!updatedSessionData) {
       const errorResponse: ApiErrorResponse = { error: 'Session not found after update' };
       return NextResponse.json(errorResponse, { status: 500 });
@@ -138,10 +137,10 @@ export async function PATCH(
 
     const sessionData = {
       id: updatedSession.getId(),
-      name: updatedSessionData.name,
-      description: updatedSessionData.description,
-      status: updatedSessionData.status,
-      createdAt: updatedSessionData.createdAt.toISOString(),
+      name: (updatedSessionData as { name: string }).name,
+      description: (updatedSessionData as { description?: string }).description,
+      status: (updatedSessionData as { status?: string }).status,
+      createdAt: (updatedSessionData as { createdAt: Date }).createdAt.toISOString(),
       agents: agents.map((agent) => ({
         threadId: agent.threadId,
         name: agent.name,
