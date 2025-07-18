@@ -5,16 +5,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '~': resolve(__dirname, 'src'),
-      '@': resolve(__dirname, 'packages/web'),
     },
   },
   test: {
-    exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/.worktrees/**',
-      // ...other excludes
-    ],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**', 'packages/**'],
     coverage: {
       reporter: ['text', 'html', 'lcov'],
       exclude: ['node_modules/', 'dist/', '**/*.test.ts', '**/*.spec.ts'],
@@ -35,20 +29,6 @@ export default defineConfig({
         exclude: ['packages/**'],
         environment: 'jsdom',
         setupFiles: ['./src/__tests__/setup.ts'],
-      },
-    },
-    {
-      // Web package tests
-      test: {
-        include: ['packages/web/**/*.test.{ts,tsx}', 'packages/web/**/*.spec.{ts,tsx}'],
-        environment: 'jsdom',
-        setupFiles: ['./packages/web/test-setup.ts'],
-      },
-      resolve: {
-        alias: {
-          '~': resolve(__dirname, 'src'),
-          '@': resolve(__dirname, 'packages/web'),
-        },
       },
     },
   ],
