@@ -1402,11 +1402,26 @@ export class Agent {
 
 **Commit**: "feat: add rich configuration for sessions and agents"
 
-## Task 3.5: Project Settings UI
+## Task 3.5: Project Settings UI ✅ **COMPLETED**
 
 **Goal**: Add comprehensive UI for managing project settings
 
-**Test First** (`packages/web/components/ProjectSettings.test.tsx`):
+**Current Status**: ✅ **COMPLETED** - Full implementation with TDD approach and all tests passing
+
+**Implementation Details**:
+- **File**: `packages/web/components/ProjectSettings.tsx` - Complete React component with tabbed interface
+- **Tests**: `packages/web/components/__tests__/ProjectSettings.test.tsx` - 12 comprehensive test cases
+- **Validation**: Zod v3.25.69 schema validation with proper error handling
+- **Features Implemented**:
+  - ✅ Tabbed interface (General, AI Configuration, Tools & Policies, Environment Variables)
+  - ✅ Form validation with user-friendly error messages
+  - ✅ Configuration management for provider, model, maxTokens, temperature
+  - ✅ Tool selection with configurable approval policies
+  - ✅ Environment variable management (add/remove/edit)
+  - ✅ Proper TypeScript typing with ProjectInfo interface extension
+  - ✅ Comprehensive test coverage (all 12 tests passing)
+
+**Test Coverage** (`packages/web/components/__tests__/ProjectSettings.test.tsx`):
 ```typescript
 describe('ProjectSettings', () => {
   const mockProject = {
