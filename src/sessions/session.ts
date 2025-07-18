@@ -383,6 +383,54 @@ export class Session {
     return Session.getSession(this._sessionId);
   }
 
+  // ===============================
+  // Configuration instance methods
+  // ===============================
+
+  getEffectiveConfiguration(): Configuration {
+    const sessionData = this.getSessionData();
+    if (!sessionData) {
+      return {};
+    }
+
+    const projectConfig = sessionData.projectId
+      ? Project.getById(sessionData.projectId)?.getConfiguration() || {}
+      : {};
+    const sessionConfig = sessionData.configuration || {};
+
+    // Merge configurations with session overriding project
+    const merged = {
+      ...projectConfig,
+      ...sessionConfig,
+    };
+
+    // Special handling for toolPolicies - merge rather than replace
+    if (projectConfig.toolPolicies || sessionConfig.toolPolicies) {
+      merged.toolPolicies = {
+        ...projectConfig.toolPolicies,
+        ...sessionConfig.toolPolicies,
+      };
+    }
+
+    return merged as Configuration;
+  }
+
+  updateConfiguration(updates: Partial<Configuration>): void {
+    // Validate configuration
+    const validatedConfig = Session.validateConfiguration(updates);
+
+    const sessionData = this.getSessionData();
+    const currentConfig = sessionData?.configuration || {};
+    const newConfig = { ...currentConfig, ...validatedConfig };
+
+    Session.updateSession(this._sessionId, { configuration: newConfig });
+  }
+
+  getToolPolicy(toolName: string): 'allow' | 'require-approval' | 'deny' {
+    const config = this.getEffectiveConfiguration();
+    return config.toolPolicies?.[toolName] || 'require-approval';
+  }
+
   getInfo(): SessionInfo | null {
     const agents = this.getAgents();
     const metadata = this._sessionAgent.getThreadMetadata();

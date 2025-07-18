@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { getPersistence, ProjectData, DatabasePersistence } from '~/persistence/database';
 import { logger } from '~/utils/logger';
 import { ThreadManager } from '~/threads/thread-manager';
+import { Configuration } from '~/sessions/session';
 
 export interface ProjectInfo {
   id: string;
@@ -149,6 +150,19 @@ export class Project {
     // Don't close the global persistence - it's managed by the persistence system
 
     logger.info('Project updated', { projectId: this._id, updates });
+  }
+
+  updateConfiguration(updates: Partial<Configuration>): void {
+    // For now, we'll do basic validation here to avoid circular dependency
+    // In a full implementation, this would use a shared validation schema
+    const validatedConfig = updates as Configuration;
+
+    const currentConfig = this.getConfiguration();
+    const newConfig = { ...currentConfig, ...validatedConfig };
+
+    this.updateInfo({
+      configuration: newConfig as Record<string, unknown>,
+    });
   }
 
   archive(): void {
