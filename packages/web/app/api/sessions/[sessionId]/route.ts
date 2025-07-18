@@ -3,7 +3,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { Session } from '@/lib/server/lace-imports';
 import { ThreadId, ApiErrorResponse } from '@/types/api';
 import { z } from 'zod';
 
@@ -110,8 +109,8 @@ export async function PATCH(
 
     const updates = bodyResult.data;
 
-    // Update session metadata using the Session static method
-    Session.updateSession(sessionId, {
+    // Update session metadata using SessionService
+    sessionService.updateSession(sessionId, {
       ...updates,
       updatedAt: new Date(),
     });
@@ -126,14 +125,15 @@ export async function PATCH(
       return NextResponse.json(errorResponse, { status: 500 });
     }
 
-    // Convert to API response format
-    // Get updated data from the sessions table
+    // Get updated session info directly from the Session class to ensure we have the latest database values
+    const { Session } = await import('@/lib/server/lace-imports');
     const updatedSessionData = Session.getSession(sessionId);
     if (!updatedSessionData) {
       const errorResponse: ApiErrorResponse = { error: 'Session not found after update' };
       return NextResponse.json(errorResponse, { status: 500 });
     }
 
+    // Convert to API response format
     const agents = updatedSession.getAgents();
 
     const sessionData = {
