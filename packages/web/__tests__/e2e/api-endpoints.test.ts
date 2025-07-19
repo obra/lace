@@ -66,7 +66,7 @@ describe('API Endpoints E2E Tests', () => {
     // Clear persistence to reset database state
     teardownTestPersistence();
   });
-  
+
   afterAll(() => {
     // Clear everything after all tests are done
     if (sessionService) {
@@ -78,7 +78,12 @@ describe('API Endpoints E2E Tests', () => {
   describe('Session Management API Flow', () => {
     it('should create session via API', async () => {
       // First create a project
-      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
       const projectId = testProject.getId();
 
       const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
@@ -109,9 +114,19 @@ describe('API Endpoints E2E Tests', () => {
 
     it('should list sessions via API', async () => {
       // Create a project and session first
-      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
       const projectId = testProject.getId();
-      await sessionService.createSession('Listable Session', 'anthropic', 'claude-3-haiku-20240307', projectId);
+      await sessionService.createSession(
+        'Listable Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
 
       // List sessions via API
       const listRequest = new NextRequest('http://localhost/api/sessions', {
@@ -128,9 +143,19 @@ describe('API Endpoints E2E Tests', () => {
 
     it('should get specific session via API', async () => {
       // Create a project and session first
-      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
       const projectId = testProject.getId();
-      const session = await sessionService.createSession('Specific Session', 'anthropic', 'claude-3-haiku-20240307', projectId);
+      const session = await sessionService.createSession(
+        'Specific Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
       const sessionId = session.id as ThreadId;
 
       // Get specific session via API
@@ -154,9 +179,19 @@ describe('API Endpoints E2E Tests', () => {
 
     beforeEach(async () => {
       // Create a session for agent tests using real service
-      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
       const projectId = testProject.getId();
-      const session = await sessionService.createSession('Agent Test Session', 'anthropic', 'claude-3-haiku-20240307', projectId);
+      const session = await sessionService.createSession(
+        'Agent Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
       sessionId = session.id as string;
     });
 
@@ -191,11 +226,9 @@ describe('API Endpoints E2E Tests', () => {
 
     it('should reflect spawned agent in session', async () => {
       // Spawn an agent via real service
-      const _agent = await sessionService.spawnAgent(
-        sessionId as ThreadId,
-        'Reflected Agent',
-        'anthropic'
-      );
+      const session = await sessionService.getSession(sessionId as ThreadId);
+      expect(session).toBeDefined();
+      const _agent = session!.spawnAgent('Reflected Agent', 'anthropic');
 
       // Get session via API to check agents
       const getRequest = new NextRequest(`http://localhost/api/sessions/${sessionId}`, {
@@ -218,31 +251,41 @@ describe('API Endpoints E2E Tests', () => {
 
     beforeEach(async () => {
       // Create session and agent fresh for each test to avoid state pollution
-      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
       const projectId = testProject.getId();
-      const session = await sessionService.createSession('Message Test Session', 'anthropic', 'claude-3-haiku-20240307', projectId);
+      const session = await sessionService.createSession(
+        'Message Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
       sessionId = session.id as string;
 
-      const agent = await sessionService.spawnAgent(
-        sessionId as ThreadId,
-        'Message Agent',
-        'anthropic'
-      );
+      const session = await sessionService.getSession(sessionId as ThreadId);
+      expect(session).toBeDefined();
+      const agent = session!.spawnAgent('Message Agent', 'anthropic');
       agentThreadId = agent.threadId as string;
     });
 
     it('should accept message via API', async () => {
       // Debug the session and agent state
-      
+
       // Check if session exists
       await sessionService.getSession(sessionId as ThreadId);
-      
+
       // Ensure the agent is properly available
       const agent = sessionService.getAgent(agentThreadId);
       if (!agent) {
-        throw new Error(`Agent not found for threadId: ${agentThreadId}. Cannot proceed with message test.`);
+        throw new Error(
+          `Agent not found for threadId: ${agentThreadId}. Cannot proceed with message test.`
+        );
       }
-      
+
       const request = new NextRequest(`http://localhost/api/threads/${agentThreadId}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -252,7 +295,7 @@ describe('API Endpoints E2E Tests', () => {
       const response = await sendMessage(request, {
         params: Promise.resolve({ threadId: agentThreadId }),
       });
-      
+
       if (response.status !== 202) {
         const _errorData = (await response.json()) as { error: string };
         // If agent not found, check if it's really there
@@ -293,9 +336,14 @@ describe('API Endpoints E2E Tests', () => {
 
     it('should handle malformed JSON in createSession', async () => {
       // Test the project-based session creation with malformed JSON
-      const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {});
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
       const projectId = testProject.getId();
-      
+
       const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
