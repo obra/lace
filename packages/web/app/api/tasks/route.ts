@@ -3,8 +3,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId } from '@/lib/server/lace-imports';
-import type { TaskFilters } from '@/lib/server/lace-imports';
+import { ThreadId } from '@/lib/server/core-types';
+import type { TaskFilters } from '@/lib/server/core-types';
 import type { Task, TaskStatus, TaskPriority } from '@/types/api';
 
 export async function GET(request: NextRequest) {

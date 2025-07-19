@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { ThreadId, SessionEvent, ApiErrorResponse } from '@/types/api';
-import type { ThreadEvent } from '@/lib/server/lace-imports';
+import type { ThreadEvent } from '@/lib/server/core-types';
 
 // Type guard for ThreadId
 function isValidThreadId(threadId: string): threadId is ThreadId {

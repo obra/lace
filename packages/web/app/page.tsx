@@ -33,10 +33,10 @@ export default function Home() {
   const [approvalRequest, setApprovalRequest] = useState<ToolApprovalRequestData | null>(null);
   const [activeTab, setActiveTab] = useState<'conversation' | 'tasks'>('conversation');
 
-  // Load sessions on mount
+  // Load sessions when project is selected
   useEffect(() => {
     void loadSessions();
-  }, []);
+  }, [selectedProject, loadSessions]);
 
   // Connect to SSE when session selected
   useEffect(() => {
@@ -116,8 +116,13 @@ export default function Home() {
   }, [selectedSession]);
 
   async function loadSessions() {
+    if (!selectedProject) {
+      setSessions([]);
+      return;
+    }
+
     try {
-      const res = await fetch('/api/sessions');
+      const res = await fetch(`/api/projects/${selectedProject}/sessions`);
       const data: unknown = await res.json();
 
       if (isApiError(data)) {
@@ -150,11 +155,11 @@ export default function Home() {
   }
 
   async function createSession() {
-    if (!sessionName.trim()) return;
+    if (!sessionName.trim() || !selectedProject) return;
 
     setLoading(true);
     try {
-      const res = await fetch('/api/sessions', {
+      const res = await fetch(`/api/projects/${selectedProject}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: sessionName }),

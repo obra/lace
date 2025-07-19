@@ -10,7 +10,7 @@ import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/tasks/[taskId]/notes/route';
 import type { SessionService } from '@/lib/server/session-service';
 import type { Session } from '@/types/api';
-import type { Session as CoreSession } from '@/lib/server/lace-imports';
+import type { Session as CoreSession } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
   teardownTestPersistence,

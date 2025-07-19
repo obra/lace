@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
 import type { ThreadId, Agent } from '@/types/api';
 import type { SessionService } from '@/lib/server/session-service';
-import type { Session as CoreSession } from '@/lib/server/lace-imports';
+import type { Session as CoreSession } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
   teardownTestPersistence,

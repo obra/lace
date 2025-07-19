@@ -11,7 +11,7 @@ import {
 } from '~/__tests__/setup/persistence-helper';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '~/projects/project';
-import { asThreadId } from '@/lib/server/lace-imports';
+import { asThreadId } from '@/lib/server/core-types';
 
 // Mock external dependencies to avoid real API calls
 vi.mock('server-only', () => ({}));

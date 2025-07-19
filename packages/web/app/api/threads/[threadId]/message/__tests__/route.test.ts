@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/threads/[threadId]/message/route';
 import type { ThreadId, MessageResponse } from '@/types/api';
-import type { Agent } from '@/lib/server/lace-imports';
+import type { Agent } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
   teardownTestPersistence,

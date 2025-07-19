@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId } from '@/lib/server/lace-imports';
+import { ThreadId } from '@/lib/server/core-types';
 import type { Task } from '@/types/api';
 import { UpdateTaskRequestSchema, ThreadIdSchema } from '@/lib/validation/schemas';
 

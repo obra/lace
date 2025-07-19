@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi, MockedFunction } from 'vitest';
 import { GET, type ProviderWithModels } from '@/app/api/providers/route';
-import type { ProviderInfo, ModelInfo } from '@/lib/server/lace-imports';
+import type { ProviderInfo, ModelInfo } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
   teardownTestPersistence,
