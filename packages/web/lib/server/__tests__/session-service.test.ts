@@ -33,6 +33,15 @@ describe('SessionService after updateSessionConfiguration removal', () => {
   });
 });
 
+describe('SessionService after getSessionData removal', () => {
+  it('should not have getSessionData method', () => {
+    const sessionService = new SessionService();
+
+    // This test should FAIL initially because method still exists
+    expect((sessionService as any).getSessionData).toBeUndefined();
+  });
+});
+
 // Mock the lace imports
 vi.mock('@/lib/server/lace-imports', async () => {
   const actual = await vi.importActual('@/lib/server/lace-imports');
@@ -85,44 +94,6 @@ describe('SessionService Missing Methods', () => {
 
       // Assert
       expect(mockUpdateSession).toHaveBeenCalledWith(mockSessionId, updates);
-    });
-  });
-
-  describe('getSessionData', () => {
-    it('should get fresh session data directly from database', async () => {
-      // Arrange
-      const { Session } = await import('@/lib/server/lace-imports');
-      const mockSessionData = {
-        id: mockSessionId,
-        name: 'Test Session',
-        description: 'Test description',
-        status: 'active',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        configuration: { model: 'claude-3-haiku' },
-        projectId: 'test-project',
-      };
-      vi.mocked(Session.getSession).mockReturnValue(mockSessionData);
-
-      // Act
-      const result = await sessionService.getSessionData(mockSessionId);
-
-      // Assert
-      expect(result).toEqual(mockSessionData);
-      expect(Session.getSession).toHaveBeenCalledWith(mockSessionId);
-    });
-
-    it('should return null when session not found', async () => {
-      // Arrange
-      const { Session } = await import('@/lib/server/lace-imports');
-      vi.mocked(Session.getSession).mockReturnValue(null);
-
-      // Act
-      const result = await sessionService.getSessionData(mockSessionId);
-
-      // Assert
-      expect(result).toBeNull();
-      expect(Session.getSession).toHaveBeenCalledWith(mockSessionId);
     });
   });
 });

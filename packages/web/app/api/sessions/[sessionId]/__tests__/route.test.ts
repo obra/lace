@@ -367,4 +367,50 @@ describe('Session Detail API Route', () => {
       expect(data.error).toBe('Session not found');
     });
   });
+
+  describe('TDD: Direct Session Data Access', () => {
+    it('should call Session.getSession() directly instead of sessionService.getSessionData()', async () => {
+      // This test verifies that PATCH route uses Session.getSession() directly
+      // instead of going through sessionService.getSessionData()
+
+      // Mock the Session class directly
+      const { Session } = await import('@/lib/server/lace-imports');
+      const mockDirectSessionData = {
+        id: 'test-session',
+        name: 'Updated Session',
+        description: 'Updated description',
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // This should spy on the core Session.getSession() method being called directly
+      const sessionGetSpy = vi.spyOn(Session, 'getSession').mockReturnValue(mockDirectSessionData);
+
+      // Create a real session first for the route to work with
+      const testProject = Project.create('TDD Test Project', '/test/path', 'TDD test project', {});
+      const session = await sessionService.createSession(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
+
+      const request = new NextRequest(`http://localhost:3005/api/sessions/${session.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: 'Updated Session' }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      // This should FAIL initially because route still uses sessionService.getSessionData
+      await PATCH(request, {
+        params: Promise.resolve({ sessionId: session.id }),
+      });
+
+      // Verify Session.getSession was called directly (not through sessionService.getSessionData)
+      expect(sessionGetSpy).toHaveBeenCalledWith(session.id);
+
+      sessionGetSpy.mockRestore();
+    });
+  });
 });

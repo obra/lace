@@ -126,7 +126,8 @@ export async function PATCH(
     }
 
     // Get updated session data directly from database to ensure we have the latest values
-    const updatedSessionData = await sessionService.getSessionData(sessionId);
+    const { Session } = await import('@/lib/server/lace-imports');
+    const updatedSessionData = Session.getSession(sessionId);
     if (!updatedSessionData) {
       const errorResponse: ApiErrorResponse = { error: 'Session not found after update' };
       return NextResponse.json(errorResponse, { status: 500 });
