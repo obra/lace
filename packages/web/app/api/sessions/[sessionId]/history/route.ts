@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId, SessionEvent, ApiErrorResponse } from '@/types/api';
+import { SessionEvent, ApiErrorResponse } from '@/types/api';
 import type { ThreadEvent } from '@/lib/server/core-types';
 import { asThreadId, isThreadId } from '@/lib/server/core-types';
 

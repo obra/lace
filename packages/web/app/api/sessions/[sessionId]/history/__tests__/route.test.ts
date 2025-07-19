@@ -8,7 +8,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/[sessionId]/history/route';
-import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import type { SessionEvent, ApiErrorResponse } from '@/types/api';
 import {
@@ -50,7 +49,7 @@ describe('Session History API', () => {
           getAgent: () => ({
             getMainAndDelegateEvents: () => [], // Return empty events for testing
           }),
-        } as any;
+        } as unknown as typeof import('@/lib/server/lace-imports').Session;
       }
       return null;
     });
