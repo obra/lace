@@ -3,6 +3,7 @@
 
 import React, { useMemo, useCallback } from 'react';
 import type { SessionEvent, Agent, ThreadId } from '@/types/api';
+import { formatThreadIdForDisplay } from '@/lib/display-utils';
 
 interface ConversationDisplayProps {
   events: SessionEvent[];
@@ -93,10 +94,9 @@ export function ConversationDisplay({
         return agent.name;
       }
 
-      // Fallback to extracting from threadId
-      const threadIdStr = String(threadId);
-      const match = threadIdStr.match(/\.(\d+)$/);
-      return match ? `Agent ${match[1]}` : 'Agent';
+      // Fallback to extracting from threadId using display utility
+      const displayName = formatThreadIdForDisplay(String(threadId));
+      return displayName.includes('.') ? `Agent ${displayName.split('.').pop()}` : 'Agent';
     },
     [agents]
   );

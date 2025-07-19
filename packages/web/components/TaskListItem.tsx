@@ -3,6 +3,7 @@
 
 import React from 'react';
 import type { Task } from '@/types/api';
+import { formatAssigneeForDisplay } from '@/lib/display-utils';
 
 interface TaskListItemProps {
   task: Task;
@@ -16,11 +17,7 @@ export function TaskListItem({ task, onClick, onStatusChange }: TaskListItemProp
   };
 
   const formatAssignee = (assignedTo?: string) => {
-    if (!assignedTo) return 'Unassigned';
-    if (assignedTo.startsWith('new:')) return assignedTo;
-    // Extract the last part of the thread ID (e.g., "agent1" from "lace_20240101_agent1")
-    const parts = assignedTo.split('_');
-    return parts.length > 1 ? parts[parts.length - 1] : assignedTo;
+    return formatAssigneeForDisplay(assignedTo);
   };
 
   const getPriorityColor = (priority: Task['priority']) => {

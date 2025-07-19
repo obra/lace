@@ -343,7 +343,7 @@ describe('API Endpoints E2E Tests', () => {
       const response = await getSession(request, {
         params: Promise.resolve({ sessionId: 'invalid-id' }),
       });
-      expect(response.status).toBe(404);
+      expect(response.status).toBe(400); // Invalid format returns validation error
     });
 
     it('should handle malformed JSON in createSession', async () => {
@@ -380,7 +380,7 @@ describe('API Endpoints E2E Tests', () => {
       const response = await spawnAgent(request, {
         params: Promise.resolve({ sessionId: 'non-existent' }),
       });
-      expect(response.status).toBe(404);
+      expect(response.status).toBe(400); // Invalid format returns validation error
     });
   });
 });

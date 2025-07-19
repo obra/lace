@@ -4,11 +4,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { ThreadId, ApiErrorResponse } from '@/types/api';
+import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { z } from 'zod';
 
-// Type guard for ThreadId
+// Type guard for ThreadId using client-safe validation
 function isValidThreadId(sessionId: string): sessionId is ThreadId {
-  return typeof sessionId === 'string' && sessionId.length > 0;
+  return isClientValidThreadId(sessionId);
 }
 
 // Type guard for unknown error values

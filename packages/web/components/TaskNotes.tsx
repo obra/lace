@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import type { TaskNote } from '@/types/api';
+import { formatAuthorForDisplay } from '@/lib/display-utils';
 
 interface TaskNotesProps {
   notes: TaskNote[];
@@ -29,10 +30,7 @@ export function TaskNotes({ notes, onAddNote }: TaskNotesProps) {
   };
 
   const formatAuthor = (author: string) => {
-    if (author.startsWith('lace_')) {
-      return author.split('.').pop() || author;
-    }
-    return author;
+    return formatAuthorForDisplay(author);
   };
 
   const formatTimestamp = (timestamp: string) => {

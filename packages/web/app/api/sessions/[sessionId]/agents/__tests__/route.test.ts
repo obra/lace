@@ -422,7 +422,7 @@ describe('Agent Spawning API', () => {
       expect(data2.agent.threadId).toBe(`${sessionId}.2`);
     });
 
-    it('should return 404 for invalid sessionId', async () => {
+    it('should return 400 for invalid sessionId format', async () => {
       mockSessionService.getSession.mockResolvedValue(null);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/invalid/agents`, {
@@ -434,8 +434,8 @@ describe('Agent Spawning API', () => {
       const response = await POST(request, { params: Promise.resolve({ sessionId: 'invalid' }) });
       const data = await parseResponse<ErrorResponse>(response);
 
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Session not found');
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Invalid session ID');
     });
 
     it('should validate required agent name', async () => {
@@ -589,15 +589,15 @@ describe('Agent Spawning API', () => {
       expect(data.agents).toEqual([]);
     });
 
-    it('should return 404 for non-existent session', async () => {
+    it('should return 400 for invalid session ID format', async () => {
       mockSessionService.getSession.mockResolvedValueOnce(null);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/invalid/agents`);
       const response = await GET(request, { params: Promise.resolve({ sessionId: 'invalid' }) });
       const data = await parseResponse<ErrorResponse>(response);
 
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Session not found');
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Invalid session ID');
     });
   });
 });

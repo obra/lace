@@ -164,7 +164,7 @@ describe('Session Detail API Route', () => {
       );
     });
 
-    it('should return 404 for non-existent session', async () => {
+    it('should return 400 for invalid session ID format', async () => {
       const sessionId = asThreadId('non_existent');
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
@@ -173,11 +173,11 @@ describe('Session Detail API Route', () => {
       });
       const data = (await response.json()) as { error: string };
 
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Session not found');
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Invalid session ID');
     });
 
-    it('should handle errors gracefully', async () => {
+    it('should handle invalid session ID format gracefully', async () => {
       const sessionId = asThreadId('invalid_session_id');
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
@@ -186,8 +186,8 @@ describe('Session Detail API Route', () => {
       });
       const data = (await response.json()) as { error: string };
 
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Session not found');
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Invalid session ID');
     });
   });
 
@@ -246,7 +246,7 @@ describe('Session Detail API Route', () => {
       );
     });
 
-    it('should return 404 for non-existent session', async () => {
+    it('should return 400 for invalid session ID format', async () => {
       const sessionId = asThreadId('non_existent');
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`, {
@@ -260,8 +260,8 @@ describe('Session Detail API Route', () => {
       });
 
       const data = (await response.json()) as { error: string };
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Session not found');
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Invalid session ID');
     });
 
     it('should validate request data', async () => {
@@ -349,7 +349,7 @@ describe('Session Detail API Route', () => {
       );
     });
 
-    it('should handle update errors gracefully', async () => {
+    it('should handle invalid session ID format in updates', async () => {
       const sessionId = asThreadId('invalid_session_id');
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`, {
@@ -363,8 +363,8 @@ describe('Session Detail API Route', () => {
       });
 
       const data = (await response.json()) as { error: string };
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Session not found');
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Invalid session ID');
     });
   });
 

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { CreateAgentRequest } from '@/types/api';
 import { asThreadId } from '@/lib/server/core-types';
+import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -21,9 +22,9 @@ function isCreateAgentRequest(body: unknown): body is CreateAgentRequest {
   );
 }
 
-// Type guard for ThreadId - validates and converts string to ThreadId
+// Type guard for ThreadId using client-safe validation
 function isValidThreadId(sessionId: string): boolean {
-  return typeof sessionId === 'string' && sessionId.length > 0;
+  return isClientValidThreadId(sessionId);
 }
 
 export async function POST(
