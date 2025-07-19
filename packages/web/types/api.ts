@@ -4,6 +4,9 @@
 // Import core types from Lace
 import type { AgentState, ThreadId, AssigneeId } from '@/lib/server/lace-imports';
 
+// Re-export imported types
+export type { ThreadId, AssigneeId, AgentState };
+
 // Define ApprovalDecision locally to avoid import issues
 export const ApprovalDecision = {
   ALLOW_ONCE: 'allow_once',

@@ -11,7 +11,9 @@ describe('SessionService after getProjectForSession removal', () => {
     const sessionService = new SessionService();
 
     // This test should FAIL initially because method still exists
-    expect((sessionService as any).getProjectForSession).toBeUndefined();
+    expect(
+      (sessionService as unknown as Record<string, unknown>).getProjectForSession
+    ).toBeUndefined();
   });
 });
 
@@ -20,7 +22,9 @@ describe('SessionService after getEffectiveConfiguration removal', () => {
     const sessionService = new SessionService();
 
     // This test should FAIL initially because method still exists
-    expect((sessionService as any).getEffectiveConfiguration).toBeUndefined();
+    expect(
+      (sessionService as unknown as Record<string, unknown>).getEffectiveConfiguration
+    ).toBeUndefined();
   });
 });
 
@@ -29,7 +33,9 @@ describe('SessionService after updateSessionConfiguration removal', () => {
     const sessionService = new SessionService();
 
     // This test should FAIL initially because method still exists
-    expect((sessionService as any).updateSessionConfiguration).toBeUndefined();
+    expect(
+      (sessionService as unknown as Record<string, unknown>).updateSessionConfiguration
+    ).toBeUndefined();
   });
 });
 
@@ -38,7 +44,7 @@ describe('SessionService after getSessionData removal', () => {
     const sessionService = new SessionService();
 
     // This test should FAIL initially because method still exists
-    expect((sessionService as any).getSessionData).toBeUndefined();
+    expect((sessionService as unknown as Record<string, unknown>).getSessionData).toBeUndefined();
   });
 });
 

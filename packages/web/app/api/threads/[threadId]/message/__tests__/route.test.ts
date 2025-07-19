@@ -5,13 +5,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/threads/[threadId]/message/route';
 import type { ThreadId, MessageResponse } from '@/types/api';
-import type { Agent } from '@/lib/server/core-types';
+import { asThreadId } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
   teardownTestPersistence,
 } from '~/__tests__/setup/persistence-helper';
 
-// Mock Agent interface
+// Mock Agent interface that matches the actual Agent API
 interface MockAgent {
   threadId: ThreadId;
   name: string;
@@ -20,6 +20,22 @@ interface MockAgent {
   status: string;
   createdAt: string;
   sendMessage: ReturnType<typeof vi.fn>;
+}
+
+// Mock Session interface
+interface MockSession {
+  getAgent: ReturnType<typeof vi.fn>;
+}
+
+// Mock business logic Agent type that has the required methods
+interface MockBusinessAgent {
+  threadId: ThreadId;
+  sendMessage: (message: string) => Promise<void>;
+  toolExecutor?: {
+    getTool: (toolName: string) => unknown;
+  };
+  on: (event: string, handler: (...args: unknown[]) => void) => void;
+  [key: string]: unknown; // Allow additional properties for casting
 }
 
 // Error response interface
@@ -74,9 +90,8 @@ describe('Thread Messaging API', () => {
   });
 
   describe('POST /api/threads/{threadId}/message', () => {
-    const threadId = 'lace_20250113_session1.1' as ThreadId;
-
-    const sessionId = 'lace_20250113_session1' as ThreadId;
+    const threadId = asThreadId('lace_20250113_session1.1');
+    const sessionId = asThreadId('lace_20250113_session1');
 
     it('should accept message and queue for processing', async () => {
       const mockAgent: MockAgent = {
@@ -89,8 +104,8 @@ describe('Thread Messaging API', () => {
         sendMessage: vi.fn().mockResolvedValue(undefined),
       };
 
-      const mockSession = {
-        getAgent: vi.fn().mockReturnValue(mockAgent as unknown as Agent),
+      const mockSession: MockSession = {
+        getAgent: vi.fn().mockReturnValue(mockAgent as unknown as MockBusinessAgent),
       };
 
       mockSessionService.getSession.mockResolvedValue(mockSession);
@@ -107,10 +122,8 @@ describe('Thread Messaging API', () => {
       expect(response.status).toBe(202);
       expect(data).toMatchObject({
         status: 'accepted',
-
         threadId,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        messageId: expect.any(String),
+        messageId: expect.any(String) as string,
       });
       expect(mockAgent.sendMessage).toHaveBeenCalledWith('Help me implement OAuth');
     });
@@ -126,11 +139,11 @@ describe('Thread Messaging API', () => {
         sendMessage: vi
           .fn()
           .mockImplementation(
-            () => new Promise((resolve) => setTimeout(() => resolve(undefined), 1000))
+            () => new Promise<void>((resolve) => setTimeout(() => resolve(undefined), 1000))
           ),
       };
 
-      mockSessionService.getAgent.mockReturnValue(mockAgent as unknown as Agent);
+      mockSessionService.getAgent.mockReturnValue(mockAgent as unknown as MockBusinessAgent);
 
       const start = Date.now();
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
@@ -169,7 +182,7 @@ describe('Thread Messaging API', () => {
 
     it('should handle non-existent threadId', async () => {
       // Mock session that exists but has no agent with the given threadId
-      const mockSession = {
+      const mockSession: MockSession = {
         getAgent: vi.fn().mockReturnValue(null), // Agent not found
       };
 
@@ -199,8 +212,8 @@ describe('Thread Messaging API', () => {
         sendMessage: vi.fn().mockResolvedValue(undefined),
       };
 
-      const mockSession = {
-        getAgent: vi.fn().mockReturnValue(mockAgent as unknown as Agent),
+      const mockSession: MockSession = {
+        getAgent: vi.fn().mockReturnValue(mockAgent as unknown as MockBusinessAgent),
       };
 
       mockSessionService.getSession.mockResolvedValue(mockSession);
@@ -250,7 +263,7 @@ describe('Thread Messaging API', () => {
         sendMessage: vi.fn(),
       };
 
-      mockSessionService.getAgent.mockReturnValue(mockAgent as unknown as Agent);
+      mockSessionService.getAgent.mockReturnValue(mockAgent as unknown as MockBusinessAgent);
 
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
@@ -276,8 +289,8 @@ describe('Thread Messaging API', () => {
         sendMessage: vi.fn().mockRejectedValue(new Error('Provider error')),
       };
 
-      const mockSession = {
-        getAgent: vi.fn().mockReturnValue(mockAgent as unknown as Agent),
+      const mockSession: MockSession = {
+        getAgent: vi.fn().mockReturnValue(mockAgent as unknown as MockBusinessAgent),
       };
 
       mockSessionService.getSession.mockResolvedValue(mockSession);
@@ -307,8 +320,8 @@ describe('Thread Messaging API', () => {
         sendMessage: vi.fn().mockResolvedValue(undefined),
       };
 
-      const mockSession = {
-        getAgent: vi.fn().mockReturnValue(mockAgent as unknown as Agent),
+      const mockSession: MockSession = {
+        getAgent: vi.fn().mockReturnValue(mockAgent as unknown as MockBusinessAgent),
       };
 
       mockSessionService.getSession.mockResolvedValue(mockSession);

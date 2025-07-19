@@ -4,7 +4,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { getSessionService } from '@/lib/server/session-service';
-import { MessageResponse, SessionEvent, ApiErrorResponse, ThreadId } from '@/types/api';
+import { MessageResponse, SessionEvent, ApiErrorResponse } from '@/types/api';
+import type { ThreadId } from '@/lib/server/core-types';
 import { SSEManager } from '@/lib/sse-manager';
 import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
 import { messageLimiter } from '@/lib/middleware/rate-limiter';
@@ -37,7 +38,8 @@ export async function POST(
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
-    const threadId: ThreadId = threadIdResult.data as ThreadId;
+    // TypeScript now knows threadIdResult.success is true, so data is properly typed
+    const threadId: ThreadId = threadIdResult.data;
 
     // Parse and validate request body with Zod
     const bodyRaw: unknown = await request.json();
@@ -53,12 +55,16 @@ export async function POST(
     const body = bodyResult.data;
 
     // Determine session ID (parent thread for agents, or self for sessions)
-    const sessionIdStr = threadId.includes('.') ? threadId.split('.')[0] : threadId;
+    // ThreadId is a string, so we can safely use string methods
+    const sessionIdStr: string = threadId.includes('.')
+      ? (threadId.split('.')[0] ?? threadId)
+      : threadId;
     const sessionIdResult = ThreadIdSchema.safeParse(sessionIdStr);
     if (!sessionIdResult.success) {
       throw new Error('Invalid session ID derived from thread ID');
     }
-    const sessionId: ThreadId = sessionIdResult.data as ThreadId;
+    // TypeScript now knows sessionIdResult.success is true, so data is properly typed
+    const sessionId: ThreadId = sessionIdResult.data;
 
     // Get agent instance through session
     const session = await sessionService.getSession(sessionId);
@@ -78,7 +84,7 @@ export async function POST(
     const sseManager = SSEManager.getInstance();
 
     const userMessageEvent: SessionEvent = {
-      type: 'USER_MESSAGE',
+      type: 'USER_MESSAGE' as const,
       threadId,
       timestamp: new Date().toISOString(),
       data: { content: body.message },
@@ -100,7 +106,7 @@ export async function POST(
         // Emit error event
         const errorMessage = error instanceof Error ? error.message : String(error);
         const errorEvent: SessionEvent = {
-          type: 'LOCAL_SYSTEM_MESSAGE',
+          type: 'LOCAL_SYSTEM_MESSAGE' as const,
           threadId,
           timestamp: new Date().toISOString(),
           data: { message: `Error: ${errorMessage}` },
@@ -110,7 +116,7 @@ export async function POST(
 
     // Return immediate acknowledgment
     const response: MessageResponse = {
-      status: 'accepted',
+      status: 'accepted' as const,
       threadId,
       messageId,
     };

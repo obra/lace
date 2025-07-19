@@ -33,6 +33,28 @@ export default function Home() {
   const [approvalRequest, setApprovalRequest] = useState<ToolApprovalRequestData | null>(null);
   const [activeTab, setActiveTab] = useState<'conversation' | 'tasks'>('conversation');
 
+  const loadSessions = useCallback(async () => {
+    if (!selectedProject) {
+      setSessions([]);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/projects/${selectedProject}/sessions`);
+      const data: unknown = await res.json();
+
+      if (isApiError(data)) {
+        console.error('Failed to load sessions:', data.error);
+        return;
+      }
+
+      const sessionsData = data as SessionsResponse;
+      setSessions(sessionsData.sessions || []);
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+    }
+  }, [selectedProject]);
+
   // Load sessions when project is selected
   useEffect(() => {
     void loadSessions();
@@ -85,7 +107,7 @@ export default function Home() {
     const connectionListener = (_event: Event) => {
       const connectionEvent: SessionEvent = {
         type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: selectedSession,
+        threadId: selectedSession as ThreadId,
         timestamp: new Date().toISOString(),
         data: { message: 'Connected to session stream' },
       };
@@ -98,7 +120,7 @@ export default function Home() {
       console.error('SSE error:', error);
       const errorEvent: SessionEvent = {
         type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: selectedSession,
+        threadId: selectedSession as ThreadId,
         timestamp: new Date().toISOString(),
         data: { message: 'Connection lost' },
       };
@@ -114,28 +136,6 @@ export default function Home() {
       eventSource.close();
     };
   }, [selectedSession]);
-
-  const loadSessions = useCallback(async () => {
-    if (!selectedProject) {
-      setSessions([]);
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/projects/${selectedProject}/sessions`);
-      const data: unknown = await res.json();
-
-      if (isApiError(data)) {
-        console.error('Failed to load sessions:', data.error);
-        return;
-      }
-
-      const sessionsData = data as SessionsResponse;
-      setSessions(sessionsData.sessions || []);
-    } catch (error) {
-      console.error('Failed to load sessions:', error);
-    }
-  }, [selectedProject]);
 
   async function loadConversationHistory(sessionId: ThreadId) {
     try {
@@ -327,7 +327,7 @@ export default function Home() {
             {selectedSession && selectedProject && (
               <div>
                 <h2 className="text-lg font-semibold mb-3">Agents</h2>
-                <AgentSpawner sessionId={selectedSession} onAgentSpawn={handleAgentSpawn} />
+                <AgentSpawner sessionId={selectedSession as ThreadId} onAgentSpawn={handleAgentSpawn} />
 
                 {/* Agent List */}
                 <div className="mt-4 space-y-2">
@@ -404,7 +404,7 @@ export default function Home() {
                           <ConversationDisplay
                             events={events}
                             agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
-                            selectedAgent={selectedAgent}
+                            selectedAgent={selectedAgent as ThreadId}
                             className="h-full p-4"
                             isLoading={loading}
                           />

@@ -52,9 +52,6 @@ export class SessionService {
       setupAgentApprovals(coordinatorAgent, sessionId);
       // Set up web-specific event handlers
       this.setupAgentEventHandlers(coordinatorAgent, sessionId);
-    } else {
-      console.warn('No coordinator agent found for session:', sessionId);
-      // In test environments, this might be expected behavior
     }
 
     // Store the session instance
@@ -75,24 +72,18 @@ export class SessionService {
 
       if (!session) {
         // Reconstruct session from database
-        console.warn(`[DEBUG] Reconstructing session from database: ${sessionInfo.id}`);
         session = (await Session.getById(sessionInfo.id)) ?? undefined;
         if (session) {
-          console.warn(`[DEBUG] Session reconstructed successfully: ${sessionInfo.id}`);
           activeSessions.set(sessionInfo.id, session);
 
           // Set up event handlers for all agents in the reconstructed session
           const agents = session.getAgents();
-          console.warn(`[DEBUG] Setting up event handlers for ${agents.length} agents`);
           for (const agentInfo of agents) {
             const agent = session.getAgent(agentInfo.threadId);
             if (agent) {
-              console.warn(`[DEBUG] Setting up event handlers for agent: ${agentInfo.threadId}`);
               this.setupAgentEventHandlers(agent, sessionInfo.id);
             }
           }
-        } else {
-          console.warn(`[DEBUG] Failed to reconstruct session: ${sessionInfo.id}`);
         }
       }
 
@@ -116,34 +107,22 @@ export class SessionService {
   }
 
   async getSession(sessionId: ThreadId): Promise<Session | null> {
-    console.warn(`[DEBUG] getSession called for sessionId: ${sessionId}`);
-
     // Try to get from active sessions first
     let session = activeSessions.get(sessionId);
-    console.warn(`[DEBUG] Session found in active sessions: ${session ? 'yes' : 'no'}`);
 
     if (!session) {
       // Try to load from database by reconstructing the session
-      console.warn(`[DEBUG] Reconstructing session from database: ${sessionId}`);
       session = (await Session.getById(sessionId)) ?? undefined;
       if (!session) {
-        console.warn(`[DEBUG] Failed to reconstruct session: ${sessionId}`);
         return null;
       }
-      console.warn(`[DEBUG] Session reconstructed successfully: ${sessionId}`);
       activeSessions.set(sessionId, session);
 
       // Set up approval callbacks and event handlers for all agents in the reconstructed session
       const agents = session.getAgents();
-      console.warn(
-        `[DEBUG] Setting up approval callbacks and event handlers for ${agents.length} agents`
-      );
       for (const agentInfo of agents) {
         const agent = session.getAgent(agentInfo.threadId);
         if (agent) {
-          console.warn(
-            `[DEBUG] Setting up approval callback and event handlers for agent: ${agentInfo.threadId}`
-          );
           const { setupAgentApprovals } = await import('./agent-utils');
           setupAgentApprovals(agent, sessionId);
           this.setupAgentEventHandlers(agent, sessionId);
@@ -158,14 +137,7 @@ export class SessionService {
     const sseManager = SSEManager.getInstance();
     const threadId = asThreadId(agent.threadId);
 
-    console.warn(`Setting up SSE event handlers for agent ${threadId} in session ${sessionId}`);
-
-    // Check if agent is started
-    const isRunning = agent.getCurrentState() !== 'idle';
-    console.warn(`Agent ${threadId} running state:`, isRunning);
-
     agent.on('agent_thinking_start', () => {
-      console.warn(`Agent ${threadId} started thinking`);
       const event: SessionEvent = {
         type: 'THINKING',
         threadId,
@@ -186,7 +158,6 @@ export class SessionService {
     });
 
     agent.on('agent_response_complete', ({ content }: { content: string }) => {
-      console.warn(`Agent ${threadId} response complete:`, content.substring(0, 100) + '...');
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
         threadId,
@@ -234,9 +205,9 @@ export class SessionService {
       }
     );
 
-    // Listen for state changes to debug
-    agent.on('state_change', ({ from, to }: { from: string; to: string }) => {
-      console.warn(`Agent ${threadId} state changed: ${from} -> ${to}`);
+    // Listen for state changes
+    agent.on('state_change', ({ from: _from, to: _to }: { from: string; to: string }) => {
+      // State change logging can be enabled for debugging if needed
     });
 
     // Listen for any errors
@@ -253,7 +224,7 @@ export class SessionService {
 
     // Listen for conversation complete
     agent.on('conversation_complete', () => {
-      console.warn(`Agent ${threadId} conversation complete`);
+      // Conversation complete - no logging needed
     });
 
     // Handle tool approval requests
@@ -272,10 +243,6 @@ export class SessionService {
         requestId: string;
         resolve: (decision: CoreApprovalDecision) => void;
       }) => {
-        console.warn(
-          `Tool approval requested for ${toolName} (${isReadOnly ? 'read-only' : 'destructive'})`
-        );
-
         const approvalManager = getApprovalManager();
 
         // Handle async approval in a separate function

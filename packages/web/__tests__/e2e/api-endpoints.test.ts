@@ -38,12 +38,12 @@ import { GET as getSession } from '@/app/api/sessions/[sessionId]/route';
 import { POST as spawnAgent } from '@/app/api/sessions/[sessionId]/agents/route';
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { POST as createProjectSession } from '@/app/api/projects/[projectId]/sessions/route';
-import { getSessionService } from '@/lib/server/session-service';
+import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 import type { Session as SessionType, ThreadId } from '@/types/api';
 
 describe('API Endpoints E2E Tests', () => {
-  let sessionService: ReturnType<typeof getSessionService>;
+  let sessionService: SessionService;
 
   beforeEach(() => {
     setupTestPersistence();
@@ -102,7 +102,8 @@ describe('API Endpoints E2E Tests', () => {
       const response = await createProjectSession(request, { params: { projectId } });
       expect(response.status).toBe(201);
 
-      const data = (await response.json()) as { session: SessionType };
+      const responseData: unknown = await response.json();
+      const data = responseData as { session: SessionType };
       expect(data.session.name).toBe('API Test Session');
       expect(data.session.id).toBeDefined();
 
@@ -136,7 +137,8 @@ describe('API Endpoints E2E Tests', () => {
       const response = await listSessions(listRequest);
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { sessions: SessionType[] };
+      const responseData: unknown = await response.json();
+      const data = responseData as { sessions: SessionType[] };
       expect(data.sessions).toHaveLength(1);
       expect(data.sessions[0]?.name).toBe('Listable Session');
     });
@@ -156,7 +158,7 @@ describe('API Endpoints E2E Tests', () => {
         'claude-3-haiku-20240307',
         projectId
       );
-      const sessionId = session.id as ThreadId;
+      const sessionId = session.id as string;
 
       // Get specific session via API
       const getRequest = new NextRequest(`http://localhost/api/sessions/${sessionId}`, {
@@ -164,11 +166,12 @@ describe('API Endpoints E2E Tests', () => {
       });
 
       const response = await getSession(getRequest, {
-        params: Promise.resolve({ sessionId: sessionId as string }),
+        params: Promise.resolve({ sessionId }),
       });
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { session: SessionType };
+      const responseData: unknown = await response.json();
+      const data = responseData as { session: SessionType };
       expect(data.session.name).toBe('Specific Session');
       expect(data.session.id).toBe(sessionId);
     });
@@ -209,7 +212,8 @@ describe('API Endpoints E2E Tests', () => {
       const response = await spawnAgent(request, { params: Promise.resolve({ sessionId }) });
       expect(response.status).toBe(201);
 
-      const data = (await response.json()) as {
+      const responseData: unknown = await response.json();
+      const data = responseData as {
         agent: { name: string; provider: string; model: string; threadId: string };
       };
       expect(data.agent.name).toBe('API Agent');
@@ -217,7 +221,8 @@ describe('API Endpoints E2E Tests', () => {
       expect(data.agent.threadId).toMatch(new RegExp(`^${sessionId}\\.\\d+$`));
 
       // Verify agent was actually added to the session
-      const updatedSession = await sessionService.getSession(sessionId as ThreadId);
+      const threadId: ThreadId = sessionId as ThreadId;
+      const updatedSession = await sessionService.getSession(threadId);
       expect(updatedSession).toBeDefined();
       const agents = updatedSession!.getAgents();
       expect(agents).toHaveLength(2); // Coordinator + spawned agent
@@ -226,7 +231,8 @@ describe('API Endpoints E2E Tests', () => {
 
     it('should reflect spawned agent in session', async () => {
       // Spawn an agent via real service
-      const session = await sessionService.getSession(sessionId as ThreadId);
+      const threadId: ThreadId = sessionId as ThreadId;
+      const session = await sessionService.getSession(threadId);
       expect(session).toBeDefined();
       const _agent = session!.spawnAgent('Reflected Agent', 'anthropic');
 
@@ -238,7 +244,8 @@ describe('API Endpoints E2E Tests', () => {
       const response = await getSession(getRequest, {
         params: Promise.resolve({ sessionId: sessionId }),
       });
-      const data = (await response.json()) as { session: SessionType };
+      const responseData: unknown = await response.json();
+      const data = responseData as { session: SessionType };
 
       expect(data.session.agents).toHaveLength(2); // Coordinator + spawned agent
       expect(data.session.agents.find((a) => a.name === 'Reflected Agent')).toBeDefined();
@@ -266,7 +273,8 @@ describe('API Endpoints E2E Tests', () => {
       );
       sessionId = session.id as string;
 
-      const sessionInstance = await sessionService.getSession(sessionId as ThreadId);
+      const threadId: ThreadId = sessionId as ThreadId;
+      const sessionInstance = await sessionService.getSession(threadId);
       expect(sessionInstance).toBeDefined();
       const agent = sessionInstance!.spawnAgent('Message Agent', 'anthropic');
       agentThreadId = agent.threadId as string;
@@ -276,7 +284,8 @@ describe('API Endpoints E2E Tests', () => {
       // Debug the session and agent state
 
       // Check if session exists and get agent through session
-      const session = await sessionService.getSession(sessionId as ThreadId);
+      const threadId: ThreadId = sessionId as ThreadId;
+      const session = await sessionService.getSession(threadId);
       if (!session) {
         throw new Error(`Session not found for sessionId: ${sessionId}`);
       }
@@ -300,13 +309,13 @@ describe('API Endpoints E2E Tests', () => {
       });
 
       if (response.status !== 202) {
-        const _errorData = (await response.json()) as { error: string };
-        // If agent not found, check if it's really there
-        const _agent = sessionService.getAgent(agentThreadId);
+        const errorResponseData: unknown = await response.json();
+        const _errorData = errorResponseData as { error: string };
       }
       expect(response.status).toBe(202);
 
-      const data = (await response.json()) as { status: string; threadId: string };
+      const responseData: unknown = await response.json();
+      const data = responseData as { status: string; threadId: string };
       expect(data.status).toBe('accepted');
       expect(data.threadId).toBe(agentThreadId);
     });

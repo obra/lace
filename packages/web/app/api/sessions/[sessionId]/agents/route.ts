@@ -3,7 +3,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId, CreateAgentRequest } from '@/types/api';
+import { CreateAgentRequest } from '@/types/api';
+import { asThreadId } from '@/lib/server/core-types';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -20,8 +21,8 @@ function isCreateAgentRequest(body: unknown): body is CreateAgentRequest {
   );
 }
 
-// Type guard for ThreadId
-function isValidThreadId(sessionId: string): sessionId is ThreadId {
+// Type guard for ThreadId - validates and converts string to ThreadId
+function isValidThreadId(sessionId: string): boolean {
   return typeof sessionId === 'string' && sessionId.length > 0;
 }
 
@@ -37,7 +38,7 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 
-    const sessionId = sessionIdParam;
+    const sessionId = asThreadId(sessionIdParam);
 
     // Parse and validate request body
     const bodyData: unknown = await request.json();
@@ -66,7 +67,7 @@ export async function POST(
 
     // Convert to API format
     const agentResponse = {
-      threadId: agent.threadId as ThreadId,
+      threadId: agent.threadId,
       name: body.name,
       provider: body.provider || 'anthropic',
       model: body.model || 'claude-3-haiku-20240307',
@@ -77,10 +78,9 @@ export async function POST(
     // Test SSE broadcast
     const { SSEManager } = await import('@/lib/sse-manager');
     const sseManager = SSEManager.getInstance();
-    const agentThreadId = agentResponse.threadId;
     const testEvent = {
       type: 'LOCAL_SYSTEM_MESSAGE' as const,
-      threadId: agentThreadId,
+      threadId: agentResponse.threadId,
       timestamp: new Date().toISOString(),
       data: { message: `Agent "${agentResponse.name}" spawned successfully` },
     };
@@ -110,7 +110,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 
-    const sessionId = sessionIdParam;
+    const sessionId = asThreadId(sessionIdParam);
 
     const session = await sessionService.getSession(sessionId);
 
@@ -121,14 +121,18 @@ export async function GET(
     // Get agents from Session instance
     const agents = session.getAgents();
     return NextResponse.json({
-      agents: agents.map((agent) => ({
-        threadId: agent.threadId,
-        name: agent.name,
-        provider: agent.provider,
-        model: agent.model,
-        status: agent.status,
-        createdAt: (agent as { createdAt?: string }).createdAt ?? new Date().toISOString(),
-      })),
+      agents: agents.map((agent) => {
+        // Safely extract createdAt if available, otherwise use current timestamp
+        const agentWithTimestamp = agent as unknown as { createdAt?: string };
+        return {
+          threadId: agent.threadId,
+          name: agent.name,
+          provider: agent.provider,
+          model: agent.model,
+          status: agent.status,
+          createdAt: agentWithTimestamp.createdAt ?? new Date().toISOString(),
+        };
+      }),
     });
   } catch (error: unknown) {
     console.error('Error in GET /api/sessions/[sessionId]/agents:', error);

@@ -5,17 +5,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/tasks/route';
 import type { SessionService } from '@/lib/server/session-service';
-import type { Task, Session } from '@/types/api';
-import type { Session as CoreSession } from '@/lib/server/core-types';
+import type { Task } from '@/types/api';
+import type { Session as CoreSession } from '@/lib/server/lace-imports';
+import { asThreadId } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
   teardownTestPersistence,
 } from '~/__tests__/setup/persistence-helper';
-
-// Helper function for tests to avoid server-only imports
-function createThreadId(id: string) {
-  return id as import('@/types/api').ThreadId;
-}
 
 // Create mock TaskManager
 const mockTaskManager = {
@@ -30,29 +26,48 @@ const mockTaskManager = {
   getTask: vi.fn(),
 };
 
-// Create a mock Session instance
-const mockSession: Partial<Session> = {
-  getId: vi.fn().mockReturnValue(createThreadId('lace_20240101_session')),
-  getInfo: vi.fn().mockReturnValue({
-    id: createThreadId('lace_20240101_session'),
-    name: 'Test Session',
-    createdAt: '2024-01-01T00:00:00Z',
-    agents: [],
-  }),
-  getAgents: vi.fn().mockReturnValue([]),
-  getTaskManager: vi.fn().mockReturnValue(mockTaskManager),
-};
+// Create a mock Session instance with proper typing
+const mockSessionId = asThreadId('lace_20240101_session');
 
-// Create the properly typed mock service
+// Create a properly typed mock service with inline mocks
 const mockSessionService = {
   createSession: vi.fn<SessionService['createSession']>(),
   listSessions: vi.fn<SessionService['listSessions']>(),
-  getSession: vi
-    .fn<SessionService['getSession']>()
-    .mockResolvedValue(mockSession as unknown as CoreSession),
+  getSession: vi.fn<SessionService['getSession']>(),
   spawnAgent: vi.fn<SessionService['spawnAgent']>(),
   getAgent: vi.fn<SessionService['getAgent']>(),
 };
+
+// Set up the default mock behavior for getSession - properly typed mock
+mockSessionService.getSession.mockImplementation(
+  async (sessionId: string): Promise<CoreSession | null> => {
+    if (sessionId === 'lace_20240101_session') {
+      // Create a partial mock session with the required methods for testing
+      const mockSessionResult: Partial<CoreSession> = {
+        getId: () => mockSessionId,
+        getInfo: () => ({
+          id: mockSessionId,
+          name: 'Test Session',
+          createdAt: new Date('2024-01-01T00:00:00Z'),
+          provider: 'anthropic',
+          model: 'claude-3-5-sonnet-20241022',
+          agents: [],
+        }),
+        getAgents: () => [],
+        getTaskManager: () => mockTaskManager,
+        spawnAgent: vi.fn(),
+        getAgent: () => null,
+        startAgent: vi.fn().mockResolvedValue(undefined),
+        stopAgent: vi.fn(),
+        sendMessage: vi.fn().mockResolvedValue(undefined),
+        destroy: vi.fn(),
+      };
+      // Type assertion is safe here since we're mocking only needed methods for tests
+      return mockSessionResult as CoreSession;
+    }
+    return null;
+  }
+);
 
 // Mock the session service
 vi.mock('@/lib/server/session-service', () => ({
@@ -102,7 +117,7 @@ describe('Task API Routes', () => {
     });
 
     it('should return tasks for a valid session', async () => {
-      const mockTasks = [
+      const mockTasks: Task[] = [
         {
           id: 'task_20240101_abc123',
           title: 'Test Task 1',
@@ -110,8 +125,8 @@ describe('Task API Routes', () => {
           prompt: 'Prompt 1',
           status: 'pending',
           priority: 'high',
-          createdBy: createThreadId('lace_20240101_agent1'),
-          threadId: createThreadId('lace_20240101_session'),
+          createdBy: asThreadId('lace_20240101_agent1'),
+          threadId: asThreadId('lace_20240101_session'),
           createdAt: new Date('2024-01-01T00:00:00Z'),
           updatedAt: new Date('2024-01-01T00:00:00Z'),
           notes: [],
@@ -123,9 +138,9 @@ describe('Task API Routes', () => {
           prompt: 'Prompt 2',
           status: 'in_progress',
           priority: 'medium',
-          assignedTo: createThreadId('lace_20240101_agent2'),
-          createdBy: createThreadId('lace_20240101_agent1'),
-          threadId: createThreadId('lace_20240101_session'),
+          assignedTo: asThreadId('lace_20240101_agent2'),
+          createdBy: asThreadId('lace_20240101_agent1'),
+          threadId: asThreadId('lace_20240101_session'),
           createdAt: new Date('2024-01-01T01:00:00Z'),
           updatedAt: new Date('2024-01-01T01:00:00Z'),
           notes: [],
@@ -151,14 +166,16 @@ describe('Task API Routes', () => {
     });
 
     it('should filter tasks by status', async () => {
-      const mockTasks = [
+      const mockTasks: Task[] = [
         {
           id: 'task_20240101_abc123',
           title: 'Pending Task',
+          description: '',
+          prompt: 'Test prompt',
           status: 'pending',
           priority: 'high',
-          createdBy: createThreadId('lace_20240101_agent1'),
-          threadId: createThreadId('lace_20240101_session'),
+          createdBy: asThreadId('lace_20240101_agent1'),
+          threadId: asThreadId('lace_20240101_session'),
           createdAt: new Date('2024-01-01T00:00:00Z'),
           updatedAt: new Date('2024-01-01T00:00:00Z'),
           notes: [],
@@ -215,15 +232,15 @@ describe('Task API Routes', () => {
     });
 
     it('should create a new task', async () => {
-      const newTask = {
+      const newTask: Task = {
         id: 'task_20240101_new123',
         title: 'New Task',
         description: 'New Description',
         prompt: 'Do something',
         status: 'pending',
         priority: 'medium',
-        createdBy: createThreadId('human'),
-        threadId: createThreadId('lace_20240101_session'),
+        createdBy: asThreadId('human'),
+        threadId: asThreadId('lace_20240101_session'),
         createdAt: new Date('2024-01-01T00:00:00Z'),
         updatedAt: new Date('2024-01-01T00:00:00Z'),
         notes: [],
@@ -266,16 +283,16 @@ describe('Task API Routes', () => {
     });
 
     it('should create task with assignment', async () => {
-      const newTask = {
+      const newTask: Task = {
         id: 'task_20240101_new123',
         title: 'Assigned Task',
         description: '',
         prompt: 'Do something',
         status: 'pending',
         priority: 'high',
-        assignedTo: createThreadId('lace_20240101_agent1'),
-        createdBy: createThreadId('human'),
-        threadId: createThreadId('lace_20240101_session'),
+        assignedTo: asThreadId('lace_20240101_agent1'),
+        createdBy: asThreadId('human'),
+        threadId: asThreadId('lace_20240101_session'),
         createdAt: new Date('2024-01-01T00:00:00Z'),
         updatedAt: new Date('2024-01-01T00:00:00Z'),
         notes: [],

@@ -2,12 +2,12 @@
 // ABOUTME: Verifies agent tool approval setup and configuration
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { setupAgentApprovals } from '../agent-utils';
+import { setupAgentApprovals } from '@/lib/server/agent-utils';
 import { Agent } from '@/lib/server/lace-imports';
-import { SessionService } from '../session-service';
+import { SessionService } from '@/lib/server/session-service';
 
 // Mock the approval manager
-vi.mock('../approval-manager', () => ({
+vi.mock('@/lib/server/approval-manager', () => ({
   getApprovalManager: vi.fn(),
 }));
 
@@ -37,20 +37,25 @@ describe('Agent Utilities', () => {
     const sessionService = new SessionService();
 
     // This should FAIL initially because method still exists
-    expect((sessionService as any).setupApprovalCallback).toBeUndefined();
+    // Use type assertion to access potentially non-existent property
+    expect(
+      (sessionService as unknown as { setupApprovalCallback?: unknown }).setupApprovalCallback
+    ).toBeUndefined();
   });
 
   it('should not have spawnAgent method in SessionService', () => {
     const sessionService = new SessionService();
 
     // This should FAIL initially because method still exists
-    expect((sessionService as any).spawnAgent).toBeUndefined();
+    // Use type assertion to access potentially non-existent property
+    expect((sessionService as unknown as { spawnAgent?: unknown }).spawnAgent).toBeUndefined();
   });
 
   it('should not have getAgent method in SessionService', () => {
     const sessionService = new SessionService();
 
     // This should FAIL initially because method still exists
-    expect((sessionService as any).getAgent).toBeUndefined();
+    // Use type assertion to access potentially non-existent property
+    expect((sessionService as unknown as { getAgent?: unknown }).getAgent).toBeUndefined();
   });
 });

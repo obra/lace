@@ -5,14 +5,34 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/route';
 import type { Session } from '@/types/api';
+import type { ThreadId } from '@/lib/validation/schemas';
 import type { SessionService } from '@/lib/server/session-service';
 import {
   setupTestPersistence,
   teardownTestPersistence,
 } from '~/__tests__/setup/persistence-helper';
-// Helper function for tests to avoid server-only imports
-function createThreadId(id: string) {
-  return id as import('@/types/api').ThreadId;
+
+// Test data factory functions
+function createMockSession(overrides: Partial<Session> = {}): Session {
+  return {
+    id: 'lace_20240101_abcd12' as ThreadId,
+    name: 'Test Session',
+    createdAt: '2024-01-01T12:00:00Z',
+    agents: [],
+    ...overrides,
+  };
+}
+
+function createMockAgent(overrides: Partial<Session['agents'][0]> = {}): Session['agents'][0] {
+  return {
+    threadId: 'lace_20240101_abcd12.1' as ThreadId,
+    name: 'Test Agent',
+    provider: 'anthropic',
+    model: 'claude-3-opus',
+    status: 'idle' as const,
+    createdAt: '2024-01-01T12:00:00Z',
+    ...overrides,
+  };
 }
 
 // Create the properly typed mock service
@@ -53,31 +73,27 @@ describe('Session API Routes', () => {
 
   describe('GET /api/sessions', () => {
     it('should list all sessions', async () => {
-      const mockSessions: Partial<Session>[] = [
-        {
-          id: createThreadId('lace_20240101_abcd12'),
+      const mockSessions: Session[] = [
+        createMockSession({
+          id: 'lace_20240101_abcd12' as ThreadId,
           name: 'Session 1',
           createdAt: '2024-01-01T12:00:00Z',
-          agents: [],
-        },
-        {
-          id: createThreadId('lace_20240101_efgh56'),
+        }),
+        createMockSession({
+          id: 'lace_20240101_efgh56' as ThreadId,
           name: 'Session 2',
           createdAt: '2024-01-01T13:00:00Z',
           agents: [
-            {
-              threadId: createThreadId('lace_20240101_efgh56.1'),
+            createMockAgent({
+              threadId: 'lace_20240101_efgh56.1' as ThreadId,
               name: 'Agent 1',
-              provider: 'anthropic',
-              model: 'claude-3-opus',
-              status: 'idle' as const,
               createdAt: '2024-01-01T13:01:00Z',
-            },
+            }),
           ],
-        },
+        }),
       ];
 
-      void mockSessionService.listSessions.mockResolvedValueOnce(mockSessions);
+      mockSessionService.listSessions.mockResolvedValueOnce(mockSessions);
 
       const request = new NextRequest('http://localhost:3005/api/sessions');
       const response = await GET(request);
@@ -89,7 +105,7 @@ describe('Session API Routes', () => {
     });
 
     it('should return empty array when no sessions exist', async () => {
-      void mockSessionService.listSessions.mockResolvedValueOnce([]);
+      mockSessionService.listSessions.mockResolvedValueOnce([]);
 
       const request = new NextRequest('http://localhost:3005/api/sessions');
       const response = await GET(request);
@@ -100,7 +116,7 @@ describe('Session API Routes', () => {
     });
 
     it('should handle listing errors', async () => {
-      void mockSessionService.listSessions.mockRejectedValueOnce(new Error('Database error'));
+      mockSessionService.listSessions.mockRejectedValueOnce(new Error('Database error'));
 
       const request = new NextRequest('http://localhost:3005/api/sessions');
       const response = await GET(request);
