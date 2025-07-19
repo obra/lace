@@ -1,11 +1,15 @@
 // ABOUTME: Tests for Agent as single event source (ThreadManager no longer emits events)
 // ABOUTME: Ensures Agent methods emit thread_event_added events for UI updates
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { createMockProvider } from '~/__tests__/utils/mock-provider';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 describe('Agent Thread Event Proxying', () => {
   let agent: Agent;
@@ -13,8 +17,9 @@ describe('Agent Thread Event Proxying', () => {
   let toolExecutor: ToolExecutor;
 
   beforeEach(() => {
+    setupTestPersistence();
     const mockProvider = createMockProvider();
-    threadManager = new ThreadManager(':memory:');
+    threadManager = new ThreadManager();
     toolExecutor = new ToolExecutor();
 
     agent = new Agent({
@@ -24,6 +29,10 @@ describe('Agent Thread Event Proxying', () => {
       threadId: 'test-thread',
       tools: [],
     });
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
   });
 
   it('should emit thread_event_added when Agent processes user messages', async () => {

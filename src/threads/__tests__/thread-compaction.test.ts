@@ -1,18 +1,27 @@
 // ABOUTME: Tests for thread compaction functionality
 // ABOUTME: Verifies tool result truncation and system message generation
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolResult } from '~/tools/types';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 describe('Thread Compaction', () => {
   let threadManager: ThreadManager;
   let threadId: string;
 
   beforeEach(() => {
-    threadManager = new ThreadManager(':memory:');
+    setupTestPersistence();
+    threadManager = new ThreadManager();
     threadId = 'test-thread-compaction';
     threadManager.createThread(threadId);
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
   });
 
   it('should truncate long tool results to 200 words', () => {
@@ -56,7 +65,7 @@ describe('Thread Compaction', () => {
 
   it('should add system message after compaction with token savings', () => {
     // Start fresh
-    threadManager = new ThreadManager(':memory:');
+    threadManager = new ThreadManager();
     threadId = 'test-thread-system-message';
     threadManager.createThread(threadId);
 

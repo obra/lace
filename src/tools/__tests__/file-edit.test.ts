@@ -61,7 +61,7 @@ describe('FileEditTool with schema validation', () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
-      expect(result.content[0].text).toContain('Path cannot be empty');
+      expect(result.content[0].text).toContain('File path cannot be empty');
     });
 
     it('should reject missing old_text', async () => {
@@ -499,6 +499,78 @@ describe('FileEditTool with schema validation', () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('No exact matches found');
+    });
+  });
+
+  describe('working directory support', () => {
+    it('should resolve relative paths using working directory from context', async () => {
+      // Create a relative test file
+      const relativeTestFile = 'relative-edit-test.txt';
+      const absoluteTestFile = join(testDir, relativeTestFile);
+      await writeFile(absoluteTestFile, 'Content for relative edit');
+
+      const result = await tool.execute(
+        {
+          path: relativeTestFile,
+          old_text: 'Content for relative edit',
+          new_text: 'Modified content for relative edit',
+        },
+        { workingDirectory: testDir }
+      );
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toContain('Successfully replaced text');
+    });
+
+    it('should use absolute paths directly even when working directory is provided', async () => {
+      await writeFile(testFile, 'absolute path content');
+
+      const result = await tool.execute(
+        {
+          path: testFile, // absolute path
+          old_text: 'absolute path content',
+          new_text: 'modified absolute path content',
+        },
+        { workingDirectory: '/some/other/dir' }
+      );
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toContain('Successfully replaced text');
+    });
+
+    it('should fall back to process.cwd() when no working directory in context', async () => {
+      // Create a file relative to current working directory
+      const relativeFile = 'temp-cwd-edit-test.txt';
+      const absoluteFile = join(process.cwd(), relativeFile);
+      await writeFile(absoluteFile, 'CWD edit test content');
+
+      try {
+        const result = await tool.execute({
+          path: relativeFile,
+          old_text: 'CWD edit test content',
+          new_text: 'Modified CWD edit test content',
+        });
+
+        expect(result.isError).toBe(false);
+        expect(result.content[0].text).toContain('Successfully replaced text');
+      } finally {
+        await rm(absoluteFile, { force: true });
+      }
+    });
+
+    it('should handle non-existent relative paths with working directory context', async () => {
+      const result = await tool.execute(
+        {
+          path: 'non-existent-relative-edit.txt',
+          old_text: 'test',
+          new_text: 'modified',
+        },
+        { workingDirectory: testDir }
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('File not found');
+      expect(result.content[0].text).toContain('non-existent-relative-edit.txt');
     });
   });
 });

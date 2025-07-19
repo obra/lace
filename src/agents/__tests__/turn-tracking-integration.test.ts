@@ -10,6 +10,10 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
 import { z } from 'zod';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock provider for controlled testing
 class MockIntegrationProvider extends BaseMockProvider {
@@ -147,8 +151,9 @@ describe('Turn Tracking Provider Integration Tests', () => {
   let threadId: string;
 
   beforeEach(() => {
+    setupTestPersistence();
     toolExecutor = new ToolExecutor();
-    threadManager = new ThreadManager(':memory:');
+    threadManager = new ThreadManager();
     threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
   });
@@ -156,6 +161,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
   afterEach(() => {
     vi.clearAllTimers();
     vi.useRealTimers();
+    teardownTestPersistence();
   });
 
   describe('Complete turn lifecycle tests', () => {

@@ -2,6 +2,7 @@
 // ABOUTME: Handles database schema, CRUD operations, and data serialization for all entities
 
 import Database from 'better-sqlite3';
+import { getLaceDbPath } from '~/config/lace-dir';
 import {
   Thread,
   ThreadEvent,
@@ -19,17 +20,47 @@ import {
 } from '~/tools/implementations/task-manager/types';
 import { logger } from '~/utils/logger';
 
+export interface ProjectData {
+  id: string;
+  name: string;
+  description: string;
+  workingDirectory: string;
+  configuration: Record<string, unknown>;
+  isArchived: boolean;
+  createdAt: Date;
+  lastUsedAt: Date;
+}
+
+export interface SessionData {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  configuration: Record<string, unknown>;
+  status: 'active' | 'archived' | 'completed';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export class DatabasePersistence {
   private db: Database.Database | null = null;
   private _closed: boolean = false;
   private _disabled: boolean = false;
 
-  constructor(dbPath: string) {
+  get database(): Database.Database | null {
+    return this.db;
+  }
+
+  constructor(dbPath: string | Database.Database) {
     try {
-      this.db = new Database(dbPath);
-      // Enable WAL mode for better concurrency
-      this.db.pragma('journal_mode = WAL');
-      this.db.pragma('busy_timeout = 5000');
+      if (typeof dbPath === 'string') {
+        this.db = new Database(dbPath);
+        // Enable WAL mode for better concurrency
+        this.db.pragma('journal_mode = WAL');
+        this.db.pragma('busy_timeout = 5000');
+      } else {
+        this.db = dbPath;
+      }
       this.initializeSchema();
     } catch (error) {
       logger.error('Failed to initialize database', {
@@ -75,6 +106,14 @@ export class DatabasePersistence {
 
     if (currentVersion < 4) {
       this.migrateToV4();
+    }
+
+    if (currentVersion < 5) {
+      this.migrateToV5();
+    }
+
+    if (currentVersion < 6) {
+      this.migrateToV6();
     }
   }
 
@@ -207,6 +246,151 @@ export class DatabasePersistence {
     this.setSchemaVersion(4);
   }
 
+  private migrateToV5(): void {
+    if (!this.db) return;
+
+    // Create projects table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        working_directory TEXT NOT NULL,
+        configuration TEXT DEFAULT '{}',
+        is_archived BOOLEAN DEFAULT FALSE,
+        created_at TEXT DEFAULT (datetime('now')),
+        last_used_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    // Create "Historical" project for migration
+    this.db
+      .prepare(
+        `
+      INSERT OR IGNORE INTO projects (id, name, description, working_directory, configuration, is_archived, created_at, last_used_at)
+      VALUES ('historical', 'Historical', 'Legacy sessions before project support', ?, '{}', FALSE, datetime('now'), datetime('now'))
+    `
+      )
+      .run(process.cwd());
+
+    this.setSchemaVersion(5);
+  }
+
+  private migrateToV6(): void {
+    if (!this.db) return;
+
+    // Create sessions table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        configuration TEXT DEFAULT '{}',
+        status TEXT CHECK(status IN ('active', 'archived', 'completed')) DEFAULT 'active',
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (project_id) REFERENCES projects(id)
+      )
+    `);
+
+    // Add session_id to threads table
+    const hasSessionId =
+      (
+        this.db
+          .prepare(
+            "SELECT COUNT(*) as count FROM pragma_table_info('threads') WHERE name='session_id'"
+          )
+          .get() as { count: number }
+      ).count > 0;
+
+    if (!hasSessionId) {
+      this.db.exec('ALTER TABLE threads ADD COLUMN session_id TEXT');
+    }
+
+    // Add project_id to threads table
+    const hasProjectId =
+      (
+        this.db
+          .prepare(
+            "SELECT COUNT(*) as count FROM pragma_table_info('threads') WHERE name='project_id'"
+          )
+          .get() as { count: number }
+      ).count > 0;
+
+    if (!hasProjectId) {
+      this.db.exec('ALTER TABLE threads ADD COLUMN project_id TEXT');
+    }
+
+    // Migrate existing session threads to sessions table
+    const sessionThreads = this.db
+      .prepare(
+        `
+      SELECT id, created_at, updated_at, metadata
+      FROM threads 
+      WHERE metadata IS NOT NULL 
+      AND json_extract(metadata, '$.isSession') = 1
+    `
+      )
+      .all() as Array<{
+      id: string;
+      created_at: string;
+      updated_at: string;
+      metadata: string;
+    }>;
+
+    for (const sessionThread of sessionThreads) {
+      const metadata = JSON.parse(sessionThread.metadata) as {
+        isSession?: boolean;
+        name?: string;
+        description?: string;
+        configuration?: Record<string, unknown>;
+        [key: string]: unknown;
+      };
+
+      // Create session record
+      this.db
+        .prepare(
+          `
+        INSERT OR IGNORE INTO sessions (id, project_id, name, description, configuration, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+        )
+        .run(
+          sessionThread.id,
+          'historical',
+          metadata.name || 'Untitled Session',
+          metadata.description || '',
+          JSON.stringify(metadata.configuration || {}),
+          sessionThread.created_at,
+          sessionThread.updated_at
+        );
+
+      // Update thread to reference session and remove isSession metadata
+      const cleanMetadata = { ...metadata };
+      delete cleanMetadata.isSession;
+      delete cleanMetadata.name;
+      delete cleanMetadata.description;
+      delete cleanMetadata.configuration;
+
+      this.db
+        .prepare(
+          `
+        UPDATE threads 
+        SET session_id = ?, metadata = ?
+        WHERE id = ?
+      `
+        )
+        .run(
+          sessionThread.id,
+          Object.keys(cleanMetadata).length > 0 ? JSON.stringify(cleanMetadata) : null,
+          sessionThread.id
+        );
+    }
+
+    this.setSchemaVersion(6);
+  }
+
   // ===============================
   // Thread-related methods
   // ===============================
@@ -215,13 +399,15 @@ export class DatabasePersistence {
     if (this._closed || this._disabled || !this.db) return;
 
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO threads (id, created_at, updated_at, metadata)
-      VALUES (?, ?, ?, ?)
+      INSERT OR REPLACE INTO threads (id, session_id, project_id, created_at, updated_at, metadata)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
 
     const metadataJson = thread.metadata ? JSON.stringify(thread.metadata) : null;
     stmt.run(
       thread.id,
+      thread.sessionId || null,
+      thread.projectId || null,
       thread.createdAt.toISOString(),
       thread.updatedAt.toISOString(),
       metadataJson
@@ -240,7 +426,14 @@ export class DatabasePersistence {
     `);
 
     const threadRow = threadStmt.get(actualThreadId) as
-      | { id: string; created_at: string; updated_at: string; metadata: string | null }
+      | {
+          id: string;
+          session_id: string | null;
+          project_id: string | null;
+          created_at: string;
+          updated_at: string;
+          metadata: string | null;
+        }
       | undefined;
     if (!threadRow) return null;
 
@@ -257,6 +450,8 @@ export class DatabasePersistence {
 
     return {
       id: threadRow.id,
+      sessionId: threadRow.session_id || undefined,
+      projectId: threadRow.project_id || undefined,
       createdAt: new Date(threadRow.created_at),
       updatedAt: new Date(threadRow.updated_at),
       events,
@@ -338,26 +533,28 @@ export class DatabasePersistence {
     if (this._disabled || !this.db) return [];
 
     const stmt = this.db.prepare(`
-      SELECT DISTINCT thread_id FROM events 
-      WHERE thread_id LIKE ? 
-      ORDER BY thread_id ASC
+      SELECT DISTINCT id FROM threads 
+      WHERE id LIKE ? 
+      ORDER BY id ASC
     `);
 
     const pattern = `${parentThreadId}.%`;
-    const rows = stmt.all(pattern) as Array<{ thread_id: string }>;
-    return rows.map((row) => row.thread_id);
+    const rows = stmt.all(pattern) as Array<{ id: string }>;
+    return rows.map((row) => row.id);
   }
 
   getAllThreadsWithMetadata(): Thread[] {
     if (this._disabled || !this.db) return [];
 
     const stmt = this.db.prepare(`
-      SELECT id, created_at, updated_at, metadata FROM threads
+      SELECT id, session_id, project_id, created_at, updated_at, metadata FROM threads
       ORDER BY updated_at DESC
     `);
 
     const rows = stmt.all() as Array<{
       id: string;
+      session_id: string | null;
+      project_id: string | null;
       created_at: string;
       updated_at: string;
       metadata: string | null;
@@ -375,6 +572,8 @@ export class DatabasePersistence {
 
       return {
         id: row.id,
+        sessionId: row.session_id || undefined,
+        projectId: row.project_id || undefined,
         createdAt: new Date(row.created_at),
         updatedAt: new Date(row.updated_at),
         events: [], // Don't load events for listing operations
@@ -896,6 +1095,293 @@ export class DatabasePersistence {
     throw lastError;
   }
 
+  // ===============================
+  // Session-related methods
+  // ===============================
+
+  saveSession(session: SessionData): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO sessions (id, project_id, name, description, configuration, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      session.id,
+      session.projectId,
+      session.name,
+      session.description,
+      JSON.stringify(session.configuration),
+      session.status,
+      session.createdAt.toISOString(),
+      session.updatedAt.toISOString()
+    );
+  }
+
+  loadSession(sessionId: string): SessionData | null {
+    if (this._disabled || !this.db) return null;
+
+    const stmt = this.db.prepare(`
+      SELECT * FROM sessions WHERE id = ?
+    `);
+
+    const row = stmt.get(sessionId) as
+      | {
+          id: string;
+          project_id: string;
+          name: string;
+          description: string;
+          configuration: string;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        }
+      | undefined;
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      name: row.name,
+      description: row.description,
+      configuration: JSON.parse(row.configuration) as Record<string, unknown>,
+      status: row.status as 'active' | 'archived' | 'completed',
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    };
+  }
+
+  loadSessionsByProject(projectId: string): SessionData[] {
+    if (this._disabled || !this.db) return [];
+
+    const stmt = this.db.prepare(`
+      SELECT * FROM sessions 
+      WHERE project_id = ? 
+      ORDER BY updated_at DESC
+    `);
+
+    const rows = stmt.all(projectId) as Array<{
+      id: string;
+      project_id: string;
+      name: string;
+      description: string;
+      configuration: string;
+      status: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      projectId: row.project_id,
+      name: row.name,
+      description: row.description,
+      configuration: JSON.parse(row.configuration) as Record<string, unknown>,
+      status: row.status as 'active' | 'archived' | 'completed',
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    }));
+  }
+
+  updateSession(sessionId: string, updates: Partial<SessionData>): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const updateFields: string[] = [];
+    const values: (string | number)[] = [];
+
+    if (updates.name !== undefined) {
+      updateFields.push('name = ?');
+      values.push(updates.name);
+    }
+    if (updates.description !== undefined) {
+      updateFields.push('description = ?');
+      values.push(updates.description);
+    }
+    if (updates.configuration !== undefined) {
+      updateFields.push('configuration = ?');
+      values.push(JSON.stringify(updates.configuration));
+    }
+    if (updates.status !== undefined) {
+      updateFields.push('status = ?');
+      values.push(updates.status);
+    }
+
+    // Update timestamp - use provided updatedAt or current time
+    updateFields.push('updated_at = ?');
+    values.push(updates.updatedAt ? updates.updatedAt.toISOString() : new Date().toISOString());
+
+    values.push(sessionId);
+
+    const stmt = this.db.prepare(`
+      UPDATE sessions 
+      SET ${updateFields.join(', ')}
+      WHERE id = ?
+    `);
+
+    const result = stmt.run(...values);
+    if (result.changes === 0) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+  }
+
+  deleteSession(sessionId: string): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const stmt = this.db.prepare(`
+      DELETE FROM sessions WHERE id = ?
+    `);
+
+    const result = stmt.run(sessionId);
+    if (result.changes === 0) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+  }
+
+  // Project persistence methods
+  saveProject(project: ProjectData): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO projects (id, name, description, working_directory, configuration, is_archived, created_at, last_used_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      project.id,
+      project.name,
+      project.description,
+      project.workingDirectory,
+      JSON.stringify(project.configuration),
+      project.isArchived ? 1 : 0,
+      project.createdAt.toISOString(),
+      project.lastUsedAt.toISOString()
+    );
+  }
+
+  loadProject(projectId: string): ProjectData | null {
+    if (this._disabled || !this.db) return null;
+
+    const stmt = this.db.prepare(`
+      SELECT * FROM projects WHERE id = ?
+    `);
+
+    const row = stmt.get(projectId) as
+      | {
+          id: string;
+          name: string;
+          description: string;
+          working_directory: string;
+          configuration: string;
+          is_archived: number;
+          created_at: string;
+          last_used_at: string;
+        }
+      | undefined;
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      workingDirectory: row.working_directory,
+      configuration: JSON.parse(row.configuration) as Record<string, unknown>,
+      isArchived: Boolean(row.is_archived),
+      createdAt: new Date(row.created_at),
+      lastUsedAt: new Date(row.last_used_at),
+    };
+  }
+
+  loadAllProjects(): ProjectData[] {
+    if (this._disabled || !this.db) return [];
+
+    const stmt = this.db.prepare(`
+      SELECT * FROM projects ORDER BY last_used_at DESC
+    `);
+
+    const rows = stmt.all() as Array<{
+      id: string;
+      name: string;
+      description: string;
+      working_directory: string;
+      configuration: string;
+      is_archived: number;
+      created_at: string;
+      last_used_at: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      workingDirectory: row.working_directory,
+      configuration: JSON.parse(row.configuration) as Record<string, unknown>,
+      isArchived: Boolean(row.is_archived),
+      createdAt: new Date(row.created_at),
+      lastUsedAt: new Date(row.last_used_at),
+    }));
+  }
+
+  updateProject(projectId: string, updates: Partial<ProjectData>): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const updateFields: string[] = [];
+    const values: (string | number)[] = [];
+
+    if (updates.name !== undefined) {
+      updateFields.push('name = ?');
+      values.push(updates.name);
+    }
+    if (updates.description !== undefined) {
+      updateFields.push('description = ?');
+      values.push(updates.description);
+    }
+    if (updates.workingDirectory !== undefined) {
+      updateFields.push('working_directory = ?');
+      values.push(updates.workingDirectory);
+    }
+    if (updates.configuration !== undefined) {
+      updateFields.push('configuration = ?');
+      values.push(JSON.stringify(updates.configuration));
+    }
+    if (updates.isArchived !== undefined) {
+      updateFields.push('is_archived = ?');
+      values.push(updates.isArchived ? 1 : 0);
+    }
+
+    // Always update last_used_at
+    updateFields.push('last_used_at = ?');
+    values.push(new Date().toISOString());
+
+    values.push(projectId);
+
+    const stmt = this.db.prepare(`
+      UPDATE projects 
+      SET ${updateFields.join(', ')}
+      WHERE id = ?
+    `);
+
+    const result = stmt.run(...values);
+    if (result.changes === 0) {
+      throw new Error(`Project ${projectId} not found`);
+    }
+  }
+
+  deleteProject(projectId: string): void {
+    if (this._closed || this._disabled || !this.db) return;
+
+    const stmt = this.db.prepare(`
+      DELETE FROM projects WHERE id = ?
+    `);
+
+    const result = stmt.run(projectId);
+    if (result.changes === 0) {
+      throw new Error(`Project ${projectId} not found`);
+    }
+  }
+
   close(): void {
     if (!this._closed) {
       this._closed = true;
@@ -903,5 +1389,31 @@ export class DatabasePersistence {
         this.db.close();
       }
     }
+  }
+}
+
+// Global persistence instance
+let globalPersistence: DatabasePersistence | null = null;
+
+export function initializePersistence(dbPath?: string): void {
+  if (globalPersistence) {
+    globalPersistence.close();
+  }
+  globalPersistence = new DatabasePersistence(dbPath || getLaceDbPath());
+}
+
+export function getPersistence(): DatabasePersistence {
+  if (!globalPersistence) {
+    // Auto-initialize with default path if not already initialized
+    logger.info('Auto-initializing database persistence with default path');
+    initializePersistence();
+  }
+  return globalPersistence!;
+}
+
+export function resetPersistence(): void {
+  if (globalPersistence) {
+    globalPersistence.close();
+    globalPersistence = null;
   }
 }

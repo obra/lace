@@ -59,19 +59,19 @@ export function AgentSpawner({ sessionId, onAgentSpawn }: AgentSpawnerProps) {
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
-      
+
       const data: unknown = await res.json();
-      
+
       // Type guard to check if response is an error
       if (isErrorResponse(data)) {
         throw new Error(data.error);
       }
-      
+
       // Type guard to check if response is valid providers response
       if (!isProvidersResponse(data)) {
         throw new Error('Invalid response format from providers API');
       }
-      
+
       setProviders(data.providers);
 
       // Build model options
@@ -99,18 +99,18 @@ export function AgentSpawner({ sessionId, onAgentSpawn }: AgentSpawnerProps) {
               label: `${provider.displayName} - ${model.displayName}`,
               disabled: false,
             };
-            
+
             if (model.description) {
               option.description = model.description;
             }
-            
+
             if (model.isDefault) {
               option.isDefault = model.isDefault;
               if (!defaultOption) {
                 defaultOption = value;
               }
             }
-            
+
             options.push(option);
           });
         }
@@ -139,7 +139,7 @@ export function AgentSpawner({ sessionId, onAgentSpawn }: AgentSpawnerProps) {
       console.error('Invalid model selection');
       return;
     }
-    
+
     const request: CreateAgentRequest = {
       name: agentName.trim(),
       provider,

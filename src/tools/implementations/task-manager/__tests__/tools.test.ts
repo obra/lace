@@ -13,6 +13,10 @@ import {
 import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 describe('Enhanced Task Manager Tools', () => {
   const _tempDirContext = useTempLaceDir();
@@ -23,6 +27,7 @@ describe('Enhanced Task Manager Tools', () => {
   const agent2ThreadId = asThreadId('lace_20250703_parent.2');
 
   beforeEach(() => {
+    setupTestPersistence();
     context = {
       threadId: agent1ThreadId,
       parentThreadId: parentThreadId,
@@ -31,6 +36,7 @@ describe('Enhanced Task Manager Tools', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    teardownTestPersistence();
   });
 
   describe('TaskCreateTool', () => {

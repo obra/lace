@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId } from '@/lib/server/lace-imports';
+import { ThreadId } from '@/lib/server/core-types';
 import type { Task } from '@/types/api';
 import { UpdateTaskRequestSchema, ThreadIdSchema } from '@/lib/validation/schemas';
 
@@ -96,7 +96,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     // Get session
     const sessionService = getSessionService();
-    const session = await sessionService.getSession(sessionId);
+    const session = await sessionService.getSession(sessionId as ThreadId);
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
@@ -104,8 +104,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const taskManager = session.getTaskManager();
 
+    // Filter out undefined properties for exactOptionalPropertyTypes
+    const filteredUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, value]) => value !== undefined)
+    );
+
     // Update task with human context
-    const task = await taskManager.updateTask(taskId, updates, {
+    const task = await taskManager.updateTask(taskId, filteredUpdates, {
       actor: 'human',
       isHuman: true,
     });

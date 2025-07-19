@@ -5,16 +5,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '~': resolve(__dirname, 'src'),
-      '@': resolve(__dirname, 'packages/web'),
     },
   },
   test: {
-    exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/.worktrees/**',
-      // ...other excludes
-    ],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**', 'packages/**'],
     coverage: {
       reporter: ['text', 'html', 'lcov'],
       exclude: ['node_modules/', 'dist/', '**/*.test.ts', '**/*.spec.ts'],
@@ -27,4 +21,15 @@ export default defineConfig({
       FORCE_COLOR: '0',
     },
   },
+  projects: [
+    {
+      // Main project (CLI tests)
+      test: {
+        include: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+        exclude: ['packages/**'],
+        environment: 'jsdom',
+        setupFiles: ['./src/__tests__/setup.ts'],
+      },
+    },
+  ],
 });

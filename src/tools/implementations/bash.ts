@@ -33,15 +33,15 @@ export class BashTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof bashSchema>,
-    _context?: ToolContext
+    context?: ToolContext
   ): Promise<ToolResult> {
-    return await this.executeCommand(args.command);
+    return await this.executeCommand(args.command, context);
   }
 
-  private async executeCommand(command: string): Promise<ToolResult> {
+  private async executeCommand(command: string, context?: ToolContext): Promise<ToolResult> {
     try {
       const { stdout, stderr } = await execAsync(command, {
-        cwd: process.cwd(),
+        cwd: context?.workingDirectory || process.cwd(),
         maxBuffer: 10485760,
         shell: '/bin/bash',
       });

@@ -3,19 +3,15 @@
 
 import { z } from 'zod';
 import { readdir, stat } from 'fs/promises';
-import { join, resolve } from 'path';
+import { join } from 'path';
 import { Tool } from '~/tools/tool';
-import { NonEmptyString } from '~/tools/schemas/common';
+import { NonEmptyString, FilePath } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 import { TOOL_LIMITS } from '~/tools/constants';
 
 const fileFindSchema = z.object({
   pattern: NonEmptyString,
-  path: z
-    .string()
-    .min(1, 'Path cannot be empty')
-    .transform((path) => resolve(path))
-    .default('.'),
+  path: FilePath.default('.'),
   type: z.enum(['file', 'directory', 'both']).default('both'),
   caseSensitive: z.boolean().default(false),
   maxDepth: z
@@ -44,29 +40,32 @@ export class FileFindTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof fileFindSchema>,
-    _context?: ToolContext
+    context?: ToolContext
   ): Promise<ToolResult> {
     try {
-      const { pattern, path, type, caseSensitive, maxDepth, includeHidden, maxResults } = args;
+      const { pattern, type, caseSensitive, maxDepth, includeHidden, maxResults } = args;
+
+      // Resolve path using working directory from context
+      const resolvedPath = this.resolvePath(args.path, context);
 
       // Validate directory exists
       try {
-        const pathStat = await stat(path);
+        const pathStat = await stat(resolvedPath);
         if (!pathStat.isDirectory()) {
           return this.createError(
-            `Path ${path} is not a directory. Specify a directory path to search in.`
+            `Path ${args.path} is not a directory. Specify a directory path to search in.`
           );
         }
       } catch (error: unknown) {
         if (error instanceof Error && (error as Error & { code?: string }).code === 'ENOENT') {
           return this.createError(
-            `Directory not found: ${path}. Ensure the directory exists before searching.`
+            `Directory not found: ${args.path}. Ensure the directory exists before searching.`
           );
         }
         throw error;
       }
 
-      const matches = await this.findFiles(path, {
+      const matches = await this.findFiles(resolvedPath, {
         pattern,
         type,
         caseSensitive,
@@ -241,10 +240,5 @@ export class FileFindTool extends Tool {
     return this.createError(
       `File search failed due to unknown error. Check the directory path and search parameters, then try again.`
     );
-  }
-
-  // Public method for testing
-  validatePath(path: string): string {
-    return resolve(path);
   }
 }

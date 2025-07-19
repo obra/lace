@@ -3,7 +3,7 @@
 
 import { NextResponse } from 'next/server';
 import { ProviderRegistry } from '@/lib/server/lace-imports';
-import type { ProviderInfo, ModelInfo } from '@/lib/server/lace-imports';
+import type { ProviderInfo, ModelInfo } from '@/lib/server/core-types';
 import { ApiErrorResponse } from '@/types/api';
 
 // Type guard for unknown error values

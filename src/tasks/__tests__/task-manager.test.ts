@@ -1,26 +1,30 @@
 // ABOUTME: Tests for the TaskManager service that handles task operations
 // ABOUTME: Validates task CRUD, filtering, session scoping, and multi-agent scenarios
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskManager } from '~/tasks/task-manager';
 import { DatabasePersistence } from '~/persistence/database';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 import { Task, CreateTaskRequest, TaskContext } from '~/tasks/types';
-import { useTempLaceDir, getTestDbPath } from '~/test-utils/temp-lace-dir';
 import { asThreadId } from '~/threads/types';
 
 describe('TaskManager', () => {
-  const tempDirContext = useTempLaceDir();
   let persistence: DatabasePersistence;
   let manager: TaskManager;
   const sessionId = asThreadId('lace_20250714_abc123');
 
   beforeEach(() => {
-    persistence = new DatabasePersistence(getTestDbPath(tempDirContext));
+    persistence = setupTestPersistence();
     manager = new TaskManager(sessionId, persistence);
   });
 
   afterEach(() => {
     persistence.close();
+    teardownTestPersistence();
+    vi.restoreAllMocks();
   });
 
   describe('createTask', () => {

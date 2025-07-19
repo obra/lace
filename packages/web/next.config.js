@@ -11,12 +11,12 @@ const __dirname = path.dirname(__filename);
 const nextConfig = {
   reactStrictMode: true,
   
+  
   // ESLint configuration
   eslint: {
     // Run ESLint on these directories during build
     dirs: ['app', 'components', 'lib', 'hooks', '__tests__'],
   },
-  
   // Handle TypeScript path aliases
   webpack: (config, { isServer }) => {
     config.resolve.alias = {

@@ -1,15 +1,27 @@
 // ABOUTME: Tests for task formatter utility
 // ABOUTME: Validates task list formatting, grouping, and display options
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TaskFormatter } from '~/tools/implementations/task-manager/formatter';
 import { Task } from '~/tools/implementations/task-manager/types';
 import { createThreadId, createNewAgentSpec } from '~/threads/types';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 describe('TaskFormatter', () => {
   const parentThreadId = createThreadId('lace_20250703_parent');
   const agent1ThreadId = createThreadId('lace_20250703_parent.1');
   const agent2ThreadId = createThreadId('lace_20250703_parent.2');
+
+  beforeEach(() => {
+    setupTestPersistence();
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
+  });
 
   const createTestTasks = (): Task[] => [
     {

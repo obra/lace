@@ -9,23 +9,23 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/**/*', 'packages/web/.next/**/*', 'vitest.config.ts'],
+    ignores: ['dist/**/*', 'packages/**/*', 'vitest.config.ts'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map(config => ({
     ...config,
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['dist/**/*'],
+    ignores: ['dist/**/*', 'packages/**/*'],
   })),
   {
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['dist/**/*'],
+    ignores: ['dist/**/*', 'packages/**/*'],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
       globals: globals.node,
       parserOptions: {
-        project: ['./tsconfig.json', './packages/*/tsconfig.json'],
+        project: './tsconfig.json',
       },
     },
     plugins: {
@@ -36,7 +36,7 @@ export default [
     settings: {
       'import/resolver': {
         typescript: {
-          project: ['./tsconfig.json', './packages/*/tsconfig.json'],
+          project: './tsconfig.json',
           alwaysTryTypes: true
         }
       }
@@ -73,14 +73,14 @@ export default [
   },
   {
     files: ['src/cli/**/*.ts', 'src/interfaces/**/*.ts', 'src/app.ts'],
-    ignores: ['dist/**/*'],
+    ignores: ['dist/**/*', 'packages/**/*'],
     rules: {
       'no-console': 'off',
     },
   },
   {
     files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
-    ignores: ['dist/**/*'],
+    ignores: ['dist/**/*', 'packages/**/*'],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
@@ -92,7 +92,7 @@ export default [
     settings: {
       'import/resolver': {
         typescript: {
-          project: ['./tsconfig.json', './packages/*/tsconfig.json'],
+          project: './tsconfig.json',
           alwaysTryTypes: true
         }
       }
@@ -110,7 +110,7 @@ export default [
   },
   {
     files: ['**/*.test.ts', '**/*.spec.ts'],
-    ignores: ['dist/**/*'],
+    ignores: ['dist/**/*', 'packages/**/*'],
     plugins: {
       vitest,
     },

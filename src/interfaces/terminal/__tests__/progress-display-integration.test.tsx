@@ -11,6 +11,10 @@ import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { TerminalInterfaceComponent } from '~/interfaces/terminal/terminal-interface';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock provider for testing progress updates
 class MockProgressProvider extends BaseMockProvider {
@@ -70,6 +74,8 @@ describe('Progress Display Integration Tests', () => {
   let threadId: string;
 
   beforeEach(async () => {
+    setupTestPersistence();
+
     // Create mock response with comprehensive token usage
     const mockResponse: ProviderResponse = {
       content: 'Test response with progress tracking',
@@ -83,7 +89,7 @@ describe('Progress Display Integration Tests', () => {
 
     provider = new MockProgressProvider(mockResponse);
     toolExecutor = new ToolExecutor();
-    threadManager = new ThreadManager(':memory:');
+    threadManager = new ThreadManager();
     threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
 
@@ -98,6 +104,8 @@ describe('Progress Display Integration Tests', () => {
   });
 
   afterEach(() => {
+    threadManager.close();
+    teardownTestPersistence();
     vi.clearAllTimers();
     vi.useRealTimers();
   });

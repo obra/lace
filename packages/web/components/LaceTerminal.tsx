@@ -211,7 +211,7 @@ export function LaceTerminal({ session, onAgentSpawn }: LaceTerminalProps) {
               onChange={(e) => {
                 const value = e.target.value;
                 if (value === '' || value === session.id) {
-                  setActiveAgentId(value === '' ? null : session.id as ThreadId);
+                  setActiveAgentId(value === '' ? null : (session.id as ThreadId));
                 } else if (isValidThreadId(value)) {
                   setActiveAgentId(value);
                 } else {

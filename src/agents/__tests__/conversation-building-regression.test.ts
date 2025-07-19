@@ -1,7 +1,7 @@
 // ABOUTME: Regression tests for conversation building using real failing thread data
 // ABOUTME: Tests the _buildConversationFromEvents method to prevent tool_use_id mismatch errors
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -11,6 +11,10 @@ import { ProviderMessage, AIProvider } from '~/providers/base-provider';
 import { convertToAnthropicFormat } from '~/providers/format-converters';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Helper function for type-safe private method access
 function buildConversationFromEvents(agent: Agent, events: ThreadEvent[]): ProviderMessage[] {
@@ -61,6 +65,13 @@ try {
 }
 
 describe('Conversation Building Regression Tests', () => {
+  beforeEach(() => {
+    setupTestPersistence();
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
+  });
   // Extract of the critical event sequence that caused the bug (sample)
   const sampleEventSequence: ThreadEvent[] = [
     {

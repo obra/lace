@@ -6,6 +6,10 @@ import { Agent } from '~/agents/agent';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { AIProvider } from '~/providers/base-provider';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 describe('Retry System Integration Tests', () => {
   let agent: Agent;
@@ -14,8 +18,10 @@ describe('Retry System Integration Tests', () => {
   let threadId: string;
 
   beforeEach(() => {
+    setupTestPersistence();
+
     toolExecutor = new ToolExecutor();
-    threadManager = new ThreadManager(':memory:');
+    threadManager = new ThreadManager();
     threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
   });
@@ -24,6 +30,7 @@ describe('Retry System Integration Tests', () => {
     if (agent) {
       agent.stop();
     }
+    teardownTestPersistence();
     vi.clearAllTimers();
     vi.useRealTimers();
   });

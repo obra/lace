@@ -3,13 +3,13 @@
 
 import { z } from 'zod';
 import { writeFile, mkdir } from 'fs/promises';
-import { dirname, resolve } from 'path';
+import { dirname } from 'path';
 import { Tool } from '~/tools/tool';
-import { NonEmptyString } from '~/tools/schemas/common';
+import { FilePath } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 
 const fileWriteSchema = z.object({
-  path: NonEmptyString.transform((path) => resolve(path)),
+  path: FilePath,
   content: z.string(), // Allow empty content
   createDirs: z.boolean().default(true),
 });
@@ -24,22 +24,23 @@ export class FileWriteTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof fileWriteSchema>,
-    _context?: ToolContext
+    context?: ToolContext
   ): Promise<ToolResult> {
     try {
-      const { path, content, createDirs } = args;
+      const { content, createDirs } = args;
+      const resolvedPath = this.resolvePath(args.path, context);
 
       // Create parent directories if requested
       if (createDirs) {
-        const dir = dirname(path);
+        const dir = dirname(resolvedPath);
         await mkdir(dir, { recursive: true });
       }
 
       // Write the file
-      await writeFile(path, content, 'utf-8');
+      await writeFile(resolvedPath, content, 'utf-8');
 
       return this.createResult(
-        `Successfully wrote ${this.formatFileSize(content.length)} to ${path}`
+        `Successfully wrote ${this.formatFileSize(content.length)} to ${resolvedPath}`
       );
     } catch (error: unknown) {
       return this.handleFileSystemError(error, args.path);
@@ -100,10 +101,5 @@ export class FileWriteTool extends Tool {
     const size = parseFloat((bytes / Math.pow(k, i)).toFixed(1));
 
     return `${size} ${sizes[i]}`;
-  }
-
-  // Public method for testing
-  validatePath(path: string): string {
-    return resolve(path);
   }
 }

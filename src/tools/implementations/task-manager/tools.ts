@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Tool } from '~/tools/tool';
 import { NonEmptyString } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext } from '~/tools/types';
-import { DatabasePersistence } from '~/persistence/database';
+import { getPersistence } from '~/persistence/database';
 import { Task, TaskNote } from '~/tools/implementations/task-manager/types';
 import { isAssigneeId, AssigneeId } from '~/threads/types';
 
@@ -25,17 +25,6 @@ const createTaskSchema = z.object({
   assignedTo: z.string().optional().describe('Thread ID or "new:provider/model"'),
 });
 
-// Singleton persistence instance
-let persistenceInstance: DatabasePersistence | null = null;
-
-async function getPersistence(): Promise<DatabasePersistence> {
-  if (!persistenceInstance) {
-    const { getLaceDbPath } = await import('../../../config/lace-dir');
-    persistenceInstance = new DatabasePersistence(getLaceDbPath());
-  }
-  return persistenceInstance;
-}
-
 export class TaskCreateTool extends Tool {
   name = 'task_add';
   description = 'Create a new task with detailed instructions for execution';
@@ -46,10 +35,6 @@ export class TaskCreateTool extends Tool {
 
   // This will be injected by the factory
   protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
-
-  private async getPersistence(): Promise<DatabasePersistence> {
-    return getPersistence();
-  }
 
   protected async executeValidated(
     args: z.infer<typeof createTaskSchema>,
@@ -107,7 +92,7 @@ export class TaskCreateTool extends Tool {
           notes: [],
         };
 
-        const persistence = await this.getPersistence();
+        const persistence = getPersistence();
         await persistence.saveTask(task);
 
         let message = `Created task ${task.id}: ${task.title}`;
@@ -142,10 +127,7 @@ export class TaskListTool extends Tool {
   // This will be injected by the factory
   protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
 
-  private async getPersistence(): Promise<DatabasePersistence> {
-    return getPersistence();
-  }
-
+  // eslint-disable-next-line @typescript-eslint/require-await
   protected async executeValidated(
     args: z.infer<typeof listTasksSchema>,
     context?: ToolContext
@@ -169,7 +151,7 @@ export class TaskListTool extends Tool {
       } else {
         // Fallback to original implementation for backward compatibility
         const parentThreadId = context.parentThreadId || context.threadId;
-        const persistence = await this.getPersistence();
+        const persistence = getPersistence();
 
         switch (args.filter) {
           case 'mine':
@@ -269,10 +251,6 @@ export class TaskCompleteTool extends Tool {
   // This will be injected by the factory
   protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
 
-  private async getPersistence(): Promise<DatabasePersistence> {
-    return getPersistence();
-  }
-
   protected async executeValidated(
     args: z.infer<typeof completeTaskSchema>,
     context?: ToolContext
@@ -295,7 +273,7 @@ export class TaskCompleteTool extends Tool {
         return this.createResult(`Completed task ${args.id}: ${task.title}`);
       } else {
         // Fallback to original implementation for backward compatibility
-        const persistence = await this.getPersistence();
+        const persistence = getPersistence();
         const task = persistence.loadTask(args.id);
         if (!task) {
           return this.createError(`Task ${args.id} not found`);
@@ -340,10 +318,6 @@ export class TaskUpdateTool extends Tool {
   // This will be injected by the factory
   protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
 
-  private async getPersistence(): Promise<DatabasePersistence> {
-    return getPersistence();
-  }
-
   protected async executeValidated(
     args: z.infer<typeof updateTaskSchema>,
     context?: ToolContext
@@ -387,7 +361,7 @@ export class TaskUpdateTool extends Tool {
         return this.createResult(`Updated task ${args.taskId}: ${updateMessages.join(', ')}`);
       } else {
         // Fallback to original implementation for backward compatibility
-        const persistence = await this.getPersistence();
+        const persistence = getPersistence();
         const task = persistence.loadTask(args.taskId);
         if (!task) {
           return this.createError(`Task ${args.taskId} not found`);
@@ -438,10 +412,6 @@ export class TaskAddNoteTool extends Tool {
   // This will be injected by the factory
   protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
 
-  private async getPersistence(): Promise<DatabasePersistence> {
-    return getPersistence();
-  }
-
   protected async executeValidated(
     args: z.infer<typeof addNoteSchema>,
     context?: ToolContext
@@ -470,7 +440,7 @@ export class TaskAddNoteTool extends Tool {
           timestamp: new Date(),
         };
 
-        const persistence = await this.getPersistence();
+        const persistence = getPersistence();
         await persistence.addNote(args.taskId, note);
 
         return this.createResult(`Added note to task ${args.taskId}`);
@@ -499,10 +469,7 @@ export class TaskViewTool extends Tool {
   // This will be injected by the factory
   protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
 
-  private async getPersistence(): Promise<DatabasePersistence> {
-    return getPersistence();
-  }
-
+  // eslint-disable-next-line @typescript-eslint/require-await
   protected async executeValidated(
     args: z.infer<typeof viewTaskSchema>,
     context?: ToolContext
@@ -520,7 +487,7 @@ export class TaskViewTool extends Tool {
         task = taskManager.getTask(args.taskId, taskContext);
       } else {
         // Fallback to original implementation for backward compatibility
-        const persistence = await this.getPersistence();
+        const persistence = getPersistence();
         task = persistence.loadTask(args.taskId);
       }
 

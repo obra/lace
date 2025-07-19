@@ -15,15 +15,8 @@ interface TaskDashboardProps {
 }
 
 export function TaskDashboard({ sessionId }: TaskDashboardProps) {
-  const {
-    tasks,
-    isLoading,
-    error,
-    createTask,
-    updateTask,
-    deleteTask,
-    addNote,
-  } = useTaskManager(sessionId);
+  const { tasks, isLoading, error, createTask, updateTask, deleteTask, addNote } =
+    useTaskManager(sessionId);
 
   const [statusFilter, setStatusFilter] = useState<Task['status'] | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<Task['priority'] | 'all'>('all');
@@ -34,17 +27,18 @@ export function TaskDashboard({ sessionId }: TaskDashboardProps) {
   // Calculate summary from tasks
   const summary = {
     total: tasks.length,
-    pending: tasks.filter(t => t.status === 'pending').length,
-    in_progress: tasks.filter(t => t.status === 'in_progress').length,
-    completed: tasks.filter(t => t.status === 'completed').length,
-    blocked: tasks.filter(t => t.status === 'blocked').length,
+    pending: tasks.filter((t) => t.status === 'pending').length,
+    in_progress: tasks.filter((t) => t.status === 'in_progress').length,
+    completed: tasks.filter((t) => t.status === 'completed').length,
+    blocked: tasks.filter((t) => t.status === 'blocked').length,
   };
 
   // Filter tasks based on current filters
   const filteredTasks = tasks.filter((task) => {
     if (statusFilter !== 'all' && task.status !== statusFilter) return false;
     if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
-    if (assigneeFilter && task.assignedTo && !String(task.assignedTo).includes(assigneeFilter)) return false;
+    if (assigneeFilter && task.assignedTo && !String(task.assignedTo).includes(assigneeFilter))
+      return false;
     return true;
   });
 

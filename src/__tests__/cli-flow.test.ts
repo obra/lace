@@ -10,6 +10,10 @@ import { withConsoleCapture } from '~/__tests__/setup/console-capture';
 import { run } from '~/app';
 import { CLIOptions } from '~/cli/args';
 import { Agent } from '~/agents/agent';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock all external dependencies
 vi.mock('../agents/agent.js');
@@ -94,6 +98,7 @@ describe('CLI Flow Tests', () => {
   };
 
   beforeEach(async () => {
+    setupTestPersistence();
     vi.clearAllMocks();
 
     // Setup common mocks
@@ -200,6 +205,7 @@ describe('CLI Flow Tests', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    teardownTestPersistence();
   });
 
   describe('provider initialization', () => {

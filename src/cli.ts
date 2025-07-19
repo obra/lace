@@ -5,11 +5,15 @@
 import { loadEnvFile } from '~/config/env-loader';
 import { parseArgs, validateProvider } from '~/cli/args';
 import { ProviderRegistry } from '~/providers/registry';
+import { initializePersistence } from '~/persistence/database';
 import { run } from '~/app';
 
 async function main() {
   // Load environment variables from .env file before anything else
   loadEnvFile();
+
+  // Initialize global persistence
+  initializePersistence();
 
   // Parse arguments (handles --help and --list-tools, exits early if needed)
   const options = parseArgs();

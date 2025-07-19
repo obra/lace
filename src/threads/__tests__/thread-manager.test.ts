@@ -3,6 +3,10 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -12,12 +16,14 @@ describe('ThreadManager', () => {
   let testDir: string;
 
   beforeEach(async () => {
+    setupTestPersistence();
     testDir = await mkdtemp(join(tmpdir(), 'lace-test-'));
-    threadManager = new ThreadManager(join(testDir, 'test.db'));
+    threadManager = new ThreadManager();
   });
 
   afterEach(async () => {
     threadManager.close();
+    teardownTestPersistence();
     await rm(testDir, { recursive: true, force: true });
   });
 

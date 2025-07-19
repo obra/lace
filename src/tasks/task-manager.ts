@@ -60,21 +60,21 @@ export class TaskManager extends EventEmitter {
     // Apply filters
     if (filters) {
       if (filters.status) {
-        tasks = tasks.filter((task) => task.status === filters.status);
+        tasks = tasks.filter((task: Task) => task.status === filters.status);
       }
       if (filters.priority) {
-        tasks = tasks.filter((task) => task.priority === filters.priority);
+        tasks = tasks.filter((task: Task) => task.priority === filters.priority);
       }
       if (filters.assignedTo) {
-        tasks = tasks.filter((task) => task.assignedTo === filters.assignedTo);
+        tasks = tasks.filter((task: Task) => task.assignedTo === filters.assignedTo);
       }
       if (filters.createdBy) {
-        tasks = tasks.filter((task) => task.createdBy === filters.createdBy);
+        tasks = tasks.filter((task: Task) => task.createdBy === filters.createdBy);
       }
     }
 
     // Sort by creation date (newest first)
-    return tasks.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return tasks.sort((a: Task, b: Task) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   getTaskById(taskId: string): Task | null {
@@ -212,14 +212,14 @@ export class TaskManager extends EventEmitter {
         // Tasks assigned to the actor
         tasks = this.persistence
           .loadTasksByAssignee(context.actor as AssigneeId)
-          .filter((t) => t.threadId === this.sessionId);
+          .filter((t: Task) => t.threadId === this.sessionId);
         break;
 
       case 'created':
         // Tasks created by the actor in this session
         tasks = this.persistence
           .loadTasksByThread(this.sessionId)
-          .filter((t) => t.createdBy === context.actor);
+          .filter((t: Task) => t.createdBy === context.actor);
         break;
 
       case 'thread':

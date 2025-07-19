@@ -449,6 +449,52 @@ describe('RipgrepSearchTool with schema validation', () => {
     });
   });
 
+  describe('Working directory functionality', () => {
+    it('should resolve relative paths based on context working directory', async () => {
+      // Create a subdirectory within testDir
+      const subDir = join(testDir, 'workdir');
+      await mkdir(subDir);
+      await writeFile(join(subDir, 'workfile.txt'), 'working directory test content');
+
+      // Test with relative path and working directory context
+      const result = await tool.execute(
+        {
+          pattern: 'working directory',
+          path: '.',
+        },
+        {
+          workingDirectory: subDir,
+        }
+      );
+
+      expect(result.isError).toBe(false);
+      const output = result.content[0].text;
+      expect(output).toContain('workfile.txt');
+      expect(output).toContain('working directory test content');
+    });
+
+    it('should handle absolute paths regardless of working directory', async () => {
+      const subDir = join(testDir, 'workdir');
+      await mkdir(subDir);
+      await writeFile(join(subDir, 'workfile.txt'), 'absolute path test');
+
+      // Test with absolute path - should work regardless of working directory
+      const result = await tool.execute(
+        {
+          pattern: 'absolute path',
+          path: testDir,
+        },
+        {
+          workingDirectory: subDir,
+        }
+      );
+
+      expect(result.isError).toBe(false);
+      const output = result.content[0].text;
+      expect(output).toContain('absolute path test');
+    });
+  });
+
   describe('Edge cases', () => {
     it('should handle quotes in search pattern', async () => {
       await writeFile(join(testDir, 'quotes.txt'), 'He said "hello world" to me');

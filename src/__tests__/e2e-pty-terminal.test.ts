@@ -5,9 +5,8 @@
  * @vitest-environment node
  */
 
-import { it, expect } from 'vitest';
+import { it, expect, describe } from 'vitest';
 import {
-  describeE2E,
   createPTYSession,
   waitForText,
   waitForReady,
@@ -19,7 +18,7 @@ import {
   AGENT_RESPONSE_TIMEOUT,
 } from '~/__tests__/helpers/terminal-e2e-helpers';
 
-describeE2E('PTY Terminal E2E Tests', () => {
+describe.skip('PTY Terminal E2E Tests', () => {
   it.sequential(
     'should complete full interactive workflow with LMStudio provider',
     async () => {

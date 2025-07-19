@@ -7,6 +7,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { SessionEvent } from '@/types/api';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock types for SSE controller
 interface MockController {
@@ -87,14 +91,16 @@ describe('SSE Integration E2E Tests', () => {
   let sseManager: MockSSEManager;
 
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
     mockSessions.clear();
-    sseManager = SSEManager.getInstance() as MockSSEManager;
+    sseManager = SSEManager.getInstance() as unknown as MockSSEManager;
   });
 
   afterEach(() => {
     // Clean up any connections
     mockSessions.clear();
+    teardownTestPersistence();
   });
 
   describe('Connection Management', () => {
@@ -236,6 +242,7 @@ describe('SSE Integration E2E Tests', () => {
       expect(controller.enqueue).toHaveBeenCalledWith(expect.any(Uint8Array));
 
       // The exact format would be: "event: TYPE\ndata: {JSON}\n\n"
+      expect(controller.enqueue.mock.calls[0]).toBeDefined();
       const call = controller.enqueue.mock.calls[0][0] as Uint8Array;
       const eventText = Buffer.from(call).toString();
 

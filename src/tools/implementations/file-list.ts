@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import { readdir, stat } from 'fs/promises';
-import { join, resolve } from 'path';
+import { join } from 'path';
 import { Tool } from '~/tools/tool';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 import { TOOL_LIMITS } from '~/tools/constants';
@@ -18,11 +18,7 @@ interface TreeNode {
 }
 
 const fileListSchema = z.object({
-  path: z
-    .string()
-    .min(1, 'Path cannot be empty')
-    .transform((path) => resolve(path))
-    .default('.'),
+  path: z.string().min(1, 'Path cannot be empty').default('.'),
   pattern: z.string().optional(),
   includeHidden: z.boolean().default(false),
   recursive: z.boolean().default(false),
@@ -71,15 +67,18 @@ export class FileListTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof fileListSchema>,
-    _context?: ToolContext
+    context?: ToolContext
   ): Promise<ToolResult> {
     try {
       const { path, pattern, includeHidden, recursive, maxDepth, summaryThreshold, maxResults } =
         args;
 
+      // Resolve path using working directory from context
+      const resolvedPath = this.resolvePath(path, context);
+
       // Validate directory exists
       try {
-        const pathStat = await stat(path);
+        const pathStat = await stat(resolvedPath);
         if (!pathStat.isDirectory()) {
           return this.createError(
             `Path ${path} is not a directory. Specify a directory path to list.`
@@ -95,7 +94,7 @@ export class FileListTool extends Tool {
       }
 
       const resultCounter = { count: 0, truncated: false };
-      const tree = await this.buildTree(path, {
+      const tree = await this.buildTree(resolvedPath, {
         pattern,
         includeHidden,
         recursive,
@@ -359,6 +358,6 @@ export class FileListTool extends Tool {
 
   // Public method for testing
   validatePath(path: string): string {
-    return resolve(path);
+    return this.resolvePath(path);
   }
 }

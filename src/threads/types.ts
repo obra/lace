@@ -27,6 +27,8 @@ export interface ThreadEvent {
 
 export interface Thread {
   id: string;
+  sessionId?: string;
+  projectId?: string;
   createdAt: Date;
   updatedAt: Date;
   events: ThreadEvent[];

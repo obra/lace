@@ -6,7 +6,6 @@ import { AIProvider } from '~/providers/base-provider';
 import { ToolExecutor } from '~/tools/executor';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { ThreadManager } from '~/threads/thread-manager';
-import { getLaceDbPath } from '~/config/lace-dir';
 import { logger } from '~/utils/logger';
 import { CLIOptions } from '~/cli/args';
 import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
@@ -97,7 +96,7 @@ function handleSessionWithAgent(agent: Agent, continueMode?: boolean | string): 
 export async function run(options: CLIOptions): Promise<void> {
   await initializeServices(options);
 
-  const threadManager = new ThreadManager(getLaceDbPath());
+  const threadManager = new ThreadManager();
 
   // Create a temporary agent to handle session resumption
   const tempThreadId = threadManager.generateThreadId();

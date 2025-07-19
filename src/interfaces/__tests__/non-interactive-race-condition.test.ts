@@ -1,12 +1,24 @@
 // ABOUTME: Test for race condition in NonInteractiveInterface error handling
 // ABOUTME: Ensures errors from sendMessage don't bypass the conversationComplete promise
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
 import { Agent } from '~/agents/agent';
 import { EventEmitter } from 'events';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 describe('NonInteractiveInterface Race Condition', () => {
+  beforeEach(() => {
+    setupTestPersistence();
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
+  });
+
   it('should handle errors from sendMessage without hanging', async () => {
     // Create a mock agent that throws an error from sendMessage
     const mockEventEmitter = new EventEmitter();

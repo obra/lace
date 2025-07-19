@@ -8,6 +8,10 @@ import { ToolExecutor } from '~/tools/executor';
 import { ProviderResponse } from '~/providers/base-provider';
 import { logger } from '~/utils/logger';
 import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock provider that returns predictable responses for stable testing
 class MockConversationProvider extends BaseMockProvider {
@@ -135,9 +139,10 @@ describe('Conversation State Management with Enhanced Agent', () => {
   let threadId: string;
 
   beforeEach(async () => {
-    provider = new MockConversationProvider();
+    setupTestPersistence();
 
-    threadManager = new ThreadManager(':memory:'); // Use SQLite in-memory database for testing
+    provider = new MockConversationProvider();
+    threadManager = new ThreadManager();
     toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
 
@@ -166,6 +171,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
       }
       threadManager.close();
     }
+    teardownTestPersistence();
     // Clear provider references
     provider = null as unknown as MockConversationProvider;
     toolExecutor = null as unknown as ToolExecutor;

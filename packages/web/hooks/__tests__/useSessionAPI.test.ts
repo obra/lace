@@ -1,10 +1,14 @@
 // ABOUTME: Tests for useSessionAPI hook
 // ABOUTME: Verifies session and agent management API calls
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
 import type { ThreadId } from '@/types/api';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -12,8 +16,13 @@ global.fetch = mockFetch as unknown as typeof fetch;
 
 describe('useSessionAPI', () => {
   beforeEach(() => {
+    void setupTestPersistence();
     vi.clearAllMocks();
     mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
   });
 
   describe('createSession', () => {

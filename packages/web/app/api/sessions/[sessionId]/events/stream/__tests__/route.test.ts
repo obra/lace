@@ -5,6 +5,10 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/[sessionId]/events/stream/route';
 import type { ThreadId } from '@/types/api';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Create the mock service outside so we can access it
 const mockSessionService = {
@@ -38,6 +42,7 @@ vi.mock('@/lib/sse-manager', () => ({
 
 describe('Session SSE Stream API', () => {
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
 
     // Reset SSE manager state
@@ -46,6 +51,7 @@ describe('Session SSE Stream API', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    teardownTestPersistence();
   });
 
   describe('GET /api/sessions/{sessionId}/events/stream', () => {
@@ -108,7 +114,7 @@ describe('Session SSE Stream API', () => {
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
       );
-      const _response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      await GET(request, { params: Promise.resolve({ sessionId }) });
 
       // Simulate broadcasting events
       expect(mockSSEManager.addConnection).toHaveBeenCalledWith(sessionId, expect.any(Object));
@@ -162,7 +168,7 @@ describe('Session SSE Stream API', () => {
         }
       );
 
-      const _response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      await GET(request, { params: Promise.resolve({ sessionId }) });
 
       // Simulate client disconnect
       abortController.abort();
@@ -229,7 +235,7 @@ describe('Session SSE Stream API', () => {
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
       );
-      const _response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      await GET(request, { params: Promise.resolve({ sessionId }) });
 
       // Verify SSE manager was called to add connection
       expect(mockSSEManager.addConnection).toHaveBeenCalledWith(sessionId, expect.any(Object));

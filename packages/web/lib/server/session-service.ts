@@ -2,7 +2,7 @@
 // ABOUTME: Provides high-level API for managing sessions and agents using the Session class
 
 import { Agent, Session } from '@/lib/server/lace-imports';
-import type { ThreadId, _ToolAnnotations } from '@/lib/server/lace-imports';
+import type { ThreadId, ApprovalDecision as CoreApprovalDecision } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/lib/server/lace-imports';
 import {
   Session as SessionType,
@@ -21,12 +21,25 @@ export class SessionService {
     // No need for direct ThreadManager access - use Agent methods instead
   }
 
-  async createSession(name?: string, provider?: string, model?: string): Promise<SessionType> {
-    // Create session using shared logic with defaults
+  async createSession(
+    name: string,
+    provider: string,
+    model: string,
+    projectId: string
+  ): Promise<SessionType> {
+    // Create project-based session
+    const { Project } = await import('@/lib/server/lace-imports');
+    const project = Project.getById(projectId);
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    // Create session using Session.createWithDefaults which handles both database and thread creation
     const session = await Session.createWithDefaults({
       name,
       provider,
       model,
+      projectId,
     });
 
     const sessionId = session.getId();
@@ -55,7 +68,7 @@ export class SessionService {
     const agentThreadId = asThreadId(agent.threadId);
 
     agent.toolExecutor.setApprovalCallback({
-      requestApproval: async (toolName: string, input: unknown): Promise<ApprovalDecision> => {
+      requestApproval: async (toolName: string, input: unknown): Promise<CoreApprovalDecision> => {
         // Get tool metadata from the agent's tool executor
         const tool = agent.toolExecutor.getTool(toolName);
         const toolDescription = tool?.description;
@@ -63,7 +76,7 @@ export class SessionService {
         const isReadOnly = toolAnnotations?.readOnlyHint === true;
 
         // Request approval through the manager with proper context
-        return await approvalManager.requestApproval(
+        const decision = await approvalManager.requestApproval(
           agentThreadId,
           sessionId,
           toolName,
@@ -72,13 +85,13 @@ export class SessionService {
           input,
           isReadOnly
         );
+        return decision;
       },
     });
   }
 
   async listSessions(): Promise<SessionType[]> {
-    const dbPath = process.env.LACE_DB_PATH || './lace.db';
-    const sessionInfos = Session.getAll(dbPath);
+    const sessionInfos = Session.getAll();
 
     // Create a map of persisted sessions
     const persistedSessions = new Map<string, SessionType>();
@@ -89,7 +102,7 @@ export class SessionService {
       if (!session) {
         // Reconstruct session from database
         console.warn(`[DEBUG] Reconstructing session from database: ${sessionInfo.id}`);
-        session = await Session.getById(sessionInfo.id, dbPath);
+        session = (await Session.getById(sessionInfo.id)) ?? undefined;
         if (session) {
           console.warn(`[DEBUG] Session reconstructed successfully: ${sessionInfo.id}`);
           activeSessions.set(sessionInfo.id, session);
@@ -131,8 +144,6 @@ export class SessionService {
   async getSession(sessionId: ThreadId): Promise<Session | null> {
     console.warn(`[DEBUG] getSession called for sessionId: ${sessionId}`);
 
-    const dbPath = process.env.LACE_DB_PATH || './lace.db';
-
     // Try to get from active sessions first
     let session = activeSessions.get(sessionId);
     console.warn(`[DEBUG] Session found in active sessions: ${session ? 'yes' : 'no'}`);
@@ -140,7 +151,7 @@ export class SessionService {
     if (!session) {
       // Try to load from database by reconstructing the session
       console.warn(`[DEBUG] Reconstructing session from database: ${sessionId}`);
-      session = await Session.getById(sessionId, dbPath);
+      session = (await Session.getById(sessionId)) ?? undefined;
       if (!session) {
         console.warn(`[DEBUG] Failed to reconstruct session: ${sessionId}`);
         return null;
@@ -225,8 +236,7 @@ export class SessionService {
     // First check if this looks like a coordinator agent (session thread ID)
     if (threadId.match(/^lace_\d{8}_[a-z0-9]+$/)) {
       // This is a coordinator agent, load its session
-      const dbPath = process.env.LACE_DB_PATH || './lace.db';
-      Session.getById(threadId, dbPath)
+      Session.getById(threadId)
         .then((session) => {
           if (session) {
             activeSessions.set(threadId, session);
@@ -364,7 +374,7 @@ export class SessionService {
         input: unknown;
         isReadOnly: boolean;
         requestId: string;
-        resolve: (decision: ApprovalDecision) => void;
+        resolve: (decision: CoreApprovalDecision) => void;
       }) => {
         console.warn(
           `Tool approval requested for ${toolName} (${isReadOnly ? 'read-only' : 'destructive'})`
@@ -396,7 +406,7 @@ export class SessionService {
           } catch (error) {
             // On timeout or error, deny the request
             console.error(`Approval request failed for ${toolName}:`, error);
-            resolve(ApprovalDecision.DENY);
+            resolve(ApprovalDecision.DENY as CoreApprovalDecision);
 
             // Notify UI about the timeout/error
             const event: SessionEvent = {
@@ -412,6 +422,86 @@ export class SessionService {
         })();
       }
     );
+  }
+
+  // Service layer methods to eliminate direct business logic calls from API routes
+  async getProjectForSession(
+    sessionId: ThreadId
+  ): Promise<InstanceType<(typeof import('@/lib/server/lace-imports'))['Project']> | null> {
+    const sessionData = Session.getSession(sessionId);
+    if (!sessionData) return null;
+
+    const projectId = (sessionData as { getProjectId(): string | undefined }).getProjectId();
+    if (!projectId) return null;
+
+    const { Project } = await import('@/lib/server/lace-imports');
+    return Project.getById(projectId) || null;
+  }
+
+  async getEffectiveConfiguration(sessionId: ThreadId): Promise<Record<string, unknown>> {
+    const sessionData = Session.getSession(sessionId);
+    if (!sessionData) {
+      throw new Error('Session not found');
+    }
+
+    const project = await this.getProjectForSession(sessionId);
+    const projectConfig = (project?.getConfiguration() as Record<string, unknown>) || {};
+    const sessionConfig =
+      (sessionData as { getConfiguration(): Record<string, unknown> }).getConfiguration() || {};
+
+    // Merge configurations with session taking precedence
+    const configuration: Record<string, unknown> = {
+      ...projectConfig,
+      ...sessionConfig,
+    };
+
+    // Merge toolPolicies separately to avoid overriding all policies
+    if (projectConfig.toolPolicies || sessionConfig.toolPolicies) {
+      configuration.toolPolicies = {
+        ...((projectConfig.toolPolicies as Record<string, string>) || {}),
+        ...((sessionConfig.toolPolicies as Record<string, string>) || {}),
+      };
+    }
+
+    return configuration;
+  }
+
+  async updateSessionConfiguration(
+    sessionId: ThreadId,
+    config: Record<string, unknown>
+  ): Promise<void> {
+    const sessionData = Session.getSession(sessionId);
+    if (!sessionData) {
+      throw new Error('Session not found');
+    }
+
+    const currentConfig =
+      (sessionData as { getConfiguration(): Record<string, unknown> }).getConfiguration() || {};
+    const newConfig: Record<string, unknown> = { ...currentConfig, ...config };
+
+    // Merge toolPolicies separately to avoid overriding all policies
+    if (currentConfig.toolPolicies || config.toolPolicies) {
+      newConfig.toolPolicies = {
+        ...((currentConfig.toolPolicies as Record<string, string>) || {}),
+        ...((config.toolPolicies as Record<string, string>) || {}),
+      };
+    }
+
+    const { getPersistence } = await import('~/persistence/database');
+    const persistence = getPersistence();
+
+    persistence.updateSession(sessionId, {
+      configuration: newConfig,
+      updatedAt: new Date(),
+    });
+  }
+
+  updateSession(sessionId: ThreadId, updates: Record<string, unknown>): void {
+    Session.updateSession(sessionId, updates);
+  }
+
+  async getSessionData(sessionId: ThreadId): Promise<Record<string, unknown> | null> {
+    return Session.getSession(sessionId);
   }
 
   // Test helper method to clear active sessions
@@ -437,7 +527,7 @@ export class SessionService {
         name: agent.name,
         provider: agent.provider,
         model: agent.model,
-        status: agent.status,
+        status: agent.status as AgentType['status'],
         createdAt: (agent as { createdAt?: string }).createdAt ?? new Date().toISOString(),
       })),
     };

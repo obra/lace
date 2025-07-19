@@ -198,4 +198,55 @@ describe('FileReadTool', () => {
       expect(result.content[0].text).toBe('Only line');
     });
   });
+
+  describe('working directory support', () => {
+    it('should resolve relative paths using working directory from context', async () => {
+      // Create a relative test file
+      const relativeTestFile = 'relative-test.txt';
+      const absoluteTestFile = join(testDir, relativeTestFile);
+      await writeFile(absoluteTestFile, 'Content from relative path');
+
+      const result = await tool.execute({ path: relativeTestFile }, { workingDirectory: testDir });
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toBe('Content from relative path');
+    });
+
+    it('should use absolute paths directly even when working directory is provided', async () => {
+      const result = await tool.execute(
+        { path: testFile }, // absolute path
+        { workingDirectory: '/some/other/dir' }
+      );
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toBe(testContent);
+    });
+
+    it('should fall back to process.cwd() when no working directory in context', async () => {
+      // Create a file relative to current working directory
+      const relativeFile = 'temp-cwd-test.txt';
+      const absoluteFile = join(process.cwd(), relativeFile);
+      await writeFile(absoluteFile, 'CWD test content');
+
+      try {
+        const result = await tool.execute({ path: relativeFile });
+
+        expect(result.isError).toBe(false);
+        expect(result.content[0].text).toBe('CWD test content');
+      } finally {
+        await rm(absoluteFile, { force: true });
+      }
+    });
+
+    it('should handle non-existent relative paths with working directory context', async () => {
+      const result = await tool.execute(
+        { path: 'non-existent-relative.txt' },
+        { workingDirectory: testDir }
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('File not found');
+      expect(result.content[0].text).toContain('non-existent-relative.txt');
+    });
+  });
 });

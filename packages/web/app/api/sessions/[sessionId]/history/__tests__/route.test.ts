@@ -10,6 +10,10 @@ import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/[sessionId]/history/route';
 import { Session } from '@/lib/server/lace-imports';
 import type { SessionEvent, ApiErrorResponse } from '@/types/api';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 interface HistoryResponse {
   events: SessionEvent[];
@@ -68,9 +72,9 @@ vi.mock('@/lib/server/lace-imports', () => ({
 
 describe('Session History API', () => {
   beforeEach(() => {
+    setupTestPersistence();
     // Reset all mocks
     vi.clearAllMocks();
-    process.env.LACE_DB_PATH = ':memory:';
 
     // Reset mock implementations
     mockSessionService.getSession.mockReset();
@@ -79,7 +83,7 @@ describe('Session History API', () => {
   });
 
   afterEach(() => {
-    delete process.env.LACE_DB_PATH;
+    teardownTestPersistence();
   });
 
   describe('GET /api/sessions/[sessionId]/history', () => {

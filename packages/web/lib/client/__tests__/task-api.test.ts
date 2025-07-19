@@ -22,7 +22,7 @@ describe('TaskAPIClient', () => {
 
   describe('listTasks', () => {
     it('should fetch tasks for a session', async () => {
-      const mockTasks: Task[] = [
+      const mockTasks: Partial<Task>[] = [
         {
           id: 'task_20240101_abc123',
           title: 'Test Task',
@@ -42,7 +42,7 @@ describe('TaskAPIClient', () => {
         ok: true,
         json: vi.fn().mockResolvedValue({ tasks: mockTasks }),
       } as unknown as Response;
-      vi.mocked(global.fetch).mockResolvedValue(mockResponse);
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse as unknown as Response);
 
       const tasks = await client.listTasks('lace_20240101_session');
 
@@ -55,7 +55,7 @@ describe('TaskAPIClient', () => {
         ok: true,
         json: vi.fn().mockResolvedValue({ tasks: [] }),
       } as unknown as Response;
-      vi.mocked(global.fetch).mockResolvedValue(mockResponse);
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse as unknown as Response);
 
       await client.listTasks('lace_20240101_session', {
         status: 'pending',
@@ -77,7 +77,7 @@ describe('TaskAPIClient', () => {
         status: 500,
         json: vi.fn().mockResolvedValue({ error: 'Server error' }),
       } as unknown as Response;
-      vi.mocked(global.fetch).mockResolvedValue(mockResponse);
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse as unknown as Response);
 
       await expect(client.listTasks('lace_20240101_session')).rejects.toThrow(
         'Failed to fetch tasks'
@@ -87,7 +87,7 @@ describe('TaskAPIClient', () => {
 
   describe('createTask', () => {
     it('should create a task', async () => {
-      const newTask: Task = {
+      const newTask: Partial<Task> = {
         id: 'task_20240101_new123',
         title: 'New Task',
         description: 'New Description',
@@ -105,7 +105,7 @@ describe('TaskAPIClient', () => {
         ok: true,
         json: vi.fn().mockResolvedValue({ task: newTask }),
       } as unknown as Response;
-      vi.mocked(global.fetch).mockResolvedValue(mockResponse);
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse as unknown as Response);
 
       const task = await client.createTask('lace_20240101_session', {
         title: 'New Task',
@@ -134,7 +134,7 @@ describe('TaskAPIClient', () => {
         status: 400,
         json: vi.fn().mockResolvedValue({ error: 'Title and prompt are required' }),
       } as unknown as Response;
-      vi.mocked(global.fetch).mockResolvedValue(mockResponse);
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse as unknown as Response);
 
       await expect(
         client.createTask('lace_20240101_session', {
@@ -147,7 +147,7 @@ describe('TaskAPIClient', () => {
 
   describe('getTask', () => {
     it('should fetch a single task', async () => {
-      const mockTask: Task = {
+      const mockTask: Partial<Task> = {
         id: 'task_20240101_abc123',
         title: 'Test Task',
         description: 'Test Description',
@@ -173,7 +173,7 @@ describe('TaskAPIClient', () => {
         ok: true,
         json: vi.fn().mockResolvedValue({ task: mockTask }),
       } as unknown as Response;
-      vi.mocked(global.fetch).mockResolvedValue(mockResponse);
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse as unknown as Response);
 
       const task = await client.getTask('lace_20240101_session', 'task_20240101_abc123');
 
@@ -186,7 +186,7 @@ describe('TaskAPIClient', () => {
 
   describe('updateTask', () => {
     it('should update a task', async () => {
-      const updatedTask: Task = {
+      const updatedTask: Partial<Task> = {
         id: 'task_20240101_abc123',
         title: 'Updated Task',
         description: 'Updated Description',
@@ -204,7 +204,7 @@ describe('TaskAPIClient', () => {
         ok: true,
         json: vi.fn().mockResolvedValue({ task: updatedTask }),
       } as unknown as Response;
-      vi.mocked(global.fetch).mockResolvedValue(mockResponse);
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse as unknown as Response);
 
       const task = await client.updateTask('lace_20240101_session', 'task_20240101_abc123', {
         title: 'Updated Task',
@@ -234,7 +234,7 @@ describe('TaskAPIClient', () => {
         ok: true,
         json: vi.fn().mockResolvedValue({ message: 'Task deleted successfully' }),
       } as unknown as Response;
-      vi.mocked(global.fetch).mockResolvedValue(mockResponse);
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse as unknown as Response);
 
       await client.deleteTask('lace_20240101_session', 'task_20240101_abc123');
 
@@ -252,7 +252,7 @@ describe('TaskAPIClient', () => {
         status: 404,
         json: vi.fn().mockResolvedValue({ error: 'Task not found' }),
       } as unknown as Response;
-      vi.mocked(global.fetch).mockResolvedValue(mockResponse);
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse as unknown as Response);
 
       await expect(
         client.deleteTask('lace_20240101_session', 'task_20240101_notfound')
@@ -262,7 +262,7 @@ describe('TaskAPIClient', () => {
 
   describe('addNote', () => {
     it('should add a note to a task', async () => {
-      const mockTask: Task = {
+      const mockTask: Partial<Task> = {
         id: 'task_20240101_abc123',
         title: 'Test Task',
         prompt: 'Test Prompt',
@@ -286,7 +286,7 @@ describe('TaskAPIClient', () => {
         ok: true,
         json: vi.fn().mockResolvedValue({ message: 'Note added successfully', task: mockTask }),
       } as unknown as Response;
-      vi.mocked(global.fetch).mockResolvedValue(mockResponse);
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse as unknown as Response);
 
       const task = await client.addNote(
         'lace_20240101_session',

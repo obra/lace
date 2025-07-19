@@ -7,8 +7,8 @@ import { z } from 'zod';
 export const ThreadIdSchema = z
   .string()
   .regex(
-    /^lace_\d{8}_[a-z0-9]+(\.\d+)?$/,
-    'Invalid thread ID format. Expected: lace_YYYYMMDD_randomId or lace_YYYYMMDD_randomId.number'
+    /^(lace_\d{8}_[a-z0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\.\d+)?$/,
+    'Invalid thread ID format. Expected: lace_YYYYMMDD_randomId, UUID, or either with .number suffix'
   );
 
 // Message request schema with size limits
@@ -40,7 +40,7 @@ export const CreateTaskRequestSchema = z.object({
   priority: z.enum(['high', 'medium', 'low']).optional().default('medium'),
   assignedTo: z
     .string()
-    .regex(/^lace_\d{8}_[a-z0-9]+(\.\d+)?$/, 'Invalid assignee ID format')
+    .regex(/^(lace_\d{8}_[a-z0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\.\d+)?$/, 'Invalid assignee ID format')
     .optional(),
 });
 
@@ -52,7 +52,7 @@ export const UpdateTaskRequestSchema = z.object({
   priority: z.enum(['high', 'medium', 'low']).optional(),
   assignedTo: z
     .string()
-    .regex(/^lace_\d{8}_[a-z0-9]+(\.\d+)?$/, 'Invalid assignee ID')
+    .regex(/^(lace_\d{8}_[a-z0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\.\d+)?$/, 'Invalid assignee ID')
     .nullable()
     .optional(),
 });

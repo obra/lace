@@ -3,13 +3,12 @@
 
 import { z } from 'zod';
 import { writeFile, readFile, stat } from 'fs/promises';
-import { resolve } from 'path';
 import { Tool } from '~/tools/tool';
-import { NonEmptyString, LineNumber } from '~/tools/schemas/common';
+import { FilePath, LineNumber } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 
 const fileInsertSchema = z.object({
-  path: NonEmptyString.transform((path) => resolve(path)),
+  path: FilePath,
   content: z.string(), // Allow empty content
   line: LineNumber.optional(),
 });
@@ -26,16 +25,17 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
 
   protected async executeValidated(
     args: z.infer<typeof fileInsertSchema>,
-    _context?: ToolContext
+    context?: ToolContext
   ): Promise<ToolResult> {
     try {
       const { path, content, line } = args;
+      const resolvedPath = this.resolvePath(path, context);
 
       // Validate file exists
-      await stat(path);
+      await stat(resolvedPath);
 
       // Read current content
-      const currentContent = await readFile(path, 'utf-8');
+      const currentContent = await readFile(resolvedPath, 'utf-8');
       const lines = currentContent.split('\n');
 
       let newContent: string;
@@ -62,12 +62,12 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
       }
 
       // Write back
-      await writeFile(path, newContent, 'utf-8');
+      await writeFile(resolvedPath, newContent, 'utf-8');
 
       const addedLines = content.split('\n').length;
 
       return this.createResult(
-        `${operation} in ${path} (+${addedLines} line${addedLines === 1 ? '' : 's'})`
+        `${operation} in ${resolvedPath} (+${addedLines} line${addedLines === 1 ? '' : 's'})`
       );
     } catch (error: unknown) {
       return this.handleFileSystemError(error, args.path);
@@ -119,6 +119,6 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
 
   // Public method for testing
   validatePath(path: string): string {
-    return resolve(path);
+    return this.resolvePath(path);
   }
 }

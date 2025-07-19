@@ -108,13 +108,7 @@ describe('TaskList', () => {
 
   it('should handle status change', () => {
     const onStatusChange = vi.fn();
-    render(
-      <TaskList
-        tasks={mockTasks}
-        onTaskClick={vi.fn()}
-        onStatusChange={onStatusChange}
-      />
-    );
+    render(<TaskList tasks={mockTasks} onTaskClick={vi.fn()} onStatusChange={onStatusChange} />);
 
     const statusSelect = screen.getAllByRole('combobox')[0];
     fireEvent.change(statusSelect, { target: { value: 'completed' } });
@@ -126,7 +120,7 @@ describe('TaskList', () => {
     render(<TaskList tasks={mockTasks} onTaskClick={vi.fn()} />);
 
     const taskTitles = screen.getAllByRole('heading', { level: 3 }).map((el) => el.textContent);
-    
+
     // High priority should be first
     expect(taskTitles[0]).toBe('Complete feature');
     // Medium priority should be second
@@ -146,11 +140,11 @@ describe('TaskList', () => {
 
     // formatAssignee extracts the last part of thread ID
     const assigneeTexts = screen.getAllByText(/Assigned to:/);
-    const assigneeValues = assigneeTexts.map(el => el.parentElement?.textContent || '');
-    
-    expect(assigneeValues.some(text => text.includes('agent1'))).toBe(true);
-    expect(assigneeValues.some(text => text.includes('agent2'))).toBe(true);
-    expect(assigneeValues.some(text => text.includes('Unassigned'))).toBe(true);
+    const assigneeValues = assigneeTexts.map((el) => el.parentElement?.textContent || '');
+
+    expect(assigneeValues.some((text) => text.includes('agent1'))).toBe(true);
+    expect(assigneeValues.some((text) => text.includes('agent2'))).toBe(true);
+    expect(assigneeValues.some((text) => text.includes('Unassigned'))).toBe(true);
   });
 
   it('should show status icons', () => {

@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId } from '@/lib/server/lace-imports';
+import { ThreadId } from '@/lib/server/core-types';
 import type { TaskEvent } from '@/hooks/useTaskStream';
 
 export async function GET(request: NextRequest) {

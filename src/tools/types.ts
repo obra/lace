@@ -7,6 +7,12 @@ export interface ToolContext {
   threadId?: ThreadId;
   // Add for multi-agent support:
   parentThreadId?: ThreadId; // Parent thread (session)
+  // Working directory for file operations
+  workingDirectory?: string;
+  // Session information for policy enforcement
+  sessionId?: string;
+  projectId?: string;
+  session?: import('~/sessions/session').Session;
 }
 
 export interface ToolAnnotations {

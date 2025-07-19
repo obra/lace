@@ -9,23 +9,26 @@ import { DelegateTool } from '~/tools/implementations/delegate';
 import { BashTool } from '~/tools/implementations/bash';
 import { TestProvider } from '~/__tests__/utils/test-provider';
 import { logger } from '~/utils/logger';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
 describe('Delegation Integration Tests', () => {
   let tempDir: string;
-  let dbPath: string;
   let threadManager: ThreadManager;
   let toolExecutor: ToolExecutor;
 
   beforeEach(() => {
     // Create temporary directory for test database
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-delegation-test-'));
-    dbPath = path.join(tempDir, 'test.db');
+    setupTestPersistence();
 
     // Set up test environment
-    threadManager = new ThreadManager(dbPath);
+    threadManager = new ThreadManager();
     toolExecutor = new ToolExecutor();
 
     // Register tools
@@ -40,6 +43,8 @@ describe('Delegation Integration Tests', () => {
 
   afterEach(() => {
     threadManager.close();
+    teardownTestPersistence();
+    vi.restoreAllMocks();
     // Clean up temp directory
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true });

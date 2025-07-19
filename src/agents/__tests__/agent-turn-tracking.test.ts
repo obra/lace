@@ -8,6 +8,10 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -44,6 +48,8 @@ describe('Agent Turn Tracking', () => {
   let threadId: string;
 
   beforeEach(async () => {
+    setupTestPersistence();
+
     // Create mock response without tool calls
     const mockResponse: ProviderResponse = {
       content: 'Test response',
@@ -57,7 +63,7 @@ describe('Agent Turn Tracking', () => {
 
     provider = new MockProvider(mockResponse);
     toolExecutor = new ToolExecutor();
-    threadManager = new ThreadManager(':memory:'); // Use in-memory SQLite for tests
+    threadManager = new ThreadManager(); // Use in-memory SQLite for tests
     threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
 
@@ -74,6 +80,7 @@ describe('Agent Turn Tracking', () => {
   });
 
   afterEach(() => {
+    teardownTestPersistence();
     vi.clearAllTimers();
     vi.useRealTimers();
   });

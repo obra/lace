@@ -1,13 +1,21 @@
 // ABOUTME: Integration tests for complete conversation flow through web API
 // ABOUTME: Tests session creation, agent spawning, messaging, and event streaming
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { POST as createSession } from '@/app/api/sessions/route';
+
+// Mock server-only module
+vi.mock('server-only', () => ({}));
+import { POST as createProjectSession } from '@/app/api/projects/[projectId]/sessions/route';
 import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessionId]/agents/route';
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { GET as streamEvents } from '@/app/api/sessions/[sessionId]/events/stream/route';
 import type { ThreadId } from '@/types/api';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
+import { Project } from '@/lib/server/lace-imports';
 
 // Create the mock service outside so we can access it
 const mockSessionService = {
@@ -41,14 +49,24 @@ vi.mock('@/lib/sse-manager', () => ({
 
 describe('Full Conversation Flow', () => {
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
     mockSSEManager.sessionStreams.clear();
   });
 
+  afterEach(() => {
+    teardownTestPersistence();
+  });
+
   it('should complete full session workflow', async () => {
-    // 1. Create session
+    // 1. Create session through project
     const sessionName = 'Test Conversation';
     const sessionId = 'lace_20250113_test123' as ThreadId;
+    
+    // Create a real project for the test
+    const project = Project.create('Test Project', '/test/path', 'Test project for integration test', {});
+    const projectId = project.getId();
+    
     const mockSession = {
       id: sessionId,
       name: sessionName,
@@ -58,17 +76,25 @@ describe('Full Conversation Flow', () => {
 
     mockSessionService.createSession.mockResolvedValue(mockSession);
 
-    const createSessionRequest = new NextRequest('http://localhost:3000/api/sessions', {
+    const createSessionRequest = new NextRequest(`http://localhost:3000/api/projects/${projectId}/sessions`, {
       method: 'POST',
       body: JSON.stringify({
         name: sessionName,
-        provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        configuration: {
+          provider: 'anthropic',
+          model: 'claude-3-haiku-20240307',
+        },
       }),
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const sessionResponse = await createSession(createSessionRequest);
+    const sessionResponse = await createProjectSession(createSessionRequest, { params: { projectId } });
+    
+    if (sessionResponse.status !== 201) {
+      const errorData = (await sessionResponse.json()) as { error: string };
+      console.error('Session creation failed:', errorData);
+    }
+    
     expect(sessionResponse.status).toBe(201);
     const sessionData = (await sessionResponse.json()) as { session: { id: string } };
     expect(sessionData.session.id).toBe(sessionId);
@@ -197,16 +223,22 @@ describe('Full Conversation Flow', () => {
 
     // Create session
     mockSessionService.createSession.mockResolvedValue(mockSession);
-    const createSessionRequest = new NextRequest('http://localhost:3000/api/sessions', {
+    
+    // Create a real project for the test
+    const project = Project.create('Multi-Agent Project', '/test/path', 'Test project for multi-agent test', {});
+    const projectId = project.getId();
+    const createSessionRequest = new NextRequest(`http://localhost:3000/api/projects/${projectId}/sessions`, {
       method: 'POST',
       body: JSON.stringify({
         name: 'Multi-Agent Session',
-        provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        configuration: {
+          provider: 'anthropic',
+          model: 'claude-3-haiku-20240307',
+        },
       }),
       headers: { 'Content-Type': 'application/json' },
     });
-    await createSession(createSessionRequest);
+    await createProjectSession(createSessionRequest, { params: { projectId } });
 
     // Spawn first agent
     const agent1 = {
@@ -304,7 +336,9 @@ describe('Full Conversation Flow', () => {
     const { agents } = listData;
 
     expect(agents).toHaveLength(2);
+    expect(agents[0]).toBeDefined();
     expect(agents[0].name).toBe('pm');
+    expect(agents[1]).toBeDefined();
     expect(agents[1].name).toBe('architect');
   });
 
@@ -328,28 +362,40 @@ describe('Full Conversation Flow', () => {
       });
 
     // Create both sessions
-    await createSession(
-      new NextRequest('http://localhost:3000/api/sessions', {
+    // Create real projects for the test
+    const project1 = Project.create('Session 1 Project', '/test/path1', 'Test project for session 1', {});
+    const project2 = Project.create('Session 2 Project', '/test/path2', 'Test project for session 2', {});
+    const projectId1 = project1.getId();
+    const projectId2 = project2.getId();
+    
+    await createProjectSession(
+      new NextRequest(`http://localhost:3000/api/projects/${projectId1}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
           name: 'Session 1',
-          provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
+          configuration: {
+            provider: 'anthropic',
+            model: 'claude-3-haiku-20240307',
+          },
         }),
         headers: { 'Content-Type': 'application/json' },
-      })
+      }),
+      { params: { projectId: projectId1 } }
     );
 
-    await createSession(
-      new NextRequest('http://localhost:3000/api/sessions', {
+    await createProjectSession(
+      new NextRequest(`http://localhost:3000/api/projects/${projectId2}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
           name: 'Session 2',
-          provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
+          configuration: {
+            provider: 'anthropic',
+            model: 'claude-3-haiku-20240307',
+          },
         }),
         headers: { 'Content-Type': 'application/json' },
-      })
+      }),
+      { params: { projectId: projectId2 } }
     );
 
     // Connect to streams

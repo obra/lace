@@ -7,6 +7,10 @@ import { useProjectContext } from '~/interfaces/terminal/hooks/use-project-conte
 import { execSync } from 'child_process';
 import * as os from 'os';
 import * as path from 'path';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock child_process and os modules
 vi.mock('child_process');
@@ -22,6 +26,7 @@ describe('useProjectContext', () => {
   const mockCwd = vi.fn();
 
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
     process.cwd = mockCwd;
     mockOs.homedir.mockReturnValue('/Users/testuser');
@@ -30,6 +35,7 @@ describe('useProjectContext', () => {
 
   afterEach(() => {
     process.cwd = originalCwd;
+    teardownTestPersistence();
   });
 
   describe('path formatting', () => {
