@@ -321,18 +321,6 @@ export class SessionService {
   }
 
   // Service layer methods to eliminate direct business logic calls from API routes
-  async getProjectForSession(
-    sessionId: ThreadId
-  ): Promise<InstanceType<(typeof import('@/lib/server/lace-imports'))['Project']> | null> {
-    const sessionData = Session.getSession(sessionId);
-    if (!sessionData) return null;
-
-    const projectId = (sessionData as { getProjectId(): string | undefined }).getProjectId();
-    if (!projectId) return null;
-
-    const { Project } = await import('@/lib/server/lace-imports');
-    return Project.getById(projectId) || null;
-  }
 
   async getEffectiveConfiguration(sessionId: ThreadId): Promise<Record<string, unknown>> {
     const sessionData = Session.getSession(sessionId);
@@ -340,7 +328,14 @@ export class SessionService {
       throw new Error('Session not found');
     }
 
-    const project = await this.getProjectForSession(sessionId);
+    // Get project directly using Project.getById() instead of getProjectForSession()
+    const projectId = (sessionData as { getProjectId(): string | undefined }).getProjectId();
+    let project = null;
+    if (projectId) {
+      const { Project } = await import('@/lib/server/lace-imports');
+      project = Project.getById(projectId);
+    }
+
     const projectConfig = (project?.getConfiguration() as Record<string, unknown>) || {};
     const sessionConfig =
       (sessionData as { getConfiguration(): Record<string, unknown> }).getConfiguration() || {};

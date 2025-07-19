@@ -2,9 +2,18 @@
 // ABOUTME: Tests the missing methods needed to eliminate direct business logic calls from API routes
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getSessionService } from '@/lib/server/session-service';
+import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/lib/server/lace-imports';
+
+describe('SessionService after getProjectForSession removal', () => {
+  it('should not have getProjectForSession method', () => {
+    const sessionService = new SessionService();
+
+    // This test should FAIL initially because method still exists
+    expect((sessionService as any).getProjectForSession).toBeUndefined();
+  });
+});
 
 // Mock the lace imports
 vi.mock('@/lib/server/lace-imports', async () => {
@@ -43,63 +52,6 @@ describe('SessionService Missing Methods', () => {
 
   afterEach(() => {
     sessionService.clearActiveSessions();
-  });
-
-  describe('getProjectForSession', () => {
-    it('should return project when session has projectId', async () => {
-      // Arrange
-      const mockProject = {
-        getId: () => 'project-123',
-        getConfiguration: vi.fn(() => ({ provider: 'anthropic' })),
-      };
-      const mockSession = {
-        getId: () => mockSessionId,
-        getProjectId: () => 'project-123',
-      };
-
-      const { Session, Project } = await import('@/lib/server/lace-imports');
-      vi.mocked(Session.getSession).mockReturnValue(mockSession);
-      vi.mocked(Project.getById).mockReturnValue(mockProject);
-
-      // Act
-      const result = await sessionService.getProjectForSession(mockSessionId);
-
-      // Assert
-      expect(result).toBe(mockProject);
-      expect(Session.getSession).toHaveBeenCalledWith(mockSessionId);
-      expect(Project.getById).toHaveBeenCalledWith('project-123');
-    });
-
-    it('should return null when session has no projectId', async () => {
-      // Arrange
-      const mockSession = {
-        getId: () => mockSessionId,
-        getProjectId: () => null,
-      };
-
-      const { Session } = await import('@/lib/server/lace-imports');
-      vi.mocked(Session.getSession).mockReturnValue(mockSession);
-
-      // Act
-      const result = await sessionService.getProjectForSession(mockSessionId);
-
-      // Assert
-      expect(result).toBe(null);
-      expect(Session.getSession).toHaveBeenCalledWith(mockSessionId);
-    });
-
-    it('should return null when session not found', async () => {
-      // Arrange
-      const { Session } = await import('@/lib/server/lace-imports');
-      vi.mocked(Session.getSession).mockReturnValue(null);
-
-      // Act
-      const result = await sessionService.getProjectForSession(mockSessionId);
-
-      // Assert
-      expect(result).toBe(null);
-      expect(Session.getSession).toHaveBeenCalledWith(mockSessionId);
-    });
   });
 
   describe('getEffectiveConfiguration', () => {

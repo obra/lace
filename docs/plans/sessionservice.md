@@ -69,10 +69,43 @@ npm test
 npm test -- --testPathPattern="api/sessions.*route.test.ts"
 ```
 
+## Progress Summary
+
+### ✅ Completed Tasks (Parallelized)
+
+**Track 2: Agent Utilities for Tool Approval**
+- ✅ **Task 5**: Create agent utilities for tool approval
+  - Created `packages/web/lib/server/agent-utils.ts` with `setupAgentApprovals()` utility
+  - Added TDD tests for agent approval setup functionality
+  - Commit: `4d6082e5` - "refactor: create agent utilities for tool approval (Task 5)"
+
+- ✅ **Task 6**: Remove agent methods from SessionService  
+  - Removed `setupApprovalCallback`, `spawnAgent`, `getAgent` methods from SessionService
+  - Updated agents route to use `session.spawnAgent()` directly with `setupAgentApprovals()` utility
+  - Updated thread message route to get agents through session instead of service
+  - Replaced all `setupApprovalCallback` calls with `setupAgentApprovals()` utility
+  - Commit: `6f3f4167` - "refactor: remove agent methods from SessionService (Task 6)"
+
+**Track 3: Provider Routes - Direct Usage**  
+- ✅ **Task 8**: Provider routes already using `ProviderRegistry.createWithAutoDiscovery()` directly
+  - No changes needed - routes already follow desired pattern
+  - All tests passing
+
+**Track 4: Project Routes - Direct Usage**
+- ✅ **Task 7**: Project routes already using `Project` class directly  
+  - Routes use `Project.getById()`, `Project.getAll()`, `Project.create()` directly
+  - No changes needed - routes already follow desired pattern  
+  - All tests passing
+
+### 🔄 Remaining Tasks (Sequential - Merge Conflicts)
+
+**Phase 1**: Remove duplicate SessionService methods that conflict on shared session routes
+
 ## Phase 1: Remove Duplicate SessionService Methods
 
-### Task 1: Remove getProjectForSession() Method
+### Task 1: Remove getProjectForSession() Method  
 
+**Status**: ⏳ PENDING  
 **Goal**: Delete `getProjectForSession()` and update routes to call `Project.getById()` directly
 
 **Background**: The core `Session` class already has `getProjectId()` method and `Project.getById()` is the standard way to get projects.
@@ -264,6 +297,7 @@ git commit -m "refactor: remove getProjectForSession() - use Project.getById() d
 
 ### Task 2: Remove getEffectiveConfiguration() Method
 
+**Status**: ⏳ PENDING  
 **Goal**: Delete `getEffectiveConfiguration()` and use core Session method directly
 
 #### Step 1: TDD - Write Failing Test
@@ -364,6 +398,7 @@ git commit -m "refactor: remove getEffectiveConfiguration() - use Session method
 
 ### Task 3: Remove updateSessionConfiguration() Method
 
+**Status**: ⏳ PENDING  
 **Goal**: Use `session.updateConfiguration()` directly
 
 #### Step 1: TDD - Write Failing Test
@@ -434,6 +469,8 @@ git commit -m "refactor: remove updateSessionConfiguration() - use Session.updat
 
 ### Task 4: Remove getSessionData() Method
 
+**Status**: ⏳ PENDING
+
 #### Step 1: TDD - Write Failing Test
 
 **Red Phase:**
@@ -493,9 +530,9 @@ git commit -m "refactor: remove getSessionData() - use Session.getSession() dire
 - TDD: failing tests first"
 ```
 
-## Phase 2: Fix Tool Approval Architecture
+## ✅ Phase 2: Fix Tool Approval Architecture - COMPLETED
 
-### Task 5: Create Agent Utility for Tool Approval
+### ✅ Task 5: Create Agent Utility for Tool Approval - COMPLETED
 
 **Goal**: Move tool approval from SessionService to agent-level utility
 
@@ -593,7 +630,7 @@ git commit -m "refactor: move tool approval from SessionService to agent utiliti
 - TDD: failing tests first, minimal implementation"
 ```
 
-### Task 6: Remove Agent Methods from SessionService
+### ✅ Task 6: Remove Agent Methods from SessionService - COMPLETED
 
 #### Step 1: TDD - Write Failing Tests
 
@@ -664,9 +701,9 @@ git commit -m "refactor: remove agent methods from SessionService
 - TDD: failing tests first"
 ```
 
-## Phase 3: Direct Backend Usage
+## ✅ Phase 3: Direct Backend Usage - COMPLETED
 
-### Task 7: Project Routes - TDD Direct Usage
+### ✅ Task 7: Project Routes - TDD Direct Usage - COMPLETED
 
 #### Step 1: Pick One Project Route
 
@@ -752,7 +789,7 @@ git commit -m "refactor: project configuration route - use Project.getById() dir
 
 **One route per commit.**
 
-### Task 8: Provider Routes - TDD Direct Usage
+### ✅ Task 8: Provider Routes - TDD Direct Usage - COMPLETED
 
 #### Step 1: TDD - Write Failing Test
 
