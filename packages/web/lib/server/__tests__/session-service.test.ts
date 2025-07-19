@@ -24,6 +24,15 @@ describe('SessionService after getEffectiveConfiguration removal', () => {
   });
 });
 
+describe('SessionService after updateSessionConfiguration removal', () => {
+  it('should not have updateSessionConfiguration method', () => {
+    const sessionService = new SessionService();
+
+    // This test should FAIL initially because method still exists
+    expect((sessionService as any).updateSessionConfiguration).toBeUndefined();
+  });
+});
+
 // Mock the lace imports
 vi.mock('@/lib/server/lace-imports', async () => {
   const actual = await vi.importActual('@/lib/server/lace-imports');
@@ -61,57 +70,6 @@ describe('SessionService Missing Methods', () => {
 
   afterEach(() => {
     sessionService.clearActiveSessions();
-  });
-
-  describe('updateSessionConfiguration', () => {
-    it('should update session configuration', async () => {
-      // Arrange
-      const mockSession = {
-        getId: () => mockSessionId,
-        getConfiguration: vi.fn(() => ({
-          provider: 'anthropic',
-          maxTokens: 1000,
-        })),
-      };
-
-      const { Session } = await import('@/lib/server/lace-imports');
-      const { getPersistence } = await import('~/persistence/database');
-      const mockPersistence = { updateSession: vi.fn() } as {
-        updateSession: ReturnType<typeof vi.fn>;
-      };
-
-      vi.mocked(Session.getSession).mockReturnValue(mockSession);
-      vi.mocked(getPersistence).mockReturnValue(mockPersistence);
-
-      const configUpdate = { model: 'claude-3-opus', maxTokens: 2000 };
-
-      // Act
-      await sessionService.updateSessionConfiguration(mockSessionId, configUpdate);
-
-      // Assert
-      expect(mockPersistence.updateSession).toHaveBeenCalledWith(
-        mockSessionId,
-        expect.objectContaining({
-          configuration: {
-            provider: 'anthropic',
-            maxTokens: 2000,
-            model: 'claude-3-opus',
-          },
-          updatedAt: expect.any(Date) as Date,
-        })
-      );
-    });
-
-    it('should throw error when session not found', async () => {
-      // Arrange
-      const { Session } = await import('@/lib/server/lace-imports');
-      vi.mocked(Session.getSession).mockReturnValue(null);
-
-      // Act & Assert
-      await expect(
-        sessionService.updateSessionConfiguration(mockSessionId, { model: 'claude-3-opus' })
-      ).rejects.toThrow('Session not found');
-    });
   });
 
   describe('updateSession', () => {

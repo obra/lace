@@ -41,15 +41,14 @@ export async function PUT(request: NextRequest, { params }: { params: { sessionI
     const validatedData = ConfigurationSchema.parse(body);
 
     const sessionService = getSessionService();
-
-    // Update session configuration using SessionService
-    await sessionService.updateSessionConfiguration(params.sessionId, validatedData);
-
-    // Get effective configuration for response
     const session = await sessionService.getSession(params.sessionId);
+
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
+
+    // Update session configuration directly
+    session.updateConfiguration(validatedData);
     const configuration = session.getEffectiveConfiguration();
 
     return NextResponse.json({ configuration });

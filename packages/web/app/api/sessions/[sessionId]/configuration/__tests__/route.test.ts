@@ -290,3 +290,62 @@ describe('TDD: Direct Session Usage', () => {
     expect(mockSessionWithMethod.getEffectiveConfiguration).toHaveBeenCalled();
   });
 });
+
+describe('TDD: Direct Session Configuration Update', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should call session.updateConfiguration() directly', async () => {
+    // Mock the dependencies
+    const { Session, Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+    const { getPersistence } = vi.mocked(await import('~/persistence/database'));
+
+    const mockSession = {
+      ...mockSessionData,
+      updateConfiguration: vi.fn(),
+      getEffectiveConfiguration: vi.fn().mockReturnValue({
+        provider: 'anthropic',
+        model: 'claude-3-sonnet',
+        maxTokens: 8000,
+        toolPolicies: {
+          'file-read': 'allow',
+          'file-write': 'deny',
+        },
+      }),
+    };
+
+    const mockPersistence = {
+      updateSession: vi.fn(),
+    };
+
+    Session.getSession = vi.fn().mockReturnValue(mockSession);
+    Project.getById = vi.fn().mockReturnValue(mockProject);
+    getPersistence.mockReturnValue(mockPersistence);
+
+    const configUpdate = {
+      provider: 'anthropic',
+      model: 'claude-3-sonnet',
+      maxTokens: 8000,
+      toolPolicies: {
+        'file-read': 'allow',
+        'file-write': 'deny',
+      },
+    };
+
+    const request = new NextRequest('http://localhost/api/sessions/test-session/configuration', {
+      method: 'PUT',
+      body: JSON.stringify(configUpdate),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    // This should FAIL initially because route still uses sessionService.updateSessionConfiguration
+    await PUT(request, { params: { sessionId: 'test-session' } });
+
+    // Verify session was retrieved
+    expect(Session.getSession).toHaveBeenCalledWith('test-session');
+
+    // Verify session.updateConfiguration was called directly
+    expect(mockSession.updateConfiguration).toHaveBeenCalledWith(configUpdate);
+  });
+});

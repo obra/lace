@@ -322,36 +322,6 @@ export class SessionService {
 
   // Service layer methods to eliminate direct business logic calls from API routes
 
-  async updateSessionConfiguration(
-    sessionId: ThreadId,
-    config: Record<string, unknown>
-  ): Promise<void> {
-    const sessionData = Session.getSession(sessionId);
-    if (!sessionData) {
-      throw new Error('Session not found');
-    }
-
-    const currentConfig =
-      (sessionData as { getConfiguration(): Record<string, unknown> }).getConfiguration() || {};
-    const newConfig: Record<string, unknown> = { ...currentConfig, ...config };
-
-    // Merge toolPolicies separately to avoid overriding all policies
-    if (currentConfig.toolPolicies || config.toolPolicies) {
-      newConfig.toolPolicies = {
-        ...((currentConfig.toolPolicies as Record<string, string>) || {}),
-        ...((config.toolPolicies as Record<string, string>) || {}),
-      };
-    }
-
-    const { getPersistence } = await import('~/persistence/database');
-    const persistence = getPersistence();
-
-    persistence.updateSession(sessionId, {
-      configuration: newConfig,
-      updatedAt: new Date(),
-    });
-  }
-
   updateSession(sessionId: ThreadId, updates: Record<string, unknown>): void {
     Session.updateSession(sessionId, updates);
   }
