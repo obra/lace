@@ -266,20 +266,23 @@ describe('API Endpoints E2E Tests', () => {
       );
       sessionId = session.id as string;
 
-      const session = await sessionService.getSession(sessionId as ThreadId);
-      expect(session).toBeDefined();
-      const agent = session!.spawnAgent('Message Agent', 'anthropic');
+      const sessionInstance = await sessionService.getSession(sessionId as ThreadId);
+      expect(sessionInstance).toBeDefined();
+      const agent = sessionInstance!.spawnAgent('Message Agent', 'anthropic');
       agentThreadId = agent.threadId as string;
     });
 
     it('should accept message via API', async () => {
       // Debug the session and agent state
 
-      // Check if session exists
-      await sessionService.getSession(sessionId as ThreadId);
+      // Check if session exists and get agent through session
+      const session = await sessionService.getSession(sessionId as ThreadId);
+      if (!session) {
+        throw new Error(`Session not found for sessionId: ${sessionId}`);
+      }
 
       // Ensure the agent is properly available
-      const agent = sessionService.getAgent(agentThreadId);
+      const agent = session.getAgent(agentThreadId);
       if (!agent) {
         throw new Error(
           `Agent not found for threadId: ${agentThreadId}. Cannot proceed with message test.`

@@ -168,7 +168,12 @@ describe('Thread Messaging API', () => {
     });
 
     it('should handle non-existent threadId', async () => {
-      mockSessionService.getAgent.mockReturnValue(null);
+      // Mock session that exists but has no agent with the given threadId
+      const mockSession = {
+        getAgent: vi.fn().mockReturnValue(null), // Agent not found
+      };
+
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
@@ -194,7 +199,11 @@ describe('Thread Messaging API', () => {
         sendMessage: vi.fn().mockResolvedValue(undefined),
       };
 
-      mockSessionService.getAgent.mockReturnValue(mockAgent as unknown as Agent);
+      const mockSession = {
+        getAgent: vi.fn().mockReturnValue(mockAgent as unknown as Agent),
+      };
+
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
@@ -209,7 +218,6 @@ describe('Thread Messaging API', () => {
         sessionId,
         expect.objectContaining({
           type: 'USER_MESSAGE',
-
           threadId,
           data: { content: 'Test message' },
         })
@@ -268,7 +276,11 @@ describe('Thread Messaging API', () => {
         sendMessage: vi.fn().mockRejectedValue(new Error('Provider error')),
       };
 
-      mockSessionService.getAgent.mockReturnValue(mockAgent as unknown as Agent);
+      const mockSession = {
+        getAgent: vi.fn().mockReturnValue(mockAgent as unknown as Agent),
+      };
+
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',
@@ -295,7 +307,11 @@ describe('Thread Messaging API', () => {
         sendMessage: vi.fn().mockResolvedValue(undefined),
       };
 
-      mockSessionService.getAgent.mockReturnValue(mockAgent as unknown as Agent);
+      const mockSession = {
+        getAgent: vi.fn().mockReturnValue(mockAgent as unknown as Agent),
+      };
+
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       const agentRequest = new NextRequest(
         `http://localhost:3000/api/threads/${threadId}/message`,
