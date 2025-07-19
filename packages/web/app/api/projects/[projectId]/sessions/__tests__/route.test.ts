@@ -75,9 +75,12 @@ describe('Session API endpoints under projects', () => {
 
       mockProject.getSessions.mockReturnValue(mockSessions);
 
-      const response = GET(new NextRequest('http://localhost/api/projects/project1/sessions'), {
-        params: { projectId: 'project1' },
-      });
+      const response = await GET(
+        new NextRequest('http://localhost/api/projects/project1/sessions'),
+        {
+          params: Promise.resolve({ projectId: 'project1' }),
+        }
+      );
 
       const data = (await response.json()) as { sessions: typeof mockSessions };
 
@@ -91,9 +94,12 @@ describe('Session API endpoints under projects', () => {
     it('should return empty array when no sessions exist', async () => {
       mockProject.getSessions.mockReturnValue([]);
 
-      const response = GET(new NextRequest('http://localhost/api/projects/project1/sessions'), {
-        params: { projectId: 'project1' },
-      });
+      const response = await GET(
+        new NextRequest('http://localhost/api/projects/project1/sessions'),
+        {
+          params: Promise.resolve({ projectId: 'project1' }),
+        }
+      );
 
       const data = (await response.json()) as { sessions: [] };
 
@@ -105,9 +111,12 @@ describe('Session API endpoints under projects', () => {
       const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
       mockedGetById.mockReturnValue(null);
 
-      const response = GET(new NextRequest('http://localhost/api/projects/project1/sessions'), {
-        params: { projectId: 'project1' },
-      });
+      const response = await GET(
+        new NextRequest('http://localhost/api/projects/project1/sessions'),
+        {
+          params: Promise.resolve({ projectId: 'project1' }),
+        }
+      );
 
       const data = (await response.json()) as { error: string };
 
@@ -120,9 +129,12 @@ describe('Session API endpoints under projects', () => {
         throw new Error('Database error');
       });
 
-      const response = GET(new NextRequest('http://localhost/api/projects/project1/sessions'), {
-        params: { projectId: 'project1' },
-      });
+      const response = await GET(
+        new NextRequest('http://localhost/api/projects/project1/sessions'),
+        {
+          params: Promise.resolve({ projectId: 'project1' }),
+        }
+      );
 
       const data = (await response.json()) as { error: string };
 

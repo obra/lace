@@ -484,14 +484,6 @@ export class Session {
     agent.stop();
   }
 
-  async sendMessage(threadId: ThreadId, message: string): Promise<void> {
-    const agent = this.getAgent(threadId);
-    if (!agent) {
-      throw new Error(`Agent not found: ${threadId}`);
-    }
-    await agent.sendMessage(message);
-  }
-
   getTaskManager(): TaskManager {
     return this._taskManager;
   }

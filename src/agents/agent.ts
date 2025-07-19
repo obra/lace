@@ -157,6 +157,10 @@ export class Agent extends EventEmitter {
   get threadId(): string {
     return this._threadId;
   }
+
+  get isRunning(): boolean {
+    return this._isRunning;
+  }
   private readonly _stopReasonHandler: StopReasonHandler;
   private readonly _tokenBudgetManager: TokenBudgetManager | null;
   private _state: AgentState = 'idle';
@@ -193,7 +197,7 @@ export class Agent extends EventEmitter {
     }
   ): Promise<void> {
     if (!this._isRunning) {
-      throw new Error('Agent is not started. Call start() first.');
+      await this.start();
     }
 
     if (this._state === 'idle') {
@@ -244,7 +248,7 @@ export class Agent extends EventEmitter {
 
   async continueConversation(): Promise<void> {
     if (!this._isRunning) {
-      throw new Error('Agent is not started. Call start() first.');
+      await this.start();
     }
 
     await this._processConversation();

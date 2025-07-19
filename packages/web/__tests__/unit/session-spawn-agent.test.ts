@@ -113,10 +113,8 @@ describe('Session.spawnAgent Method', () => {
     const agent = session.spawnAgent('Eventful Agent', 'anthropic', 'claude-3-haiku-20240307');
     const agentThreadId = agent.threadId;
 
-    // Start the agent
-    await agent.start();
-
-    // Verify agent was started (state may be 'idle' if not processing, but it should be started)
+    // Agent will auto-start when needed
+    // Verify agent state is defined
     expect(agent.getCurrentState()).toBeDefined();
 
     // Try to add an event to the agent's thread

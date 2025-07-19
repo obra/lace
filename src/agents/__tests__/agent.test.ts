@@ -157,16 +157,27 @@ describe('Enhanced Agent', () => {
       expect(stateChangeSpy).not.toHaveBeenCalled();
     });
 
-    it('should throw error when sending message before start', async () => {
+    it('should auto-start when sending message before explicit start', async () => {
       agent = createAgent();
+      expect(agent.isRunning).toBe(false);
 
-      await expect(agent.sendMessage('test')).rejects.toThrow('Agent is not started');
+      await agent.sendMessage('test');
+
+      expect(agent.isRunning).toBe(true);
+      expect(agent.getCurrentState()).toBe('idle');
     });
 
-    it('should throw error when continuing conversation before start', async () => {
+    it('should auto-start when continuing conversation before explicit start', async () => {
       agent = createAgent();
+      expect(agent.isRunning).toBe(false);
 
-      await expect(agent.continueConversation()).rejects.toThrow('Agent is not started');
+      // Add a user message first so there's conversation to continue
+      threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Previous message');
+
+      await agent.continueConversation();
+
+      expect(agent.isRunning).toBe(true);
+      expect(agent.getCurrentState()).toBe('idle');
     });
   });
 

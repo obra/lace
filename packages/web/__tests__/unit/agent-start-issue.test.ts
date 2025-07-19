@@ -1,5 +1,5 @@
-// ABOUTME: Unit tests to isolate the exact agent start issue
-// ABOUTME: Tests the specific scenario where agent.start() fails after spawnAgent
+// ABOUTME: Unit tests to isolate agent spawning and thread creation
+// ABOUTME: Tests the scenario where agent delegates work with spawnAgent
 
 /**
  * @vitest-environment node
@@ -15,7 +15,7 @@ import {
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
-describe('Agent Start Issue', () => {
+describe('Agent Spawning and Thread Creation', () => {
   let session: Session;
   let projectId: string;
 
@@ -65,11 +65,7 @@ describe('Agent Start Issue', () => {
       ._threadManager;
     expect(_agentThreadManager).toBeDefined();
 
-    // This is the exact call that fails in E2E tests
-    // Let's see what happens when we call agent.start()
-    // This is the exact call that fails in E2E tests
-    // Let's see what happens when we call agent.start()
-    await agent.start();
+    // Agent auto-starts when needed - no manual start required
     expect(agent).toBeDefined();
   });
 
@@ -117,7 +113,7 @@ describe('Agent Start Issue', () => {
     const _retrievedThread = sessionThreadManager.getThread(delegateThreadId);
     expect(_retrievedThread).toBeDefined();
 
-    // Now try to simulate what happens in agent.start()
+    // Now try to simulate what happens during agent operation
     // The agent tries to add an event to its thread
     const _event = sessionThreadManager.addEvent(
       delegateThreadId,
@@ -157,8 +153,7 @@ describe('Agent Start Issue', () => {
     const _agentThread = agentThreadManager.getThread(delegateAgent.threadId);
     expect(_agentThread).toBeDefined();
 
-    // Try to start the agent
-    await delegateAgent.start();
+    // Agent will auto-start when needed - no manual start required
     expect(delegateAgent).toBeDefined();
   });
 });

@@ -1,15 +1,15 @@
 // ABOUTME: Display formatting utilities for UI components
 // ABOUTME: Provides safe, consistent formatting for ThreadIds and other core types
 
-import { isThreadId } from '@/lib/server/core-types';
+import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 
 /**
  * Formats a ThreadId for display by extracting a human-readable name
  * Handles both session IDs (lace_YYYYMMDD_name) and agent IDs (lace_YYYYMMDD_name.N)
  */
 export function formatThreadIdForDisplay(threadId: string): string {
-  // Validate input using core validation
-  if (!isThreadId(threadId)) {
+  // Validate input using client-safe validation
+  if (!isValidThreadId(threadId)) {
     return threadId; // Return as-is if not a valid ThreadId
   }
 

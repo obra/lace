@@ -2,17 +2,57 @@
 // ABOUTME: Tests the complete user workflow for tool approval in the web UI
 
 import { test, expect } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 // Test environment setup
 test.describe.configure({ mode: 'serial' }); // Run tests sequentially to avoid session conflicts
 
 test.describe('Tool Approval Modal E2E Tests', () => {
+  let tempDir: string;
+  let projectName: string;
+
   test.beforeEach(async ({ page }) => {
+    // Create unique temp directory for this test
+    tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lace-e2e-approval-'));
+
+    // Create unique project name for this test run
+    projectName = `Tool Approval Project ${Date.now()}`;
+
+    // Set up test environment with temp directory
+    await page.addInitScript((testTempDir) => {
+      window.testEnv = {
+        ANTHROPIC_KEY: 'test-key',
+        LACE_DB_PATH: path.join(testTempDir, 'lace.db'),
+      };
+    }, tempDir);
+
+    // Set LACE_DIR environment variable for the server
+    process.env.LACE_DIR = tempDir;
+
     // Navigate to the web app
-    await page.goto('http://localhost:3005');
+    await page.goto('/');
+
+    // Create a test project first
+    await page.click('text=New Project');
+    await page.fill('#name', projectName);
+    await page.fill('#description', 'Project for tool approval testing');
+    await page.fill('#workingDirectory', path.join(tempDir, 'workspace'));
+    await page.click('button[type="submit"]');
+
+    // Wait for project to be created and selected
+    await expect(page.getByText(projectName)).toBeVisible();
 
     // Wait for the app to load
     await page.waitForSelector('[data-testid="create-session-button"]');
+  });
+
+  test.afterEach(async () => {
+    // Clean up temp directory
+    if (tempDir && fs.existsSync(tempDir)) {
+      await fs.promises.rm(tempDir, { recursive: true, force: true });
+    }
   });
 
   test('should display basic UI elements', async ({ page }) => {

@@ -2,6 +2,9 @@
 // ABOUTME: Tests the complete user workflow through a real browser
 
 import { test, expect } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 // Define the test environment type
 interface TestEnvironment {
@@ -17,14 +20,26 @@ declare global {
 }
 
 test.describe('Web UI End-to-End Tests', () => {
+  let tempDir: string;
+  let projectName: string;
+
   test.beforeEach(async ({ page }) => {
-    // Set up test environment
-    await page.addInitScript(() => {
+    // Create unique temp directory for this test
+    tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lace-e2e-test-'));
+
+    // Create unique project name for this test run
+    projectName = `E2E Test Project ${Date.now()}`;
+
+    // Set up test environment with temp directory
+    await page.addInitScript((testTempDir) => {
       window.testEnv = {
         ANTHROPIC_KEY: 'test-key',
-        LACE_DB_PATH: ':memory:',
+        LACE_DB_PATH: path.join(testTempDir, 'lace.db'),
       };
-    });
+    }, tempDir);
+
+    // Set LACE_DIR environment variable for the server
+    process.env.LACE_DIR = tempDir;
 
     // Go to home page and create/select a project for all tests
     await page.goto('/');
@@ -32,16 +47,23 @@ test.describe('Web UI End-to-End Tests', () => {
     // Create a test project by clicking the "New Project" button
     await page.click('text=New Project');
 
-    // Fill in the project form
-    await page.fill('#name', 'E2E Test Project');
+    // Fill in the project form with unique name
+    await page.fill('#name', projectName);
     await page.fill('#description', 'Project for E2E testing');
-    await page.fill('#workingDirectory', '/tmp/e2e-test');
+    await page.fill('#workingDirectory', path.join(tempDir, 'workspace'));
 
     // Submit the form
     await page.click('button[type="submit"]');
 
     // Wait for project to be created and selected
-    await expect(page.getByText('E2E Test Project')).toBeVisible();
+    await expect(page.getByText(projectName)).toBeVisible();
+  });
+
+  test.afterEach(async () => {
+    // Clean up temp directory
+    if (tempDir && fs.existsSync(tempDir)) {
+      await fs.promises.rm(tempDir, { recursive: true, force: true });
+    }
   });
 
   test.describe('Session Management', () => {
@@ -83,7 +105,7 @@ test.describe('Web UI End-to-End Tests', () => {
       await page.reload();
 
       // Re-select the project after refresh (if needed)
-      await page.click('text=E2E Test Project');
+      await page.click(`text=${projectName}`);
 
       // Verify session still exists
       await expect(page.getByText('Persistent Session')).toBeVisible();

@@ -12,9 +12,13 @@ const CreateSessionSchema = z.object({
   configuration: z.record(z.unknown()).optional(),
 });
 
-export function GET(_request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> }
+) {
   try {
-    const project = Project.getById(params.projectId);
+    const { projectId } = await params;
+    const project = Project.getById(projectId);
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
@@ -30,12 +34,16 @@ export function GET(_request: NextRequest, { params }: { params: { projectId: st
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> }
+) {
   try {
+    const { projectId } = await params;
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = CreateSessionSchema.parse(body);
 
-    const project = Project.getById(params.projectId);
+    const project = Project.getById(projectId);
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
@@ -44,9 +52,9 @@ export async function POST(request: NextRequest, { params }: { params: { project
     const sessionService = getSessionService();
     const session = await sessionService.createSession(
       validatedData.name,
-      validatedData.configuration?.provider as string || 'anthropic',
-      validatedData.configuration?.model as string || 'claude-3-haiku-20240307',
-      params.projectId
+      (validatedData.configuration?.provider as string) || 'anthropic',
+      (validatedData.configuration?.model as string) || 'claude-3-haiku-20240307',
+      projectId
     );
 
     return NextResponse.json({ session }, { status: 201 });

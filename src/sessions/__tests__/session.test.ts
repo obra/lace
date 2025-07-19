@@ -351,44 +351,6 @@ describe('Session', () => {
     });
   });
 
-  describe('sendMessage', () => {
-    it('should send message to agent', async () => {
-      const session = Session.create(
-        'Test Session',
-        'anthropic',
-        'claude-3-haiku-20240307',
-        testProject.getId()
-      );
-      const spawnedAgent = session.spawnAgent('Test Agent');
-
-      // Start the agent first
-      await spawnedAgent.start();
-
-      // Mock the agent's sendMessage method to avoid real API calls
-      const sendMessageSpy = vi.spyOn(spawnedAgent, 'sendMessage').mockResolvedValue();
-
-      // Should not throw
-      await expect(
-        session.sendMessage(asThreadId(spawnedAgent.threadId), 'Hello')
-      ).resolves.toBeUndefined();
-
-      // Verify the message was sent
-      expect(sendMessageSpy).toHaveBeenCalledWith('Hello');
-    });
-
-    it('should throw error for non-existent agent', async () => {
-      const session = Session.create(
-        'Test Session',
-        'anthropic',
-        'claude-3-haiku-20240307',
-        testProject.getId()
-      );
-      await expect(session.sendMessage(asThreadId('non-existent'), 'Hello')).rejects.toThrow(
-        'Agent not found: non-existent'
-      );
-    });
-  });
-
   describe('destroy', () => {
     it('should stop all agents and clear them', () => {
       const session = Session.create(

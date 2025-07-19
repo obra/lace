@@ -5,7 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { SessionEvent, ApiErrorResponse } from '@/types/api';
 import type { ThreadEvent } from '@/lib/server/core-types';
-import { asThreadId, isThreadId } from '@/lib/server/core-types';
+import { asThreadId } from '@/lib/server/core-types';
+import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 
 // Use core ThreadId validation instead of custom validation
 // isThreadId is imported from core-types and handles proper format validation
@@ -165,8 +166,8 @@ export async function GET(
   try {
     const { sessionId: sessionIdParam } = await params;
 
-    // Validate session ID format using core ThreadId validation
-    if (!isThreadId(sessionIdParam)) {
+    // Validate session ID format using client-safe validation that accepts both lace and UUID formats
+    if (!isValidThreadId(sessionIdParam)) {
       const errorResponse: ApiErrorResponse = { error: 'Invalid session ID format' };
       return NextResponse.json(errorResponse, { status: 400 });
     }
