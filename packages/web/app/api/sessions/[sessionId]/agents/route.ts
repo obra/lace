@@ -52,21 +52,41 @@ export async function POST(
       return NextResponse.json({ error: 'Agent name is required' }, { status: 400 });
     }
 
-    const agent = await sessionService.spawnAgent(sessionId, body.name, body.provider, body.model);
+    // Get session and spawn agent directly
+    const session = await sessionService.getSession(sessionId);
+    if (!session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    const agent = session.spawnAgent(body.name, body.provider, body.model);
+
+    // Setup agent approvals using utility
+    const { setupAgentApprovals } = await import('@/lib/server/agent-utils');
+    setupAgentApprovals(agent, sessionId);
+
+    // Convert to API format
+    const agentResponse = {
+      threadId: agent.threadId as ThreadId,
+      name: body.name,
+      provider: body.provider || 'anthropic',
+      model: body.model || 'claude-3-haiku-20240307',
+      status: 'idle' as const,
+      createdAt: new Date().toISOString(),
+    };
 
     // Test SSE broadcast
     const { SSEManager } = await import('@/lib/sse-manager');
     const sseManager = SSEManager.getInstance();
-    const agentThreadId = agent.threadId as ThreadId;
+    const agentThreadId = agentResponse.threadId;
     const testEvent = {
       type: 'LOCAL_SYSTEM_MESSAGE' as const,
       threadId: agentThreadId,
       timestamp: new Date().toISOString(),
-      data: { message: `Agent "${agent.name}" spawned successfully` },
+      data: { message: `Agent "${agentResponse.name}" spawned successfully` },
     };
     sseManager.broadcast(sessionId, testEvent);
 
-    return NextResponse.json({ agent }, { status: 201 });
+    return NextResponse.json({ agent: agentResponse }, { status: 201 });
   } catch (error: unknown) {
     console.error('Error in POST /api/sessions/[sessionId]/agents:', error);
 

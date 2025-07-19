@@ -47,8 +47,9 @@ export class SessionService {
     // Set up approval callback and event handlers for the coordinator agent
     const coordinatorAgent = session.getAgent(sessionId);
     if (coordinatorAgent) {
-      // Set up approval callback for the coordinator agent
-      this.setupApprovalCallback(coordinatorAgent, sessionId);
+      // Set up approval callback for the coordinator agent using utility
+      const { setupAgentApprovals } = await import('./agent-utils');
+      setupAgentApprovals(coordinatorAgent, sessionId);
       // Set up web-specific event handlers
       this.setupAgentEventHandlers(coordinatorAgent, sessionId);
     } else {
@@ -61,33 +62,6 @@ export class SessionService {
 
     // Return metadata for API response
     return this.sessionToMetadata(session);
-  }
-
-  private setupApprovalCallback(agent: Agent, sessionId: ThreadId): void {
-    const approvalManager = getApprovalManager();
-    const agentThreadId = asThreadId(agent.threadId);
-
-    agent.toolExecutor.setApprovalCallback({
-      requestApproval: async (toolName: string, input: unknown): Promise<CoreApprovalDecision> => {
-        // Get tool metadata from the agent's tool executor
-        const tool = agent.toolExecutor.getTool(toolName);
-        const toolDescription = tool?.description;
-        const toolAnnotations = tool?.annotations;
-        const isReadOnly = toolAnnotations?.readOnlyHint === true;
-
-        // Request approval through the manager with proper context
-        const decision = await approvalManager.requestApproval(
-          agentThreadId,
-          sessionId,
-          toolName,
-          toolDescription,
-          toolAnnotations,
-          input,
-          isReadOnly
-        );
-        return decision;
-      },
-    });
   }
 
   async listSessions(): Promise<SessionType[]> {
@@ -170,92 +144,14 @@ export class SessionService {
           console.warn(
             `[DEBUG] Setting up approval callback and event handlers for agent: ${agentInfo.threadId}`
           );
-          this.setupApprovalCallback(agent, sessionId);
+          const { setupAgentApprovals } = await import('./agent-utils');
+          setupAgentApprovals(agent, sessionId);
           this.setupAgentEventHandlers(agent, sessionId);
         }
       }
     }
 
     return session;
-  }
-
-  async spawnAgent(
-    sessionId: ThreadId,
-    name: string,
-    provider?: string,
-    model?: string
-  ): Promise<AgentType> {
-    // Get the session
-    const session = activeSessions.get(sessionId);
-    if (!session) {
-      throw new Error('Session not found');
-    }
-
-    // Spawn agent using Session class
-    const agent = session.spawnAgent(name, provider, model);
-
-    // Set up approval callback using shared helper
-    this.setupApprovalCallback(agent, sessionId);
-
-    // Start the agent
-    await agent.start();
-
-    // Set up event handlers for SSE broadcasting
-    this.setupAgentEventHandlers(agent, sessionId);
-
-    const agentData: AgentType = {
-      threadId: asThreadId(agent.threadId),
-      name,
-      provider: agent.providerName,
-      model: model || 'claude-3-haiku-20240307',
-      status: 'idle',
-      createdAt: new Date().toISOString(),
-    };
-
-    return agentData;
-  }
-
-  getAgent(threadId: ThreadId): Agent | null {
-    console.warn(`[DEBUG] getAgent called for threadId: ${threadId}`);
-    console.warn(`[DEBUG] Active sessions count: ${activeSessions.size}`);
-    console.warn(`[DEBUG] Active session IDs: ${Array.from(activeSessions.keys()).join(', ')}`);
-
-    // Find session that contains this agent
-    for (const session of activeSessions.values()) {
-      console.warn(`[DEBUG] Checking session ${session.getId()} for agent ${threadId}`);
-      const agent = session.getAgent(threadId);
-      if (agent) {
-        console.warn(`[DEBUG] Found agent in session ${session.getId()}`);
-        console.warn(`[DEBUG] Agent state: ${agent.getCurrentState()}`);
-        console.warn(`[DEBUG] Agent started: ${agent.getCurrentState() !== 'idle'}`);
-        return agent;
-      }
-    }
-
-    // If not found in active sessions, try to load the session from database
-    // First check if this looks like a coordinator agent (session thread ID)
-    if (threadId.match(/^lace_\d{8}_[a-z0-9]+$/)) {
-      // This is a coordinator agent, load its session
-      Session.getById(threadId)
-        .then((session) => {
-          if (session) {
-            activeSessions.set(threadId, session);
-            // Set up event handlers for the coordinator agent
-            const coordinatorAgent = session.getAgent(threadId);
-            if (coordinatorAgent) {
-              this.setupAgentEventHandlers(coordinatorAgent, threadId);
-            }
-          }
-        })
-        .catch((error) => {
-          console.error(`Failed to load session ${threadId}:`, error);
-        });
-
-      // Return null for now, the session will be loaded asynchronously
-      return null;
-    }
-
-    return null;
   }
 
   private setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {

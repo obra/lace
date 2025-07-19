@@ -60,8 +60,14 @@ export async function POST(
     }
     const sessionId: ThreadId = sessionIdResult.data as ThreadId;
 
-    // Get agent instance
-    const agent = sessionService.getAgent(threadId);
+    // Get agent instance through session
+    const session = await sessionService.getSession(sessionId);
+    if (!session) {
+      const errorResponse: ApiErrorResponse = { error: 'Session not found' };
+      return NextResponse.json(errorResponse, { status: 404 });
+    }
+
+    const agent = session.getAgent(threadId);
 
     if (!agent) {
       const errorResponse: ApiErrorResponse = { error: 'Agent not found' };

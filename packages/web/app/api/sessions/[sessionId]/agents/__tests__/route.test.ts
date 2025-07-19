@@ -71,7 +71,14 @@ function createMockSession(props: {
     getAgents: () => agents,
     getAgent: vi.fn(),
     getTaskManager: vi.fn(),
-    spawnAgent: vi.fn(),
+    spawnAgent: vi.fn().mockImplementation((name: string, provider?: string, model?: string) => ({
+      threadId: `${props.id}.${agents.length + 1}`,
+      name,
+      provider: provider || 'anthropic',
+      model: model || 'claude-3-haiku-20240307',
+      status: 'idle',
+      createdAt: new Date().toISOString(),
+    })),
     startAgent: vi.fn(),
     stopAgent: vi.fn(),
     sendMessage: vi.fn(),
@@ -109,9 +116,38 @@ vi.mock('@/lib/server/session-service', () => ({
   getSessionService: () => mockSessionService,
 }));
 
+// Mock the agent utilities
+vi.mock('@/lib/server/agent-utils', () => ({
+  setupAgentApprovals: vi.fn(),
+}));
+
 describe('Agent Spawning API', () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+
+  describe('TDD: Direct Session Usage', () => {
+    it('should spawn agent using session.spawnAgent() directly', async () => {
+      const sessionId: ThreadId = createThreadId('lace_20250113_session1');
+      const mockAgent = { threadId: `${sessionId}.1` };
+      const mockSession = {
+        spawnAgent: vi.fn().mockReturnValue(mockAgent),
+        getAgents: vi.fn().mockReturnValue([]),
+      };
+
+      mockSessionService.getSession.mockResolvedValueOnce(mockSession as unknown as CoreSession);
+
+      const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        body: JSON.stringify({ name: 'test-agent' }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      // This should FAIL initially because route uses sessionService.spawnAgent
+      await POST(request, { params: Promise.resolve({ sessionId }) });
+
+      expect(mockSession.spawnAgent).toHaveBeenCalledWith('test-agent', undefined, undefined);
+    });
+  });
 
   beforeEach(() => {
     setupTestPersistence();
@@ -153,25 +189,14 @@ describe('Agent Spawning API', () => {
         }),
       ];
 
-      mockSessionService.getSession.mockResolvedValueOnce(
-        createMockSession({
-          id: sessionId,
-          name: 'Test Session',
-          createdAt: new Date().toISOString(),
-          agents: existingAgents,
-        }) as unknown as CoreSession
-      );
-
-      const newThreadId: ThreadId = createThreadId(`${sessionId}.3`);
-      const newAgent: Agent = createAgent({
-        threadId: newThreadId,
-        name: 'architect',
-        provider: 'anthropic',
-        model: 'claude-3-opus-20240229',
-        status: 'idle',
+      const mockSession = createMockSession({
+        id: sessionId,
+        name: 'Test Session',
         createdAt: new Date().toISOString(),
+        agents: existingAgents,
       });
-      mockSessionService.spawnAgent.mockResolvedValueOnce(newAgent);
+
+      mockSessionService.getSession.mockResolvedValueOnce(mockSession as unknown as CoreSession);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
         method: 'POST',
@@ -188,14 +213,13 @@ describe('Agent Spawning API', () => {
 
       expect(response.status).toBe(201);
       expect(data.agent).toMatchObject({
-        threadId: newThreadId,
+        threadId: `${sessionId}.3`,
         name: 'architect',
         provider: 'anthropic',
         model: 'claude-3-opus-20240229',
         status: 'idle',
       });
-      expect(mockSessionService.spawnAgent).toHaveBeenCalledWith(
-        sessionId,
+      expect(mockSession.spawnAgent).toHaveBeenCalledWith(
         'architect',
         'anthropic',
         'claude-3-opus-20240229'

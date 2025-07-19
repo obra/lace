@@ -89,7 +89,11 @@ describe('Thread Messaging API', () => {
         sendMessage: vi.fn().mockResolvedValue(undefined),
       };
 
-      mockSessionService.getAgent.mockReturnValue(mockAgent as unknown as Agent);
+      const mockSession = {
+        getAgent: vi.fn().mockReturnValue(mockAgent as unknown as Agent),
+      };
+
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/message`, {
         method: 'POST',

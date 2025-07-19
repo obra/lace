@@ -39,4 +39,18 @@ describe('Agent Utilities', () => {
     // This should FAIL initially because method still exists
     expect((sessionService as any).setupApprovalCallback).toBeUndefined();
   });
+
+  it('should not have spawnAgent method in SessionService', () => {
+    const sessionService = new SessionService();
+
+    // This should FAIL initially because method still exists
+    expect((sessionService as any).spawnAgent).toBeUndefined();
+  });
+
+  it('should not have getAgent method in SessionService', () => {
+    const sessionService = new SessionService();
+
+    // This should FAIL initially because method still exists
+    expect((sessionService as any).getAgent).toBeUndefined();
+  });
 });
