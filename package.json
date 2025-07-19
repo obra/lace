@@ -24,7 +24,7 @@
     "web:build": "cd packages/web && npm run build",
     "web:start": "cd packages/web && npm run start",
     "web:install": "cd packages/web && npm install",
-    "test": "npm run test:run && npm run test:web:run",
+    "test": "npm run test:run && npm run test:web:run && npm run test:e2e",
     "test:watch": "vitest",
     "test:run": "vitest run",
     "test:unit": "vitest run --exclude=\"**/*{e2e,integration}*\"",
@@ -40,7 +40,7 @@
     "test:e2e:ui": "cd packages/web && npm run test:e2e:ui",
     "test:e2e:debug": "cd packages/web && npm run test:e2e:debug",
     "test:e2e:headed": "cd packages/web && npm run test:e2e:headed",
-    "test:all": "npm run test:run && npm run test:web:run",
+    "test:all": "npm run test:run && npm run test:web:run && npm run test:e2e",
     "test:all:unit": "npm run test:unit && npm run test:web:unit"
 
 
