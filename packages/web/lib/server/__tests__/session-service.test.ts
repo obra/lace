@@ -15,6 +15,15 @@ describe('SessionService after getProjectForSession removal', () => {
   });
 });
 
+describe('SessionService after getEffectiveConfiguration removal', () => {
+  it('should not have getEffectiveConfiguration method', () => {
+    const sessionService = new SessionService();
+
+    // This test should FAIL initially because method still exists
+    expect((sessionService as any).getEffectiveConfiguration).toBeUndefined();
+  });
+});
+
 // Mock the lace imports
 vi.mock('@/lib/server/lace-imports', async () => {
   const actual = await vi.importActual('@/lib/server/lace-imports');
@@ -52,81 +61,6 @@ describe('SessionService Missing Methods', () => {
 
   afterEach(() => {
     sessionService.clearActiveSessions();
-  });
-
-  describe('getEffectiveConfiguration', () => {
-    it('should return merged project and session configuration', async () => {
-      // Arrange
-      const mockProject = {
-        getConfiguration: vi.fn(() => ({
-          provider: 'anthropic',
-          maxTokens: 1000,
-          toolPolicies: { bash: 'allow' },
-        })),
-      };
-      const mockSession = {
-        getId: () => mockSessionId,
-        getProjectId: () => 'project-123',
-        getConfiguration: vi.fn(() => ({
-          model: 'claude-3-sonnet',
-          maxTokens: 2000,
-          toolPolicies: { 'file-read': 'require-approval' },
-        })),
-      };
-
-      const { Session, Project } = await import('@/lib/server/lace-imports');
-      vi.mocked(Session.getSession).mockReturnValue(mockSession);
-      vi.mocked(Project.getById).mockReturnValue(mockProject);
-
-      // Act
-      const result = await sessionService.getEffectiveConfiguration(mockSessionId);
-
-      // Assert
-      expect(result).toEqual({
-        provider: 'anthropic',
-        model: 'claude-3-sonnet',
-        maxTokens: 2000,
-        toolPolicies: {
-          bash: 'allow',
-          'file-read': 'require-approval',
-        },
-      });
-    });
-
-    it('should handle session with no project', async () => {
-      // Arrange
-      const mockSession = {
-        getId: () => mockSessionId,
-        getProjectId: () => null,
-        getConfiguration: vi.fn(() => ({
-          model: 'claude-3-sonnet',
-          maxTokens: 2000,
-        })),
-      };
-
-      const { Session } = await import('@/lib/server/lace-imports');
-      vi.mocked(Session.getSession).mockReturnValue(mockSession);
-
-      // Act
-      const result = await sessionService.getEffectiveConfiguration(mockSessionId);
-
-      // Assert
-      expect(result).toEqual({
-        model: 'claude-3-sonnet',
-        maxTokens: 2000,
-      });
-    });
-
-    it('should throw error when session not found', async () => {
-      // Arrange
-      const { Session } = await import('@/lib/server/lace-imports');
-      vi.mocked(Session.getSession).mockReturnValue(null);
-
-      // Act & Assert
-      await expect(sessionService.getEffectiveConfiguration(mockSessionId)).rejects.toThrow(
-        'Session not found'
-      );
-    });
   });
 
   describe('updateSessionConfiguration', () => {

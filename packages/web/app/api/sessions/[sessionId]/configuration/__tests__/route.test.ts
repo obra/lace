@@ -249,3 +249,44 @@ describe('Session Configuration API', () => {
     });
   });
 });
+
+describe('TDD: Direct Session Usage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should call session.getEffectiveConfiguration() directly', async () => {
+    // Mock the dependencies with proper Session object having getEffectiveConfiguration
+    const { Session, Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+
+    const mockSessionWithMethod = {
+      ...mockSessionData,
+      getEffectiveConfiguration: vi.fn().mockReturnValue({
+        provider: 'openai',
+        model: 'gpt-4',
+        maxTokens: 4000,
+        tools: ['file-read', 'file-write'],
+        toolPolicies: {
+          'file-read': 'allow',
+          'file-write': 'require-approval',
+        },
+        workingDirectory: '/test/path',
+        environmentVariables: { NODE_ENV: 'test' },
+      }),
+    };
+
+    Session.getSession = vi.fn().mockReturnValue(mockSessionWithMethod);
+    Project.getById = vi.fn().mockReturnValue(mockProject);
+
+    const request = new NextRequest('http://localhost/api/sessions/test-session/configuration');
+
+    // This should PASS because route uses session.getEffectiveConfiguration() directly
+    await GET(request, { params: { sessionId: 'test-session' } });
+
+    // Verify the session was retrieved
+    expect(Session.getSession).toHaveBeenCalledWith('test-session');
+
+    // Verify the session's getEffectiveConfiguration method was called directly
+    expect(mockSessionWithMethod.getEffectiveConfiguration).toHaveBeenCalled();
+  });
+});

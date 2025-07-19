@@ -18,13 +18,16 @@ const ConfigurationSchema = z.object({
 export async function GET(request: NextRequest, { params }: { params: { sessionId: string } }) {
   try {
     const sessionService = getSessionService();
-    const configuration = await sessionService.getEffectiveConfiguration(params.sessionId);
+    const session = await sessionService.getSession(params.sessionId);
+
+    if (!session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    const configuration = session.getEffectiveConfiguration();
 
     return NextResponse.json({ configuration });
   } catch (error: unknown) {
-    if (error instanceof Error && error.message === 'Session not found') {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch configuration' },
       { status: 500 }
@@ -43,7 +46,11 @@ export async function PUT(request: NextRequest, { params }: { params: { sessionI
     await sessionService.updateSessionConfiguration(params.sessionId, validatedData);
 
     // Get effective configuration for response
-    const configuration = await sessionService.getEffectiveConfiguration(params.sessionId);
+    const session = await sessionService.getSession(params.sessionId);
+    if (!session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+    const configuration = session.getEffectiveConfiguration();
 
     return NextResponse.json({ configuration });
   } catch (error: unknown) {

@@ -322,41 +322,6 @@ export class SessionService {
 
   // Service layer methods to eliminate direct business logic calls from API routes
 
-  async getEffectiveConfiguration(sessionId: ThreadId): Promise<Record<string, unknown>> {
-    const sessionData = Session.getSession(sessionId);
-    if (!sessionData) {
-      throw new Error('Session not found');
-    }
-
-    // Get project directly using Project.getById() instead of getProjectForSession()
-    const projectId = (sessionData as { getProjectId(): string | undefined }).getProjectId();
-    let project = null;
-    if (projectId) {
-      const { Project } = await import('@/lib/server/lace-imports');
-      project = Project.getById(projectId);
-    }
-
-    const projectConfig = (project?.getConfiguration() as Record<string, unknown>) || {};
-    const sessionConfig =
-      (sessionData as { getConfiguration(): Record<string, unknown> }).getConfiguration() || {};
-
-    // Merge configurations with session taking precedence
-    const configuration: Record<string, unknown> = {
-      ...projectConfig,
-      ...sessionConfig,
-    };
-
-    // Merge toolPolicies separately to avoid overriding all policies
-    if (projectConfig.toolPolicies || sessionConfig.toolPolicies) {
-      configuration.toolPolicies = {
-        ...((projectConfig.toolPolicies as Record<string, string>) || {}),
-        ...((sessionConfig.toolPolicies as Record<string, string>) || {}),
-      };
-    }
-
-    return configuration;
-  }
-
   async updateSessionConfiguration(
     sessionId: ThreadId,
     config: Record<string, unknown>
