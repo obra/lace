@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type {
   Session,
   ThreadId,
@@ -115,7 +115,7 @@ export default function Home() {
     };
   }, [selectedSession]);
 
-  async function loadSessions() {
+  const loadSessions = useCallback(async () => {
     if (!selectedProject) {
       setSessions([]);
       return;
@@ -135,7 +135,7 @@ export default function Home() {
     } catch (error) {
       console.error('Failed to load sessions:', error);
     }
-  }
+  }, [selectedProject]);
 
   async function loadConversationHistory(sessionId: ThreadId) {
     try {
