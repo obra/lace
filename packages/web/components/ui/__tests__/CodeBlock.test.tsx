@@ -1,6 +1,7 @@
 // ABOUTME: Tests for the CodeBlock component
 // ABOUTME: Tests rendering, syntax highlighting, and user interactions
 
+import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CodeBlock from '../CodeBlock';
