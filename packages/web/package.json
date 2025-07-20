@@ -18,15 +18,27 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "chromatic": "chromatic --exit-zero-on-changes"
   },
   "dependencies": {
     "@playwright/test": "^1.54.1",
-    "next": "^15.4.1",
-    "react": "^19.1.0",
-    "react-dom": "^19.0.0",
+    "next": "15.3.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "server-only": "^0.0.1",
-    "zod": "^3.25.69"
+    "zod": "^3.25.69",
+    "@tailwindcss/typography": "^0.5.15",
+    "daisyui": "5.0.46",
+    "@fortawesome/fontawesome-svg-core": "6.7.0",
+    "@fortawesome/free-solid-svg-icons": "6.7.0",
+    "@fortawesome/react-fontawesome": "0.2.2",
+    "@heroicons/react": "2.2.0",
+    "framer-motion": "12.23.3",
+    "clsx": "^2.1.1",
+    "class-variance-authority": "^0.7.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
@@ -45,9 +57,18 @@
     "eslint-plugin-no-relative-import-paths": "^1.6.1",
     "jsdom": "^26.1.0",
     "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.4",
+    "tailwindcss": "4.1.11",
     "tsx": "^4.19.2",
     "typescript": "^5.6.0",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@storybook/react": "9.0.17",
+    "@storybook/addon-essentials": "9.0.17",
+    "@storybook/addon-interactions": "9.0.17",
+    "@storybook/addon-links": "9.0.17",
+    "@storybook/addon-a11y": "9.0.17",
+    "@storybook/addon-docs": "9.0.17",
+    "@storybook/nextjs": "9.0.17",
+    "@storybook/test": "9.0.17",
+    "chromatic": "^6.0.0"
   }
 }
