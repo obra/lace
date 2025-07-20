@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTasks, faUser } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
-import { Task } from '~/types';
+import { Task } from '@/types';
 
 interface TaskBoardModalProps {
   isOpen: boolean;

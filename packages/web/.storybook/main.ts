@@ -7,8 +7,6 @@ const config: StorybookConfig = {
     '@storybook/addon-essentials',
     '@storybook/addon-docs',
     '@storybook/addon-a11y',
-    '@storybook/addon-onboarding',
-    '@storybook/addon-vitest',
   ],
   framework: {
     name: '@storybook/nextjs-vite',
@@ -23,7 +21,8 @@ const config: StorybookConfig = {
     // Replicate the path aliases from next.config.ts
     config.resolve!.alias = {
       ...config.resolve!.alias,
-      '~': path.resolve(process.cwd(), '.'),
+      '~': path.resolve(process.cwd(), '../../src'),
+      '@': path.resolve(process.cwd(), '.'),
     };
 
     // Handle Node.js dependencies that might not be available in browser

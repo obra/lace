@@ -11,8 +11,8 @@ import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
 import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import { VoiceRecognitionUI } from '@/components/ui/VoiceRecognitionUI';
-import { TimelineEntry, Project, Timeline, Task, RecentFile } from '~/types';
-import { useVoiceRecognition } from '~/hooks/useVoiceRecognition';
+import { TimelineEntry, Project, Timeline, Task, RecentFile } from '@/types';
+import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
 import {
   pageTransition,
   fadeInUp,

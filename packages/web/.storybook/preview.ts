@@ -1,6 +1,6 @@
 import type { Preview } from '@storybook/nextjs-vite';
 import React from 'react';
-import '../src/app/globals.css';
+import '../app/globals.css';
 import { withTennisCommentary } from './decorators/tennis-commentary';
 
 // Performance optimization: Lazy load heavy dependencies

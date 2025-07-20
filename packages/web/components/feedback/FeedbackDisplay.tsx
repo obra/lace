@@ -4,7 +4,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FeedbackEvent, FeedbackInsight, PerformanceAnalysis, PredictiveInsight } from '~/feedback/types';
+import { FeedbackEvent, FeedbackInsight, PerformanceAnalysis, PredictiveInsight } from '@/feedback/types';
 import { FeedbackEventCard } from './FeedbackEventCard';
 import { FeedbackInsightCard } from './FeedbackInsightCard';
 import { PerformancePanel } from './PerformancePanel';

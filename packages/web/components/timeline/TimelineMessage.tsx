@@ -1,12 +1,12 @@
 'use client';
 
-import { TimelineEntry } from '~/types';
+import { TimelineEntry } from '@/types';
 import { MessageDisplay } from '@/components/ui';
 import { IntegrationEntry } from '@/components/timeline/IntegrationEntry';
 import GoogleDocChatMessage from '@/components/organisms/GoogleDocChatMessage';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faImages, faExternalLinkAlt, faUser, faRobot } from '@/lib/fontawesome';
-import { formatTime } from '~/utils/format';
+import { formatTime } from '@/lib/format';
 
 interface TimelineMessageProps {
   /** The timeline entry data to display with type discrimination for different message types */

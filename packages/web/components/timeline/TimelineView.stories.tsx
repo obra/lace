@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { TimelineView } from './TimelineView';
-import { TimelineEntry } from '~/types';
+import { TimelineEntry } from '@/types';
 
 const meta: Meta<typeof TimelineView> = {
   title: 'Organisms/TimelineView',

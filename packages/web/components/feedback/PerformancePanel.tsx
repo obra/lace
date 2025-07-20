@@ -3,7 +3,7 @@
 
 'use client';
 
-import { PerformanceAnalysis } from '~/feedback/types';
+import { PerformanceAnalysis } from '@/feedback/types';
 import { Badge } from '@/components/ui';
 
 interface PerformancePanelProps {

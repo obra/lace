@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { TaskBoardModal } from './TaskBoardModal';
-import { Task } from '~/types';
+import { Task } from '@/types';
 
 const meta: Meta<typeof TaskBoardModal> = {
   title: 'Organisms/TaskBoardModal',

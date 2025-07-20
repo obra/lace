@@ -12,9 +12,9 @@ import { VoiceRecognitionUI } from '@/components/ui/VoiceRecognitionUI';
 import { StreamingIndicator } from '@/components/ui/StreamingIndicator';
 import { DragDropOverlay } from '@/components/ui/DragDropOverlay';
 import { AttachedFile } from '@/components/ui/FileAttachment';
-import { TimelineEntry, Project, Timeline, Task, RecentFile, StreamEvent } from '~/types';
-import { useVoiceRecognition } from '~/hooks/useVoiceRecognition';
-import { useConversationStream } from '~/hooks/useConversationStream';
+import { TimelineEntry, Project, Timeline, Task, RecentFile, StreamEvent } from '@/types';
+import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
+import { useConversationStream } from '@/hooks/useConversationStream';
 
 const availableThemes = [
   { name: 'light', colors: { primary: '#570DF8', secondary: '#F000B8', accent: '#37CDBE' } },

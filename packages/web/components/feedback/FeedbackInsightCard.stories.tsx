@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { FeedbackInsightCard } from './FeedbackInsightCard';
-import { FeedbackInsight } from '~/feedback/types';
+import { FeedbackInsight } from '@/feedback/types';
 
 const meta: Meta<typeof FeedbackInsightCard> = {
   title: 'Organisms/FeedbackInsightCard',

@@ -32,7 +32,11 @@ vi.mock('@/lib/syntax-themes', () => ({
 
 // Mock performance utils
 vi.mock('@/lib/performance-utils', () => ({
-  debounce: vi.fn((fn) => fn),
+  debounce: vi.fn((fn) => {
+    const debouncedFn = fn as any;
+    debouncedFn.cancel = vi.fn();
+    return debouncedFn;
+  }),
   isCodeTooLarge: vi.fn().mockReturnValue(false),
 }));
 

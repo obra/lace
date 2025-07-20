@@ -4,7 +4,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FeedbackEvent } from '~/feedback/types';
+import { FeedbackEvent } from '@/feedback/types';
 import { FeedbackEventCard } from './FeedbackEventCard';
 import { Badge } from '@/components/ui';
 

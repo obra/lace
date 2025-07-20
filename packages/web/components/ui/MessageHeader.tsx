@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Avatar } from '@/components/ui';
-import { formatTime } from '~/utils/format';
+import { formatTime } from '@/lib/format';
 
 interface MessageHeaderProps {
   name: string;

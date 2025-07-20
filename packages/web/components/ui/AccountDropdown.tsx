@@ -1,6 +1,6 @@
 'use client';
 
-import { useTokenUsage } from '~/hooks/useTokenUsage';
+import { useTokenUsage } from '@/hooks/useTokenUsage';
 
 // Using FontAwesome instead of Heroicons
 

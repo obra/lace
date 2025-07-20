@@ -1,0 +1,277 @@
+import { useState, useCallback, useRef, useEffect } from 'react';
+import type { StreamEvent } from '@/types';
+
+interface UseConversationStreamOptions {
+  onStreamEvent?: (event: StreamEvent) => void;
+  onMessageComplete?: (content: string) => void;
+  onError?: (error: string) => void;
+}
+
+interface ConversationStreamState {
+  isStreaming: boolean;
+  isThinking: boolean;
+  currentThreadId?: string;
+  error?: string;
+  isConnected: boolean;
+}
+
+export function useConversationStream({
+  onStreamEvent,
+  onMessageComplete,
+  onError,
+}: UseConversationStreamOptions = {}) {
+  const [state, setState] = useState<ConversationStreamState>({
+    isStreaming: false,
+    isThinking: false,
+    isConnected: false,
+  });
+
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentContentRef = useRef<string>('');
+  const isProcessingRef = useRef<boolean>(false);
+  const connectionKeyRef = useRef<string | null>(null);
+
+  // Initialize connection on mount
+  useEffect(() => {
+    // Don't auto-initialize connection - wait for first message
+    return () => {
+      cleanup();
+    };
+  }, []);
+
+  const cleanup = useCallback(() => {
+    if (readerRef.current) {
+      readerRef.current.cancel().catch(() => {
+        // Ignore cancel errors
+      });
+      readerRef.current = null;
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    connectionKeyRef.current = null;
+    setState((prev) => ({ ...prev, isConnected: false, isStreaming: false, isThinking: false }));
+  }, []);
+
+  const processStream = useCallback(async () => {
+    if (!readerRef.current || isProcessingRef.current) return;
+
+    isProcessingRef.current = true;
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (readerRef.current) {
+        const { done, value } = await readerRef.current.read();
+
+        if (done) {
+          // Stream ended naturally
+          readerRef.current = null;
+          setState((prev) => ({ ...prev, isConnected: false }));
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6)) as StreamEvent;
+              handleStreamEvent(event);
+            } catch (parseError) {
+              console.warn('Failed to parse SSE event:', parseError);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('Stream processing error:', error);
+        onError?.(`Stream error: ${error.message}`);
+      }
+    } finally {
+      isProcessingRef.current = false;
+    }
+  }, [onError]);
+
+  const handleStreamEvent = useCallback(
+    (event: StreamEvent) => {
+      onStreamEvent?.(event);
+
+      switch (event.type) {
+        case 'connection':
+          setState((prev) => ({
+            ...prev,
+            currentThreadId: event.threadId,
+            isConnected: true,
+          }));
+          connectionKeyRef.current = event.connectionKey || null;
+          break;
+
+        case 'thinking_start':
+          setState((prev) => ({ ...prev, isThinking: true }));
+          break;
+
+        case 'thinking_complete':
+          setState((prev) => ({ ...prev, isThinking: false }));
+          break;
+
+        case 'token':
+          if (event.content) {
+            currentContentRef.current += event.content;
+          }
+          break;
+
+        case 'response_complete':
+          // Response complete, content length: ${currentContentRef.current.length}
+          setState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            isThinking: false,
+          }));
+
+          if (currentContentRef.current) {
+            onMessageComplete?.(currentContentRef.current);
+          }
+
+          // Reset content for next message
+          currentContentRef.current = '';
+          break;
+
+        case 'ready_for_input':
+          setState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            isThinking: false,
+          }));
+          break;
+
+        case 'error':
+          setState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            isThinking: false,
+            error: event.error,
+          }));
+          if (event.error) {
+            onError?.(event.error);
+          }
+          break;
+      }
+    },
+    [onStreamEvent, onMessageComplete, onError]
+  );
+
+  const sendMessage = useCallback(
+    async (message: string, threadId?: string) => {
+      if (!message.trim()) return;
+
+      try {
+        setState((prev) => ({
+          ...prev,
+          isStreaming: true,
+          isThinking: false,
+          error: undefined,
+        }));
+
+        currentContentRef.current = '';
+
+        // Create new abort controller if needed
+        if (!abortControllerRef.current) {
+          abortControllerRef.current = new AbortController();
+        }
+
+        // Start new streaming connection for this message
+        const response = await fetch('/api/conversations/stream', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message,
+            threadId: threadId || state.currentThreadId,
+            provider: 'anthropic',
+          }),
+          signal: abortControllerRef.current.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('No response stream available');
+        }
+
+        // Set the new reader and start processing
+        readerRef.current = reader;
+        setState((prev) => ({ ...prev, isConnected: true }));
+
+        // Start reading the stream
+        processStream().catch((error) => {
+          console.error('Stream processing error:', error);
+          onError?.(error instanceof Error ? error.message : 'Stream processing failed');
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+          const errorMessage = error.message || 'Failed to send message';
+          setState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            isThinking: false,
+            error: errorMessage,
+          }));
+          onError?.(errorMessage);
+        }
+      }
+    },
+    [state.currentThreadId, processStream, onError]
+  );
+
+  const interruptStream = useCallback(() => {
+    // Interrupting stream
+
+    setState((prev) => ({
+      ...prev,
+      isStreaming: false,
+      isThinking: false,
+    }));
+
+    // If there's partial content, treat it as a completed message
+    if (currentContentRef.current.trim()) {
+      onMessageComplete?.(currentContentRef.current);
+    }
+
+    // Reset content
+    currentContentRef.current = '';
+
+    // Stop the current stream
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    if (readerRef.current) {
+      readerRef.current.cancel().catch(() => {
+        // Ignore cancel errors
+      });
+      readerRef.current = null;
+    }
+  }, [onMessageComplete]);
+
+  const stopStream = useCallback(() => {
+    cleanup();
+  }, [cleanup]);
+
+  return {
+    ...state,
+    sendMessage,
+    stopStream,
+    interruptStream,
+  };
+}

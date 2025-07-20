@@ -1,4 +1,4 @@
-import { formatTime } from '~/utils/format';
+import { formatTime } from '@/lib/format';
 
 interface TimestampDisplayProps {
   timestamp: Date | string;

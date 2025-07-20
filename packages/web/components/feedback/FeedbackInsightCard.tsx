@@ -3,7 +3,7 @@
 
 'use client';
 
-import { FeedbackInsight } from '~/feedback/types';
+import { FeedbackInsight } from '@/feedback/types';
 import { Badge } from '@/components/ui';
 
 interface FeedbackInsightCardProps {
