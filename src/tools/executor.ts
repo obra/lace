@@ -165,7 +165,7 @@ export class ToolExecutor {
       // Apply project environment variables if projectId is available
       if (context?.projectId) {
         const projectEnv = this.envManager.getMergedEnvironment(context.projectId);
-        process.env = projectEnv;
+        Object.assign(process.env, projectEnv);
       }
 
       const result = await tool.execute(call.arguments, context);

@@ -15,6 +15,9 @@ describe('Agent Utilities', () => {
   let mockAgent: {
     on: ReturnType<typeof vi.fn>;
     threadId: string;
+    toolExecutor: {
+      setApprovalCallback: ReturnType<typeof vi.fn>;
+    };
   };
 
   beforeEach(() => {
@@ -22,6 +25,9 @@ describe('Agent Utilities', () => {
     mockAgent = {
       on: vi.fn(),
       threadId: 'test-thread-id',
+      toolExecutor: {
+        setApprovalCallback: vi.fn(),
+      },
     };
   });
 
@@ -30,7 +36,11 @@ describe('Agent Utilities', () => {
 
     setupAgentApprovals(mockAgent as unknown as Agent, sessionId);
 
-    expect(mockAgent.on).toHaveBeenCalledWith('approval_request', expect.any(Function));
+    expect(mockAgent.toolExecutor.setApprovalCallback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestApproval: expect.any(Function),
+      })
+    );
   });
 
   it('should not have setupApprovalCallback method in SessionService', () => {

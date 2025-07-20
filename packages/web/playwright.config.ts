@@ -7,10 +7,10 @@ export default defineConfig({
   testDir: './__tests__/e2e',
   testMatch: '**/*.e2e.ts',
 
-  fullyParallel: true,
+  fullyParallel: false, // Disable parallel execution to avoid state conflicts
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1, // Use only 1 worker to avoid DB conflicts
   reporter: 'html',
 
   use: {
@@ -32,10 +32,12 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 60 * 1000,
     env: {
-      // Add test environment variables
-      ANTHROPIC_KEY: process.env.ANTHROPIC_KEY || 'test-key',
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_KEY || 'test-key',
+      // Add test environment variables for E2E tests
+      ANTHROPIC_KEY: 'test-anthropic-key-for-e2e-tests',
+      ANTHROPIC_API_KEY: 'test-anthropic-key-for-e2e-tests',
       LACE_DB_PATH: ':memory:', // Use in-memory database for tests
+      NODE_ENV: 'test', // This will enable test mocks
+      VITEST_RUNNING: 'true', // Trigger test environment behavior
     },
   },
 });

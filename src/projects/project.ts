@@ -312,7 +312,7 @@ export class Project {
     return this._tokenBudgetManager;
   }
 
-  setTokenBudgetManager(manager: TokenBudgetManager): void {
+  setTokenBudgetManager(manager: TokenBudgetManager | null): void {
     this._tokenBudgetManager = manager;
   }
 

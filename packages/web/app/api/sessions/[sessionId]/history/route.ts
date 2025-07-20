@@ -175,7 +175,7 @@ export async function GET(
     const sessionId = sessionIdParam;
 
     const sessionService = getSessionService();
-    const session = await sessionService.getSession(sessionId);
+    const session = await sessionService.getSession(asThreadId(sessionId));
 
     if (!session) {
       const errorResponse: ApiErrorResponse = { error: 'Session not found' };
@@ -183,7 +183,7 @@ export async function GET(
     }
 
     // Get the coordinator agent and load events through it (proper architecture)
-    const coordinatorAgent = session.getAgent(sessionId);
+    const coordinatorAgent = session.getAgent(asThreadId(sessionId));
     if (!coordinatorAgent) {
       const errorResponse: ApiErrorResponse = { error: 'Could not access session coordinator' };
       return NextResponse.json(errorResponse, { status: 500 });

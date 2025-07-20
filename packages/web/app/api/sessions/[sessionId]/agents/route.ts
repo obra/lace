@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { CreateAgentRequest } from '@/types/api';
-import { asThreadId } from '@/lib/server/core-types';
+import { asThreadId, ThreadId } from '@/lib/server/core-types';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 
 // Type guard for unknown error values
@@ -81,7 +81,7 @@ export async function POST(
     const sseManager = SSEManager.getInstance();
     const testEvent = {
       type: 'LOCAL_SYSTEM_MESSAGE' as const,
-      threadId: agentResponse.threadId,
+      threadId: agentResponse.threadId as ThreadId,
       timestamp: new Date().toISOString(),
       data: { message: `Agent "${agentResponse.name}" spawned successfully` },
     };

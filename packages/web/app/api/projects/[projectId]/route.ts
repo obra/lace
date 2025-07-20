@@ -13,9 +13,13 @@ const UpdateProjectSchema = z.object({
   isArchived: z.boolean().optional(),
 });
 
-export async function GET(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> }
+) {
   try {
-    const project = Project.getById(params.projectId);
+    const { projectId } = await params;
+    const project = Project.getById(projectId);
 
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
@@ -32,12 +36,16 @@ export async function GET(request: NextRequest, { params }: { params: { projectI
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> }
+) {
   try {
+    const { projectId } = await params;
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = UpdateProjectSchema.parse(body);
 
-    const project = Project.getById(params.projectId);
+    const project = Project.getById(projectId);
 
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
@@ -63,9 +71,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { projec
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> }
+) {
   try {
-    const project = Project.getById(params.projectId);
+    const { projectId } = await params;
+    const project = Project.getById(projectId);
 
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });

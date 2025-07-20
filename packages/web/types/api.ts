@@ -20,7 +20,7 @@ export interface Session {
   id: ThreadId; // sessionId (parent threadId)
   name: string;
   createdAt: string;
-  agents: Agent[];
+  agents?: Agent[]; // Optional for list view, populated when session is selected
 }
 
 export interface Agent {

@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { getSessionService } from '@/lib/server/session-service';
 import { MessageResponse, SessionEvent, ApiErrorResponse } from '@/types/api';
-import type { ThreadId } from '@/lib/server/core-types';
+import { asThreadId, type ThreadId } from '@/lib/server/core-types';
 import { SSEManager } from '@/lib/sse-manager';
 import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
 import { messageLimiter } from '@/lib/middleware/rate-limiter';
@@ -39,7 +39,7 @@ export async function POST(
     }
 
     // TypeScript now knows threadIdResult.success is true, so data is properly typed
-    const threadId: ThreadId = threadIdResult.data;
+    const threadId: ThreadId = asThreadId(threadIdResult.data);
 
     // Parse and validate request body with Zod
     const bodyRaw: unknown = await request.json();
@@ -64,7 +64,7 @@ export async function POST(
       throw new Error('Invalid session ID derived from thread ID');
     }
     // TypeScript now knows sessionIdResult.success is true, so data is properly typed
-    const sessionId: ThreadId = sessionIdResult.data;
+    const sessionId: ThreadId = asThreadId(sessionIdResult.data);
 
     // Get agent instance through session
     const session = await sessionService.getSession(sessionId);

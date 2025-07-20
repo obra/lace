@@ -23,6 +23,7 @@ import { getAllEventTypes } from '@/types/events';
 export default function Home() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedSession, setSelectedSession] = useState<ThreadId | null>(null);
+  const [selectedSessionDetails, setSelectedSessionDetails] = useState<Session | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -60,15 +61,36 @@ export default function Home() {
     void loadSessions();
   }, [selectedProject, loadSessions]);
 
+  const loadSessionDetails = useCallback(async (sessionId: ThreadId) => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`);
+      const data: unknown = await res.json();
+
+      if (isApiError(data)) {
+        console.error('Failed to load session details:', data.error);
+        return;
+      }
+
+      const sessionResponse = data as SessionResponse;
+      setSelectedSessionDetails(sessionResponse.session);
+    } catch (error) {
+      console.error('Failed to load session details:', error);
+    }
+  }, []);
+
   // Connect to SSE when session selected
   useEffect(() => {
-    if (!selectedSession) return;
+    if (!selectedSession) {
+      setSelectedSessionDetails(null);
+      return;
+    }
 
     // Clear events when switching sessions
     setEvents([]);
     setSelectedAgent(null);
 
-    // Load conversation history first
+    // Load full session details and conversation history
+    void loadSessionDetails(selectedSession);
     void loadConversationHistory(selectedSession);
 
     const eventSource = new EventSource(`/api/sessions/${selectedSession}/events/stream`);
@@ -135,7 +157,7 @@ export default function Home() {
       eventSource.removeEventListener('connection', connectionListener);
       eventSource.close();
     };
-  }, [selectedSession]);
+  }, [selectedSession, loadSessionDetails]);
 
   async function loadConversationHistory(sessionId: ThreadId) {
     try {
@@ -186,6 +208,10 @@ export default function Home() {
 
   const handleAgentSpawn = async (agent: Agent) => {
     await loadSessions();
+    // Reload session details to include the new agent
+    if (selectedSession) {
+      await loadSessionDetails(selectedSession);
+    }
     // Select the new agent
     setSelectedAgent(agent.threadId as ThreadId);
   };
@@ -199,6 +225,7 @@ export default function Home() {
     setSelectedProject(projectId);
     // When switching projects, clear session and agent selection
     setSelectedSession(null);
+    setSelectedSessionDetails(null);
     setSelectedAgent(null);
     setEvents([]);
   };
@@ -312,7 +339,7 @@ export default function Home() {
                       >
                         <div className="font-semibold">{session.name}</div>
                         <div className="text-xs text-gray-300">
-                          {session.agents.length} agents •{' '}
+                          {session.agents?.length || 0} agents •{' '}
                           {new Date(session.createdAt).toLocaleDateString()}
                         </div>
                         <div className="text-xs text-gray-400 font-mono">{session.id}</div>
@@ -330,10 +357,8 @@ export default function Home() {
                 <AgentSpawner sessionId={selectedSession as ThreadId} onAgentSpawn={handleAgentSpawn} />
 
                 {/* Agent List */}
-                <div className="mt-4 space-y-2">
-                  {sessions
-                    .find((s) => s.id === selectedSession)
-                    ?.agents.map((agent) => (
+                <div className="mt-4 space-y-2" data-testid="agent-list">
+                  {selectedSessionDetails?.agents?.map((agent) => (
                       <div
                         key={String(agent.threadId)}
                         onClick={() => setSelectedAgent(agent.threadId as ThreadId)}
@@ -342,6 +367,7 @@ export default function Home() {
                             ? 'bg-green-600'
                             : 'bg-gray-700 hover:bg-gray-600'
                         }`}
+                        data-testid="agent-item"
                       >
                         <div className="font-semibold">{agent.name}</div>
                         <div className="text-xs text-gray-300">
@@ -403,7 +429,7 @@ export default function Home() {
                         <div className="flex-1 overflow-hidden">
                           <ConversationDisplay
                             events={events}
-                            agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
+                            agents={selectedSessionDetails?.agents || []}
                             selectedAgent={selectedAgent as ThreadId}
                             className="h-full p-4"
                             isLoading={loading}

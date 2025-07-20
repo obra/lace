@@ -23,7 +23,15 @@ export async function GET(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const sessions = project.getSessions();
+    const sessionData = project.getSessions();
+
+    // Convert SessionData to Session format (without agents for list efficiency)
+    const sessions = sessionData.map((data) => ({
+      id: data.id,
+      name: data.name,
+      createdAt: data.createdAt.toISOString(),
+      // agents will be populated when individual session is selected
+    }));
 
     return NextResponse.json({ sessions });
   } catch (error: unknown) {

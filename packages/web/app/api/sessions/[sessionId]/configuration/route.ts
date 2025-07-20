@@ -3,10 +3,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
+import { asThreadId } from '@/lib/server/core-types';
 import { z } from 'zod';
 
 const ConfigurationSchema = z.object({
-  provider: z.string().optional(),
+  provider: z.enum(['anthropic', 'openai', 'lmstudio', 'ollama']).optional(),
   model: z.string().optional(),
   maxTokens: z.number().positive().optional(),
   tools: z.array(z.string()).optional(),
@@ -18,7 +19,7 @@ const ConfigurationSchema = z.object({
 export async function GET(request: NextRequest, { params }: { params: { sessionId: string } }) {
   try {
     const sessionService = getSessionService();
-    const session = await sessionService.getSession(params.sessionId);
+    const session = await sessionService.getSession(asThreadId(params.sessionId));
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
@@ -41,7 +42,7 @@ export async function PUT(request: NextRequest, { params }: { params: { sessionI
     const validatedData = ConfigurationSchema.parse(body);
 
     const sessionService = getSessionService();
-    const session = await sessionService.getSession(params.sessionId);
+    const session = await sessionService.getSession(asThreadId(params.sessionId));
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });

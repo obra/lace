@@ -6,7 +6,7 @@ import { Project } from '@/lib/server/lace-imports';
 import { z } from 'zod';
 
 const ConfigurationSchema = z.object({
-  provider: z.string().optional(),
+  provider: z.enum(['anthropic', 'openai', 'lmstudio', 'ollama']).optional(),
   model: z.string().optional(),
   maxTokens: z.number().positive().optional(),
   tools: z.array(z.string()).optional(),
