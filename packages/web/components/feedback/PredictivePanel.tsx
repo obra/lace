@@ -4,7 +4,7 @@
 'use client';
 
 import { PredictiveInsight } from '~/feedback/types';
-import { Badge } from '~/components/ui';
+import { Badge } from '@/components/ui';
 
 interface PredictivePanelProps {
   insights: PredictiveInsight[];

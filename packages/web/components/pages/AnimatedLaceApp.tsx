@@ -3,14 +3,14 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars, faSearch, faTerminal, faTasks, faFolder, faMicrophone } from '~/lib/fontawesome';
-import { Sidebar } from '~/components/layout/Sidebar';
-import { MobileSidebar } from '~/components/layout/MobileSidebar';
-import { AnimatedTimelineView } from '~/components/timeline/AnimatedTimelineView';
-import { EnhancedChatInput } from '~/components/chat/EnhancedChatInput';
-import { AnimatedModal } from '~/components/ui/AnimatedModal';
-import { TaskBoardModal } from '~/components/modals/TaskBoardModal';
-import { VoiceRecognitionUI } from '~/components/ui/VoiceRecognitionUI';
+import { faBars, faSearch, faTerminal, faTasks, faFolder, faMicrophone } from '@/lib/fontawesome';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { MobileSidebar } from '@/components/layout/MobileSidebar';
+import { AnimatedTimelineView } from '@/components/timeline/AnimatedTimelineView';
+import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
+import { AnimatedModal } from '@/components/ui/AnimatedModal';
+import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
+import { VoiceRecognitionUI } from '@/components/ui/VoiceRecognitionUI';
 import { TimelineEntry, Project, Timeline, Task, RecentFile } from '~/types';
 import { useVoiceRecognition } from '~/hooks/useVoiceRecognition';
 import {
@@ -22,7 +22,7 @@ import {
   springConfig,
   sidebarVariants,
   notificationVariants,
-} from '~/lib/animations';
+} from '@/lib/animations';
 
 const availableThemes = [
   { name: 'light', colors: { primary: '#570DF8', secondary: '#F000B8', accent: '#37CDBE' } },

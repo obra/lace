@@ -1,7 +1,7 @@
 'use client';
 
-import { ChatInputComposer } from '~/components/ui';
-import { AttachedFile } from '~/components/ui/FileAttachment';
+import { ChatInputComposer } from '@/components/ui';
+import { AttachedFile } from '@/components/ui/FileAttachment';
 
 interface EnhancedChatInputProps {
   value: string;

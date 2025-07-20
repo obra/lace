@@ -2,8 +2,8 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperclip, faTimes, faFile, faImage, faFileCode, faFileAlt } from '~/lib/fontawesome';
-import { Modal } from '~/components/ui/Modal';
+import { faPaperclip, faTimes, faFile, faImage, faFileCode, faFileAlt } from '@/lib/fontawesome';
+import { Modal } from '@/components/ui/Modal';
 
 export interface AttachedFile {
   id: string;

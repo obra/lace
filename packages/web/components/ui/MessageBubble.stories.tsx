@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import MessageBubble from './MessageBubble';
 import IconButton from './IconButton';
-import { faHeart, faShare, faBookmark, faReply } from '~/lib/fontawesome';
+import { faHeart, faShare, faBookmark, faReply } from '@/lib/fontawesome';
 
 const meta: Meta<typeof MessageBubble> = {
   title: 'Molecules/MessageBubble',

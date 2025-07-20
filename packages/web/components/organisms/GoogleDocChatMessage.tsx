@@ -13,7 +13,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { useOgImage } from '~/hooks/useOgImage';
 import { isGoogleDocsUrl } from '~/utils/urlUtils';
-import { DocumentSkeleton } from '~/components/ui/SkeletonLoader';
+import { DocumentSkeleton } from '@/components/ui/SkeletonLoader';
 import type { Message } from '~/types';
 
 interface GoogleDocAttachment {

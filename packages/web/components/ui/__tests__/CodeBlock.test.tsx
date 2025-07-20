@@ -6,7 +6,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CodeBlock from '../CodeBlock';
 
 // Mock the syntax highlighting service
-vi.mock('~/lib/syntax-highlighting', () => ({
+vi.mock('@/lib/syntax-highlighting', () => ({
   syntaxHighlighting: {
     initialize: vi.fn().mockResolvedValue(undefined),
     highlightCode: vi.fn().mockResolvedValue({
@@ -23,20 +23,20 @@ vi.mock('~/lib/syntax-highlighting', () => ({
 }));
 
 // Mock the theme manager
-vi.mock('~/lib/syntax-themes', () => ({
+vi.mock('@/lib/syntax-themes', () => ({
   syntaxThemeManager: {
     autoLoadTheme: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
 // Mock performance utils
-vi.mock('~/lib/performance-utils', () => ({
+vi.mock('@/lib/performance-utils', () => ({
   debounce: vi.fn((fn) => fn),
   isCodeTooLarge: vi.fn().mockReturnValue(false),
 }));
 
 // Mock FontAwesome icons
-vi.mock('~/lib/fontawesome', () => ({
+vi.mock('@/lib/fontawesome', () => ({
   faCopy: 'copy-icon',
   faCheck: 'check-icon',
   faExpand: 'expand-icon',
@@ -202,7 +202,7 @@ describe('CodeBlock', () => {
   });
 
   it('should handle highlighting errors gracefully', async () => {
-    const { syntaxHighlighting } = await import('~/lib/syntax-highlighting');
+    const { syntaxHighlighting } = await import('@/lib/syntax-highlighting');
     
     // Mock error
     vi.mocked(syntaxHighlighting.highlightCode).mockRejectedValueOnce(
@@ -274,7 +274,7 @@ describe('CodeBlock', () => {
   });
 
   it('should handle JSON formatting', async () => {
-    const { syntaxHighlighting } = await import('~/lib/syntax-highlighting');
+    const { syntaxHighlighting } = await import('@/lib/syntax-highlighting');
     
     // Mock JSON highlighting
     vi.mocked(syntaxHighlighting.highlightCode).mockResolvedValueOnce({

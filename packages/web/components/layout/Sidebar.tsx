@@ -12,11 +12,11 @@ import {
   faPlus,
   faCog,
   faFileCode,
-} from '~/lib/fontawesome';
-import { ChevronDownIcon, ChevronRightIcon, ChevronLeftIcon } from '~/lib/heroicons';
+} from '@/lib/fontawesome';
+import { ChevronDownIcon, ChevronRightIcon, ChevronLeftIcon } from '@/lib/heroicons';
 import { Timeline, Project, Task, RecentFile } from '~/types';
-import { ThemeSelector } from '~/components/ui/ThemeSelector';
-import { AccountDropdown } from '~/components/ui/AccountDropdown';
+import { ThemeSelector } from '@/components/ui/ThemeSelector';
+import { AccountDropdown } from '@/components/ui/AccountDropdown';
 
 interface SidebarProps {
   isOpen: boolean;

@@ -3,9 +3,9 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEye, faColumns, faList, faCopy, faExpand, faCompress } from '~/lib/fontawesome';
-import { syntaxHighlighting, type HighlightResult } from '~/lib/syntax-highlighting';
-import { syntaxThemeManager } from '~/lib/syntax-themes';
+import { faEye, faColumns, faList, faCopy, faExpand, faCompress } from '@/lib/fontawesome';
+import { syntaxHighlighting, type HighlightResult } from '@/lib/syntax-highlighting';
+import { syntaxThemeManager } from '@/lib/syntax-themes';
 
 // Core diff data structures
 export interface DiffLine {

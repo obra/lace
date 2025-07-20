@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { buttonTap, hoverLift, springConfig, focusRing } from '~/lib/animations';
+import { buttonTap, hoverLift, springConfig, focusRing } from '@/lib/animations';
 
 interface AnimatedButtonProps {
   children: React.ReactNode;

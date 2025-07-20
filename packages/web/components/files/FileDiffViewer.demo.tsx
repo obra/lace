@@ -175,8 +175,8 @@ export default function FileDiffViewerDemo() {
         <div className="bg-base-200 p-4 rounded-lg">
           <h4 className="font-medium mb-2">Basic Usage</h4>
           <pre className="text-sm bg-base-300 p-3 rounded font-mono overflow-x-auto">
-{`import { FileDiffViewer } from '~/components/ui';
-import { createFileDiffFromText } from '~/components/ui/FileDiffViewer.utils';
+{`import { FileDiffViewer } from '@/components/ui';
+import { createFileDiffFromText } from '@/components/ui/FileDiffViewer.utils';
 
 const diff = createFileDiffFromText(
   oldContent,

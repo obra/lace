@@ -4,7 +4,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { syntaxHighlighting, type HighlightResult } from '~/lib/syntax-highlighting';
+import { syntaxHighlighting, type HighlightResult } from '@/lib/syntax-highlighting';
 
 interface InlineCodeProps {
   code: string;

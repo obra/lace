@@ -1,5 +1,5 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMicrophone, faTimes } from '~/lib/fontawesome';
+import { faMicrophone, faTimes } from '@/lib/fontawesome';
 
 interface VoiceButtonProps {
   isListening: boolean;

@@ -2,8 +2,8 @@
 
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRobot } from '~/lib/fontawesome';
-import { loadingDots, loadingDot, springConfig, fadeInUp } from '~/lib/animations';
+import { faRobot } from '@/lib/fontawesome';
+import { loadingDots, loadingDot, springConfig, fadeInUp } from '@/lib/animations';
 
 interface AnimatedTypingIndicatorProps {
   agent: string;

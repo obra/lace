@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { shimmer, springConfig, staggerContainer, staggerItem } from '~/lib/animations';
+import { shimmer, springConfig, staggerContainer, staggerItem } from '@/lib/animations';
 
 interface LoadingSkeletonProps {
   variant?: 'text' | 'card' | 'avatar' | 'timeline' | 'carousel';

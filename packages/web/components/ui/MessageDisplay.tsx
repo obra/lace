@@ -1,4 +1,4 @@
-import { MessageHeader, MessageText, Avatar, AgentBadge, TimestampDisplay } from '~/components/ui';
+import { MessageHeader, MessageText, Avatar, AgentBadge, TimestampDisplay } from '@/components/ui';
 
 interface MessageDisplayProps {
   type: 'human' | 'ai' | 'admin' | 'tool';

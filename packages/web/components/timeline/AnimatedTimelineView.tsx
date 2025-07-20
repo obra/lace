@@ -5,7 +5,7 @@ import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { TimelineEntry } from '~/types';
 import { AnimatedTimelineMessage } from './AnimatedTimelineMessage';
 import { AnimatedTypingIndicator } from './AnimatedTypingIndicator';
-import { staggerContainer, fadeInUp, springConfig } from '~/lib/animations';
+import { staggerContainer, fadeInUp, springConfig } from '@/lib/animations';
 
 interface AnimatedTimelineViewProps {
   entries: TimelineEntry[];

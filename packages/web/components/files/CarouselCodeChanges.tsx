@@ -1,7 +1,7 @@
 'use client';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFileCode, faPlus, faMinus } from '~/lib/fontawesome';
+import { faFileCode, faPlus, faMinus } from '@/lib/fontawesome';
 
 interface CodeChange {
   id: string;

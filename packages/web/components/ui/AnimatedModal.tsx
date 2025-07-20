@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes } from '~/lib/fontawesome';
+import { faTimes } from '@/lib/fontawesome';
 import {
   modalOverlay,
   modalContent,
@@ -11,7 +11,7 @@ import {
   springConfig,
   fadeInUp,
   scaleIn,
-} from '~/lib/animations';
+} from '@/lib/animations';
 
 interface AnimatedModalProps {
   isOpen: boolean;

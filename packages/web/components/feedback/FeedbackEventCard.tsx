@@ -4,7 +4,7 @@
 'use client';
 
 import { FeedbackEvent } from '~/feedback/types';
-import { Badge, TimestampDisplay } from '~/components/ui';
+import { Badge, TimestampDisplay } from '@/components/ui';
 import { formatTime } from '~/utils/format';
 
 interface FeedbackEventCardProps {

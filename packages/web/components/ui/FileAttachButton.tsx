@@ -1,6 +1,6 @@
 import { useRef, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperclip } from '~/lib/fontawesome';
+import { faPaperclip } from '@/lib/fontawesome';
 
 interface FileAttachButtonProps {
   onFilesSelected: (files: FileList) => void;

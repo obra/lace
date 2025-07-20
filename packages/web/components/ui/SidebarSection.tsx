@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { SectionHeader } from '~/components/ui';
+import { SectionHeader } from '@/components/ui';
 
 interface SidebarSectionProps {
   title: string;

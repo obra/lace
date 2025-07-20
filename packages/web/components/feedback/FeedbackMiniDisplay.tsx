@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { FeedbackEvent } from '~/feedback/types';
 import { FeedbackEventCard } from './FeedbackEventCard';
-import { Badge } from '~/components/ui';
+import { Badge } from '@/components/ui';
 
 interface FeedbackMiniDisplayProps {
   events: FeedbackEvent[];

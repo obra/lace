@@ -1,7 +1,7 @@
 'use client';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt } from '~/lib/fontawesome';
+import { faExternalLinkAlt } from '@/lib/fontawesome';
 
 interface BaseIntegrationEntry {
   id: string;

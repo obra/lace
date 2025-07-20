@@ -9,7 +9,7 @@ import { FeedbackEventCard } from './FeedbackEventCard';
 import { FeedbackInsightCard } from './FeedbackInsightCard';
 import { PerformancePanel } from './PerformancePanel';
 import { PredictivePanel } from './PredictivePanel';
-import { Badge } from '~/components/ui';
+import { Badge } from '@/components/ui';
 
 interface FeedbackDisplayProps {
   events: FeedbackEvent[];

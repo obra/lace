@@ -4,11 +4,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import CodeBlock from '~/components/ui/CodeBlock';
-import InlineCode from '~/components/ui/InlineCode';
-import { syntaxHighlighting } from '~/lib/syntax-highlighting';
-import { syntaxThemeManager } from '~/lib/syntax-themes';
-import { performanceMonitor } from '~/lib/performance-utils';
+import CodeBlock from '@/components/ui/CodeBlock';
+import InlineCode from '@/components/ui/InlineCode';
+import { syntaxHighlighting } from '@/lib/syntax-highlighting';
+import { syntaxThemeManager } from '@/lib/syntax-themes';
+import { performanceMonitor } from '@/lib/performance-utils';
 
 // Sample code for different languages
 const SAMPLE_CODE = {

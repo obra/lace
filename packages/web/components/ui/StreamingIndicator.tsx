@@ -1,7 +1,7 @@
 'use client';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faStop, faRobot } from '~/lib/fontawesome';
+import { faStop, faRobot } from '@/lib/fontawesome';
 
 interface StreamingIndicatorProps {
   isVisible: boolean;

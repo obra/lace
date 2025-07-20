@@ -6,8 +6,8 @@ import {
   VoiceButton, 
   SendButton, 
   FileAttachButton 
-} from '~/components/ui';
-import { FileAttachment, AttachedFile } from '~/components/ui/FileAttachment';
+} from '@/components/ui';
+import { FileAttachment, AttachedFile } from '@/components/ui/FileAttachment';
 
 interface ChatInputComposerProps {
   value: string;

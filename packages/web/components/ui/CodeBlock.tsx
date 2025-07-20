@@ -5,10 +5,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCopy, faCheck, faExpand, faCompress } from '~/lib/fontawesome';
-import { syntaxHighlighting, type HighlightResult } from '~/lib/syntax-highlighting';
-import { simpleSyntaxThemeManager } from '~/lib/syntax-themes-simple';
-import { debounce, isCodeTooLarge } from '~/lib/performance-utils';
+import { faCopy, faCheck, faExpand, faCompress } from '@/lib/fontawesome';
+import { syntaxHighlighting, type HighlightResult } from '@/lib/syntax-highlighting';
+import { simpleSyntaxThemeManager } from '@/lib/syntax-themes-simple';
+import { debounce, isCodeTooLarge } from '@/lib/performance-utils';
 
 interface CodeBlockProps {
   code: string;

@@ -2,8 +2,8 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch, faTerminal, faTasks, faFolder } from '~/lib/fontawesome';
-import { ChevronLeftIcon } from '~/lib/heroicons';
+import { faSearch, faTerminal, faTasks, faFolder } from '@/lib/fontawesome';
+import { ChevronLeftIcon } from '@/lib/heroicons';
 import { Timeline, Project, Task } from '~/types';
 import {
   fadeInLeft,
@@ -17,7 +17,7 @@ import {
   popIn,
   sidebarVariants,
   modalOverlay,
-} from '~/lib/animations';
+} from '@/lib/animations';
 
 interface AnimatedMobileSidebarProps {
   isOpen: boolean;

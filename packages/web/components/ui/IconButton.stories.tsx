@@ -42,7 +42,7 @@ import {
   faCopy,
   faExpand,
   faCompress,
-} from '~/lib/fontawesome';
+} from '@/lib/fontawesome';
 
 const meta: Meta<typeof IconButton> = {
   title: 'Atoms/IconButton',
@@ -76,7 +76,7 @@ A fundamental action atom that provides consistent interactive elements with Fon
 - **Borders**: Rounded corners for modern appearance
 
 ### Icon System
-- **FontAwesome Integration**: Uses centralized icon library from ~/lib/fontawesome
+- **FontAwesome Integration**: Uses centralized icon library from @/lib/fontawesome
 - **Semantic Icons**: Consistent icon usage (search, send, settings, etc.)
 - **Size Scaling**: Icons automatically scale with button size
 - **Accessibility**: Proper ARIA labels and tooltips

@@ -2,16 +2,16 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars, faSearch, faTerminal, faTasks, faFolder, faMicrophone } from '~/lib/fontawesome';
-import { Sidebar } from '~/components/layout/Sidebar';
-import { MobileSidebar } from '~/components/layout/MobileSidebar';
-import { TimelineView } from '~/components/timeline/TimelineView';
-import { EnhancedChatInput } from '~/components/chat/EnhancedChatInput';
-import { TaskBoardModal } from '~/components/modals/TaskBoardModal';
-import { VoiceRecognitionUI } from '~/components/ui/VoiceRecognitionUI';
-import { StreamingIndicator } from '~/components/ui/StreamingIndicator';
-import { DragDropOverlay } from '~/components/ui/DragDropOverlay';
-import { AttachedFile } from '~/components/ui/FileAttachment';
+import { faBars, faSearch, faTerminal, faTasks, faFolder, faMicrophone } from '@/lib/fontawesome';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { MobileSidebar } from '@/components/layout/MobileSidebar';
+import { TimelineView } from '@/components/timeline/TimelineView';
+import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
+import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
+import { VoiceRecognitionUI } from '@/components/ui/VoiceRecognitionUI';
+import { StreamingIndicator } from '@/components/ui/StreamingIndicator';
+import { DragDropOverlay } from '@/components/ui/DragDropOverlay';
+import { AttachedFile } from '@/components/ui/FileAttachment';
 import { TimelineEntry, Project, Timeline, Task, RecentFile, StreamEvent } from '~/types';
 import { useVoiceRecognition } from '~/hooks/useVoiceRecognition';
 import { useConversationStream } from '~/hooks/useConversationStream';
@@ -179,7 +179,7 @@ export function LaceApp() {
     {
       id: 3,
       type: 'ai',
-      content: "I'll help you create a React component with TypeScript that demonstrates our syntax highlighting capabilities. Here's a complete example:\n\n```typescript\nimport React, { useState, useEffect } from 'react';\nimport { syntaxHighlighting } from '~/lib/syntax-highlighting';\n\ninterface CodeDisplayProps {\n  code: string;\n  language?: string;\n  fileName?: string;\n  showLineNumbers?: boolean;\n}\n\nexport const CodeDisplay: React.FC<CodeDisplayProps> = ({\n  code,\n  language = 'javascript',\n  fileName,\n  showLineNumbers = true\n}) => {\n  const [highlighted, setHighlighted] = useState<string>('');\n  const [isLoading, setIsLoading] = useState(true);\n\n  useEffect(() => {\n    const highlightCode = async () => {\n      try {\n        const result = await syntaxHighlighting.highlightCode(\n          code,\n          language,\n          fileName\n        );\n        setHighlighted(result.highlighted);\n      } catch (error) {\n        console.error('Syntax highlighting failed:', error);\n        setHighlighted(code); // Fallback to plain text\n      } finally {\n        setIsLoading(false);\n      }\n    };\n\n    highlightCode();\n  }, [code, language, fileName]);\n\n  if (isLoading) {\n    return <div className=\"animate-pulse\">Loading...</div>;\n  }\n\n  return (\n    <div className=\"bg-base-300 rounded-lg p-4 font-mono\">\n      {fileName && (\n        <div className=\"text-sm text-base-content/60 mb-2\">\n          {fileName}\n        </div>\n      )}\n      <pre\n        className=\"text-sm overflow-x-auto\"\n        dangerouslySetInnerHTML={{ __html: highlighted }}\n      />\n    </div>\n  );\n};\n```\n\nThis component uses our new syntax highlighting system with these features:\n\n- **Language Detection**: Automatically detects the language if not specified\n- **File Name Support**: Can use the filename for better language detection\n- **Async Highlighting**: Uses the `syntaxHighlighting` service asynchronously\n- **Error Handling**: Falls back to plain text if highlighting fails\n- **Loading States**: Shows a loading indicator while processing\n- **Responsive Design**: Uses Tailwind classes for consistent styling\n\nYou can also use inline code like `const result = await api.getData()` which will be highlighted appropriately.",
+      content: "I'll help you create a React component with TypeScript that demonstrates our syntax highlighting capabilities. Here's a complete example:\n\n```typescript\nimport React, { useState, useEffect } from 'react';\nimport { syntaxHighlighting } from '@/lib/syntax-highlighting';\n\ninterface CodeDisplayProps {\n  code: string;\n  language?: string;\n  fileName?: string;\n  showLineNumbers?: boolean;\n}\n\nexport const CodeDisplay: React.FC<CodeDisplayProps> = ({\n  code,\n  language = 'javascript',\n  fileName,\n  showLineNumbers = true\n}) => {\n  const [highlighted, setHighlighted] = useState<string>('');\n  const [isLoading, setIsLoading] = useState(true);\n\n  useEffect(() => {\n    const highlightCode = async () => {\n      try {\n        const result = await syntaxHighlighting.highlightCode(\n          code,\n          language,\n          fileName\n        );\n        setHighlighted(result.highlighted);\n      } catch (error) {\n        console.error('Syntax highlighting failed:', error);\n        setHighlighted(code); // Fallback to plain text\n      } finally {\n        setIsLoading(false);\n      }\n    };\n\n    highlightCode();\n  }, [code, language, fileName]);\n\n  if (isLoading) {\n    return <div className=\"animate-pulse\">Loading...</div>;\n  }\n\n  return (\n    <div className=\"bg-base-300 rounded-lg p-4 font-mono\">\n      {fileName && (\n        <div className=\"text-sm text-base-content/60 mb-2\">\n          {fileName}\n        </div>\n      )}\n      <pre\n        className=\"text-sm overflow-x-auto\"\n        dangerouslySetInnerHTML={{ __html: highlighted }}\n      />\n    </div>\n  );\n};\n```\n\nThis component uses our new syntax highlighting system with these features:\n\n- **Language Detection**: Automatically detects the language if not specified\n- **File Name Support**: Can use the filename for better language detection\n- **Async Highlighting**: Uses the `syntaxHighlighting` service asynchronously\n- **Error Handling**: Falls back to plain text if highlighting fails\n- **Loading States**: Shows a loading indicator while processing\n- **Responsive Design**: Uses Tailwind classes for consistent styling\n\nYou can also use inline code like `const result = await api.getData()` which will be highlighted appropriately.",
       agent: 'Claude',
       timestamp: new Date(Date.now() - 1790000),
     },
@@ -388,7 +388,7 @@ This creates an engaging, sports-commentary-style experience that makes developm
 
 \`\`\`typescript
 import React from 'react';
-import { FileDiffViewer } from '~/components/files/FileDiffViewer';
+import { FileDiffViewer } from '@/components/files/FileDiffViewer';
 
 // Example usage showing before/after code changes
 const ExampleDiffUsage = () => {

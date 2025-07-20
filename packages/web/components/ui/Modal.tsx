@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes } from '~/lib/fontawesome';
+import { faTimes } from '@/lib/fontawesome';
 
 interface ModalProps {
   isOpen: boolean;

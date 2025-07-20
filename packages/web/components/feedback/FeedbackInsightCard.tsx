@@ -4,7 +4,7 @@
 'use client';
 
 import { FeedbackInsight } from '~/feedback/types';
-import { Badge } from '~/components/ui';
+import { Badge } from '@/components/ui';
 
 interface FeedbackInsightCardProps {
   insight: FeedbackInsight;

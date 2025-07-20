@@ -11,9 +11,9 @@ import {
   faTerminal,
   faExternalLinkAlt,
   faImages,
-} from '~/lib/fontawesome';
-import { Carousel } from '~/components/ui/Carousel';
-import { IntegrationEntry } from '~/components/timeline/IntegrationEntry';
+} from '@/lib/fontawesome';
+import { Carousel } from '@/components/ui/Carousel';
+import { IntegrationEntry } from '@/components/timeline/IntegrationEntry';
 import {
   messageVariants,
   fadeInUp,
@@ -23,7 +23,7 @@ import {
   springConfig,
   staggerContainer,
   staggerItem,
-} from '~/lib/animations';
+} from '@/lib/animations';
 
 interface AnimatedTimelineMessageProps {
   entry: TimelineEntry;

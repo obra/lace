@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { ChevronDownIcon, ChevronRightIcon } from '~/lib/heroicons';
+import { ChevronDownIcon, ChevronRightIcon } from '@/lib/heroicons';
 
 interface SectionHeaderProps {
   title: string;

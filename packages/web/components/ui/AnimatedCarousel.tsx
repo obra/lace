@@ -10,7 +10,7 @@ import {
   fadeInUp,
   staggerContainer,
   staggerItem,
-} from '~/lib/animations';
+} from '@/lib/animations';
 
 interface AnimatedCarouselProps {
   children: React.ReactNode[];

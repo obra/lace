@@ -1,7 +1,7 @@
 'use client';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRobot } from '~/lib/fontawesome';
+import { faRobot } from '@/lib/fontawesome';
 
 interface TypingIndicatorProps {
   agent: string;
