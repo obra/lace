@@ -1,0 +1,67 @@
+// FontAwesome configuration for React components
+import { config } from '@fortawesome/fontawesome-svg-core';
+
+// Prevent FontAwesome from adding CSS since we'll import it manually
+config.autoAddCss = false;
+
+// Export all the icons we need for easy importing
+export {
+  faSearch,
+  faTerminal,
+  faTasks,
+  faFolder,
+  faFolderOpen,
+  faMicrophone,
+  faPaperPlane,
+  faPaperclip,
+  faBars,
+  faTimes,
+  faComments,
+  faPlus,
+  faCheck,
+  faCog,
+  faFileCode,
+  faUser,
+  faSignOutAlt,
+  // Additional icons for other components
+  faCrown,
+  faRobot,
+  faInfoCircle,
+  faCreditCard,
+  faImages,
+  faFileAlt,
+  faFile,
+  faImage,
+  faFileExcel,
+  faFolderPlus,
+  faShare,
+  faEdit,
+  faCheckCircle,
+  faTable,
+  faMinus,
+  faPlug,
+  faStop,
+  faEye,
+  faColumns,
+  faList,
+  faCopy,
+  faExpand,
+  faCompress,
+  // Navigation icons for NavigationButton component
+  faHome,
+  faBell,
+  faHeart,
+  faBookmark,
+  faChartBar as faChart,
+  // Additional icons used in stories and components
+  faComment,
+  faEllipsisV,
+  faTrash,
+  faHistory,
+  faInbox,
+  faStar,
+  faReply,
+  faFileText,
+  faExternalLinkAlt,
+  faExternalLinkAlt as faExternalLink,
+} from '@fortawesome/free-solid-svg-icons';
