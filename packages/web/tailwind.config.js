@@ -1,24 +1,51 @@
+import daisyui from 'daisyui';
+
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   content: [
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./lib/**/*.{js,ts,jsx,tsx,mdx}",
+    "./.storybook/**/*.{js,ts,jsx,tsx,mdx}"
   ],
   theme: {
     extend: {
-      colors: {
-        'terminal-bg': '#1a1a1a',
-        'terminal-fg': '#d4d4d4',
-        'terminal-green': '#4ade80',
-        'terminal-blue': '#60a5fa',
-        'terminal-yellow': '#facc15',
-        'terminal-red': '#f87171',
-        'terminal-purple': '#c084fc',
-      },
       fontFamily: {
-        mono: ['Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', 'monospace'],
+        mono: [
+          'ui-monospace',
+          'JetBrains Mono',
+          'Fira Code',
+          'SF Mono',
+          'SFMono-Regular',
+          'Monaco',
+          'Consolas',
+          'Liberation Mono',
+          'Menlo',
+          'Courier New',
+          'monospace'
+        ],
       },
     },
   },
-  plugins: [],
-}
+  plugins: [daisyui],
+  daisyui: {
+    themes: [
+      'light',
+      'dark',
+      'cupcake',
+      'corporate',
+      'synthwave',
+      'black',
+      'business',
+      'emerald',
+      'lofi',
+    ],
+    darkTheme: 'dark',
+    base: true,
+    styled: true,
+    utils: true,
+    prefix: '',
+    logs: true,
+    themeRoot: ':root',
+  },
+};
