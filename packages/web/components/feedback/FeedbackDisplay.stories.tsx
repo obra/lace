@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { FeedbackDisplay } from './FeedbackDisplay';
-import { FeedbackEvent, FeedbackInsight, PerformanceAnalysis, PredictiveInsight } from '~/feedback/types';
+import { FeedbackEvent, FeedbackInsight, PerformanceAnalysis, PredictiveInsight } from '@/feedback/types';
 
 const meta: Meta<typeof FeedbackDisplay> = {
   title: 'Organisms/FeedbackDisplay',
