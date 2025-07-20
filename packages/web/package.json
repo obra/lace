@@ -61,14 +61,11 @@
     "tsx": "^4.19.2",
     "typescript": "^5.6.0",
     "vitest": "^3.2.4",
-    "@storybook/react": "^8.6.14",
-    "@storybook/addon-essentials": "^8.6.14",
-    "@storybook/addon-interactions": "^8.6.14",
-    "@storybook/addon-links": "^8.6.14",
-    "@storybook/addon-a11y": "^8.6.14",
-    "@storybook/addon-docs": "^8.6.14",
-    "@storybook/nextjs": "^8.6.14",
-    "@storybook/test": "^8.6.14",
+    "storybook": "^9.0.17",
+    "@storybook/addon-essentials": "^9.0.0-alpha.12",
+    "@storybook/addon-a11y": "^9.0.17",
+    "@storybook/addon-docs": "^9.0.0-alpha.12",
+    "@storybook/nextjs-vite": "^9.0.17",
     "chromatic": "^6.0.0"
   }
 }
