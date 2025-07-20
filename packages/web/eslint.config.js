@@ -71,6 +71,13 @@ const config = [
       'no-restricted-imports': 'off',
     },
   },
+  {
+    files: ['**/*.stories.tsx', '**/*.stories.ts'],
+    rules: {
+      'no-console': 'off', // Allow console.log in Storybook stories for debugging and examples
+      'react-hooks/rules-of-hooks': 'off', // Allow hooks in Storybook render functions
+    },
+  },
 ];
 
 export default config;
