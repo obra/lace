@@ -3,9 +3,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
-import { setupAgentApprovals } from '@/lib/server/agent-utils';
 import { getApprovalManager } from '@/lib/server/approval-manager';
-import { Agent, ApprovalDecision, ToolExecutor, Project } from '@/lib/server/lace-imports';
+import { Agent, ApprovalDecision, Project } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
@@ -18,6 +17,24 @@ import { tmpdir } from 'os';
 // Mock the file-read tool for testing
 import { Tool } from '~/tools/tool';
 import { z } from 'zod';
+
+// Type definitions for test
+interface ToolExecutorWithApproval {
+  approvalCallback?: {
+    requestApproval: (toolName: string, input: unknown) => Promise<ApprovalDecision>;
+  };
+}
+
+interface EventLogEntry {
+  event: string;
+  data: unknown;
+  timestamp: number;
+}
+
+interface ApprovalManagerWithPending {
+  pendingApprovals: Map<string, unknown>;
+  resolveApproval: (requestId: string, decision: ApprovalDecision) => boolean;
+}
 
 class MockFileReadTool extends Tool {
   name = 'file-read';
@@ -33,7 +50,7 @@ class MockFileReadTool extends Tool {
     };
   }
 
-  protected async executeValidated(args: z.infer<typeof this.schema>) {
+  protected async executeValidated(_args: z.infer<typeof this.schema>) {
     return this.createResult('File content here');
   }
 }
@@ -47,9 +64,9 @@ describe('Tool Approval Flow Integration', () => {
   let tempDir: string;
 
   // Track events for debugging
-  const eventLog: Array<{ event: string; data: any; timestamp: number }> = [];
+  const eventLog: EventLogEntry[] = [];
 
-  function logEvent(event: string, data: any) {
+  function logEvent(event: string, data: unknown): void {
     eventLog.push({ event, data, timestamp: Date.now() });
     console.log(`[${new Date().toISOString()}] ${event}:`, data);
   }
@@ -107,24 +124,52 @@ describe('Tool Approval Flow Integration', () => {
 
     // Add event logging to agent
     const originalEmit = agent.emit.bind(agent);
-    agent.emit = vi.fn().mockImplementation((event: string, ...args: any[]) => {
+    agent.emit = vi.fn().mockImplementation((event: string, ...args: unknown[]) => {
       logEvent(`agent.emit(${event})`, args[0]);
       return originalEmit(event, ...args);
     });
 
     // Add event logging to approval manager
     const originalRequestApproval = approvalManager.requestApproval.bind(approvalManager);
-    approvalManager.requestApproval = vi.fn().mockImplementation(async (...args) => {
-      logEvent('approvalManager.requestApproval', { args });
-      return originalRequestApproval(...args);
-    });
+    approvalManager.requestApproval = vi
+      .fn()
+      .mockImplementation(
+        async (
+          threadId: ThreadId,
+          sessionId: ThreadId,
+          toolName: string,
+          description: string,
+          context: unknown,
+          input: unknown,
+          isReadOnly: boolean
+        ) => {
+          logEvent('approvalManager.requestApproval', {
+            threadId,
+            sessionId,
+            toolName,
+            description,
+            context,
+            input,
+            isReadOnly,
+          });
+          return originalRequestApproval(
+            threadId,
+            sessionId,
+            toolName,
+            description,
+            context,
+            input,
+            isReadOnly
+          );
+        }
+      );
 
     logEvent('setup.complete', {
       projectId,
       sessionId,
       agentId: agent.threadId,
       toolExecutorSet: !!agent.toolExecutor,
-      approvalCallbackSet: !!(agent.toolExecutor as any).approvalCallback,
+      approvalCallbackSet: !!(agent.toolExecutor as ToolExecutorWithApproval).approvalCallback,
     });
   });
 
@@ -155,14 +200,16 @@ describe('Tool Approval Flow Integration', () => {
     expect(agent.toolExecutor).toBeDefined();
 
     // Step 2: Verify approval callback is set
-    const toolExecutor = agent.toolExecutor as any;
+    const toolExecutor = agent.toolExecutor as ToolExecutorWithApproval;
     logEvent('approval.callback.check', {
       callbackExists: !!toolExecutor.approvalCallback,
       callbackType: typeof toolExecutor.approvalCallback,
     });
 
     expect(toolExecutor.approvalCallback).toBeDefined();
-    expect(typeof toolExecutor.approvalCallback.requestApproval).toBe('function');
+    if (toolExecutor.approvalCallback) {
+      expect(typeof toolExecutor.approvalCallback.requestApproval).toBe('function');
+    }
 
     // Step 3: Verify agent has approval_request event listeners
     const listenerCount = agent.listenerCount('approval_request');
@@ -184,15 +231,16 @@ describe('Tool Approval Flow Integration', () => {
     let approvalResolveFunction: ((decision: ApprovalDecision) => void) | null = null;
 
     // Listen for approval_request event
-    agent.once('approval_request', (data) => {
+    agent.once('approval_request', (data: unknown) => {
+      const approvalData = data as { resolve: (decision: ApprovalDecision) => void };
       logEvent('approval_request.received', data);
       approvalRequestReceived = true;
-      approvalResolveFunction = data.resolve;
+      approvalResolveFunction = approvalData.resolve;
 
       // Automatically approve after a short delay to complete the flow
       setTimeout(() => {
         logEvent('approval_request.resolving', { decision: 'ALLOW_ONCE' });
-        data.resolve(ApprovalDecision.ALLOW_ONCE);
+        approvalData.resolve(ApprovalDecision.ALLOW_ONCE);
       }, 100);
     });
 
@@ -206,7 +254,13 @@ describe('Tool Approval Flow Integration', () => {
 
     logEvent('tool.execution.complete', {
       result: toolResult,
-      resultError: toolResult.isError ? toolResult.content[0]?.text : null,
+      resultError:
+        toolResult.isError &&
+        toolResult.content &&
+        toolResult.content[0] &&
+        'text' in toolResult.content[0]
+          ? toolResult.content[0].text
+          : null,
       approvalRequestReceived,
       resolveFunction: !!approvalResolveFunction,
     });
@@ -228,22 +282,30 @@ describe('Tool Approval Flow Integration', () => {
   it('should test approval callback directly', async () => {
     logEvent('test.start', { testName: 'direct approval callback' });
 
-    const toolExecutor = agent.toolExecutor as any;
+    const toolExecutor = agent.toolExecutor as ToolExecutorWithApproval;
     const approvalCallback = toolExecutor.approvalCallback;
 
     expect(approvalCallback).toBeDefined();
+    if (!approvalCallback) {
+      throw new Error('Approval callback not found');
+    }
 
     // Test the approval callback directly
     let eventEmitted = false;
-    let eventData: any = null;
+    let eventData: unknown = null;
 
-    agent.once('approval_request', (data) => {
+    agent.once('approval_request', (data: unknown) => {
+      const approvalData = data as {
+        resolve: (decision: ApprovalDecision) => void;
+        toolName: string;
+        requestId: string;
+      };
       logEvent('direct.approval_request.received', data);
       eventEmitted = true;
       eventData = data;
 
       // Resolve immediately
-      data.resolve(ApprovalDecision.ALLOW_ONCE);
+      approvalData.resolve(ApprovalDecision.ALLOW_ONCE);
     });
 
     logEvent('direct.callback.calling', { toolName: 'file-read' });
@@ -257,17 +319,19 @@ describe('Tool Approval Flow Integration', () => {
       eventEmitted,
       eventData: eventData
         ? {
-            toolName: eventData.toolName,
-            hasResolve: typeof eventData.resolve === 'function',
-            requestId: eventData.requestId,
+            toolName: (eventData as { toolName?: string })?.toolName,
+            hasResolve: typeof (eventData as { resolve?: unknown })?.resolve === 'function',
+            requestId: (eventData as { requestId?: string })?.requestId,
           }
         : null,
     });
 
     expect(eventEmitted).toBe(true);
     expect(decision).toBe(ApprovalDecision.ALLOW_ONCE);
-    expect(eventData.toolName).toBe('file-read');
-    expect(typeof eventData.resolve).toBe('function');
+    if (eventData) {
+      expect((eventData as { toolName?: string })?.toolName).toBe('file-read');
+      expect(typeof (eventData as { resolve?: unknown })?.resolve).toBe('function');
+    }
   });
 
   it('should test SessionService approval event handling', async () => {
@@ -286,11 +350,31 @@ describe('Tool Approval Flow Integration', () => {
     let approvalManagerCalled = false;
     const originalRequestApproval = approvalManager.requestApproval;
 
-    approvalManager.requestApproval = vi.fn().mockImplementation(async (...args) => {
-      logEvent('manual.approval_manager.called', { args });
-      approvalManagerCalled = true;
-      return ApprovalDecision.ALLOW_ONCE;
-    });
+    approvalManager.requestApproval = vi
+      .fn()
+      .mockImplementation(
+        async (
+          threadId: ThreadId,
+          sessionId: ThreadId,
+          toolName: string,
+          description: string,
+          context: unknown,
+          input: unknown,
+          isReadOnly: boolean
+        ) => {
+          logEvent('manual.approval_manager.called', {
+            threadId,
+            sessionId,
+            toolName,
+            description,
+            context,
+            input,
+            isReadOnly,
+          });
+          approvalManagerCalled = true;
+          return ApprovalDecision.ALLOW_ONCE;
+        }
+      );
 
     const testPromise = new Promise<ApprovalDecision>((resolve) => {
       logEvent('manual.approval_request.emitting', {
@@ -339,17 +423,19 @@ describe('Tool Approval Flow Integration', () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Check if there are any pending approvals
-    const pendingApprovals = (approvalManager as any).pendingApprovals;
+    const approvalManagerWithState = approvalManager as ApprovalManagerWithPending;
+    const pendingApprovals = approvalManagerWithState.pendingApprovals;
+    const pendingKeys = Array.from(pendingApprovals.keys());
     logEvent('approval_manager.state', {
-      hasPendingApprovals: Object.keys(pendingApprovals || {}).length > 0,
-      pendingKeys: Object.keys(pendingApprovals || {}),
+      hasPendingApprovals: pendingKeys.length > 0,
+      pendingKeys,
     });
 
     // Simulate approval resolution
-    const requestId = Object.keys(pendingApprovals || {})[0];
+    const requestId = pendingKeys[0];
     if (requestId) {
       logEvent('approval_manager.resolving', { requestId });
-      approvalManager.resolveApproval(requestId, ApprovalDecision.ALLOW_ONCE);
+      approvalManagerWithState.resolveApproval(requestId, ApprovalDecision.ALLOW_ONCE);
     }
 
     const result = await approvalPromise;

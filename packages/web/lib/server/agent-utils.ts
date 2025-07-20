@@ -2,10 +2,9 @@
 // ABOUTME: Handles tool approval and SSE setup for individual agents
 
 import { Agent, ApprovalDecision } from '@/lib/server/lace-imports';
-import { asThreadId, type ThreadId } from '@/lib/server/core-types';
-import { getApprovalManager } from '@/lib/server/approval-manager';
+import type { ThreadId } from '@/lib/server/core-types';
 
-export function setupAgentApprovals(agent: Agent, sessionId: ThreadId): void {
+export function setupAgentApprovals(agent: Agent, _sessionId: ThreadId): void {
   // Create ApprovalCallback implementation that emits events (like CLI)
   const approvalCallback = {
     async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {

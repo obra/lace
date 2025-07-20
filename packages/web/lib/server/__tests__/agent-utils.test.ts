@@ -38,7 +38,7 @@ describe('Agent Utilities', () => {
 
     expect(mockAgent.toolExecutor.setApprovalCallback).toHaveBeenCalledWith(
       expect.objectContaining({
-        requestApproval: expect.any(Function),
+        requestApproval: expect.any(Function) as unknown,
       })
     );
   });
