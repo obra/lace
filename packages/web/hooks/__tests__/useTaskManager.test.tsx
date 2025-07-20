@@ -7,6 +7,7 @@ import { act } from 'react';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { TaskAPIClient } from '@/lib/client/task-api';
 import type { Task } from '@/types/api';
+import { setupTestPersistence, teardownTestPersistence } from '~/__tests__/setup/persistence-helper';
 
 // Mock the TaskAPIClient
 vi.mock('@/lib/client/task-api');
@@ -18,21 +19,14 @@ class MockEventSource {
   close = vi.fn();
   addEventListener = vi.fn();
   removeEventListener = vi.fn();
-  
+
   constructor(public url: string) {}
 }
 
 global.EventSource = MockEventSource as unknown as typeof EventSource;
 
 describe('useTaskManager', () => {
-  let mockClient: {
-    listTasks: ReturnType<typeof vi.fn>;
-    createTask: ReturnType<typeof vi.fn>;
-    getTask: ReturnType<typeof vi.fn>;
-    updateTask: ReturnType<typeof vi.fn>;
-    deleteTask: ReturnType<typeof vi.fn>;
-    addNote: ReturnType<typeof vi.fn>;
-  };
+  let mockClient: Partial<TaskAPIClient>;
 
   const mockSessionId = 'lace_20240101_session';
   const mockTask: Task = {
@@ -50,6 +44,7 @@ describe('useTaskManager', () => {
   };
 
   beforeEach(() => {
+    void setupTestPersistence();
     mockClient = {
       listTasks: vi.fn().mockResolvedValue([mockTask]),
       createTask: vi.fn().mockResolvedValue(mockTask),
@@ -58,7 +53,9 @@ describe('useTaskManager', () => {
       deleteTask: vi.fn().mockResolvedValue(undefined),
       addNote: vi.fn().mockResolvedValue({
         ...mockTask,
-        notes: [{ id: 'note1', author: 'human', content: 'Test note', timestamp: '2024-01-01T01:00:00Z' }],
+        notes: [
+          { id: 'note1', author: 'human', content: 'Test note', timestamp: '2024-01-01T01:00:00Z' },
+        ],
       }),
     };
 
@@ -67,6 +64,7 @@ describe('useTaskManager', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    teardownTestPersistence();
   });
 
   it('should initialize with loading state', async () => {
@@ -95,7 +93,7 @@ describe('useTaskManager', () => {
   });
 
   it('should handle fetch errors', async () => {
-    mockClient.listTasks.mockRejectedValueOnce(new Error('Failed to fetch'));
+    (mockClient.listTasks as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Failed to fetch'));
 
     const { result } = renderHook(() => useTaskManager(mockSessionId));
 
@@ -140,7 +138,7 @@ describe('useTaskManager', () => {
     });
 
     expect(mockClient.createTask).toHaveBeenCalledWith(mockSessionId, newTask);
-    
+
     // Wait for the refetch to occur
     await waitFor(() => {
       expect(mockClient.listTasks).toHaveBeenCalledTimes(2); // Initial + refetch
@@ -158,12 +156,10 @@ describe('useTaskManager', () => {
       await result.current.updateTask('task_20240101_abc123', { status: 'completed' });
     });
 
-    expect(mockClient.updateTask).toHaveBeenCalledWith(
-      mockSessionId,
-      'task_20240101_abc123',
-      { status: 'completed' }
-    );
-    
+    expect(mockClient.updateTask).toHaveBeenCalledWith(mockSessionId, 'task_20240101_abc123', {
+      status: 'completed',
+    });
+
     // Wait for the refetch to occur
     await waitFor(() => {
       expect(mockClient.listTasks).toHaveBeenCalledTimes(2); // Initial + refetch
@@ -182,7 +178,7 @@ describe('useTaskManager', () => {
     });
 
     expect(mockClient.deleteTask).toHaveBeenCalledWith(mockSessionId, 'task_20240101_abc123');
-    
+
     // Wait for the refetch to occur
     await waitFor(() => {
       expect(mockClient.listTasks).toHaveBeenCalledTimes(2); // Initial + refetch
@@ -206,7 +202,7 @@ describe('useTaskManager', () => {
       'Test note',
       undefined
     );
-    
+
     // Wait for the refetch to occur
     await waitFor(() => {
       expect(mockClient.listTasks).toHaveBeenCalledTimes(2); // Initial + refetch
@@ -235,7 +231,7 @@ describe('useTaskManager', () => {
     });
 
     expect(mockClient.createTask).toHaveBeenCalledTimes(2);
-    
+
     // Wait for the batched refetch to occur
     await waitFor(() => {
       // Should only refetch once after all operations complete
@@ -259,8 +255,8 @@ describe('useTaskManager', () => {
     const createPromise = new Promise<void>((resolve) => {
       resolveCreate = resolve;
     });
-    
-    mockClient.createTask.mockImplementationOnce(() => {
+
+    (mockClient.createTask as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
       return createPromise.then(() => mockTask);
     });
 

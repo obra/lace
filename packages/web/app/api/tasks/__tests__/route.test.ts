@@ -1,19 +1,17 @@
 // ABOUTME: Unit tests for task management API endpoints
 // ABOUTME: Tests task CRUD operations and note management
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/tasks/route';
 import type { SessionService } from '@/lib/server/session-service';
-
-// Helper function for tests to avoid server-only imports
-function createThreadId(id: string) {
-  return id as import('@/types/api').ThreadId;
-}
+import type { Task } from '@/types/api';
+import type { Session as CoreSession } from '@/lib/server/lace-imports';
+import { asThreadId } from '@/lib/server/core-types';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Create mock TaskManager
 const mockTaskManager = {
@@ -28,27 +26,48 @@ const mockTaskManager = {
   getTask: vi.fn(),
 };
 
-// Create a mock Session instance
-const mockSession = {
-  getId: vi.fn().mockReturnValue(createThreadId('lace_20240101_session')),
-  getInfo: vi.fn().mockReturnValue({
-    id: createThreadId('lace_20240101_session'),
-    name: 'Test Session',
-    createdAt: '2024-01-01T00:00:00Z',
-    agents: [],
-  }),
-  getAgents: vi.fn().mockReturnValue([]),
-  getTaskManager: vi.fn().mockReturnValue(mockTaskManager),
-};
+// Create a mock Session instance with proper typing
+const mockSessionId = asThreadId('lace_20240101_session');
 
-// Create the properly typed mock service
+// Create a properly typed mock service with inline mocks
 const mockSessionService = {
   createSession: vi.fn<SessionService['createSession']>(),
   listSessions: vi.fn<SessionService['listSessions']>(),
-  getSession: vi.fn<SessionService['getSession']>().mockResolvedValue(mockSession),
+  getSession: vi.fn<SessionService['getSession']>(),
   spawnAgent: vi.fn<SessionService['spawnAgent']>(),
   getAgent: vi.fn<SessionService['getAgent']>(),
 };
+
+// Set up the default mock behavior for getSession - properly typed mock
+mockSessionService.getSession.mockImplementation(
+  async (sessionId: string): Promise<CoreSession | null> => {
+    if (sessionId === 'lace_20240101_session') {
+      // Create a partial mock session with the required methods for testing
+      const mockSessionResult: Partial<CoreSession> = {
+        getId: () => mockSessionId,
+        getInfo: () => ({
+          id: mockSessionId,
+          name: 'Test Session',
+          createdAt: new Date('2024-01-01T00:00:00Z'),
+          provider: 'anthropic',
+          model: 'claude-3-5-sonnet-20241022',
+          agents: [],
+        }),
+        getAgents: () => [],
+        getTaskManager: () => mockTaskManager,
+        spawnAgent: vi.fn(),
+        getAgent: () => null,
+        startAgent: vi.fn().mockResolvedValue(undefined),
+        stopAgent: vi.fn(),
+        sendMessage: vi.fn().mockResolvedValue(undefined),
+        destroy: vi.fn(),
+      };
+      // Type assertion is safe here since we're mocking only needed methods for tests
+      return mockSessionResult as CoreSession;
+    }
+    return null;
+  }
+);
 
 // Mock the session service
 vi.mock('@/lib/server/session-service', () => ({
@@ -60,6 +79,7 @@ describe('Task API Routes', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
 
     // Mock console methods to prevent stderr pollution during tests
@@ -70,13 +90,14 @@ describe('Task API Routes', () => {
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
+    teardownTestPersistence();
   });
 
   describe('GET /api/tasks', () => {
     it('should return 400 if sessionId is missing', async () => {
       const request = new NextRequest('http://localhost:3000/api/tasks');
       const response = await GET(request);
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Session ID is required');
@@ -89,14 +110,14 @@ describe('Task API Routes', () => {
         'http://localhost:3000/api/tasks?sessionId=lace_20240101_notfound'
       );
       const response = await GET(request);
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Session not found');
     });
 
     it('should return tasks for a valid session', async () => {
-      const mockTasks = [
+      const mockTasks: Task[] = [
         {
           id: 'task_20240101_abc123',
           title: 'Test Task 1',
@@ -104,8 +125,8 @@ describe('Task API Routes', () => {
           prompt: 'Prompt 1',
           status: 'pending',
           priority: 'high',
-          createdBy: createThreadId('lace_20240101_agent1'),
-          threadId: createThreadId('lace_20240101_session'),
+          createdBy: asThreadId('lace_20240101_agent1'),
+          threadId: asThreadId('lace_20240101_session'),
           createdAt: new Date('2024-01-01T00:00:00Z'),
           updatedAt: new Date('2024-01-01T00:00:00Z'),
           notes: [],
@@ -117,9 +138,9 @@ describe('Task API Routes', () => {
           prompt: 'Prompt 2',
           status: 'in_progress',
           priority: 'medium',
-          assignedTo: createThreadId('lace_20240101_agent2'),
-          createdBy: createThreadId('lace_20240101_agent1'),
-          threadId: createThreadId('lace_20240101_session'),
+          assignedTo: asThreadId('lace_20240101_agent2'),
+          createdBy: asThreadId('lace_20240101_agent1'),
+          threadId: asThreadId('lace_20240101_session'),
           createdAt: new Date('2024-01-01T01:00:00Z'),
           updatedAt: new Date('2024-01-01T01:00:00Z'),
           notes: [],
@@ -132,7 +153,7 @@ describe('Task API Routes', () => {
         'http://localhost:3000/api/tasks?sessionId=lace_20240101_session'
       );
       const response = await GET(request);
-      const data = await response.json();
+      const data = (await response.json()) as { tasks: Task[] };
 
       expect(response.status).toBe(200);
       expect(data.tasks).toHaveLength(2);
@@ -145,14 +166,16 @@ describe('Task API Routes', () => {
     });
 
     it('should filter tasks by status', async () => {
-      const mockTasks = [
+      const mockTasks: Task[] = [
         {
           id: 'task_20240101_abc123',
           title: 'Pending Task',
+          description: '',
+          prompt: 'Test prompt',
           status: 'pending',
           priority: 'high',
-          createdBy: createThreadId('lace_20240101_agent1'),
-          threadId: createThreadId('lace_20240101_session'),
+          createdBy: asThreadId('lace_20240101_agent1'),
+          threadId: asThreadId('lace_20240101_session'),
           createdAt: new Date('2024-01-01T00:00:00Z'),
           updatedAt: new Date('2024-01-01T00:00:00Z'),
           notes: [],
@@ -165,7 +188,7 @@ describe('Task API Routes', () => {
         'http://localhost:3000/api/tasks?sessionId=lace_20240101_session&status=pending'
       );
       const response = await GET(request);
-      const data = await response.json();
+      const _data = (await response.json()) as { tasks: Task[] };
 
       expect(response.status).toBe(200);
       expect(mockTaskManager.getTasks).toHaveBeenCalledWith({
@@ -185,7 +208,7 @@ describe('Task API Routes', () => {
       });
 
       const response = await POST(request);
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Session ID is required');
@@ -202,22 +225,22 @@ describe('Task API Routes', () => {
       });
 
       const response = await POST(request);
-      const data = await response.json();
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Title and prompt are required');
     });
 
     it('should create a new task', async () => {
-      const newTask = {
+      const newTask: Task = {
         id: 'task_20240101_new123',
         title: 'New Task',
         description: 'New Description',
         prompt: 'Do something',
         status: 'pending',
         priority: 'medium',
-        createdBy: createThreadId('human'),
-        threadId: createThreadId('lace_20240101_session'),
+        createdBy: asThreadId('human'),
+        threadId: asThreadId('lace_20240101_session'),
         createdAt: new Date('2024-01-01T00:00:00Z'),
         updatedAt: new Date('2024-01-01T00:00:00Z'),
         notes: [],
@@ -237,7 +260,7 @@ describe('Task API Routes', () => {
       });
 
       const response = await POST(request);
-      const data = await response.json();
+      const data = (await response.json()) as { task: Task };
 
       expect(response.status).toBe(201);
       expect(data.task).toMatchObject({
@@ -260,16 +283,16 @@ describe('Task API Routes', () => {
     });
 
     it('should create task with assignment', async () => {
-      const newTask = {
+      const newTask: Task = {
         id: 'task_20240101_new123',
         title: 'Assigned Task',
         description: '',
         prompt: 'Do something',
         status: 'pending',
         priority: 'high',
-        assignedTo: createThreadId('lace_20240101_agent1'),
-        createdBy: createThreadId('human'),
-        threadId: createThreadId('lace_20240101_session'),
+        assignedTo: asThreadId('lace_20240101_agent1'),
+        createdBy: asThreadId('human'),
+        threadId: asThreadId('lace_20240101_session'),
         createdAt: new Date('2024-01-01T00:00:00Z'),
         updatedAt: new Date('2024-01-01T00:00:00Z'),
         notes: [],
@@ -289,7 +312,7 @@ describe('Task API Routes', () => {
       });
 
       const response = await POST(request);
-      const data = await response.json();
+      const data = (await response.json()) as { task: Task };
 
       expect(response.status).toBe(201);
       expect(data.task.assignedTo).toBe('lace_20240101_agent1');

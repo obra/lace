@@ -13,13 +13,7 @@ interface TaskListProps {
   error?: string;
 }
 
-export function TaskList({
-  tasks,
-  onTaskClick,
-  onStatusChange,
-  loading,
-  error,
-}: TaskListProps) {
+export function TaskList({ tasks, onTaskClick, onStatusChange, loading, error }: TaskListProps) {
   // Sort tasks by priority and creation date
   const sortedTasks = [...tasks].sort((a, b) => {
     const priorityOrder = { high: 3, medium: 2, low: 1 };

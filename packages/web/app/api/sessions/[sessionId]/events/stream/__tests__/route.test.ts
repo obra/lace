@@ -4,10 +4,24 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/[sessionId]/events/stream/route';
-import type { ThreadId } from '@/types/api';
+import type { ThreadId, Session, SessionEvent } from '@/types/api';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
-// Create the mock service outside so we can access it
-const mockSessionService = {
+// Create properly typed mocks for the session service
+interface MockSessionService {
+  createSession: ReturnType<typeof vi.fn>;
+  listSessions: ReturnType<typeof vi.fn>;
+  getSession: ReturnType<typeof vi.fn>;
+  spawnAgent: ReturnType<typeof vi.fn>;
+  getAgent: ReturnType<typeof vi.fn>;
+  sendMessage: ReturnType<typeof vi.fn>;
+  handleAgentEvent: ReturnType<typeof vi.fn>;
+}
+
+const mockSessionService: MockSessionService = {
   createSession: vi.fn(),
   listSessions: vi.fn(),
   getSession: vi.fn(),
@@ -22,12 +36,19 @@ vi.mock('@/lib/server/session-service', () => ({
   getSessionService: () => mockSessionService,
 }));
 
-// Mock SSE manager
-const mockSSEManager = {
+// Create properly typed mocks for the SSE manager
+interface MockSSEManager {
+  addConnection: ReturnType<typeof vi.fn>;
+  removeConnection: ReturnType<typeof vi.fn>;
+  broadcast: ReturnType<typeof vi.fn>;
+  sessionStreams: Map<ThreadId, Set<ReadableStreamDefaultController<Uint8Array>>>;
+}
+
+const mockSSEManager: MockSSEManager = {
   addConnection: vi.fn(),
   removeConnection: vi.fn(),
   broadcast: vi.fn(),
-  sessionStreams: new Map(),
+  sessionStreams: new Map<ThreadId, Set<ReadableStreamDefaultController<Uint8Array>>>(),
 };
 
 vi.mock('@/lib/sse-manager', () => ({
@@ -38,6 +59,7 @@ vi.mock('@/lib/sse-manager', () => ({
 
 describe('Session SSE Stream API', () => {
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
 
     // Reset SSE manager state
@@ -46,23 +68,32 @@ describe('Session SSE Stream API', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    teardownTestPersistence();
   });
 
   describe('GET /api/sessions/{sessionId}/events/stream', () => {
-    const sessionId = 'lace_20250113_session1' as ThreadId;
+    const sessionId: ThreadId = 'lace_20250113_session1' as ThreadId;
 
-    it('should establish SSE connection', async () => {
-      mockSessionService.getSession.mockResolvedValue({
-        id: sessionId,
+    // Helper function to create properly typed mock sessions
+    const createMockSession = (id: ThreadId): Session => {
+      const session: Session = {
+        id,
         name: 'Test Session',
         createdAt: new Date().toISOString(),
         agents: [],
-      });
+      };
+      return session;
+    };
+
+    it('should establish SSE connection', async () => {
+      const mockSession = createMockSession(sessionId);
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
       );
-      const response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const params = Promise.resolve({ sessionId: sessionId as string });
+      const response = await GET(request, { params });
 
       expect(response.status).toBe(200);
       expect(response.headers.get('Content-Type')).toBe('text/event-stream');
@@ -72,17 +103,14 @@ describe('Session SSE Stream API', () => {
     });
 
     it('should send connection event on open', async () => {
-      mockSessionService.getSession.mockResolvedValue({
-        id: sessionId,
-        name: 'Test Session',
-        createdAt: new Date().toISOString(),
-        agents: [],
-      });
+      const mockSession = createMockSession(sessionId);
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
       );
-      const response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const params = Promise.resolve({ sessionId: sessionId as string });
+      const response = await GET(request, { params });
 
       // Get the stream
       const reader = response.body!.getReader();
@@ -98,48 +126,47 @@ describe('Session SSE Stream API', () => {
     });
 
     it('should stream events for session only', async () => {
-      mockSessionService.getSession.mockResolvedValue({
-        id: sessionId,
-        name: 'Test Session',
-        createdAt: new Date().toISOString(),
-        agents: [],
-      });
+      const mockSession = createMockSession(sessionId);
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
       );
-      const _response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const params = Promise.resolve({ sessionId: sessionId as string });
+      await GET(request, { params });
 
       // Simulate broadcasting events
       expect(mockSSEManager.addConnection).toHaveBeenCalledWith(sessionId, expect.any(Object));
 
       // Verify that the connection was added for the correct session
-      const addConnectionCall = mockSSEManager.addConnection.mock.calls[0] as [string, unknown];
+      const addConnectionCall = mockSSEManager.addConnection.mock.calls[0] as [
+        ThreadId,
+        ReadableStreamDefaultController<Uint8Array>,
+      ];
       expect(addConnectionCall[0]).toBe(sessionId);
     });
 
     it('should filter out events from other sessions', async () => {
-      const otherSessionId = 'lace_20250113_other' as ThreadId;
+      const otherSessionId: ThreadId = 'lace_20250113_other' as ThreadId;
 
-      mockSessionService.getSession.mockResolvedValue({
-        id: sessionId,
-        name: 'Test Session',
-        createdAt: new Date().toISOString(),
-        agents: [],
-      });
+      const mockSession = createMockSession(sessionId);
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
       );
-      await GET(request, { params: Promise.resolve({ sessionId }) });
+      const params = Promise.resolve({ sessionId: sessionId as string });
+      await GET(request, { params });
 
       // Broadcast to different session should not affect this connection
-      mockSSEManager.broadcast(otherSessionId, {
+      const threadId: ThreadId = `${otherSessionId}.1` as ThreadId;
+      const broadcastEvent: SessionEvent = {
         type: 'USER_MESSAGE',
-        threadId: `${otherSessionId}.1` as ThreadId,
+        threadId,
         timestamp: new Date().toISOString(),
         data: { content: 'Should not see this' },
-      });
+      };
+      void mockSSEManager.broadcast(otherSessionId, broadcastEvent);
 
       // Only connections for otherSessionId should receive the event
       expect(mockSSEManager.broadcast).toHaveBeenCalledWith(otherSessionId, expect.any(Object));
@@ -147,12 +174,8 @@ describe('Session SSE Stream API', () => {
 
     it.skip('should handle client disconnection gracefully', async () => {
       // Skip: AbortController signal handling is complex in test environment
-      mockSessionService.getSession.mockResolvedValue({
-        id: sessionId,
-        name: 'Test Session',
-        createdAt: new Date().toISOString(),
-        agents: [],
-      });
+      const mockSession = createMockSession(sessionId);
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       const abortController = new AbortController();
       const request = new NextRequest(
@@ -162,7 +185,8 @@ describe('Session SSE Stream API', () => {
         }
       );
 
-      const _response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const params = Promise.resolve({ sessionId: sessionId as string });
+      await GET(request, { params });
 
       // Simulate client disconnect
       abortController.abort();
@@ -172,12 +196,8 @@ describe('Session SSE Stream API', () => {
     });
 
     it('should support multiple concurrent connections', async () => {
-      mockSessionService.getSession.mockResolvedValue({
-        id: sessionId,
-        name: 'Test Session',
-        createdAt: new Date().toISOString(),
-        agents: [],
-      });
+      const mockSession = createMockSession(sessionId);
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       // Create multiple connections
       const request1 = new NextRequest(
@@ -190,10 +210,14 @@ describe('Session SSE Stream API', () => {
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
       );
 
+      const params1 = Promise.resolve({ sessionId: sessionId as string });
+      const params2 = Promise.resolve({ sessionId: sessionId as string });
+      const params3 = Promise.resolve({ sessionId: sessionId as string });
+
       const responses = await Promise.all([
-        GET(request1, { params: Promise.resolve({ sessionId }) }),
-        GET(request2, { params: Promise.resolve({ sessionId }) }),
-        GET(request3, { params: Promise.resolve({ sessionId }) }),
+        GET(request1, { params: params1 }),
+        GET(request2, { params: params2 }),
+        GET(request3, { params: params3 }),
       ]);
       // Responses are created for all connections
       expect(responses).toHaveLength(3);
@@ -211,7 +235,8 @@ describe('Session SSE Stream API', () => {
       mockSessionService.getSession.mockResolvedValue(null);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/invalid/events/stream`);
-      const response = await GET(request, { params: Promise.resolve({ sessionId: 'invalid' }) });
+      const params = Promise.resolve({ sessionId: 'invalid' });
+      const response = await GET(request, { params });
 
       expect(response.status).toBe(404);
       const data = (await response.json()) as { error: string };
@@ -219,34 +244,28 @@ describe('Session SSE Stream API', () => {
     });
 
     it('should handle SSE event format correctly', async () => {
-      mockSessionService.getSession.mockResolvedValue({
-        id: sessionId,
-        name: 'Test Session',
-        createdAt: new Date().toISOString(),
-        agents: [],
-      });
+      const mockSession = createMockSession(sessionId);
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
       );
-      const _response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const params = Promise.resolve({ sessionId: sessionId as string });
+      await GET(request, { params });
 
       // Verify SSE manager was called to add connection
       expect(mockSSEManager.addConnection).toHaveBeenCalledWith(sessionId, expect.any(Object));
     });
 
     it('should include retry hint in SSE stream', async () => {
-      mockSessionService.getSession.mockResolvedValue({
-        id: sessionId,
-        name: 'Test Session',
-        createdAt: new Date().toISOString(),
-        agents: [],
-      });
+      const mockSession = createMockSession(sessionId);
+      mockSessionService.getSession.mockResolvedValue(mockSession);
 
       const request = new NextRequest(
         `http://localhost:3000/api/sessions/${sessionId}/events/stream`
       );
-      const response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const params = Promise.resolve({ sessionId: sessionId as string });
+      const response = await GET(request, { params });
 
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();

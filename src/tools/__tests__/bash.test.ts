@@ -375,4 +375,86 @@ describe('BashTool', () => {
       expect(output.stderr).toContain('not found');
     });
   });
+
+  describe('Working directory context', () => {
+    it('should use working directory from context when provided', async () => {
+      // Create a temporary directory and test file
+      const result = await bashTool.execute({
+        command:
+          'mkdir -p /tmp/test-bash-tool && echo "test content" > /tmp/test-bash-tool/test.txt',
+      });
+      expect(result.isError).toBe(false);
+
+      // Now execute a command with context pointing to that directory
+      const context = { workingDirectory: '/tmp/test-bash-tool' };
+      const pwdResult = await bashTool.execute({ command: 'pwd && cat test.txt' }, context);
+
+      expect(pwdResult.isError).toBe(false);
+
+      const output = JSON.parse(pwdResult.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
+
+      expect(output.exitCode).toBe(0);
+      expect(output.stdout).toContain('/tmp/test-bash-tool');
+      expect(output.stdout).toContain('test content');
+    });
+
+    it('should use process.cwd() when no context provided', async () => {
+      const result = await bashTool.execute({ command: 'pwd' });
+
+      expect(result.isError).toBe(false);
+
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
+
+      expect(output.exitCode).toBe(0);
+      expect(output.stdout.trim()).toBe(process.cwd());
+    });
+
+    it('should use process.cwd() when context has no workingDirectory', async () => {
+      const context = {}; // Empty context
+      const result = await bashTool.execute({ command: 'pwd' }, context);
+
+      expect(result.isError).toBe(false);
+
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
+
+      expect(output.exitCode).toBe(0);
+      expect(output.stdout.trim()).toBe(process.cwd());
+    });
+
+    it('should handle relative paths correctly with working directory', async () => {
+      // Create a test structure
+      const setupResult = await bashTool.execute({
+        command:
+          'mkdir -p /tmp/test-bash-relative/subdir && echo "relative test" > /tmp/test-bash-relative/subdir/file.txt',
+      });
+      expect(setupResult.isError).toBe(false);
+
+      // Use context to set working directory and test relative path
+      const context = { workingDirectory: '/tmp/test-bash-relative' };
+      const result = await bashTool.execute({ command: 'cat subdir/file.txt' }, context);
+
+      expect(result.isError).toBe(false);
+
+      const output = JSON.parse(result.content[0].text!) as {
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      };
+
+      expect(output.exitCode).toBe(0);
+      expect(output.stdout).toContain('relative test');
+    });
+  });
 });

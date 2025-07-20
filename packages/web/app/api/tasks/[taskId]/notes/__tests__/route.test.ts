@@ -9,10 +9,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/tasks/[taskId]/notes/route';
 import type { SessionService } from '@/lib/server/session-service';
-import type { TaskManager } from '@/lib/server/lace-imports';
+import type { Session } from '@/types/api';
+// Note: We can't import the actual Session class due to server-only restrictions in tests
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Helper function for tests to avoid server-only imports
-function createThreadId(id: string) {
+function createThreadId(id: string): import('@/types/api').ThreadId {
   return id as import('@/types/api').ThreadId;
 }
 
@@ -29,24 +34,63 @@ const mockTaskManager = {
   getTask: vi.fn(),
 };
 
-// Create a mock Session instance
-const mockSession = {
+// Interface matching the actual Session class methods used by SessionService
+interface MockCoreSession {
+  getId(): import('@/types/api').ThreadId;
+  getInfo(): {
+    id: import('@/types/api').ThreadId;
+    name: string;
+    createdAt: Date;
+    provider: string;
+    model: string;
+    agents: Array<{
+      threadId: import('@/types/api').ThreadId;
+      name: string;
+      provider: string;
+      model: string;
+      status: string;
+    }>;
+  } | null;
+  getAgents(): Array<{
+    threadId: import('@/types/api').ThreadId;
+    name: string;
+    provider: string;
+    model: string;
+    status: string;
+  }>;
+  getTaskManager(): typeof mockTaskManager;
+  spawnAgent(name: string, provider?: string, model?: string): unknown;
+  getAgent(threadId: import('@/types/api').ThreadId): unknown;
+  getProjectId(): string | undefined;
+  getWorkingDirectory(): string;
+  destroy(): void;
+}
+
+// Create a properly typed mock Session instance that matches the core Session interface
+const mockCoreSession: MockCoreSession = {
   getId: vi.fn().mockReturnValue(createThreadId('lace_20240101_session')),
   getInfo: vi.fn().mockReturnValue({
     id: createThreadId('lace_20240101_session'),
     name: 'Test Session',
-    createdAt: '2024-01-01T00:00:00Z',
+    createdAt: new Date('2024-01-01T00:00:00Z'),
+    provider: 'anthropic',
+    model: 'claude-3-haiku-20240307',
     agents: [],
   }),
   getAgents: vi.fn().mockReturnValue([]),
   getTaskManager: vi.fn().mockReturnValue(mockTaskManager),
+  spawnAgent: vi.fn(),
+  getAgent: vi.fn(),
+  getProjectId: vi.fn(),
+  getWorkingDirectory: vi.fn().mockReturnValue('/test/working/directory'),
+  destroy: vi.fn(),
 };
 
 // Create the properly typed mock service
 const mockSessionService = {
   createSession: vi.fn<SessionService['createSession']>(),
   listSessions: vi.fn<SessionService['listSessions']>(),
-  getSession: vi.fn<SessionService['getSession']>().mockResolvedValue(mockSession),
+  getSession: vi.fn<SessionService['getSession']>().mockResolvedValue(mockCoreSession),
   spawnAgent: vi.fn<SessionService['spawnAgent']>(),
   getAgent: vi.fn<SessionService['getAgent']>(),
 };
@@ -61,6 +105,7 @@ describe('Task Notes API Routes', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
 
     // Mock console methods to prevent stderr pollution during tests
@@ -71,6 +116,7 @@ describe('Task Notes API Routes', () => {
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
+    teardownTestPersistence();
   });
 
   describe('POST /api/tasks/[taskId]/notes', () => {

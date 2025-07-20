@@ -3,6 +3,7 @@
 
 import { ZodType, ZodError } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
+import { resolve, isAbsolute } from 'path';
 import type { ToolResult, ToolContext, ToolInputSchema, ToolAnnotations } from '~/tools/types';
 
 export abstract class Tool {
@@ -73,6 +74,16 @@ export abstract class Tool {
     metadata?: Record<string, unknown>
   ): ToolResult {
     return this._makeResult({ content, metadata, isError: true });
+  }
+
+  // Path resolution helper for file operations
+  protected resolvePath(path: string, context?: ToolContext): string {
+    if (isAbsolute(path)) {
+      return path;
+    }
+
+    const workingDir = context?.workingDirectory || process.cwd();
+    return resolve(workingDir, path);
   }
 
   // Private implementation

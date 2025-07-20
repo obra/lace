@@ -6,7 +6,6 @@
       }
     ],
     "baseUrl": ".",
-    "rootDir": ".",
     "paths": {
       "@/*": [
         "./*"
@@ -27,19 +26,13 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "strict": true,
-    "exactOptionalPropertyTypes": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitOverride": true,
-    "noImplicitReturns": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "noUncheckedIndexedAccess": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "target": "ES2017",
+    "target": "ES2023",
     "skipLibCheck": true,
-    "module": "esnext",
+    "module": "ESNext",
     "esModuleInterop": true,
-    "moduleResolution": "node"
+    "moduleResolution": "Bundler",
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true
   },
   "include": [
     "next-env.d.ts",

@@ -4,10 +4,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { ThreadId, ApiErrorResponse } from '@/types/api';
+import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
+import { z } from 'zod';
 
-// Type guard for ThreadId
+// Type guard for ThreadId using client-safe validation
 function isValidThreadId(sessionId: string): sessionId is ThreadId {
-  return typeof sessionId === 'string' && sessionId.length > 0;
+  return isClientValidThreadId(sessionId);
 }
 
 // Type guard for unknown error values
@@ -58,6 +60,102 @@ export async function GET(
     return NextResponse.json({ session: sessionData });
   } catch (error: unknown) {
     console.error('Error in GET /api/sessions/[sessionId]:', error);
+
+    const errorMessage = isError(error) ? error.message : 'Internal server error';
+    const errorResponse: ApiErrorResponse = { error: errorMessage };
+    return NextResponse.json(errorResponse, { status: 500 });
+  }
+}
+
+// Schema for validating session update requests
+const UpdateSessionSchema = z.object({
+  name: z.string().min(1, 'Name cannot be empty').optional(),
+  description: z.string().optional(),
+  status: z.enum(['active', 'archived', 'completed']).optional(),
+});
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ sessionId: string }> }
+): Promise<NextResponse> {
+  try {
+    const sessionService = getSessionService();
+    const { sessionId: sessionIdParam } = await params;
+
+    if (!isValidThreadId(sessionIdParam)) {
+      const errorResponse: ApiErrorResponse = { error: 'Invalid session ID' };
+      return NextResponse.json(errorResponse, { status: 400 });
+    }
+
+    const sessionId = sessionIdParam;
+
+    // Check if session exists
+    const existingSession = await sessionService.getSession(sessionId);
+    if (!existingSession) {
+      const errorResponse: ApiErrorResponse = { error: 'Session not found' };
+      return NextResponse.json(errorResponse, { status: 404 });
+    }
+
+    // Parse and validate request body
+    const bodyRaw: unknown = await request.json();
+    const bodyResult = UpdateSessionSchema.safeParse(bodyRaw);
+
+    if (!bodyResult.success) {
+      const errorResponse: ApiErrorResponse = {
+        error: 'Invalid request data',
+        details: bodyResult.error.errors,
+      };
+      return NextResponse.json(errorResponse, { status: 400 });
+    }
+
+    const updates = bodyResult.data;
+
+    // Update session metadata using SessionService
+    sessionService.updateSession(sessionId, {
+      ...updates,
+      updatedAt: new Date(),
+    });
+
+    // Clear the active sessions cache so the session gets reloaded from database with updated info
+    sessionService.clearActiveSessions();
+
+    // Get updated session data
+    const updatedSession = await sessionService.getSession(sessionId);
+    if (!updatedSession) {
+      const errorResponse: ApiErrorResponse = { error: 'Session not found after update' };
+      return NextResponse.json(errorResponse, { status: 500 });
+    }
+
+    // Get updated session data directly from database to ensure we have the latest values
+    const { Session } = await import('@/lib/server/lace-imports');
+    const updatedSessionData = Session.getSession(sessionId);
+    if (!updatedSessionData) {
+      const errorResponse: ApiErrorResponse = { error: 'Session not found after update' };
+      return NextResponse.json(errorResponse, { status: 500 });
+    }
+
+    // Convert to API response format
+    const agents = updatedSession.getAgents();
+
+    const sessionData = {
+      id: updatedSession.getId(),
+      name: (updatedSessionData as { name: string }).name,
+      description: (updatedSessionData as { description?: string }).description,
+      status: (updatedSessionData as { status?: string }).status,
+      createdAt: (updatedSessionData as { createdAt: Date }).createdAt.toISOString(),
+      agents: agents.map((agent) => ({
+        threadId: agent.threadId,
+        name: agent.name,
+        provider: agent.provider,
+        model: agent.model,
+        status: agent.status,
+        createdAt: (agent as { createdAt?: string }).createdAt ?? new Date().toISOString(),
+      })),
+    };
+
+    return NextResponse.json({ session: sessionData });
+  } catch (error: unknown) {
+    console.error('Error in PATCH /api/sessions/[sessionId]:', error);
 
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     const errorResponse: ApiErrorResponse = { error: errorMessage };

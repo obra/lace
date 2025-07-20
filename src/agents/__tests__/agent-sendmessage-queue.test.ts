@@ -1,13 +1,17 @@
 // ABOUTME: Tests for sendMessage queue option functionality
 // ABOUTME: Ensures sendMessage can queue messages when agent is busy
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Type helper for accessing private methods in tests
 type AgentWithPrivateMethods = {
@@ -45,6 +49,7 @@ describe('Agent sendMessage Queue Option', () => {
   let mockThreadManager: ThreadManager;
 
   beforeEach(async () => {
+    setupTestPersistence();
     mockProvider = new MockProvider();
 
     mockToolExecutor = {
@@ -76,6 +81,10 @@ describe('Agent sendMessage Queue Option', () => {
     });
 
     await agent.start();
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
   });
 
   describe('when agent is idle', () => {

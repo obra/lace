@@ -8,6 +8,10 @@ import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { Tool } from '~/tools/tool';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock provider that can emit retry events
 class MockRetryProvider extends BaseMockProvider {
@@ -107,6 +111,7 @@ describe('Agent retry event forwarding', () => {
   let threadId: string;
 
   beforeEach(async () => {
+    setupTestPersistence();
     threadId = 'test-thread-id';
     mockProvider = new MockRetryProvider({});
 
@@ -141,6 +146,7 @@ describe('Agent retry event forwarding', () => {
 
   afterEach(() => {
     agent.stop();
+    teardownTestPersistence();
   });
 
   describe('retry_attempt event forwarding', () => {

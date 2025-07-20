@@ -2,17 +2,83 @@
 // ABOUTME: Tests the complete user workflow for tool approval in the web UI
 
 import { test, expect } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+
+// Helper function to set up isolated temp directory for E2E tests
+async function setupTempLaceDir(): Promise<{
+  tempDir: string;
+  originalLaceDir: string | undefined;
+}> {
+  const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lace-e2e-approval-'));
+  const originalLaceDir = process.env.LACE_DIR;
+  process.env.LACE_DIR = tempDir;
+  return { tempDir, originalLaceDir };
+}
+
+async function cleanupTempLaceDir(tempDir: string, originalLaceDir: string | undefined) {
+  // Restore original LACE_DIR
+  if (originalLaceDir !== undefined) {
+    process.env.LACE_DIR = originalLaceDir;
+  } else {
+    delete process.env.LACE_DIR;
+  }
+
+  // Clean up test environment variables
+  delete process.env.ANTHROPIC_KEY;
+
+  // Clean up temp directory
+  if (tempDir && fs.existsSync(tempDir)) {
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+  }
+}
 
 // Test environment setup
 test.describe.configure({ mode: 'serial' }); // Run tests sequentially to avoid session conflicts
 
 test.describe('Tool Approval Modal E2E Tests', () => {
+  let tempDir: string;
+  let originalLaceDir: string | undefined;
+  let projectName: string;
+
   test.beforeEach(async ({ page }) => {
+    // Set up isolated temp directory
+    ({ tempDir, originalLaceDir } = await setupTempLaceDir());
+
+    // Create unique project name for this test run
+    projectName = `Tool Approval Project ${Date.now()}`;
+
+    // Set environment variables for the server
+    process.env.ANTHROPIC_KEY = 'test-anthropic-key-for-e2e';
+
+    // Set up test environment with temp directory
+    await page.addInitScript((testTempDir) => {
+      window.testEnv = {
+        ANTHROPIC_KEY: 'test-key',
+        LACE_DB_PATH: path.join(testTempDir, 'lace.db'),
+      };
+    }, tempDir);
+
     // Navigate to the web app
-    await page.goto('http://localhost:3005');
+    await page.goto('/');
+
+    // Create a test project first
+    await page.click('text=New Project');
+    await page.fill('#name', projectName);
+    await page.fill('#description', 'Project for tool approval testing');
+    await page.fill('#workingDirectory', path.join(tempDir, 'workspace'));
+    await page.click('button[type="submit"]');
+
+    // Wait for project to be created and selected
+    await expect(page.getByText(projectName)).toBeVisible();
 
     // Wait for the app to load
     await page.waitForSelector('[data-testid="create-session-button"]');
+  });
+
+  test.afterEach(async () => {
+    await cleanupTempLaceDir(tempDir, originalLaceDir);
   });
 
   test('should display basic UI elements', async ({ page }) => {
@@ -45,7 +111,7 @@ test.describe('Tool Approval Modal E2E Tests', () => {
     await expect(page.locator('text=Test Agent').first()).toBeVisible({ timeout: 10000 });
 
     // Click on the agent to select it (click the agent name in the list, not the status message)
-    await page.click('div.font-semibold:has-text("Test Agent")');
+    await page.locator('text=Test Agent').first().click();
 
     // Wait for message input to be available
     await page.waitForSelector('[data-testid="message-input"]', { timeout: 10000 });
@@ -84,7 +150,7 @@ test.describe('Tool Approval Modal E2E Tests', () => {
     await page.click('[data-testid="confirm-spawn-agent"]');
     await page.waitForSelector('[data-testid="message-input"]');
 
-    await page.click('div.font-semibold:has-text("Test Agent")');
+    await page.locator('text=Test Agent').first().click();
 
     // Trigger tool approval
     await page.fill('[data-testid="message-input"]', 'Please read package.json');
@@ -112,7 +178,7 @@ test.describe('Tool Approval Modal E2E Tests', () => {
     await page.click('[data-testid="confirm-spawn-agent"]');
     await page.waitForSelector('[data-testid="message-input"]');
 
-    await page.click('div.font-semibold:has-text("Test Agent")');
+    await page.locator('text=Test Agent').first().click();
 
     // Trigger tool approval
     await page.fill('[data-testid="message-input"]', 'Please read package.json');
@@ -140,7 +206,7 @@ test.describe('Tool Approval Modal E2E Tests', () => {
     await page.click('[data-testid="confirm-spawn-agent"]');
     await page.waitForSelector('[data-testid="message-input"]');
 
-    await page.click('div.font-semibold:has-text("Test Agent")');
+    await page.locator('text=Test Agent').first().click();
 
     // Trigger tool approval
     await page.fill('[data-testid="message-input"]', 'Please read package.json');
@@ -169,7 +235,7 @@ test.describe('Tool Approval Modal E2E Tests', () => {
     await page.click('[data-testid="confirm-spawn-agent"]');
     await page.waitForSelector('[data-testid="message-input"]');
 
-    await page.click('div.font-semibold:has-text("Test Agent")');
+    await page.locator('text=Test Agent').first().click();
 
     // Test Y key for Allow Once
     await page.fill('[data-testid="message-input"]', 'Please read package.json');
@@ -196,7 +262,7 @@ test.describe('Tool Approval Modal E2E Tests', () => {
     await page.click('[data-testid="confirm-spawn-agent"]');
     await page.waitForSelector('[data-testid="message-input"]');
 
-    await page.click('div.font-semibold:has-text("Test Agent")');
+    await page.locator('text=Test Agent').first().click();
 
     // Trigger tool approval
     await page.fill('[data-testid="message-input"]', 'Please read package.json');
@@ -225,7 +291,7 @@ test.describe('Tool Approval Modal E2E Tests', () => {
     await page.click('[data-testid="confirm-spawn-agent"]');
     await page.waitForSelector('[data-testid="message-input"]');
 
-    await page.click('div.font-semibold:has-text("Test Agent")');
+    await page.locator('text=Test Agent').first().click();
 
     // Trigger tool approval
     await page.fill('[data-testid="message-input"]', 'Please read package.json');
@@ -263,7 +329,7 @@ test.describe('Tool Approval Modal E2E Tests', () => {
     await page.click('[data-testid="confirm-spawn-agent"]');
     await page.waitForSelector('[data-testid="message-input"]');
 
-    await page.click('div.font-semibold:has-text("Test Agent")');
+    await page.locator('text=Test Agent').first().click();
 
     // Trigger tool approval
     await page.fill('[data-testid="message-input"]', 'Please read package.json');
@@ -302,7 +368,7 @@ test.describe('Tool Approval Modal E2E Tests', () => {
     await page.click('[data-testid="confirm-spawn-agent"]');
     await page.waitForSelector('[data-testid="message-input"]');
 
-    await page.click('div.font-semibold:has-text("Test Agent")');
+    await page.locator('text=Test Agent').first().click();
 
     // Test A key (alternative to Y for Allow Once)
     await page.fill('[data-testid="message-input"]', 'Please read package.json');
@@ -326,7 +392,7 @@ test.describe('Tool Approval Modal E2E Tests', () => {
     await page.click('[data-testid="confirm-spawn-agent"]');
     await page.waitForSelector('[data-testid="message-input"]');
 
-    await page.click('div.font-semibold:has-text("Test Agent")');
+    await page.locator('text=Test Agent').first().click();
 
     // First tool call - approve for session
     await page.fill('[data-testid="message-input"]', 'Please read package.json');

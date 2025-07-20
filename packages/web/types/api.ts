@@ -2,7 +2,10 @@
 // ABOUTME: Defines interfaces for sessions, agents, and events
 
 // Import core types from Lace
-export type { ThreadId } from '@/lib/server/lace-imports';
+import type { AgentState, ThreadId, AssigneeId } from '@/lib/server/lace-imports';
+
+// Re-export imported types
+export type { ThreadId, AssigneeId, AgentState };
 
 // Define ApprovalDecision locally to avoid import issues
 export const ApprovalDecision = {
@@ -17,10 +20,8 @@ export interface Session {
   id: ThreadId; // sessionId (parent threadId)
   name: string;
   createdAt: string;
-  agents: Agent[];
+  agents?: Agent[]; // Optional for list view, populated when session is selected
 }
-
-import type { AgentState } from '@/lib/server/lace-imports';
 
 export interface Agent {
   threadId: ThreadId; // Full thread ID like sessionId.1
@@ -49,7 +50,7 @@ export interface Task {
   prompt: string;
   status: TaskStatus;
   priority: TaskPriority;
-  assignedTo?: ThreadId;
+  assignedTo?: AssigneeId;
   createdBy: ThreadId;
   threadId: ThreadId;
   createdAt: Date | string;
@@ -249,4 +250,43 @@ export interface ModelInfo {
   contextWindow: number;
   supportsFunctionCalling: boolean;
   supportsStreaming: boolean;
+}
+
+// Project management types
+export interface ProjectInfo {
+  id: string;
+  name: string;
+  description: string;
+  workingDirectory: string;
+  isArchived: boolean;
+  createdAt: Date | string;
+  lastUsedAt: Date | string;
+  sessionCount?: number;
+}
+
+export interface ProjectsResponse {
+  projects: ProjectInfo[];
+}
+
+export interface ProjectResponse {
+  project: ProjectInfo;
+}
+
+export interface CreateProjectRequest {
+  name: string;
+  description?: string;
+  workingDirectory: string;
+  configuration?: Record<string, unknown>;
+}
+
+export interface UpdateProjectRequest {
+  name?: string;
+  description?: string;
+  workingDirectory?: string;
+  configuration?: Record<string, unknown>;
+  isArchived?: boolean;
+}
+
+export interface DeleteProjectResponse {
+  success: boolean;
 }

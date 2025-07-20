@@ -1228,3 +1228,194 @@ If you encounter issues:
 5. **Test incrementally**: Build up functionality step by step
 
 Remember: The goal is clean, maintainable code that behaves predictably and provides helpful feedback to both developers and AI agents.
+
+## Tool Approval System
+
+The Lace tool approval system uses a hybrid callback-event architecture that allows different interfaces (CLI, web) to handle tool approvals while maintaining a consistent core execution flow.
+
+### Architecture Overview
+
+#### Core Components
+
+1. **ToolExecutor** (`src/tools/executor.ts`)
+   - Central tool execution engine
+   - Requires an `ApprovalCallback` to be set via `setApprovalCallback()`
+   - Calls the callback before executing any tool that requires approval
+
+2. **ApprovalCallback Interface** (`src/tools/approval-types.ts`)
+   ```typescript
+   interface ApprovalCallback {
+     requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision>;
+   }
+   ```
+
+3. **Agent Class** (`src/agents/agent.ts`)
+   - Defines `approval_request` events (lines 84-92)
+   - Delegates tool execution to its `toolExecutor` instance
+   - Emits events when approval is needed
+
+4. **ApprovalDecision Enum**
+   - `ALLOW_ONCE`: Approve this specific tool call
+   - `ALLOW_SESSION`: Approve all future calls to this tool in the session
+   - `DENY`: Reject the tool call
+
+### Event Flow Architecture
+
+The system uses a "round-trip" event pattern to maintain loose coupling between interfaces:
+
+```
+Tool Execution Request
+       ↓
+ToolExecutor.executeTool()
+       ↓
+ApprovalCallback.requestApproval()
+       ↓
+Agent.emit('approval_request')
+       ↓
+Interface-specific approval handler
+       ↓
+User Decision
+       ↓
+Promise resolves with ApprovalDecision
+       ↓
+ToolExecutor continues/aborts execution
+```
+
+### CLI Implementation
+
+**Approval Callback Setup:**
+```typescript
+// src/app.ts
+const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);
+agent.toolExecutor.setApprovalCallback(policyCallback);
+```
+
+**Policy Callback Implementation:**
+```typescript
+// interfaces/terminal/approval.ts
+async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
+  const tool = this.toolExecutor.getTool(toolName);
+  const isReadOnly = tool?.annotations?.readOnlyHint === true;
+  
+  return new Promise<ApprovalDecision>((resolve) => {
+    const requestId = `${toolName}-${Date.now()}`;
+    
+    // Emit event for terminal interface to handle
+    this.agent.emit('approval_request', {
+      toolName, input, isReadOnly, requestId, resolve
+    });
+  });
+}
+```
+
+### Web Implementation
+
+**Approval Callback Setup:**
+```typescript
+// lib/server/agent-utils.ts
+export function setupAgentApprovals(agent: Agent, sessionId: ThreadId): void {
+  const approvalCallback = {
+    async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
+      const tool = agent.toolExecutor?.getTool(toolName);
+      const isReadOnly = tool?.annotations?.readOnlyHint === true;
+      
+      return new Promise<ApprovalDecision>((resolve) => {
+        const requestId = `${toolName}-${Date.now()}`;
+        
+        // Emit event for SessionService to handle
+        agent.emit('approval_request', {
+          toolName, input, isReadOnly, requestId, resolve
+        });
+      });
+    }
+  };
+  
+  agent.toolExecutor.setApprovalCallback(approvalCallback);
+}
+```
+
+**Event Handler:**
+```typescript
+// lib/server/session-service.ts
+agent.on('approval_request', async ({toolName, input, isReadOnly, requestId, resolve}) => {
+  try {
+    const decision = await approvalManager.requestApproval(
+      agentId, sessionId, toolName, description, annotations, input, isReadOnly
+    );
+    resolve(decision);
+  } catch (error) {
+    resolve(ApprovalDecision.DENY);
+  }
+});
+```
+
+### Web Frontend Approval Flow
+
+#### Server-Side (ApprovalManager)
+
+1. **Request Creation**: `ApprovalManager.requestApproval()` creates a pending approval
+2. **SSE Broadcast**: Sends `TOOL_APPROVAL_REQUEST` event to frontend via Server-Sent Events
+3. **Promise Wait**: Returns a promise that waits for user decision
+4. **Resolution**: `ApprovalManager.resolveApproval()` resolves the promise when decision is made
+
+#### Client-Side (React)
+
+1. **SSE Listener**: Receives `TOOL_APPROVAL_REQUEST` event
+2. **Modal Display**: Shows `ToolApprovalModal` component
+3. **User Decision**: User clicks Allow Once/Allow Session/Deny
+4. **API Call**: POST to `/api/approvals/[requestId]` with decision
+5. **Modal Close**: Modal disappears, tool execution continues
+
+#### API Endpoint
+
+```typescript
+// app/api/approvals/[requestId]/route.ts
+export async function POST(request: NextRequest, { params }) {
+  const { requestId } = await params;
+  const { decision } = await request.json();
+  
+  const approvalManager = getApprovalManager();
+  approvalManager.resolveApproval(requestId, decision);
+  
+  return NextResponse.json({ success: true });
+}
+```
+
+### Key Design Principles
+
+#### 1. Interface Independence
+Each interface (CLI, web) implements its own approval handling while using the same core callback mechanism.
+
+#### 2. Event-Driven Loose Coupling  
+The ApprovalCallback emits events rather than directly handling approvals, allowing different interfaces to implement their own approval UI.
+
+#### 3. Consistent Promise-Based Flow
+All approval callbacks return promises that resolve with ApprovalDecision, ensuring predictable async behavior.
+
+#### 4. Session-Aware Approvals
+Approval decisions can be cached per session (ALLOW_SESSION) to avoid repeated prompts for the same tool.
+
+### Common Issues
+
+#### Missing Approval Callback
+**Error**: "Tool execution requires approval but no approval callback is configured"
+**Cause**: `agent.toolExecutor.setApprovalCallback()` was never called
+**Fix**: Ensure `setupAgentApprovals()` is called when creating agents
+
+#### Events Not Emitted
+**Problem**: approval_request event handlers never trigger
+**Cause**: ApprovalCallback bypasses event system and handles approval directly
+**Fix**: ApprovalCallback should emit events, not handle approvals
+
+#### Timeout Issues
+**Problem**: Approval promises never resolve
+**Cause**: Frontend SSE listeners not connected or API endpoints not working
+**Fix**: Verify SSE connection and `/api/approvals/[requestId]` endpoint
+
+### Security Considerations
+
+1. **Tool Classification**: Tools are classified as read-only or destructive
+2. **User Confirmation**: All destructive operations require explicit user approval
+3. **Session Isolation**: Approval decisions are scoped to individual sessions
+4. **Timeout Protection**: Approvals auto-deny after timeout to prevent hanging processes
+5. **Audit Trail**: All approval decisions are logged for security auditing

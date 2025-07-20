@@ -3,15 +3,12 @@
 
 import { z } from 'zod';
 import { readFile, writeFile } from 'fs/promises';
-import { resolve } from 'path';
 import { Tool } from '~/tools/tool';
+import { FilePath } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 
 const fileEditSchema = z.object({
-  path: z
-    .string()
-    .min(1, 'Path cannot be empty')
-    .transform((path) => resolve(path)),
+  path: FilePath,
   old_text: z.string(),
   new_text: z.string(),
 });
@@ -29,19 +26,20 @@ The old_text must appear exactly once in the file.`;
 
   protected async executeValidated(
     args: z.infer<typeof fileEditSchema>,
-    _context?: ToolContext
+    context?: ToolContext
   ): Promise<ToolResult> {
     try {
-      const { path, old_text, new_text } = args;
+      const { old_text, new_text } = args;
+      const resolvedPath = this.resolvePath(args.path, context);
 
       // Read current content with enhanced error handling
       let content: string;
       try {
-        content = await readFile(path, 'utf-8');
+        content = await readFile(resolvedPath, 'utf-8');
       } catch (error: unknown) {
         if (error instanceof Error && (error as Error & { code?: string }).code === 'ENOENT') {
           return this.createError(
-            `File not found: ${path}. Ensure the file exists before editing. Check the file path and permissions.`
+            `File not found: ${args.path}. Ensure the file exists before editing. Check the file path and permissions.`
           );
         }
         throw error;
@@ -54,7 +52,7 @@ The old_text must appear exactly once in the file.`;
         // Enhanced error with file content preview
         const filePreview = this.createFilePreview(content, old_text);
         return this.createError(
-          `No exact matches found for the specified text in ${path}. Use file_read to see the exact file content, then copy the text exactly including all whitespace, tabs, and line breaks. File contains ${this.countLines(content)} lines. ${filePreview}`
+          `No exact matches found for the specified text in ${args.path}. Use file_read to see the exact file content, then copy the text exactly including all whitespace, tabs, and line breaks. File contains ${this.countLines(content)} lines. ${filePreview}`
         );
       }
 
@@ -62,7 +60,7 @@ The old_text must appear exactly once in the file.`;
         // Enhanced error with line number information
         const matchInfo = this.findMatchLocations(content, old_text);
         return this.createError(
-          `Found ${occurrences} matches for the specified text in ${path}. Include more surrounding context (lines before/after) to make old_text unique. Matches found at lines: ${matchInfo}. Include the entire function or block instead of just one line.`
+          `Found ${occurrences} matches for the specified text in ${args.path}. Include more surrounding context (lines before/after) to make old_text unique. Matches found at lines: ${matchInfo}. Include the entire function or block instead of just one line.`
         );
       }
 
@@ -71,11 +69,11 @@ The old_text must appear exactly once in the file.`;
 
       // Write back with enhanced error handling
       try {
-        await writeFile(path, newContent, 'utf-8');
+        await writeFile(resolvedPath, newContent, 'utf-8');
       } catch (error: unknown) {
         if (error instanceof Error && (error as Error & { code?: string }).code === 'EACCES') {
           return this.createError(
-            `Permission denied writing to ${path}. Check file permissions or choose a different location. File system error: ${error.message}`
+            `Permission denied writing to ${args.path}. Check file permissions or choose a different location. File system error: ${error.message}`
           );
         }
         throw error;
@@ -86,7 +84,7 @@ The old_text must appear exactly once in the file.`;
       const newLines = this.countLines(new_text);
       const lineInfo = this.formatLineChange(oldLines, newLines);
 
-      return this.createResult(`Successfully replaced text in ${path} (${lineInfo})`);
+      return this.createResult(`Successfully replaced text in ${args.path} (${lineInfo})`);
     } catch (error: unknown) {
       return this.createError(
         `File edit operation failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}. Check the input parameters and try again.`

@@ -10,6 +10,10 @@ import { Tool } from '~/tools/tool';
 import { ToolResult } from '~/tools/types';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock provider with configurable token usage
 class MockTokenProvider extends BaseMockProvider {
@@ -82,6 +86,7 @@ describe('Agent Token Tracking Integration', () => {
   let threadId: string;
 
   beforeEach(async () => {
+    setupTestPersistence();
     // Create mock response with token usage
     const mockResponse: ProviderResponse = {
       content: 'Test response with tokens',
@@ -95,7 +100,7 @@ describe('Agent Token Tracking Integration', () => {
 
     provider = new MockTokenProvider(mockResponse);
     toolExecutor = new ToolExecutor();
-    threadManager = new ThreadManager(':memory:');
+    threadManager = new ThreadManager();
     threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
 
@@ -112,6 +117,7 @@ describe('Agent Token Tracking Integration', () => {
   });
 
   afterEach(() => {
+    teardownTestPersistence();
     vi.clearAllTimers();
     vi.useRealTimers();
   });

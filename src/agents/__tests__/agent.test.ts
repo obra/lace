@@ -10,6 +10,10 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
 import { ThreadManager } from '~/threads/thread-manager';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -63,6 +67,8 @@ describe('Enhanced Agent', () => {
   let agent: Agent;
 
   beforeEach(() => {
+    setupTestPersistence();
+
     mockProvider = new MockProvider({
       content: 'Test response',
       toolCalls: [],
@@ -76,7 +82,7 @@ describe('Enhanced Agent', () => {
     toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
     toolExecutor.setApprovalCallback(autoApprovalCallback);
-    threadManager = new ThreadManager(':memory:');
+    threadManager = new ThreadManager();
     threadId = 'test_thread_123';
     threadManager.createThread(threadId);
   });
@@ -86,11 +92,11 @@ describe('Enhanced Agent', () => {
       agent.removeAllListeners(); // Prevent EventEmitter memory leaks
       agent.stop();
     }
+    threadManager.close();
+    teardownTestPersistence();
     // Clear mock references to prevent circular references
     mockProvider = null as unknown as MockProvider;
     toolExecutor = null as unknown as ToolExecutor;
-
-    threadManager.close();
   });
 
   function createAgent(config?: Partial<AgentConfig>): Agent {
@@ -151,16 +157,27 @@ describe('Enhanced Agent', () => {
       expect(stateChangeSpy).not.toHaveBeenCalled();
     });
 
-    it('should throw error when sending message before start', async () => {
+    it('should auto-start when sending message before explicit start', async () => {
       agent = createAgent();
+      expect(agent.isRunning).toBe(false);
 
-      await expect(agent.sendMessage('test')).rejects.toThrow('Agent is not started');
+      await agent.sendMessage('test');
+
+      expect(agent.isRunning).toBe(true);
+      expect(agent.getCurrentState()).toBe('idle');
     });
 
-    it('should throw error when continuing conversation before start', async () => {
+    it('should auto-start when continuing conversation before explicit start', async () => {
       agent = createAgent();
+      expect(agent.isRunning).toBe(false);
 
-      await expect(agent.continueConversation()).rejects.toThrow('Agent is not started');
+      // Add a user message first so there's conversation to continue
+      threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Previous message');
+
+      await agent.continueConversation();
+
+      expect(agent.isRunning).toBe(true);
+      expect(agent.getCurrentState()).toBe('idle');
     });
   });
 

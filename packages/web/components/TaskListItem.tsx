@@ -3,6 +3,7 @@
 
 import React from 'react';
 import type { Task } from '@/types/api';
+import { formatAssigneeForDisplay } from '@/lib/display-utils';
 
 interface TaskListItemProps {
   task: Task;
@@ -11,16 +12,12 @@ interface TaskListItemProps {
 }
 
 export function TaskListItem({ task, onClick, onStatusChange }: TaskListItemProps) {
-  const formatDate = (date: string) => {
+  const formatDate = (date: string | Date) => {
     return new Date(date).toLocaleDateString();
   };
 
   const formatAssignee = (assignedTo?: string) => {
-    if (!assignedTo) return 'Unassigned';
-    if (assignedTo.startsWith('new:')) return assignedTo;
-    // Extract the last part of the thread ID (e.g., "agent1" from "lace_20240101_agent1")
-    const parts = assignedTo.split('_');
-    return parts.length > 1 ? parts[parts.length - 1] : assignedTo;
+    return formatAssigneeForDisplay(assignedTo);
   };
 
   const getPriorityColor = (priority: Task['priority']) => {
@@ -62,20 +59,18 @@ export function TaskListItem({ task, onClick, onStatusChange }: TaskListItemProp
             <span className="text-lg">{getStatusIcon(task.status)}</span>
             <h3 className="font-medium text-gray-100">{task.title}</h3>
             <span
-              className={`px-2 py-1 rounded text-xs font-medium ${getPriorityColor(
-                task.priority
-              )}`}
+              className={`px-2 py-1 rounded text-xs font-medium ${getPriorityColor(task.priority)}`}
             >
               {task.priority.toUpperCase()}
             </span>
           </div>
 
-          {task.description && (
-            <p className="text-sm text-gray-400 mb-2">{task.description}</p>
-          )}
+          {task.description && <p className="text-sm text-gray-400 mb-2">{task.description}</p>}
 
           <div className="flex items-center gap-4 text-xs text-gray-400">
-            <span>Assigned to: {formatAssignee(task.assignedTo ? String(task.assignedTo) : undefined)}</span>
+            <span>
+              Assigned to: {formatAssignee(task.assignedTo ? String(task.assignedTo) : undefined)}
+            </span>
             <span>Created: {formatDate(task.createdAt)}</span>
             {task.notes.length > 0 && <span>{task.notes.length} notes</span>}
           </div>

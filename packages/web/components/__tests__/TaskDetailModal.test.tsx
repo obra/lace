@@ -101,7 +101,7 @@ describe('TaskDetailModal', () => {
 
     // Find all buttons and filter for the Edit button
     const buttons = screen.getAllByRole('button');
-    const editButton = buttons.find(btn => btn.textContent === 'Edit');
+    const editButton = buttons.find((btn) => btn.textContent === 'Edit');
     if (editButton) {
       fireEvent.click(editButton);
     }

@@ -3,16 +3,16 @@
 
 import { Agent } from '~/agents/agent';
 import { ThreadId, asThreadId } from '~/threads/types';
-import { getLaceDbPath } from '~/config/lace-dir';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderRegistry } from '~/providers/registry';
 import { ToolExecutor } from '~/tools/executor';
 import { TaskManager } from '~/tasks/task-manager';
-import { DatabasePersistence } from '~/persistence/database';
+import { getPersistence, SessionData } from '~/persistence/database';
 import { createTaskManagerTools } from '~/tools/implementations/task-manager';
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { FileWriteTool } from '~/tools/implementations/file-write';
+import { Project } from '~/projects/project';
 import { FileEditTool } from '~/tools/implementations/file-edit';
 import { FileInsertTool } from '~/tools/implementations/file-insert';
 import { FileListTool } from '~/tools/implementations/file-list';
@@ -22,6 +22,8 @@ import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url-fetch';
 import { logger } from '~/utils/logger';
 import type { ApprovalCallback } from '~/tools/approval-types';
+import { randomUUID } from 'crypto';
+import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 
 export interface SessionInfo {
   id: ThreadId;
@@ -42,40 +44,50 @@ export class Session {
   private _sessionAgent: Agent;
   private _sessionId: ThreadId;
   private _agents: Map<ThreadId, Agent> = new Map();
-  private _dbPath: string;
   private _taskManager: TaskManager;
   private _destroyed = false;
+  private _projectId?: string;
 
-  constructor(sessionAgent: Agent) {
+  constructor(sessionAgent: Agent, projectId?: string) {
     this._sessionAgent = sessionAgent;
     this._sessionId = asThreadId(sessionAgent.threadId);
-    this._dbPath = getLaceDbPath();
+    this._projectId = projectId;
 
     // Initialize TaskManager for this session
-    const persistence = new DatabasePersistence(this._dbPath);
-    this._taskManager = new TaskManager(this._sessionId, persistence);
+    this._taskManager = new TaskManager(this._sessionId, getPersistence());
   }
 
   static create(
     name: string,
     provider = 'anthropic',
     model = 'claude-3-haiku-20240307',
-    dbPath?: string
+    projectId: string // REQUIRED: All sessions must be project-based
   ): Session {
-    const actualDbPath = dbPath || getLaceDbPath();
-
     // Create provider
     const registry = ProviderRegistry.createWithAutoDiscovery();
     const providerInstance = registry.createProvider(provider, { model });
 
     // Create thread manager
-    const threadManager = new ThreadManager(actualDbPath);
-    const sessionInfo = threadManager.resumeOrCreate();
-    const threadId = sessionInfo.threadId;
+    const threadManager = new ThreadManager();
 
-    // Create a temporary session to get TaskManager
-    const tempPersistence = new DatabasePersistence(actualDbPath);
-    const taskManager = new TaskManager(asThreadId(threadId), tempPersistence);
+    // Create session record in sessions table
+    const sessionData = {
+      id: randomUUID(),
+      projectId,
+      name,
+      description: '',
+      configuration: { provider, model },
+      status: 'active' as const,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    Session.createSession(sessionData);
+
+    // Create thread for this session
+    const threadId = threadManager.createThread(sessionData.id, projectId);
+
+    // Create TaskManager using global persistence
+    const taskManager = new TaskManager(asThreadId(threadId), getPersistence());
 
     // Create tool executor with TaskManager injection
     const toolExecutor = new ToolExecutor();
@@ -98,55 +110,58 @@ export class Session {
       model,
     });
 
-    const session = new Session(sessionAgent);
+    const session = new Session(sessionAgent, projectId);
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
 
     return session;
   }
 
-  static getAll(dbPath?: string): SessionInfo[] {
-    const threadManager = new ThreadManager(dbPath || getLaceDbPath());
-    const allThreads = threadManager.getAllThreadsWithMetadata();
-
-    // Filter for session threads
-    const sessionThreads = allThreads.filter((thread) => thread.metadata?.isSession === true);
-
-    return sessionThreads.map((thread) => ({
-      id: asThreadId(thread.id),
-      name: thread.metadata?.name || 'Unnamed Session',
-      createdAt: thread.createdAt,
-      provider: thread.metadata?.provider || 'unknown',
-      model: thread.metadata?.model || 'unknown',
+  static getAll(): SessionInfo[] {
+    // NEW: Get sessions from sessions table
+    const sessions = Session.getAllSessionData();
+    return sessions.map((session) => ({
+      id: asThreadId(session.id),
+      name: session.name,
+      createdAt: session.createdAt,
+      provider: (session.configuration?.provider as string) || 'unknown',
+      model: (session.configuration?.model as string) || 'unknown',
       agents: [], // Will be populated later if needed
     }));
   }
 
-  static async getById(sessionId: ThreadId, dbPath?: string): Promise<Session | null> {
+  static async getById(sessionId: ThreadId): Promise<Session | null> {
     logger.debug(`Session.getById called for sessionId: ${sessionId}`);
 
-    const actualDbPath = dbPath || getLaceDbPath();
-    const threadManager = new ThreadManager(actualDbPath);
+    // Get session from the sessions table
+    const sessionData = Session.getSession(sessionId);
+    if (!sessionData) {
+      logger.warn(`Session not found in database: ${sessionId}`);
+      return null;
+    }
+
+    // Get the thread (which should exist since we created it)
+    const threadManager = new ThreadManager();
     const thread = threadManager.getThread(sessionId);
 
-    if (!thread || !thread.metadata?.isSession) {
-      logger.warn(`Thread not found or not a session: ${sessionId}`);
+    if (!thread) {
+      logger.warn(`Thread not found for session: ${sessionId}`);
       return null;
     }
 
     logger.debug(`Reconstructing session agent for ${sessionId}`);
 
-    // Reconstruct the session agent from the existing thread
-    const provider = (thread.metadata.provider as string) || 'anthropic';
-    const model = (thread.metadata.model as string) || 'claude-3-haiku-20240307';
+    // Get provider and model from session configuration
+    const sessionConfig = sessionData.configuration || {};
+    const provider = (sessionConfig.provider as string) || 'anthropic';
+    const model = (sessionConfig.model as string) || 'claude-3-haiku-20240307';
 
     // Create provider and tool executor (same as Agent.createSession)
     const registry = ProviderRegistry.createWithAutoDiscovery();
     const providerInstance = registry.createProvider(provider, { model });
 
-    // Create TaskManager first
-    const persistence = new DatabasePersistence(actualDbPath);
-    const taskManager = new TaskManager(sessionId, persistence);
+    // Create TaskManager using global persistence
+    const taskManager = new TaskManager(sessionId, getPersistence());
 
     // Create tool executor with TaskManager injection
     const toolExecutor = new ToolExecutor();
@@ -169,7 +184,7 @@ export class Session {
     // Set this as the current thread for delegate creation
     threadManager.setCurrentThread(sessionId);
 
-    const session = new Session(sessionAgent);
+    const session = new Session(sessionAgent, sessionData.projectId);
 
     // Load delegate threads (child agents) for this session
     const delegateThreadIds = threadManager.getThreadsForSession(sessionId);
@@ -219,8 +234,161 @@ export class Session {
     return session;
   }
 
+  // ===============================
+  // Session management static methods
+  // ===============================
+
+  static createSession(session: SessionData): void {
+    getPersistence().saveSession(session);
+    logger.info('Session created', { sessionId: session.id, projectId: session.projectId });
+  }
+
+  static getSession(sessionId: string): SessionData | null {
+    return getPersistence().loadSession(sessionId);
+  }
+
+  static getSessionsByProject(projectId: string): SessionData[] {
+    return getPersistence().loadSessionsByProject(projectId);
+  }
+
+  static getAllSessionData(): SessionData[] {
+    // Get all sessions from the database
+    const persistence = getPersistence();
+    if (!persistence.database) return [];
+
+    const stmt = persistence.database.prepare(`
+      SELECT * FROM sessions ORDER BY updated_at DESC
+    `);
+
+    const rows = stmt.all() as Array<{
+      id: string;
+      project_id: string;
+      name: string;
+      description: string;
+      configuration: string;
+      status: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      projectId: row.project_id,
+      name: row.name,
+      description: row.description,
+      configuration: JSON.parse(row.configuration) as Record<string, unknown>,
+      status: row.status as 'active' | 'archived' | 'completed',
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    }));
+  }
+
+  static updateSession(sessionId: string, updates: Partial<SessionData>): void {
+    getPersistence().updateSession(sessionId, updates);
+    logger.info('Session updated', { sessionId, updates });
+  }
+
+  static deleteSession(sessionId: string): void {
+    // First delete all threads in this session
+    const threadManager = new ThreadManager();
+    const threads = threadManager.getThreadsBySession(sessionId);
+    for (const thread of threads) {
+      threadManager.deleteThread(thread.id);
+    }
+
+    // Then delete the session
+    getPersistence().deleteSession(sessionId);
+    logger.info('Session deleted', { sessionId });
+  }
+
+  // ===============================
+  // Configuration management static methods
+  // ===============================
+
+  static validateConfiguration(config: Record<string, unknown>): SessionConfiguration {
+    return ConfigurationValidator.validateSessionConfiguration(config);
+  }
+
+  static getEffectiveConfiguration(
+    projectId: string,
+    sessionConfig: Record<string, unknown> = {}
+  ): SessionConfiguration {
+    // Get project configuration
+    const project = Project.getById(projectId);
+    const projectConfig = project?.getConfiguration() || {};
+
+    // Merge configurations with session overriding project
+    return ConfigurationValidator.mergeConfigurations(
+      projectConfig as SessionConfiguration,
+      sessionConfig as Partial<SessionConfiguration>
+    );
+  }
+
   getId(): ThreadId {
     return this._sessionId;
+  }
+
+  getProjectId(): string | undefined {
+    const sessionData = this.getSessionData();
+    return sessionData?.projectId;
+  }
+
+  getWorkingDirectory(): string {
+    const sessionData = this.getSessionData();
+    if (sessionData?.configuration?.workingDirectory) {
+      return sessionData.configuration.workingDirectory as string;
+    }
+
+    if (sessionData?.projectId) {
+      const project = Project.getById(sessionData.projectId);
+      if (project) {
+        return project.getWorkingDirectory();
+      }
+    }
+
+    return process.cwd();
+  }
+
+  private getSessionData() {
+    return Session.getSession(this._sessionId);
+  }
+
+  // ===============================
+  // Configuration instance methods
+  // ===============================
+
+  getEffectiveConfiguration(): SessionConfiguration {
+    const sessionData = this.getSessionData();
+    if (!sessionData) {
+      return {};
+    }
+
+    const projectConfig = sessionData.projectId
+      ? Project.getById(sessionData.projectId)?.getConfiguration() || {}
+      : {};
+    const sessionConfig = sessionData.configuration || {};
+
+    // Merge configurations with session overriding project
+    return ConfigurationValidator.mergeConfigurations(
+      projectConfig as SessionConfiguration,
+      sessionConfig as Partial<SessionConfiguration>
+    );
+  }
+
+  updateConfiguration(updates: Partial<SessionConfiguration>): void {
+    // Validate configuration
+    const validatedConfig = Session.validateConfiguration(updates);
+
+    const sessionData = this.getSessionData();
+    const currentConfig = sessionData?.configuration || {};
+    const newConfig = { ...currentConfig, ...validatedConfig };
+
+    Session.updateSession(this._sessionId, { configuration: newConfig });
+  }
+
+  getToolPolicy(toolName: string): 'allow' | 'require-approval' | 'deny' {
+    const config = this.getEffectiveConfiguration();
+    return config.toolPolicies?.[toolName] || 'require-approval';
   }
 
   getInfo(): SessionInfo | null {
@@ -316,14 +484,6 @@ export class Session {
     agent.stop();
   }
 
-  async sendMessage(threadId: ThreadId, message: string): Promise<void> {
-    const agent = this.getAgent(threadId);
-    if (!agent) {
-      throw new Error(`Agent not found: ${threadId}`);
-    }
-    await agent.sendMessage(message);
-  }
-
   getTaskManager(): TaskManager {
     return this._taskManager;
   }
@@ -369,23 +529,20 @@ export class Session {
     this._agents.clear();
   }
 
-  static async createWithDefaults(
-    options: {
-      name?: string;
-      provider?: string;
-      model?: string;
-      approvalCallback?: ApprovalCallback;
-      dbPath?: string;
-    } = {}
-  ): Promise<Session> {
+  static async createWithDefaults(options: {
+    name?: string;
+    provider?: string;
+    model?: string;
+    projectId: string; // REQUIRED: All sessions must be project-based
+    approvalCallback?: ApprovalCallback;
+  }): Promise<Session> {
     // Use existing logic for provider/model detection
     const provider = options.provider || Session.detectDefaultProvider();
     const model = options.model || Session.getDefaultModel(provider);
-    const dbPath = options.dbPath || getLaceDbPath();
     const name = options.name || Session.generateSessionName();
 
     // Create session using existing create method
-    const session = Session.create(name, provider, model, dbPath);
+    const session = Session.create(name, provider, model, options.projectId);
 
     // Set up coordinator agent with approval callback if provided
     const coordinatorAgent = session.getAgent(session.getId());

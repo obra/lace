@@ -2,7 +2,7 @@
 // ABOUTME: Provides detailed view, editing capabilities, and note management
 
 import React, { useState } from 'react';
-import type { Task } from '@/types/api';
+import type { Task, AssigneeId } from '@/types/api';
 import { TaskNotes } from '@/components/TaskNotes';
 
 interface TaskDetailModalProps {
@@ -38,14 +38,15 @@ export function TaskDetailModal({
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onUpdate(task.id, {
+      const updateData = {
         title: editForm.title,
-        description: editForm.description || undefined,
         prompt: editForm.prompt,
         priority: editForm.priority,
-        assignedTo: editForm.assignedTo || undefined,
         status: editForm.status,
-      });
+        ...(editForm.description && { description: editForm.description }),
+        ...(editForm.assignedTo && { assignedTo: editForm.assignedTo as AssigneeId }),
+      };
+      await onUpdate(task.id, updateData);
       setEditing(false);
     } catch (error) {
       console.error('Failed to update task:', error);
@@ -84,12 +85,7 @@ export function TaskDetailModal({
               className="text-gray-400 hover:text-gray-600"
               aria-label="Close"
             >
-              <svg
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -106,15 +102,11 @@ export function TaskDetailModal({
               /* Edit form */
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Title
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
                   <input
                     type="text"
                     value={editForm.title}
-                    onChange={(e) =>
-                      setEditForm((prev) => ({ ...prev, title: e.target.value }))
-                    }
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -139,9 +131,7 @@ export function TaskDetailModal({
                   </label>
                   <textarea
                     value={editForm.prompt}
-                    onChange={(e) =>
-                      setEditForm((prev) => ({ ...prev, prompt: e.target.value }))
-                    }
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, prompt: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     rows={4}
                   />
@@ -149,9 +139,7 @@ export function TaskDetailModal({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Priority
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
                     <select
                       value={editForm.priority}
                       onChange={(e) =>
@@ -169,9 +157,7 @@ export function TaskDetailModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Status
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                     <select
                       value={editForm.status}
                       onChange={(e) =>
@@ -216,8 +202,8 @@ export function TaskDetailModal({
                         task.priority === 'high'
                           ? 'text-red-600 bg-red-50'
                           : task.priority === 'medium'
-                          ? 'text-yellow-600 bg-yellow-50'
-                          : 'text-green-600 bg-green-50'
+                            ? 'text-yellow-600 bg-yellow-50'
+                            : 'text-green-600 bg-green-50'
                       }`}
                     >
                       {task.priority.toUpperCase()}
@@ -227,10 +213,10 @@ export function TaskDetailModal({
                         task.status === 'completed'
                           ? 'text-green-600 bg-green-50'
                           : task.status === 'in_progress'
-                          ? 'text-blue-600 bg-blue-50'
-                          : task.status === 'blocked'
-                          ? 'text-red-600 bg-red-50'
-                          : 'text-gray-600 bg-gray-50'
+                            ? 'text-blue-600 bg-blue-50'
+                            : task.status === 'blocked'
+                              ? 'text-red-600 bg-red-50'
+                              : 'text-gray-600 bg-gray-50'
                       }`}
                     >
                       {task.status.toUpperCase().replace('_', ' ')}
@@ -241,16 +227,12 @@ export function TaskDetailModal({
                 {task.description && (
                   <div>
                     <h4 className="text-sm font-medium text-gray-700 mb-1">Description</h4>
-                    <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                      {task.description}
-                    </p>
+                    <p className="text-sm text-gray-600 whitespace-pre-wrap">{task.description}</p>
                   </div>
                 )}
 
                 <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">
-                    Agent Instructions
-                  </h4>
+                  <h4 className="text-sm font-medium text-gray-700 mb-1">Agent Instructions</h4>
                   <p className="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 p-3 rounded">
                     {task.prompt}
                   </p>

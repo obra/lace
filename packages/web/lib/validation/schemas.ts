@@ -2,14 +2,16 @@
 // ABOUTME: Provides runtime type validation for API endpoints
 
 import { z } from 'zod';
+import { isValidThreadId, asValidThreadId } from '@/lib/validation/thread-id-validation';
 
-// Thread ID schema with regex validation
+// Thread ID schema using client-safe validation with transform
 export const ThreadIdSchema = z
   .string()
-  .regex(
-    /^lace_\d{8}_[a-z0-9]+(\.\d+)?$/,
-    'Invalid thread ID format. Expected: lace_YYYYMMDD_randomId or lace_YYYYMMDD_randomId.number'
-  );
+  .refine(
+    (value) => isValidThreadId(value),
+    'Invalid thread ID format. Expected: lace_YYYYMMDD_randomId, UUID, or either with .number suffix'
+  )
+  .transform((value) => asValidThreadId(value));
 
 // Message request schema with size limits
 export const MessageRequestSchema = z.object({
@@ -40,7 +42,8 @@ export const CreateTaskRequestSchema = z.object({
   priority: z.enum(['high', 'medium', 'low']).optional().default('medium'),
   assignedTo: z
     .string()
-    .regex(/^lace_\d{8}_[a-z0-9]+(\.\d+)?$/, 'Invalid assignee ID format')
+    .refine((value) => isValidThreadId(value), 'Invalid assignee ID format')
+    .transform((value) => asValidThreadId(value))
     .optional(),
 });
 
@@ -52,7 +55,8 @@ export const UpdateTaskRequestSchema = z.object({
   priority: z.enum(['high', 'medium', 'low']).optional(),
   assignedTo: z
     .string()
-    .regex(/^lace_\d{8}_[a-z0-9]+(\.\d+)?$/, 'Invalid assignee ID')
+    .refine((value) => isValidThreadId(value), 'Invalid assignee ID')
+    .transform((value) => asValidThreadId(value))
     .nullable()
     .optional(),
 });

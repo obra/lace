@@ -8,6 +8,10 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { AnthropicProvider } from '~/providers/anthropic-provider';
 import type { AIProvider } from '~/providers/base-provider';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Note: Tool approval is not yet implemented in lace
 // When it is, subagent tool calls should use the same approval flow
@@ -31,6 +35,7 @@ describe('DelegateTool', () => {
   let mockToolExecutor: ToolExecutor;
 
   beforeEach(() => {
+    setupTestPersistence();
     // Reset mocks
     vi.clearAllMocks();
 
@@ -38,7 +43,7 @@ describe('DelegateTool', () => {
     process.env.ANTHROPIC_KEY = 'test-api-key';
 
     // Create mock instances
-    mockThreadManager = new ThreadManager(':memory:');
+    mockThreadManager = new ThreadManager();
     mockToolExecutor = new ToolExecutor();
     mockToolExecutor.registerAllAvailableTools();
 
@@ -96,6 +101,7 @@ describe('DelegateTool', () => {
     vi.restoreAllMocks();
     // Clean up test environment variables
     delete process.env.ANTHROPIC_KEY;
+    teardownTestPersistence();
   });
 
   it('should have correct metadata', () => {

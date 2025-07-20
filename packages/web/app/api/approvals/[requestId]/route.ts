@@ -21,11 +21,15 @@ export async function POST(
     const body = (await request.json()) as ToolApprovalResponse;
 
     // Validate decision matches ApprovalDecision enum
-    const validDecisions = [ApprovalDecision.ALLOW_ONCE, ApprovalDecision.ALLOW_SESSION, ApprovalDecision.DENY];
+    const validDecisions = [
+      ApprovalDecision.ALLOW_ONCE,
+      ApprovalDecision.ALLOW_SESSION,
+      ApprovalDecision.DENY,
+    ];
 
     if (!validDecisions.includes(body.decision)) {
-      const errorResponse: ApiErrorResponse = { 
-        error: 'Invalid decision. Must be: allow_once, allow_session, or deny' 
+      const errorResponse: ApiErrorResponse = {
+        error: 'Invalid decision. Must be: allow_once, allow_session, or deny',
       };
       return NextResponse.json(errorResponse, { status: 400 });
     }
@@ -36,8 +40,8 @@ export async function POST(
     const success = approvalManager.resolveApproval(requestId, laceDecision);
 
     if (!success) {
-      const errorResponse: ApiErrorResponse = { 
-        error: 'Approval request not found or expired' 
+      const errorResponse: ApiErrorResponse = {
+        error: 'Approval request not found or expired',
       };
       return NextResponse.json(errorResponse, { status: 404 });
     }
@@ -46,7 +50,7 @@ export async function POST(
     return NextResponse.json({ status: 'resolved', decision: body.decision });
   } catch (error: unknown) {
     console.error('Error in POST /api/approvals/[requestId]:', error);
-    
+
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     const errorResponse: ApiErrorResponse = { error: errorMessage };
     return NextResponse.json(errorResponse, { status: 500 });

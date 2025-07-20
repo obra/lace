@@ -8,6 +8,10 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 class MockProvider extends BaseMockProvider {
   constructor() {
@@ -39,6 +43,7 @@ describe('Agent getQueueContents', () => {
   let mockThreadManager: ThreadManager;
 
   beforeEach(async () => {
+    setupTestPersistence();
     mockProvider = new MockProvider();
 
     mockToolExecutor = {
@@ -75,6 +80,7 @@ describe('Agent getQueueContents', () => {
     if (agent) {
       agent.stop();
     }
+    teardownTestPersistence();
   });
 
   it('should return empty array for empty queue', () => {

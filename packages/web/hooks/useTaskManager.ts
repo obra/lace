@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { TaskAPIClient } from '@/lib/client/task-api';
-import { useTaskStream } from '~/../packages/web/hooks/useTaskStream';
+import { useTaskStream, type TaskEvent } from '~/../packages/web/hooks/useTaskStream';
 import type { Task } from '@/types/api';
 import type { TaskFilters, CreateTaskRequest, UpdateTaskRequest } from '@/lib/client/task-api';
 
@@ -57,27 +57,27 @@ export function useTaskManager(sessionId: string) {
   // Subscribe to real-time task updates
   useTaskStream({
     sessionId,
-    onTaskCreated: useCallback((event) => {
+    onTaskCreated: useCallback((event: TaskEvent) => {
       if (event.task) {
-        setTasks((prev) => [...prev, event.task]);
+        setTasks((prev) => [...prev, event.task!]);
       }
     }, []),
-    onTaskUpdated: useCallback((event) => {
+    onTaskUpdated: useCallback((event: TaskEvent) => {
       if (event.task) {
-        setTasks((prev) => prev.map((task) => (task.id === event.task.id ? event.task : task)));
+        setTasks((prev) => prev.map((task) => (task.id === event.task!.id ? event.task! : task)));
       }
     }, []),
-    onTaskDeleted: useCallback((event) => {
+    onTaskDeleted: useCallback((event: TaskEvent) => {
       if (event.taskId) {
         setTasks((prev) => prev.filter((task) => task.id !== event.taskId));
       }
     }, []),
-    onTaskNoteAdded: useCallback((event) => {
+    onTaskNoteAdded: useCallback((event: TaskEvent) => {
       if (event.task) {
-        setTasks((prev) => prev.map((task) => (task.id === event.task.id ? event.task : task)));
+        setTasks((prev) => prev.map((task) => (task.id === event.task!.id ? event.task! : task)));
       }
     }, []),
-    onError: useCallback((error) => {
+    onError: useCallback((error: Error) => {
       console.error('Task stream error:', error);
     }, []),
   });

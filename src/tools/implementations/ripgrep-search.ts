@@ -4,9 +4,8 @@
 import { z } from 'zod';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { resolve } from 'path';
 import { Tool } from '~/tools/tool';
-import { NonEmptyString } from '~/tools/schemas/common';
+import { NonEmptyString, FilePath } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 import { TOOL_LIMITS } from '~/tools/constants';
 
@@ -20,11 +19,7 @@ interface SearchMatch {
 
 const ripgrepSearchSchema = z.object({
   pattern: NonEmptyString,
-  path: z
-    .string()
-    .min(1, 'Path cannot be empty')
-    .transform((path) => resolve(path))
-    .default('.'),
+  path: FilePath.default('.'),
   caseSensitive: z.boolean().default(false),
   wholeWord: z.boolean().default(false),
   includePattern: z.string().optional(),
@@ -55,7 +50,7 @@ export class RipgrepSearchTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof ripgrepSearchSchema>,
-    _context?: ToolContext
+    context?: ToolContext
   ): Promise<ToolResult> {
     try {
       const {
@@ -69,9 +64,12 @@ export class RipgrepSearchTool extends Tool {
         contextLines,
       } = args;
 
+      // Resolve path using working directory from context
+      const resolvedPath = this.resolvePath(path, context);
+
       const ripgrepArgs = this.buildRipgrepArgs({
         pattern,
-        path,
+        path: resolvedPath,
         caseSensitive,
         wholeWord,
         includePattern,

@@ -17,7 +17,9 @@ import { loadPromptConfig } from '~/config/prompts';
 import { estimateTokens } from '~/utils/token-estimation';
 import { QueuedMessage, MessageQueueStats } from '~/agents/types';
 import { ProviderRegistry } from '~/providers/registry';
-import { getLaceDbPath } from '~/config/lace-dir';
+import { Project } from '~/projects/project';
+import { Session } from '~/sessions/session';
+import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -120,8 +122,7 @@ export class Agent extends EventEmitter {
     toolExecutor.registerAllAvailableTools();
 
     // Create thread manager
-    const dbPath = config.dbPath || getLaceDbPath();
-    const threadManager = new ThreadManager(dbPath);
+    const threadManager = new ThreadManager();
 
     // Create new thread
     const sessionInfo = threadManager.resumeOrCreate();
@@ -156,6 +157,10 @@ export class Agent extends EventEmitter {
   get threadId(): string {
     return this._threadId;
   }
+
+  get isRunning(): boolean {
+    return this._isRunning;
+  }
   private readonly _stopReasonHandler: StopReasonHandler;
   private readonly _tokenBudgetManager: TokenBudgetManager | null;
   private _state: AgentState = 'idle';
@@ -166,6 +171,7 @@ export class Agent extends EventEmitter {
   private _lastStreamingTokenCount = 0; // Track last cumulative token count from streaming
   private _messageQueue: QueuedMessage[] = [];
   private _isProcessingQueue = false;
+  private _configuration: AgentConfiguration = {};
 
   constructor(config: AgentConfig) {
     super();
@@ -191,7 +197,7 @@ export class Agent extends EventEmitter {
     }
   ): Promise<void> {
     if (!this._isRunning) {
-      throw new Error('Agent is not started. Call start() first.');
+      await this.start();
     }
 
     if (this._state === 'idle') {
@@ -242,7 +248,7 @@ export class Agent extends EventEmitter {
 
   async continueConversation(): Promise<void> {
     if (!this._isRunning) {
-      throw new Error('Agent is not started. Call start() first.');
+      await this.start();
     }
 
     await this._processConversation();
@@ -861,6 +867,7 @@ export class Agent extends EventEmitter {
         const result = await this._toolExecutor.executeTool(toolCall, {
           threadId: asThreadId(this._threadId),
           parentThreadId: asThreadId(this._getParentThreadId()),
+          workingDirectory: this._getWorkingDirectory(),
         });
 
         const outputText = result.content[0]?.text || '';
@@ -1341,7 +1348,7 @@ export class Agent extends EventEmitter {
 
   // Thread management API - proxies to ThreadManager
   getCurrentThreadId(): string | null {
-    return this._threadManager.getCurrentThreadId();
+    return this._threadId;
   }
 
   getThreadEvents(threadId?: string): ThreadEvent[] {
@@ -1406,8 +1413,8 @@ export class Agent extends EventEmitter {
     provider?: AIProvider,
     tokenBudget?: TokenBudgetConfig
   ): Agent {
-    // Get current thread as parent
-    const parentThreadId = this.getCurrentThreadId();
+    // Use this agent's thread ID as parent (not ThreadManager's current thread)
+    const parentThreadId = this._threadId;
     if (!parentThreadId) {
       throw new Error('No active thread for delegation');
     }
@@ -1434,7 +1441,7 @@ export class Agent extends EventEmitter {
    * Used for error messages, notifications, etc.
    */
   addSystemMessage(message: string, threadId?: string): ThreadEvent {
-    const targetThreadId = threadId || this.getCurrentThreadId();
+    const targetThreadId = threadId || this._threadId;
     if (!targetThreadId) {
       throw new Error('No active thread available for system message');
     }
@@ -1540,5 +1547,162 @@ export class Agent extends EventEmitter {
       this._isProcessingQueue = false;
       this.emit('queue_processing_complete');
     }
+  }
+
+  private _getWorkingDirectory(): string | undefined {
+    try {
+      // Get the current thread to find its session and project
+      const thread = this._threadManager.getThread(this._threadId);
+      if (!thread) return undefined;
+
+      // If thread has a sessionId, get the session to find the project
+      if (thread.sessionId) {
+        const session = Session.getSession(thread.sessionId);
+        if (session?.projectId) {
+          const project = Project.getById(session.projectId);
+          return project?.getWorkingDirectory();
+        }
+      }
+
+      // If thread has a direct projectId, use that
+      if (thread.projectId) {
+        const project = Project.getById(thread.projectId);
+        return project?.getWorkingDirectory();
+      }
+
+      // Fallback to current working directory
+      return process.cwd();
+    } catch (error) {
+      logger.warn('Failed to get working directory from session/project', {
+        threadId: this._threadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return process.cwd();
+    }
+  }
+
+  // ===============================
+  // Configuration management methods
+  // ===============================
+
+  /**
+   * Get agent-specific configuration
+   */
+  getConfiguration(): AgentConfiguration {
+    return { ...this._configuration };
+  }
+
+  /**
+   * Get effective configuration (merged with session and project)
+   */
+  getEffectiveConfiguration(): AgentConfiguration {
+    try {
+      // Get thread to find session and project
+      const thread = this._threadManager.getThread(this._threadId);
+      if (!thread) return { ...this._configuration };
+
+      let sessionConfig: AgentConfiguration = {};
+      let projectConfig: AgentConfiguration = {};
+
+      // Get session configuration if thread has a sessionId or parentSessionId
+      let sessionId = thread.sessionId;
+      if (!sessionId) {
+        // Check thread metadata for parentSessionId (for delegate agents)
+        const metadata = this._threadManager.getThread(this._threadId)?.metadata;
+        if (metadata && metadata.parentSessionId) {
+          sessionId = metadata.parentSessionId as string;
+        }
+      }
+
+      if (sessionId) {
+        const sessionData = Session.getSession(sessionId);
+        if (sessionData) {
+          sessionConfig = (sessionData.configuration as AgentConfiguration) || {};
+
+          // Get project configuration if session has a projectId
+          if (sessionData.projectId) {
+            const project = Project.getById(sessionData.projectId);
+            if (project) {
+              projectConfig = (project.getConfiguration() as AgentConfiguration) || {};
+            }
+          }
+        }
+      }
+
+      // If thread has a direct projectId, use that
+      if (thread.projectId) {
+        const project = Project.getById(thread.projectId);
+        if (project) {
+          projectConfig = (project.getConfiguration() as AgentConfiguration) || {};
+        }
+      }
+
+      // Merge configurations: project < session < agent
+      const merged = { ...projectConfig, ...sessionConfig, ...this._configuration };
+
+      // Special handling for nested objects
+      if (
+        projectConfig.toolPolicies ||
+        sessionConfig.toolPolicies ||
+        this._configuration.toolPolicies
+      ) {
+        merged.toolPolicies = {
+          ...projectConfig.toolPolicies,
+          ...sessionConfig.toolPolicies,
+          ...this._configuration.toolPolicies,
+        };
+      }
+
+      if (
+        projectConfig.environmentVariables ||
+        sessionConfig.environmentVariables ||
+        this._configuration.environmentVariables
+      ) {
+        merged.environmentVariables = {
+          ...projectConfig.environmentVariables,
+          ...sessionConfig.environmentVariables,
+          ...this._configuration.environmentVariables,
+        };
+      }
+
+      return merged;
+    } catch (error) {
+      logger.warn('Failed to get effective configuration', {
+        threadId: this._threadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { ...this._configuration };
+    }
+  }
+
+  /**
+   * Update agent configuration
+   */
+  updateConfiguration(updates: Partial<AgentConfiguration>): void {
+    // Validate configuration
+    const validatedConfig = ConfigurationValidator.validateAgentConfiguration(updates);
+
+    // Merge with existing configuration
+    this._configuration = { ...this._configuration, ...validatedConfig };
+
+    // Special handling for nested objects
+    if (updates.toolPolicies) {
+      this._configuration.toolPolicies = {
+        ...this._configuration.toolPolicies,
+        ...updates.toolPolicies,
+      };
+    }
+
+    if (updates.environmentVariables) {
+      this._configuration.environmentVariables = {
+        ...this._configuration.environmentVariables,
+        ...updates.environmentVariables,
+      };
+    }
+
+    logger.debug('Agent configuration updated', {
+      threadId: this._threadId,
+      updates: Object.keys(updates),
+    });
   }
 }

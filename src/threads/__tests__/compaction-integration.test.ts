@@ -12,6 +12,10 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { Tool } from '~/tools/tool';
 import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -61,8 +65,9 @@ describe('Compaction Integration', () => {
   let toolExecutor: ToolExecutor;
 
   beforeEach(async () => {
+    setupTestPersistence();
     tempDbPath = path.join(os.tmpdir(), `lace-test-${Date.now()}.db`);
-    threadManager = new ThreadManager(tempDbPath);
+    threadManager = new ThreadManager();
 
     // Configure compaction strategy with lower token limit for testing
     threadManager['_compactionStrategy'] = new SummarizeStrategy({
@@ -93,6 +98,7 @@ describe('Compaction Integration', () => {
     if (fs.existsSync(tempDbPath)) {
       fs.unlinkSync(tempDbPath);
     }
+    teardownTestPersistence();
   });
 
   it('should trigger compaction and preserve conversational flow', async () => {

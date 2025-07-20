@@ -1,17 +1,21 @@
 // ABOUTME: E2E tests for web API endpoints
-// ABOUTME: Tests full API workflow from session creation to message sending
+// ABOUTME: Tests full API workflow from session creation to message sending using real services
 
 /**
  * @vitest-environment node
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
-// Mock the server-side modules
+// Mock only external dependencies, not core functionality
 vi.mock('@/lib/sse-manager', () => ({
   SSEManager: {
     getInstance: () => ({
@@ -21,349 +25,111 @@ vi.mock('@/lib/sse-manager', () => ({
     }),
   },
 }));
+
 vi.mock('@/lib/server/approval-manager', () => ({
   getApprovalManager: () => ({
     requestApproval: vi.fn().mockResolvedValue('allow_once'),
   }),
 }));
 
-// Mock the provider registry to avoid API key requirements
-vi.mock('~/providers/registry', () => ({
-  ProviderRegistry: {
-    createWithAutoDiscovery: () => ({
-      createProvider: () => ({
-        name: 'mock-provider',
-        models: ['mock-model'],
-        model: 'mock-model',
-      }),
-    }),
-  },
-}));
-
-// Mock the Agent class
-vi.mock('~/agents/agent', () => ({
-  Agent: vi.fn().mockImplementation(() => ({
-    threadId: 'mock-thread-id',
-    start: vi.fn(),
-    stop: vi.fn(),
-    sendMessage: vi.fn(),
-    getCurrentState: () => 'idle',
-    getThreadMetadata: () => ({ name: 'mock-agent' }),
-    getThreadCreatedAt: () => new Date(),
-    providerName: 'mock-provider',
-    toolExecutor: {
-      setApprovalCallback: vi.fn(),
-      getAllTools: () => [],
-    },
-    updateThreadMetadata: vi.fn(),
-    removeAllListeners: vi.fn(),
-  })),
-}));
-
-// Mock ThreadManager
-vi.mock('~/threads/thread-manager', () => ({
-  ThreadManager: vi.fn().mockImplementation(() => ({
-    generateThreadId: () => 'lace_20240101_abcd12',
-    createThread: vi.fn(),
-    resumeOrCreate: () => ({ threadId: 'lace_20240101_abcd12' }),
-    getThread: () => ({ metadata: { isSession: true } }),
-    getAllThreadsWithMetadata: () => [],
-    getThreadsForSession: () => [],
-    setCurrentThread: vi.fn(),
-  })),
-}));
-
-// Mock ToolExecutor
-vi.mock('~/tools/executor', () => ({
-  ToolExecutor: vi.fn().mockImplementation(() => ({
-    registerAllAvailableTools: vi.fn(),
-    getAllTools: () => [],
-    setApprovalCallback: vi.fn(),
-  })),
-}));
-
-// Mock TaskManager and DatabasePersistence
-vi.mock('~/tasks/task-manager', () => ({
-  TaskManager: vi.fn().mockImplementation(() => ({
-    // mock implementation
-  })),
-}));
-
-vi.mock('~/persistence/database', () => ({
-  DatabasePersistence: vi.fn().mockImplementation(() => ({
-    // mock implementation
-  })),
-}));
-
-vi.mock('~/tools/implementations/task-manager', () => ({
-  createTaskManagerTools: () => [],
-}));
-
-// Mock the Session class with more dynamic behavior
-interface MockSession {
-  id: string;
-  name: string;
-  createdAt: Date;
-  agents: MockAgent[];
-  getId: () => string;
-  getInfo: () => {
-    id: string;
-    name: string;
-    createdAt: Date;
-    provider: string;
-    model: string;
-    agents: MockAgent[];
-  };
-  spawnAgent: (agentName: string) => MockAgent;
-  getAgents: () => MockAgent[];
-  getAgent: (threadId: string) => MockAgent | null;
-  startAgent: ReturnType<typeof vi.fn>;
-  stopAgent: ReturnType<typeof vi.fn>;
-  sendMessage: ReturnType<typeof vi.fn>;
-  destroy: ReturnType<typeof vi.fn>;
-}
-
-interface MockAgent {
-  threadId: string;
-  name: string;
-  provider: string;
-  model: string;
-  status: string;
-  providerName: string;
-  toolExecutor: {
-    setApprovalCallback: ReturnType<typeof vi.fn>;
-    getTool: ReturnType<typeof vi.fn>;
-  };
-  getCurrentState: ReturnType<typeof vi.fn>;
-  start: ReturnType<typeof vi.fn>;
-  stop: ReturnType<typeof vi.fn>;
-  sendMessage: ReturnType<typeof vi.fn>;
-  on: ReturnType<typeof vi.fn>;
-  removeAllListeners: ReturnType<typeof vi.fn>;
-  getThreadCreatedAt: ReturnType<typeof vi.fn>;
-}
-
-const sessionStore = new Map<string, MockSession>();
-let sessionCounter = 0;
-
-vi.mock('~/sessions/session', () => ({
-  Session: {
-    create: vi.fn().mockImplementation((name: string) => {
-      sessionCounter++;
-      const sessionId = `lace_20240101_test${sessionCounter}`;
-      const session: MockSession = {
-        id: sessionId,
-        name,
-        createdAt: new Date(),
-        agents: [],
-        getId: () => sessionId,
-        getInfo: () => ({
-          id: sessionId,
-          name,
-          createdAt: new Date(),
-          provider: 'mock-provider',
-          model: 'mock-model',
-          agents: session.agents,
-        }),
-        spawnAgent: vi.fn().mockImplementation((agentName: string) => {
-          const agentThreadId = `${sessionId}.${session.agents.length + 1}`;
-          const agent: MockAgent = {
-            threadId: agentThreadId,
-            name: agentName,
-            provider: 'mock-provider',
-            model: 'mock-model',
-            status: 'idle',
-            providerName: 'mock-provider',
-            toolExecutor: {
-              setApprovalCallback: vi.fn(),
-              getTool: vi.fn().mockReturnValue({
-                description: 'Mock tool',
-                annotations: { readOnlyHint: true },
-              }),
-            },
-            getCurrentState: vi.fn().mockReturnValue('idle'),
-            start: vi.fn(),
-            stop: vi.fn(),
-            sendMessage: vi.fn().mockResolvedValue(undefined),
-            on: vi.fn(),
-            removeAllListeners: vi.fn(),
-            getThreadCreatedAt: vi.fn().mockReturnValue(new Date()),
-          };
-          session.agents.push(agent);
-          return agent;
-        }),
-        getAgents: () => session.agents,
-        getAgent: (threadId: string) => session.agents.find((a) => a.threadId === threadId) || null,
-        startAgent: vi.fn(),
-        stopAgent: vi.fn(),
-        sendMessage: vi.fn(),
-        destroy: vi.fn(),
-      };
-      sessionStore.set(sessionId, session);
-      return session;
-    }),
-    getAll: vi
-      .fn()
-      .mockImplementation(() => Array.from(sessionStore.values()).map((s) => s.getInfo())),
-    getById: vi.fn().mockImplementation((id: string) => sessionStore.get(id) || null),
-    createWithDefaults: vi
-      .fn()
-      .mockImplementation(
-        async (options: { name?: string; provider?: string; model?: string } = {}) => {
-          await Promise.resolve(); // Add explicit await to satisfy ESLint
-          sessionCounter++;
-          const sessionId = `lace_20240101_test${sessionCounter}`;
-          const session: MockSession = {
-            id: sessionId,
-            name: options.name || `Session ${sessionCounter}`,
-            createdAt: new Date(),
-            agents: [],
-            getId: () => sessionId,
-            getInfo: () => ({
-              id: sessionId,
-              name: options.name || `Session ${sessionCounter}`,
-              createdAt: new Date(),
-              provider: options.provider || 'anthropic',
-              model: options.model || 'claude-3-haiku-20240307',
-              agents: session.agents,
-            }),
-            spawnAgent: vi
-              .fn()
-              .mockImplementation(
-                (agentName: string, agentProvider?: string, agentModel?: string) => {
-                  const agentThreadId = `${sessionId}.${session.agents.length + 1}`;
-                  const agent: MockAgent = {
-                    threadId: agentThreadId,
-                    name: agentName,
-                    provider: agentProvider || options.provider || 'anthropic',
-                    model: agentModel || options.model || 'claude-3-haiku-20240307',
-                    status: 'idle',
-                    providerName: agentProvider || options.provider || 'anthropic',
-                    toolExecutor: {
-                      setApprovalCallback: vi.fn(),
-                      getTool: vi.fn().mockReturnValue({
-                        description: 'Mock tool',
-                        annotations: { readOnlyHint: true },
-                      }),
-                    },
-                    getCurrentState: vi.fn().mockReturnValue('idle'),
-                    start: vi.fn(),
-                    stop: vi.fn(),
-                    sendMessage: vi.fn().mockResolvedValue(undefined),
-                    on: vi.fn(),
-                    removeAllListeners: vi.fn(),
-                    getThreadCreatedAt: vi.fn().mockReturnValue(new Date()),
-                  };
-                  session.agents.push(agent);
-                  return agent;
-                }
-              ),
-            getAgents: () => session.agents,
-            getAgent: (threadId: string) => {
-              // Check if it's the coordinator agent (same as session ID)
-              if (threadId === sessionId) {
-                return {
-                  threadId: sessionId,
-                  name: 'Coordinator',
-                  provider: options.provider || 'anthropic',
-                  model: options.model || 'claude-3-haiku-20240307',
-                  status: 'idle',
-                  providerName: options.provider || 'anthropic',
-                  toolExecutor: {
-                    setApprovalCallback: vi.fn(),
-                    getTool: vi.fn(),
-                  },
-                  getCurrentState: vi.fn().mockReturnValue('idle'),
-                  start: vi.fn(),
-                  stop: vi.fn(),
-                  sendMessage: vi.fn(),
-                  on: vi.fn(),
-                  removeAllListeners: vi.fn(),
-                  getThreadCreatedAt: vi.fn().mockReturnValue(new Date()),
-                };
-              }
-              return session.agents.find((a) => a.threadId === threadId) || null;
-            },
-            startAgent: vi.fn(),
-            stopAgent: vi.fn(),
-            sendMessage: vi.fn(),
-            destroy: vi.fn(),
-          };
-          sessionStore.set(sessionId, session);
-          return session;
-        }
-      ),
-  },
-}));
-
-// Mock the ThreadManager
-vi.mock('~/threads/thread-manager', () => ({
-  ThreadManager: class {
-    constructor() {}
-    createThreadWithMetadata = vi.fn().mockResolvedValue({ id: 'test-thread' });
-    getAllThreadsWithMetadata = vi.fn().mockReturnValue([]);
-    getThread = vi.fn().mockReturnValue(null);
-  },
-}));
-
-// Import API route handlers after mocks
-import { POST as createSession, GET as listSessions } from '@/app/api/sessions/route';
+// Import the real API route handlers after mocks
+import { GET as listSessions } from '@/app/api/sessions/route';
 import { GET as getSession } from '@/app/api/sessions/[sessionId]/route';
 import { POST as spawnAgent } from '@/app/api/sessions/[sessionId]/agents/route';
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
+import { POST as createProjectSession } from '@/app/api/projects/[projectId]/sessions/route';
+import { getSessionService, SessionService } from '@/lib/server/session-service';
+import { Project } from '@/lib/server/lace-imports';
+import type { Session as SessionType, ThreadId } from '@/types/api';
 
 describe('API Endpoints E2E Tests', () => {
-  let testDbPath: string;
+  let sessionService: SessionService;
 
   beforeEach(() => {
-    // Use in-memory database for testing
-    testDbPath = ':memory:';
-    process.env.LACE_DB_PATH = testDbPath;
+    setupTestPersistence();
 
-    // Clear session store
-    sessionStore.clear();
-    sessionCounter = 0;
+    // Set up environment for session service
+    process.env = {
+      ...process.env,
+      ANTHROPIC_KEY: 'test-key',
+      LACE_DB_PATH: ':memory:',
+    };
+
+    sessionService = getSessionService();
   });
 
   afterEach(() => {
-    // Clean up
-    delete process.env.LACE_DB_PATH;
+    // Clear active sessions to prevent test pollution
+    if (sessionService) {
+      sessionService.clearActiveSessions();
+    }
+    // Clear persistence to reset database state
+    teardownTestPersistence();
+  });
+
+  afterAll(() => {
+    // Clear everything after all tests are done
+    if (sessionService) {
+      sessionService.clearActiveSessions();
+    }
+    global.sessionService = undefined;
   });
 
   describe('Session Management API Flow', () => {
     it('should create session via API', async () => {
-      const request = new NextRequest('http://localhost/api/sessions', {
+      // First create a project
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
+      const projectId = testProject.getId();
+
+      const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'API Test Session',
-          provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
+          description: 'Test session description',
+          configuration: {
+            provider: 'anthropic',
+            model: 'claude-3-haiku-20240307',
+          },
         }),
       });
 
-      const response = await createSession(request);
+      const response = await createProjectSession(request, { params: { projectId } });
       expect(response.status).toBe(201);
 
-      const data = (await response.json()) as { session: { name: string; id: string } };
+      const responseData: unknown = await response.json();
+      const data = responseData as { session: SessionType };
       expect(data.session.name).toBe('API Test Session');
       expect(data.session.id).toBeDefined();
+
+      // Verify session was actually created in the service
+      const sessions = await sessionService.listSessions();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0]?.name).toBe('API Test Session');
     });
 
     it('should list sessions via API', async () => {
-      // Create a session first
-      const createRequest = new NextRequest('http://localhost/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Listable Session',
-          provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
-        }),
-      });
-      await createSession(createRequest);
+      // Create a project and session first
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
+      const projectId = testProject.getId();
+      await sessionService.createSession(
+        'Listable Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
 
-      // List sessions
+      // List sessions via API
       const listRequest = new NextRequest('http://localhost/api/sessions', {
         method: 'GET',
       });
@@ -371,35 +137,41 @@ describe('API Endpoints E2E Tests', () => {
       const response = await listSessions(listRequest);
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { sessions: Array<{ name: string }> };
+      const responseData: unknown = await response.json();
+      const data = responseData as { sessions: SessionType[] };
       expect(data.sessions).toHaveLength(1);
-      expect(data.sessions[0].name).toBe('Listable Session');
+      expect(data.sessions[0]?.name).toBe('Listable Session');
     });
 
     it('should get specific session via API', async () => {
-      // Create a session first
-      const createRequest = new NextRequest('http://localhost/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Specific Session',
-          provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
-        }),
-      });
-      const createResponse = await createSession(createRequest);
-      const sessionData = (await createResponse.json()) as { session: { id: string } };
-      const sessionId = sessionData.session.id;
+      // Create a project and session first
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
+      const projectId = testProject.getId();
+      const session = await sessionService.createSession(
+        'Specific Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
+      const sessionId = session.id as string;
 
-      // Get specific session
+      // Get specific session via API
       const getRequest = new NextRequest(`http://localhost/api/sessions/${sessionId}`, {
         method: 'GET',
       });
 
-      const response = await getSession(getRequest, { params: { sessionId } });
+      const response = await getSession(getRequest, {
+        params: Promise.resolve({ sessionId }),
+      });
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { session: { name: string; id: string } };
+      const responseData: unknown = await response.json();
+      const data = responseData as { session: SessionType };
       expect(data.session.name).toBe('Specific Session');
       expect(data.session.id).toBe(sessionId);
     });
@@ -409,19 +181,21 @@ describe('API Endpoints E2E Tests', () => {
     let sessionId: string;
 
     beforeEach(async () => {
-      // Create a session for agent tests
-      const createRequest = new NextRequest('http://localhost/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Agent Test Session',
-          provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
-        }),
-      });
-      const createResponse = await createSession(createRequest);
-      const sessionData = (await createResponse.json()) as { session: { id: string } };
-      sessionId = sessionData.session.id;
+      // Create a session for agent tests using real service
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
+      const projectId = testProject.getId();
+      const session = await sessionService.createSession(
+        'Agent Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
+      sessionId = session.id as string;
     });
 
     it('should spawn agent via API', async () => {
@@ -430,46 +204,51 @@ describe('API Endpoints E2E Tests', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'API Agent',
-          provider: 'mock-provider',
-          model: 'mock-model',
-        }),
-      });
-
-      const response = await spawnAgent(request, { params: { sessionId } });
-      expect(response.status).toBe(201);
-
-      const data = (await response.json()) as {
-        agent: { name: string; provider: string; model: string; threadId: string };
-      };
-      expect(data.agent.name).toBe('API Agent');
-      expect(data.agent.provider).toBe('mock-provider');
-      expect(data.agent.model).toBe('mock-model');
-      expect(data.agent.threadId).toBe(`lace_20240101_test1.1`);
-    });
-
-    it('should reflect spawned agent in session', async () => {
-      // Spawn an agent
-      const spawnRequest = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Reflected Agent',
           provider: 'anthropic',
           model: 'claude-3-haiku-20240307',
         }),
       });
-      await spawnAgent(spawnRequest, { params: { sessionId } });
 
-      // Get session to check agents
+      const response = await spawnAgent(request, { params: Promise.resolve({ sessionId }) });
+      expect(response.status).toBe(201);
+
+      const responseData: unknown = await response.json();
+      const data = responseData as {
+        agent: { name: string; provider: string; model: string; threadId: string };
+      };
+      expect(data.agent.name).toBe('API Agent');
+      expect(data.agent.provider).toBe('anthropic');
+      expect(data.agent.threadId).toMatch(new RegExp(`^${sessionId}\\.\\d+$`));
+
+      // Verify agent was actually added to the session
+      const threadId: ThreadId = sessionId as ThreadId;
+      const updatedSession = await sessionService.getSession(threadId);
+      expect(updatedSession).toBeDefined();
+      const agents = updatedSession!.getAgents();
+      expect(agents).toHaveLength(2); // Coordinator + spawned agent
+      expect(agents.find((a) => a.name === 'API Agent')).toBeDefined();
+    });
+
+    it('should reflect spawned agent in session', async () => {
+      // Spawn an agent via real service
+      const threadId: ThreadId = sessionId as ThreadId;
+      const session = await sessionService.getSession(threadId);
+      expect(session).toBeDefined();
+      const _agent = session!.spawnAgent('Reflected Agent', 'anthropic');
+
+      // Get session via API to check agents
       const getRequest = new NextRequest(`http://localhost/api/sessions/${sessionId}`, {
         method: 'GET',
       });
 
-      const response = await getSession(getRequest, { params: { sessionId } });
-      const data = (await response.json()) as { session: { agents: Array<{ name: string }> } };
+      const response = await getSession(getRequest, {
+        params: Promise.resolve({ sessionId: sessionId }),
+      });
+      const responseData: unknown = await response.json();
+      const data = responseData as { session: SessionType };
 
-      expect(data.session.agents).toHaveLength(1);
-      expect(data.session.agents[0].name).toBe('Reflected Agent');
+      expect(data.session.agents).toHaveLength(2); // Coordinator + spawned agent
+      expect(data.session.agents.find((a) => a.name === 'Reflected Agent')).toBeDefined();
     });
   });
 
@@ -478,45 +257,65 @@ describe('API Endpoints E2E Tests', () => {
     let agentThreadId: string;
 
     beforeEach(async () => {
-      // Create session and agent for message tests
-      const createRequest = new NextRequest('http://localhost/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Message Test Session',
-          provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
-        }),
-      });
-      const createResponse = await createSession(createRequest);
-      const sessionData = (await createResponse.json()) as { session: { id: string } };
-      sessionId = sessionData.session.id;
+      // Create session and agent fresh for each test to avoid state pollution
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
+      const projectId = testProject.getId();
+      const session = await sessionService.createSession(
+        'Message Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        projectId
+      );
+      sessionId = session.id as string;
 
-      const spawnRequest = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Message Agent',
-          provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
-        }),
-      });
-      const spawnResponse = await spawnAgent(spawnRequest, { params: { sessionId } });
-      const agentData = (await spawnResponse.json()) as { agent: { threadId: string } };
-      agentThreadId = agentData.agent.threadId;
+      const threadId: ThreadId = sessionId as ThreadId;
+      const sessionInstance = await sessionService.getSession(threadId);
+      expect(sessionInstance).toBeDefined();
+      const agent = sessionInstance!.spawnAgent('Message Agent', 'anthropic');
+      agentThreadId = agent.threadId as string;
     });
 
     it('should accept message via API', async () => {
+      // Debug the session and agent state
+
+      // Check if session exists and get agent through session
+      const threadId: ThreadId = sessionId as ThreadId;
+      const session = await sessionService.getSession(threadId);
+      if (!session) {
+        throw new Error(`Session not found for sessionId: ${sessionId}`);
+      }
+
+      // Ensure the agent is properly available
+      const agent = session.getAgent(agentThreadId);
+      if (!agent) {
+        throw new Error(
+          `Agent not found for threadId: ${agentThreadId}. Cannot proceed with message test.`
+        );
+      }
+
       const request = new NextRequest(`http://localhost/api/threads/${agentThreadId}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: 'Hello, agent!' }),
       });
 
-      const response = await sendMessage(request, { params: { threadId: agentThreadId } });
+      const response = await sendMessage(request, {
+        params: Promise.resolve({ threadId: agentThreadId }),
+      });
+
+      if (response.status !== 202) {
+        const errorResponseData: unknown = await response.json();
+        const _errorData = errorResponseData as { error: string };
+      }
       expect(response.status).toBe(202);
 
-      const data = (await response.json()) as { status: string; threadId: string };
+      const responseData: unknown = await response.json();
+      const data = responseData as { status: string; threadId: string };
       expect(data.status).toBe('accepted');
       expect(data.threadId).toBe(agentThreadId);
     });
@@ -528,7 +327,9 @@ describe('API Endpoints E2E Tests', () => {
         body: JSON.stringify({ message: 'Hello, agent!' }),
       });
 
-      const response = await sendMessage(request, { params: { threadId: 'invalid-thread-id' } });
+      const response = await sendMessage(request, {
+        params: Promise.resolve({ threadId: 'invalid-thread-id' }),
+      });
       expect(response.status).toBe(400);
     });
   });
@@ -539,18 +340,29 @@ describe('API Endpoints E2E Tests', () => {
         method: 'GET',
       });
 
-      const response = await getSession(request, { params: { sessionId: 'invalid-id' } });
-      expect(response.status).toBe(404);
+      const response = await getSession(request, {
+        params: Promise.resolve({ sessionId: 'invalid-id' }),
+      });
+      expect(response.status).toBe(400); // Invalid format returns validation error
     });
 
     it('should handle malformed JSON in createSession', async () => {
-      const request = new NextRequest('http://localhost/api/sessions', {
+      // Test the project-based session creation with malformed JSON
+      const testProject = Project.create(
+        'Test Project',
+        '/test/path',
+        'Test project for API test',
+        {}
+      );
+      const projectId = testProject.getId();
+
+      const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: 'invalid json',
       });
 
-      const response = await createSession(request);
+      const response = await createProjectSession(request, { params: { projectId } });
       expect(response.status).toBe(500); // JSON parsing error is caught by outer try-catch
     });
 
@@ -565,8 +377,10 @@ describe('API Endpoints E2E Tests', () => {
         }),
       });
 
-      const response = await spawnAgent(request, { params: { sessionId: 'non-existent' } });
-      expect(response.status).toBe(404);
+      const response = await spawnAgent(request, {
+        params: Promise.resolve({ sessionId: 'non-existent' }),
+      });
+      expect(response.status).toBe(400); // Invalid format returns validation error
     });
   });
 });

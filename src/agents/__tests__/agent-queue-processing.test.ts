@@ -1,13 +1,17 @@
 // ABOUTME: Tests for automatic queue processing on state transitions
 // ABOUTME: Ensures messages are processed when agent returns to idle
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Type helper for accessing private methods in tests
 type AgentWithPrivateMethods = Agent & {
@@ -46,6 +50,7 @@ describe('Agent Queue Processing', () => {
   let mockThreadManager: ThreadManager;
 
   beforeEach(() => {
+    setupTestPersistence();
     mockProvider = new MockProvider();
 
     mockToolExecutor = {
@@ -75,6 +80,10 @@ describe('Agent Queue Processing', () => {
       threadId: 'test-thread',
       tools: [],
     });
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
   });
 
   describe('processQueuedMessages', () => {

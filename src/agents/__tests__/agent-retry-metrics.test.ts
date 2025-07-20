@@ -8,6 +8,10 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Mock provider that can simulate retry scenarios
 class MockRetryMetricsProvider extends BaseMockProvider {
@@ -89,9 +93,11 @@ describe('Agent Retry Metrics Tracking', () => {
   let threadId: string;
 
   beforeEach(async () => {
+    setupTestPersistence();
+
     provider = new MockRetryMetricsProvider();
     toolExecutor = new ToolExecutor();
-    threadManager = new ThreadManager(':memory:');
+    threadManager = new ThreadManager();
     threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
 
@@ -108,6 +114,7 @@ describe('Agent Retry Metrics Tracking', () => {
 
   afterEach(() => {
     agent.stop();
+    teardownTestPersistence();
     vi.clearAllTimers();
   });
 

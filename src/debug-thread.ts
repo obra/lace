@@ -8,8 +8,6 @@ import { Agent } from '~/agents/agent';
 import { ProviderRegistry } from '~/providers/registry';
 import { estimateTokens } from '~/utils/token-estimation';
 import { convertToAnthropicFormat } from '~/providers/format-converters';
-import { getLaceDir } from '~/config/lace-dir';
-import { join } from 'path';
 import { loadEnvFile } from '~/config/env-loader';
 import { ToolExecutor } from '~/tools/executor';
 import { ProviderMessage } from '~/providers/base-provider';
@@ -47,9 +45,7 @@ function debugThread(options: DebugOptions): ThreadDebugInfo {
   loadEnvFile();
 
   // Initialize database and thread manager
-  const laceDir = getLaceDir();
-  const dbPath = join(laceDir, 'lace.db');
-  const threadManager = new ThreadManager(dbPath);
+  const threadManager = new ThreadManager();
 
   // Load thread events
   const thread = threadManager.getThread(options.threadId);

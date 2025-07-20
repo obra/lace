@@ -1,10 +1,14 @@
 // ABOUTME: Tests for task SSE streaming endpoint
 // ABOUTME: Verifies real-time task event streaming functionality
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/tasks/stream/route';
 import { EventEmitter } from 'events';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
 // Create mock TaskManager that extends EventEmitter
 class MockTaskManager extends EventEmitter {
@@ -60,7 +64,12 @@ global.TextEncoder = class MockTextEncoder {
 
 describe('Task SSE Stream', () => {
   beforeEach(() => {
+    setupTestPersistence();
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
   });
 
   it('should establish SSE connection for valid session', async () => {

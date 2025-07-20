@@ -3,7 +3,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId, CreateAgentRequest } from '@/types/api';
+import { CreateAgentRequest } from '@/types/api';
+import { asThreadId, ThreadId } from '@/lib/server/core-types';
+import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -20,9 +22,9 @@ function isCreateAgentRequest(body: unknown): body is CreateAgentRequest {
   );
 }
 
-// Type guard for ThreadId
-function isValidThreadId(sessionId: string): sessionId is ThreadId {
-  return typeof sessionId === 'string' && sessionId.length > 0;
+// Type guard for ThreadId using client-safe validation
+function isValidThreadId(sessionId: string): boolean {
+  return isClientValidThreadId(sessionId);
 }
 
 export async function POST(
@@ -37,7 +39,7 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 
-    const sessionId = sessionIdParam;
+    const sessionId = asThreadId(sessionIdParam);
 
     // Parse and validate request body
     const bodyData: unknown = await request.json();
@@ -52,21 +54,40 @@ export async function POST(
       return NextResponse.json({ error: 'Agent name is required' }, { status: 400 });
     }
 
-    const agent = await sessionService.spawnAgent(sessionId, body.name, body.provider, body.model);
+    // Get session and spawn agent directly
+    const session = await sessionService.getSession(sessionId);
+    if (!session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    const agent = session.spawnAgent(body.name, body.provider, body.model);
+
+    // Setup agent approvals using utility
+    const { setupAgentApprovals } = await import('@/lib/server/agent-utils');
+    setupAgentApprovals(agent, sessionId);
+
+    // Convert to API format
+    const agentResponse = {
+      threadId: agent.threadId,
+      name: body.name,
+      provider: body.provider || 'anthropic',
+      model: body.model || 'claude-3-haiku-20240307',
+      status: 'idle' as const,
+      createdAt: new Date().toISOString(),
+    };
 
     // Test SSE broadcast
     const { SSEManager } = await import('@/lib/sse-manager');
     const sseManager = SSEManager.getInstance();
-    const agentThreadId = agent.threadId as ThreadId;
     const testEvent = {
       type: 'LOCAL_SYSTEM_MESSAGE' as const,
-      threadId: agentThreadId,
+      threadId: agentResponse.threadId as ThreadId,
       timestamp: new Date().toISOString(),
-      data: { message: `Agent "${agent.name}" spawned successfully` },
+      data: { message: `Agent "${agentResponse.name}" spawned successfully` },
     };
     sseManager.broadcast(sessionId, testEvent);
 
-    return NextResponse.json({ agent }, { status: 201 });
+    return NextResponse.json({ agent: agentResponse }, { status: 201 });
   } catch (error: unknown) {
     console.error('Error in POST /api/sessions/[sessionId]/agents:', error);
 
@@ -90,7 +111,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 
-    const sessionId = sessionIdParam;
+    const sessionId = asThreadId(sessionIdParam);
 
     const session = await sessionService.getSession(sessionId);
 
@@ -101,14 +122,18 @@ export async function GET(
     // Get agents from Session instance
     const agents = session.getAgents();
     return NextResponse.json({
-      agents: agents.map((agent) => ({
-        threadId: agent.threadId,
-        name: agent.name,
-        provider: agent.provider,
-        model: agent.model,
-        status: agent.status,
-        createdAt: (agent as { createdAt?: string }).createdAt ?? new Date().toISOString(),
-      })),
+      agents: agents.map((agent) => {
+        // Safely extract createdAt if available, otherwise use current timestamp
+        const agentWithTimestamp = agent as unknown as { createdAt?: string };
+        return {
+          threadId: agent.threadId,
+          name: agent.name,
+          provider: agent.provider,
+          model: agent.model,
+          status: agent.status,
+          createdAt: agentWithTimestamp.createdAt ?? new Date().toISOString(),
+        };
+      }),
     });
   } catch (error: unknown) {
     console.error('Error in GET /api/sessions/[sessionId]/agents:', error);

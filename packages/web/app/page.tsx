@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type {
   Session,
   ThreadId,
@@ -10,17 +10,21 @@ import type {
   Agent,
   SessionsResponse,
   SessionResponse,
+  ProjectInfo,
 } from '@/types/api';
 import { isApiError } from '@/types/api';
 import { ConversationDisplay } from '@/components/ConversationDisplay';
 import { ToolApprovalModal } from '@/components/ToolApprovalModal';
 import { AgentSpawner } from '@/components/AgentSpawner';
 import { TaskDashboard } from '@/components/TaskDashboard';
+import { ProjectManager } from '@/components/ProjectManager';
 import { getAllEventTypes } from '@/types/events';
 
 export default function Home() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedSession, setSelectedSession] = useState<ThreadId | null>(null);
+  const [selectedSessionDetails, setSelectedSessionDetails] = useState<Session | null>(null);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<SessionEvent[]>([]);
@@ -30,24 +34,67 @@ export default function Home() {
   const [approvalRequest, setApprovalRequest] = useState<ToolApprovalRequestData | null>(null);
   const [activeTab, setActiveTab] = useState<'conversation' | 'tasks'>('conversation');
 
-  // Load sessions on mount
+  const loadSessions = useCallback(async () => {
+    if (!selectedProject) {
+      setSessions([]);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/projects/${selectedProject}/sessions`);
+      const data: unknown = await res.json();
+
+      if (isApiError(data)) {
+        console.error('Failed to load sessions:', data.error);
+        return;
+      }
+
+      const sessionsData = data as SessionsResponse;
+      setSessions(sessionsData.sessions || []);
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+    }
+  }, [selectedProject]);
+
+  // Load sessions when project is selected
   useEffect(() => {
     void loadSessions();
+  }, [selectedProject, loadSessions]);
+
+  const loadSessionDetails = useCallback(async (sessionId: ThreadId) => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`);
+      const data: unknown = await res.json();
+
+      if (isApiError(data)) {
+        console.error('Failed to load session details:', data.error);
+        return;
+      }
+
+      const sessionResponse = data as SessionResponse;
+      setSelectedSessionDetails(sessionResponse.session);
+    } catch (error) {
+      console.error('Failed to load session details:', error);
+    }
   }, []);
 
   // Connect to SSE when session selected
   useEffect(() => {
-    if (!selectedSession) return;
+    if (!selectedSession) {
+      setSelectedSessionDetails(null);
+      return;
+    }
 
     // Clear events when switching sessions
     setEvents([]);
     setSelectedAgent(null);
 
-    // Load conversation history first
+    // Load full session details and conversation history
+    void loadSessionDetails(selectedSession);
     void loadConversationHistory(selectedSession);
 
     const eventSource = new EventSource(`/api/sessions/${selectedSession}/events/stream`);
-    
+
     // Store event listeners for cleanup
     const eventListeners = new Map<string, (event: MessageEvent) => void>();
 
@@ -62,7 +109,7 @@ export default function Home() {
           // Type guard for event structure
           if (typeof data === 'object' && data !== null && 'type' in data) {
             const eventData = data as { type: string; data: unknown };
-            
+
             // Handle approval requests separately
             if (eventData.type === 'TOOL_APPROVAL_REQUEST') {
               setApprovalRequest(eventData.data as ToolApprovalRequestData);
@@ -74,7 +121,7 @@ export default function Home() {
           console.error('Failed to parse event:', error);
         }
       };
-      
+
       eventListeners.set(eventType, listener);
       eventSource.addEventListener(eventType, listener);
     });
@@ -82,20 +129,20 @@ export default function Home() {
     const connectionListener = (_event: Event) => {
       const connectionEvent: SessionEvent = {
         type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: selectedSession,
+        threadId: selectedSession as ThreadId,
         timestamp: new Date().toISOString(),
         data: { message: 'Connected to session stream' },
       };
       setEvents((prev) => [...prev, connectionEvent]);
     };
-    
+
     eventSource.addEventListener('connection', connectionListener);
 
     eventSource.onerror = (error) => {
       console.error('SSE error:', error);
       const errorEvent: SessionEvent = {
         type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: selectedSession,
+        threadId: selectedSession as ThreadId,
         timestamp: new Date().toISOString(),
         data: { message: 'Connection lost' },
       };
@@ -110,35 +157,18 @@ export default function Home() {
       eventSource.removeEventListener('connection', connectionListener);
       eventSource.close();
     };
-  }, [selectedSession]);
-
-  async function loadSessions() {
-    try {
-      const res = await fetch('/api/sessions');
-      const data: unknown = await res.json();
-      
-      if (isApiError(data)) {
-        console.error('Failed to load sessions:', data.error);
-        return;
-      }
-      
-      const sessionsData = data as SessionsResponse;
-      setSessions(sessionsData.sessions || []);
-    } catch (error) {
-      console.error('Failed to load sessions:', error);
-    }
-  }
+  }, [selectedSession, loadSessionDetails]);
 
   async function loadConversationHistory(sessionId: ThreadId) {
     try {
       const res = await fetch(`/api/sessions/${sessionId}/history`);
       const data: unknown = await res.json();
-      
+
       if (isApiError(data)) {
         console.error('Failed to load conversation history:', data.error);
         return;
       }
-      
+
       const historyData = data as { events: SessionEvent[] };
       setEvents(historyData.events || []);
     } catch (error) {
@@ -147,11 +177,11 @@ export default function Home() {
   }
 
   async function createSession() {
-    if (!sessionName.trim()) return;
+    if (!sessionName.trim() || !selectedProject) return;
 
     setLoading(true);
     try {
-      const res = await fetch('/api/sessions', {
+      const res = await fetch(`/api/projects/${selectedProject}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: sessionName }),
@@ -159,12 +189,12 @@ export default function Home() {
 
       if (res.ok) {
         const data: unknown = await res.json();
-        
+
         if (isApiError(data)) {
           console.error('Failed to create session:', data.error);
           return;
         }
-        
+
         const sessionData = data as SessionResponse;
         setSelectedSession(sessionData.session.id as ThreadId);
         setSessionName('');
@@ -178,8 +208,26 @@ export default function Home() {
 
   const handleAgentSpawn = async (agent: Agent) => {
     await loadSessions();
+    // Reload session details to include the new agent
+    if (selectedSession) {
+      await loadSessionDetails(selectedSession);
+    }
     // Select the new agent
     setSelectedAgent(agent.threadId as ThreadId);
+  };
+
+  const handleProjectCreated = (project: ProjectInfo) => {
+    // Project created successfully - could show a notification
+    console.warn('Project created:', project);
+  };
+
+  const handleProjectSelect = (projectId: string) => {
+    setSelectedProject(projectId);
+    // When switching projects, clear session and agent selection
+    setSelectedSession(null);
+    setSelectedSessionDetails(null);
+    setSelectedAgent(null);
+    setEvents([]);
   };
 
   async function handleApprovalDecision(decision: ApprovalDecision) {
@@ -238,72 +286,79 @@ export default function Home() {
           <div className="p-4">
             <h1 className="text-2xl font-bold mb-6">Lace</h1>
 
-            {/* Session Creation */}
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-3">New Session</h2>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={sessionName}
-                  onChange={(e) => setSessionName(e.target.value)}
-                  placeholder="Session name..."
-                  className="flex-1 px-3 py-2 bg-gray-700 rounded text-white text-sm"
-                  onKeyDown={(e) => e.key === 'Enter' && createSession()}
-                  data-testid="session-name-input"
-                />
-                <button
-                  onClick={createSession}
-                  disabled={loading || !sessionName.trim()}
-                  className="px-3 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
-                  data-testid="create-session-button"
-                >
-                  Create
-                </button>
-              </div>
-            </div>
+            {/* Project Management */}
+            <ProjectManager
+              selectedProjectId={selectedProject}
+              onProjectSelect={handleProjectSelect}
+              onProjectCreated={handleProjectCreated}
+            />
 
-            {/* Sessions List */}
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-3">Sessions</h2>
-              {sessions.length === 0 ? (
-                <p className="text-gray-400 text-sm">No sessions yet</p>
-              ) : (
-                <div className="space-y-2">
-                  {sessions.map((session) => (
-                    <div
-                      key={String(session.id)}
-                      onClick={() => setSelectedSession(session.id as ThreadId)}
-                      className={`p-3 rounded cursor-pointer text-sm ${
-                        selectedSession === session.id ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'
-                      }`}
-                    >
-                      <div className="font-semibold">{session.name}</div>
-                      <div className="text-xs text-gray-300">
-                        {session.agents.length} agents • {new Date(session.createdAt).toLocaleDateString()}
-                      </div>
-                      <div className="text-xs text-gray-400 font-mono">
-                        {session.id}
-                      </div>
-                    </div>
-                  ))}
+            {/* Session Creation - Only show if a project is selected */}
+            {selectedProject && (
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold mb-3">New Session</h2>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={sessionName}
+                    onChange={(e) => setSessionName(e.target.value)}
+                    placeholder="Session name..."
+                    className="flex-1 px-3 py-2 bg-gray-700 rounded text-white text-sm"
+                    onKeyDown={(e) => e.key === 'Enter' && createSession()}
+                    data-testid="session-name-input"
+                  />
+                  <button
+                    onClick={createSession}
+                    disabled={loading || !sessionName.trim()}
+                    className="px-3 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+                    data-testid="create-session-button"
+                  >
+                    Create
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Agent Management */}
-            {selectedSession && (
+            {/* Sessions List - Only show if a project is selected */}
+            {selectedProject && (
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold mb-3">Sessions</h2>
+                {sessions.length === 0 ? (
+                  <p className="text-gray-400 text-sm">No sessions yet</p>
+                ) : (
+                  <div className="space-y-2">
+                    {sessions.map((session) => (
+                      <div
+                        key={String(session.id)}
+                        onClick={() => setSelectedSession(session.id as ThreadId)}
+                        className={`p-3 rounded cursor-pointer text-sm ${
+                          selectedSession === session.id
+                            ? 'bg-blue-600'
+                            : 'bg-gray-700 hover:bg-gray-600'
+                        }`}
+                      >
+                        <div className="font-semibold">{session.name}</div>
+                        <div className="text-xs text-gray-300">
+                          {session.agents?.length || 0} agents •{' '}
+                          {new Date(session.createdAt).toLocaleDateString()}
+                        </div>
+                        <div className="text-xs text-gray-400 font-mono">{session.id}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Agent Management - Only show if a session is selected */}
+            {selectedSession && selectedProject && (
               <div>
                 <h2 className="text-lg font-semibold mb-3">Agents</h2>
-                <AgentSpawner
-                  sessionId={selectedSession}
-                  onAgentSpawn={handleAgentSpawn}
-                />
+                <AgentSpawner sessionId={selectedSession as ThreadId} onAgentSpawn={handleAgentSpawn} />
 
                 {/* Agent List */}
-                <div className="mt-4 space-y-2">
-                  {sessions
-                    .find((s) => s.id === selectedSession)
-                    ?.agents.map((agent) => (
+                <div className="mt-4 space-y-2" data-testid="agent-list">
+                  {selectedSessionDetails?.agents?.map((agent) => (
                       <div
                         key={String(agent.threadId)}
                         onClick={() => setSelectedAgent(agent.threadId as ThreadId)}
@@ -312,17 +367,14 @@ export default function Home() {
                             ? 'bg-green-600'
                             : 'bg-gray-700 hover:bg-gray-600'
                         }`}
+                        data-testid="agent-item"
                       >
                         <div className="font-semibold">{agent.name}</div>
                         <div className="text-xs text-gray-300">
                           {agent.provider} • {agent.model}
                         </div>
-                        <div className="text-xs text-gray-400">
-                          Status: {agent.status}
-                        </div>
-                        <div className="text-xs text-gray-400 font-mono">
-                          {agent.threadId}
-                        </div>
+                        <div className="text-xs text-gray-400">Status: {agent.status}</div>
+                        <div className="text-xs text-gray-400 font-mono">{agent.threadId}</div>
                         {agent.createdAt && (
                           <div className="text-xs text-gray-500">
                             {new Date(agent.createdAt).toLocaleString()}
@@ -338,7 +390,8 @@ export default function Home() {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col h-full">
-          {selectedSession ? (
+          {selectedProject ? (
+            selectedSession ? (
             <>
               {/* Tab Navigation */}
               <div className="bg-gray-800 border-b border-gray-700">
@@ -376,8 +429,8 @@ export default function Home() {
                         <div className="flex-1 overflow-hidden">
                           <ConversationDisplay
                             events={events}
-                            agents={sessions.find((s) => s.id === selectedSession)?.agents || []}
-                            selectedAgent={selectedAgent}
+                            agents={selectedSessionDetails?.agents || []}
+                            selectedAgent={selectedAgent as ThreadId}
                             className="h-full p-4"
                             isLoading={loading}
                           />
@@ -423,9 +476,14 @@ export default function Home() {
                 )}
               </div>
             </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-gray-400">
+                Select a session to get started
+              </div>
+            )
           ) : (
             <div className="flex-1 flex items-center justify-center text-gray-400">
-              Select a session to get started
+              Select a project to get started
             </div>
           )}
         </div>
