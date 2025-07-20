@@ -42,7 +42,7 @@ const config = [
       'no-console': ['error', { allow: ['warn', 'error'] }],
       'no-relative-import-paths/no-relative-import-paths': [
         'error',
-        { allowSameFolder: false, rootDir: '.', prefix: '@' }
+        { allowSameFolder: true, rootDir: '.', prefix: '@' }
       ],
       'no-restricted-imports': ['error', {
         patterns: [
