@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import type { Task, AssigneeId } from '@/types/api';
-import { TaskNotes } from '@/components/TaskNotes';
+import { TaskNotes } from '@/components/old/TaskNotes';
 
 interface TaskDetailModalProps {
   task: Task;

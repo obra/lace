@@ -4,7 +4,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { TaskDetailModal } from '@/components/TaskDetailModal';
+import { TaskDetailModal } from '@/components/old/TaskDetailModal';
 import type { Task } from '@/types/api';
 
 const mockTask: Task = {

@@ -4,11 +4,11 @@
 import React, { useState } from 'react';
 import type { Task } from '@/types/api';
 import { useTaskManager } from '@/hooks/useTaskManager';
-import { TaskSummary } from '@/components/TaskSummary';
-import { TaskFilters } from '@/components/TaskFilters';
-import { TaskList } from '@/components/TaskList';
-import { TaskDetailModal } from '@/components/TaskDetailModal';
-import { CreateTaskModal } from '@/components/CreateTaskModal';
+import { TaskSummary } from '@/components/old/TaskSummary';
+import { TaskFilters } from '@/components/old/TaskFilters';
+import { TaskList } from '@/components/old/TaskList';
+import { TaskDetailModal } from '@/components/old/TaskDetailModal';
+import { CreateTaskModal } from '@/components/old/CreateTaskModal';
 
 interface TaskDashboardProps {
   sessionId: string;

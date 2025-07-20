@@ -4,8 +4,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ProjectInfo } from '@/types/api';
 import { useProjectAPI } from '@/hooks/useProjectAPI';
-import { CreateProjectModal } from '@/components/CreateProjectModal';
-import { ProjectSettings } from '@/components/ProjectSettings';
+import { CreateProjectModal } from '@/components/old/CreateProjectModal';
+import { ProjectSettings } from '@/components/old/ProjectSettings';
 
 interface ProjectWithConfiguration extends ProjectInfo {
   configuration: {

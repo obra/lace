@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
-import { ProjectSettings } from '@/components/ProjectSettings';
+import { ProjectSettings } from '@/components/old/ProjectSettings';
 import type { ProjectInfo } from '@/types/api';
 
 interface ProjectWithConfiguration extends ProjectInfo {

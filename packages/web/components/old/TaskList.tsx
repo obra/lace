@@ -3,7 +3,7 @@
 
 import React from 'react';
 import type { Task } from '@/types/api';
-import { TaskListItem } from '@/components/TaskListItem';
+import { TaskListItem } from '@/components/old/TaskListItem';
 
 interface TaskListProps {
   tasks: Task[];

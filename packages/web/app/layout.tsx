@@ -3,7 +3,7 @@
 
 import type { Metadata } from 'next';
 import '@/app/globals.css';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ErrorBoundary } from '@/components/old/ErrorBoundary';
 
 export const metadata: Metadata = {
   title: 'Lace Web Terminal',

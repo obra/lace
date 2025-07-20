@@ -4,7 +4,7 @@
 import React from 'react';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { TaskList } from '@/components/TaskList';
+import { TaskList } from '@/components/old/TaskList';
 import type { Task } from '@/types/api';
 
 const mockTasks: Task[] = [

@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Session, Agent, ThreadId, ToolCallEventData, ToolResultEventData } from '@/types/api';
 import { useSSEStream } from '@/hooks/useSSEStream';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
-import { AgentSpawner } from '@/components/AgentSpawner';
+import { AgentSpawner } from '@/components/old/AgentSpawner';
 interface LaceTerminalProps {
   session: Session;
   onAgentSpawn: (agent: Agent) => void;

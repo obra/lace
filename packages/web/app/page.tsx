@@ -13,11 +13,11 @@ import type {
   ProjectInfo,
 } from '@/types/api';
 import { isApiError } from '@/types/api';
-import { ConversationDisplay } from '@/components/ConversationDisplay';
-import { ToolApprovalModal } from '@/components/ToolApprovalModal';
-import { AgentSpawner } from '@/components/AgentSpawner';
-import { TaskDashboard } from '@/components/TaskDashboard';
-import { ProjectManager } from '@/components/ProjectManager';
+import { ConversationDisplay } from '@/components/old/ConversationDisplay';
+import { ToolApprovalModal } from '@/components/old/ToolApprovalModal';
+import { AgentSpawner } from '@/components/old/AgentSpawner';
+import { TaskDashboard } from '@/components/old/TaskDashboard';
+import { ProjectManager } from '@/components/old/ProjectManager';
 import { getAllEventTypes } from '@/types/events';
 
 export default function Home() {
