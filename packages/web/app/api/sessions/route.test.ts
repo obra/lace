@@ -5,57 +5,66 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/route';
 import type { Session } from '@/types/api';
-import { asThreadId } from '@/lib/server/core-types';
-import type { SessionService } from '@/lib/server/session-service';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
 
-// Test data factory functions
-function createMockSession(overrides: Partial<Session> = {}): Session {
+// Mock external dependencies (database persistence) but not business logic
+const projectStore = new Map<string, any>();
+const sessionStore = new Map<string, any>();
+
+vi.mock('~/persistence/database', () => {
   return {
-    id: asThreadId('lace_20240101_abcd12'),
-    name: 'Test Session',
-    createdAt: '2024-01-01T12:00:00Z',
-    agents: [],
-    ...overrides,
+    getPersistence: vi.fn(() => ({
+      // Project persistence methods
+      loadAllProjects: vi.fn(() => {
+        return Array.from(projectStore.values());
+      }),
+      loadProject: vi.fn((projectId: string) => {
+        return projectStore.get(projectId) || null;
+      }),
+      saveProject: vi.fn((project: any) => {
+        projectStore.set(project.id, project);
+      }),
+      loadSessionsByProject: vi.fn((projectId: string) => {
+        return Array.from(sessionStore.values()).filter((s) => s.projectId === projectId);
+      }),
+
+      // Session persistence methods
+      loadAllSessions: vi.fn(() => {
+        return Array.from(sessionStore.values());
+      }),
+      loadSession: vi.fn((sessionId: string) => {
+        return sessionStore.get(sessionId) || null;
+      }),
+      saveSession: vi.fn((session: any) => {
+        sessionStore.set(session.id, session);
+      }),
+
+      // Thread persistence methods (needed for session functionality)
+      loadThreadEvents: vi.fn(() => []),
+      saveThreadEvents: vi.fn(),
+      deleteThread: vi.fn(),
+    })),
   };
-}
+});
 
-function createMockAgent(overrides: Partial<NonNullable<Session['agents']>[0]> = {}): NonNullable<Session['agents']>[0] {
-  return {
-    threadId: asThreadId('lace_20240101_abcd12.1'),
-    name: 'Test Agent',
-    provider: 'anthropic',
-    model: 'claude-3-opus',
-    status: 'idle' as const,
-    createdAt: '2024-01-01T12:00:00Z',
-    ...overrides,
-  };
-}
-
-// Create the properly typed mock service
-const mockSessionService = {
-  createSession: vi.fn<SessionService['createSession']>(),
-  listSessions: vi.fn<SessionService['listSessions']>(),
-  getSession: vi.fn<SessionService['getSession']>(),
-};
-
-// ❌ PROBLEMATIC MOCK - This mocks business logic instead of testing real HTTP behavior
-// Should use real SessionService with test database for proper integration testing
-// Tests currently validate mock responses instead of actual API functionality
-vi.mock('@/lib/server/session-service', () => ({
-  getSessionService: () => mockSessionService,
+// Mock ThreadManager for session management - external dependency
+vi.mock('~/threads/thread-manager', () => ({
+  ThreadManager: vi.fn(() => ({
+    getSessionsForProject: vi.fn(() => []), // Empty array for clean tests
+  })),
 }));
+
+// Now using real SessionService for proper integration testing
+// No more mocking of business logic - tests validate real HTTP behavior
 
 describe('Session API Routes', () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    setupTestPersistence();
     vi.clearAllMocks();
+    // Clear the in-memory stores between tests
+    projectStore.clear();
+    sessionStore.clear();
 
     // ✅ ESSENTIAL MOCK - Console suppression to prevent test output noise and control log verification
     // These mocks are necessary for clean test output and error handling verification
@@ -66,7 +75,6 @@ describe('Session API Routes', () => {
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
-    teardownTestPersistence();
   });
 
   // POST endpoint removed - sessions must be created through projects
@@ -74,57 +82,100 @@ describe('Session API Routes', () => {
 
   describe('GET /api/sessions', () => {
     it('should list all sessions', async () => {
-      const mockSessions: Session[] = [
-        createMockSession({
-          id: asThreadId('lace_20240101_abcd12'),
-          name: 'Session 1',
-          createdAt: '2024-01-01T12:00:00Z',
-        }),
-        createMockSession({
-          id: asThreadId('lace_20240101_efgh56'),
-          name: 'Session 2',
-          createdAt: '2024-01-01T13:00:00Z',
-          agents: [
-            createMockAgent({
-              threadId: asThreadId('lace_20240101_efgh56.1'),
-              name: 'Agent 1',
-              createdAt: '2024-01-01T13:01:00Z',
-            }),
-          ],
-        }),
-      ];
+      // Arrange: Create real project and sessions using real services
+      const { Project } = await import('@/lib/server/lace-imports');
+      const { getSessionService } = await import('@/lib/server/session-service');
 
-      mockSessionService.listSessions.mockResolvedValueOnce(mockSessions);
+      // Create and ensure project is saved
+      const testProject = Project.create('Test Project', '/test', 'Test project for sessions');
 
+      // Verify project was saved to our mocked store
+      expect(projectStore.has(testProject.id)).toBe(true);
+
+      const sessionService = getSessionService();
+
+      const session1 = await sessionService.createSession(
+        'Test Session 1',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.id
+      );
+
+      const session2 = await sessionService.createSession(
+        'Test Session 2',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.id
+      );
+
+      // Act: Call the API endpoint
       const request = new NextRequest('http://localhost:3005/api/sessions');
       const response = await GET(request);
-      const data = (await response.json()) as { sessions: typeof mockSessions };
+      const data = (await response.json()) as { sessions: Session[] };
 
+      // Assert: Verify real HTTP response with real data
       expect(response.status).toBe(200);
-      expect(data.sessions).toEqual(mockSessions);
-      expect(mockSessionService.listSessions).toHaveBeenCalled();
+      expect(data.sessions).toHaveLength(2);
+
+      // Find sessions by name since IDs are generated
+      const returnedSession1 = data.sessions.find((s) => s.name === 'Test Session 1');
+      const returnedSession2 = data.sessions.find((s) => s.name === 'Test Session 2');
+
+      expect(returnedSession1).toBeDefined();
+      expect(returnedSession1).toMatchObject({
+        name: 'Test Session 1',
+        id: session1.id,
+        createdAt: session1.createdAt,
+      });
+
+      expect(returnedSession2).toBeDefined();
+      expect(returnedSession2).toMatchObject({
+        name: 'Test Session 2',
+        id: session2.id,
+        createdAt: session2.createdAt,
+      });
     });
 
     it('should return empty array when no sessions exist', async () => {
-      mockSessionService.listSessions.mockResolvedValueOnce([]);
-
+      // Act: Call API with no sessions created
       const request = new NextRequest('http://localhost:3005/api/sessions');
       const response = await GET(request);
       const data = (await response.json()) as { sessions: unknown[] };
 
+      // Assert: Empty array returned from real service
       expect(response.status).toBe(200);
       expect(data.sessions).toEqual([]);
     });
 
-    it('should handle listing errors', async () => {
-      mockSessionService.listSessions.mockRejectedValueOnce(new Error('Database error'));
+    it('should handle listing errors gracefully', async () => {
+      // Arrange: Force a database error by corrupting the persistence layer
+      const mockPersistence = {
+        loadAllSessions: vi.fn(() => {
+          throw new Error('Database connection failed');
+        }),
+        loadAllProjects: vi.fn(() => []),
+        loadProject: vi.fn(() => null),
+        saveProject: vi.fn(),
+        saveSession: vi.fn(),
+        loadSession: vi.fn(() => null),
+        loadThreadEvents: vi.fn(() => []),
+        saveThreadEvents: vi.fn(),
+        deleteThread: vi.fn(),
+        loadSessionsByProject: vi.fn(() => []),
+      };
 
+      // Override the persistence mock for this test only
+      const { getPersistence } = await import('~/persistence/database');
+      vi.mocked(getPersistence).mockReturnValueOnce(mockPersistence as any);
+
+      // Act: Call the API when service fails
       const request = new NextRequest('http://localhost:3005/api/sessions');
       const response = await GET(request);
       const data = (await response.json()) as { error: string };
 
+      // Assert: API handles the persistence error gracefully
       expect(response.status).toBe(500);
-      expect(data.error).toBe('Database error');
+      expect(data.error).toBe('Database connection failed');
     });
   });
 });

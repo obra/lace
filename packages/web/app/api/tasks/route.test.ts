@@ -4,93 +4,93 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/tasks/route';
-import type { SessionService } from '@/lib/server/session-service';
 import type { Task } from '@/types/api';
-import { asThreadId } from '@/lib/server/core-types';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
 
-// Create mock TaskManager
-const mockTaskManager = {
-  createTask: vi.fn(),
-  getTasks: vi.fn(),
-  getTaskById: vi.fn(),
-  updateTask: vi.fn(),
-  addNote: vi.fn(),
-  deleteTask: vi.fn(),
-  getTaskSummary: vi.fn(),
-  listTasks: vi.fn(),
-  getTask: vi.fn(),
-};
+// Mock external dependencies (database persistence) but not business logic
+const projectStore = new Map<string, any>();
+const sessionStore = new Map<string, any>();
 
-// Create a mock Session instance with proper typing
-const mockSessionId = asThreadId('lace_20240101_session');
+vi.mock('~/persistence/database', () => {
+  return {
+    getPersistence: vi.fn(() => ({
+      // Project persistence methods
+      loadAllProjects: vi.fn(() => {
+        return Array.from(projectStore.values());
+      }),
+      loadProject: vi.fn((projectId: string) => {
+        return projectStore.get(projectId) || null;
+      }),
+      saveProject: vi.fn((project: any) => {
+        projectStore.set(project.id, project);
+      }),
+      loadSessionsByProject: vi.fn((projectId: string) => {
+        return Array.from(sessionStore.values()).filter((s) => s.projectId === projectId);
+      }),
 
-// Create a properly typed mock service with inline mocks
-const mockSessionService = {
-  createSession: vi.fn<SessionService['createSession']>(),
-  listSessions: vi.fn<SessionService['listSessions']>(),
-  getSession: vi.fn<SessionService['getSession']>(),
-};
+      // Session persistence methods
+      loadAllSessions: vi.fn(() => {
+        return Array.from(sessionStore.values());
+      }),
+      loadSession: vi.fn((sessionId: string) => {
+        return sessionStore.get(sessionId) || null;
+      }),
+      saveSession: vi.fn((session: any) => {
+        sessionStore.set(session.id, session);
+      }),
 
-// Set up the default mock behavior for getSession - properly typed mock
-mockSessionService.getSession.mockImplementation(
-  async (sessionId: import('@/types/api').ThreadId) => {
-    if (sessionId === 'lace_20240101_session') {
-      // Create a partial mock session with the required methods for testing
-      const mockSessionResult: Record<string, unknown> = {
-        getId: () => mockSessionId,
-        getInfo: () => ({
-          id: mockSessionId,
-          name: 'Test Session',
-          createdAt: new Date('2024-01-01T00:00:00Z'),
-          provider: 'anthropic',
-          model: 'claude-3-5-sonnet-20241022',
-          agents: [],
-        }),
-        getAgents: () => [],
-        getTaskManager: () => mockTaskManager,
-        spawnAgent: vi.fn(),
-        getAgent: () => null,
-        startAgent: vi.fn().mockResolvedValue(undefined),
-        stopAgent: vi.fn(),
-        sendMessage: vi.fn().mockResolvedValue(undefined),
-        destroy: vi.fn(),
-      };
-      // Type assertion is safe here since we're mocking only needed methods for tests
-      return mockSessionResult as never;
-    }
-    return null;
-  }
-);
+      // Thread persistence methods (needed for session functionality)
+      loadThreadEvents: vi.fn(() => []),
+      saveThreadEvents: vi.fn(),
+      deleteThread: vi.fn(),
+    })),
+  };
+});
 
-// ❌ PROBLEMATIC MOCK - This mocks TaskManager and SessionService business logic
-// Should use real services with test database for proper integration testing
-// Tests currently validate mock responses instead of actual API functionality
-vi.mock('@/lib/server/session-service', () => ({
-  getSessionService: () => mockSessionService,
+// Mock ThreadManager for session management - external dependency
+vi.mock('~/threads/thread-manager', () => ({
+  ThreadManager: vi.fn(() => ({
+    getSessionsForProject: vi.fn(() => []), // Empty array for clean tests
+  })),
 }));
+
+// Now using real TaskManager and SessionService for proper integration testing
+// No more mocking of business logic - tests validate real HTTP behavior
 
 describe('Task API Routes', () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+  let testProject: any;
+  let testSession: any;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
     vi.clearAllMocks();
+    // Clear the in-memory stores between tests
+    projectStore.clear();
+    sessionStore.clear();
 
-    // ✅ ESSENTIAL MOCK - Console suppression to prevent test output noise and control log verification  
+    // ✅ ESSENTIAL MOCK - Console suppression to prevent test output noise and control log verification
     // These mocks are necessary for clean test output and error handling verification
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Set up test data: Create a real project and session for task testing
+    const { Project } = await import('@/lib/server/lace-imports');
+    const { getSessionService } = await import('@/lib/server/session-service');
+
+    testProject = Project.create('Test Project', '/test', 'Test project for tasks');
+    const sessionService = getSessionService();
+
+    testSession = await sessionService.createSession(
+      'Test Session',
+      'anthropic',
+      'claude-3-haiku-20240307',
+      testProject.id
+    );
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
-    teardownTestPersistence();
   });
 
   describe('GET /api/tasks', () => {
@@ -104,8 +104,6 @@ describe('Task API Routes', () => {
     });
 
     it('should return 404 if session is not found', async () => {
-      mockSessionService.getSession.mockResolvedValueOnce(null);
-
       const request = new NextRequest(
         'http://localhost:3000/api/tasks?sessionId=lace_20240101_notfound'
       );
@@ -117,83 +115,106 @@ describe('Task API Routes', () => {
     });
 
     it('should return tasks for a valid session', async () => {
-      const mockTasks: Task[] = [
+      // Arrange: Create real tasks using the test session
+      const { getSessionService } = await import('@/lib/server/session-service');
+      const sessionService = getSessionService();
+      const session = await sessionService.getSession(testSession.id);
+
+      if (!session) {
+        throw new Error('Test session not found');
+      }
+
+      const taskManager = session.getTaskManager();
+
+      // Create two real tasks
+      const task1 = await taskManager.createTask(
         {
-          id: 'task_20240101_abc123',
           title: 'Test Task 1',
           description: 'Description 1',
           prompt: 'Prompt 1',
-          status: 'pending',
-          priority: 'high',
-          createdBy: asThreadId('lace_20240101_agent1'),
-          threadId: asThreadId('lace_20240101_session'),
-          createdAt: new Date('2024-01-01T00:00:00Z'),
-          updatedAt: new Date('2024-01-01T00:00:00Z'),
-          notes: [],
+          priority: 'high' as const,
         },
+        { actor: 'human', isHuman: true }
+      );
+
+      const task2 = await taskManager.createTask(
         {
-          id: 'task_20240101_def456',
           title: 'Test Task 2',
           description: 'Description 2',
           prompt: 'Prompt 2',
-          status: 'in_progress',
-          priority: 'medium',
-          assignedTo: asThreadId('lace_20240101_agent2'),
-          createdBy: asThreadId('lace_20240101_agent1'),
-          threadId: asThreadId('lace_20240101_session'),
-          createdAt: new Date('2024-01-01T01:00:00Z'),
-          updatedAt: new Date('2024-01-01T01:00:00Z'),
-          notes: [],
+          priority: 'medium' as const,
         },
-      ];
+        { actor: 'human', isHuman: true }
+      );
 
-      mockTaskManager.getTasks.mockReturnValue(mockTasks);
-
+      // Act: Call the API endpoint with the real session ID
       const request = new NextRequest(
-        'http://localhost:3000/api/tasks?sessionId=lace_20240101_session'
+        `http://localhost:3000/api/tasks?sessionId=${testSession.id}`
       );
       const response = await GET(request);
       const data = (await response.json()) as { tasks: Task[] };
 
+      // Assert: Verify real HTTP response with real task data
       expect(response.status).toBe(200);
       expect(data.tasks).toHaveLength(2);
-      expect(data.tasks[0]).toMatchObject({
-        id: 'task_20240101_abc123',
+
+      // Find tasks by title since IDs are generated
+      const returnedTask1 = data.tasks.find((t) => t.title === 'Test Task 1');
+      const returnedTask2 = data.tasks.find((t) => t.title === 'Test Task 2');
+
+      expect(returnedTask1).toBeDefined();
+      expect(returnedTask1).toMatchObject({
         title: 'Test Task 1',
+        description: 'Description 1',
+        prompt: 'Prompt 1',
         status: 'pending',
         priority: 'high',
+      });
+
+      expect(returnedTask2).toBeDefined();
+      expect(returnedTask2).toMatchObject({
+        title: 'Test Task 2',
+        description: 'Description 2',
+        prompt: 'Prompt 2',
+        status: 'pending',
+        priority: 'medium',
       });
     });
 
     it('should filter tasks by status', async () => {
-      const mockTasks: Task[] = [
+      // Arrange: Create tasks with different statuses
+      const { getSessionService } = await import('@/lib/server/session-service');
+      const sessionService = getSessionService();
+      const session = await sessionService.getSession(testSession.id);
+
+      if (!session) {
+        throw new Error('Test session not found');
+      }
+
+      const taskManager = session.getTaskManager();
+
+      // Create a pending task
+      await taskManager.createTask(
         {
-          id: 'task_20240101_abc123',
           title: 'Pending Task',
-          description: '',
           prompt: 'Test prompt',
-          status: 'pending',
-          priority: 'high',
-          createdBy: asThreadId('lace_20240101_agent1'),
-          threadId: asThreadId('lace_20240101_session'),
-          createdAt: new Date('2024-01-01T00:00:00Z'),
-          updatedAt: new Date('2024-01-01T00:00:00Z'),
-          notes: [],
+          priority: 'high' as const,
         },
-      ];
+        { actor: 'human', isHuman: true }
+      );
 
-      mockTaskManager.getTasks.mockReturnValue(mockTasks);
-
+      // Act: Call API with status filter
       const request = new NextRequest(
-        'http://localhost:3000/api/tasks?sessionId=lace_20240101_session&status=pending'
+        `http://localhost:3000/api/tasks?sessionId=${testSession.id}&status=pending`
       );
       const response = await GET(request);
-      const _data = (await response.json()) as { tasks: Task[] };
+      const data = (await response.json()) as { tasks: Task[] };
 
+      // Assert: Verify filtering worked on real data
       expect(response.status).toBe(200);
-      expect(mockTaskManager.getTasks).toHaveBeenCalledWith({
-        status: 'pending',
-      });
+      expect(data.tasks).toHaveLength(1);
+      expect(data.tasks[0].status).toBe('pending');
+      expect(data.tasks[0].title).toBe('Pending Task');
     });
   });
 
@@ -232,90 +253,73 @@ describe('Task API Routes', () => {
     });
 
     it('should create a new task', async () => {
-      const newTask: Task = {
-        id: 'task_20240101_new123',
+      // Act: Create task via API with real services
+      const request = new NextRequest('http://localhost:3000/api/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          sessionId: testSession.id,
+          title: 'New Task',
+          description: 'New Description',
+          prompt: 'Do something',
+          priority: 'medium',
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const response = await POST(request);
+      const data = (await response.json()) as { task: Task };
+
+      // Assert: Verify real HTTP response with real task creation
+      expect(response.status).toBe(201);
+      expect(data.task).toMatchObject({
         title: 'New Task',
         description: 'New Description',
         prompt: 'Do something',
         status: 'pending',
         priority: 'medium',
-        createdBy: asThreadId('human'),
-        threadId: asThreadId('lace_20240101_session'),
-        createdAt: new Date('2024-01-01T00:00:00Z'),
-        updatedAt: new Date('2024-01-01T00:00:00Z'),
-        notes: [],
-      };
-
-      mockTaskManager.createTask.mockResolvedValue(newTask);
-
-      const request = new NextRequest('http://localhost:3000/api/tasks', {
-        method: 'POST',
-        body: JSON.stringify({
-          sessionId: 'lace_20240101_session',
-          title: 'New Task',
-          description: 'New Description',
-          prompt: 'Do something',
-          priority: 'medium',
-        }),
       });
+      expect(data.task.id).toMatch(/^task_/); // Real task ID generation
+      expect(data.task.createdAt).toBeTruthy();
+      expect(data.task.updatedAt).toBeTruthy();
 
-      const response = await POST(request);
-      const data = (await response.json()) as { task: Task };
+      // Verify task was actually created in the session
+      const { getSessionService } = await import('@/lib/server/session-service');
+      const sessionService = getSessionService();
+      const session = await sessionService.getSession(testSession.id);
+      const taskManager = session?.getTaskManager();
+      const tasks = taskManager?.getTasks();
 
-      expect(response.status).toBe(201);
-      expect(data.task).toMatchObject({
-        id: 'task_20240101_new123',
-        title: 'New Task',
-        status: 'pending',
-      });
-      expect(mockTaskManager.createTask).toHaveBeenCalledWith(
-        {
-          title: 'New Task',
-          description: 'New Description',
-          prompt: 'Do something',
-          priority: 'medium',
-        },
-        {
-          actor: 'human',
-          isHuman: true,
-        }
-      );
+      const createdTask = tasks?.find((t) => t.title === 'New Task');
+      expect(createdTask).toBeDefined();
+      expect(createdTask?.description).toBe('New Description');
     });
 
     it('should create task with assignment', async () => {
-      const newTask: Task = {
-        id: 'task_20240101_new123',
-        title: 'Assigned Task',
-        description: '',
-        prompt: 'Do something',
-        status: 'pending',
-        priority: 'high',
-        assignedTo: asThreadId('lace_20240101_agent1'),
-        createdBy: asThreadId('human'),
-        threadId: asThreadId('lace_20240101_session'),
-        createdAt: new Date('2024-01-01T00:00:00Z'),
-        updatedAt: new Date('2024-01-01T00:00:00Z'),
-        notes: [],
-      };
-
-      mockTaskManager.createTask.mockResolvedValue(newTask);
-
+      // Act: Create assigned task via API
       const request = new NextRequest('http://localhost:3000/api/tasks', {
         method: 'POST',
         body: JSON.stringify({
-          sessionId: 'lace_20240101_session',
+          sessionId: testSession.id,
           title: 'Assigned Task',
           prompt: 'Do something',
           priority: 'high',
           assignedTo: 'lace_20240101_agent1',
         }),
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await POST(request);
       const data = (await response.json()) as { task: Task };
 
+      // Assert: Verify task assignment worked
       expect(response.status).toBe(201);
-      expect(data.task.assignedTo).toBe('lace_20240101_agent1');
+      expect(data.task).toMatchObject({
+        title: 'Assigned Task',
+        prompt: 'Do something',
+        priority: 'high',
+        assignedTo: 'lace_20240101_agent1',
+        status: 'pending',
+      });
     });
   });
 });

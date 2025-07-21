@@ -30,50 +30,33 @@ vi.mock('~/providers/registry', () => ({
   },
 }));
 
-// Mock tools to avoid file system dependencies
-vi.mock('~/tools/implementations/bash', () => ({
-  BashTool: vi.fn(() => ({ name: 'bash' })),
+// Mock external dependencies that require system calls or network access
+// - File system operations are mocked to avoid disk I/O during tests
+vi.mock('fs/promises', () => ({
+  default: {
+    readFile: vi.fn(),
+    writeFile: vi.fn(),
+    mkdir: vi.fn(),
+    readdir: vi.fn(),
+  },
+  readFile: vi.fn(),
+  writeFile: vi.fn(),
+  mkdir: vi.fn(),
+  readdir: vi.fn(),
 }));
 
-vi.mock('~/tools/implementations/file-read', () => ({
-  FileReadTool: vi.fn(() => ({ name: 'file-read' })),
+// - Process operations are mocked to avoid spawning real processes
+vi.mock('child_process', () => ({
+  default: {
+    spawn: vi.fn(),
+    exec: vi.fn(),
+  },
+  spawn: vi.fn(),
+  exec: vi.fn(),
 }));
 
-vi.mock('~/tools/implementations/file-write', () => ({
-  FileWriteTool: vi.fn(() => ({ name: 'file-write' })),
-}));
-
-vi.mock('~/tools/implementations/file-edit', () => ({
-  FileEditTool: vi.fn(() => ({ name: 'file-edit' })),
-}));
-
-vi.mock('~/tools/implementations/file-insert', () => ({
-  FileInsertTool: vi.fn(() => ({ name: 'file-insert' })),
-}));
-
-vi.mock('~/tools/implementations/file-list', () => ({
-  FileListTool: vi.fn(() => ({ name: 'file-list' })),
-}));
-
-vi.mock('~/tools/implementations/ripgrep-search', () => ({
-  RipgrepSearchTool: vi.fn(() => ({ name: 'ripgrep-search' })),
-}));
-
-vi.mock('~/tools/implementations/file-find', () => ({
-  FileFindTool: vi.fn(() => ({ name: 'file-find' })),
-}));
-
-vi.mock('~/tools/implementations/delegate', () => ({
-  DelegateTool: vi.fn(() => ({ name: 'delegate' })),
-}));
-
-vi.mock('~/tools/implementations/url-fetch', () => ({
-  UrlFetchTool: vi.fn(() => ({ name: 'url-fetch' })),
-}));
-
-vi.mock('~/tools/implementations/task-manager', () => ({
-  createTaskManagerTools: vi.fn(() => []),
-}));
+// - Network operations are mocked to avoid external requests
+vi.mock('node-fetch', () => vi.fn());
 
 describe('Session Configuration Integration', () => {
   let testProject: Project;
