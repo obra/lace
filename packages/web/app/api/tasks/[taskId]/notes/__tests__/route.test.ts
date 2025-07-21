@@ -1,9 +1,6 @@
 // ABOUTME: Unit tests for task notes API endpoints
 // ABOUTME: Tests adding notes to tasks
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';

@@ -200,8 +200,7 @@ describe('Session.spawnAgent Method', () => {
     expect(sessionThreadManager).toBeDefined();
 
     // Create another thread and make it current
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const otherThreadId: ThreadId = sessionThreadManager.createThread() as ThreadId;
+    const otherThreadId = asThreadId(sessionThreadManager.createThread());
     sessionThreadManager.setCurrentThread(otherThreadId);
 
     // Verify the delegate thread is still accessible

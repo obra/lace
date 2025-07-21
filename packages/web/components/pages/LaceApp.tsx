@@ -109,9 +109,36 @@ export function LaceApp() {
   });
 
   const [projects] = useState<Project[]>([
-    { id: 1, name: 'AI Research', path: '/projects/ai-research' },
-    { id: 2, name: 'Web App', path: '/projects/webapp' },
-    { id: 3, name: 'Data Pipeline', path: '/projects/data-pipeline' },
+    { 
+      id: 'ai-research-project',
+      name: 'AI Research',
+      description: 'Advanced AI research and development project',
+      workingDirectory: '/projects/ai-research',
+      isArchived: false,
+      createdAt: new Date('2024-01-01T08:00:00Z'),
+      lastUsedAt: new Date('2024-01-15T10:00:00Z'),
+      sessionCount: 42,
+    },
+    { 
+      id: 'web-app-project',
+      name: 'Web App',
+      description: 'Full-stack web application development',
+      workingDirectory: '/projects/webapp',
+      isArchived: false,
+      createdAt: new Date('2023-12-20T10:00:00Z'),
+      lastUsedAt: new Date('2024-01-14T15:30:00Z'),
+      sessionCount: 28,
+    },
+    { 
+      id: 'data-pipeline-project',
+      name: 'Data Pipeline',
+      description: 'ETL data processing pipeline',
+      workingDirectory: '/projects/data-pipeline',
+      isArchived: false,
+      createdAt: new Date('2023-11-15T12:00:00Z'),
+      lastUsedAt: new Date('2024-01-13T09:15:00Z'),
+      sessionCount: 32,
+    },
   ]);
 
   const [currentTimeline, setCurrentTimeline] = useState<Timeline>({

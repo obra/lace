@@ -1,9 +1,6 @@
 // ABOUTME: Test suite for individual session API endpoints - GET/PATCH/DELETE operations
 // ABOUTME: Tests session ownership validation and proper CRUD operations within project context
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
 import { NextRequest } from 'next/server';
 import { describe, it, expect, vi, beforeEach } from 'vitest';

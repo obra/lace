@@ -36,8 +36,8 @@ describe('Session API endpoints under projects', () => {
   let mockProject: MockProject;
 
   beforeEach(() => {
-    const getSessionsMock = vi.fn<[], unknown[]>();
-    const createSessionMock = vi.fn<[string, string, Record<string, unknown>], unknown>();
+    const getSessionsMock = vi.fn();
+    const createSessionMock = vi.fn();
     
     mockProject = {
       getSessions: getSessionsMock,
