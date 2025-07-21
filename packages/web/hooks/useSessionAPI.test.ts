@@ -223,7 +223,10 @@ describe('useSessionAPI', () => {
       });
 
       expect(agent).toEqual(mockAgent);
-      expect(global.fetch).toHaveBeenCalledWith(`/api/sessions/${sessionId}/agents`, {
+      // Verify correct agent creation request was made
+      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(fetchCall[0]).toBe(`/api/sessions/${sessionId}/agents`);
+      expect(fetchCall[1]).toEqual({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -291,7 +294,9 @@ describe('useSessionAPI', () => {
       });
 
       expect(agents).toEqual(mockAgents);
-      expect(global.fetch).toHaveBeenCalledWith(`/api/sessions/${sessionId}/agents`);
+      // Verify agents list request was made correctly
+      const requestUrl = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(requestUrl).toBe(`/api/sessions/${sessionId}/agents`);
     });
   });
 
@@ -317,7 +322,10 @@ describe('useSessionAPI', () => {
       });
 
       expect(success).toBe(true);
-      expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${threadId}/message`, {
+      // Verify message sending request was made correctly
+      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(fetchCall[0]).toBe(`/api/threads/${threadId}/message`);
+      expect(fetchCall[1]).toEqual({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: 'Hello, assistant!' }),

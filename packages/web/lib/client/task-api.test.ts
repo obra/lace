@@ -22,7 +22,7 @@ describe('TaskAPIClient', () => {
   });
 
   describe('listTasks', () => {
-    it('should fetch tasks for a session', async () => {
+    it('should return tasks for a session', async () => {
       const mockTasks: Partial<Task>[] = [
         {
           id: 'task_20240101_abc123',
@@ -47,11 +47,13 @@ describe('TaskAPIClient', () => {
 
       const tasks = await client.listTasks('lace_20240101_session');
 
-      expect(global.fetch).toHaveBeenCalledWith('/api/tasks?sessionId=lace_20240101_session');
+      // Verify correct URL was constructed and result was returned
+      const fetchCall = vi.mocked(global.fetch).mock.calls[0];
+      expect(fetchCall[0]).toBe('/api/tasks?sessionId=lace_20240101_session');
       expect(tasks).toEqual(mockTasks);
     });
 
-    it('should include filters in query params', async () => {
+    it('should construct URL with filter parameters', async () => {
       const mockResponse = {
         ok: true,
         json: vi.fn().mockResolvedValue({ tasks: [] }),
@@ -64,12 +66,13 @@ describe('TaskAPIClient', () => {
         priority: 'high',
       });
 
-      const call = vi.mocked(global.fetch).mock.calls[0][0] as string;
-      expect(call).toContain('/api/tasks?');
-      expect(call).toContain('sessionId=lace_20240101_session');
-      expect(call).toContain('status=pending');
-      expect(call).toContain('assignedTo=lace_20240101_agent1');
-      expect(call).toContain('priority=high');
+      // Verify URL includes all filter parameters
+      const requestUrl = vi.mocked(global.fetch).mock.calls[0][0] as string;
+      expect(requestUrl).toContain('/api/tasks?');
+      expect(requestUrl).toContain('sessionId=lace_20240101_session');
+      expect(requestUrl).toContain('status=pending');
+      expect(requestUrl).toContain('assignedTo=lace_20240101_agent1');
+      expect(requestUrl).toContain('priority=high');
     });
 
     it('should throw error on failed request', async () => {
@@ -115,7 +118,10 @@ describe('TaskAPIClient', () => {
         priority: 'medium',
       });
 
-      expect(global.fetch).toHaveBeenCalledWith('/api/tasks', {
+      // Verify POST request was made with correct data
+      const fetchCall = vi.mocked(global.fetch).mock.calls[0];
+      expect(fetchCall[0]).toBe('/api/tasks');
+      expect(fetchCall[1]).toEqual({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -178,9 +184,9 @@ describe('TaskAPIClient', () => {
 
       const task = await client.getTask('lace_20240101_session', 'task_20240101_abc123');
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/tasks/task_20240101_abc123?sessionId=lace_20240101_session'
-      );
+      // Verify GET request URL construction
+      const requestUrl = vi.mocked(global.fetch).mock.calls[0][0] as string;
+      expect(requestUrl).toBe('/api/tasks/task_20240101_abc123?sessionId=lace_20240101_session');
       expect(task).toEqual(mockTask);
     });
   });
@@ -214,7 +220,10 @@ describe('TaskAPIClient', () => {
         priority: 'low',
       });
 
-      expect(global.fetch).toHaveBeenCalledWith('/api/tasks/task_20240101_abc123', {
+      // Verify PATCH request was made with correct data
+      const fetchCall = vi.mocked(global.fetch).mock.calls[0];
+      expect(fetchCall[0]).toBe('/api/tasks/task_20240101_abc123');
+      expect(fetchCall[1]).toEqual({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -239,12 +248,10 @@ describe('TaskAPIClient', () => {
 
       await client.deleteTask('lace_20240101_session', 'task_20240101_abc123');
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/tasks/task_20240101_abc123?sessionId=lace_20240101_session',
-        {
-          method: 'DELETE',
-        }
-      );
+      // Verify DELETE request was made correctly
+      const fetchCall = vi.mocked(global.fetch).mock.calls[0];
+      expect(fetchCall[0]).toBe('/api/tasks/task_20240101_abc123?sessionId=lace_20240101_session');
+      expect(fetchCall[1]).toEqual({ method: 'DELETE' });
     });
 
     it('should throw error on failed deletion', async () => {
@@ -295,7 +302,10 @@ describe('TaskAPIClient', () => {
         'This is a new note'
       );
 
-      expect(global.fetch).toHaveBeenCalledWith('/api/tasks/task_20240101_abc123/notes', {
+      // Verify POST request for note was made correctly
+      const fetchCall = vi.mocked(global.fetch).mock.calls[0];
+      expect(fetchCall[0]).toBe('/api/tasks/task_20240101_abc123/notes');
+      expect(fetchCall[1]).toEqual({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
