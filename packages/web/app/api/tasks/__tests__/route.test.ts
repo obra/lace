@@ -33,8 +33,6 @@ const mockSessionService = {
   createSession: vi.fn<SessionService['createSession']>(),
   listSessions: vi.fn<SessionService['listSessions']>(),
   getSession: vi.fn<SessionService['getSession']>(),
-  spawnAgent: vi.fn<SessionService['spawnAgent']>(),
-  getAgent: vi.fn<SessionService['getAgent']>(),
 };
 
 // Set up the default mock behavior for getSession - properly typed mock

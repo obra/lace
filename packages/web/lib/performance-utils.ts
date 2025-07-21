@@ -4,7 +4,7 @@
 import { type HighlightResult } from './syntax-highlighting';
 
 // Cache for highlighted code
-const highlightCache = new Map<string, HighlightResult>();
+const _highlightCache = new Map<string, HighlightResult>();
 const MAX_CACHE_SIZE = 1000;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 

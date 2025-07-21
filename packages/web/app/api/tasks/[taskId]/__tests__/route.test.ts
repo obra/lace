@@ -103,7 +103,7 @@ describe('Task [taskId] API Routes', () => {
   describe('GET /api/tasks/[taskId]', () => {
     it('should return 400 if sessionId is missing', async () => {
       const request = new NextRequest('http://localhost:3000/api/tasks/task_20240101_abc123');
-      const response = await GET(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
+      const response = await GET(request, { params: { taskId: 'task_20240101_abc123' } });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
@@ -159,7 +159,7 @@ describe('Task [taskId] API Routes', () => {
       const request = new NextRequest(
         'http://localhost:3000/api/tasks/task_20240101_abc123?sessionId=lace_20240101_session'
       );
-      const response = await GET(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
+      const response = await GET(request, { params: { taskId: 'task_20240101_abc123' } });
       const data = (await response.json()) as { task: unknown };
 
       expect(response.status).toBe(200);
@@ -184,7 +184,7 @@ describe('Task [taskId] API Routes', () => {
         body: JSON.stringify({ status: 'completed' }),
       });
 
-      const response = await PATCH(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
+      const response = await PATCH(request, { params: { taskId: 'task_20240101_abc123' } });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
@@ -220,7 +220,7 @@ describe('Task [taskId] API Routes', () => {
         }),
       });
 
-      const response = await PATCH(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
+      const response = await PATCH(request, { params: { taskId: 'task_20240101_abc123' } });
       const data = (await response.json()) as { task: { status: string } };
 
       expect(response.status).toBe(200);
@@ -263,7 +263,7 @@ describe('Task [taskId] API Routes', () => {
         }),
       });
 
-      const response = await PATCH(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
+      const response = await PATCH(request, { params: { taskId: 'task_20240101_abc123' } });
       const data = (await response.json()) as { task: { assignedTo: string } };
 
       expect(response.status).toBe(200);
@@ -302,7 +302,7 @@ describe('Task [taskId] API Routes', () => {
         }),
       });
 
-      const response = await PATCH(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
+      const response = await PATCH(request, { params: { taskId: 'task_20240101_abc123' } });
       const data = (await response.json()) as { task: unknown };
 
       expect(response.status).toBe(200);
@@ -321,7 +321,7 @@ describe('Task [taskId] API Routes', () => {
         method: 'DELETE',
       });
 
-      const response = await DELETE(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
+      const response = await DELETE(request, { params: { taskId: 'task_20240101_abc123' } });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
@@ -338,7 +338,7 @@ describe('Task [taskId] API Routes', () => {
         }
       );
 
-      const response = await DELETE(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
+      const response = await DELETE(request, { params: { taskId: 'task_20240101_abc123' } });
       const data = (await response.json()) as { message: string };
 
       expect(response.status).toBe(200);

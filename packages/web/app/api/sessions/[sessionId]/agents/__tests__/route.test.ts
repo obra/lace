@@ -406,7 +406,7 @@ describe('Agent Spawning API', () => {
         agents: [firstAgent],
       });
 
-      secondMockSession.spawnAgent.mockReturnValue(secondAgent);
+      secondMockSession.spawnAgent.mockResolvedValue(secondAgent);
       mockSessionService.getSession.mockResolvedValueOnce(
         secondMockSession as unknown as Session
       );
