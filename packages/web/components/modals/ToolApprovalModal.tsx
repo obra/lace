@@ -86,7 +86,7 @@ export function ToolApprovalModal({ request, onDecision, onTimeout }: ToolApprov
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
         {/* Header */}
         <div className="flex justify-between items-start mb-4">
           <div>
@@ -149,7 +149,7 @@ export function ToolApprovalModal({ request, onDecision, onTimeout }: ToolApprov
         </div>
 
         {/* Parameters */}
-        <div className="flex-1 overflow-auto mb-4">
+        <div className="flex-1 overflow-auto mb-4 min-h-0">
           <h4 className="text-sm font-semibold text-base-content/70 mb-2">Parameters:</h4>
           <div className="mockup-code">
             <pre className="text-sm"><code>{formatInput(request.input)}</code></pre>
