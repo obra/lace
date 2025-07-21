@@ -7,7 +7,9 @@
       "Bash(git commit:*)",
       "Bash(npx:*)",
       "Bash(npm --prefix /Users/jesse/Documents/GitHub/lace/.worktrees/f-integrate-spicy-web run typecheck)",
-      "Bash(npm --prefix /Users/jesse/Documents/GitHub/lace/.worktrees/f-integrate-spicy-web test)"
+      "Bash(npm --prefix /Users/jesse/Documents/GitHub/lace/.worktrees/f-integrate-spicy-web test)",
+      "Bash(npm test:*)",
+      "mcp__secret-journal__process_thoughts"
     ],
     "deny": []
   }

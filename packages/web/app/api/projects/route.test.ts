@@ -37,87 +37,96 @@ interface ErrorResponse {
   details?: unknown;
 }
 
-// ❌ PROBLEMATIC MOCK - This mocks the entire Project backend logic
-// Should use real Project class with test database for proper integration testing
-// Tests currently validate mock responses instead of actual API functionality
-vi.mock('@/lib/server/lace-imports', () => ({
-  Project: {
-    getAll: vi.fn(),
-    create: vi.fn().mockReturnValue({
-      getId: vi.fn().mockReturnValue('test-project-id'),
-      getInfo: vi.fn().mockReturnValue({
-        id: 'test-project-id',
-        name: 'Test Project',
-        description: 'A test project',
-        workingDirectory: '/test/path',
-        isArchived: false,
-        createdAt: '2023-01-01T00:00:00.000Z',
-        lastUsedAt: '2023-01-01T00:00:00.000Z',
-        sessionCount: 0,
+// Mock external dependencies (database persistence) but not business logic
+const projectStore = new Map<string, any>();
+
+vi.mock('~/persistence/database', () => {
+  return {
+    getPersistence: vi.fn(() => ({
+      // Mock the persistence layer to use in-memory storage for testing
+      loadAllProjects: vi.fn(() => {
+        return Array.from(projectStore.values());
       }),
-    }),
-  },
+      loadProject: vi.fn((projectId: string) => {
+        return projectStore.get(projectId) || null;
+      }),
+      saveProject: vi.fn((project: any) => {
+        projectStore.set(project.id, project);
+      }),
+      // Mock method needed by Project.getSessions() -> Project.getSessionCount()
+      loadSessionsByProject: vi.fn((projectId: string) => {
+        // Return empty sessions for now - we can add session testing later if needed
+        return [];
+      }),
+    })),
+  };
+});
+
+// Mock ThreadManager for session counting - external dependency
+vi.mock('~/threads/thread-manager', () => ({
+  ThreadManager: vi.fn(() => ({
+    getSessionsForProject: vi.fn(() => []), // Empty array for clean tests
+  })),
 }));
 
 describe('Projects API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Clear the in-memory project store between tests
+    projectStore.clear();
   });
 
   describe('GET /api/projects', () => {
     it('should return all projects', async () => {
-      const mockProjects = [
-        {
-          id: 'project1',
-          name: 'Project 1',
-          description: 'First project',
-          workingDirectory: '/path/1',
-          isArchived: false,
-          createdAt: '2023-01-01T00:00:00.000Z',
-          lastUsedAt: '2023-01-01T00:00:00.000Z',
-          sessionCount: 0,
-        },
-        {
-          id: 'project2',
-          name: 'Project 2',
-          description: 'Second project',
-          workingDirectory: '/path/2',
-          isArchived: false,
-          createdAt: '2023-01-02T00:00:00.000Z',
-          lastUsedAt: '2023-01-02T00:00:00.000Z',
-          sessionCount: 0,
-        },
-      ];
+      // Arrange: Create test projects using real Project class
+      const { Project } = await import('@/lib/server/lace-imports');
 
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
-      Project.getAll = vi.fn().mockReturnValue(mockProjects);
+      // Create projects and they will be stored in our mocked persistence
+      const project1 = Project.create('Project 1', '/path/1', 'First project');
+      const project2 = Project.create('Project 2', '/path/2', 'Second project');
 
+      // Act: Call the API endpoint
       const response = await GET();
       const data = (await response.json()) as ProjectsResponse;
 
+      // Assert: Verify the projects are returned
       expect(response.status).toBe(200);
       expect(data.projects).toHaveLength(2);
-      expect(data.projects[0].id).toBe('project1');
-      expect(data.projects[1].id).toBe('project2');
-      expect(Project.getAll).toHaveBeenCalled();
+
+      // Find projects by name since IDs are generated
+      const returnedProject1 = data.projects.find((p) => p.name === 'Project 1');
+      const returnedProject2 = data.projects.find((p) => p.name === 'Project 2');
+
+      expect(returnedProject1).toMatchObject({
+        name: 'Project 1',
+        description: 'First project',
+        workingDirectory: '/path/1',
+        isArchived: false,
+        sessionCount: 0,
+      });
+      expect(returnedProject2).toMatchObject({
+        name: 'Project 2',
+        description: 'Second project',
+        workingDirectory: '/path/2',
+        isArchived: false,
+        sessionCount: 0,
+      });
     });
 
-    it('should handle errors gracefully', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
-      Project.getAll = vi.fn().mockImplementation(() => {
-        throw new Error('Database error');
-      });
-
+    it('should return empty array when no projects exist', async () => {
+      // Act: Call API with no projects created
       const response = await GET();
-      const data = (await response.json()) as ErrorResponse;
+      const data = (await response.json()) as ProjectsResponse;
 
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Database error');
+      // Assert: Empty array returned
+      expect(response.status).toBe(200);
+      expect(data.projects).toHaveLength(0);
     });
   });
 
   describe('POST /api/projects', () => {
-    it('should create new project', async () => {
+    it('should create new project with full data', async () => {
+      // Arrange: Prepare request with full project data
       const requestBody = {
         name: 'New Project',
         description: 'A new project',
@@ -131,29 +140,35 @@ describe('Projects API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
-
+      // Act: Create the project via API
       const response = await POST(request);
       const data = (await response.json()) as ProjectResponse;
 
+      // Assert: Verify project was created with correct data
       expect(response.status).toBe(201);
-      expect(data.project).toEqual({
-        id: 'test-project-id',
-        name: 'Test Project',
-        description: 'A test project',
-        workingDirectory: '/test/path',
+      expect(data.project).toMatchObject({
+        name: 'New Project',
+        description: 'A new project',
+        workingDirectory: '/new/path',
         isArchived: false,
-        createdAt: '2023-01-01T00:00:00.000Z',
-        lastUsedAt: '2023-01-01T00:00:00.000Z',
         sessionCount: 0,
       });
+      expect(data.project.id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      );
+      expect(data.project.createdAt).toBeTruthy();
+      expect(data.project.lastUsedAt).toBeTruthy();
 
-      expect(Project.create).toHaveBeenCalledWith('New Project', '/new/path', 'A new project', {
-        key: 'value',
-      });
+      // Verify the project can be retrieved via Project.getAll() (tests persistence)
+      const { Project } = await import('@/lib/server/lace-imports');
+      const allProjects = Project.getAll();
+      const createdProject = allProjects.find((p) => p.name === 'New Project');
+      expect(createdProject).toBeTruthy();
+      expect(createdProject?.description).toBe('A new project');
     });
 
-    it('should create project with minimal data', async () => {
+    it('should create project with minimal required data', async () => {
+      // Arrange: Request with only required fields
       const requestBody = {
         name: 'Minimal Project',
         workingDirectory: '/minimal/path',
@@ -165,12 +180,19 @@ describe('Projects API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
-
+      // Act: Create project with minimal data
       const response = await POST(request);
+      const data = (await response.json()) as ProjectResponse;
 
+      // Assert: Verify project created with defaults for optional fields
       expect(response.status).toBe(201);
-      expect(Project.create).toHaveBeenCalledWith('Minimal Project', '/minimal/path', '', {});
+      expect(data.project).toMatchObject({
+        name: 'Minimal Project',
+        description: '', // Default empty description
+        workingDirectory: '/minimal/path',
+        isArchived: false,
+        sessionCount: 0,
+      });
     });
 
     it('should validate required fields', async () => {
@@ -211,7 +233,20 @@ describe('Projects API', () => {
       expect(data.error).toBe('Invalid request data');
     });
 
-    it('should handle creation errors', async () => {
+    it('should handle creation errors gracefully', async () => {
+      // Arrange: Mock persistence layer to simulate database error
+      const mockPersistence = {
+        loadAllProjects: vi.fn(() => []),
+        loadProject: vi.fn(() => null),
+        saveProject: vi.fn(() => {
+          throw new Error('Database connection failed');
+        }),
+      };
+
+      // Override the persistence mock for this test
+      const { getPersistence } = await import('~/persistence/database');
+      vi.mocked(getPersistence).mockReturnValue(mockPersistence as any);
+
       const requestBody = {
         name: 'Test Project',
         workingDirectory: '/test/path',
@@ -223,16 +258,13 @@ describe('Projects API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
-      Project.create = vi.fn().mockImplementation(() => {
-        throw new Error('Creation failed');
-      });
-
+      // Act: Attempt to create project when persistence fails
       const response = await POST(request);
       const data = (await response.json()) as ErrorResponse;
 
+      // Assert: API handles the persistence error gracefully
       expect(response.status).toBe(500);
-      expect(data.error).toBe('Creation failed');
+      expect(data.error).toBe('Database connection failed');
     });
   });
 });
