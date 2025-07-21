@@ -12,6 +12,7 @@ import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import { VoiceRecognitionUI } from '@/components/ui/VoiceRecognitionUI';
 import { TimelineEntry, Project, Timeline, Task, RecentFile } from '@/types';
+import { asThreadId } from '@/lib/server/core-types';
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
 import {
   pageTransition,
@@ -131,10 +132,10 @@ export function AnimatedLaceApp() {
       description: 'Integrate latest language model',
       prompt: 'Integrate the latest language model API with our existing codebase, ensuring proper error handling and performance optimization',
       priority: 'high',
-      assignedTo: 'claude-agent-thread-id',
+      assignedTo: asThreadId('lace_20240115_claude001'),
       status: 'in_progress',
-      createdBy: 'session-main-thread',
-      threadId: 'session-main',
+      createdBy: asThreadId('lace_20240115_session001'),
+      threadId: asThreadId('lace_20240115_session001'),
       createdAt: new Date('2024-01-15T09:00:00Z'),
       updatedAt: new Date('2024-01-15T10:30:00Z'),
       notes: [],
@@ -147,8 +148,8 @@ export function AnimatedLaceApp() {
       priority: 'medium',
       assignedTo: undefined,
       status: 'pending',
-      createdBy: 'session-main-thread',
-      threadId: 'session-main',
+      createdBy: asThreadId('lace_20240115_session001'),
+      threadId: asThreadId('lace_20240115_session001'),
       createdAt: new Date('2024-01-14T14:00:00Z'),
       updatedAt: new Date('2024-01-14T14:00:00Z'),
       notes: [],
@@ -159,10 +160,10 @@ export function AnimatedLaceApp() {
       description: 'API documentation',
       prompt: 'Update the API documentation to reflect the recent changes in authentication endpoints and response formats',
       priority: 'low',
-      assignedTo: 'claude-agent-thread-id',
+      assignedTo: asThreadId('lace_20240115_claude001'),
       status: 'blocked',
-      createdBy: 'session-main-thread',
-      threadId: 'session-main',
+      createdBy: asThreadId('lace_20240115_session001'),
+      threadId: asThreadId('lace_20240115_session001'),
       createdAt: new Date('2024-01-13T16:00:00Z'),
       updatedAt: new Date('2024-01-13T16:30:00Z'),
       notes: [],

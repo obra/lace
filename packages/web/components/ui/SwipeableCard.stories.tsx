@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj, StoryContext } from '@storybook/react';
 import React, { useState } from 'react';
 import { SwipeableCard, SwipeableTimelineMessage, PullToRefresh, FloatingActionButton, LongPress } from './SwipeableCard';
 
@@ -407,17 +407,17 @@ export const InteractiveDemo: Story = {
         
         <div className="cursor-pointer">
           <h4 className="font-medium mb-3">Long Press</h4>
-          {LongPressDemo.render ? (LongPressDemo.render as () => React.ReactElement)() : <div>Long Press Demo</div>}
+          {LongPressDemo.render ? LongPressDemo.render(LongPressDemo.args || {}, {} as StoryContext) : <div>Long Press Demo</div>}
         </div>
         
         <div className="cursor-pointer">
           <h4 className="font-medium mb-3">Floating Action Button</h4>
-          {FloatingActionButtonDemo.render ? (FloatingActionButtonDemo.render as () => React.ReactElement)() : <div>Floating Action Button Demo</div>}
+          {FloatingActionButtonDemo.render ? FloatingActionButtonDemo.render(FloatingActionButtonDemo.args || {}, {} as StoryContext) : <div>Floating Action Button Demo</div>}
         </div>
         
         <div className="cursor-pointer">
           <h4 className="font-medium mb-3">Pull to Refresh</h4>
-          {PullToRefreshDemo.render ? (PullToRefreshDemo.render as () => React.ReactElement)() : <div>Pull to Refresh Demo</div>}
+          {PullToRefreshDemo.render ? PullToRefreshDemo.render(PullToRefreshDemo.args || {}, {} as StoryContext) : <div>Pull to Refresh Demo</div>}
         </div>
       </div>
       

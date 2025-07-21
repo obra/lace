@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj, StoryContext } from '@storybook/react';
 import React, { useState, useEffect } from 'react';
 import SkeletonLoader, { DocumentSkeleton } from './SkeletonLoader';
 
@@ -376,16 +376,16 @@ export const InteractiveDemo: Story = {
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="cursor-pointer">
-          {LoadingSimulation.render ? LoadingSimulation.render() : <div>Loading Simulation</div>}
+          {LoadingSimulation.render ? LoadingSimulation.render(LoadingSimulation.args || {}, {} as StoryContext) : <div>Loading Simulation</div>}
         </div>
         
         <div className="cursor-pointer">
-          {DocumentSkeletonDemo.render ? DocumentSkeletonDemo.render() : <div>Document Skeleton Demo</div>}
+          {DocumentSkeletonDemo.render ? DocumentSkeletonDemo.render(DocumentSkeletonDemo.args || {}, {} as StoryContext) : <div>Document Skeleton Demo</div>}
         </div>
       </div>
       
       <div className="cursor-pointer">
-        {CardSkeletons.render ? CardSkeletons.render() : <div>Card Skeletons</div>}
+        {CardSkeletons.render ? CardSkeletons.render(CardSkeletons.args || {}, {} as StoryContext) : <div>Card Skeletons</div>}
       </div>
       
       <div className="text-sm text-gray-600 space-y-1">

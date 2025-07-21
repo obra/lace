@@ -13,6 +13,7 @@ import { StreamingIndicator } from '@/components/ui/StreamingIndicator';
 import { DragDropOverlay } from '@/components/ui/DragDropOverlay';
 import { AttachedFile } from '@/components/ui/FileAttachment';
 import { TimelineEntry, Project, Timeline, Task, RecentFile, StreamEvent } from '@/types';
+import { asThreadId, asNewAgentSpec, type ThreadId } from '@/lib/server/core-types';
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
 import { useConversationStream } from '@/hooks/useConversationStream';
 
@@ -170,17 +171,17 @@ export function LaceApp() {
       description: 'Integrate latest language model',
       prompt: 'Integrate the latest language model into our AI system with proper error handling and performance optimization',
       priority: 'high',
-      assignedTo: 'claude-agent',
+      assignedTo: asThreadId('lace_20240115_agent001.1'),
       status: 'in_progress',
-      createdBy: 'session-001',
-      threadId: 'session-001.1',
+      createdBy: asThreadId('lace_20240115_session001'),
+      threadId: asThreadId('lace_20240115_session001'),
       createdAt: new Date('2024-01-15T08:00:00Z'),
       updatedAt: new Date('2024-01-15T10:30:00Z'),
       notes: [
         {
           id: 'note-001',
           content: 'Started integration process, reviewing API compatibility',
-          author: 'session-001.1',
+          author: asThreadId('lace_20240115_agent001.1'),
           createdAt: new Date('2024-01-15T09:15:00Z'),
         },
       ],
@@ -191,10 +192,10 @@ export function LaceApp() {
       description: 'Fix login timeout',
       prompt: 'Fix the authentication system timeout issue that is causing users to be logged out prematurely',
       priority: 'medium',
-      assignedTo: 'human-developer',
+      assignedTo: 'human',
       status: 'pending',
-      createdBy: 'session-002',
-      threadId: 'session-002.1',
+      createdBy: asThreadId('lace_20240114_session002'),
+      threadId: asThreadId('lace_20240114_session002'),
       createdAt: new Date('2024-01-14T14:00:00Z'),
       updatedAt: new Date('2024-01-14T14:00:00Z'),
       notes: [],
@@ -205,17 +206,17 @@ export function LaceApp() {
       description: 'API documentation',
       prompt: 'Update the API documentation to reflect the latest changes and add examples for new endpoints',
       priority: 'low',
-      assignedTo: 'claude-agent',
+      assignedTo: asNewAgentSpec('new:anthropic/claude-3-sonnet'),
       status: 'blocked',
-      createdBy: 'session-003',
-      threadId: 'session-003.1',
+      createdBy: asThreadId('lace_20240113_session003'),
+      threadId: asThreadId('lace_20240113_session003'),
       createdAt: new Date('2024-01-13T16:30:00Z'),
       updatedAt: new Date('2024-01-14T12:00:00Z'),
       notes: [
         {
           id: 'note-002',
           content: 'Waiting for API changes to be finalized before updating documentation',
-          author: 'session-003.1',
+          author: asThreadId('lace_20240113_session003'),
           createdAt: new Date('2024-01-14T12:00:00Z'),
         },
       ],

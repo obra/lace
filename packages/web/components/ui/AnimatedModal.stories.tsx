@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj, StoryContext } from '@storybook/react';
 import { useState } from 'react';
 import { AnimatedModal, AnimatedConfirmModal } from './AnimatedModal';
 
@@ -486,21 +486,21 @@ export const InteractiveDemo: Story = {
         </div>
         
         <div className="cursor-pointer">
-          {FormModal.render ? FormModal.render({} as Parameters<NonNullable<typeof FormModal.render>>[0]) : <div>Form Modal</div>}
+          {FormModal.render ? FormModal.render(FormModal.args || {}, {} as StoryContext) : <div>Form Modal</div>}
         </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="cursor-pointer">
-          {ConfirmModal.render ? ConfirmModal.render({} as Parameters<NonNullable<typeof ConfirmModal.render>>[0]) : <div>Confirm Modal</div>}
+          {ConfirmModal.render ? ConfirmModal.render(ConfirmModal.args || {}, {} as StoryContext) : <div>Confirm Modal</div>}
         </div>
         
         <div className="cursor-pointer">
-          {WarningModal.render ? WarningModal.render({} as Parameters<NonNullable<typeof WarningModal.render>>[0]) : <div>Warning Modal</div>}
+          {WarningModal.render ? WarningModal.render(WarningModal.args || {}, {} as StoryContext) : <div>Warning Modal</div>}
         </div>
         
         <div className="cursor-pointer">
-          {InfoModal.render ? InfoModal.render({} as Parameters<NonNullable<typeof InfoModal.render>>[0]) : <div>Info Modal</div>}
+          {InfoModal.render ? InfoModal.render(InfoModal.args || {}, {} as StoryContext) : <div>Info Modal</div>}
         </div>
       </div>
       

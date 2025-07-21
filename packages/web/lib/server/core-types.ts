@@ -17,5 +17,11 @@ export type { ProjectInfo } from '~/projects/project';
 // Constants
 export { EVENT_TYPES } from '~/threads/types';
 
-// Utility functions for ThreadId
-export { asThreadId, createThreadId, isThreadId } from '~/threads/types';
+// Utility functions for ThreadId and NewAgentSpec
+export {
+  asThreadId,
+  createThreadId,
+  isThreadId,
+  asNewAgentSpec,
+  createNewAgentSpec,
+} from '~/threads/types';
