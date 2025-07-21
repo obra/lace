@@ -171,6 +171,73 @@ select {
   @apply bg-yellow-900/20;
 }
 
+/* Syntax highlighting using DaisyUI theme colors */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag {
+  @apply text-primary;
+}
+
+.hljs-string,
+.hljs-attr,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+  @apply text-secondary;
+}
+
+.hljs-comment,
+.hljs-quote,
+.hljs-deletion {
+  @apply text-base-content/50;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-template-variable {
+  @apply text-accent;
+}
+
+.hljs-title,
+.hljs-class .hljs-title,
+.hljs-type,
+.hljs-function .hljs-title {
+  @apply text-info;
+}
+
+.hljs-attribute,
+.hljs-property,
+.hljs-params {
+  @apply text-success;
+}
+
+.hljs-regexp,
+.hljs-link {
+  @apply text-warning;
+}
+
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-selector-pseudo {
+  @apply text-secondary-focus;
+}
+
+.hljs-meta,
+.hljs-doctag {
+  @apply text-neutral;
+}
+
+.hljs-emphasis {
+  @apply italic;
+}
+
+.hljs-strong {
+  @apply font-bold;
+}
+
 /* Terminal syntax highlighting colors for fallback */
 .terminal-syntax {
   @apply font-mono text-sm;

@@ -61,67 +61,67 @@ type Story = StoryObj<typeof FeedbackDisplay>;
 const sampleEvents: FeedbackEvent[] = [
   {
     id: '1',
-    type: 'code_quality',
+    type: 'optimization',
     title: 'Code Quality Improvement',
-    description: 'Detected unused imports in src/components/ui/Button.tsx',
+    content: 'Detected unused imports in src/components/ui/Button.tsx',
     timestamp: new Date(Date.now() - 300000),
-    severity: 'medium',
+    priority: 'medium',
+    tags: ['code-quality', 'imports'],
     context: {
-      file: 'src/components/ui/Button.tsx',
-      line: 5,
-      suggestion: 'Remove unused import: import { unused } from "library"',
+      threadId: 'main',
+      currentTool: 'code_analysis',
     },
   },
   {
     id: '2',
     type: 'performance',
     title: 'Performance Optimization',
-    description: 'Large component re-renders detected in TimelineView',
+    content: 'Large component re-renders detected in TimelineView',
     timestamp: new Date(Date.now() - 240000),
-    severity: 'high',
+    priority: 'high',
+    tags: ['performance', 'react'],
     context: {
-      component: 'TimelineView',
-      renderCount: 45,
-      suggestion: 'Consider memoization with useMemo or React.memo',
+      threadId: 'main',
+      currentTool: 'performance_monitor',
     },
   },
   {
     id: '3',
-    type: 'accessibility',
+    type: 'optimization',
     title: 'Accessibility Issue',
-    description: 'Missing alt text for images in carousel component',
+    content: 'Missing alt text for images in carousel component',
     timestamp: new Date(Date.now() - 180000),
-    severity: 'medium',
+    priority: 'medium',
+    tags: ['accessibility', 'images'],
     context: {
-      component: 'Carousel',
-      element: 'img',
-      suggestion: 'Add descriptive alt text for screen readers',
+      threadId: 'main',
+      currentTool: 'accessibility_checker',
     },
   },
   {
     id: '4',
-    type: 'security',
+    type: 'error',
     title: 'Security Alert',
-    description: 'Potential XSS vulnerability in user input handling',
+    content: 'Potential XSS vulnerability in user input handling',
     timestamp: new Date(Date.now() - 120000),
-    severity: 'high',
+    priority: 'high',
+    tags: ['security', 'xss'],
     context: {
-      file: 'src/components/chat/ChatInput.tsx',
-      vulnerability: 'Unescaped user input in dangerouslySetInnerHTML',
-      suggestion: 'Use DOMPurify or remove dangerouslySetInnerHTML',
+      threadId: 'main',
+      currentTool: 'security_scanner',
     },
   },
   {
     id: '5',
-    type: 'testing',
+    type: 'insight',
     title: 'Test Coverage',
-    description: 'Low test coverage in authentication module',
+    content: 'Low test coverage in authentication module',
     timestamp: new Date(Date.now() - 60000),
-    severity: 'low',
+    priority: 'low',
+    tags: ['testing', 'coverage'],
     context: {
-      module: 'src/auth/',
-      coverage: 45,
-      suggestion: 'Add tests for edge cases and error handling',
+      threadId: 'main',
+      currentTool: 'test_analyzer',
     },
   },
 ];
@@ -130,12 +130,12 @@ const sampleEvents: FeedbackEvent[] = [
 const sampleInsights: FeedbackInsight[] = [
   {
     id: '1',
-    type: 'pattern_recognition',
+    category: 'pattern',
     title: 'Development Pattern Insight',
     description: 'You frequently modify components without updating tests',
     confidence: 0.85,
-    timestamp: new Date(Date.now() - 600000),
-    suggestions: [
+    actionable: true,
+    recommendations: [
       'Consider test-driven development approach',
       'Set up pre-commit hooks for test validation',
       'Create component test templates',
@@ -144,12 +144,12 @@ const sampleInsights: FeedbackInsight[] = [
   },
   {
     id: '2',
-    type: 'productivity',
+    category: 'performance',
     title: 'Productivity Insight',
     description: 'Most productive hours are between 9-11 AM',
     confidence: 0.92,
-    timestamp: new Date(Date.now() - 480000),
-    suggestions: [
+    actionable: true,
+    recommendations: [
       'Schedule complex tasks during peak hours',
       'Use afternoon for code reviews and documentation',
       'Consider pair programming in the morning',
@@ -158,12 +158,12 @@ const sampleInsights: FeedbackInsight[] = [
   },
   {
     id: '3',
-    type: 'code_quality',
+    category: 'optimization',
     title: 'Code Quality Insight',
     description: 'Consistent use of TypeScript strict mode improves code quality',
     confidence: 0.78,
-    timestamp: new Date(Date.now() - 360000),
-    suggestions: [
+    actionable: true,
+    recommendations: [
       'Enable strict mode in all new projects',
       'Gradually migrate existing code to strict mode',
       'Use ESLint rules for TypeScript best practices',
@@ -174,83 +174,63 @@ const sampleInsights: FeedbackInsight[] = [
 
 // Sample performance analysis
 const samplePerformanceAnalysis: PerformanceAnalysis = {
-  overall_score: 78,
-  response_time: {
+  responseTimeAnalysis: {
+    current: 450,
     average: 450,
-    p95: 890,
-    p99: 1200,
-  },
-  memory_usage: {
-    peak: 120,
-    average: 85,
     trend: 'stable',
+    percentile95: 890,
   },
-  cpu_usage: {
-    peak: 65,
-    average: 35,
-    trend: 'improving',
-  },
-  bottlenecks: [
+  toolEfficiency: [
     {
-      type: 'component_render',
-      component: 'TimelineView',
-      impact: 'high',
-      suggestion: 'Implement virtualization for large lists',
+      toolName: 'TimelineView',
+      successRate: 0.95,
+      averageTime: 1200,
+      errorPatterns: ['component_render', 'large lists'],
     },
     {
-      type: 'api_call',
-      endpoint: '/api/messages',
-      impact: 'medium',
-      suggestion: 'Add response caching and pagination',
+      toolName: 'api_call',
+      successRate: 0.88,
+      averageTime: 890,
+      errorPatterns: ['/api/messages', 'timeout'],
     },
   ],
-  improvements: [
-    {
-      description: 'Reduced bundle size by 23%',
-      impact: 15,
-      implemented: new Date(Date.now() - 86400000),
-    },
-    {
-      description: 'Optimized image loading',
-      impact: 8,
-      implemented: new Date(Date.now() - 43200000),
-    },
-  ],
+  conversationFlow: {
+    turnsPerMinute: 2.5,
+    contextSwitches: 5,
+    backtrackingEvents: 1,
+  },
+  resourceUsage: {
+    tokenUsage: 2400,
+    tokenEfficiency: 0.85,
+    costEstimate: 0.024,
+  },
 };
 
 // Sample predictive insights
 const samplePredictiveInsights: PredictiveInsight[] = [
   {
-    id: '1',
-    type: 'technical_debt',
-    title: 'Technical Debt Prediction',
-    description: 'Current velocity suggests tech debt will impact delivery in 2 weeks',
+    prediction: 'Current velocity suggests tech debt will impact delivery in 2 weeks',
     confidence: 0.73,
-    probability: 0.68,
-    timeframe: '2 weeks',
-    timestamp: new Date(Date.now() - 900000),
-    recommendations: [
+    timeframe: 'medium',
+    factors: ['increasing complexity', 'decreasing velocity', 'technical debt accumulation'],
+    actionable: true,
+    preventionSuggestions: [
       'Allocate 20% of sprint capacity to refactoring',
       'Prioritize high-impact debt items',
       'Schedule architecture review session',
     ],
-    impact: 'high',
   },
   {
-    id: '2',
-    type: 'performance_degradation',
-    title: 'Performance Degradation Risk',
-    description: 'Memory usage trends indicate potential performance issues',
+    prediction: 'Memory usage trends indicate potential performance issues',
     confidence: 0.81,
-    probability: 0.45,
-    timeframe: '1 week',
-    timestamp: new Date(Date.now() - 720000),
-    recommendations: [
+    timeframe: 'short',
+    factors: ['increasing memory usage', 'large component tree', 'memory leaks'],
+    actionable: true,
+    preventionSuggestions: [
       'Review memory-intensive components',
       'Implement performance monitoring',
       'Consider code splitting for large bundles',
     ],
-    impact: 'medium',
   },
 ];
 
@@ -354,7 +334,7 @@ export const EmptyState: Story = {
 
 export const HighSeverityEvents: Story = {
   args: {
-    events: sampleEvents.filter(event => event.severity === 'high'),
+    events: sampleEvents.filter(event => event.priority === 'high'),
     insights: sampleInsights,
     performanceAnalysis: samplePerformanceAnalysis,
     predictiveInsights: samplePredictiveInsights,
@@ -375,9 +355,10 @@ export const HighSeverityEvents: Story = {
 export const PerformanceFocused: Story = {
   args: {
     events: sampleEvents.filter(event => event.type === 'performance'),
-    insights: sampleInsights.filter(insight => insight.type === 'productivity'),
+    insights: sampleInsights.filter(insight => insight.category === 'performance'),
     performanceAnalysis: samplePerformanceAnalysis,
-    predictiveInsights: samplePredictiveInsights.filter(insight => insight.type === 'performance_degradation'),
+    predictiveInsights: samplePredictiveInsights.filter(insight => 
+      insight.prediction.toLowerCase().includes('performance')),
     showPerformanceMetrics: true,
     showPredictions: true,
     showInsights: true,
@@ -395,15 +376,20 @@ export const PerformanceFocused: Story = {
 export const SecurityFocused: Story = {
   args: {
     events: [
-      ...sampleEvents.filter(event => event.type === 'security'),
+      ...sampleEvents.filter(event => event.type === 'error' && event.tags.includes('security')),
       {
         id: '6',
-        type: 'security',
+        type: 'error',
         title: 'Dependency Vulnerability',
-        description: 'Outdated package with known security vulnerabilities',
+        content: 'Outdated package with known security vulnerabilities',
         timestamp: new Date(Date.now() - 90000),
-        severity: 'high',
+        priority: 'high',
+        tags: ['security', 'dependency'],
         context: {
+          threadId: 'main',
+          currentTool: 'security_scanner',
+        },
+        metadata: {
           package: 'lodash@4.17.15',
           vulnerability: 'CVE-2021-23337',
           suggestion: 'Update to lodash@4.17.21 or later',
@@ -411,12 +397,17 @@ export const SecurityFocused: Story = {
       },
       {
         id: '7',
-        type: 'security',
+        type: 'error',
         title: 'Insecure API Endpoint',
-        description: 'API endpoint missing authentication',
+        content: 'API endpoint missing authentication',
         timestamp: new Date(Date.now() - 30000),
-        severity: 'high',
+        priority: 'high',
+        tags: ['security', 'api'],
         context: {
+          threadId: 'main',
+          currentTool: 'security_scanner',
+        },
+        metadata: {
           endpoint: '/api/admin/users',
           issue: 'No authentication middleware',
           suggestion: 'Add authentication middleware to protect endpoint',
@@ -444,12 +435,17 @@ export const DevelopmentWorkflow: Story = {
     events: [
       {
         id: '8',
-        type: 'code_quality',
+        type: 'optimization',
         title: 'Code Review Feedback',
-        description: 'Pull request #123 needs attention',
+        content: 'Pull request #123 needs attention',
         timestamp: new Date(Date.now() - 150000),
-        severity: 'medium',
+        priority: 'medium',
+        tags: ['code-quality', 'review'],
         context: {
+          threadId: 'main',
+          currentTool: 'code_review',
+        },
+        metadata: {
           pr: 123,
           reviewer: 'senior-dev',
           suggestion: 'Address comments about error handling',
@@ -457,12 +453,17 @@ export const DevelopmentWorkflow: Story = {
       },
       {
         id: '9',
-        type: 'testing',
+        type: 'error',
         title: 'Test Failure',
-        description: 'Unit test failing in CI pipeline',
+        content: 'Unit test failing in CI pipeline',
         timestamp: new Date(Date.now() - 100000),
-        severity: 'high',
+        priority: 'high',
+        tags: ['testing', 'ci'],
         context: {
+          threadId: 'main',
+          currentTool: 'test_runner',
+        },
+        metadata: {
           test: 'should handle async operations',
           file: 'src/utils/api.test.ts',
           suggestion: 'Update test to handle Promise.resolve properly',
@@ -470,12 +471,17 @@ export const DevelopmentWorkflow: Story = {
       },
       {
         id: '10',
-        type: 'deployment',
+        type: 'celebration',
         title: 'Deployment Success',
-        description: 'Application deployed to staging environment',
+        content: 'Application deployed to staging environment',
         timestamp: new Date(Date.now() - 50000),
-        severity: 'low',
+        priority: 'low',
+        tags: ['deployment', 'success'],
         context: {
+          threadId: 'main',
+          currentTool: 'deployment',
+        },
+        metadata: {
           environment: 'staging',
           branch: 'feature/new-ui',
           suggestion: 'Ready for QA testing',
@@ -485,12 +491,12 @@ export const DevelopmentWorkflow: Story = {
     insights: [
       {
         id: '4',
-        type: 'workflow',
+        category: 'pattern',
         title: 'Development Workflow Insight',
         description: 'Tests are frequently failing due to async timing issues',
         confidence: 0.89,
-        timestamp: new Date(Date.now() - 800000),
-        suggestions: [
+        actionable: true,
+        recommendations: [
           'Use async/await consistently in tests',
           'Add proper test cleanup and timeouts',
           'Consider using testing library utilities',

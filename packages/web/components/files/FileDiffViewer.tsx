@@ -4,8 +4,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEye, faColumns, faList, faCopy, faExpand, faCompress } from '@/lib/fontawesome';
-import { syntaxHighlighting, type HighlightResult } from '@/lib/syntax-highlighting';
-import { syntaxThemeManager } from '@/lib/syntax-themes';
+import hljs from 'highlight.js';
 
 // Core diff data structures
 export interface DiffLine {
@@ -98,33 +97,22 @@ export default function FileDiffViewer({
       try {
         setIsHighlighting(true);
         
-        // Initialize services
-        await syntaxHighlighting.initialize();
-        
-        if (!themeInitialized) {
-          await syntaxThemeManager.autoLoadTheme();
-          setThemeInitialized(true);
-        }
-
-        // Highlight all lines
+        // Highlight all lines using highlight.js directly
         const newHighlightedLines = new Map<string, string>();
         const allLines = diff.chunks.flatMap(chunk => chunk.lines);
         
         for (const line of allLines) {
           if (line.content.trim()) {
             try {
-              const result = await syntaxHighlighting.highlightCode(
-                line.content,
-                diff.language,
-                diff.newFilePath
-              );
+              const result = diff.language 
+                ? hljs.highlight(line.content, { language: diff.language })
+                : hljs.highlightAuto(line.content);
               
-              if (!isCancelled && result.success) {
+              if (!isCancelled) {
                 const key = `${line.oldLineNumber || 'new'}-${line.newLineNumber || 'old'}`;
-                newHighlightedLines.set(key, result.highlighted);
+                newHighlightedLines.set(key, result.value);
               }
             } catch (error) {
-              // Silently fail for individual lines
               // Silently fail for individual line highlighting
             }
           }

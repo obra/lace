@@ -42,8 +42,11 @@ const baseEvent = {
     agentState: 'thinking',
     currentTool: 'file_read',
     turnMetrics: {
-      turnId: 'turn-456',
+      startTime: new Date(Date.now() - 1250),
       elapsedMs: 1250,
+      tokensIn: 120,
+      tokensOut: 185,
+      turnId: 'turn-456',
     },
   },
   metadata: {
@@ -370,14 +373,14 @@ export const AllTypes: Story = {
   render: () => (
     <div className="space-y-4">
       {[
-        { type: 'action', title: 'Action Event', content: 'Quick action available' },
-        { type: 'performance', title: 'Performance Event', content: 'Performance optimization suggestion' },
-        { type: 'educational', title: 'Educational Event', content: 'Learning opportunity' },
-        { type: 'predictive', title: 'Predictive Event', content: 'Potential future issue' },
-        { type: 'error', title: 'Error Event', content: 'Critical error detected' },
-        { type: 'optimization', title: 'Optimization Event', content: 'Code optimization opportunity' },
-        { type: 'insight', title: 'Insight Event', content: 'Development pattern insight' },
-        { type: 'celebration', title: 'Celebration Event', content: 'Achievement unlocked!' },
+        { type: 'action' as const, title: 'Action Event', content: 'Quick action available' },
+        { type: 'performance' as const, title: 'Performance Event', content: 'Performance optimization suggestion' },
+        { type: 'educational' as const, title: 'Educational Event', content: 'Learning opportunity' },
+        { type: 'predictive' as const, title: 'Predictive Event', content: 'Potential future issue' },
+        { type: 'error' as const, title: 'Error Event', content: 'Critical error detected' },
+        { type: 'optimization' as const, title: 'Optimization Event', content: 'Code optimization opportunity' },
+        { type: 'insight' as const, title: 'Insight Event', content: 'Development pattern insight' },
+        { type: 'celebration' as const, title: 'Celebration Event', content: 'Achievement unlocked!' },
       ].map((eventData, index) => (
         <FeedbackEventCard
           key={index}
@@ -408,11 +411,11 @@ export const CompactList: Story = {
     <div className="space-y-2">
       <h3 className="text-lg font-semibold mb-4">Compact Event List</h3>
       {[
-        { type: 'action', priority: 'high', content: 'Quick action available for optimization' },
-        { type: 'performance', priority: 'medium', content: 'Component re-render detected' },
-        { type: 'educational', priority: 'low', content: 'Learning tip about TypeScript' },
-        { type: 'error', priority: 'high', content: 'Unhandled promise rejection' },
-        { type: 'celebration', priority: 'low', content: 'Test coverage milestone reached!' },
+        { type: 'action' as const, priority: 'high' as const, content: 'Quick action available for optimization' },
+        { type: 'performance' as const, priority: 'medium' as const, content: 'Component re-render detected' },
+        { type: 'educational' as const, priority: 'low' as const, content: 'Learning tip about TypeScript' },
+        { type: 'error' as const, priority: 'high' as const, content: 'Unhandled promise rejection' },
+        { type: 'celebration' as const, priority: 'low' as const, content: 'Test coverage milestone reached!' },
       ].map((eventData, index) => (
         <FeedbackEventCard
           key={index}

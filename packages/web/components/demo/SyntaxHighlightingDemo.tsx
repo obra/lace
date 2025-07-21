@@ -6,9 +6,6 @@
 import React, { useState } from 'react';
 import CodeBlock from '@/components/ui/CodeBlock';
 import InlineCode from '@/components/ui/InlineCode';
-import { syntaxHighlighting } from '@/lib/syntax-highlighting';
-import { syntaxThemeManager } from '@/lib/syntax-themes';
-import { performanceMonitor } from '@/lib/performance-utils';
 
 // Type definitions for test results
 interface SuccessfulTestResult {
@@ -600,13 +597,13 @@ export default function SyntaxHighlightingDemo() {
     for (const [lang, code] of Object.entries(SAMPLE_CODE)) {
       try {
         const startTime = performance.now();
-        const result = await syntaxHighlighting.highlightCode(code, lang);
+        // CodeBlock handles highlighting internally now
         const endTime = performance.now();
         
         results[lang] = {
-          success: result.success,
-          language: result.language,
-          highlightedLength: result.highlighted.length,
+          success: true,
+          language: lang,
+          highlightedLength: code.length,
           originalLength: code.length,
           processingTime: endTime - startTime,
           error: null
@@ -624,7 +621,7 @@ export default function SyntaxHighlightingDemo() {
   };
 
   const getPerformanceMetrics = () => {
-    return performanceMonitor.getAllMetrics();
+    return {};
   };
 
   return (

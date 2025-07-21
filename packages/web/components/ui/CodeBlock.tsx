@@ -1,14 +1,12 @@
-// ABOUTME: Advanced code block component with syntax highlighting for web interface
-// ABOUTME: Features copy functionality, language detection, line numbers, and theme support
+// ABOUTME: Simple code block component with syntax highlighting for web interface
+// ABOUTME: Uses highlight.js with CSS theme integration, no complex theme management
 
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCopy, faCheck, faExpand, faCompress } from '@/lib/fontawesome';
-import { syntaxHighlighting, type HighlightResult } from '@/lib/syntax-highlighting';
-import { simpleSyntaxThemeManager } from '@/lib/syntax-themes-simple';
-import { debounce, isCodeTooLarge } from '@/lib/performance-utils';
+import hljs from 'highlight.js';
 
 interface CodeBlockProps {
   code: string;
@@ -39,102 +37,39 @@ export default function CodeBlock({
   collapsed = false,
   collapsible = false,
 }: CodeBlockProps) {
-  const [highlightResult, setHighlightResult] = useState<HighlightResult | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!collapsed);
-  const [themeInitialized, setThemeInitialized] = useState(false);
-  const codeRef = useRef<HTMLElement>(null);
-  const copyTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Debounced highlighting function
-  const debouncedHighlight = useRef(
-    debounce(async (
-      codeToHighlight: string,
-      isCancelled: () => boolean,
-      lang?: string,
-      file?: string
-    ) => {
-      if (isCancelled()) return;
+  // Simple syntax highlighting
+  const highlightCode = (code: string, lang?: string) => {
+    if (!lang) {
+      return { value: code, language: 'plaintext' };
+    }
 
-      setIsLoading(true);
-      setError(null);
+    try {
+      // Format JSON if it's JSON
+      let codeToHighlight = code;
+      if (lang === 'json' || code.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(code) as unknown;
+          codeToHighlight = JSON.stringify(parsed, null, 2);
+        } catch {
+          // Keep original if not valid JSON
+        }
+      }
 
+      const result = hljs.highlight(codeToHighlight, { language: lang });
+      return { value: result.value, language: result.language || lang };
+    } catch {
+      // Fallback to auto-detection or plain text
       try {
-        // Initialize services
-        await syntaxHighlighting.initialize();
-        
-        if (!themeInitialized) {
-          await simpleSyntaxThemeManager.autoLoadTheme();
-          setThemeInitialized(true);
-        }
-
-        // Format JSON if it's JSON
-        let displayCode = codeToHighlight;
-        if (lang === 'json' || (!lang && codeToHighlight.trim().startsWith('{'))) {
-          try {
-            const parsed = JSON.parse(codeToHighlight) as unknown;
-            displayCode = JSON.stringify(parsed, null, 2);
-          } catch {
-            // Keep original if not valid JSON
-          }
-        }
-
-        // Use appropriate highlighting method based on code size
-        const result = isCodeTooLarge(displayCode) 
-          ? await syntaxHighlighting.highlightLargeCode(displayCode, lang, file)
-          : await syntaxHighlighting.highlightCode(displayCode, lang, file);
-        
-        if (!isCancelled()) {
-          setHighlightResult(result);
-        }
-      } catch (err) {
-        if (!isCancelled()) {
-          const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-          setError(errorMessage);
-          // Fallback to plain text
-          setHighlightResult({ highlighted: codeToHighlight, language: 'plaintext', success: false });
-        }
-      } finally {
-        if (!isCancelled()) {
-          setIsLoading(false);
-        }
+        const result = hljs.highlightAuto(code);
+        return { value: result.value, language: result.language || 'plaintext' };
+      } catch {
+        return { value: code, language: 'plaintext' };
       }
-    }, 300)
-  ).current;
-
-  // Initialize syntax highlighting and theme
-  useEffect(() => {
-    let isCancelled = false;
-
-    const initializeHighlighting = async () => {
-      if (!code.trim()) {
-        setHighlightResult({ highlighted: code, language: 'plaintext', success: true });
-        setIsLoading(false);
-        return;
-      }
-
-      // Use debounced highlighting for better performance
-      const debouncedFn = debouncedHighlight.current as ((code: string, cancelled: () => boolean, lang?: string, file?: string) => Promise<void>) | undefined;
-      if (debouncedFn) {
-        await debouncedFn(code, () => isCancelled, language, filename);
-      }
-    };
-
-    initializeHighlighting();
-
-    return () => {
-      isCancelled = true;
-      const currentDebounced = debouncedHighlight.current as { cancel?: () => void } | undefined;
-      if (currentDebounced && typeof currentDebounced.cancel === 'function') {
-        currentDebounced.cancel();
-      }
-      if (copyTimeoutRef.current) {
-        clearTimeout(copyTimeoutRef.current);
-      }
-    };
-  }, [code, language, filename, themeInitialized, debouncedHighlight]);
+    }
+  };
 
   const handleCopy = async () => {
     if (onCopy) {
@@ -149,10 +84,7 @@ export default function CodeBlock({
     }
 
     setCopied(true);
-    if (copyTimeoutRef.current) {
-      clearTimeout(copyTimeoutRef.current);
-    }
-    copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const renderLineNumbers = (lines: string[]) => {
@@ -169,24 +101,9 @@ export default function CodeBlock({
     );
   };
 
-  const renderHighlightedCode = (highlighted: string) => {
-    const lines = highlighted.split('\n');
-
-    return (
-      <div className="code-line">
-        {showLineNumbers && renderLineNumbers(lines)}
-        <div className="code-line-content">
-          <code
-            ref={codeRef}
-            className="hljs"
-            dangerouslySetInnerHTML={{ __html: highlighted }}
-          />
-        </div>
-      </div>
-    );
-  };
-
-  const detectedLanguage = highlightResult?.language || language || 'text';
+  const highlightResult = highlightCode(code, language);
+  const lines = highlightResult.value.split('\n');
+  const detectedLanguage = highlightResult.language;
   const displayLanguage = detectedLanguage === 'plaintext' ? 'text' : detectedLanguage;
 
   return (
@@ -202,11 +119,6 @@ export default function CodeBlock({
             {showLanguageLabel && (
               <span className="code-block-language">
                 {displayLanguage}
-              </span>
-            )}
-            {error && (
-              <span className="text-xs text-error">
-                Highlighting failed
               </span>
             )}
           </div>
@@ -243,37 +155,23 @@ export default function CodeBlock({
           className="code-block-content"
           style={{ maxHeight }}
         >
-          {isLoading ? (
-            <div className="flex items-center justify-center p-4">
-              <div className="loading loading-spinner loading-sm"></div>
-              <span className="ml-2 text-sm text-base-content/60">
-                Highlighting code...
-              </span>
-            </div>
-          ) : error ? (
-            <div className="p-4">
-              <div className="text-error text-sm mb-2">
-                Failed to highlight code: {error}
+          <div className="font-mono text-sm">
+            <div className="code-line">
+              {showLineNumbers && renderLineNumbers(lines)}
+              <div className="code-line-content">
+                {detectedLanguage === 'plaintext' ? (
+                  <pre className="whitespace-pre-wrap p-4">
+                    {code}
+                  </pre>
+                ) : (
+                  <code
+                    className="hljs"
+                    dangerouslySetInnerHTML={{ __html: highlightResult.value }}
+                  />
+                )}
               </div>
-              <pre className="font-mono text-sm whitespace-pre-wrap">
-                {code}
-              </pre>
             </div>
-          ) : highlightResult ? (
-            highlightResult.language === 'plaintext' ? (
-              <pre className="font-mono text-sm whitespace-pre-wrap p-4">
-                {highlightResult.highlighted}
-              </pre>
-            ) : (
-              <div className="font-mono text-sm">
-                {renderHighlightedCode(highlightResult.highlighted)}
-              </div>
-            )
-          ) : (
-            <pre className="font-mono text-sm whitespace-pre-wrap p-4">
-              {code}
-            </pre>
-          )}
+          </div>
         </div>
       )}
     </div>

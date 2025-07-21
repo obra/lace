@@ -84,8 +84,8 @@ describe('ProjectSettings', () => {
     await user.click(screen.getByText('AI Configuration'));
 
     // Check initial values
-    const providerSelect = screen.getByTestId('provider-select');
-    const modelSelect = screen.getByTestId('model-select');
+    const providerSelect = screen.getByTestId('provider-select') as HTMLSelectElement;
+    const modelSelect = screen.getByTestId('model-select') as HTMLSelectElement;
     expect(providerSelect.value).toBe('anthropic');
     expect(modelSelect.value).toBe('claude-3-sonnet');
 
