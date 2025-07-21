@@ -130,7 +130,7 @@ export default function ChatInputComposer({
         : placeholder;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 p-4 lg:relative lg:bottom-auto">
+    <div className="relative bg-base-100 border-t border-base-300 p-4">
       {/* Mobile Status Bar */}
       {disabled && (
         <div className="flex items-center justify-center text-xs text-base-content/60 mb-3 lg:hidden">
@@ -234,8 +234,6 @@ export default function ChatInputComposer({
         )}
       </form>
 
-      {/* Safe area padding for mobile */}
-      <div className="h-safe-bottom lg:hidden"></div>
     </div>
   );
 }
