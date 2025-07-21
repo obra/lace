@@ -143,7 +143,7 @@ export function getCacheStats(): {
 /**
  * Debounce function for reducing rapid API calls
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): T & { cancel: () => void } {

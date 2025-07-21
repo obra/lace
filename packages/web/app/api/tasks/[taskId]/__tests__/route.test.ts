@@ -116,7 +116,7 @@ describe('Task [taskId] API Routes', () => {
       const request = new NextRequest(
         'http://localhost:3000/api/tasks/task_20240101_notfound?sessionId=lace_20240101_session'
       );
-      const response = await GET(request, { params: Promise.resolve({ taskId: 'task_20240101_notfound' }) });
+      const response = await GET(request, { params: { taskId: 'task_20240101_notfound' } });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(404);
@@ -126,7 +126,6 @@ describe('Task [taskId] API Routes', () => {
     it('should return task details', async () => {
       type TaskType = import('@/types/api').Task;
       type TaskNoteType = import('@/types/api').TaskNote;
-      type TaskType = import('@/types/api').Task;
 
       const agentThreadId = createThreadId('lace_20240101_agent1');
       const creatorThreadId = createThreadId('lace_20240101_creator');
@@ -361,7 +360,7 @@ describe('Task [taskId] API Routes', () => {
         }
       );
 
-      const response = await DELETE(request, { params: Promise.resolve({ taskId: 'task_20240101_notfound' }) });
+      const response = await DELETE(request, { params: { taskId: 'task_20240101_notfound' } });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(404);

@@ -199,7 +199,7 @@ describe('Agent Spawning API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      await POST(request, { params: Promise.resolve({ sessionId }) });
+      await POST(request, { params: { sessionId } });
 
       expect(mockSession.spawnAgent).toHaveBeenCalledWith('test-agent', undefined, undefined);
     });
@@ -264,7 +264,7 @@ describe('Agent Spawning API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await POST(request, { params: Promise.resolve({ sessionId }) });
+      const response = await POST(request, { params: { sessionId } });
       const data = await parseResponse<AgentResponse>(response);
 
       expect(response.status).toBe(201);
@@ -314,7 +314,7 @@ describe('Agent Spawning API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await POST(request, { params: Promise.resolve({ sessionId }) });
+      const response = await POST(request, { params: { sessionId } });
       const data = await parseResponse<AgentResponse>(response);
 
       expect(response.status).toBe(201);
@@ -349,7 +349,7 @@ describe('Agent Spawning API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await POST(request, { params: Promise.resolve({ sessionId }) });
+      const response = await POST(request, { params: { sessionId } });
       const data = await parseResponse<AgentResponse>(response);
 
       expect(data.agent).toMatchObject({
@@ -385,7 +385,7 @@ describe('Agent Spawning API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response1 = await POST(request1, { params: Promise.resolve({ sessionId }) });
+      const response1 = await POST(request1, { params: { sessionId } });
       const data1 = await parseResponse<AgentResponse>(response1);
       expect(data1.agent.threadId).toBe(`${sessionId}.1`);
 
@@ -417,7 +417,7 @@ describe('Agent Spawning API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response2 = await POST(request2, { params: Promise.resolve({ sessionId }) });
+      const response2 = await POST(request2, { params: { sessionId } });
       const data2 = await parseResponse<AgentResponse>(response2);
       expect(data2.agent.threadId).toBe(`${sessionId}.2`);
     });
@@ -431,7 +431,7 @@ describe('Agent Spawning API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await POST(request, { params: Promise.resolve({ sessionId: 'invalid' }) });
+      const response = await POST(request, { params: { sessionId: 'invalid' } });
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -454,7 +454,7 @@ describe('Agent Spawning API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await POST(request, { params: Promise.resolve({ sessionId }) });
+      const response = await POST(request, { params: { sessionId } });
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -478,7 +478,7 @@ describe('Agent Spawning API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await POST(request, { params: Promise.resolve({ sessionId }) });
+      const response = await POST(request, { params: { sessionId } });
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -519,7 +519,7 @@ describe('Agent Spawning API', () => {
       );
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`);
-      const response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const response = await GET(request, { params: { sessionId } });
       const data = await parseResponse<AgentsListResponse>(response);
 
       expect(response.status).toBe(200);
@@ -558,7 +558,7 @@ describe('Agent Spawning API', () => {
       );
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`);
-      const response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const response = await GET(request, { params: { sessionId } });
       const data = await parseResponse<AgentsListResponse>(response);
 
       expect(data.agents[0]).toMatchObject({
@@ -582,7 +582,7 @@ describe('Agent Spawning API', () => {
       );
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`);
-      const response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const response = await GET(request, { params: { sessionId } });
       const data = await parseResponse<AgentsListResponse>(response);
 
       expect(response.status).toBe(200);
@@ -593,7 +593,7 @@ describe('Agent Spawning API', () => {
       mockSessionService.getSession.mockResolvedValueOnce(null);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/invalid/agents`);
-      const response = await GET(request, { params: Promise.resolve({ sessionId: 'invalid' }) });
+      const response = await GET(request, { params: { sessionId: 'invalid' } });
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);

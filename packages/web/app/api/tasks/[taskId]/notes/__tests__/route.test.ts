@@ -6,7 +6,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/tasks/[taskId]/notes/route';
 import type { SessionService } from '@/lib/server/session-service';
-import type { Session } from '@/types/api';
 // Note: We can't import the actual Session class due to server-only restrictions in tests
 import {
   setupTestPersistence,
@@ -87,7 +86,7 @@ const mockCoreSession: MockCoreSession = {
 const mockSessionService = {
   createSession: vi.fn<SessionService['createSession']>(),
   listSessions: vi.fn<SessionService['listSessions']>(),
-  getSession: vi.fn<SessionService['getSession']>().mockResolvedValue(mockCoreSession),
+  getSession: vi.fn<SessionService['getSession']>().mockResolvedValue(mockCoreSession as never),
 };
 
 // Mock the session service
@@ -124,8 +123,8 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
-      const data = await response.json();
+      const response = await POST(request, { params: { taskId: 'task_20240101_abc123' } });
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Session ID is required');
@@ -140,8 +139,8 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
-      const data = await response.json();
+      const response = await POST(request, { params: { taskId: 'task_20240101_abc123' } });
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Note content is required');
@@ -183,8 +182,8 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
-      const data = await response.json();
+      const response = await POST(request, { params: { taskId: 'task_20240101_abc123' } });
+      const data = (await response.json()) as { message: string; task: { notes: Array<{ content: string }> } };
 
       expect(response.status).toBe(201);
       expect(data.message).toBe('Note added successfully');
@@ -211,8 +210,8 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_notfound' }) });
-      const data = await response.json();
+      const response = await POST(request, { params: { taskId: 'task_20240101_notfound' } });
+      const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Task not found');
@@ -255,8 +254,8 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
-      const data = await response.json();
+      const response = await POST(request, { params: { taskId: 'task_20240101_abc123' } });
+      const _data = (await response.json()) as { message: string };
 
       expect(response.status).toBe(201);
       expect(mockTaskManager.addNote).toHaveBeenCalledWith(

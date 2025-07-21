@@ -37,7 +37,7 @@ const mockSessionService = {
 
 // Set up the default mock behavior for getSession - properly typed mock
 mockSessionService.getSession.mockImplementation(
-  async (sessionId: string): Promise<unknown> => {
+  async (sessionId: import('@/types/api').ThreadId): Promise<unknown> => {
     if (sessionId === 'lace_20240101_session') {
       // Create a partial mock session with the required methods for testing
       const mockSessionResult: Record<string, unknown> = {
@@ -60,7 +60,7 @@ mockSessionService.getSession.mockImplementation(
         destroy: vi.fn(),
       };
       // Type assertion is safe here since we're mocking only needed methods for tests
-      return mockSessionResult as CoreSession;
+      return mockSessionResult as never;
     }
     return null;
   }
