@@ -156,10 +156,10 @@ export function LaceApp() {
     // Clear events when switching agents
     setEvents([]);
 
-    // Load conversation history for the selected agent
-    void loadConversationHistory(selectedAgent);
+    // Load conversation history for the session (contains all agent events)
+    void loadConversationHistory(selectedSession);
 
-    const eventSource = new EventSource(`/api/sessions/${selectedAgent}/events/stream`);
+    const eventSource = new EventSource(`/api/sessions/${selectedSession}/events/stream`);
 
     // Store event listeners for cleanup
     const eventListeners = new Map<string, (event: MessageEvent) => void>();
