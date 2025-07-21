@@ -3,8 +3,9 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { syntaxHighlighting, type HighlightResult } from '@/lib/syntax-highlighting';
+import React from 'react';
+import DOMPurify from 'dompurify';
+import hljs from 'highlight.js';
 
 interface InlineCodeProps {
   code: string;
@@ -19,57 +20,34 @@ export default function InlineCode({
   className = '',
   enableHighlighting = false,
 }: InlineCodeProps) {
-  const [highlightResult, setHighlightResult] = useState<HighlightResult | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
+  // Simple syntax highlighting similar to CodeBlock
+  const getHighlightedCode = () => {
     if (!enableHighlighting || !language || !code.trim()) {
-      return;
+      return code;
     }
 
-    let isCancelled = false;
-    setIsLoading(true);
-
-    const highlightCode = async () => {
+    try {
+      const result = hljs.highlight(code, { language });
+      return DOMPurify.sanitize(result.value);
+    } catch {
+      // Fallback to auto-detection
       try {
-        await syntaxHighlighting.initialize();
-        const result = await syntaxHighlighting.highlightCode(code, language);
-        
-        if (!isCancelled) {
-          setHighlightResult(result);
-        }
-      } catch (err) {
-        if (!isCancelled) {
-          // Fallback to plain text
-          setHighlightResult({ highlighted: code, language: 'plaintext', success: false });
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
+        const result = hljs.highlightAuto(code);
+        return DOMPurify.sanitize(result.value);
+      } catch {
+        return code;
       }
-    };
+    }
+  };
 
-    highlightCode();
+  const highlightedCode = getHighlightedCode();
+  const shouldRenderAsHtml = enableHighlighting && language && highlightedCode !== code;
 
-    return () => {
-      isCancelled = true;
-    };
-  }, [code, language, enableHighlighting]);
-
-  if (isLoading) {
-    return (
-      <code className={`inline-code ${className}`}>
-        {code}
-      </code>
-    );
-  }
-
-  if (enableHighlighting && highlightResult && highlightResult.language !== 'plaintext') {
+  if (shouldRenderAsHtml) {
     return (
       <code 
         className={`inline-code ${className}`}
-        dangerouslySetInnerHTML={{ __html: highlightResult.highlighted }}
+        dangerouslySetInnerHTML={{ __html: highlightedCode }}
       />
     );
   }

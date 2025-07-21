@@ -4,6 +4,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEye, faColumns, faList, faCopy, faExpand, faCompress } from '@/lib/fontawesome';
+import DOMPurify from 'dompurify';
 import hljs from 'highlight.js';
 
 // Core diff data structures
@@ -206,10 +207,11 @@ export default function FileDiffViewer({
     );
   };
 
-  // Get highlighted content for a line
+  // Get highlighted content for a line with sanitization
   const getHighlightedContent = (line: DiffLine) => {
     const key = `${line.oldLineNumber || 'new'}-${line.newLineNumber || 'old'}`;
-    return highlightedLines.get(key) || line.content;
+    const highlightedContent = highlightedLines.get(key) || line.content;
+    return DOMPurify.sanitize(highlightedContent);
   };
 
   // Render unified diff view

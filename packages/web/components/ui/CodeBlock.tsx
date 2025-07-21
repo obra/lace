@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCopy, faCheck, faExpand, faCompress } from '@/lib/fontawesome';
+import DOMPurify from 'dompurify';
 import hljs from 'highlight.js';
 
 interface CodeBlockProps {
@@ -166,7 +167,7 @@ export default function CodeBlock({
                 ) : (
                   <code
                     className="hljs"
-                    dangerouslySetInnerHTML={{ __html: highlightResult.value }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlightResult.value) }}
                   />
                 )}
               </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useCallback } from 'react';
+import DOMPurify from 'dompurify';
 import CodeBlock from './CodeBlock';
 import InlineCode from './InlineCode';
 
@@ -111,8 +112,9 @@ export default function MessageText({ content, className = '' }: MessageTextProp
   }, [content, processInlineCode]);
 
   const formatTextContent = (text: string) => {
-    // Convert newlines to <br> tags
-    return text.replace(/\n/g, '<br>');
+    // Convert newlines to <br> tags and sanitize HTML
+    const withBreaks = text.replace(/\n/g, '<br>');
+    return DOMPurify.sanitize(withBreaks);
   };
 
   return (
