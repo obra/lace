@@ -13,7 +13,7 @@ import type {
   ProjectInfo,
 } from '@/types/api';
 import { isApiError } from '@/types/api';
-import { ConversationDisplay } from '@/components/old/ConversationDisplay';
+import { LaceMessageList } from '@/components/ui/LaceMessageList';
 import { ToolApprovalModal } from '@/components/old/ToolApprovalModal';
 import { AgentSpawner } from '@/components/old/AgentSpawner';
 import { TaskDashboard } from '@/components/old/TaskDashboard';
@@ -428,7 +428,7 @@ export default function Home() {
                       <>
                         {/* Conversation Display */}
                         <div className="flex-1 overflow-hidden">
-                          <ConversationDisplay
+                          <LaceMessageList
                             events={events}
                             agents={selectedSessionDetails?.agents || []}
                             selectedAgent={selectedAgent as ThreadId}

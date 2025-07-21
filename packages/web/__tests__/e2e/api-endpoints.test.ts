@@ -41,6 +41,7 @@ import { POST as createProjectSession } from '@/app/api/projects/[projectId]/ses
 import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 import type { Session as SessionType, ThreadId } from '@/types/api';
+import { asThreadId } from '@/lib/server/core-types';
 
 describe('API Endpoints E2E Tests', () => {
   let sessionService: SessionService;

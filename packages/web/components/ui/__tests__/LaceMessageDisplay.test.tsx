@@ -5,7 +5,7 @@ import React from 'react';
 import { describe, test, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { SessionEvent, Agent, ThreadId } from '@/types/api';
-import { LaceMessageDisplay } from '../LaceMessageDisplay';
+import { LaceMessageDisplay } from '@/components/ui/LaceMessageDisplay';
 
 // Mock design system components
 vi.mock('@/components/ui/MessageBubble', () => ({
@@ -41,7 +41,7 @@ vi.mock('@/components/ui/CodeBlock', () => ({
 }));
 
 vi.mock('@/components/ui/StreamingIndicator', () => ({
-  default: ({ ...props }: any) => (
+  StreamingIndicator: ({ ...props }: any) => (
     <span data-testid="streaming-indicator" {...props}>
       ▌
     </span>
