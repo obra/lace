@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFolder, faPlus, faCalendar, faHashtag, faClock } from '@/lib/fontawesome';
+import { faFolder, faPlus, faFileText, faHistory } from '@/lib/fontawesome';
 import type { ProjectInfo } from '@/types/api';
 
 interface ProjectSelectorPanelProps {
@@ -164,19 +164,19 @@ export function ProjectSelectorPanel({
               {/* Project Stats */}
               <div className="space-y-2 mb-4">
                 <div className="flex items-center gap-2 text-sm text-base-content/60">
-                  <FontAwesomeIcon icon={faHashtag} className="w-3 h-3" />
+                  <FontAwesomeIcon icon={faFileText} className="w-3 h-3" />
                   <span>
                     {project.sessionCount ? `${project.sessionCount} sessions` : 'No sessions'}
                   </span>
                 </div>
                 
                 <div className="flex items-center gap-2 text-sm text-base-content/60">
-                  <FontAwesomeIcon icon={faCalendar} className="w-3 h-3" />
+                  <FontAwesomeIcon icon={faFolder} className="w-3 h-3" />
                   <span>Created {formatDate(project.createdAt)}</span>
                 </div>
 
                 <div className="flex items-center gap-2 text-sm text-base-content/60">
-                  <FontAwesomeIcon icon={faClock} className="w-3 h-3" />
+                  <FontAwesomeIcon icon={faHistory} className="w-3 h-3" />
                   <span>Active {getRelativeTime(project.lastUsedAt)}</span>
                 </div>
               </div>
