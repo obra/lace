@@ -33,16 +33,7 @@ vi.mock('ink', async (importOriginal) => {
   };
 });
 
-// Mock the expansion toggle hooks
-vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
-  TimelineExpansionProvider: ({ children }: { children: React.ReactNode }) => children,
-  useTimelineItemExpansion: () => ({
-    isExpanded: false,
-    onExpand: vi.fn(),
-    onCollapse: vi.fn(),
-  }),
-  useTimelineItemFocusEntry: vi.fn(() => vi.fn()),
-}));
+// No mocks needed for expansion hooks - test real component behavior with proper providers
 
 const mockDelegateCall = {
   id: 'call-123',

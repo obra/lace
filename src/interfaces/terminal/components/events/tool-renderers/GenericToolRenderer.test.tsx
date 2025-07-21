@@ -37,13 +37,13 @@ const mockErrorResult = {
   isError: true,
 };
 
-function renderWithProviders(component: React.ReactElement) {
+function renderWithProviders(component: React.ReactElement, isSelected = false) {
   return render(
     <TimelineExpansionProvider>
       <TimelineItemProvider
-        isSelected={false}
+        isSelected={isSelected}
         onToggle={() => {
-          // Mock onToggle for test - no action needed
+          // onToggle callback for tests - no action needed
         }}
       >
         {component}

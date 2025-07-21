@@ -8,15 +8,7 @@ import { BashToolRenderer } from '~/interfaces/terminal/components/events/tool-r
 import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
 import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
 
-// Mock the expansion toggle hooks
-vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
-  TimelineExpansionProvider: ({ children }: { children: React.ReactNode }) => children,
-  useTimelineItemExpansion: () => ({
-    isExpanded: false,
-    onExpand: vi.fn(),
-    onCollapse: vi.fn(),
-  }),
-}));
+// No mocks needed - test real component behavior with proper providers
 
 const mockBashCall = {
   id: 'call-123',
@@ -55,13 +47,13 @@ const mockErrorResult = {
   isError: false,
 };
 
-function renderWithProviders(component: React.ReactElement) {
+function renderWithProviders(component: React.ReactElement, isSelected = false) {
   return render(
     <TimelineExpansionProvider>
       <TimelineItemProvider
-        isSelected={false}
+        isSelected={isSelected}
         onToggle={() => {
-          // Mock onToggle for test - no action needed
+          // onToggle callback for tests - no action needed
         }}
       >
         {component}
@@ -146,5 +138,43 @@ describe('BashToolRenderer', () => {
     expect(frame).toContain('✔'); // Success symbol
     expect(frame).toContain('bash: pwd');
     // Still has " - " for line count, just not for description
+  });
+
+  it('should start collapsed and show expansion indicator when expandable', () => {
+    const item = {
+      type: 'tool_execution' as const,
+      call: mockBashCall,
+      result: mockSuccessResult,
+      timestamp: new Date(),
+      callId: 'call-123',
+    };
+
+    // Test with selected=true so expansion indicators are visible
+    const { lastFrame } = renderWithProviders(<BashToolRenderer item={item} />, true);
+
+    const frame = lastFrame();
+    // Should start collapsed and show collapsed indicator
+    expect(frame).toContain('▶'); // Collapsed indicator
+    expect(frame).toContain('to open'); // Expansion hint
+    
+    // Should not show expanded content initially (command line with $)
+    expect(frame).not.toContain('$'); // Command prompt not visible when collapsed
+  });
+
+  it('should show compact preview when collapsed', () => {
+    const item = {
+      type: 'tool_execution' as const,
+      call: mockBashCall,
+      result: mockSuccessResult,
+      timestamp: new Date(),
+      callId: 'call-123',
+    };
+
+    const { lastFrame } = renderWithProviders(<BashToolRenderer item={item} />);
+
+    const frame = lastFrame();
+    // Should show preview content (limited lines from output)
+    expect(frame).toContain('file1.txt'); // Preview from stdout
+    expect(frame).toContain('3 lines'); // Line count
   });
 });

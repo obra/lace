@@ -5,22 +5,17 @@ import React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TaskListToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/TaskListToolRenderer';
+import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
 import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
 import { ToolRendererProps } from '~/interfaces/terminal/components/events/tool-renderers/components/shared';
 
-// Mock the expansion toggle hooks
-vi.mock('../hooks/useTimelineExpansionToggle.js', () => ({
-  TimelineExpansionProvider: ({ children }: { children: React.ReactNode }) => children,
-  useTimelineItemExpansion: () => ({
-    isExpanded: false,
-    onExpand: vi.fn(),
-    onCollapse: vi.fn(),
-  }),
-}));
+// No mocks needed - test real component behavior with proper providers
 
-const createMockProvider = () => {
+const createMockProvider = (isSelected = false) => {
   return ({ children }: { children: React.ReactNode }) => (
-    <TimelineItemProvider isSelected={false}>{children}</TimelineItemProvider>
+    <TimelineExpansionProvider>
+      <TimelineItemProvider isSelected={isSelected}>{children}</TimelineItemProvider>
+    </TimelineExpansionProvider>
   );
 };
 
