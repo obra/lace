@@ -8,7 +8,6 @@ import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faXmark } from '@/lib/fontawesome';
 import { ThemeSelector } from '@/components/ui/ThemeSelector';
-import { AccountDropdown } from '@/components/ui/AccountDropdown';
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -62,7 +61,6 @@ export function MobileSidebar({ isOpen, onClose, currentTheme, onThemeChange, ch
             </div>
             
             <div className="flex items-center gap-2">
-              <AccountDropdown />
               <button
                 onClick={onClose}
                 className="p-2 hover:bg-base-200 rounded-lg transition-colors"

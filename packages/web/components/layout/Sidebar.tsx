@@ -8,7 +8,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { ChevronRightIcon } from '@/lib/heroicons';
 import { faCog } from '@/lib/fontawesome';
 import { ThemeSelector } from '@/components/ui/ThemeSelector';
-import { AccountDropdown } from '@/components/ui/AccountDropdown';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -91,7 +90,6 @@ export function Sidebar({ isOpen, onToggle, currentTheme, onThemeChange, childre
               </div>
               <span className="font-semibold text-base-content">Lace</span>
             </div>
-            <AccountDropdown />
           </div>
         </div>
 
@@ -119,6 +117,11 @@ export function Sidebar({ isOpen, onToggle, currentTheme, onThemeChange, childre
 
 export function SidebarSection({ title, icon, children, collapsible = true, defaultCollapsed = false }: SidebarSectionProps) {
   const [collapsed, setCollapsed] = React.useState(defaultCollapsed);
+  
+  // Sync internal state with prop changes
+  React.useEffect(() => {
+    setCollapsed(defaultCollapsed);
+  }, [defaultCollapsed]);
 
   return (
     <div className="px-4 py-3">

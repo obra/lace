@@ -366,8 +366,13 @@ export function LaceApp() {
               currentTheme={theme}
               onThemeChange={setTheme}
             >
-              {/* Projects Section */}
-              <SidebarSection title="Projects" icon={faFolder}>
+              {/* Projects Section - Always show, collapsed when project selected */}
+              <SidebarSection 
+                title="Projects" 
+                icon={faFolder}
+                defaultCollapsed={!!selectedProject}
+                collapsible={true}
+              >
                 {projectsForSidebar.map((project) => (
                   <SidebarItem
                     key={project.id}
@@ -392,12 +397,18 @@ export function LaceApp() {
                 ))}
               </SidebarSection>
 
-              {/* Sessions Section - Only show when project is selected but no session selected */}
-              {selectedProject && !selectedSession && (
-                <SidebarSection title="Sessions" icon={faComments}>
+              {/* Sessions Section - Show when project selected, collapsed when session selected */}
+              {selectedProject && (
+                <SidebarSection 
+                  title="Sessions" 
+                  icon={faComments}
+                  defaultCollapsed={!!selectedSession}
+                  collapsible={true}
+                >
                   {sessions.map((session) => (
                     <SidebarItem
                       key={session.id}
+                      active={selectedSession === session.id}
                       onClick={() => {
                         handleSessionSelect(session.id);
                         setShowMobileNav(false);
@@ -424,9 +435,14 @@ export function LaceApp() {
                 </SidebarSection>
               )}
 
-              {/* Agents Section - Only show when session is selected */}
+              {/* Agents Section - Show when session selected, stay open */}
               {selectedSession && selectedSessionDetails && (
-                <SidebarSection title="Agents" icon={faRobot}>
+                <SidebarSection 
+                  title="Agents" 
+                  icon={faRobot}
+                  defaultCollapsed={false}
+                  collapsible={true}
+                >
                   {selectedSessionDetails.agents?.map((agent) => (
                     <SidebarItem
                       key={agent.threadId}
@@ -479,8 +495,13 @@ export function LaceApp() {
           currentTheme={theme}
           onThemeChange={setTheme}
         >
-          {/* Projects Section */}
-          <SidebarSection title="Projects" icon={faFolder}>
+          {/* Projects Section - Always show, collapsed when project selected */}
+          <SidebarSection 
+            title="Projects" 
+            icon={faFolder} 
+            defaultCollapsed={!!selectedProject}
+            collapsible={true}
+          >
             {projectsForSidebar.map((project) => (
               <SidebarItem
                 key={project.id}
@@ -502,12 +523,18 @@ export function LaceApp() {
             ))}
           </SidebarSection>
 
-          {/* Sessions Section - Only show when project is selected but no session selected */}
-          {selectedProject && !selectedSession && (
-            <SidebarSection title="Sessions" icon={faComments}>
+          {/* Sessions Section - Show when project selected, collapsed when session selected */}
+          {selectedProject && (
+            <SidebarSection 
+              title="Sessions" 
+              icon={faComments}
+              defaultCollapsed={!!selectedSession}
+              collapsible={true}
+            >
               {sessions.map((session) => (
                 <SidebarItem
                   key={session.id}
+                  active={selectedSession === session.id}
                   onClick={() => handleSessionSelect(session.id)}
                 >
                   <div className="flex items-center justify-between">
@@ -528,9 +555,14 @@ export function LaceApp() {
             </SidebarSection>
           )}
 
-          {/* Agents Section - Only show when session is selected */}
+          {/* Agents Section - Show when session selected, stay open */}
           {selectedSession && selectedSessionDetails && (
-            <SidebarSection title="Agents" icon={faRobot}>
+            <SidebarSection 
+              title="Agents" 
+              icon={faRobot}
+              defaultCollapsed={false}
+              collapsible={true}
+            >
               {selectedSessionDetails.agents?.map((agent) => (
                 <SidebarItem
                   key={agent.threadId}
