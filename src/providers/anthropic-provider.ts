@@ -412,7 +412,7 @@ export class AnthropicProvider extends AIProvider {
       {
         id: 'claude-opus-4-20250514',
         displayName: 'Claude Opus 4',
-        description: 'World\'s best coding model with sustained performance',
+        description: "World's best coding model with sustained performance",
         contextWindow: 200000,
         maxOutputTokens: 8192,
         capabilities: ['vision', 'function-calling', 'coding', 'reasoning'],
