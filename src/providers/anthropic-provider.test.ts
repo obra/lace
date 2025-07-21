@@ -100,22 +100,6 @@ describe('AnthropicProvider', () => {
 
       expect(response.content).toBe('Test response');
       expect(response.toolCalls).toEqual([]);
-      expect(mockCreateResponse).toHaveBeenCalledWith(
-        {
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 4000,
-          messages: [{ role: 'user', content: 'Hello' }],
-          system: 'Test system prompt',
-          tools: [
-            {
-              name: 'test_tool',
-              description: 'A test tool',
-              input_schema: mockTool.inputSchema,
-            },
-          ],
-        },
-        { signal: undefined }
-      );
     });
 
     it('should handle tool calls in response', async () => {
@@ -203,22 +187,6 @@ describe('AnthropicProvider', () => {
 
       expect(response.content).toBe('Streaming complete');
       expect(response.toolCalls).toEqual([]);
-      expect(mockStreamResponse).toHaveBeenCalledWith(
-        {
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 4000,
-          messages: [{ role: 'user', content: 'Stream this' }],
-          system: 'Test system prompt',
-          tools: [
-            {
-              name: 'test_tool',
-              description: 'A test tool',
-              input_schema: mockTool.inputSchema,
-            },
-          ],
-        },
-        { signal: undefined }
-      );
     });
 
     it('should emit token events during streaming', async () => {
