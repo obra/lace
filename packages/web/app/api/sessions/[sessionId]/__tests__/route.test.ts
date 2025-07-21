@@ -140,7 +140,7 @@ describe('Session Detail API Route', () => {
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
       const response = await GET(request, {
-        params: { sessionId: String(sessionId) },
+        params: Promise.resolve({ sessionId: String(sessionId) }),
       });
 
       expect(response.status).toBe(200);
@@ -169,7 +169,7 @@ describe('Session Detail API Route', () => {
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
       const response = await GET(request, {
-        params: { sessionId: String(sessionId) },
+        params: Promise.resolve({ sessionId: String(sessionId) }),
       });
       const data = (await response.json()) as { error: string };
 
@@ -182,7 +182,7 @@ describe('Session Detail API Route', () => {
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
       const response = await GET(request, {
-        params: { sessionId: String(sessionId) },
+        params: Promise.resolve({ sessionId: String(sessionId) }),
       });
       const data = (await response.json()) as { error: string };
 
@@ -224,7 +224,7 @@ describe('Session Detail API Route', () => {
       });
 
       const response = await PATCH(request, {
-        params: { sessionId: String(sessionId) },
+        params: Promise.resolve({ sessionId: String(sessionId) }),
       });
 
       if (response.status !== 200) {
@@ -256,7 +256,7 @@ describe('Session Detail API Route', () => {
       });
 
       const response = await PATCH(request, {
-        params: { sessionId: String(sessionId) },
+        params: Promise.resolve({ sessionId: String(sessionId) }),
       });
 
       const data = (await response.json()) as { error: string };
@@ -295,7 +295,7 @@ describe('Session Detail API Route', () => {
       });
 
       const response = await PATCH(request, {
-        params: { sessionId: String(sessionId) },
+        params: Promise.resolve({ sessionId: String(sessionId) }),
       });
 
       const data = (await response.json()) as { error: string; details?: unknown };
@@ -335,7 +335,7 @@ describe('Session Detail API Route', () => {
       });
 
       const response = await PATCH(request, {
-        params: { sessionId: String(sessionId) },
+        params: Promise.resolve({ sessionId: String(sessionId) }),
       });
 
       expect(response.status).toBe(200);
@@ -359,7 +359,7 @@ describe('Session Detail API Route', () => {
       });
 
       const response = await PATCH(request, {
-        params: { sessionId: String(sessionId) },
+        params: Promise.resolve({ sessionId: String(sessionId) }),
       });
 
       const data = (await response.json()) as { error: string };
@@ -406,7 +406,7 @@ describe('Session Detail API Route', () => {
 
       // This should FAIL initially because route still uses sessionService.getSessionData
       await PATCH(request, {
-        params: { sessionId: session.id },
+        params: Promise.resolve({ sessionId: session.id }),
       });
 
       // Verify Session.getSession was called directly (not through sessionService.getSessionData)

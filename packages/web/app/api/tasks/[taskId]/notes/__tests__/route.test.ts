@@ -123,7 +123,7 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: { taskId: 'task_20240101_abc123' } });
+      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
@@ -139,7 +139,7 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: { taskId: 'task_20240101_abc123' } });
+      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
@@ -182,7 +182,7 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: { taskId: 'task_20240101_abc123' } });
+      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
       const data = (await response.json()) as { message: string; task: { notes: Array<{ content: string }> } };
 
       expect(response.status).toBe(201);
@@ -210,7 +210,7 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: { taskId: 'task_20240101_notfound' } });
+      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_notfound' }) });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(404);
@@ -254,7 +254,7 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: { taskId: 'task_20240101_abc123' } });
+      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
       const _data = (await response.json()) as { message: string };
 
       expect(response.status).toBe(201);

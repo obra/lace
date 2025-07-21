@@ -37,7 +37,7 @@ const mockSessionService = {
 
 // Set up the default mock behavior for getSession - properly typed mock
 mockSessionService.getSession.mockImplementation(
-  async (sessionId: import('@/types/api').ThreadId): Promise<unknown> => {
+  async (sessionId: import('@/types/api').ThreadId) => {
     if (sessionId === 'lace_20240101_session') {
       // Create a partial mock session with the required methods for testing
       const mockSessionResult: Record<string, unknown> = {
