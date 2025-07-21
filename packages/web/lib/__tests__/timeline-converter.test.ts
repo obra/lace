@@ -1,8 +1,11 @@
 // ABOUTME: Test suite for SessionEvent to TimelineEntry conversion
 // ABOUTME: Comprehensive TDD tests for timeline converter functionality
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+
 import { describe, test, expect } from 'vitest';
 import type { SessionEvent, Agent } from '@/types/api';
+import type { TimelineEntry } from '@/types/design-system';
 import { asThreadId } from '@/lib/server/core-types';
 import { 
   convertSessionEventsToTimeline,
@@ -81,7 +84,7 @@ describe('convertSessionEventsToTimeline', () => {
 
   test('converts USER_MESSAGE to human timeline entry', () => {
     const events: SessionEvent[] = [mockSessionEvents[0]];
-    const result = convertSessionEventsToTimeline(events, defaultContext);
+    const result: TimelineEntry[] = convertSessionEventsToTimeline(events, defaultContext);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(expect.objectContaining({
@@ -94,7 +97,7 @@ describe('convertSessionEventsToTimeline', () => {
 
   test('converts AGENT_MESSAGE to ai timeline entry with agent name', () => {
     const events: SessionEvent[] = [mockSessionEvents[1]];
-    const result = convertSessionEventsToTimeline(events, defaultContext);
+    const result: TimelineEntry[] = convertSessionEventsToTimeline(events, defaultContext);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(expect.objectContaining({
@@ -108,7 +111,7 @@ describe('convertSessionEventsToTimeline', () => {
 
   test('converts TOOL_CALL to tool timeline entry', () => {
     const events: SessionEvent[] = [mockSessionEvents[2]];
-    const result = convertSessionEventsToTimeline(events, defaultContext);
+    const result: TimelineEntry[] = convertSessionEventsToTimeline(events, defaultContext);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(expect.objectContaining({
@@ -123,7 +126,7 @@ describe('convertSessionEventsToTimeline', () => {
 
   test('converts TOOL_RESULT to tool timeline entry with result', () => {
     const events: SessionEvent[] = [mockSessionEvents[3]];
-    const result = convertSessionEventsToTimeline(events, defaultContext);
+    const result: TimelineEntry[] = convertSessionEventsToTimeline(events, defaultContext);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(expect.objectContaining({
@@ -138,7 +141,7 @@ describe('convertSessionEventsToTimeline', () => {
 
   test('converts THINKING to ai timeline entry with thinking message', () => {
     const events: SessionEvent[] = [mockSessionEvents[4]];
-    const result = convertSessionEventsToTimeline(events, defaultContext);
+    const result: TimelineEntry[] = convertSessionEventsToTimeline(events, defaultContext);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(expect.objectContaining({
@@ -152,7 +155,7 @@ describe('convertSessionEventsToTimeline', () => {
 
   test('converts LOCAL_SYSTEM_MESSAGE to admin timeline entry', () => {
     const events: SessionEvent[] = [mockSessionEvents[5]];
-    const result = convertSessionEventsToTimeline(events, defaultContext);
+    const result: TimelineEntry[] = convertSessionEventsToTimeline(events, defaultContext);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(expect.objectContaining({
