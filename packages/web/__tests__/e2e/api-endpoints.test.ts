@@ -292,7 +292,7 @@ describe('API Endpoints E2E Tests', () => {
       }
 
       // Ensure the agent is properly available
-      const agent = session.getAgent(agentThreadId);
+      const agent = session.getAgent(asThreadId(agentThreadId));
       if (!agent) {
         throw new Error(
           `Agent not found for threadId: ${agentThreadId}. Cannot proceed with message test.`

@@ -214,7 +214,7 @@ describe('useSSEStream', () => {
 
   it('should disconnect when sessionId becomes null', async () => {
     const sessionId = 'lace_20250113_test123' as ThreadId;
-    const { result, rerender } = renderHook(({ id }) => useSSEStream(id), {
+    const { result, rerender } = renderHook(({ id }: { id: ThreadId | null }) => useSSEStream(id), {
       initialProps: { id: sessionId },
     });
 

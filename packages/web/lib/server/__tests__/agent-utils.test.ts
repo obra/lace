@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setupAgentApprovals } from '@/lib/server/agent-utils';
 import { Agent } from '@/lib/server/lace-imports';
 import { SessionService } from '@/lib/server/session-service';
+import { asThreadId } from '@/lib/server/core-types';
 
 // Mock the approval manager
 vi.mock('@/lib/server/approval-manager', () => ({
@@ -32,7 +33,7 @@ describe('Agent Utilities', () => {
   });
 
   it('should setup approval callback on agent', () => {
-    const sessionId = 'test-session-id';
+    const sessionId = asThreadId('lace_20240101_test01');
 
     setupAgentApprovals(mockAgent as unknown as Agent, sessionId);
 

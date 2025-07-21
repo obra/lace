@@ -7,6 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session, Project } from '@/lib/server/lace-imports';
+import { asThreadId } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
   teardownTestPersistence,
@@ -62,7 +63,7 @@ describe('Session.spawnAgent Method', () => {
     const agentThreadId = agent.threadId;
 
     // Retrieve agent from session
-    const retrievedAgent = session.getAgent(agentThreadId);
+    const retrievedAgent = session.getAgent(asThreadId(agentThreadId));
 
     // Verify agent was retrieved
     expect(retrievedAgent).toBeDefined();
