@@ -18,6 +18,7 @@ import { ToolApprovalModal } from '@/components/old/ToolApprovalModal';
 import { AgentSpawner } from '@/components/old/AgentSpawner';
 import { TaskDashboard } from '@/components/old/TaskDashboard';
 import { ProjectManager } from '@/components/old/ProjectManager';
+import ChatInputComposer from '@/components/ui/ChatInputComposer';
 import { getAllEventTypes } from '@/types/events';
 
 export default function Home() {
@@ -438,26 +439,16 @@ export default function Home() {
 
                         {/* Message Input at Bottom */}
                         <div className="border-t border-gray-700 p-4 bg-gray-800">
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={message}
-                              onChange={(e) => setMessage(e.target.value)}
-                              placeholder="Type your message..."
-                              className="flex-1 px-4 py-2 bg-gray-700 rounded text-white"
-                              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                              disabled={sendingMessage}
-                              data-testid="message-input"
-                            />
-                            <button
-                              onClick={sendMessage}
-                              disabled={sendingMessage || !message.trim()}
-                              className="px-6 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-                              data-testid="send-message-button"
-                            >
-                              Send
-                            </button>
-                          </div>
+                          <ChatInputComposer
+                            value={message}
+                            onChange={setMessage}
+                            onSubmit={sendMessage}
+                            disabled={sendingMessage}
+                            placeholder="Type your message..."
+                            showVoiceButton={false}
+                            showFileAttachment={false}
+                            isStreaming={sendingMessage}
+                          />
                         </div>
                       </>
                     ) : (
