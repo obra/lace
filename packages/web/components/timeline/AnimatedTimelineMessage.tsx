@@ -33,10 +33,10 @@ interface AnimatedTimelineMessageProps {
 export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessageProps) {
   const renderMessage = (content: string) => {
     // Code block formatting
-    let formatted = content.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+    let formatted = content.replace(/```(\w+)?\n([\s\S]*?)```/g, (match: string, lang: string | undefined, code: string) => {
       return `<div class="bg-base-300 border border-base-content/20 rounded-lg p-3 my-2 overflow-x-auto">
         <div class="text-xs text-base-content/60 mb-2 font-mono">${lang || 'code'}</div>
-        <pre class="text-accent text-sm font-mono"><code class="font-mono">${escapeHtml(code.trim())}</code></pre>
+        <pre class="text-accent text-sm font-mono"><code class="font-mono">${escapeHtml((code || '').trim())}</code></pre>
       </div>`;
     });
 

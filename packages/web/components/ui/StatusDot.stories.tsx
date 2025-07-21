@@ -163,9 +163,9 @@ export const WithPulse: Story = {
 export const AllStatuses: Story = {
   render: () => (
     <div className="flex flex-wrap gap-6">
-      {['online', 'offline', 'busy', 'away', 'error', 'success', 'warning', 'info'].map((status) => (
+      {(['online', 'offline', 'busy', 'away', 'error', 'success', 'warning', 'info'] as const).map((status) => (
         <div key={status} className="text-center">
-          <StatusDot status={status as any} size="md" />
+          <StatusDot status={status} size="md" />
           <p className="text-xs text-gray-500 mt-1 capitalize">{status}</p>
         </div>
       ))}
@@ -183,9 +183,9 @@ export const AllStatuses: Story = {
 export const AllSizes: Story = {
   render: () => (
     <div className="flex items-center gap-6">
-      {['xs', 'sm', 'md', 'lg'].map((size) => (
+      {(['xs', 'sm', 'md', 'lg'] as const).map((size) => (
         <div key={size} className="text-center">
-          <StatusDot status="online" size={size as any} />
+          <StatusDot status="online" size={size} />
           <p className="text-xs text-gray-500 mt-1 uppercase">{size}</p>
         </div>
       ))}
@@ -203,9 +203,9 @@ export const AllSizes: Story = {
 export const PulsingStatuses: Story = {
   render: () => (
     <div className="flex flex-wrap gap-6">
-      {['online', 'busy', 'warning', 'error'].map((status) => (
+      {(['online', 'busy', 'warning', 'error'] as const).map((status) => (
         <div key={status} className="text-center">
-          <StatusDot status={status as any} size="lg" pulse={true} />
+          <StatusDot status={status} size="lg" pulse={true} />
           <p className="text-xs text-gray-500 mt-1 capitalize">{status} (Pulsing)</p>
         </div>
       ))}

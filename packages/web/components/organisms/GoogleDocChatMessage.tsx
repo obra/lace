@@ -139,6 +139,7 @@ export default function GoogleDocChatMessage({ message }: GoogleDocChatMessagePr
                   {/* Thumbnail or fallback */}
                   {thumbnailUrl && !imageError ? (
                     <div className="mb-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={thumbnailUrl}
                         alt={`Preview of ${message.document.title}`}

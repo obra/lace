@@ -32,10 +32,10 @@ vi.mock('@/lib/syntax-themes', () => ({
 
 // Mock performance utils
 vi.mock('@/lib/performance-utils', () => ({
-  debounce: vi.fn((fn) => {
-    const debouncedFn = fn as any;
-    debouncedFn.cancel = vi.fn();
-    return debouncedFn;
+  debounce: vi.fn(<T extends (...args: unknown[]) => unknown>(fn: T) => {
+    const mockFn = fn as T & { cancel: () => void };
+    mockFn.cancel = vi.fn();
+    return mockFn;
   }),
   isCodeTooLarge: vi.fn().mockReturnValue(false),
 }));
@@ -49,7 +49,7 @@ vi.mock('@/lib/fontawesome', () => ({
 }));
 
 vi.mock('@fortawesome/react-fontawesome', () => ({
-  FontAwesomeIcon: ({ icon }: { icon: any }) => (
+  FontAwesomeIcon: ({ icon }: { icon: { iconName: string; prefix: string } }) => (
     <span aria-label={icon.iconName}>{icon.iconName}</span>
   ),
 }));

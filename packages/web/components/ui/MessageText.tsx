@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import CodeBlock from './CodeBlock';
 import InlineCode from './InlineCode';
 
@@ -16,7 +16,7 @@ interface ContentPart {
 }
 
 export default function MessageText({ content, className = '' }: MessageTextProps) {
-  const processInlineCode = (text: string): ContentPart[] => {
+  const processInlineCode = useCallback((text: string): ContentPart[] => {
     const parts: ContentPart[] = [];
     let currentIndex = 0;
     
@@ -46,7 +46,7 @@ export default function MessageText({ content, className = '' }: MessageTextProp
     }
     
     return parts.length > 0 ? parts : [{ type: 'text', content: text }];
-  };
+  }, []);
 
   const parsedContent = useMemo(() => {
     const parts: ContentPart[] = [];

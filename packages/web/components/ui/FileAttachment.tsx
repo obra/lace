@@ -432,6 +432,7 @@ function FilePreviewCard({ file, onFileClick, onFileRemoved, disabled }: FilePre
         {/* Preview area */}
         <div className="flex-1 flex items-center justify-center relative">
           {isImageFile(file) && imagePreview ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={imagePreview}
               alt={file.name}
@@ -516,6 +517,7 @@ function FileContentModal({ file, content }: FileContentModalProps) {
       {/* File content */}
       <div className="max-h-96 overflow-y-auto">
         {isImageFile(file) ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={URL.createObjectURL(file.file)}
             alt={file.name}

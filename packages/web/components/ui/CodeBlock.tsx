@@ -74,7 +74,7 @@ export default function CodeBlock({
         let displayCode = codeToHighlight;
         if (lang === 'json' || (!lang && codeToHighlight.trim().startsWith('{'))) {
           try {
-            const parsed = JSON.parse(codeToHighlight);
+            const parsed = JSON.parse(codeToHighlight) as unknown;
             displayCode = JSON.stringify(parsed, null, 2);
           } catch {
             // Keep original if not valid JSON
@@ -116,15 +116,19 @@ export default function CodeBlock({
       }
 
       // Use debounced highlighting for better performance
-      debouncedHighlight.current(code, () => isCancelled, language, filename);
+      const debouncedFn = debouncedHighlight.current as ((code: string, cancelled: () => boolean, lang?: string, file?: string) => Promise<void>) | undefined;
+      if (debouncedFn) {
+        await debouncedFn(code, () => isCancelled, language, filename);
+      }
     };
 
     initializeHighlighting();
 
     return () => {
       isCancelled = true;
-      if (debouncedHighlight.current) {
-        debouncedHighlight.current.cancel();
+      const currentDebounced = debouncedHighlight.current as { cancel?: () => void } | undefined;
+      if (currentDebounced && typeof currentDebounced.cancel === 'function') {
+        currentDebounced.cancel();
       }
       if (copyTimeoutRef.current) {
         clearTimeout(copyTimeoutRef.current);
