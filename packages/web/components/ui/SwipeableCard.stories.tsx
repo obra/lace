@@ -402,17 +402,17 @@ export const InteractiveDemo: Story = {
         
         <div className="cursor-pointer">
           <h4 className="font-medium mb-3">Long Press</h4>
-          {LongPressDemo.render ? LongPressDemo.render() : <div>Long Press Demo</div>}
+          {LongPressDemo.render ? (LongPressDemo.render as any)() : <div>Long Press Demo</div>}
         </div>
         
         <div className="cursor-pointer">
           <h4 className="font-medium mb-3">Floating Action Button</h4>
-          {FloatingActionButtonDemo.render ? FloatingActionButtonDemo.render() : <div>Floating Action Button Demo</div>}
+          {FloatingActionButtonDemo.render ? (FloatingActionButtonDemo.render as any)() : <div>Floating Action Button Demo</div>}
         </div>
         
         <div className="cursor-pointer">
           <h4 className="font-medium mb-3">Pull to Refresh</h4>
-          {PullToRefreshDemo.render ? PullToRefreshDemo.render() : <div>Pull to Refresh Demo</div>}
+          {PullToRefreshDemo.render ? (PullToRefreshDemo.render as any)() : <div>Pull to Refresh Demo</div>}
         </div>
       </div>
       

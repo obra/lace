@@ -163,7 +163,7 @@ function convertEvent(event: SessionEvent, index: number, context: ConversionCon
       return {
         id,
         type: 'admin',
-        content: `Unknown event: ${(event as any).type}`,
+        content: `Unknown event: ${(event as { type: string }).type}`,
         timestamp,
       };
   }

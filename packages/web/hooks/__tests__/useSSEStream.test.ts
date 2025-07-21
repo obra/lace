@@ -127,7 +127,7 @@ describe('useSSEStream', () => {
       eventSource.dispatchEvent('USER_MESSAGE', {
         type: 'USER_MESSAGE',
         threadId: sessionId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { content: 'Hello' },
       });
     });
@@ -144,7 +144,7 @@ describe('useSSEStream', () => {
       eventSource.dispatchEvent('AGENT_MESSAGE', {
         type: 'AGENT_MESSAGE',
         threadId: sessionId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { content: 'Hi there!' },
       });
     });
@@ -167,7 +167,7 @@ describe('useSSEStream', () => {
       eventSource.dispatchEvent('USER_MESSAGE', {
         type: 'USER_MESSAGE',
         threadId: sessionId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { content: 'Hello' },
       });
     });
@@ -248,7 +248,7 @@ describe('useSSEStream', () => {
       eventSource1.dispatchEvent('USER_MESSAGE', {
         type: 'USER_MESSAGE',
         threadId: sessionId1,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { content: 'Session 1' },
       });
     });
@@ -292,7 +292,7 @@ describe('useSSEStream', () => {
         eventSource.dispatchEvent(type, {
           type,
           threadId: sessionId,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
           data: { test: `Event ${index}` },
         });
       });

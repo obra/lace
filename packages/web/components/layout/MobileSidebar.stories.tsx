@@ -174,7 +174,7 @@ const defaultArgs = {
   onClose: () => {},
   currentProject: sampleProjects[0],
   projects: sampleProjects,
-  currentTimeline: { id: 1, name: 'Main Dev', agent: 'Claude' },
+  currentTimeline: { id: 1, name: 'Main Dev', agent: 'Claude' as const },
   timelines: sampleTimelines,
   activeTasks: sampleTasks,
   currentTheme: 'dark',

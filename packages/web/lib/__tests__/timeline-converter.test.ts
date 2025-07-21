@@ -3,7 +3,6 @@
 
 import { describe, test, expect } from 'vitest';
 import type { SessionEvent, Agent, ThreadId } from '@/types/api';
-import type { TimelineEntry } from '@/types/design-system';
 import { 
   convertSessionEventsToTimeline,
   type ConversionContext 
@@ -312,7 +311,7 @@ describe('convertSessionEventsToTimeline', () => {
       threadId: 'session-123' as ThreadId,
       timestamp: new Date('2025-07-21T10:38:00Z'),
       data: { someData: 'test' },
-    } as any; // Cast to bypass TypeScript checking for test
+    } as SessionEvent; // Cast to SessionEvent to test fallback handling
 
     const result = convertSessionEventsToTimeline([unknownEvent], defaultContext);
     

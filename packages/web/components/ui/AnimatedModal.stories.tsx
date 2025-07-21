@@ -477,21 +477,21 @@ export const InteractiveDemo: Story = {
         </div>
         
         <div className="cursor-pointer">
-          {FormModal.render ? FormModal.render() : <div>Form Modal</div>}
+          {FormModal.render ? (FormModal.render as any)() : <div>Form Modal</div>}
         </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="cursor-pointer">
-          {ConfirmModal.render ? ConfirmModal.render() : <div>Confirm Modal</div>}
+          {ConfirmModal.render ? (ConfirmModal.render as any)() : <div>Confirm Modal</div>}
         </div>
         
         <div className="cursor-pointer">
-          {WarningModal.render ? WarningModal.render() : <div>Warning Modal</div>}
+          {WarningModal.render ? (WarningModal.render as any)() : <div>Warning Modal</div>}
         </div>
         
         <div className="cursor-pointer">
-          {InfoModal.render ? InfoModal.render() : <div>Info Modal</div>}
+          {InfoModal.render ? (InfoModal.render as any)() : <div>Info Modal</div>}
         </div>
       </div>
       

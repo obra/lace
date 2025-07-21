@@ -172,7 +172,7 @@ describe('SSE Integration E2E Tests', () => {
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
         threadId: asThreadId(`${sessionId}.1`),
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { content: 'Hello, world!' },
       };
 
@@ -197,7 +197,7 @@ describe('SSE Integration E2E Tests', () => {
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
         threadId: asThreadId(`${sessionId1}.1`),
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { content: 'Only for session 1' },
       };
 
@@ -212,7 +212,7 @@ describe('SSE Integration E2E Tests', () => {
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
         threadId: asThreadId('lace_20240101_test.1'),
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { content: 'This should not crash' },
       };
 
@@ -233,7 +233,7 @@ describe('SSE Integration E2E Tests', () => {
       const event: SessionEvent = {
         type: 'TOOL_CALL',
         threadId: asThreadId(`${sessionId}.1`),
-        timestamp: '2024-01-01T12:00:00Z',
+        timestamp: new Date('2024-01-01T12:00:00Z'),
         data: { toolName: 'test-tool', input: { param: 'value' } },
       };
 
@@ -270,7 +270,7 @@ describe('SSE Integration E2E Tests', () => {
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
         threadId: asThreadId(`${sessionId}.1`),
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { content: 'This should handle errors' },
       };
 
@@ -295,7 +295,7 @@ describe('SSE Integration E2E Tests', () => {
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
         threadId: asThreadId(`${sessionId}.1`),
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { content: 'Test cleanup' },
       };
 

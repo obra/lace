@@ -371,16 +371,16 @@ export const InteractiveDemo: Story = {
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="cursor-pointer">
-          {LoadingSimulation.render ? LoadingSimulation.render() : <div>Loading Simulation</div>}
+          {LoadingSimulation.render ? (LoadingSimulation.render as any)() : <div>Loading Simulation</div>}
         </div>
         
         <div className="cursor-pointer">
-          {DocumentSkeletonDemo.render ? DocumentSkeletonDemo.render() : <div>Document Skeleton Demo</div>}
+          {DocumentSkeletonDemo.render ? (DocumentSkeletonDemo.render as any)() : <div>Document Skeleton Demo</div>}
         </div>
       </div>
       
       <div className="cursor-pointer">
-        {CardSkeletons.render ? CardSkeletons.render() : <div>Card Skeletons</div>}
+        {CardSkeletons.render ? (CardSkeletons.render as any)() : <div>Card Skeletons</div>}
       </div>
       
       <div className="text-sm text-gray-600 space-y-1">
