@@ -4,7 +4,10 @@
       "Bash(find:*)",
       "Bash(grep:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npx:*)",
+      "Bash(npm --prefix /Users/jesse/Documents/GitHub/lace/.worktrees/f-integrate-spicy-web run typecheck)",
+      "Bash(npm --prefix /Users/jesse/Documents/GitHub/lace/.worktrees/f-integrate-spicy-web test)"
     ],
     "deny": []
   }

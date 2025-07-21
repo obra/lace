@@ -102,19 +102,19 @@ describe('CLI Flow Tests', () => {
     vi.clearAllMocks();
 
     // Setup common mocks
-    const { getEnvVar } = vi.mocked(await import('../config/env-loader'));
-    const { ThreadManager } = vi.mocked(await import('../threads/thread-manager'));
-    const { ToolExecutor } = vi.mocked(await import('../tools/executor'));
-    const { Agent } = vi.mocked(await import('../agents/agent'));
-    const { logger } = vi.mocked(await import('../utils/logger'));
-    const { enableTrafficLogging } = vi.mocked(await import('../utils/traffic-logger'));
+    const { getEnvVar } = vi.mocked(await import('~/config/env-loader'));
+    const { ThreadManager } = vi.mocked(await import('~/threads/thread-manager'));
+    const { ToolExecutor } = vi.mocked(await import('~/tools/executor'));
+    const { Agent } = vi.mocked(await import('~/agents/agent'));
+    const { logger } = vi.mocked(await import('~/utils/logger'));
+    const { enableTrafficLogging } = vi.mocked(await import('~/utils/traffic-logger'));
     const { NonInteractiveInterface } = vi.mocked(
-      await import('../interfaces/non-interactive-interface')
+      await import('~/interfaces/non-interactive-interface')
     );
     const { TerminalInterface } = vi.mocked(
-      await import('../interfaces/terminal/terminal-interface')
+      await import('~/interfaces/terminal/terminal-interface')
     );
-    const { createGlobalPolicyCallback } = vi.mocked(await import('../tools/policy-wrapper'));
+    const { createGlobalPolicyCallback } = vi.mocked(await import('~/tools/policy-wrapper'));
 
     // Mock environment variables
     getEnvVar.mockImplementation((key) => {
@@ -210,7 +210,7 @@ describe('CLI Flow Tests', () => {
 
   describe('provider initialization', () => {
     it('should initialize Anthropic provider with API key', async () => {
-      const { AnthropicProvider } = await import('../providers/anthropic-provider');
+      const { AnthropicProvider } = await import('~/providers/anthropic-provider');
 
       await run(mockCliOptions);
 
@@ -221,7 +221,7 @@ describe('CLI Flow Tests', () => {
     });
 
     it('should initialize OpenAI provider with API key', async () => {
-      const { OpenAIProvider } = await import('../providers/openai-provider');
+      const { OpenAIProvider } = await import('~/providers/openai-provider');
       const options = { ...mockCliOptions, provider: 'openai', model: 'gpt-4' };
 
       await run(options);
@@ -233,7 +233,7 @@ describe('CLI Flow Tests', () => {
     });
 
     it('should initialize LMStudio provider without API key', async () => {
-      const { LMStudioProvider } = await import('../providers/lmstudio-provider');
+      const { LMStudioProvider } = await import('~/providers/lmstudio-provider');
       const options = { ...mockCliOptions, provider: 'lmstudio', model: 'local-model' };
 
       await run(options);
@@ -244,7 +244,7 @@ describe('CLI Flow Tests', () => {
     });
 
     it('should initialize Ollama provider without API key', async () => {
-      const { OllamaProvider } = await import('../providers/ollama-provider');
+      const { OllamaProvider } = await import('~/providers/ollama-provider');
       const options = { ...mockCliOptions, provider: 'ollama', model: 'llama2' };
 
       await run(options);
@@ -255,7 +255,7 @@ describe('CLI Flow Tests', () => {
     });
 
     it('should throw error for missing Anthropic API key', async () => {
-      const { getEnvVar } = vi.mocked(await import('../config/env-loader'));
+      const { getEnvVar } = vi.mocked(await import('~/config/env-loader'));
       getEnvVar.mockImplementation((key) => {
         if (key === 'ANTHROPIC_KEY') return undefined;
         return undefined;
@@ -267,7 +267,7 @@ describe('CLI Flow Tests', () => {
     });
 
     it('should throw error for missing OpenAI API key', async () => {
-      const { getEnvVar } = vi.mocked(await import('../config/env-loader'));
+      const { getEnvVar } = vi.mocked(await import('~/config/env-loader'));
       getEnvVar.mockImplementation((key) => {
         if (key === 'OPENAI_API_KEY' || key === 'OPENAI_KEY') return undefined;
         return undefined;
@@ -289,7 +289,7 @@ describe('CLI Flow Tests', () => {
   describe('session management', () => {
     it('should create new session when no continue specified', async () => {
       const { log } = withConsoleCapture();
-      const { Agent } = vi.mocked(await import('../agents/agent'));
+      const { Agent } = vi.mocked(await import('~/agents/agent'));
 
       await run(mockCliOptions);
 
@@ -301,8 +301,8 @@ describe('CLI Flow Tests', () => {
 
     it('should resume session when continue is true', async () => {
       const { log } = withConsoleCapture();
-      const { Agent } = vi.mocked(await import('../agents/agent'));
-      const { ToolExecutor } = vi.mocked(await import('../tools/executor'));
+      const { Agent } = vi.mocked(await import('~/agents/agent'));
+      const { ToolExecutor } = vi.mocked(await import('~/tools/executor'));
 
       // Override the mock to return resumed session
       const mockAgentInstance = {
@@ -328,8 +328,8 @@ describe('CLI Flow Tests', () => {
 
     it('should resume specific session when thread ID provided', async () => {
       const { log } = withConsoleCapture();
-      const { Agent } = vi.mocked(await import('../agents/agent'));
-      const { ToolExecutor } = vi.mocked(await import('../tools/executor'));
+      const { Agent } = vi.mocked(await import('~/agents/agent'));
+      const { ToolExecutor } = vi.mocked(await import('~/tools/executor'));
 
       // Override the mock to return specific session
       const mockAgentInstance = {
@@ -354,8 +354,8 @@ describe('CLI Flow Tests', () => {
 
     it('should handle resume error gracefully', async () => {
       const { log, warn } = withConsoleCapture();
-      const { Agent } = vi.mocked(await import('../agents/agent'));
-      const { ToolExecutor } = vi.mocked(await import('../tools/executor'));
+      const { Agent } = vi.mocked(await import('~/agents/agent'));
+      const { ToolExecutor } = vi.mocked(await import('~/tools/executor'));
 
       // Override the mock to return error case
       const mockAgentInstance = {
@@ -379,7 +379,7 @@ describe('CLI Flow Tests', () => {
   describe('interface selection', () => {
     it('should use NonInteractiveInterface for prompt execution', async () => {
       const { NonInteractiveInterface } = vi.mocked(
-        await import('../interfaces/non-interactive-interface')
+        await import('~/interfaces/non-interactive-interface')
       );
       const options = { ...mockCliOptions, prompt: 'test prompt' };
 
@@ -393,7 +393,7 @@ describe('CLI Flow Tests', () => {
 
     it('should use TerminalInterface for interactive mode', async () => {
       const { TerminalInterface } = vi.mocked(
-        await import('../interfaces/terminal/terminal-interface')
+        await import('~/interfaces/terminal/terminal-interface')
       );
 
       await run(mockCliOptions);
@@ -406,7 +406,7 @@ describe('CLI Flow Tests', () => {
 
   describe('logging and configuration', () => {
     it('should configure logger with provided options', async () => {
-      const { logger } = vi.mocked(await import('../utils/logger'));
+      const { logger } = vi.mocked(await import('~/utils/logger'));
       const options = { ...mockCliOptions, logLevel: 'debug' as const, logFile: 'test.log' };
 
       await run(options);
@@ -416,7 +416,7 @@ describe('CLI Flow Tests', () => {
     });
 
     it('should enable traffic logging when harFile specified', async () => {
-      const { enableTrafficLogging } = vi.mocked(await import('../utils/traffic-logger'));
+      const { enableTrafficLogging } = vi.mocked(await import('~/utils/traffic-logger'));
       const options = { ...mockCliOptions, harFile: 'test.har' };
 
       await run(options);
@@ -425,8 +425,8 @@ describe('CLI Flow Tests', () => {
     });
 
     it('should set up global policy callback', async () => {
-      const { createGlobalPolicyCallback } = vi.mocked(await import('../tools/policy-wrapper'));
-      const { Agent } = vi.mocked(await import('../agents/agent'));
+      const { createGlobalPolicyCallback } = vi.mocked(await import('~/tools/policy-wrapper'));
+      const { Agent } = vi.mocked(await import('~/agents/agent'));
 
       await run(mockCliOptions);
 
@@ -438,7 +438,7 @@ describe('CLI Flow Tests', () => {
 
   describe('agent and tool setup', () => {
     it('should create Agent with correct configuration', async () => {
-      const { Agent } = vi.mocked(await import('../agents/agent'));
+      const { Agent } = vi.mocked(await import('~/agents/agent'));
 
       await run(mockCliOptions);
 
@@ -452,7 +452,7 @@ describe('CLI Flow Tests', () => {
     });
 
     it('should register all available tools', async () => {
-      const { ToolExecutor } = vi.mocked(await import('../tools/executor'));
+      const { ToolExecutor } = vi.mocked(await import('~/tools/executor'));
 
       await run(mockCliOptions);
 
@@ -461,7 +461,7 @@ describe('CLI Flow Tests', () => {
     });
 
     it('should set delegate tool dependencies if delegate tool exists', async () => {
-      const { ToolExecutor } = vi.mocked(await import('../tools/executor'));
+      const { ToolExecutor } = vi.mocked(await import('~/tools/executor'));
       const mockDelegateTool = {
         name: 'delegate',
         description: 'Mock delegate tool',

@@ -17,12 +17,12 @@ import {
 // When it is, subagent tool calls should use the same approval flow
 
 // Mock providers
-vi.mock('../../providers/anthropic-provider.js');
-vi.mock('../../providers/lmstudio-provider.js');
-vi.mock('../../providers/ollama-provider.js');
+vi.mock('~/providers/anthropic-provider');
+vi.mock('~/providers/lmstudio-provider');
+vi.mock('~/providers/ollama-provider');
 
 // Mock the Agent
-vi.mock('../../agents/agent.js');
+vi.mock('~/agents/agent');
 
 describe('DelegateTool', () => {
   let tool: DelegateTool;

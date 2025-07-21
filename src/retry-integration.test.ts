@@ -196,7 +196,7 @@ describe('Retry System Integration Tests', () => {
 
     it('should verify UI theme includes retry symbols', async () => {
       // Import the UI theme and verify retry symbols are defined
-      const { UI_SYMBOLS } = await import('../interfaces/terminal/theme');
+      const { UI_SYMBOLS } = await import('./interfaces/terminal/theme');
 
       expect(UI_SYMBOLS.RETRY).toBeDefined();
       expect(typeof UI_SYMBOLS.RETRY).toBe('string');
@@ -205,7 +205,7 @@ describe('Retry System Integration Tests', () => {
 
     it('should verify StatusBar component accepts retry status', async () => {
       // Import StatusBar and verify it accepts retry status props
-      const StatusBarModule = await import('../interfaces/terminal/components/status-bar');
+      const StatusBarModule = await import('./interfaces/terminal/components/status-bar');
 
       // This test verifies the component exists and can be imported
       // The actual functionality is tested in the component-specific tests
@@ -217,7 +217,7 @@ describe('Retry System Integration Tests', () => {
       const { promises: fs } = await import('fs');
       const path = await import('path');
 
-      const testDir = path.join(process.cwd(), 'src/providers/__tests__');
+      const testDir = path.join(process.cwd(), 'src/providers');
       const files = await fs.readdir(testDir);
 
       const retryTestFiles = files.filter((file) => file.includes('retry-'));
