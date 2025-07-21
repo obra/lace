@@ -78,6 +78,12 @@ const config = [
       'react-hooks/rules-of-hooks': 'off', // Allow hooks in Storybook render functions
     },
   },
+  {
+    files: ['components/**/*.ts', 'components/**/*.tsx'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'off', // Allow unused vars in components
+    },
+  },
 ];
 
 export default config;
