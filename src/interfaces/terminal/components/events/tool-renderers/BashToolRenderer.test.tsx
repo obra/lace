@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { render } from 'ink-testing-library';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { BashToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/BashToolRenderer';
 import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
 import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
@@ -156,7 +156,6 @@ describe('BashToolRenderer', () => {
     // Should start collapsed and show collapsed indicator
     expect(frame).toContain('▶'); // Collapsed indicator
     expect(frame).toContain('to open'); // Expansion hint
-    
     // Should not show expanded content initially (command line with $)
     expect(frame).not.toContain('$'); // Command prompt not visible when collapsed
   });

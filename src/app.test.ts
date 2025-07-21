@@ -99,7 +99,7 @@ vi.mock('~/providers/ollama-provider', () => ({
 
 describe('App Initialization (run function)', () => {
   const _tempLaceDir = useTempLaceDir();
-  
+
   const mockCliOptions: CLIOptions = {
     provider: 'anthropic',
     model: 'claude-3-opus',

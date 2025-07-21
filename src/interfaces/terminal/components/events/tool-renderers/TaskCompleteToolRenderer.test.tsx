@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { render } from 'ink-testing-library';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { TaskCompleteToolRenderer } from '~/interfaces/terminal/components/events/tool-renderers/TaskCompleteToolRenderer';
 import { TimelineExpansionProvider } from '~/interfaces/terminal/components/events/hooks/useTimelineExpansionToggle';
 import { TimelineItemProvider } from '~/interfaces/terminal/components/events/contexts/TimelineItemContext';
