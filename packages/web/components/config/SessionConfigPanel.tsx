@@ -79,11 +79,17 @@ export function SessionConfigPanel({
   const [newEnvKey, setNewEnvKey] = useState('');
   const [newEnvValue, setNewEnvValue] = useState('');
 
-  // Get available models for selected provider
-  const availableModels = useMemo(() => {
-    const provider = providers.find(p => p.type === (sessionConfig.provider || agentProvider));
+  // Get available models for session configuration
+  const sessionAvailableModels = useMemo(() => {
+    const provider = providers.find(p => p.type === sessionConfig.provider);
     return provider?.models || [];
-  }, [providers, sessionConfig.provider, agentProvider]);
+  }, [providers, sessionConfig.provider]);
+
+  // Get available models for agent configuration  
+  const agentAvailableModels = useMemo(() => {
+    const provider = providers.find(p => p.type === agentProvider);
+    return provider?.models || [];
+  }, [providers, agentProvider]);
 
   // Get available providers (only those that are available)
   const availableProviders = useMemo(() => {
@@ -251,7 +257,7 @@ export function SessionConfigPanel({
                             setShowCreateAgent(true);
                           }}
                           className="btn btn-primary btn-xs"
-                          title="Add Agent"
+                          title="Launch Agent"
                         >
                           <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
                         </button>
@@ -377,7 +383,7 @@ export function SessionConfigPanel({
                       onChange={(e) => setSessionConfig(prev => ({ ...prev, model: e.target.value }))}
                       className="select select-bordered w-full"
                     >
-                      {availableModels.map((model) => (
+                      {sessionAvailableModels.map((model) => (
                         <option key={model.name} value={model.name}>
                           {model.displayName}
                         </option>
@@ -530,7 +536,7 @@ export function SessionConfigPanel({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">Add Agent to {selectedSession.name}</h3>
+              <h3 className="text-xl font-semibold">Launch Agent in {selectedSession.name}</h3>
               <button
                 onClick={() => setShowCreateAgent(false)}
                 className="btn btn-ghost btn-sm"
@@ -586,11 +592,11 @@ export function SessionConfigPanel({
                   onChange={(e) => setAgentModel(e.target.value)}
                   className="select select-bordered w-full"
                 >
-                  {providers.find(p => p.type === agentProvider)?.models.map((model) => (
+                  {agentAvailableModels.map((model) => (
                     <option key={model.name} value={model.name}>
                       {model.displayName}
                     </option>
-                  )) || []}
+                  ))}
                 </select>
               </div>
 
@@ -610,10 +616,10 @@ export function SessionConfigPanel({
                   {loading ? (
                     <>
                       <div className="loading loading-spinner loading-sm"></div>
-                      Adding...
+                      Launching...
                     </>
                   ) : (
-                    'Add Agent'
+                    'Launch Agent'
                   )}
                 </button>
               </div>

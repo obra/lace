@@ -13,6 +13,7 @@ import { TimelineView } from '@/components/timeline/TimelineView';
 import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
 import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
+import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import type {
   Session,
@@ -454,36 +455,45 @@ export function LaceApp() {
               currentTheme={theme}
               onThemeChange={setTheme}
             >
-              {/* Projects Section - Only show project selection */}
-              <SidebarSection 
-                title="Projects" 
-                icon={faFolder}
-                defaultCollapsed={false}
-                collapsible={true}
-              >
-                {projectsForSidebar.map((project) => (
-                  <SidebarItem
-                    key={project.id}
-                    active={selectedProject === project.id}
-                    onClick={() => {
-                      handleProjectSelect(project);
-                      setShowMobileNav(false); // Close mobile nav after selection
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FontAwesomeIcon icon={faFolder} className="w-4 h-4" />
-                        <span>{project.name}</span>
-                      </div>
-                      {sessions.length > 0 && (
-                        <span className="text-xs text-base-content/40">
-                          {sessions.length} sessions
-                        </span>
-                      )}
+              {/* Current Project - Show only when project selected */}
+              {selectedProject && (
+                <SidebarSection 
+                  title="Current Project" 
+                  icon={faFolder}
+                  defaultCollapsed={false}
+                  collapsible={false}
+                >
+                  <div className="px-3 py-2 bg-base-50 rounded border border-base-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
+                      <span className="font-medium text-base-content truncate">
+                        {currentProject.name}
+                      </span>
                     </div>
-                  </SidebarItem>
-                ))}
-              </SidebarSection>
+                    <div className="text-xs text-base-content/60 truncate">
+                      {currentProject.description}
+                    </div>
+                    <div className="text-xs text-base-content/50 mt-1">
+                      {sessions.length} sessions
+                    </div>
+                  </div>
+                  
+                  {/* Switch Project Button */}
+                  <SidebarButton
+                    onClick={() => {
+                      setSelectedProject(null);
+                      setSelectedSession(null);
+                      setSelectedAgent(undefined);
+                      setEvents([]);
+                      setShowMobileNav(false);
+                    }}
+                    variant="ghost"
+                  >
+                    <FontAwesomeIcon icon={faFolder} className="w-4 h-4" />
+                    Switch Project
+                  </SidebarButton>
+                </SidebarSection>
+              )}
 
               {/* Session Management - Show session context and agent selection */}
               {selectedSessionDetails && (
@@ -566,33 +576,44 @@ export function LaceApp() {
           currentTheme={theme}
           onThemeChange={setTheme}
         >
-          {/* Projects Section - Only show project selection */}
-          <SidebarSection 
-            title="Projects" 
-            icon={faFolder} 
-            defaultCollapsed={false}
-            collapsible={true}
-          >
-            {projectsForSidebar.map((project) => (
-              <SidebarItem
-                key={project.id}
-                active={selectedProject === project.id}
-                onClick={() => handleProjectSelect(project)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FontAwesomeIcon icon={faFolder} className="w-4 h-4" />
-                    <span>{project.name}</span>
-                  </div>
-                  {sessions.length > 0 && (
-                    <span className="text-xs text-base-content/40">
-                      {sessions.length} sessions
-                    </span>
-                  )}
+          {/* Current Project - Show only when project selected */}
+          {selectedProject && (
+            <SidebarSection 
+              title="Current Project" 
+              icon={faFolder} 
+              defaultCollapsed={false}
+              collapsible={false}
+            >
+              <div className="px-3 py-2 bg-base-50 rounded border border-base-200">
+                <div className="flex items-center gap-2 mb-1">
+                  <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
+                  <span className="font-medium text-base-content truncate">
+                    {currentProject.name}
+                  </span>
                 </div>
-              </SidebarItem>
-            ))}
-          </SidebarSection>
+                <div className="text-xs text-base-content/60 truncate">
+                  {currentProject.description}
+                </div>
+                <div className="text-xs text-base-content/50 mt-1">
+                  {sessions.length} sessions
+                </div>
+              </div>
+              
+              {/* Switch Project Button */}
+              <SidebarButton
+                onClick={() => {
+                  setSelectedProject(null);
+                  setSelectedSession(null);
+                  setSelectedAgent(undefined);
+                  setEvents([]);
+                }}
+                variant="ghost"
+              >
+                <FontAwesomeIcon icon={faFolder} className="w-4 h-4" />
+                Switch Project
+              </SidebarButton>
+            </SidebarSection>
+          )}
 
           {/* Session Management - Show session context and agent selection */}
           {selectedSessionDetails && (
@@ -744,11 +765,14 @@ export function LaceApp() {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center p-6">
-              <div className="text-center space-y-2">
-                <h2 className="text-lg font-medium">Select a Project</h2>
-                <p className="text-base-content/60">Choose a project from the sidebar to continue</p>
-              </div>
+            /* Project Selection Panel - When no project selected */
+            <div className="flex-1 p-6">
+              <ProjectSelectorPanel
+                projects={projectsForSidebar}
+                selectedProject={currentProject.id ? currentProject : null}
+                onProjectSelect={handleProjectSelect}
+                loading={loadingProjects}
+              />
             </div>
           )}
         </div>

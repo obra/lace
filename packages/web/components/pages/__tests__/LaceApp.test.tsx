@@ -56,6 +56,10 @@ vi.mock('@/components/config/SessionConfigPanel', () => ({
   SessionConfigPanel: () => <div data-testid="session-config-panel">Session Config Panel</div>,
 }));
 
+vi.mock('@/components/config/ProjectSelectorPanel', () => ({
+  ProjectSelectorPanel: () => <div data-testid="project-selector-panel">Project Selector Panel</div>,
+}));
+
 vi.mock('@/lib/timeline-converter', () => ({
   convertSessionEventsToTimeline: () => [],
 }));
