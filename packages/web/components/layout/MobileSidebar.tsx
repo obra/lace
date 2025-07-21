@@ -6,7 +6,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faXmark } from '@/lib/fontawesome';
+import { faTimes } from '@/lib/fontawesome';
 import { ThemeSelector } from '@/components/ui/ThemeSelector';
 
 interface MobileSidebarProps {
@@ -65,7 +65,7 @@ export function MobileSidebar({ isOpen, onClose, currentTheme, onThemeChange, ch
                 onClick={onClose}
                 className="p-2 hover:bg-base-200 rounded-lg transition-colors"
               >
-                <FontAwesomeIcon icon={faXmark} className="w-5 h-5 text-base-content/60" />
+                <FontAwesomeIcon icon={faTimes} className="w-5 h-5 text-base-content/60" />
               </button>
             </div>
           </div>

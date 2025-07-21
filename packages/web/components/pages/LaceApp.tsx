@@ -35,10 +35,6 @@ export function LaceApp() {
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [showDesktopSidebar, setShowDesktopSidebar] = useState(true);
   
-  // Debug: Track sidebar state changes
-  useEffect(() => {
-    console.log('showDesktopSidebar changed to:', showDesktopSidebar);
-  }, [showDesktopSidebar]);
 
   // Business Logic State (from current app/page.tsx)
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
@@ -328,10 +324,8 @@ export function LaceApp() {
 
   // Handle agent selection within a session
   const handleAgentSelect = (agentThreadId: string) => {
-    console.log('handleAgentSelect called:', agentThreadId, 'showDesktopSidebar:', showDesktopSidebar);
     setSelectedAgent(agentThreadId as ThreadId);
     setEvents([]);
-    console.log('handleAgentSelect completed, showDesktopSidebar should still be:', showDesktopSidebar);
   };
 
   // Convert projects to format expected by Sidebar
@@ -491,11 +485,7 @@ export function LaceApp() {
       </AnimatePresence>
 
       {/* Desktop Sidebar */}
-      <div className="h-full">
-        {/* Debug info - Add more debugging */}
-        <div className="fixed top-0 left-0 bg-red-500 text-white p-2 z-50 text-xs">
-          Sidebar: {showDesktopSidebar ? 'VISIBLE' : 'HIDDEN'} | Agent: {selectedAgent || 'none'} | Session: {selectedSession || 'none'}
-        </div>
+      <div className="hidden lg:block flex-shrink-0">
         <Sidebar
           isOpen={showDesktopSidebar}
           onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
@@ -689,13 +679,15 @@ export function LaceApp() {
                 </div>
               </div>
             ) : selectedAgent ? (
-              <div className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 flex flex-col h-full">
                 {/* Conversation Display */}
-                <TimelineView
-                  entries={timelineEntries}
-                  isTyping={sendingMessage}
-                  currentAgent={selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'Agent'}
-                />
+                <div className="flex-1 min-h-0">
+                  <TimelineView
+                    entries={timelineEntries}
+                    isTyping={sendingMessage}
+                    currentAgent={selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'Agent'}
+                  />
+                </div>
 
                 {/* Chat Input */}
                 <motion.div

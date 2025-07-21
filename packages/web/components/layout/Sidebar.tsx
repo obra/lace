@@ -47,7 +47,7 @@ export function Sidebar({ isOpen, onToggle, currentTheme, onThemeChange, childre
   // Collapsed state
   if (!isOpen) {
     return (
-      <div className="hidden lg:flex bg-base-100 border-r border-base-300 flex-col items-center py-4 transition-all duration-300 w-16 relative">
+      <div className="bg-base-100 border-r border-base-300 flex flex-col items-center py-4 transition-all duration-300 w-16 relative">
         <div className="flex flex-col gap-2">
           <button
             className="p-2 hover:bg-base-200 rounded-lg transition-colors"
@@ -68,7 +68,7 @@ export function Sidebar({ isOpen, onToggle, currentTheme, onThemeChange, childre
   }
 
   return (
-    <div className="hidden lg:flex bg-base-100 border-r border-base-300 flex-col relative transition-all duration-300 w-[350px]">
+    <div className="bg-base-100 border-r border-base-300 flex flex-col relative transition-all duration-300 w-[350px] h-full">
       <div className="flex flex-col h-full">
         {/* Header */}
         <div className="p-4 border-b border-base-300">
