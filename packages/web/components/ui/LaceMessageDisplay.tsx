@@ -7,7 +7,7 @@ import MessageBubble from '@/components/ui/MessageBubble';
 import MessageHeader from '@/components/ui/MessageHeader';
 import AgentBadge from '@/components/ui/AgentBadge';
 import CodeBlock from '@/components/ui/CodeBlock';
-import StreamingIndicator from '@/components/ui/StreamingIndicator';
+import { StreamingIndicator } from '@/components/ui/StreamingIndicator';
 
 interface LaceMessageDisplayProps {
   event: SessionEvent;
