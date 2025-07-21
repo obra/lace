@@ -206,7 +206,7 @@ export function MobileSidebar({
                     >
                       {task.priority}
                     </span>
-                    <span className="text-xs text-base-content/50">{task.assignee}</span>
+                    <span className="text-xs text-base-content/50">{task.assignedTo || 'Unassigned'}</span>
                   </div>
                 </div>
               ))}

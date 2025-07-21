@@ -35,9 +35,9 @@ const taskColumns: TaskColumn[] = [
     color: 'bg-yellow-100 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800',
   },
   {
-    id: 'review',
-    title: 'Review',
-    status: 'review',
+    id: 'blocked',
+    title: 'Blocked',
+    status: 'blocked',
     color: 'bg-purple-100 border-purple-200 dark:bg-purple-900/20 dark:border-purple-800',
   },
   {
@@ -61,7 +61,7 @@ export function TaskBoardModal({
     title: '',
     description: '',
     priority: 'medium' as Task['priority'],
-    assignee: '',
+    assignedTo: '',
   });
 
   const getPriorityColor = (priority: Task['priority']) => {
@@ -107,10 +107,10 @@ export function TaskBoardModal({
         title: newTask.title,
         description: newTask.description,
         priority: newTask.priority,
-        assignee: newTask.assignee || 'Unassigned',
+        assignedTo: newTask.assignedTo || undefined,
         status: 'pending',
-      });
-      setNewTask({ title: '', description: '', priority: 'medium', assignee: '' });
+      } as Omit<Task, 'id'>);
+      setNewTask({ title: '', description: '', priority: 'medium', assignedTo: '' });
       setShowNewTaskForm(false);
     }
   };
@@ -233,7 +233,7 @@ export function TaskBoardModal({
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-1 text-xs text-base-content/60">
                               <FontAwesomeIcon icon={faUser} className="w-3 h-3" />
-                              <span>{task.assignee}</span>
+                              <span>{task.assignedTo || 'Unassigned'}</span>
                             </div>
 
                             <div className="text-xs text-base-content/50">Task #{task.id}</div>

@@ -406,7 +406,7 @@ export function AnimatedMobileSidebar({
                         >
                           {task.priority}
                         </motion.span>
-                        <span className="text-xs text-base-content/50">{task.assignee}</span>
+                        <span className="text-xs text-base-content/50">{task.assignedTo || 'Unassigned'}</span>
                       </motion.div>
                     </motion.div>
                   ))}

@@ -475,13 +475,19 @@ export const ManyTasks: Story = {
     activeTasks: [
       ...sampleTasks,
       ...Array.from({ length: 5 }, (_, i) => ({
-        id: i + 10,
+        id: `task-${i + 10}`,
         title: `Additional Task ${i + 1}`,
         description: `Task description ${i + 1}`,
+        prompt: `Complete task ${i + 1}`,
         priority: ['high', 'medium', 'low'][i % 3] as Task['priority'],
-        assignee: ['Claude', 'Human'][i % 2],
+        assignedTo: (['claude-agent', 'human-user'] as any)[i % 2],
+        createdBy: 'session-main' as any,
+        threadId: 'session-main' as any,
         status: 'pending' as const,
-      })),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        notes: [],
+      } as Task)),
     ],
   },
   parameters: {
