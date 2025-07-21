@@ -32,6 +32,9 @@ export function ProjectSelectorPanel({
   const [filter, setFilter] = useState<ProjectFilter>('active');
   const [timeFrame, setTimeFrame] = useState<ProjectTimeFrame>('week');
   const [showContextMenu, setShowContextMenu] = useState<string | null>(null);
+  const [editingProject, setEditingProject] = useState<ProjectInfo | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
 
   // Helper function to check if project was active in given timeframe
   const isProjectActiveInTimeframe = (project: ProjectInfo, timeframe: ProjectTimeFrame): boolean => {
@@ -110,12 +113,35 @@ export function ProjectSelectorPanel({
         onProjectUpdate(projectId, { isArchived: false });
         break;
       case 'edit':
-        // TODO: Implement edit modal
-        // Edit functionality to be implemented
+        setEditingProject(project);
+        setEditName(project.name);
+        setEditDescription(project.description || '');
         break;
     }
     
     setShowContextMenu(null);
+  };
+
+  // Handle edit project form submission
+  const handleEditProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProject || !onProjectUpdate || !editName.trim()) return;
+
+    onProjectUpdate(editingProject.id, {
+      name: editName.trim(),
+      description: editDescription.trim() || undefined,
+    });
+
+    setEditingProject(null);
+    setEditName('');
+    setEditDescription('');
+  };
+
+  // Cancel edit project
+  const handleCancelEdit = () => {
+    setEditingProject(null);
+    setEditName('');
+    setEditDescription('');
   };
 
   // Close context menu on click outside
@@ -236,7 +262,21 @@ export function ProjectSelectorPanel({
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 pb-4">
-          {filteredProjects.map((project) => (
+            {/* New Project Card */}
+            {onProjectCreate && (
+              <div
+                onClick={onProjectCreate}
+                className="border-2 border-dashed border-primary/50 rounded-lg p-6 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 flex flex-col items-center justify-center text-center min-h-48"
+              >
+                <FontAwesomeIcon icon={faPlus} className="w-8 h-8 text-primary mb-3" />
+                <h3 className="font-semibold text-base-content mb-2">Create New Project</h3>
+                <p className="text-sm text-base-content/60">
+                  Start a new project to organize your AI conversations
+                </p>
+              </div>
+            )}
+            
+            {filteredProjects.map((project) => (
             <div
               key={project.id}
               className={`border rounded-lg p-6 cursor-pointer transition-all hover:shadow-lg ${
@@ -351,6 +391,77 @@ export function ProjectSelectorPanel({
           </div>
         )}
       </div>
+
+      {/* Edit Project Modal */}
+      {editingProject && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">Edit Project</h3>
+              <button
+                onClick={handleCancelEdit}
+                className="btn btn-ghost btn-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleEditProject} className="space-y-4">
+              <div>
+                <label className="label">
+                  <span className="label-text font-medium">Project Name *</span>
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="input input-bordered w-full"
+                  placeholder="Enter project name"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="label">
+                  <span className="label-text font-medium">Description</span>
+                </label>
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="textarea textarea-bordered w-full"
+                  placeholder="Optional description"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="btn btn-ghost"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={!editName.trim() || loading}
+                >
+                  {loading ? (
+                    <>
+                      <div className="loading loading-spinner loading-sm"></div>
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Project'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
