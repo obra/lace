@@ -29,8 +29,8 @@ const ProjectSettingsSchema = z.object({
   description: z.string(),
   workingDirectory: z.string().min(1, 'Working directory is required'),
   isArchived: z.boolean(),
-  createdAt: z.date(),
-  lastUsedAt: z.date(),
+  createdAt: z.union([z.date(), z.string()]).transform(val => typeof val === 'string' ? new Date(val) : val),
+  lastUsedAt: z.union([z.date(), z.string()]).transform(val => typeof val === 'string' ? new Date(val) : val),
   configuration: z.object({
     provider: z.enum(['anthropic', 'openai', 'lmstudio', 'ollama']).optional(),
     model: z.string().optional(),
@@ -114,11 +114,11 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow">
-      <h1 className="text-2xl font-bold mb-6">Project Settings</h1>
+    <div className="max-w-4xl mx-auto p-6 bg-gray-800 rounded-lg shadow text-white">
+      <h1 className="text-2xl font-bold mb-6 text-white">Project Settings</h1>
       
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200 mb-6">
+      <div className="border-b border-gray-600 mb-6">
         <nav className="flex space-x-8">
           {[
             { id: 'general', label: 'General' },
@@ -132,7 +132,7 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
               }`}
             >
               {tab.label}
@@ -146,39 +146,39 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
         {activeTab === 'general' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-300 mb-1">
                 Project Name
               </label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => updateField('name', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-300 mb-1">
                 Description
               </label>
               <textarea
                 value={formData.description}
                 onChange={(e) => updateField('description', e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-300 mb-1">
                 Working Directory
               </label>
               <input
                 type="text"
                 value={formData.workingDirectory}
                 onChange={(e) => updateField('workingDirectory', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               {errors.workingDirectory && <p className="text-red-500 text-sm mt-1">{errors.workingDirectory}</p>}
             </div>
@@ -190,14 +190,14 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Provider
                 </label>
                 <select
                   data-testid="provider-select"
                   value={formData.configuration?.provider || ''}
                   onChange={(e) => updateField('configuration.provider', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select Provider</option>
                   <option value="anthropic">Anthropic</option>
@@ -208,14 +208,14 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Model
                 </label>
                 <select
                   data-testid="model-select"
                   value={formData.configuration?.model || ''}
                   onChange={(e) => updateField('configuration.model', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select Model</option>
                   {formData.configuration?.provider === 'anthropic' && (
@@ -238,20 +238,20 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Max Tokens
                 </label>
                 <input
                   type="number"
                   value={formData.configuration?.maxTokens || ''}
                   onChange={(e) => updateField('configuration.maxTokens', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {errors['configuration.maxTokens'] && <p className="text-red-500 text-sm mt-1">{errors['configuration.maxTokens']}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Temperature
                 </label>
                 <input
@@ -261,7 +261,7 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
                   max="2"
                   value={formData.configuration?.temperature || ''}
                   onChange={(e) => updateField('configuration.temperature', parseFloat(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {errors['configuration.temperature'] && <p className="text-red-500 text-sm mt-1">{errors['configuration.temperature']}</p>}
               </div>
@@ -273,7 +273,7 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
         {activeTab === 'tools' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
                 Available Tools
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -303,7 +303,7 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
                 Tool Policies
               </label>
               <div className="space-y-2">
@@ -320,7 +320,7 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
                           [tool]: e.target.value,
                         });
                       }}
-                      className="px-2 py-1 border border-gray-300 rounded text-sm"
+                      className="px-2 py-1 border border-gray-600 bg-gray-700 text-white rounded text-sm"
                     >
                       <option value="allow">Allow</option>
                       <option value="require-approval">Require Approval</option>
@@ -337,13 +337,13 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
         {activeTab === 'environment' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-300">
                 Environment Variables
               </label>
               <button
                 type="button"
                 onClick={addEnvironmentVariable}
-                className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+                className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 Add Variable
               </button>
@@ -356,7 +356,7 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
                     type="text"
                     value={key}
                     readOnly
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                    className="flex-1 px-3 py-2 border border-gray-600 rounded-md bg-gray-600 text-white"
                   />
                   <span>=</span>
                   <input
@@ -367,12 +367,12 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
                       envVars[key] = e.target.value;
                       updateField('configuration.environmentVariables', envVars);
                     }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+                    className="flex-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md"
                   />
                   <button
                     type="button"
                     onClick={() => removeEnvironmentVariable(key)}
-                    className="px-2 py-1 text-red-500 hover:text-red-700"
+                    className="px-2 py-1 text-red-400 hover:text-red-300"
                   >
                     Remove
                   </button>
@@ -383,19 +383,19 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
         )}
 
         {/* Form Actions */}
-        <div className="flex justify-end space-x-3 pt-6 border-t">
+        <div className="flex justify-end space-x-3 pt-6 border-t border-gray-600">
           {onCancel && (
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 text-gray-300 border border-gray-600 rounded-md hover:bg-gray-700"
             >
               Cancel
             </button>
           )}
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
             Save Settings
           </button>

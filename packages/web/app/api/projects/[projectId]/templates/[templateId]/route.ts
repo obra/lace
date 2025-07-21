@@ -13,17 +13,18 @@ function isError(error: unknown): error is Error {
   return error instanceof Error;
 }
 
-export function GET(
+export async function GET(
   _request: NextRequest,
-  { params }: { params: { projectId: string; templateId: string } }
-): NextResponse {
+  { params }: { params: Promise<{ projectId: string; templateId: string }> }
+): Promise<NextResponse> {
   try {
-    const project = Project.getById(params.projectId);
+    const { projectId, templateId } = await params;
+    const project = Project.getById(projectId);
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const template = project.getPromptTemplate(params.templateId);
+    const template = project.getPromptTemplate(templateId);
     if (!template) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 });
     }
@@ -35,17 +36,18 @@ export function GET(
   }
 }
 
-export function DELETE(
+export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { projectId: string; templateId: string } }
-): NextResponse {
+  { params }: { params: Promise<{ projectId: string; templateId: string }> }
+): Promise<NextResponse> {
   try {
-    const project = Project.getById(params.projectId);
+    const { projectId, templateId } = await params;
+    const project = Project.getById(projectId);
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const success = project.deletePromptTemplate(params.templateId);
+    const success = project.deletePromptTemplate(templateId);
     if (!success) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 });
     }
@@ -59,10 +61,11 @@ export function DELETE(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string; templateId: string } }
+  { params }: { params: Promise<{ projectId: string; templateId: string }> }
 ): Promise<NextResponse> {
   try {
-    const project = Project.getById(params.projectId);
+    const { projectId, templateId } = await params;
+    const project = Project.getById(projectId);
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
@@ -70,7 +73,7 @@ export async function POST(
     const body: unknown = await request.json();
     const validatedData = RenderTemplateSchema.parse(body);
 
-    const renderedContent = project.renderPromptTemplate(params.templateId, validatedData.variables);
+    const renderedContent = project.renderPromptTemplate(templateId, validatedData.variables);
 
     return NextResponse.json({ renderedContent });
   } catch (error: unknown) {

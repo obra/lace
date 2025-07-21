@@ -15,12 +15,13 @@ function isError(error: unknown): error is Error {
   return error instanceof Error;
 }
 
-export function GET(
+export async function GET(
   _request: NextRequest,
-  { params }: { params: { projectId: string } }
-): NextResponse {
+  { params }: { params: Promise<{ projectId: string }> }
+): Promise<NextResponse> {
   try {
-    const project = Project.getById(params.projectId);
+    const { projectId } = await params;
+    const project = Project.getById(projectId);
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
@@ -48,10 +49,11 @@ export function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ): Promise<NextResponse> {
   try {
-    const project = Project.getById(params.projectId);
+    const { projectId } = await params;
+    const project = Project.getById(projectId);
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
@@ -81,12 +83,13 @@ export async function PUT(
   }
 }
 
-export function DELETE(
+export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { projectId: string } }
-): NextResponse {
+  { params }: { params: Promise<{ projectId: string }> }
+): Promise<NextResponse> {
   try {
-    const project = Project.getById(params.projectId);
+    const { projectId } = await params;
+    const project = Project.getById(projectId);
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }

@@ -16,10 +16,11 @@ const ConfigurationSchema = z.object({
   environmentVariables: z.record(z.string()).optional(),
 });
 
-export async function GET(request: NextRequest, { params }: { params: { sessionId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   try {
+    const { sessionId } = await params;
     const sessionService = getSessionService();
-    const session = await sessionService.getSession(asThreadId(params.sessionId));
+    const session = await sessionService.getSession(asThreadId(sessionId));
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
@@ -36,13 +37,14 @@ export async function GET(request: NextRequest, { params }: { params: { sessionI
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { sessionId: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   try {
+    const { sessionId } = await params;
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = ConfigurationSchema.parse(body);
 
     const sessionService = getSessionService();
-    const session = await sessionService.getSession(asThreadId(params.sessionId));
+    const session = await sessionService.getSession(asThreadId(sessionId));
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });

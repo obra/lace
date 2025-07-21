@@ -163,7 +163,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: { projectId: 'project1' } });
+      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
       const data = (await response.json()) as {
         session: { id: string; name: string; projectId: string };
       };
@@ -190,7 +190,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: { projectId: 'nonexistent' } });
+      const response = await POST(request, { params: Promise.resolve({ projectId: 'nonexistent' }) });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(404);
@@ -205,7 +205,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: { projectId: 'project1' } });
+      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
       const data = (await response.json()) as { error: string; details?: unknown };
 
       expect(response.status).toBe(400);
@@ -219,7 +219,7 @@ describe('Session API endpoints under projects', () => {
         body: JSON.stringify({}),
       });
 
-      const response = await POST(request, { params: { projectId: 'project1' } });
+      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
@@ -243,7 +243,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: { projectId: 'project1' } });
+      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
       const data = (await response.json()) as {
         session: { id: string; name: string };
       };
@@ -263,7 +263,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: { projectId: 'project1' } });
+      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(500);

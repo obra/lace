@@ -17,7 +17,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('sessionId');
-    const { taskId } = context.params;
+    const resolvedParams = await context.params;
+    const { taskId } = resolvedParams;
 
     if (!sessionId) {
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
@@ -61,7 +62,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
-    const { taskId } = context.params;
+    const resolvedParams = await context.params;
+    const { taskId } = resolvedParams;
 
     // Parse and validate request body
     const bodyRaw: unknown = await request.json();
@@ -140,7 +142,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('sessionId');
-    const { taskId } = context.params;
+    const resolvedParams = await context.params;
+    const { taskId } = resolvedParams;
 
     if (!sessionId) {
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });

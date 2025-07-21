@@ -7,20 +7,21 @@ import { ThreadId } from '@/lib/server/core-types';
 import type { Task } from '@/types/api';
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     taskId: string;
-  };
+  }>;
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
+    const resolvedParams = await context.params;
     const body = (await request.json()) as {
       sessionId?: string;
       content?: string;
       author?: string;
     };
     const { sessionId, content, author } = body;
-    const { taskId } = context.params;
+    const { taskId } = resolvedParams;
 
     if (!sessionId) {
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });

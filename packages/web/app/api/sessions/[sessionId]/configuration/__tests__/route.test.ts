@@ -67,7 +67,7 @@ describe('Session Configuration API', () => {
   describe('GET /api/sessions/:sessionId/configuration', () => {
     it('should return session effective configuration when found', async () => {
       const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/configuration`);
-      const response = await GET(request, { params: { sessionId } });
+      const response = await GET(request, { params: Promise.resolve({ sessionId }) });
       const data = (await response.json()) as ConfigurationResponse;
 
       expect(response.status).toBe(200);
@@ -79,7 +79,7 @@ describe('Session Configuration API', () => {
 
     it('should return 404 when session not found', async () => {
       const request = new NextRequest('http://localhost/api/sessions/nonexistent/configuration');
-      const response = await GET(request, { params: { sessionId: 'nonexistent' } });
+      const response = await GET(request, { params: Promise.resolve({ sessionId: 'nonexistent' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);
@@ -91,7 +91,7 @@ describe('Session Configuration API', () => {
       const request = new NextRequest(
         'http://localhost/api/sessions/invalid-session-id/configuration'
       );
-      const response = await GET(request, { params: { sessionId: 'invalid-session-id' } });
+      const response = await GET(request, { params: Promise.resolve({ sessionId: 'invalid-session-id' }) });
 
       // Should return 404 for non-existent session (which is the actual behavior)
       expect(response.status).toBe(404);
@@ -118,7 +118,7 @@ describe('Session Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, { params: { sessionId } });
+      const response = await PUT(request, { params: Promise.resolve({ sessionId }) });
       const data = (await response.json()) as ConfigurationResponse;
 
       expect(response.status).toBe(200);
@@ -135,7 +135,7 @@ describe('Session Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, { params: { sessionId: 'nonexistent' } });
+      const response = await PUT(request, { params: Promise.resolve({ sessionId: 'nonexistent' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);
@@ -156,7 +156,7 @@ describe('Session Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, { params: { sessionId } });
+      const response = await PUT(request, { params: Promise.resolve({ sessionId }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(400);
@@ -172,7 +172,7 @@ describe('Session Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, { params: { sessionId } });
+      const response = await PUT(request, { params: Promise.resolve({ sessionId }) });
 
       expect(response.status).toBe(500);
     });
@@ -208,7 +208,7 @@ describe('TDD: Direct Session Usage', () => {
 
   it('should use SessionService.getSession() which calls session.getEffectiveConfiguration() directly', async () => {
     const request = new NextRequest(`http://localhost/api/sessions/${testSessionId}/configuration`);
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await GET(request, { params: Promise.resolve({ sessionId: testSessionId }) });
 
     // This verifies that the route successfully calls the session's getEffectiveConfiguration method
     // (not a duplicated SessionService method that we removed)
@@ -265,7 +265,7 @@ describe('TDD: Direct Session Configuration Update', () => {
       }
     );
 
-    const response = await PUT(request, { params: { sessionId: testSessionId } });
+    const response = await PUT(request, { params: Promise.resolve({ sessionId: testSessionId }) });
 
     // This verifies that the route successfully calls session.updateConfiguration() directly
     // (not a duplicated SessionService method that we removed)
