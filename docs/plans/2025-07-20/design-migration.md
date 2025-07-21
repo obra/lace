@@ -15,13 +15,15 @@
 
 ---
 
-## Phase 2: Message & Content Display
+## Phase 2: Message & Content Display ⚠️ SUPERSEDED
 
-**Goal:** Replace custom message rendering with design system components.
+**Status:** ⚠️ **SUPERSEDED BY NEW PLAN** - See `docs/plans/2025-07-21/phase2-timeline-migration.md`
 
-**Impact:** High - messages are the primary UI users interact with.
+**Previous Goal:** Replace custom message rendering with design system components.
 
-**Current State:** `ConversationDisplay` component renders events in a terminal-style layout.
+**New Approach:** Use proper TimelineView components + API cleanup for full design system compliance.
+
+**Current State:** Custom LaceMessageList implementation completed but needs to be replaced with proper TimelineView integration.
 
 ### Task 2.1: Analyze Current Message Rendering
 

@@ -82,7 +82,7 @@ export async function POST(
     const testEvent = {
       type: 'LOCAL_SYSTEM_MESSAGE' as const,
       threadId: agentResponse.threadId as ThreadId,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
       data: { message: `Agent "${agentResponse.name}" spawned successfully` },
     };
     sseManager.broadcast(sessionId, testEvent);

@@ -71,7 +71,7 @@ class ApprovalManager {
       const event: SessionEvent = {
         type: 'TOOL_APPROVAL_REQUEST',
         threadId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: approvalData,
       };
 

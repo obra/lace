@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type {
   Session,
   ThreadId,
@@ -13,7 +13,8 @@ import type {
   ProjectInfo,
 } from '@/types/api';
 import { isApiError } from '@/types/api';
-import { LaceMessageList } from '@/components/ui/LaceMessageList';
+import { TimelineView } from '@/components/timeline/TimelineView';
+import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
 import { ToolApprovalModal } from '@/components/old/ToolApprovalModal';
 import { AgentSpawner } from '@/components/old/AgentSpawner';
 import { TaskDashboard } from '@/components/old/TaskDashboard';
@@ -30,10 +31,18 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [message, setMessage] = useState('');
-  const [selectedAgent, setSelectedAgent] = useState<ThreadId | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<ThreadId | undefined>(undefined);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [approvalRequest, setApprovalRequest] = useState<ToolApprovalRequestData | null>(null);
   const [activeTab, setActiveTab] = useState<'conversation' | 'tasks'>('conversation');
+
+  // Convert SessionEvents to TimelineEntries for the design system
+  const timelineEntries = useMemo(() => {
+    return convertSessionEventsToTimeline(events, {
+      agents: selectedSessionDetails?.agents || [],
+      selectedAgent,
+    });
+  }, [events, selectedSessionDetails?.agents, selectedAgent]);
 
   const loadSessions = useCallback(async () => {
     if (!selectedProject) {
@@ -88,7 +97,7 @@ export default function Home() {
 
     // Clear events when switching sessions
     setEvents([]);
-    setSelectedAgent(null);
+    setSelectedAgent(undefined);
 
     // Load full session details and conversation history
     void loadSessionDetails(selectedSession);
@@ -109,13 +118,20 @@ export default function Home() {
 
           // Type guard for event structure
           if (typeof data === 'object' && data !== null && 'type' in data) {
-            const eventData = data as { type: string; data: unknown };
+            const eventData = data as { type: string; data: unknown; timestamp?: string | Date };
 
             // Handle approval requests separately
             if (eventData.type === 'TOOL_APPROVAL_REQUEST') {
               setApprovalRequest(eventData.data as ToolApprovalRequestData);
             } else {
-              setEvents((prev) => [...prev, data as SessionEvent]);
+              // Convert timestamp from string to Date if needed
+              const sessionEvent: SessionEvent = {
+                ...eventData as Omit<SessionEvent, 'timestamp'>,
+                timestamp: eventData.timestamp 
+                  ? (typeof eventData.timestamp === 'string' ? new Date(eventData.timestamp) : eventData.timestamp)
+                  : new Date()
+              };
+              setEvents((prev) => [...prev, sessionEvent]);
             }
           }
         } catch (error) {
@@ -131,8 +147,8 @@ export default function Home() {
       const connectionEvent: SessionEvent = {
         type: 'LOCAL_SYSTEM_MESSAGE',
         threadId: selectedSession as ThreadId,
-        timestamp: new Date().toISOString(),
-        data: { message: 'Connected to session stream' },
+        timestamp: new Date(),
+        data: { content: 'Connected to session stream' },
       };
       setEvents((prev) => [...prev, connectionEvent]);
     };
@@ -144,8 +160,8 @@ export default function Home() {
       const errorEvent: SessionEvent = {
         type: 'LOCAL_SYSTEM_MESSAGE',
         threadId: selectedSession as ThreadId,
-        timestamp: new Date().toISOString(),
-        data: { message: 'Connection lost' },
+        timestamp: new Date(),
+        data: { content: 'Connection lost' },
       };
       setEvents((prev) => [...prev, errorEvent]);
     };
@@ -227,7 +243,7 @@ export default function Home() {
     // When switching projects, clear session and agent selection
     setSelectedSession(null);
     setSelectedSessionDetails(null);
-    setSelectedAgent(null);
+    setSelectedAgent(undefined);
     setEvents([]);
   };
 
@@ -428,12 +444,10 @@ export default function Home() {
                       <>
                         {/* Conversation Display */}
                         <div className="flex-1 overflow-hidden">
-                          <LaceMessageList
-                            events={events}
-                            agents={selectedSessionDetails?.agents || []}
-                            selectedAgent={selectedAgent as ThreadId}
-                            className="h-full p-4"
-                            isLoading={loading}
+                          <TimelineView
+                            entries={timelineEntries}
+                            isTyping={loading}
+                            currentAgent={selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'Agent'}
                           />
                         </div>
 
