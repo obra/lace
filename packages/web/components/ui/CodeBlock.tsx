@@ -123,7 +123,9 @@ export default function CodeBlock({
 
     return () => {
       isCancelled = true;
-      debouncedHighlight.current.cancel();
+      if (debouncedHighlight.current) {
+        debouncedHighlight.current.cancel();
+      }
       if (copyTimeoutRef.current) {
         clearTimeout(copyTimeoutRef.current);
       }
