@@ -70,14 +70,14 @@ const ChatTextareaWrapper = ({ initialValue = '', ...props }: ChatTextareaWrappe
     if (value.trim()) {
       setSubmitted(prev => [...prev, value]);
       setValue('');
-      void ('Message submitted:', value);
+      console.log('Message submitted:', value);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Escape') {
       setValue('');
-      void ('Textarea cleared');
+      console.log('Textarea cleared');
     }
   };
 
@@ -95,7 +95,7 @@ const ChatTextareaWrapper = ({ initialValue = '', ...props }: ChatTextareaWrappe
     e.preventDefault();
     setIsDragOver(false);
     const files = Array.from(e.dataTransfer.files);
-    void ('Files dropped:', files.map(f => f.name));
+    console.log('Files dropped:', files.map(f => f.name));
   };
 
   return (

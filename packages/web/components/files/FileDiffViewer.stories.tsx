@@ -154,7 +154,7 @@ import { Button } from './Button';
 
 function MyComponent({ title, count }) {
   const handleClick = () => {
-    void ('Button clicked');
+    console.log('Button clicked');
   };
 
   return (
@@ -176,7 +176,7 @@ import { Counter } from './Counter';
 
 function MyComponent({ title, count, onIncrement }) {
   const handleClick = () => {
-    void ('Button clicked');
+    console.log('Button clicked');
     onIncrement();
   };
 

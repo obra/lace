@@ -134,7 +134,7 @@ export const MediumSize: Story = {
   args: {
     size: 'md',
     hasContent: true,
-    onSubmit: () => void ('Medium button clicked!'),
+    onSubmit: () => console.log('Medium button clicked!'),
   },
 };
 
@@ -142,7 +142,7 @@ export const LargeSize: Story = {
   args: {
     size: 'lg',
     hasContent: true,
-    onSubmit: () => void ('Large button clicked!'),
+    onSubmit: () => console.log('Large button clicked!'),
   },
 };
 
@@ -153,7 +153,7 @@ export const AllSizes: Story = {
         <SendButton 
           size="sm" 
           hasContent={true}
-          onSubmit={() => void ('Small send')}
+          onSubmit={() => console.log('Small send')}
         />
         <p className="text-xs text-gray-500 mt-2">SM</p>
       </div>
@@ -161,7 +161,7 @@ export const AllSizes: Story = {
         <SendButton 
           size="md" 
           hasContent={true}
-          onSubmit={() => void ('Medium send')}
+          onSubmit={() => console.log('Medium send')}
         />
         <p className="text-xs text-gray-500 mt-2">MD</p>
       </div>
@@ -169,7 +169,7 @@ export const AllSizes: Story = {
         <SendButton 
           size="lg" 
           hasContent={true}
-          onSubmit={() => void ('Large send')}
+          onSubmit={() => console.log('Large send')}
         />
         <p className="text-xs text-gray-500 mt-2">LG</p>
       </div>
@@ -190,7 +190,7 @@ export const AllStates: Story = {
       <div className="flex items-center gap-4">
         <SendButton 
           hasContent={true}
-          onSubmit={() => void ('Ready to send')}
+          onSubmit={() => console.log('Ready to send')}
         />
         <span className="text-sm">Ready to send</span>
       </div>
@@ -198,7 +198,7 @@ export const AllStates: Story = {
       <div className="flex items-center gap-4">
         <SendButton 
           hasContent={false}
-          onSubmit={() => void ('No content')}
+          onSubmit={() => console.log('No content')}
         />
         <span className="text-sm">No content (disabled)</span>
       </div>
@@ -207,7 +207,7 @@ export const AllStates: Story = {
         <SendButton 
           isStreaming={true}
           hasContent={true}
-          onStop={() => void ('Stop streaming')}
+          onStop={() => console.log('Stop streaming')}
         />
         <span className="text-sm">Streaming (stop button)</span>
       </div>
@@ -216,7 +216,7 @@ export const AllStates: Story = {
         <SendButton 
           disabled={true}
           hasContent={true}
-          onSubmit={() => void ('Disabled')}
+          onSubmit={() => console.log('Disabled')}
         />
         <span className="text-sm">Disabled</span>
       </div>
@@ -247,7 +247,7 @@ export const InteractiveDemo: Story = {
             <SendButton 
               size="lg"
               hasContent={true}
-              onSubmit={() => void ('Send message!')}
+              onSubmit={() => console.log('Send message!')}
             />
           </div>
           <p className="text-sm font-medium">Send Message</p>
@@ -260,7 +260,7 @@ export const InteractiveDemo: Story = {
               size="lg"
               isStreaming={true}
               hasContent={true}
-              onStop={() => void ('Stop streaming!')}
+              onStop={() => console.log('Stop streaming!')}
             />
           </div>
           <p className="text-sm font-medium">Stop Streaming</p>
@@ -272,7 +272,7 @@ export const InteractiveDemo: Story = {
             <SendButton 
               size="lg"
               hasContent={false}
-              onSubmit={() => void ('No content')}
+              onSubmit={() => console.log('No content')}
             />
           </div>
           <p className="text-sm font-medium">No Content</p>
@@ -285,7 +285,7 @@ export const InteractiveDemo: Story = {
               size="lg"
               disabled={true}
               hasContent={true}
-              onSubmit={() => void ('Disabled')}
+              onSubmit={() => console.log('Disabled')}
             />
           </div>
           <p className="text-sm font-medium">Disabled</p>

@@ -147,7 +147,7 @@ export const Default: Story = {
   args: {
     icon: faFolder,
     title: 'Documents',
-    onClick: () => void ('Clicked Documents'),
+    onClick: () => console.log('Clicked Documents'),
   },
 };
 
@@ -156,7 +156,7 @@ export const WithSubtitle: Story = {
     icon: faFile,
     title: 'Project Report',
     subtitle: 'Last updated 2 hours ago',
-    onClick: () => void ('Clicked Project Report'),
+    onClick: () => console.log('Clicked Project Report'),
   },
 };
 
@@ -165,7 +165,7 @@ export const WithBadge: Story = {
     icon: faComment,
     title: 'Messages',
     badge: '3',
-    onClick: () => void ('Clicked Messages'),
+    onClick: () => console.log('Clicked Messages'),
   },
 };
 
@@ -174,7 +174,7 @@ export const WithStatus: Story = {
     icon: faUser,
     title: 'John Doe',
     status: 'online',
-    onClick: () => void ('Clicked John Doe'),
+    onClick: () => console.log('Clicked John Doe'),
   },
 };
 
@@ -183,7 +183,7 @@ export const Active: Story = {
     icon: faFolder,
     title: 'Current Project',
     isActive: true,
-    onClick: () => void ('Clicked Current Project'),
+    onClick: () => console.log('Clicked Current Project'),
   },
 };
 
@@ -192,7 +192,7 @@ export const Disabled: Story = {
     icon: faCog,
     title: 'Settings',
     isDisabled: true,
-    onClick: () => void ('This should not trigger'),
+    onClick: () => console.log('This should not trigger'),
   },
 };
 
@@ -208,7 +208,7 @@ export const WithActions: Story = {
         <IconButton icon={faEllipsisV} variant="ghost" size="xs" tooltip="More" />
       </div>
     ),
-    onClick: () => void ('Clicked Important Document'),
+    onClick: () => console.log('Clicked Important Document'),
   },
 };
 
@@ -226,7 +226,7 @@ export const ComplexExample: Story = {
         <IconButton icon={faShare} variant="ghost" size="xs" tooltip="Share" />
       </div>
     ),
-    onClick: () => void ('Clicked AI Assistant'),
+    onClick: () => console.log('Clicked AI Assistant'),
   },
 };
 
@@ -239,7 +239,7 @@ export const ConversationItems: Story = {
         subtitle="Last message 5 minutes ago"
         badge="3"
         status="online"
-        onClick={() => void ('Clicked Project Discussion')}
+        onClick={() => console.log('Clicked Project Discussion')}
       />
       <NavigationItem
         icon={faRobot}
@@ -247,20 +247,20 @@ export const ConversationItems: Story = {
         subtitle="Claude - Ready to help"
         status="online"
         isActive={true}
-        onClick={() => void ('Clicked AI Assistant Chat')}
+        onClick={() => console.log('Clicked AI Assistant Chat')}
       />
       <NavigationItem
         icon={faHistory}
         title="Previous Conversation"
         subtitle="Completed yesterday"
         status="offline"
-        onClick={() => void ('Clicked Previous Conversation')}
+        onClick={() => console.log('Clicked Previous Conversation')}
       />
       <NavigationItem
         icon={faBookmark}
         title="Saved Chat"
         subtitle="Bookmarked for later"
-        onClick={() => void ('Clicked Saved Chat')}
+        onClick={() => console.log('Clicked Saved Chat')}
       />
     </div>
   ),
@@ -280,35 +280,35 @@ export const AllStates: Story = {
         icon={faFolder}
         title="Default State"
         subtitle="Normal navigation item"
-        onClick={() => void ('Default clicked')}
+        onClick={() => console.log('Default clicked')}
       />
       <NavigationItem
         icon={faFolder}
         title="Active State"
         subtitle="Currently selected"
         isActive={true}
-        onClick={() => void ('Active clicked')}
+        onClick={() => console.log('Active clicked')}
       />
       <NavigationItem
         icon={faFolder}
         title="With Badge"
         subtitle="Has notification"
         badge="5"
-        onClick={() => void ('Badge clicked')}
+        onClick={() => console.log('Badge clicked')}
       />
       <NavigationItem
         icon={faFolder}
         title="With Status"
         subtitle="Online indicator"
         status="online"
-        onClick={() => void ('Status clicked')}
+        onClick={() => console.log('Status clicked')}
       />
       <NavigationItem
         icon={faFolder}
         title="Disabled State"
         subtitle="Cannot be clicked"
         isDisabled={true}
-        onClick={() => void ('This should not trigger')}
+        onClick={() => console.log('This should not trigger')}
       />
     </div>
   ),
@@ -329,7 +329,7 @@ export const WithDifferentIcons: Story = {
         title="Inbox"
         subtitle="New messages"
         badge="12"
-        onClick={() => void ('Inbox clicked')}
+        onClick={() => console.log('Inbox clicked')}
       />
       <NavigationItem
         icon={faBell}
@@ -337,19 +337,19 @@ export const WithDifferentIcons: Story = {
         subtitle="Recent alerts"
         badge="3"
         status="warning"
-        onClick={() => void ('Notifications clicked')}
+        onClick={() => console.log('Notifications clicked')}
       />
       <NavigationItem
         icon={faStar}
         title="Favorites"
         subtitle="Starred items"
-        onClick={() => void ('Favorites clicked')}
+        onClick={() => console.log('Favorites clicked')}
       />
       <NavigationItem
         icon={faCog}
         title="Settings"
         subtitle="Configure preferences"
-        onClick={() => void ('Settings clicked')}
+        onClick={() => console.log('Settings clicked')}
       />
     </div>
   ),
@@ -435,7 +435,7 @@ export const InteractiveDemo: Story = {
                     <IconButton icon={faEllipsisV} variant="ghost" size="xs" tooltip="More" />
                   </div>
                 }
-                onClick={() => void (`Clicked ${item.title}`)}
+                onClick={() => console.log(`Clicked ${item.title}`)}
               />
             </div>
           ))}

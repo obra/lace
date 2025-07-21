@@ -142,7 +142,7 @@ for (let i = 0; i < 10; i++) {
   fibSequence.push(fibonacci(i));
 }
 
-void ('Fibonacci sequence:', fibSequence);`;
+console.log('Fibonacci sequence:', fibSequence);`;
 
 const sampleTypeScript = `interface User {
   id: number;
@@ -291,7 +291,7 @@ export const Collapsible: Story = {
 export const NoHeader: Story = {
   args: {
     code: `const greeting = "Hello, World!";
-void (greeting);`,
+console.log(greeting);`,
     language: 'javascript',
     showHeader: false,
     showLineNumbers: false,
@@ -307,7 +307,7 @@ ${Array.from({ length: 50 }, (_, i) => `function example${i}() {
 }
 
 const result${i} = example${i}();
-void (result${i});
+console.log(result${i});
 `).join('\n')}`,
     language: 'javascript',
     filename: 'large-example.js',
@@ -422,7 +422,7 @@ export const InteractiveCopy: Story = {
   return \`Hello, \${name}!\`;
 }
 
-void (greet("World"));`}
+console.log(greet("World"));`}
           language="javascript"
           filename="greeting.js"
           showLineNumbers={true}
@@ -457,7 +457,7 @@ export const ErrorHandling: Story = {
       <CodeBlock
         code={`// This code will fallback to plain text if highlighting fails
 const example = "Hello World";
-void (example);`}
+console.log(example);`}
         language="javascript"
         filename="fallback.js"
         showLineNumbers={true}
@@ -480,7 +480,7 @@ export const AllFeatures: Story = {
         <div>
           <h4 className="font-medium mb-2">Minimal</h4>
           <CodeBlock
-            code="void ('Hello!');"
+            code="console.log('Hello!');"
             language="javascript"
             showHeader={false}
             showLineNumbers={false}
@@ -494,7 +494,7 @@ export const AllFeatures: Story = {
   return a + b;
 }
 
-void (add(2, 3));`}
+console.log(add(2, 3));`}
             language="javascript"
             showLineNumbers={true}
           />
@@ -565,7 +565,7 @@ export const InteractiveDemo: Story = {
   return calculateFibonacci(n - 1) + calculateFibonacci(n - 2);
 }
 
-void (calculateFibonacci(10));`}
+console.log(calculateFibonacci(10));`}
             language="javascript"
             filename="fibonacci.js"
             showLineNumbers={true}

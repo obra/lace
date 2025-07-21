@@ -590,7 +590,7 @@ export const FormIntegration: Story = {
     
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      void ('Form submitted:', { formData, attachedFiles });
+      console.log('Form submitted with files:', attachedFiles.map(f => f.file.name));
       alert(`Form submitted with ${attachedFiles.length} files!`);
     };
     

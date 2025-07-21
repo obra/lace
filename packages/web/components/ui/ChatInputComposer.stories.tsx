@@ -124,7 +124,7 @@ const ChatInputWrapper = ({ initialValue = '', ...props }: ChatInputWrapperProps
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
 
   const handleSubmit = () => {
-    void ('Message sent:', value);
+    console.log('Message sent with value:', value);
     setValue('');
   };
 
@@ -139,7 +139,7 @@ const ChatInputWrapper = ({ initialValue = '', ...props }: ChatInputWrapperProps
 
   const handleInterrupt = () => {
     setIsStreaming(false);
-    void ('Interrupted');
+    console.log('Interrupted');
   };
 
   const handleFilesAttached = (files: AttachedFile[]) => {

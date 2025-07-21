@@ -74,7 +74,7 @@ const config = [
   {
     files: ['**/*.stories.tsx', '**/*.stories.ts'],
     rules: {
-      'no-console': ['error', { allow: ['warn', 'error'] }], // Enforce no-console in Storybook stories
+      'no-console': 'off', // Allow console.log in Storybook stories for debugging
       'react-hooks/rules-of-hooks': 'off', // Allow hooks in Storybook render functions
     },
   },

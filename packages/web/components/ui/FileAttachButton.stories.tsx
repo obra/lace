@@ -54,7 +54,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     onFilesSelected: (files: FileList) => {
-      void ('Files selected:', Array.from(files).map(f => f.name));
+      console.log('Files selected:', Array.from(files).map(f => f.name));
     },
   },
 };
@@ -63,7 +63,7 @@ export const Disabled: Story = {
   args: {
     disabled: true,
     onFilesSelected: (files: FileList) => {
-      void ('This should not trigger');
+      console.log('This should not trigger');
     },
   },
 };
@@ -72,7 +72,7 @@ export const SmallSize: Story = {
   args: {
     size: 'sm',
     onFilesSelected: (files: FileList) => {
-      void ('Small button - Files selected:', Array.from(files).map(f => f.name));
+      console.log('Small button - Files selected:', Array.from(files).map(f => f.name));
     },
   },
 };
@@ -81,7 +81,7 @@ export const MediumSize: Story = {
   args: {
     size: 'md',
     onFilesSelected: (files: FileList) => {
-      void ('Medium button - Files selected:', Array.from(files).map(f => f.name));
+      console.log('Medium button - Files selected:', Array.from(files).map(f => f.name));
     },
   },
 };
@@ -90,7 +90,7 @@ export const LargeSize: Story = {
   args: {
     size: 'lg',
     onFilesSelected: (files: FileList) => {
-      void ('Large button - Files selected:', Array.from(files).map(f => f.name));
+      console.log('Large button - Files selected:', Array.from(files).map(f => f.name));
     },
   },
 };
@@ -99,7 +99,7 @@ export const PrimaryVariant: Story = {
   args: {
     variant: 'primary',
     onFilesSelected: (files: FileList) => {
-      void ('Primary variant - Files selected:', Array.from(files).map(f => f.name));
+      console.log('Primary variant - Files selected:', Array.from(files).map(f => f.name));
     },
   },
 };
@@ -108,7 +108,7 @@ export const GhostVariant: Story = {
   args: {
     variant: 'ghost',
     onFilesSelected: (files: FileList) => {
-      void ('Ghost variant - Files selected:', Array.from(files).map(f => f.name));
+      console.log('Ghost variant - Files selected:', Array.from(files).map(f => f.name));
     },
   },
 };
@@ -117,7 +117,7 @@ export const OutlineVariant: Story = {
   args: {
     variant: 'outline',
     onFilesSelected: (files: FileList) => {
-      void ('Outline variant - Files selected:', Array.from(files).map(f => f.name));
+      console.log('Outline variant - Files selected:', Array.from(files).map(f => f.name));
     },
   },
 };
@@ -126,7 +126,7 @@ export const SingleFile: Story = {
   args: {
     maxFiles: 1,
     onFilesSelected: (files: FileList) => {
-      void ('Single file selected:', files[0]?.name);
+      console.log('Single file selected:', Array.from(files).map(f => f.name));
     },
   },
   parameters: {
@@ -143,7 +143,7 @@ export const ImagesOnly: Story = {
     acceptedTypes: ['image/*'],
     title: 'Attach images only',
     onFilesSelected: (files: FileList) => {
-      void ('Image files selected:', Array.from(files).map(f => f.name));
+      console.log('Image files selected:', Array.from(files).map(f => f.name));
     },
   },
   parameters: {
@@ -160,7 +160,7 @@ export const DocumentsOnly: Story = {
     acceptedTypes: ['.pdf', '.doc', '.docx', '.txt', '.md'],
     title: 'Attach documents only',
     onFilesSelected: (files: FileList) => {
-      void ('Document files selected:', Array.from(files).map(f => f.name));
+      console.log('Document files selected:', Array.from(files).map(f => f.name));
     },
   },
   parameters: {
@@ -178,21 +178,21 @@ export const AllSizes: Story = {
       <div className="text-center">
         <FileAttachButton 
           size="sm" 
-          onFilesSelected={(files) => void ('Small button:', files.length, 'files')}
+          onFilesSelected={(files) => console.log('Small button')} // Small button
         />
         <p className="text-xs text-gray-500 mt-2">SM</p>
       </div>
       <div className="text-center">
         <FileAttachButton 
           size="md" 
-          onFilesSelected={(files) => void ('Medium button:', files.length, 'files')}
+          onFilesSelected={(files) => console.log('Medium button')} // Medium button
         />
         <p className="text-xs text-gray-500 mt-2">MD</p>
       </div>
       <div className="text-center">
         <FileAttachButton 
           size="lg" 
-          onFilesSelected={(files) => void ('Large button:', files.length, 'files')}
+          onFilesSelected={(files) => console.log('Large button')} // Large button
         />
         <p className="text-xs text-gray-500 mt-2">LG</p>
       </div>
@@ -213,21 +213,21 @@ export const AllVariants: Story = {
       <div className="text-center">
         <FileAttachButton 
           variant="primary" 
-          onFilesSelected={(files) => void ('Primary variant:', files.length, 'files')}
+          onFilesSelected={(files) => console.log('Primary variant')} // Primary variant
         />
         <p className="text-xs text-gray-500 mt-2">Primary</p>
       </div>
       <div className="text-center">
         <FileAttachButton 
           variant="ghost" 
-          onFilesSelected={(files) => void ('Ghost variant:', files.length, 'files')}
+          onFilesSelected={(files) => console.log('Ghost variant')} // Ghost variant
         />
         <p className="text-xs text-gray-500 mt-2">Ghost</p>
       </div>
       <div className="text-center">
         <FileAttachButton 
           variant="outline" 
-          onFilesSelected={(files) => void ('Outline variant:', files.length, 'files')}
+          onFilesSelected={(files) => console.log('Outline variant')} // Outline variant
         />
         <p className="text-xs text-gray-500 mt-2">Outline</p>
       </div>
@@ -247,7 +247,7 @@ export const AllStates: Story = {
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-4">
         <FileAttachButton 
-          onFilesSelected={(files) => void ('Ready to attach:', files.length, 'files')}
+          onFilesSelected={(files) => console.log('Ready to attach')} // Ready to attach
         />
         <span className="text-sm">Ready to attach files</span>
       </div>
@@ -255,7 +255,7 @@ export const AllStates: Story = {
       <div className="flex items-center gap-4">
         <FileAttachButton 
           disabled={true}
-          onFilesSelected={(files) => void ('Disabled')}
+          onFilesSelected={(files) => console.log('Disabled')}
         />
         <span className="text-sm">Disabled</span>
       </div>
@@ -263,7 +263,7 @@ export const AllStates: Story = {
       <div className="flex items-center gap-4">
         <FileAttachButton 
           maxFiles={1}
-          onFilesSelected={(files) => void ('Single file:', files[0]?.name)}
+          onFilesSelected={(files) => console.log('Single file')} // Single file
         />
         <span className="text-sm">Single file only</span>
       </div>
@@ -271,7 +271,7 @@ export const AllStates: Story = {
       <div className="flex items-center gap-4">
         <FileAttachButton 
           acceptedTypes={['image/*']}
-          onFilesSelected={(files) => void ('Images only:', files.length, 'files')}
+          onFilesSelected={(files) => console.log('Images only')} // Images only
         />
         <span className="text-sm">Images only</span>
       </div>
