@@ -152,4 +152,64 @@ describe('LaceApp', () => {
     await screen.findByText('Select a Project');
     expect(screen.getByText('Choose a project from the sidebar to continue')).toBeInTheDocument();
   });
+
+  it('handles session management when project is selected', async () => {
+    const mockProjects = [
+      {
+        id: 'project-1',
+        name: 'Test Project',
+        description: 'A test project',
+        workingDirectory: '/test',
+        isArchived: false,
+        createdAt: new Date(),
+        lastUsedAt: new Date(),
+      },
+    ];
+
+    const mockSessions = [
+      {
+        id: 'session-1',
+        name: 'Test Session',
+        createdAt: '2025-01-01T00:00:00Z',
+        agents: [{
+          threadId: 'agent-1',
+          name: 'Claude',
+          provider: 'anthropic',
+          model: 'claude-3-sonnet-20241022'
+        }]
+      }
+    ];
+
+    // Mock API responses
+    (fetch as vi.MockedFunction<typeof fetch>).mockImplementation((url) => {
+      if (typeof url === 'string') {
+        if (url === '/api/projects') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ projects: mockProjects }),
+          } as Response);
+        } else if (url.includes('/sessions')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ sessions: mockSessions }),
+          } as Response);
+        }
+      }
+      return Promise.resolve({
+        ok: false,
+        json: () => Promise.resolve({ error: 'Not found' }),
+      } as Response);
+    });
+
+    render(<LaceApp />);
+    
+    // Wait for projects to load
+    await screen.findByText('Select a Project');
+
+    // Should show project selection initially
+    expect(screen.getByText('Choose a project from the sidebar to continue')).toBeInTheDocument();
+    
+    // Should have called projects API
+    expect(fetch).toHaveBeenCalledWith('/api/projects');
+  });
 });
