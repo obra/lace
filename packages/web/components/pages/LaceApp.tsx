@@ -6,12 +6,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars, faFolder, faComments, faRobot, faPlus } from '@/lib/fontawesome';
+import { faBars, faFolder, faComments, faRobot, faPlus, faCog } from '@/lib/fontawesome';
 import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { TimelineView } from '@/components/timeline/TimelineView';
 import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
+import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import type {
   Session,
@@ -23,6 +24,9 @@ import type {
   SessionsResponse,
   SessionResponse,
   ProjectInfo,
+  ProviderInfo,
+  ProvidersResponse,
+  CreateAgentRequest,
 } from '@/types/api';
 import { isApiError } from '@/types/api';
 import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
@@ -41,6 +45,8 @@ export function LaceApp() {
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [loadingProjects, setLoadingProjects] = useState(true);
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(true);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedSession, setSelectedSession] = useState<ThreadId | null>(null);
   const [selectedSessionDetails, setSelectedSessionDetails] = useState<Session | null>(null);
@@ -81,6 +87,26 @@ export function LaceApp() {
     setLoadingProjects(false);
   }, []);
 
+  // Provider loading function
+  const loadProviders = useCallback(async () => {
+    setLoadingProviders(true);
+    try {
+      const res = await fetch('/api/providers');
+      const data: unknown = await res.json();
+      
+      if (isApiError(data)) {
+        console.error('Failed to load providers:', data.error);
+        return;
+      }
+
+      const providersData = data as ProvidersResponse;
+      setProviders(providersData.providers || []);
+    } catch (error) {
+      console.error('Failed to load providers:', error);
+    }
+    setLoadingProviders(false);
+  }, []);
+
   const loadSessions = useCallback(async () => {
     if (!selectedProject) {
       setSessions([]);
@@ -103,10 +129,11 @@ export function LaceApp() {
     }
   }, [selectedProject]);
 
-  // Load projects on mount
+  // Load projects and providers on mount
   useEffect(() => {
     void loadProjects();
-  }, [loadProjects]);
+    void loadProviders();
+  }, [loadProjects, loadProviders]);
 
   const loadSessionDetails = useCallback(async (sessionId: ThreadId) => {
     try {
@@ -309,21 +336,23 @@ export function LaceApp() {
     void handleApprovalDecision(ApprovalDecision.DENY);
   };
 
-  // Session creation function
-  const createSession = async () => {
-    if (!selectedProject || !sessionName.trim()) return;
+  // Session creation function with configuration
+  const handleSessionCreate = async (sessionData: { 
+    name: string; 
+    description?: string; 
+    configuration?: Record<string, unknown> 
+  }) => {
+    if (!selectedProject) return;
     
     setLoading(true);
     try {
       const res = await fetch(`/api/projects/${selectedProject}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: sessionName.trim() }),
+        body: JSON.stringify(sessionData),
       });
       
       if (res.ok) {
-        setSessionName('');
-        setCreatingSession(false);
         // Reload sessions to show the new one
         void loadSessions();
       } else {
@@ -333,6 +362,37 @@ export function LaceApp() {
       console.error('Failed to create session:', error);
     }
     setLoading(false);
+  };
+
+  // Agent creation function
+  const handleAgentCreate = async (sessionId: string, agentData: CreateAgentRequest) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(agentData),
+      });
+      
+      if (res.ok) {
+        // Reload session details to show the new agent
+        void loadSessionDetails(sessionId as ThreadId);
+      } else {
+        console.error('Failed to create agent');
+      }
+    } catch (error) {
+      console.error('Failed to create agent:', error);
+    }
+    setLoading(false);
+  };
+
+  // Legacy session creation (for backward compatibility)
+  const createSession = async () => {
+    if (!selectedProject || !sessionName.trim()) return;
+    
+    await handleSessionCreate({ name: sessionName.trim() });
+    setSessionName('');
+    setCreatingSession(false);
   };
 
   const cancelSessionCreation = () => {
@@ -394,11 +454,11 @@ export function LaceApp() {
               currentTheme={theme}
               onThemeChange={setTheme}
             >
-              {/* Projects Section - Always show, collapsed when project selected */}
+              {/* Projects Section - Only show project selection */}
               <SidebarSection 
                 title="Projects" 
                 icon={faFolder}
-                defaultCollapsed={!!selectedProject}
+                defaultCollapsed={false}
                 collapsible={true}
               >
                 {projectsForSidebar.map((project) => (
@@ -415,62 +475,48 @@ export function LaceApp() {
                         <FontAwesomeIcon icon={faFolder} className="w-4 h-4" />
                         <span>{project.name}</span>
                       </div>
-                      {project.sessionCount ? (
+                      {sessions.length > 0 && (
                         <span className="text-xs text-base-content/40">
-                          {project.sessionCount}
+                          {sessions.length} sessions
                         </span>
-                      ) : null}
+                      )}
                     </div>
                   </SidebarItem>
                 ))}
               </SidebarSection>
 
-              {/* Sessions Section - Show when project selected, collapsed when session selected */}
-              {selectedProject && (
+              {/* Session Management - Show session context and agent selection */}
+              {selectedSessionDetails && (
                 <SidebarSection 
-                  title="Sessions" 
+                  title="Current Session" 
                   icon={faComments}
-                  defaultCollapsed={!!selectedSession}
-                  collapsible={true}
-                >
-                  {sessions.map((session) => (
-                    <SidebarItem
-                      key={session.id}
-                      active={selectedSession === session.id}
-                      onClick={() => {
-                        handleSessionSelect(session.id);
-                        setShowMobileNav(false);
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <FontAwesomeIcon icon={faComments} className="w-4 h-4" />
-                          <span>{session.name}</span>
-                        </div>
-                        <span className="text-xs text-base-content/40">
-                          {session.agents?.length || 0} agents
-                        </span>
-                      </div>
-                    </SidebarItem>
-                  ))}
-                  <SidebarButton onClick={() => {
-                    setCreatingSession(true);
-                    setShowMobileNav(false);
-                  }}>
-                    <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-                    New Session
-                  </SidebarButton>
-                </SidebarSection>
-              )}
-
-              {/* Agents Section - Show when session selected, stay open */}
-              {selectedSession && selectedSessionDetails && (
-                <SidebarSection 
-                  title="Agents" 
-                  icon={faRobot}
                   defaultCollapsed={false}
-                  collapsible={true}
+                  collapsible={false}
                 >
+                  {/* Session Info */}
+                  <div className="px-3 py-2 bg-base-50 rounded border border-base-200 mb-2">
+                    <div className="text-sm font-medium text-base-content truncate">
+                      {selectedSessionDetails.name}
+                    </div>
+                    <div className="text-xs text-base-content/60">
+                      {selectedSessionDetails.agents?.length || 0} agents available
+                    </div>
+                  </div>
+
+                  {/* Back to Session Config */}
+                  <SidebarButton
+                    onClick={() => {
+                      setSelectedAgent(undefined);
+                      setEvents([]);
+                      setShowMobileNav(false);
+                    }}
+                    variant="ghost"
+                  >
+                    <FontAwesomeIcon icon={faCog} className="w-4 h-4" />
+                    Configure Session
+                  </SidebarButton>
+
+                  {/* Agent Selection */}
                   {selectedSessionDetails.agents?.map((agent) => (
                     <SidebarItem
                       key={agent.threadId}
@@ -482,28 +528,29 @@ export function LaceApp() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <FontAwesomeIcon icon={faRobot} className="w-4 h-4" />
-                          <span>{agent.name}</span>
+                          <FontAwesomeIcon 
+                            icon={faRobot} 
+                            className={`w-4 h-4 ${
+                              selectedAgent === agent.threadId ? 'text-primary' : 'text-base-content/60'
+                            }`} 
+                          />
+                          <span className="font-medium">{agent.name}</span>
                         </div>
-                        <span className="text-xs text-base-content/40">
-                          {agent.provider}
-                        </span>
+                        <div className="flex flex-col items-end">
+                          <span className="text-xs text-base-content/60">
+                            {agent.provider}
+                          </span>
+                          <span className={`text-xs badge badge-xs ${
+                            agent.status === 'idle' ? 'badge-success' :
+                            agent.status === 'busy' ? 'badge-warning' :
+                            'badge-neutral'
+                          }`}>
+                            {agent.status}
+                          </span>
+                        </div>
                       </div>
                     </SidebarItem>
                   )) || []}
-                  <SidebarButton 
-                    variant="secondary" 
-                    onClick={() => {
-                      const name = prompt('Enter agent name:');
-                      if (name) {
-                        // TODO: Implement agent spawning
-                        console.log('Would spawn agent:', name, 'in session:', selectedSession);
-                      }
-                    }}
-                  >
-                    <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-                    New Agent
-                  </SidebarButton>
                 </SidebarSection>
               )}
             </MobileSidebar>
@@ -519,11 +566,11 @@ export function LaceApp() {
           currentTheme={theme}
           onThemeChange={setTheme}
         >
-          {/* Projects Section - Always show, collapsed when project selected */}
+          {/* Projects Section - Only show project selection */}
           <SidebarSection 
             title="Projects" 
             icon={faFolder} 
-            defaultCollapsed={!!selectedProject}
+            defaultCollapsed={false}
             collapsible={true}
           >
             {projectsForSidebar.map((project) => (
@@ -537,56 +584,47 @@ export function LaceApp() {
                     <FontAwesomeIcon icon={faFolder} className="w-4 h-4" />
                     <span>{project.name}</span>
                   </div>
-                  {project.sessionCount ? (
+                  {sessions.length > 0 && (
                     <span className="text-xs text-base-content/40">
-                      {project.sessionCount}
+                      {sessions.length} sessions
                     </span>
-                  ) : null}
+                  )}
                 </div>
               </SidebarItem>
             ))}
           </SidebarSection>
 
-          {/* Sessions Section - Show when project selected, collapsed when session selected */}
-          {selectedProject && (
+          {/* Session Management - Show session context and agent selection */}
+          {selectedSessionDetails && (
             <SidebarSection 
-              title="Sessions" 
+              title="Current Session" 
               icon={faComments}
-              defaultCollapsed={!!selectedSession}
-              collapsible={true}
-            >
-              {sessions.map((session) => (
-                <SidebarItem
-                  key={session.id}
-                  active={selectedSession === session.id}
-                  onClick={() => handleSessionSelect(session.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FontAwesomeIcon icon={faComments} className="w-4 h-4" />
-                      <span>{session.name}</span>
-                    </div>
-                    <span className="text-xs text-base-content/40">
-                      {session.agents?.length || 0} agents
-                    </span>
-                  </div>
-                </SidebarItem>
-              ))}
-              <SidebarButton onClick={() => setCreatingSession(true)}>
-                <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-                New Session
-              </SidebarButton>
-            </SidebarSection>
-          )}
-
-          {/* Agents Section - Show when session selected, stay open */}
-          {selectedSession && selectedSessionDetails && (
-            <SidebarSection 
-              title="Agents" 
-              icon={faRobot}
               defaultCollapsed={false}
-              collapsible={true}
+              collapsible={false}
             >
+              {/* Session Info */}
+              <div className="px-3 py-2 bg-base-50 rounded border border-base-200 mb-2">
+                <div className="text-sm font-medium text-base-content truncate">
+                  {selectedSessionDetails.name}
+                </div>
+                <div className="text-xs text-base-content/60">
+                  {selectedSessionDetails.agents?.length || 0} agents available
+                </div>
+              </div>
+
+              {/* Back to Session Config */}
+              <SidebarButton
+                onClick={() => {
+                  setSelectedAgent(undefined);
+                  setEvents([]);
+                }}
+                variant="ghost"
+              >
+                <FontAwesomeIcon icon={faCog} className="w-4 h-4" />
+                Configure Session
+              </SidebarButton>
+
+              {/* Agent Selection */}
               {selectedSessionDetails.agents?.map((agent) => (
                 <SidebarItem
                   key={agent.threadId}
@@ -595,28 +633,29 @@ export function LaceApp() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <FontAwesomeIcon icon={faRobot} className="w-4 h-4" />
-                      <span>{agent.name}</span>
+                      <FontAwesomeIcon 
+                        icon={faRobot} 
+                        className={`w-4 h-4 ${
+                          selectedAgent === agent.threadId ? 'text-primary' : 'text-base-content/60'
+                        }`} 
+                      />
+                      <span className="font-medium">{agent.name}</span>
                     </div>
-                    <span className="text-xs text-base-content/40">
-                      {agent.provider}
-                    </span>
+                    <div className="flex flex-col items-end">
+                      <span className="text-xs text-base-content/60">
+                        {agent.provider}
+                      </span>
+                      <span className={`text-xs badge badge-xs ${
+                        agent.status === 'idle' ? 'badge-success' :
+                        agent.status === 'busy' ? 'badge-warning' :
+                        'badge-neutral'
+                      }`}>
+                        {agent.status}
+                      </span>
+                    </div>
                   </div>
                 </SidebarItem>
               )) || []}
-              <SidebarButton 
-                variant="secondary" 
-                onClick={() => {
-                  const name = prompt('Enter agent name:');
-                  if (name) {
-                    // TODO: Implement agent spawning
-                    console.log('Would spawn agent:', name, 'in session:', selectedSession);
-                  }
-                }}
-              >
-                <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-                New Agent
-              </SidebarButton>
             </SidebarSection>
           )}
         </Sidebar>
@@ -644,68 +683,16 @@ export function LaceApp() {
         </motion.div>
 
         {/* Content Area */}
-        <div className="flex-1 flex flex-col min-h-0 text-base-content">{/* Remove centering for chat interface */}
-          {loadingProjects ? (
+        <div className="flex-1 flex flex-col min-h-0 text-base-content">
+          {loadingProjects || loadingProviders ? (
             <div className="flex-1 flex items-center justify-center p-6">
               <div className="flex items-center gap-2">
                 <div className="loading loading-spinner loading-md"></div>
-                <span>Loading projects...</span>
+                <span>Loading...</span>
               </div>
             </div>
           ) : selectedProject ? (
-            creatingSession ? (
-              // Session creation form
-              <div className="flex-1 flex items-center justify-center p-6">
-                <div className="w-full max-w-md">
-                <div className="bg-base-100 rounded-lg shadow-lg p-6">
-                  <h2 className="text-xl font-semibold mb-4">Create New Session</h2>
-                  <p className="text-base-content/60 mb-6">
-                    Create a new session in <strong>{currentProject.name}</strong>
-                  </p>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="label">
-                        <span className="label-text">Session Name</span>
-                      </label>
-                      <input
-                        type="text"
-                        className="input input-bordered w-full"
-                        value={sessionName}
-                        onChange={(e) => setSessionName(e.target.value)}
-                        placeholder="Enter session name..."
-                        autoFocus
-                      />
-                    </div>
-                    
-                    <div className="flex gap-3 pt-4">
-                      <button 
-                        className="btn btn-primary flex-1"
-                        onClick={createSession}
-                        disabled={!sessionName.trim() || loading}
-                      >
-                        {loading ? (
-                          <>
-                            <div className="loading loading-spinner loading-sm"></div>
-                            Creating...
-                          </>
-                        ) : (
-                          'Create Session'
-                        )}
-                      </button>
-                      <button 
-                        className="btn btn-ghost flex-1"
-                        onClick={cancelSessionCreation}
-                        disabled={loading}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                </div>
-              </div>
-            ) : selectedAgent ? (
+            selectedAgent ? (
               <div className="flex-1 flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
                 {/* Conversation Display */}
                 <div style={{ height: 'calc(100% - 80px)' }}>
@@ -734,38 +721,19 @@ export function LaceApp() {
                   />
                 </motion.div>
               </div>
-            ) : selectedSession ? (
-              <div className="flex-1 flex items-center justify-center p-6">
-                <div className="text-center space-y-2">
-                  <h2 className="text-lg font-medium">Session: {sessions.find(s => s.id === selectedSession)?.name}</h2>
-                  <p className="text-base-content/60">Select an agent from the sidebar to continue</p>
-                  <div className="text-sm text-base-content/40">
-                    {selectedSessionDetails?.agents?.length || 0} agent{(selectedSessionDetails?.agents?.length || 0) !== 1 ? 's' : ''} available
-                  </div>
-                </div>
-              </div>
-            ) : sessions.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center p-6">
-                <div className="text-center space-y-2">
-                  <h2 className="text-lg font-medium">Project: {currentProject.name}</h2>
-                  <p className="text-base-content/60">No sessions found</p>
-                  <button 
-                    className="btn btn-primary btn-sm"
-                    onClick={() => setCreatingSession(true)}
-                  >
-                    Create Session
-                  </button>
-                </div>
-              </div>
             ) : (
-              <div className="flex-1 flex items-center justify-center p-6">
-                <div className="text-center space-y-2">
-                  <h2 className="text-lg font-medium">Project: {currentProject.name}</h2>
-                  <p className="text-base-content/60">Select a session from the sidebar to continue</p>
-                  <div className="text-sm text-base-content/40">
-                    {sessions.length} session{sessions.length !== 1 ? 's' : ''} available
-                  </div>
-                </div>
+              /* Session Configuration Panel - Main UI for session/agent management */
+              <div className="flex-1 p-6">
+                <SessionConfigPanel
+                  selectedProject={currentProject}
+                  sessions={sessions}
+                  selectedSession={selectedSessionDetails}
+                  providers={providers}
+                  onSessionCreate={handleSessionCreate}
+                  onSessionSelect={(session) => handleSessionSelect(session.id)}
+                  onAgentCreate={handleAgentCreate}
+                  loading={loading}
+                />
               </div>
             )
           ) : projects.length === 0 ? (

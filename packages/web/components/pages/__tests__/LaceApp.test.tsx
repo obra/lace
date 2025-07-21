@@ -9,7 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { LaceApp } from '../LaceApp';
+import { LaceApp } from '@/components/pages/LaceApp';
 
 // Mock the theme context
 vi.mock('@/components/providers/ThemeProvider', () => ({
@@ -50,6 +50,10 @@ vi.mock('@/components/chat/EnhancedChatInput', () => ({
 
 vi.mock('@/components/modals/ToolApprovalModal', () => ({
   ToolApprovalModal: () => <div data-testid="tool-approval-modal">Tool Approval Modal</div>,
+}));
+
+vi.mock('@/components/config/SessionConfigPanel', () => ({
+  SessionConfigPanel: () => <div data-testid="session-config-panel">Session Config Panel</div>,
 }));
 
 vi.mock('@/lib/timeline-converter', () => ({
