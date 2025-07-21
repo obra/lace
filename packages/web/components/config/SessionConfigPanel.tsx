@@ -64,6 +64,8 @@ export function SessionConfigPanel({
   const [showCreateSession, setShowCreateSession] = useState(false);
   const [showCreateAgent, setShowCreateAgent] = useState(false);
   const [showEditConfig, setShowEditConfig] = useState(false);
+  const [showEditAgent, setShowEditAgent] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<{ threadId: string; name: string; provider: string; model: string } | null>(null);
   
   // Session creation state
   const [newSessionName, setNewSessionName] = useState('');
@@ -78,6 +80,13 @@ export function SessionConfigPanel({
   // Environment variables helper state
   const [newEnvKey, setNewEnvKey] = useState('');
   const [newEnvValue, setNewEnvValue] = useState('');
+  
+  // Session edit state
+  const [editSessionName, setEditSessionName] = useState('');
+  const [editSessionDescription, setEditSessionDescription] = useState('');
+  const [editSessionConfig, setEditSessionConfig] = useState<SessionConfiguration>(DEFAULT_CONFIG);
+  const [editNewEnvKey, setEditNewEnvKey] = useState('');
+  const [editNewEnvValue, setEditNewEnvValue] = useState('');
 
   // Get available models for session configuration
   const sessionAvailableModels = useMemo(() => {
@@ -91,6 +100,12 @@ export function SessionConfigPanel({
     return provider?.models || [];
   }, [providers, agentProvider]);
 
+  // Get available models for session edit configuration
+  const editSessionAvailableModels = useMemo(() => {
+    const provider = providers.find(p => p.type === editSessionConfig.provider);
+    return provider?.models || [];
+  }, [providers, editSessionConfig.provider]);
+
   // Get available providers (only those that are available)
   const availableProviders = useMemo(() => {
     return providers.filter(p => p.available);
@@ -101,8 +116,11 @@ export function SessionConfigPanel({
     setShowCreateSession(false);
     setShowCreateAgent(false);
     setShowEditConfig(false);
+    setShowEditAgent(false);
+    setEditingAgent(null);
     resetSessionForm();
     resetAgentForm();
+    resetEditSessionForm();
   }, [selectedProject.id]);
 
   const resetSessionForm = () => {
@@ -117,6 +135,14 @@ export function SessionConfigPanel({
     setNewAgentName('');
     setAgentProvider('anthropic');
     setAgentModel('claude-3-sonnet-20241022');
+  };
+
+  const resetEditSessionForm = () => {
+    setEditSessionName('');
+    setEditSessionDescription('');
+    setEditSessionConfig(DEFAULT_CONFIG);
+    setEditNewEnvKey('');
+    setEditNewEnvValue('');
   };
 
   const handleCreateSession = (e: React.FormEvent) => {
@@ -182,6 +208,84 @@ export function SessionConfigPanel({
     }));
   };
 
+  // Handle session edit
+  const handleEditSessionClick = () => {
+    if (!selectedSession) return;
+    
+    setEditSessionName(selectedSession.name);
+    setEditSessionDescription(''); // TODO: Load from API if available
+    // TODO: Load actual session configuration from API
+    setEditSessionConfig(DEFAULT_CONFIG);
+    setShowEditConfig(true);
+  };
+
+  const handleEditSessionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSession || !onSessionUpdate || !editSessionName.trim()) return;
+
+    onSessionUpdate(selectedSession.id, {
+      name: editSessionName.trim(),
+      description: editSessionDescription.trim() || undefined,
+      configuration: editSessionConfig,
+    });
+
+    setShowEditConfig(false);
+    resetEditSessionForm();
+  };
+
+  // Handle edit session environment variables
+  const handleAddEditEnvironmentVariable = () => {
+    if (!editNewEnvKey.trim() || !editNewEnvValue.trim()) return;
+
+    setEditSessionConfig(prev => ({
+      ...prev,
+      environmentVariables: {
+        ...prev.environmentVariables,
+        [editNewEnvKey.trim()]: editNewEnvValue.trim(),
+      },
+    }));
+
+    setEditNewEnvKey('');
+    setEditNewEnvValue('');
+  };
+
+  const handleRemoveEditEnvironmentVariable = (key: string) => {
+    setEditSessionConfig(prev => ({
+      ...prev,
+      environmentVariables: {
+        ...prev.environmentVariables,
+        [key]: undefined,
+      },
+    }));
+  };
+
+  const handleEditToolPolicyChange = (tool: string, policy: 'allow' | 'require-approval' | 'deny') => {
+    setEditSessionConfig(prev => ({
+      ...prev,
+      toolPolicies: {
+        ...prev.toolPolicies,
+        [tool]: policy,
+      },
+    }));
+  };
+
+  // Handle agent edit
+  const handleEditAgentClick = (agent: { threadId: string; name: string; provider: string; model: string }) => {
+    setEditingAgent(agent);
+    setShowEditAgent(true);
+  };
+
+  const handleEditAgentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAgent) return;
+
+    // TODO: Implement agent update API call
+    console.warn('Agent update not yet implemented:', editingAgent);
+    
+    setShowEditAgent(false);
+    setEditingAgent(null);
+  };
+
   return (
     <div className="bg-base-100 rounded-lg border border-base-300 p-6">
       {/* Header */}
@@ -244,7 +348,7 @@ export function SessionConfigPanel({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setShowEditConfig(true);
+                            handleEditSessionClick();
                           }}
                           className="btn btn-ghost btn-xs"
                           title="Edit Configuration"
@@ -282,13 +386,25 @@ export function SessionConfigPanel({
                               {agent.provider} • {agent.model}
                             </span>
                           </div>
-                          <span className={`badge badge-xs ${
-                            agent.status === 'idle' ? 'badge-success' :
-                            agent.status === 'busy' ? 'badge-warning' :
-                            'badge-neutral'
-                          }`}>
-                            {agent.status}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditAgentClick(agent);
+                              }}
+                              className="btn btn-ghost btn-xs opacity-60 hover:opacity-100"
+                              title="Edit Agent"
+                            >
+                              <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
+                            </button>
+                            <span className={`badge badge-xs ${
+                              agent.status === 'idle' ? 'badge-success' :
+                              agent.status === 'busy' ? 'badge-warning' :
+                              'badge-neutral'
+                            }`}>
+                              {agent.status}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -620,6 +736,337 @@ export function SessionConfigPanel({
                     </>
                   ) : (
                     'Launch Agent'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Session Configuration Modal */}
+      {showEditConfig && selectedSession && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">Edit Session: {selectedSession.name}</h3>
+              <button
+                onClick={() => setShowEditConfig(false)}
+                className="btn btn-ghost btn-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSessionSubmit} className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto min-h-0 space-y-6">
+                {/* Basic Information */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Session Name *</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editSessionName}
+                      onChange={(e) => setEditSessionName(e.target.value)}
+                      className="input input-bordered w-full"
+                      placeholder="e.g., Backend API Development"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Description</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editSessionDescription}
+                      onChange={(e) => setEditSessionDescription(e.target.value)}
+                      className="input input-bordered w-full"
+                      placeholder="Optional description"
+                    />
+                  </div>
+                </div>
+
+                {/* Provider and Model Configuration */}
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Default Provider</span>
+                    </label>
+                    <select
+                      value={editSessionConfig.provider}
+                      onChange={(e) => {
+                        const newProvider = e.target.value;
+                        const providerModels = providers.find(p => p.type === newProvider)?.models || [];
+                        setEditSessionConfig(prev => ({
+                          ...prev,
+                          provider: newProvider,
+                          model: providerModels[0]?.name || prev.model,
+                        }));
+                      }}
+                      className="select select-bordered w-full"
+                    >
+                      {availableProviders.map((provider) => (
+                        <option key={provider.type} value={provider.type}>
+                          {provider.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Default Model</span>
+                    </label>
+                    <select
+                      value={editSessionConfig.model}
+                      onChange={(e) => setEditSessionConfig(prev => ({ ...prev, model: e.target.value }))}
+                      className="select select-bordered w-full"
+                    >
+                      {editSessionAvailableModels.map((model) => (
+                        <option key={model.name} value={model.name}>
+                          {model.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Max Tokens</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="200000"
+                      value={editSessionConfig.maxTokens}
+                      onChange={(e) => setEditSessionConfig(prev => ({ ...prev, maxTokens: parseInt(e.target.value) || 4096 }))}
+                      className="input input-bordered w-full"
+                    />
+                  </div>
+                </div>
+
+                {/* Working Directory */}
+                <div>
+                  <label className="label">
+                    <span className="label-text font-medium">Working Directory</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editSessionConfig.workingDirectory || selectedProject.workingDirectory}
+                    onChange={(e) => setEditSessionConfig(prev => ({ ...prev, workingDirectory: e.target.value }))}
+                    className="input input-bordered w-full"
+                    placeholder={selectedProject.workingDirectory}
+                  />
+                </div>
+
+                {/* Environment Variables */}
+                <div>
+                  <label className="label">
+                    <span className="label-text font-medium">Environment Variables</span>
+                  </label>
+                  <div className="space-y-2">
+                    {Object.entries(editSessionConfig.environmentVariables || {}).map(([key, value]) => (
+                      <div key={key} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={key}
+                          className="input input-bordered input-sm flex-1"
+                          readOnly
+                        />
+                        <span className="text-base-content/60">=</span>
+                        <input
+                          type="text"
+                          value={value}
+                          className="input input-bordered input-sm flex-1"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEditEnvironmentVariable(key)}
+                          className="btn btn-error btn-sm btn-square"
+                        >
+                          <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={editNewEnvKey}
+                        onChange={(e) => setEditNewEnvKey(e.target.value)}
+                        className="input input-bordered input-sm flex-1"
+                        placeholder="Key"
+                      />
+                      <span className="text-base-content/60">=</span>
+                      <input
+                        type="text"
+                        value={editNewEnvValue}
+                        onChange={(e) => setEditNewEnvValue(e.target.value)}
+                        className="input input-bordered input-sm flex-1"
+                        placeholder="Value"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddEditEnvironmentVariable}
+                        className="btn btn-primary btn-sm"
+                        disabled={!editNewEnvKey.trim() || !editNewEnvValue.trim()}
+                      >
+                        <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tool Configuration */}
+                <div>
+                  <label className="label">
+                    <span className="label-text font-medium">Tool Access Policies</span>
+                  </label>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    {AVAILABLE_TOOLS.map((tool) => (
+                      <div key={tool} className="flex items-center justify-between p-3 border border-base-300 rounded-lg">
+                        <span className="font-medium text-sm">{tool}</span>
+                        <select
+                          value={editSessionConfig.toolPolicies?.[tool] || 'require-approval'}
+                          onChange={(e) => handleEditToolPolicyChange(tool, e.target.value as 'allow' | 'require-approval' | 'deny')}
+                          className="select select-bordered select-sm w-40"
+                        >
+                          <option value="allow">Allow</option>
+                          <option value="require-approval">Require Approval</option>
+                          <option value="deny">Deny</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-base-300">
+                <button
+                  type="button"
+                  onClick={() => setShowEditConfig(false)}
+                  className="btn btn-ghost"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={!editSessionName.trim() || loading}
+                >
+                  {loading ? (
+                    <>
+                      <div className="loading loading-spinner loading-sm"></div>
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Session'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Agent Modal */}
+      {showEditAgent && editingAgent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">Edit Agent: {editingAgent.name}</h3>
+              <button
+                onClick={() => setShowEditAgent(false)}
+                className="btn btn-ghost btn-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleEditAgentSubmit} className="space-y-4">
+              <div>
+                <label className="label">
+                  <span className="label-text font-medium">Agent Name *</span>
+                </label>
+                <input
+                  type="text"
+                  value={editingAgent.name}
+                  onChange={(e) => setEditingAgent(prev => prev ? { ...prev, name: e.target.value } : null)}
+                  className="input input-bordered w-full"
+                  placeholder="e.g., Code Reviewer"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="label">
+                  <span className="label-text font-medium">Provider</span>
+                </label>
+                <select
+                  value={editingAgent.provider}
+                  onChange={(e) => {
+                    const newProvider = e.target.value;
+                    const providerModels = providers.find(p => p.type === newProvider)?.models || [];
+                    setEditingAgent(prev => prev ? {
+                      ...prev,
+                      provider: newProvider,
+                      model: providerModels[0]?.name || prev.model,
+                    } : null);
+                  }}
+                  className="select select-bordered w-full"
+                >
+                  {availableProviders.map((provider) => (
+                    <option key={provider.type} value={provider.type}>
+                      {provider.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label">
+                  <span className="label-text font-medium">Model</span>
+                </label>
+                <select
+                  value={editingAgent.model}
+                  onChange={(e) => setEditingAgent(prev => prev ? { ...prev, model: e.target.value } : null)}
+                  className="select select-bordered w-full"
+                >
+                  {providers.find(p => p.type === editingAgent.provider)?.models.map((model) => (
+                    <option key={model.name} value={model.name}>
+                      {model.displayName}
+                    </option>
+                  )) || []}
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowEditAgent(false)}
+                  className="btn btn-ghost"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={!editingAgent.name.trim() || loading}
+                >
+                  {loading ? (
+                    <>
+                      <div className="loading loading-spinner loading-sm"></div>
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Agent'
                   )}
                 </button>
               </div>
