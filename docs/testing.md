@@ -2,7 +2,315 @@
 
 This document outlines testing patterns and best practices for the Lace codebase.
 
-## Terminal Interface Testing
+## Philosophy: Test Behavior, Not Implementation
+
+**Golden Rule**: Test what the system does, not how it does it.
+
+**Good**: "When I create a session with name 'My Session', it appears in the session list"  
+**Bad**: "When I call createSession(), it calls Session.create() with the right parameters"
+
+## Code Standards
+
+### TypeScript Requirements
+- **NEVER use `any` type** - Use `unknown` and type guards instead
+- **Always type test data** - Use factory functions with `Partial<T>` for fixtures
+- **Type your mocks** - Use `vi.mocked()` and interface types
+
+```typescript
+// ❌ Bad
+const mockService: any = { create: vi.fn() };
+
+// ✅ Good  
+const mockService: jest.Mocked<ServiceInterface> = {
+  create: vi.fn().mockResolvedValue(expectedResult)
+};
+```
+
+### Test Organization
+- **Colocated tests**: Place `feature.test.ts` next to `feature.ts`
+- **Descriptive names**: Test names should describe the behavior being tested
+- **Arrange-Act-Assert**: Clear separation of test phases
+
+## What to Test vs What Not to Test
+
+### ✅ Test These Behaviors
+- **User interactions**: Button clicks, form submissions, navigation
+- **State changes**: Data updates, loading states, error states  
+- **Integration points**: API calls return correct data, components communicate
+- **Error handling**: System responds correctly to failures
+- **Business logic**: Calculations, validations, transformations
+
+### ❌ Don't Test These Details
+- **Implementation details**: Which methods get called internally
+- **Mock interactions**: Whether mocks were called with right parameters  
+- **Framework internals**: React lifecycle, Next.js routing mechanics
+- **Third-party libraries**: Assume they work correctly
+
+## Mock Usage Policy
+
+### Essential Mocks (Allowed)
+These require documentation explaining why:
+
+```typescript
+// ✅ External APIs - avoid network calls in tests
+vi.mock('~/utils/api-client');
+
+// ✅ File system - avoid disk I/O in tests  
+vi.mock('fs/promises');
+
+// ✅ Time/randomness - need deterministic results
+vi.mock('~/utils/date', () => ({ now: () => '2024-01-01T00:00:00Z' }));
+```
+
+### Prohibited Mocks
+```typescript
+// ❌ Never mock your own business logic
+vi.mock('~/services/session-service'); 
+
+// ❌ Never mock the component you're testing
+vi.mock('~/components/TaskList');
+
+// ❌ Never mock database operations - use test DB
+vi.mock('~/persistence/database');
+```
+
+### Mock Documentation Template
+Every mock needs a comment:
+```typescript
+// Mock file system operations to avoid disk I/O in tests
+// Tests focus on business logic, not file handling implementation
+vi.mock('fs/promises', () => ({ ... }));
+```
+
+## Test Patterns by Component Type
+
+### React Components
+Test user interactions and visual outcomes:
+
+```typescript
+// ✅ Good - tests user behavior
+it('should show error when form submission fails', async () => {
+  render(<TaskForm onSubmit={mockSubmitThatFails} />);
+  
+  fireEvent.click(screen.getByText('Save'));
+  
+  await waitFor(() => {
+    expect(screen.getByText('Save failed')).toBeInTheDocument();
+  });
+});
+
+// ❌ Bad - tests implementation
+it('should call onSubmit with form data', () => {
+  const onSubmit = vi.fn();
+  render(<TaskForm onSubmit={onSubmit} />);
+  
+  fireEvent.click(screen.getByText('Save'));
+  
+  expect(onSubmit).toHaveBeenCalledWith(expectedData);
+});
+```
+
+### API Routes (Next.js)
+Test actual HTTP responses:
+
+```typescript
+// ✅ Good - tests real API behavior
+it('should return 201 when creating valid session', async () => {
+  const request = new NextRequest('http://localhost:3000/api/sessions', {
+    method: 'POST',
+    body: JSON.stringify({ name: 'Test Session' })
+  });
+
+  const response = await POST(request);
+  
+  expect(response.status).toBe(201);
+  const data = await response.json();
+  expect(data.session.name).toBe('Test Session');
+});
+```
+
+### Services/Business Logic
+Test state changes and outputs:
+
+```typescript
+// ✅ Good - tests actual behavior
+it('should persist session and return ID', () => {
+  const service = new SessionService();
+  
+  const sessionId = service.createSession({ name: 'My Session' });
+  const retrieved = service.getSession(sessionId);
+  
+  expect(retrieved.name).toBe('My Session');
+});
+```
+
+### Custom Hooks
+Test state management and effects:
+
+```typescript
+// ✅ Good - tests hook state behavior  
+it('should set loading true during API call', async () => {
+  const { result } = renderHook(() => useSessionAPI());
+  
+  act(() => {
+    void result.current.createSession({ name: 'Test' });
+  });
+  
+  expect(result.current.loading).toBe(true);
+  
+  await waitFor(() => {
+    expect(result.current.loading).toBe(false);
+  });
+});
+```
+
+## Test Data Management
+
+### Factory Functions
+Create typed test data with factories:
+
+```typescript
+function createMockTask(overrides?: Partial<Task>): Task {
+  return {
+    id: 'task_123',
+    title: 'Default Task',
+    status: 'pending',
+    priority: 'medium',
+    createdAt: new Date().toISOString(),
+    ...overrides, // Allows customization per test
+  };
+}
+
+// Usage
+const highPriorityTask = createMockTask({ priority: 'high' });
+```
+
+### Database Testing
+Use real database with test data:
+
+```typescript
+beforeEach(async () => {
+  // Use real database operations
+  await setupTestDatabase();
+  await seedTestData();
+});
+
+afterEach(async () => {
+  await cleanupTestDatabase();
+});
+```
+
+## Running Tests
+
+### Commands
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode  
+npm run test:watch
+
+# Run specific test file
+npm test TaskList.test.tsx
+
+# Run with coverage
+npm run test:coverage
+```
+
+### Debugging Failed Tests
+1. **Read the error message** - it usually tells you exactly what's wrong
+2. **Check test data** - ensure your mock data matches expected types
+3. **Add debug output** - use `screen.debug()` for component tests
+4. **Run single test** - isolate the failing test to debug faster
+
+## Common Mistakes to Avoid
+
+### 1. Testing Mock Behavior
+```typescript
+// ❌ Bad - only tests that mock works
+expect(mockFetch).toHaveBeenCalledWith('/api/sessions');
+
+// ✅ Good - tests actual result  
+expect(result.current.sessions).toHaveLength(2);
+```
+
+### 2. Over-Mocking  
+```typescript
+// ❌ Bad - mocks everything
+vi.mock('~/services/session-service');
+vi.mock('~/services/task-service');
+vi.mock('~/utils/validation');
+
+// ✅ Good - only essential mocks
+vi.mock('~/utils/api-client'); // External dependency only
+```
+
+### 3. Implementation-Coupled Names
+```typescript
+// ❌ Bad - tied to implementation
+it('should call updateSession with correct params', () => {});
+
+// ✅ Good - describes behavior
+it('should save changes when update button clicked', () => {});
+```
+
+### 4. Using `any` Types
+```typescript
+// ❌ Bad - no type safety
+const mockData: any = { id: 1, name: 'test' };
+
+// ✅ Good - proper typing
+const mockData: Task = createMockTask({ name: 'test' });
+```
+
+## Test File Organization
+
+### File Structure
+```
+src/
+├── components/
+│   ├── TaskList.tsx
+│   ├── TaskList.test.tsx          # Component behavior tests
+│   ├── TaskForm.tsx
+│   └── TaskForm.test.tsx
+├── services/
+│   ├── session-service.ts
+│   ├── session-service.test.ts    # Service logic tests
+│   ├── task-service.ts  
+│   └── task-service.test.ts
+└── app/api/
+    ├── sessions/
+    │   ├── route.ts
+    │   └── route.test.ts          # API endpoint tests
+    └── tasks/
+        ├── route.ts
+        └── route.test.ts
+```
+
+### Test Categories
+- **Unit tests**: Single component/function behavior
+- **Integration tests**: Multiple components working together  
+- **E2E tests**: Full user workflows (use Playwright)
+
+## When You're Stuck
+
+1. **Ask yourself**: "What would the user see/experience if this worked correctly?"
+2. **Write the test first** - describe the behavior you want
+3. **Make it fail** - verify the test catches the problem
+4. **Implement just enough** - make the test pass
+5. **Refactor** - clean up while keeping tests green
+
+## Getting Help
+
+- Read existing good tests in `packages/web/components/` for patterns
+- Check `CLAUDE.md` for project-specific guidelines
+- Ask questions about business logic - don't guess
+
+Remember: **Good tests give you confidence to refactor. Bad tests break when you refactor.**
+
+---
+
+## Legacy Terminal Interface Testing (DEPRECATED)
 
 ### Overview
 
