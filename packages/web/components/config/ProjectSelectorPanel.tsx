@@ -3,26 +3,52 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faPlus, faFileText, faHistory, faEllipsisV, faEdit, faTrash } from '@/lib/fontawesome';
-import type { ProjectInfo } from '@/types/api';
+import type { ProjectInfo, ProviderInfo } from '@/types/api';
 
 interface ProjectSelectorPanelProps {
   projects: ProjectInfo[];
   selectedProject: ProjectInfo | null;
+  providers?: ProviderInfo[];
   onProjectSelect: (project: ProjectInfo) => void;
   onProjectCreate?: () => void;
-  onProjectUpdate?: (projectId: string, updates: { isArchived?: boolean; name?: string; description?: string }) => void;
+  onProjectUpdate?: (projectId: string, updates: { isArchived?: boolean; name?: string; description?: string; workingDirectory?: string; configuration?: ProjectConfiguration }) => void;
   loading?: boolean;
 }
 
 type ProjectFilter = 'active' | 'archived' | 'all';
 type ProjectTimeFrame = 'week' | 'month' | 'all';
 
+interface ProjectConfiguration {
+  provider?: string;
+  model?: string;
+  maxTokens?: number;
+  tools?: string[];
+  toolPolicies?: Record<string, 'allow' | 'require-approval' | 'deny'>;
+  workingDirectory?: string;
+  environmentVariables?: Record<string, string>;
+}
+
+const DEFAULT_PROJECT_CONFIG: ProjectConfiguration = {
+  provider: 'anthropic',
+  model: 'claude-3-sonnet-20241022',
+  maxTokens: 4096,
+  tools: [],
+  toolPolicies: {},
+  environmentVariables: {},
+};
+
+const AVAILABLE_TOOLS = [
+  'bash', 'file-read', 'file-write', 'file-edit', 'file-list', 
+  'file-find', 'url-fetch', 'task-manager', 'delegate'
+];
+
 export function ProjectSelectorPanel({
   projects,
   selectedProject,
+  providers = [],
   onProjectSelect,
   onProjectCreate,
   onProjectUpdate,
@@ -35,6 +61,21 @@ export function ProjectSelectorPanel({
   const [editingProject, setEditingProject] = useState<ProjectInfo | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editWorkingDirectory, setEditWorkingDirectory] = useState('');
+  const [editConfig, setEditConfig] = useState<ProjectConfiguration>(DEFAULT_PROJECT_CONFIG);
+  const [newEnvKey, setNewEnvKey] = useState('');
+  const [newEnvValue, setNewEnvValue] = useState('');
+
+  // Get available models for project configuration
+  const availableModels = useMemo(() => {
+    const provider = providers.find(p => p.type === editConfig.provider);
+    return provider?.models || [];
+  }, [providers, editConfig.provider]);
+
+  // Get available providers (only those that are available)
+  const availableProviders = useMemo(() => {
+    return providers.filter(p => p.available);
+  }, [providers]);
 
   // Helper function to check if project was active in given timeframe
   const isProjectActiveInTimeframe = (project: ProjectInfo, timeframe: ProjectTimeFrame): boolean => {
@@ -116,6 +157,9 @@ export function ProjectSelectorPanel({
         setEditingProject(project);
         setEditName(project.name);
         setEditDescription(project.description || '');
+        setEditWorkingDirectory(project.workingDirectory);
+        // TODO: Load actual project configuration from API
+        setEditConfig(DEFAULT_PROJECT_CONFIG);
         break;
     }
     
@@ -130,11 +174,11 @@ export function ProjectSelectorPanel({
     onProjectUpdate(editingProject.id, {
       name: editName.trim(),
       description: editDescription.trim() || undefined,
+      workingDirectory: editWorkingDirectory.trim(),
+      configuration: editConfig,
     });
 
-    setEditingProject(null);
-    setEditName('');
-    setEditDescription('');
+    handleCancelEdit();
   };
 
   // Cancel edit project
@@ -142,6 +186,48 @@ export function ProjectSelectorPanel({
     setEditingProject(null);
     setEditName('');
     setEditDescription('');
+    setEditWorkingDirectory('');
+    setEditConfig(DEFAULT_PROJECT_CONFIG);
+    setNewEnvKey('');
+    setNewEnvValue('');
+  };
+
+  // Handle environment variable addition
+  const handleAddEnvironmentVariable = () => {
+    if (!newEnvKey.trim() || !newEnvValue.trim()) return;
+
+    setEditConfig(prev => ({
+      ...prev,
+      environmentVariables: {
+        ...prev.environmentVariables,
+        [newEnvKey.trim()]: newEnvValue.trim(),
+      },
+    }));
+
+    setNewEnvKey('');
+    setNewEnvValue('');
+  };
+
+  // Handle environment variable removal
+  const handleRemoveEnvironmentVariable = (key: string) => {
+    setEditConfig(prev => ({
+      ...prev,
+      environmentVariables: {
+        ...prev.environmentVariables,
+        [key]: undefined,
+      },
+    }));
+  };
+
+  // Handle tool policy changes
+  const handleToolPolicyChange = (tool: string, policy: 'allow' | 'require-approval' | 'deny') => {
+    setEditConfig(prev => ({
+      ...prev,
+      toolPolicies: {
+        ...prev.toolPolicies,
+        [tool]: policy,
+      },
+    }));
   };
 
   // Close context menu on click outside
@@ -395,9 +481,9 @@ export function ProjectSelectorPanel({
       {/* Edit Project Modal */}
       {editingProject && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+          <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">Edit Project</h3>
+              <h3 className="text-xl font-semibold">Edit Project: {editingProject.name}</h3>
               <button
                 onClick={handleCancelEdit}
                 className="btn btn-ghost btn-sm"
@@ -406,36 +492,197 @@ export function ProjectSelectorPanel({
               </button>
             </div>
 
-            <form onSubmit={handleEditProject} className="space-y-4">
-              <div>
-                <label className="label">
-                  <span className="label-text font-medium">Project Name *</span>
-                </label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="input input-bordered w-full"
-                  placeholder="Enter project name"
-                  required
-                  autoFocus
-                />
+            <form onSubmit={handleEditProject} className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto min-h-0 space-y-6">
+                {/* Basic Information */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Project Name *</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="input input-bordered w-full"
+                      placeholder="Enter project name"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Description</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      className="input input-bordered w-full"
+                      placeholder="Optional description"
+                    />
+                  </div>
+                </div>
+
+                {/* Working Directory */}
+                <div>
+                  <label className="label">
+                    <span className="label-text font-medium">Working Directory *</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editWorkingDirectory}
+                    onChange={(e) => setEditWorkingDirectory(e.target.value)}
+                    className="input input-bordered w-full"
+                    placeholder="/path/to/project"
+                    required
+                  />
+                </div>
+
+                {/* Default Provider and Model Configuration */}
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Default Provider</span>
+                    </label>
+                    <select
+                      value={editConfig.provider}
+                      onChange={(e) => {
+                        const newProvider = e.target.value;
+                        const providerModels = providers.find(p => p.type === newProvider)?.models || [];
+                        setEditConfig(prev => ({
+                          ...prev,
+                          provider: newProvider,
+                          model: providerModels[0]?.name || prev.model,
+                        }));
+                      }}
+                      className="select select-bordered w-full"
+                    >
+                      {availableProviders.map((provider) => (
+                        <option key={provider.type} value={provider.type}>
+                          {provider.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Default Model</span>
+                    </label>
+                    <select
+                      value={editConfig.model}
+                      onChange={(e) => setEditConfig(prev => ({ ...prev, model: e.target.value }))}
+                      className="select select-bordered w-full"
+                    >
+                      {availableModels.map((model) => (
+                        <option key={model.name} value={model.name}>
+                          {model.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Max Tokens</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="200000"
+                      value={editConfig.maxTokens}
+                      onChange={(e) => setEditConfig(prev => ({ ...prev, maxTokens: parseInt(e.target.value) || 4096 }))}
+                      className="input input-bordered w-full"
+                    />
+                  </div>
+                </div>
+
+                {/* Environment Variables */}
+                <div>
+                  <label className="label">
+                    <span className="label-text font-medium">Environment Variables</span>
+                  </label>
+                  <div className="space-y-2">
+                    {Object.entries(editConfig.environmentVariables || {}).map(([key, value]) => (
+                      <div key={key} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={key}
+                          className="input input-bordered input-sm flex-1"
+                          readOnly
+                        />
+                        <span className="text-base-content/60">=</span>
+                        <input
+                          type="text"
+                          value={value}
+                          className="input input-bordered input-sm flex-1"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEnvironmentVariable(key)}
+                          className="btn btn-error btn-sm btn-square"
+                        >
+                          <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={newEnvKey}
+                        onChange={(e) => setNewEnvKey(e.target.value)}
+                        className="input input-bordered input-sm flex-1"
+                        placeholder="Key"
+                      />
+                      <span className="text-base-content/60">=</span>
+                      <input
+                        type="text"
+                        value={newEnvValue}
+                        onChange={(e) => setNewEnvValue(e.target.value)}
+                        className="input input-bordered input-sm flex-1"
+                        placeholder="Value"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddEnvironmentVariable}
+                        className="btn btn-primary btn-sm"
+                        disabled={!newEnvKey.trim() || !newEnvValue.trim()}
+                      >
+                        <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tool Access Policies */}
+                <div>
+                  <label className="label">
+                    <span className="label-text font-medium">Tool Access Policies</span>
+                  </label>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    {AVAILABLE_TOOLS.map((tool) => (
+                      <div key={tool} className="flex items-center justify-between p-3 border border-base-300 rounded-lg">
+                        <span className="font-medium text-sm">{tool}</span>
+                        <select
+                          value={editConfig.toolPolicies?.[tool] || 'require-approval'}
+                          onChange={(e) => handleToolPolicyChange(tool, e.target.value as 'allow' | 'require-approval' | 'deny')}
+                          className="select select-bordered select-sm w-40"
+                        >
+                          <option value="allow">Allow</option>
+                          <option value="require-approval">Require Approval</option>
+                          <option value="deny">Deny</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="label">
-                  <span className="label-text font-medium">Description</span>
-                </label>
-                <textarea
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  className="textarea textarea-bordered w-full"
-                  placeholder="Optional description"
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
+              {/* Actions */}
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-base-300">
                 <button
                   type="button"
                   onClick={handleCancelEdit}
@@ -446,7 +693,7 @@ export function ProjectSelectorPanel({
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={!editName.trim() || loading}
+                  disabled={!editName.trim() || !editWorkingDirectory.trim() || loading}
                 >
                   {loading ? (
                     <>

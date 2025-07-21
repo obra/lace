@@ -416,8 +416,8 @@ export function LaceApp() {
     setEvents([]);
   };
 
-  // Handle project updates (archive/unarchive)
-  const handleProjectUpdate = async (projectId: string, updates: { isArchived?: boolean; name?: string; description?: string }) => {
+  // Handle project updates (archive/unarchive/edit)
+  const handleProjectUpdate = async (projectId: string, updates: { isArchived?: boolean; name?: string; description?: string; workingDirectory?: string; configuration?: Record<string, unknown> }) => {
     try {
       const res = await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
@@ -790,6 +790,7 @@ export function LaceApp() {
               <ProjectSelectorPanel
                 projects={projectsForSidebar}
                 selectedProject={currentProject.id ? currentProject : null}
+                providers={providers}
                 onProjectSelect={handleProjectSelect}
                 onProjectUpdate={handleProjectUpdate}
                 loading={loadingProjects}
