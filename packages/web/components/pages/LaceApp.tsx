@@ -708,7 +708,7 @@ export function LaceApp() {
             ) : selectedAgent ? (
               <div className="flex-1 flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
                 {/* Conversation Display */}
-                <div className="flex-1 overflow-hidden">
+                <div style={{ height: 'calc(100% - 80px)' }}>
                   <TimelineView
                     entries={timelineEntries}
                     isTyping={sendingMessage}
