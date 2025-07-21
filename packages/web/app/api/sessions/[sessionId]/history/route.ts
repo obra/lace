@@ -138,12 +138,12 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     }
 
     case 'LOCAL_SYSTEM_MESSAGE': {
-      const message =
+      const content =
         typeof threadEvent.data === 'string' ? threadEvent.data : String(threadEvent.data);
       return {
         ...baseEvent,
         type: 'LOCAL_SYSTEM_MESSAGE',
-        data: { message },
+        data: { content },
       };
     }
 

@@ -100,7 +100,7 @@ describe('API Endpoints E2E Tests', () => {
         }),
       });
 
-      const response = await createProjectSession(request, { params: { projectId } });
+      const response = await createProjectSession(request, { params: Promise.resolve({ projectId }) });
       expect(response.status).toBe(201);
 
       const responseData: unknown = await response.json();
@@ -363,7 +363,7 @@ describe('API Endpoints E2E Tests', () => {
         body: 'invalid json',
       });
 
-      const response = await createProjectSession(request, { params: { projectId } });
+      const response = await createProjectSession(request, { params: Promise.resolve({ projectId }) });
       expect(response.status).toBe(500); // JSON parsing error is caught by outer try-catch
     });
 

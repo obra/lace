@@ -15,7 +15,7 @@ const ConfigurationSchema = z.object({
   environmentVariables: z.record(z.string()).optional(),
 });
 
-export async function GET(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
   try {
     const resolvedParams = await params;
     const project = Project.getById(resolvedParams.projectId);
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest, { params }: { params: { projectI
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = ConfigurationSchema.parse(body);

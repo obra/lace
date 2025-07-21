@@ -40,7 +40,7 @@ describe('Session API endpoints under projects', () => {
       getSessions: vi.fn(),
       createSession: vi.fn(),
     };
-    const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
+    const mockedGetById = vi.mocked(Project.getById);
     mockedGetById.mockReturnValue(mockProject as unknown as ReturnType<typeof Project.getById>);
   });
 
@@ -69,7 +69,7 @@ describe('Session API endpoints under projects', () => {
         },
       ];
 
-      mockProject.getSessions.mockReturnValue(mockSessions);
+      (mockProject.getSessions as unknown as vi.MockedFunction<() => unknown[]>).mockReturnValue(mockSessions);
 
       const response = await GET(
         new NextRequest('http://localhost/api/projects/project1/sessions'),
@@ -88,7 +88,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should return empty array when no sessions exist', async () => {
-      mockProject.getSessions.mockReturnValue([]);
+      (mockProject.getSessions as unknown as vi.MockedFunction<() => unknown[]>).mockReturnValue([]);
 
       const response = await GET(
         new NextRequest('http://localhost/api/projects/project1/sessions'),
@@ -104,7 +104,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should return 404 when project not found', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
+      const mockedGetById = vi.mocked(Project.getById);
       mockedGetById.mockReturnValue(null);
 
       const response = await GET(
@@ -121,7 +121,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should handle database errors', async () => {
-      mockProject.getSessions.mockImplementation(() => {
+      (mockProject.getSessions as unknown as vi.MockedFunction<() => unknown[]>).mockImplementation(() => {
         throw new Error('Database error');
       });
 
@@ -176,7 +176,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should return 404 when project not found', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
+      const mockedGetById = vi.mocked(Project.getById);
       mockedGetById.mockReturnValue(null);
 
       const request = new NextRequest('http://localhost/api/projects/nonexistent/sessions', {

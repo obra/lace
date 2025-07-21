@@ -217,7 +217,7 @@ const mockGoogleDocEntry: TimelineEntry = {
     id: 'doc123',
     title: 'Project Specification',
     url: 'https://docs.google.com/document/d/doc123',
-    lastModified: '2024-01-15T10:35:00Z',
+    lastModified: new Date('2024-01-15T10:35:00Z'),
     owner: 'John Doe',
     permissions: 'edit',
   },

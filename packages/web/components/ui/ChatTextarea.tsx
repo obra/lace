@@ -14,6 +14,7 @@ interface ChatTextareaProps {
   onDrop?: (e: DragEvent<HTMLDivElement>) => void;
   className?: string;
   autoFocus?: boolean;
+  'data-testid'?: string;
 }
 
 export interface ChatTextareaRef {
@@ -35,6 +36,7 @@ const ChatTextarea = forwardRef<ChatTextareaRef, ChatTextareaProps>(({
   onDrop,
   className = '',
   autoFocus = false,
+  'data-testid': testId,
 }, ref) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -98,6 +100,7 @@ const ChatTextarea = forwardRef<ChatTextareaRef, ChatTextareaProps>(({
           rows={1}
           style={{ minHeight: '44px', maxHeight: '120px' }}
           disabled={disabled}
+          data-testid={testId}
         />
 
         {isDragOver && (

@@ -89,7 +89,7 @@ describe('Full Conversation Flow', () => {
     );
 
     const sessionResponse = await createProjectSession(createSessionRequest, {
-      params: { projectId },
+      params: Promise.resolve({ projectId }),
     });
 
     if (sessionResponse.status !== 201) {
@@ -185,7 +185,7 @@ describe('Full Conversation Flow', () => {
       }
     );
     const sessionResponse = await createProjectSession(createSessionRequest, {
-      params: { projectId },
+      params: Promise.resolve({ projectId }),
     });
     expect(sessionResponse.status).toBe(201);
     const sessionData = (await sessionResponse.json()) as { session: { id: string } };
@@ -272,7 +272,7 @@ describe('Full Conversation Flow', () => {
         }),
         headers: { 'Content-Type': 'application/json' },
       }),
-      { params: { projectId: projectId1 } }
+      { params: Promise.resolve({ projectId: projectId1 }) }
     );
     const session1Data = (await session1Response.json()) as { session: { id: string } };
     const session1Id: ThreadId = session1Data.session.id as ThreadId;
@@ -289,7 +289,7 @@ describe('Full Conversation Flow', () => {
         }),
         headers: { 'Content-Type': 'application/json' },
       }),
-      { params: { projectId: projectId2 } }
+      { params: Promise.resolve({ projectId: projectId2 }) }
     );
     const session2Data = (await session2Response.json()) as { session: { id: string } };
     const session2Id: ThreadId = session2Data.session.id as ThreadId;

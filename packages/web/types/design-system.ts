@@ -107,6 +107,7 @@ export interface RecentFile {
   name: string;
   path: string;
   lastModified?: Date;
+  size?: number;
 }
 
 export interface Theme {
