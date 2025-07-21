@@ -121,7 +121,7 @@ describe('Session API Routes', () => {
       const { getPersistence } = await import('~/persistence/database');
 
       // Override a persistence method to throw an error
-      const originalMethod = getPersistence().database;
+      const _originalMethod = getPersistence().database;
       vi.spyOn(getPersistence(), 'database', 'get').mockImplementationOnce(() => {
         throw new Error('Database connection failed');
       });

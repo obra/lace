@@ -129,7 +129,7 @@ describe('Tool Approval Flow Integration', () => {
     const originalEmit = agent.emit.bind(agent);
     agent.emit = vi.fn().mockImplementation((event: keyof AgentEvents, ...args: unknown[]) => {
       logEvent(`agent.emit(${String(event)})`, args[0]);
-      return (originalEmit as any)(event, ...args);
+      return (originalEmit as typeof agent.emit)(event, ...args);
     });
 
     // Add event logging to approval manager
@@ -172,7 +172,8 @@ describe('Tool Approval Flow Integration', () => {
       sessionId,
       agentId: agent.threadId,
       toolExecutorSet: !!agent.toolExecutor,
-      approvalCallbackSet: !!(agent.toolExecutor as unknown as ToolExecutorWithApproval).approvalCallback,
+      approvalCallbackSet: !!(agent.toolExecutor as unknown as ToolExecutorWithApproval)
+        .approvalCallback,
     });
   });
 
@@ -189,7 +190,7 @@ describe('Tool Approval Flow Integration', () => {
     if (tempDir) {
       try {
         await rm(tempDir, { recursive: true, force: true });
-      } catch (error) {
+      } catch (_error) {
         // Failed to cleanup temp directory silently
       }
     }

@@ -38,23 +38,23 @@ interface ErrorResponse {
 }
 
 // Mock external dependencies (database persistence) but not business logic
-const projectStore = new Map<string, any>();
+const projectStore = new Map<string, Record<string, unknown>>();
 
 vi.mock('~/persistence/database', () => {
   return {
     getPersistence: vi.fn(() => ({
       // Mock the persistence layer to use in-memory storage for testing
       loadAllProjects: vi.fn(() => {
-        return Array.from(projectStore.values());
+        return Array.from(projectStore.values()) as Record<string, unknown>[];
       }),
       loadProject: vi.fn((projectId: string) => {
         return projectStore.get(projectId) || null;
       }),
-      saveProject: vi.fn((project: any) => {
+      saveProject: vi.fn((project: Record<string, unknown> & { id: string }) => {
         projectStore.set(project.id, project);
       }),
       // Mock method needed by Project.getSessions() -> Project.getSessionCount()
-      loadSessionsByProject: vi.fn((projectId: string) => {
+      loadSessionsByProject: vi.fn((_projectId: string) => {
         // Return empty sessions for now - we can add session testing later if needed
         return [];
       }),
@@ -82,8 +82,8 @@ describe('Projects API', () => {
       const { Project } = await import('@/lib/server/lace-imports');
 
       // Create projects and they will be stored in our mocked persistence
-      const project1 = Project.create('Project 1', '/path/1', 'First project');
-      const project2 = Project.create('Project 2', '/path/2', 'Second project');
+      const _project1 = Project.create('Project 1', '/path/1', 'First project');
+      const _project2 = Project.create('Project 2', '/path/2', 'Second project');
 
       // Act: Call the API endpoint
       const response = await GET();
@@ -245,7 +245,9 @@ describe('Projects API', () => {
 
       // Override the persistence mock for this test
       const { getPersistence } = await import('~/persistence/database');
-      vi.mocked(getPersistence).mockReturnValue(mockPersistence as any);
+      vi.mocked(getPersistence).mockReturnValue(
+        mockPersistence as ReturnType<typeof getPersistence>
+      );
 
       const requestBody = {
         name: 'Test Project',

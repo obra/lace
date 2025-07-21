@@ -4,7 +4,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/lib/server/lace-imports';
-import type { ThreadId } from '@/lib/server/lace-imports';
 
 describe('SessionService after getProjectForSession removal', () => {
   it('should not have getProjectForSession method', () => {
@@ -51,12 +50,12 @@ describe('SessionService after getSessionData removal', () => {
 // Mock external dependencies (filesystem, database) but not business logic
 vi.mock('~/persistence/database', () => {
   // Keep a simple in-memory store to test real behavior
-  const sessionStore = new Map<string, any>();
+  const sessionStore = new Map<string, Record<string, unknown>>();
 
   return {
     getPersistence: vi.fn(() => ({
       // Mock the persistence layer to use in-memory storage for testing
-      updateSession: vi.fn((sessionId: string, updates: any) => {
+      updateSession: vi.fn((sessionId: string, updates: Record<string, unknown>) => {
         const existing = sessionStore.get(sessionId) || {};
         const updated = { ...existing, ...updates, updatedAt: new Date() };
         sessionStore.set(sessionId, updated);
@@ -64,7 +63,7 @@ vi.mock('~/persistence/database', () => {
       loadSession: vi.fn((sessionId: string) => {
         return sessionStore.get(sessionId) || null;
       }),
-      saveSession: vi.fn((session: any) => {
+      saveSession: vi.fn((session: Record<string, unknown> & { id: string }) => {
         sessionStore.set(session.id, session);
       }),
     })),

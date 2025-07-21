@@ -27,8 +27,8 @@ vi.mock('~/config/env-loader', () => ({
 describe('Task API Routes', () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
-  let testProject: any;
-  let testSession: any;
+  let testProject: { getId(): string };
+  let testSession: { id: string };
 
   beforeEach(async () => {
     vi.clearAllMocks();
