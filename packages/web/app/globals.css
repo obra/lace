@@ -1,82 +1,324 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@import '@fortawesome/fontawesome-svg-core/styles.css';
+@plugin 'daisyui';
 
-@layer base {
-  body {
-    @apply bg-terminal-bg text-terminal-fg font-mono;
+/* Mobile-specific improvements */
+@supports (padding: max(0px)) {
+  .h-safe-bottom {
+    height: max(16px, env(safe-area-inset-bottom));
   }
 }
 
-@layer components {
-  .terminal-container {
-    @apply bg-black/90 backdrop-blur-sm rounded-lg shadow-2xl;
-  }
+/* Smooth scrolling for mobile */
+.overscroll-contain {
+  overscroll-behavior: contain;
+}
 
-  .terminal-header {
-    @apply bg-gray-800 px-4 py-2 rounded-t-lg flex items-center justify-between;
-  }
+/* Better mobile text selection */
+.timeline-entry {
+  -webkit-user-select: text;
+  user-select: text;
+}
 
-  .terminal-content {
-    @apply p-4 h-[600px] overflow-y-auto;
-  }
+/* Prevent zoom on input focus (iOS) */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
 
-  .terminal-input {
-    @apply bg-transparent border-0 outline-none flex-1 text-terminal-fg;
-  }
-
-  .terminal-prompt {
-    @apply text-terminal-green mr-2;
-  }
-
-  .message-user {
-    @apply text-terminal-blue;
-  }
-
-  .message-agent {
-    @apply text-terminal-fg;
-  }
-
-  .message-thinking {
-    @apply text-terminal-purple italic;
-  }
-
-  .message-tool {
-    @apply text-terminal-yellow;
-  }
-
-  .status-idle {
-    @apply text-gray-500;
-  }
-
-  .status-thinking {
-    @apply text-terminal-purple animate-pulse;
-  }
-
-  .status-streaming {
-    @apply text-terminal-green;
-  }
-
-  .status-tool-execution {
-    @apply text-terminal-yellow;
+@media (min-width: 1024px) {
+  input,
+  textarea,
+  select {
+    font-size: 14px;
   }
 }
 
-/* Custom scrollbar */
-@layer utilities {
-  .scrollbar-terminal::-webkit-scrollbar {
-    width: 8px;
-  }
+/* Dropdown animation fix */
+[x-collapse] {
+  overflow: hidden;
+  transition: height 0.3s ease;
+}
 
-  .scrollbar-terminal::-webkit-scrollbar-track {
-    @apply bg-gray-900;
-  }
+/* Sidebar toggle button enhancement */
+.sidebar-toggle {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
 
-  .scrollbar-terminal::-webkit-scrollbar-thumb {
-    @apply bg-gray-700 rounded;
-  }
+/* Smooth sidebar transitions */
+.sidebar-content {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
-  .scrollbar-terminal::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-600;
+/* Avatar ring effect */
+.avatar-ring {
+  box-shadow:
+    0 0 0 2px var(--b3),
+    0 0 0 4px var(--p);
+}
+
+/* Progress bar animation */
+.progress-fill {
+  transition: width 0.6s ease;
+}
+
+/* Collapsed sidebar icon hover effects */
+.collapsed-icon:hover {
+  transform: scale(1.1);
+  transition: transform 0.2s ease;
+}
+
+/* Mobile sidebar slide animation */
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
   }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.3s ease-out;
+}
+
+/* Hide scrollbar for carousel */
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+/* Monospace font utilities for code, terminal, and technical content */
+.font-mono {
+  font-variant-ligatures: common-ligatures;
+  font-feature-settings: 'liga' 1, 'calt' 1;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ensure proper spacing for monospace content */
+.font-mono code,
+.font-mono pre {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+/* Syntax highlighting overrides for DaisyUI integration */
+.hljs {
+  background: transparent !important;
+  padding: 0 !important;
+  overflow-x: visible !important;
+}
+
+/* Code block styling */
+.code-block {
+  @apply bg-base-300 border border-base-content/20 rounded-lg overflow-hidden;
+}
+
+.code-block-header {
+  @apply bg-base-200 px-4 py-2 border-b border-base-content/20 flex items-center justify-between;
+}
+
+.code-block-content {
+  @apply p-4 overflow-x-auto;
+}
+
+.code-block-language {
+  @apply text-xs text-base-content/60 font-mono;
+}
+
+.code-block-copy {
+  @apply text-xs text-base-content/60 hover:text-base-content cursor-pointer;
+}
+
+/* Inline code styling */
+.inline-code {
+  @apply bg-base-300 px-2 py-1 rounded text-accent font-mono text-sm;
+}
+
+/* Diff styling for syntax highlighted code */
+.diff-line {
+  @apply flex items-start;
+}
+
+.diff-line.added {
+  @apply bg-green-50 border-l-2 border-green-500;
+}
+
+.diff-line.removed {
+  @apply bg-red-50 border-l-2 border-red-500;
+}
+
+.diff-line.highlighted {
+  @apply bg-yellow-50;
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .diff-line.added {
+  @apply bg-green-900/20 border-green-400;
+}
+
+[data-theme="dark"] .diff-line.removed {
+  @apply bg-red-900/20 border-red-400;
+}
+
+[data-theme="dark"] .diff-line.highlighted {
+  @apply bg-yellow-900/20;
+}
+
+/* Syntax highlighting using DaisyUI theme colors */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag {
+  @apply text-primary;
+}
+
+.hljs-string,
+.hljs-attr,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+  @apply text-secondary;
+}
+
+.hljs-comment,
+.hljs-quote,
+.hljs-deletion {
+  @apply text-base-content/50;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-template-variable {
+  @apply text-accent;
+}
+
+.hljs-title,
+.hljs-class .hljs-title,
+.hljs-type,
+.hljs-function .hljs-title {
+  @apply text-info;
+}
+
+.hljs-attribute,
+.hljs-property,
+.hljs-params {
+  @apply text-success;
+}
+
+.hljs-regexp,
+.hljs-link {
+  @apply text-warning;
+}
+
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-selector-pseudo {
+  @apply text-secondary-focus;
+}
+
+.hljs-meta,
+.hljs-doctag {
+  @apply text-neutral;
+}
+
+.hljs-emphasis {
+  @apply italic;
+}
+
+.hljs-strong {
+  @apply font-bold;
+}
+
+/* Terminal syntax highlighting colors for fallback */
+.terminal-syntax {
+  @apply font-mono text-sm;
+}
+
+.terminal-syntax .hljs-string {
+  @apply text-green-500;
+}
+
+.terminal-syntax .hljs-number {
+  @apply text-yellow-500;
+}
+
+.terminal-syntax .hljs-keyword {
+  @apply text-blue-500;
+}
+
+.terminal-syntax .hljs-literal {
+  @apply text-cyan-500;
+}
+
+.terminal-syntax .hljs-comment {
+  @apply text-gray-500;
+}
+
+.terminal-syntax .hljs-attr {
+  @apply text-cyan-500;
+}
+
+.terminal-syntax .hljs-title {
+  @apply text-purple-500;
+}
+
+.terminal-syntax .hljs-built_in {
+  @apply text-blue-500;
+}
+
+.terminal-syntax .hljs-variable {
+  @apply text-yellow-500;
+}
+
+/* Scrollbar styling for code blocks */
+.code-block-content::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.code-block-content::-webkit-scrollbar-track {
+  @apply bg-base-200;
+}
+
+.code-block-content::-webkit-scrollbar-thumb {
+  @apply bg-base-content/20 rounded-full;
+}
+
+.code-block-content::-webkit-scrollbar-thumb:hover {
+  @apply bg-base-content/40;
+}
+
+/* Line numbers styling */
+.line-numbers {
+  @apply text-base-content/40 select-none pr-4 text-right;
+  min-width: 2.5rem;
+}
+
+/* Code line wrapper */
+.code-line {
+  @apply flex items-start;
+}
+
+.code-line-content {
+  @apply flex-1 min-w-0;
+}
+
+/* Performance optimizations */
+.code-block-content {
+  contain: layout style paint;
+}
+
+/* Ensure proper word breaking for long lines */
+.code-line-content code {
+  word-break: break-all;
+  white-space: pre-wrap;
 }

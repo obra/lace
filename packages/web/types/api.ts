@@ -70,7 +70,6 @@ type _SessionEventType =
 // Specific event data types
 export interface UserMessageEventData {
   content: string;
-  message?: string;
 }
 
 export interface AgentMessageEventData {
@@ -92,7 +91,7 @@ export interface ThinkingEventData {
 }
 
 export interface LocalSystemMessageEventData {
-  message: string;
+  content: string;
 }
 
 // Discriminated union for session events
@@ -100,55 +99,55 @@ export type SessionEvent =
   | {
       type: 'USER_MESSAGE';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: UserMessageEventData;
     }
   | {
       type: 'AGENT_MESSAGE';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: AgentMessageEventData;
     }
   | {
       type: 'TOOL_CALL';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: ToolCallEventData;
     }
   | {
       type: 'TOOL_RESULT';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: ToolResultEventData;
     }
   | {
       type: 'THINKING';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: ThinkingEventData;
     }
   | {
       type: 'LOCAL_SYSTEM_MESSAGE';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: LocalSystemMessageEventData;
     }
   | {
       type: 'AGENT_TOKEN';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: { token: string };
     }
   | {
       type: 'AGENT_STREAMING';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: { content: string };
     }
   | {
       type: 'TOOL_APPROVAL_REQUEST';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: ToolApprovalRequestData;
     };
 

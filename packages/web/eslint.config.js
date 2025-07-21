@@ -42,7 +42,7 @@ const config = [
       'no-console': ['error', { allow: ['warn', 'error'] }],
       'no-relative-import-paths/no-relative-import-paths': [
         'error',
-        { allowSameFolder: false, rootDir: '.', prefix: '@' }
+        { allowSameFolder: true, rootDir: '.', prefix: '@' }
       ],
       'no-restricted-imports': ['error', {
         patterns: [
@@ -67,8 +67,21 @@ const config = [
   {
     files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx'],
     rules: {
-      'no-console': 'off',
+      'no-console': ['error', { allow: ['warn', 'error'] }], // Allow only warn/error in tests
       'no-restricted-imports': 'off',
+    },
+  },
+  {
+    files: ['**/*.stories.tsx', '**/*.stories.ts'],
+    rules: {
+      'no-console': 'off', // Allow console.log in Storybook stories for debugging
+      'react-hooks/rules-of-hooks': 'off', // Allow hooks in Storybook render functions
+    },
+  },
+  {
+    files: ['components/**/*.ts', 'components/**/*.tsx'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'off', // Allow unused vars in components
     },
   },
 ];

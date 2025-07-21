@@ -81,9 +81,14 @@ export function createNewAgentSpec(provider: string, model: string): NewAgentSpe
   return `new:${provider}/${model}` as NewAgentSpec;
 }
 
+// Unsafe cast for internal use only (e.g., when we know format is correct)
+export function asNewAgentSpec(value: string): NewAgentSpec {
+  return value as NewAgentSpec;
+}
+
 // Union type for task assignment
-export type AssigneeId = ThreadId | NewAgentSpec;
+export type AssigneeId = ThreadId | NewAgentSpec | 'human';
 
 export function isAssigneeId(value: string): value is AssigneeId {
-  return isThreadId(value) || isNewAgentSpec(value);
+  return isThreadId(value) || isNewAgentSpec(value) || value === 'human';
 }

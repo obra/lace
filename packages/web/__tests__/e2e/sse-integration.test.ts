@@ -7,6 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { SessionEvent } from '@/types/api';
+import { asThreadId } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
   teardownTestPersistence,
@@ -170,8 +171,8 @@ describe('SSE Integration E2E Tests', () => {
       // Broadcast event
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
-        threadId: `${sessionId}.1`,
-        timestamp: new Date().toISOString(),
+        threadId: asThreadId(`${sessionId}.1`),
+        timestamp: new Date(),
         data: { content: 'Hello, world!' },
       };
 
@@ -195,8 +196,8 @@ describe('SSE Integration E2E Tests', () => {
       // Broadcast to session 1 only
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
-        threadId: `${sessionId1}.1`,
-        timestamp: new Date().toISOString(),
+        threadId: asThreadId(`${sessionId1}.1`),
+        timestamp: new Date(),
         data: { content: 'Only for session 1' },
       };
 
@@ -210,8 +211,8 @@ describe('SSE Integration E2E Tests', () => {
     it('should handle broadcasting to non-existent session', () => {
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
-        threadId: 'non-existent.1',
-        timestamp: new Date().toISOString(),
+        threadId: asThreadId('lace_20240101_test.1'),
+        timestamp: new Date(),
         data: { content: 'This should not crash' },
       };
 
@@ -231,8 +232,8 @@ describe('SSE Integration E2E Tests', () => {
 
       const event: SessionEvent = {
         type: 'TOOL_CALL',
-        threadId: `${sessionId}.1`,
-        timestamp: '2024-01-01T12:00:00Z',
+        threadId: asThreadId(`${sessionId}.1`),
+        timestamp: new Date('2024-01-01T12:00:00Z'),
         data: { toolName: 'test-tool', input: { param: 'value' } },
       };
 
@@ -268,8 +269,8 @@ describe('SSE Integration E2E Tests', () => {
 
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
-        threadId: `${sessionId}.1`,
-        timestamp: new Date().toISOString(),
+        threadId: asThreadId(`${sessionId}.1`),
+        timestamp: new Date(),
         data: { content: 'This should handle errors' },
       };
 
@@ -293,8 +294,8 @@ describe('SSE Integration E2E Tests', () => {
 
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
-        threadId: `${sessionId}.1`,
-        timestamp: new Date().toISOString(),
+        threadId: asThreadId(`${sessionId}.1`),
+        timestamp: new Date(),
         data: { content: 'Test cleanup' },
       };
 

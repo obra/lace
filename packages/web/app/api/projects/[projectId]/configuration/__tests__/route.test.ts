@@ -58,7 +58,7 @@ describe('Project Configuration API', () => {
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
       const request = new NextRequest('http://localhost/api/projects/test-project/configuration');
-      const response = GET(request, { params: { projectId: 'test-project' } });
+      const response = await GET(request, { params: Promise.resolve({ projectId: 'test-project' }) });
       const data = (await response.json()) as ConfigurationResponse;
 
       expect(response.status).toBe(200);
@@ -83,7 +83,7 @@ describe('Project Configuration API', () => {
       Project.getById = vi.fn().mockReturnValue(null);
 
       const request = new NextRequest('http://localhost/api/projects/nonexistent/configuration');
-      const response = GET(request, { params: { projectId: 'nonexistent' } });
+      const response = await GET(request, { params: Promise.resolve({ projectId: 'nonexistent' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);
@@ -97,7 +97,7 @@ describe('Project Configuration API', () => {
       });
 
       const request = new NextRequest('http://localhost/api/projects/test-project/configuration');
-      const response = GET(request, { params: { projectId: 'test-project' } });
+      const response = await GET(request, { params: Promise.resolve({ projectId: 'test-project' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(500);
@@ -128,7 +128,7 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, { params: { projectId: 'test-project' } });
+      const response = await PUT(request, { params: Promise.resolve({ projectId: 'test-project' }) });
       const data = (await response.json()) as ConfigurationResponse;
 
       expect(response.status).toBe(200);
@@ -146,7 +146,7 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, { params: { projectId: 'nonexistent' } });
+      const response = await PUT(request, { params: Promise.resolve({ projectId: 'nonexistent' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);
@@ -170,7 +170,7 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, { params: { projectId: 'test-project' } });
+      const response = await PUT(request, { params: Promise.resolve({ projectId: 'test-project' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(400);
@@ -191,7 +191,7 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, { params: { projectId: 'test-project' } });
+      const response = await PUT(request, { params: Promise.resolve({ projectId: 'test-project' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(500);

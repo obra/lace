@@ -141,7 +141,7 @@ export class SessionService {
       const event: SessionEvent = {
         type: 'THINKING',
         threadId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { status: 'start' },
       };
       sseManager.broadcast(sessionId, event);
@@ -151,7 +151,7 @@ export class SessionService {
       const event: SessionEvent = {
         type: 'THINKING',
         threadId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { status: 'complete' },
       };
       sseManager.broadcast(sessionId, event);
@@ -161,7 +161,7 @@ export class SessionService {
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
         threadId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { content },
       };
       sseManager.broadcast(sessionId, event);
@@ -176,7 +176,7 @@ export class SessionService {
       const event: SessionEvent = {
         type: 'AGENT_TOKEN',
         threadId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { token },
       };
       sseManager.broadcast(sessionId, event);
@@ -186,7 +186,7 @@ export class SessionService {
       const event: SessionEvent = {
         type: 'TOOL_CALL',
         threadId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { toolName, input },
       };
       sseManager.broadcast(sessionId, event);
@@ -198,7 +198,7 @@ export class SessionService {
         const event: SessionEvent = {
           type: 'TOOL_RESULT',
           threadId,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
           data: { toolName, result },
         };
         sseManager.broadcast(sessionId, event);
@@ -216,8 +216,8 @@ export class SessionService {
       const event: SessionEvent = {
         type: 'LOCAL_SYSTEM_MESSAGE',
         threadId,
-        timestamp: new Date().toISOString(),
-        data: { message: `Agent error: ${error.message}` },
+        timestamp: new Date(),
+        data: { content: `Agent error: ${error.message}` },
       };
       sseManager.broadcast(sessionId, event);
     });
@@ -275,9 +275,9 @@ export class SessionService {
             const event: SessionEvent = {
               type: 'LOCAL_SYSTEM_MESSAGE',
               threadId,
-              timestamp: new Date().toISOString(),
+              timestamp: new Date(),
               data: {
-                message: `Tool "${toolName}" was denied (${error instanceof Error ? error.message : 'approval failed'})`,
+                content: `Tool "${toolName}" was denied (${error instanceof Error ? error.message : 'approval failed'})`,
               },
             };
             sseManager.broadcast(sessionId, event);

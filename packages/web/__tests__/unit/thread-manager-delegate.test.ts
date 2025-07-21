@@ -98,8 +98,7 @@ describe('ThreadManager Delegate Thread Creation', () => {
     const delegate2 = threadManager.createDelegateThreadFor(parentThreadId);
     const delegate3 = threadManager.createDelegateThreadFor(parentThreadId);
     
-    // Log the IDs to debug
-    console.log('Delegate IDs:', delegate1.id, delegate2.id, delegate3.id);
+    // Delegate IDs available for debugging if needed
     
     // Verify they have unique IDs
     expect(delegate1.id).not.toBe(delegate2.id);

@@ -54,7 +54,7 @@ describe('Individual Project API Integration Tests', () => {
   describe('GET /api/projects/:projectId', () => {
     it('should return project when it exists', async () => {
       const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`);
-      const response = await GET(request, { params: { projectId: testProject.getId() } });
+      const response = await GET(request, { params: Promise.resolve({ projectId: testProject.getId() }) });
       const data = (await response.json()) as ProjectResponse;
 
       expect(response.status).toBe(200);
@@ -74,7 +74,7 @@ describe('Individual Project API Integration Tests', () => {
       testProject.createSession('Session 2');
 
       const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`);
-      const response = await GET(request, { params: { projectId: testProject.getId() } });
+      const response = await GET(request, { params: Promise.resolve({ projectId: testProject.getId() }) });
       const data = (await response.json()) as ProjectResponse;
 
       expect(response.status).toBe(200);
@@ -83,7 +83,7 @@ describe('Individual Project API Integration Tests', () => {
 
     it('should return 404 when project does not exist', async () => {
       const request = new NextRequest('http://localhost/api/projects/non-existent-id');
-      const response = await GET(request, { params: { projectId: 'non-existent-id' } });
+      const response = await GET(request, { params: Promise.resolve({ projectId: 'non-existent-id' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);
@@ -100,7 +100,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, { params: { projectId: testProject.getId() } });
+      const response = await PATCH(request, { params: Promise.resolve({ projectId: testProject.getId() }) });
       const data = (await response.json()) as ProjectResponse;
 
       expect(response.status).toBe(200);
@@ -122,7 +122,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, { params: { projectId: testProject.getId() } });
+      const response = await PATCH(request, { params: Promise.resolve({ projectId: testProject.getId() }) });
       const data = (await response.json()) as ProjectResponse;
 
       expect(response.status).toBe(200);
@@ -143,7 +143,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, { params: { projectId: testProject.getId() } });
+      const response = await PATCH(request, { params: Promise.resolve({ projectId: testProject.getId() }) });
       const data = (await response.json()) as ProjectResponse;
 
       expect(response.status).toBe(200);
@@ -163,7 +163,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, { params: { projectId: testProject.getId() } });
+      const response = await PATCH(request, { params: Promise.resolve({ projectId: testProject.getId() }) });
       await response.json();
 
       expect(response.status).toBe(200);
@@ -182,7 +182,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, { params: { projectId: testProject.getId() } });
+      const response = await PATCH(request, { params: Promise.resolve({ projectId: testProject.getId() }) });
       const data = (await response.json()) as ProjectResponse;
 
       expect(response.status).toBe(200);
@@ -205,7 +205,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, { params: { projectId: testProject.getId() } });
+      const response = await PATCH(request, { params: Promise.resolve({ projectId: testProject.getId() }) });
       const data = (await response.json()) as ProjectResponse;
 
       expect(response.status).toBe(200);
@@ -232,7 +232,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, { params: { projectId: testProject.getId() } });
+      const response = await PATCH(request, { params: Promise.resolve({ projectId: testProject.getId() }) });
       const data = (await response.json()) as ProjectResponse;
 
       expect(response.status).toBe(200);
@@ -259,7 +259,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, { params: { projectId: 'non-existent-id' } });
+      const response = await PATCH(request, { params: Promise.resolve({ projectId: 'non-existent-id' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);
@@ -274,7 +274,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, { params: { projectId: testProject.getId() } });
+      const response = await PATCH(request, { params: Promise.resolve({ projectId: testProject.getId() }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(400);
@@ -288,7 +288,7 @@ describe('Individual Project API Integration Tests', () => {
       const projectId = testProject.getId();
       const request = new NextRequest(`http://localhost/api/projects/${projectId}`);
 
-      const response = await DELETE(request, { params: { projectId } });
+      const response = await DELETE(request, { params: Promise.resolve({ projectId }) });
       const data = (await response.json()) as SuccessResponse;
 
       expect(response.status).toBe(200);
@@ -308,7 +308,7 @@ describe('Individual Project API Integration Tests', () => {
       const projectId = testProject.getId();
       const request = new NextRequest(`http://localhost/api/projects/${projectId}`);
 
-      const response = await DELETE(request, { params: { projectId } });
+      const response = await DELETE(request, { params: Promise.resolve({ projectId }) });
       const data = (await response.json()) as SuccessResponse;
 
       expect(response.status).toBe(200);
@@ -323,7 +323,7 @@ describe('Individual Project API Integration Tests', () => {
     it('should return 404 when project does not exist', async () => {
       const request = new NextRequest('http://localhost/api/projects/non-existent-id');
 
-      const response = await DELETE(request, { params: { projectId: 'non-existent-id' } });
+      const response = await DELETE(request, { params: Promise.resolve({ projectId: 'non-existent-id' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);

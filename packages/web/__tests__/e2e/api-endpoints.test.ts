@@ -41,6 +41,7 @@ import { POST as createProjectSession } from '@/app/api/projects/[projectId]/ses
 import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 import type { Session as SessionType, ThreadId } from '@/types/api';
+import { asThreadId } from '@/lib/server/core-types';
 
 describe('API Endpoints E2E Tests', () => {
   let sessionService: SessionService;
@@ -99,7 +100,7 @@ describe('API Endpoints E2E Tests', () => {
         }),
       });
 
-      const response = await createProjectSession(request, { params: { projectId } });
+      const response = await createProjectSession(request, { params: Promise.resolve({ projectId }) });
       expect(response.status).toBe(201);
 
       const responseData: unknown = await response.json();
@@ -247,8 +248,8 @@ describe('API Endpoints E2E Tests', () => {
       const responseData: unknown = await response.json();
       const data = responseData as { session: SessionType };
 
-      expect(data.session.agents).toHaveLength(2); // Coordinator + spawned agent
-      expect(data.session.agents.find((a) => a.name === 'Reflected Agent')).toBeDefined();
+      expect(data.session.agents || []).toHaveLength(2); // Coordinator + spawned agent  
+      expect(data.session.agents?.find((a) => a.name === 'Reflected Agent')).toBeDefined();
     });
   });
 
@@ -291,7 +292,7 @@ describe('API Endpoints E2E Tests', () => {
       }
 
       // Ensure the agent is properly available
-      const agent = session.getAgent(agentThreadId);
+      const agent = session.getAgent(asThreadId(agentThreadId));
       if (!agent) {
         throw new Error(
           `Agent not found for threadId: ${agentThreadId}. Cannot proceed with message test.`
@@ -362,7 +363,7 @@ describe('API Endpoints E2E Tests', () => {
         body: 'invalid json',
       });
 
-      const response = await createProjectSession(request, { params: { projectId } });
+      const response = await createProjectSession(request, { params: Promise.resolve({ projectId }) });
       expect(response.status).toBe(500); // JSON parsing error is caught by outer try-catch
     });
 

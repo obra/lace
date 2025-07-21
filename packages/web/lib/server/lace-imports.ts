@@ -4,7 +4,7 @@
 import 'server-only';
 
 // Business logic classes - should only be used by service layer
-export { Agent } from '~/agents/agent';
+export { Agent, type AgentEvents } from '~/agents/agent';
 export { ProviderRegistry } from '~/providers/registry';
 export { ToolExecutor } from '~/tools/executor';
 export { DelegateTool } from '~/tools/implementations/delegate';

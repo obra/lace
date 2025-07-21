@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskAPIClient } from '@/lib/client/task-api';
 import type { Task } from '@/types/api';
+import { asThreadId } from '@/lib/server/core-types';
 
 // Mock fetch
 global.fetch = vi.fn() as unknown as typeof fetch;
@@ -30,8 +31,8 @@ describe('TaskAPIClient', () => {
           prompt: 'Test Prompt',
           status: 'pending',
           priority: 'high',
-          createdBy: 'lace_20240101_agent1',
-          threadId: 'lace_20240101_session',
+          createdBy: asThreadId('lace_20240101_agent1'),
+          threadId: asThreadId('lace_20240101_session'),
           createdAt: '2024-01-01T00:00:00Z',
           updatedAt: '2024-01-01T00:00:00Z',
           notes: [],
@@ -59,7 +60,7 @@ describe('TaskAPIClient', () => {
 
       await client.listTasks('lace_20240101_session', {
         status: 'pending',
-        assignedTo: 'lace_20240101_agent1',
+        assignedTo: asThreadId('lace_20240101_agent1'),
         priority: 'high',
       });
 
@@ -94,8 +95,8 @@ describe('TaskAPIClient', () => {
         prompt: 'Do something',
         status: 'pending',
         priority: 'medium',
-        createdBy: 'human',
-        threadId: 'lace_20240101_session',
+        createdBy: asThreadId('lace_20240101_agent1'),
+        threadId: asThreadId('lace_20240101_session'),
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T00:00:00Z',
         notes: [],
@@ -154,15 +155,15 @@ describe('TaskAPIClient', () => {
         prompt: 'Test Prompt',
         status: 'in_progress',
         priority: 'high',
-        assignedTo: 'lace_20240101_agent1',
-        createdBy: 'lace_20240101_creator',
-        threadId: 'lace_20240101_session',
+        assignedTo: asThreadId('lace_20240101_agent1'),
+        createdBy: asThreadId('lace_20240101_creator'),
+        threadId: asThreadId('lace_20240101_session'),
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T01:00:00Z',
         notes: [
           {
             id: 'note_20240101_n1',
-            author: 'lace_20240101_agent1',
+            author: asThreadId('lace_20240101_agent1'),
             content: 'Working on this',
             timestamp: '2024-01-01T00:30:00Z',
           },
@@ -193,8 +194,8 @@ describe('TaskAPIClient', () => {
         prompt: 'Test Prompt',
         status: 'completed',
         priority: 'low',
-        createdBy: 'lace_20240101_creator',
-        threadId: 'lace_20240101_session',
+        createdBy: asThreadId('lace_20240101_creator'),
+        threadId: asThreadId('lace_20240101_session'),
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T02:00:00Z',
         notes: [],
@@ -268,14 +269,14 @@ describe('TaskAPIClient', () => {
         prompt: 'Test Prompt',
         status: 'in_progress',
         priority: 'high',
-        createdBy: 'lace_20240101_creator',
-        threadId: 'lace_20240101_session',
+        createdBy: asThreadId('lace_20240101_creator'),
+        threadId: asThreadId('lace_20240101_session'),
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T02:00:00Z',
         notes: [
           {
             id: 'note_20240101_new',
-            author: 'human',
+            author: asThreadId('lace_20240101_agent1'),
             content: 'This is a new note',
             timestamp: '2024-01-01T02:00:00Z',
           },

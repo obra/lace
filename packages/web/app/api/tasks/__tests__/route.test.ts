@@ -6,7 +6,6 @@ import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/tasks/route';
 import type { SessionService } from '@/lib/server/session-service';
 import type { Task } from '@/types/api';
-import type { Session as CoreSession } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
@@ -34,16 +33,14 @@ const mockSessionService = {
   createSession: vi.fn<SessionService['createSession']>(),
   listSessions: vi.fn<SessionService['listSessions']>(),
   getSession: vi.fn<SessionService['getSession']>(),
-  spawnAgent: vi.fn<SessionService['spawnAgent']>(),
-  getAgent: vi.fn<SessionService['getAgent']>(),
 };
 
 // Set up the default mock behavior for getSession - properly typed mock
 mockSessionService.getSession.mockImplementation(
-  async (sessionId: string): Promise<CoreSession | null> => {
+  async (sessionId: import('@/types/api').ThreadId) => {
     if (sessionId === 'lace_20240101_session') {
       // Create a partial mock session with the required methods for testing
-      const mockSessionResult: Partial<CoreSession> = {
+      const mockSessionResult: Record<string, unknown> = {
         getId: () => mockSessionId,
         getInfo: () => ({
           id: mockSessionId,
@@ -63,7 +60,7 @@ mockSessionService.getSession.mockImplementation(
         destroy: vi.fn(),
       };
       // Type assertion is safe here since we're mocking only needed methods for tests
-      return mockSessionResult as CoreSession;
+      return mockSessionResult as never;
     }
     return null;
   }

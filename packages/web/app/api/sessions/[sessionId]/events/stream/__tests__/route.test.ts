@@ -163,7 +163,7 @@ describe('Session SSE Stream API', () => {
       const broadcastEvent: SessionEvent = {
         type: 'USER_MESSAGE',
         threadId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { content: 'Should not see this' },
       };
       void mockSSEManager.broadcast(otherSessionId, broadcastEvent);

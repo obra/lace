@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type {
   Session,
   ThreadId,
@@ -13,11 +13,13 @@ import type {
   ProjectInfo,
 } from '@/types/api';
 import { isApiError } from '@/types/api';
-import { ConversationDisplay } from '@/components/ConversationDisplay';
-import { ToolApprovalModal } from '@/components/ToolApprovalModal';
-import { AgentSpawner } from '@/components/AgentSpawner';
-import { TaskDashboard } from '@/components/TaskDashboard';
-import { ProjectManager } from '@/components/ProjectManager';
+import { TimelineView } from '@/components/timeline/TimelineView';
+import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
+import { ToolApprovalModal } from '@/components/old/ToolApprovalModal';
+import { AgentSpawner } from '@/components/old/AgentSpawner';
+import { TaskDashboard } from '@/components/old/TaskDashboard';
+import { ProjectManager } from '@/components/old/ProjectManager';
+import ChatInputComposer from '@/components/ui/ChatInputComposer';
 import { getAllEventTypes } from '@/types/events';
 
 export default function Home() {
@@ -29,10 +31,20 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [message, setMessage] = useState('');
-  const [selectedAgent, setSelectedAgent] = useState<ThreadId | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<ThreadId | undefined>(undefined);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [approvalRequest, setApprovalRequest] = useState<ToolApprovalRequestData | null>(null);
   const [activeTab, setActiveTab] = useState<'conversation' | 'tasks'>('conversation');
+
+  // Convert SessionEvents to TimelineEntries for the design system
+  const timelineEntries = useMemo(() => {
+    const entries = convertSessionEventsToTimeline(events, {
+      agents: selectedSessionDetails?.agents || [],
+      selectedAgent,
+    });
+    
+    return entries;
+  }, [events, selectedSessionDetails?.agents, selectedAgent]);
 
   const loadSessions = useCallback(async () => {
     if (!selectedProject) {
@@ -87,7 +99,7 @@ export default function Home() {
 
     // Clear events when switching sessions
     setEvents([]);
-    setSelectedAgent(null);
+    setSelectedAgent(undefined);
 
     // Load full session details and conversation history
     void loadSessionDetails(selectedSession);
@@ -108,13 +120,25 @@ export default function Home() {
 
           // Type guard for event structure
           if (typeof data === 'object' && data !== null && 'type' in data) {
-            const eventData = data as { type: string; data: unknown };
+            const eventData = data as { type: string; data: unknown; timestamp?: string | Date };
 
             // Handle approval requests separately
             if (eventData.type === 'TOOL_APPROVAL_REQUEST') {
               setApprovalRequest(eventData.data as ToolApprovalRequestData);
             } else {
-              setEvents((prev) => [...prev, data as SessionEvent]);
+              // Convert timestamp from string to Date if needed
+              const timestamp = eventData.timestamp 
+                ? (typeof eventData.timestamp === 'string' ? new Date(eventData.timestamp) : eventData.timestamp)
+                : new Date();
+
+              // Create the session event with proper type narrowing
+              const sessionEvent = {
+                ...eventData,
+                threadId: selectedSession as ThreadId,
+                timestamp
+              } as SessionEvent;
+
+              setEvents((prev) => [...prev, sessionEvent]);
             }
           }
         } catch (error) {
@@ -130,8 +154,8 @@ export default function Home() {
       const connectionEvent: SessionEvent = {
         type: 'LOCAL_SYSTEM_MESSAGE',
         threadId: selectedSession as ThreadId,
-        timestamp: new Date().toISOString(),
-        data: { message: 'Connected to session stream' },
+        timestamp: new Date(),
+        data: { content: 'Connected to session stream' },
       };
       setEvents((prev) => [...prev, connectionEvent]);
     };
@@ -143,8 +167,8 @@ export default function Home() {
       const errorEvent: SessionEvent = {
         type: 'LOCAL_SYSTEM_MESSAGE',
         threadId: selectedSession as ThreadId,
-        timestamp: new Date().toISOString(),
-        data: { message: 'Connection lost' },
+        timestamp: new Date(),
+        data: { content: 'Connection lost' },
       };
       setEvents((prev) => [...prev, errorEvent]);
     };
@@ -169,8 +193,15 @@ export default function Home() {
         return;
       }
 
-      const historyData = data as { events: SessionEvent[] };
-      setEvents(historyData.events || []);
+      const historyData = data as { events: Array<SessionEvent & { timestamp: string }> };
+      
+      // Convert string timestamps to Date objects
+      const eventsWithDateTimestamps: SessionEvent[] = (historyData.events || []).map(event => ({
+        ...event,
+        timestamp: new Date(event.timestamp)
+      }));
+      
+      setEvents(eventsWithDateTimestamps);
     } catch (error) {
       console.error('Failed to load conversation history:', error);
     }
@@ -218,7 +249,8 @@ export default function Home() {
 
   const handleProjectCreated = (project: ProjectInfo) => {
     // Project created successfully - could show a notification
-    console.warn('Project created:', project);
+    // TODO: Show user notification for project creation
+    void project; // Acknowledge parameter
   };
 
   const handleProjectSelect = (projectId: string) => {
@@ -226,7 +258,7 @@ export default function Home() {
     // When switching projects, clear session and agent selection
     setSelectedSession(null);
     setSelectedSessionDetails(null);
-    setSelectedAgent(null);
+    setSelectedAgent(undefined);
     setEvents([]);
   };
 
@@ -426,38 +458,24 @@ export default function Home() {
                     {selectedAgent ? (
                       <>
                         {/* Conversation Display */}
-                        <div className="flex-1 overflow-hidden">
-                          <ConversationDisplay
-                            events={events}
-                            agents={selectedSessionDetails?.agents || []}
-                            selectedAgent={selectedAgent as ThreadId}
-                            className="h-full p-4"
-                            isLoading={loading}
-                          />
-                        </div>
+                        <TimelineView
+                          entries={timelineEntries}
+                          isTyping={loading}
+                          currentAgent={selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'Agent'}
+                        />
 
                         {/* Message Input at Bottom */}
                         <div className="border-t border-gray-700 p-4 bg-gray-800">
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={message}
-                              onChange={(e) => setMessage(e.target.value)}
-                              placeholder="Type your message..."
-                              className="flex-1 px-4 py-2 bg-gray-700 rounded text-white"
-                              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                              disabled={sendingMessage}
-                              data-testid="message-input"
-                            />
-                            <button
-                              onClick={sendMessage}
-                              disabled={sendingMessage || !message.trim()}
-                              className="px-6 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-                              data-testid="send-message-button"
-                            >
-                              Send
-                            </button>
-                          </div>
+                          <ChatInputComposer
+                            value={message}
+                            onChange={setMessage}
+                            onSubmit={sendMessage}
+                            disabled={sendingMessage}
+                            placeholder="Type your message..."
+                            showVoiceButton={false}
+                            showFileAttachment={false}
+                            isStreaming={sendingMessage}
+                          />
                         </div>
                       </>
                     ) : (

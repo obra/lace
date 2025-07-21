@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
-import { ProjectSettings } from '@/components/ProjectSettings';
+import { ProjectSettings } from '@/components/old/ProjectSettings';
 import type { ProjectInfo } from '@/types/api';
 
 interface ProjectWithConfiguration extends ProjectInfo {
@@ -84,8 +84,8 @@ describe('ProjectSettings', () => {
     await user.click(screen.getByText('AI Configuration'));
 
     // Check initial values
-    const providerSelect = screen.getByTestId('provider-select');
-    const modelSelect = screen.getByTestId('model-select');
+    const providerSelect = screen.getByTestId('provider-select') as HTMLSelectElement;
+    const modelSelect = screen.getByTestId('model-select') as HTMLSelectElement;
     expect(providerSelect.value).toBe('anthropic');
     expect(modelSelect.value).toBe('claude-3-sonnet');
 

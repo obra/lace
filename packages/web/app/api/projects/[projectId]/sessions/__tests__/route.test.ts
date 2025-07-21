@@ -1,10 +1,6 @@
 // ABOUTME: Test suite for session API endpoints under projects hierarchy
 // ABOUTME: Tests CRUD operations with proper project-session relationships and validation
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-
 import { NextRequest } from 'next/server';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GET, POST } from '@/app/api/projects/[projectId]/sessions/route';
@@ -32,19 +28,22 @@ vi.mock('@/lib/utils/id-generator', () => ({
 }));
 
 describe('Session API endpoints under projects', () => {
-  let mockProject: {
-    getSessions: vi.MockedFunction<() => unknown[]>;
-    createSession: vi.MockedFunction<
-      (name: string, description: string, config: Record<string, unknown>) => unknown
-    >;
-  };
+  interface MockProject {
+    getSessions: () => unknown[];
+    createSession: (name: string, description: string, config: Record<string, unknown>) => unknown;
+  }
+  
+  let mockProject: MockProject;
 
   beforeEach(() => {
+    const getSessionsMock = vi.fn();
+    const createSessionMock = vi.fn();
+    
     mockProject = {
-      getSessions: vi.fn(),
-      createSession: vi.fn(),
+      getSessions: getSessionsMock,
+      createSession: createSessionMock,
     };
-    const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
+    const mockedGetById = vi.mocked(Project.getById);
     mockedGetById.mockReturnValue(mockProject as unknown as ReturnType<typeof Project.getById>);
   });
 
@@ -73,7 +72,7 @@ describe('Session API endpoints under projects', () => {
         },
       ];
 
-      mockProject.getSessions.mockReturnValue(mockSessions);
+      vi.mocked(mockProject.getSessions).mockReturnValue(mockSessions);
 
       const response = await GET(
         new NextRequest('http://localhost/api/projects/project1/sessions'),
@@ -92,7 +91,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should return empty array when no sessions exist', async () => {
-      mockProject.getSessions.mockReturnValue([]);
+      vi.mocked(mockProject.getSessions).mockReturnValue([]);
 
       const response = await GET(
         new NextRequest('http://localhost/api/projects/project1/sessions'),
@@ -108,7 +107,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should return 404 when project not found', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
+      const mockedGetById = vi.mocked(Project.getById);
       mockedGetById.mockReturnValue(null);
 
       const response = await GET(
@@ -125,7 +124,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should handle database errors', async () => {
-      mockProject.getSessions.mockImplementation(() => {
+      vi.mocked(mockProject.getSessions).mockImplementation(() => {
         throw new Error('Database error');
       });
 
@@ -163,7 +162,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: { projectId: 'project1' } });
+      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
       const data = (await response.json()) as {
         session: { id: string; name: string; projectId: string };
       };
@@ -180,7 +179,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should return 404 when project not found', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
+      const mockedGetById = vi.mocked(Project.getById);
       mockedGetById.mockReturnValue(null);
 
       const request = new NextRequest('http://localhost/api/projects/nonexistent/sessions', {
@@ -190,7 +189,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: { projectId: 'nonexistent' } });
+      const response = await POST(request, { params: Promise.resolve({ projectId: 'nonexistent' }) });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(404);
@@ -205,7 +204,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: { projectId: 'project1' } });
+      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
       const data = (await response.json()) as { error: string; details?: unknown };
 
       expect(response.status).toBe(400);
@@ -219,7 +218,7 @@ describe('Session API endpoints under projects', () => {
         body: JSON.stringify({}),
       });
 
-      const response = await POST(request, { params: { projectId: 'project1' } });
+      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
@@ -243,7 +242,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: { projectId: 'project1' } });
+      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
       const data = (await response.json()) as {
         session: { id: string; name: string };
       };
@@ -263,7 +262,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: { projectId: 'project1' } });
+      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(500);

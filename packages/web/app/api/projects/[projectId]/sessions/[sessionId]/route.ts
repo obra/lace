@@ -12,17 +12,18 @@ const UpdateSessionSchema = z.object({
   status: z.enum(['active', 'archived', 'completed']).optional(),
 });
 
-export function GET(
+export async function GET(
   _request: NextRequest,
-  { params }: { params: { projectId: string; sessionId: string } }
-) {
+  { params }: { params: Promise<{ projectId: string; sessionId: string }> }
+): Promise<NextResponse> {
   try {
-    const project = Project.getById(params.projectId);
+    const { projectId, sessionId } = await params;
+    const project = Project.getById(projectId);
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const session = project.getSession(params.sessionId);
+    const session = project.getSession(sessionId);
     if (!session) {
       return NextResponse.json({ error: 'Session not found in this project' }, { status: 404 });
     }
@@ -38,18 +39,19 @@ export function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { projectId: string; sessionId: string } }
-) {
+  { params }: { params: Promise<{ projectId: string; sessionId: string }> }
+): Promise<NextResponse> {
   try {
+    const { projectId, sessionId } = await params;
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = UpdateSessionSchema.parse(body);
 
-    const project = Project.getById(params.projectId);
+    const project = Project.getById(projectId);
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const session = project.updateSession(params.sessionId, validatedData);
+    const session = project.updateSession(sessionId, validatedData);
     if (!session) {
       return NextResponse.json({ error: 'Session not found in this project' }, { status: 404 });
     }
@@ -70,17 +72,18 @@ export async function PATCH(
   }
 }
 
-export function DELETE(
+export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { projectId: string; sessionId: string } }
-) {
+  { params }: { params: Promise<{ projectId: string; sessionId: string }> }
+): Promise<NextResponse> {
   try {
-    const project = Project.getById(params.projectId);
+    const { projectId, sessionId } = await params;
+    const project = Project.getById(projectId);
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const success = project.deleteSession(params.sessionId);
+    const success = project.deleteSession(sessionId);
     if (!success) {
       return NextResponse.json({ error: 'Session not found in this project' }, { status: 404 });
     }

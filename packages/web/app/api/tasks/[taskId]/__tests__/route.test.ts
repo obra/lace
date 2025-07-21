@@ -6,7 +6,6 @@ import { NextRequest } from 'next/server';
 import { GET, PATCH, DELETE } from '@/app/api/tasks/[taskId]/route';
 import type { SessionService } from '@/lib/server/session-service';
 import type { Session as ApiSession } from '@/types/api';
-import type { Session as CoreSession } from '@/lib/server/core-types';
 import { asThreadId } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
@@ -72,22 +71,9 @@ const mockSession: MockCoreSession = {
 
 // Create the properly typed mock service
 const mockSessionService: Partial<SessionService> = {
-  createSession: vi.fn<
-    Parameters<SessionService['createSession']>,
-    ReturnType<SessionService['createSession']>
-  >(),
-  listSessions: vi.fn<
-    Parameters<SessionService['listSessions']>,
-    ReturnType<SessionService['listSessions']>
-  >(),
-  getSession: vi
-    .fn<Parameters<SessionService['getSession']>, ReturnType<SessionService['getSession']>>()
-    .mockResolvedValue(mockSession as unknown as CoreSession),
-  spawnAgent: vi.fn<
-    Parameters<SessionService['spawnAgent']>,
-    ReturnType<SessionService['spawnAgent']>
-  >(),
-  getAgent: vi.fn<Parameters<SessionService['getAgent']>, ReturnType<SessionService['getAgent']>>(),
+  createSession: vi.fn(),
+  listSessions: vi.fn(),
+  getSession: vi.fn().mockResolvedValue(mockSession),
 };
 
 // Mock the session service
@@ -140,7 +126,6 @@ describe('Task [taskId] API Routes', () => {
     it('should return task details', async () => {
       type TaskType = import('@/types/api').Task;
       type TaskNoteType = import('@/types/api').TaskNote;
-      type TaskType = import('@/types/api').Task;
 
       const agentThreadId = createThreadId('lace_20240101_agent1');
       const creatorThreadId = createThreadId('lace_20240101_creator');

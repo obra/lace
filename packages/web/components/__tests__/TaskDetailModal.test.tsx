@@ -4,8 +4,9 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { TaskDetailModal } from '@/components/TaskDetailModal';
+import { TaskDetailModal } from '@/components/old/TaskDetailModal';
 import type { Task } from '@/types/api';
+import { asThreadId, type ThreadId } from '@/lib/server/core-types';
 
 const mockTask: Task = {
   id: 'task_20240101_abc123',
@@ -14,15 +15,15 @@ const mockTask: Task = {
   prompt: 'Test prompt for agent',
   status: 'pending',
   priority: 'high',
-  assignedTo: 'lace_20240101_agent1',
-  createdBy: 'human',
-  threadId: 'lace_20240101_session',
+  assignedTo: asThreadId('lace_20240101_agent1'),
+  createdBy: asThreadId('lace_20240101_human'),
+  threadId: asThreadId('lace_20240101_session'),
   createdAt: '2024-01-01T10:00:00Z',
   updatedAt: '2024-01-01T10:00:00Z',
   notes: [
     {
       id: 'note_20240101_n1',
-      author: 'lace_20240101_agent1',
+      author: asThreadId('lace_20240101_agent1'),
       content: 'Working on this task',
       timestamp: '2024-01-01T11:00:00Z',
     },
@@ -140,7 +141,7 @@ describe('TaskDetailModal', () => {
         description: 'Test description',
         prompt: 'Test prompt for agent',
         priority: 'high',
-        assignedTo: 'lace_20240101_agent1',
+        assignedTo: asThreadId('lace_20240101_agent1'),
         status: 'pending',
       });
     });

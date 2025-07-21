@@ -62,7 +62,7 @@ describe('Individual Project API', () => {
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
       const request = new NextRequest('http://localhost/api/projects/test-project');
-      const response = await GET(request, { params: { projectId: 'test-project' } });
+      const response = await GET(request, { params: Promise.resolve({ projectId: 'test-project' }) });
       const data = (await response.json()) as ProjectResponse;
 
       expect(response.status).toBe(200);
@@ -84,7 +84,7 @@ describe('Individual Project API', () => {
       Project.getById = vi.fn().mockReturnValue(null);
 
       const request = new NextRequest('http://localhost/api/projects/nonexistent');
-      const response = await GET(request, { params: { projectId: 'nonexistent' } });
+      const response = await GET(request, { params: Promise.resolve({ projectId: 'nonexistent' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);
@@ -98,7 +98,7 @@ describe('Individual Project API', () => {
       });
 
       const request = new NextRequest('http://localhost/api/projects/test-project');
-      const response = await GET(request, { params: { projectId: 'test-project' } });
+      const response = await GET(request, { params: Promise.resolve({ projectId: 'test-project' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(500);
@@ -123,7 +123,7 @@ describe('Individual Project API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, { params: { projectId: 'test-project' } });
+      const response = await PATCH(request, { params: Promise.resolve({ projectId: 'test-project' }) });
       const data = (await response.json()) as ProjectResponse;
 
       expect(response.status).toBe(200);
@@ -141,7 +141,7 @@ describe('Individual Project API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, { params: { projectId: 'nonexistent' } });
+      const response = await PATCH(request, { params: Promise.resolve({ projectId: 'nonexistent' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);
@@ -163,7 +163,7 @@ describe('Individual Project API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, { params: { projectId: 'test-project' } });
+      const response = await PATCH(request, { params: Promise.resolve({ projectId: 'test-project' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(400);
@@ -184,7 +184,7 @@ describe('Individual Project API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, { params: { projectId: 'test-project' } });
+      const response = await PATCH(request, { params: Promise.resolve({ projectId: 'test-project' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(500);
@@ -198,7 +198,7 @@ describe('Individual Project API', () => {
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
       const request = new NextRequest('http://localhost/api/projects/test-project');
-      const response = await DELETE(request, { params: { projectId: 'test-project' } });
+      const response = await DELETE(request, { params: Promise.resolve({ projectId: 'test-project' }) });
       const data = (await response.json()) as SuccessResponse;
 
       expect(response.status).toBe(200);
@@ -211,7 +211,7 @@ describe('Individual Project API', () => {
       Project.getById = vi.fn().mockReturnValue(null);
 
       const request = new NextRequest('http://localhost/api/projects/nonexistent');
-      const response = await DELETE(request, { params: { projectId: 'nonexistent' } });
+      const response = await DELETE(request, { params: Promise.resolve({ projectId: 'nonexistent' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);
@@ -226,7 +226,7 @@ describe('Individual Project API', () => {
       });
 
       const request = new NextRequest('http://localhost/api/projects/test-project');
-      const response = await DELETE(request, { params: { projectId: 'test-project' } });
+      const response = await DELETE(request, { params: Promise.resolve({ projectId: 'test-project' }) });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(500);

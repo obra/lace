@@ -187,7 +187,7 @@ describe('SessionService.spawnAgent Method', () => {
 
     // This should NOT throw an error if the thread was properly persisted
     const event = threadManager.addEvent(agentThreadId, 'USER_MESSAGE', 'Hello persistent agent');
-    expect((event as { threadId: ThreadId }).threadId).toBe(agentThreadId);
+    expect((event as unknown as { threadId: ThreadId }).threadId).toBe(agentThreadId);
     expect((event as { type: string }).type).toBe('USER_MESSAGE');
     expect((event as { data: string }).data).toBe('Hello persistent agent');
 
@@ -233,7 +233,7 @@ describe('SessionService.spawnAgent Method', () => {
     if (serviceAgent) {
       // Get the agent's ThreadManager via the proper accessor
       const serviceThreadManager = (
-        serviceAgent as { _threadManager: { getEvents: (id: ThreadId) => unknown[] } }
+        serviceAgent as unknown as { _threadManager: { getEvents: (id: ThreadId) => unknown[] } }
       )._threadManager;
       expect(serviceThreadManager).toBeDefined();
 

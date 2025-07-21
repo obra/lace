@@ -22,7 +22,6 @@ import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url-fetch';
 import { logger } from '~/utils/logger';
 import type { ApprovalCallback } from '~/tools/approval-types';
-import { randomUUID } from 'crypto';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 
 export interface SessionInfo {
@@ -72,7 +71,7 @@ export class Session {
 
     // Create session record in sessions table
     const sessionData = {
-      id: randomUUID(),
+      id: threadManager.generateThreadId(),
       projectId,
       name,
       description: '',
@@ -405,16 +404,18 @@ export class Session {
     };
   }
 
-  spawnAgent(name: string, _provider?: string, _model?: string): Agent {
+  spawnAgent(name: string, provider?: string, model?: string): Agent {
     // Create delegate agent using the session agent
     // This uses the same provider as the session agent
     const agent = this._sessionAgent.createDelegateAgent(this._sessionAgent.toolExecutor);
 
-    // Store the agent name in the thread metadata
+    // Store the agent metadata including provider and model
     agent.updateThreadMetadata({
       name,
       isAgent: true,
       parentSessionId: this._sessionId,
+      provider: provider || this._sessionAgent.providerName,
+      model: model || this._sessionAgent.provider.modelName,
     });
 
     // Store agent
@@ -448,8 +449,8 @@ export class Session {
       agents.push({
         threadId: asThreadId(agent.threadId),
         name: (metadata?.name as string) || 'Agent ' + agent.threadId,
-        provider: agent.providerName,
-        model: (metadata?.model as string) || 'unknown',
+        provider: (metadata?.provider as string) || agent.providerName,
+        model: (metadata?.model as string) || agent.provider.modelName,
         status: agent.getCurrentState(),
       });
     });

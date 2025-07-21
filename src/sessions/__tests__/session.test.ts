@@ -20,6 +20,7 @@ vi.mock('~/providers/registry', () => ({
       createProvider: vi.fn().mockReturnValue({
         type: 'anthropic',
         model: 'claude-3-haiku-20240307',
+        modelName: 'claude-3-haiku-20240307',
         providerName: 'anthropic',
         defaultModel: 'claude-3-haiku-20240307',
         setSystemPrompt: vi.fn(),
@@ -198,6 +199,81 @@ describe('Session', () => {
         expect.objectContaining({
           name: 'Test Agent',
           provider: 'anthropic',
+          status: expect.any(String) as string,
+        })
+      );
+    });
+
+    it('should preserve custom model when spawning agent', () => {
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
+
+      // Spawn agent with custom model
+      session.spawnAgent('Claude Opus Agent', 'anthropic', 'claude-3-opus-20240229');
+
+      const agents = session.getAgents();
+      expect(agents).toHaveLength(2); // Coordinator + 1 spawned agent
+
+      const spawnedAgent = agents[1];
+      expect(spawnedAgent).toEqual(
+        expect.objectContaining({
+          name: 'Claude Opus Agent',
+          provider: 'anthropic',
+          model: 'claude-3-opus-20240229',
+          status: expect.any(String) as string,
+        })
+      );
+    });
+
+    it('should preserve custom provider when spawning agent', () => {
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
+
+      // Spawn agent with custom provider and model
+      session.spawnAgent('GPT Agent', 'openai', 'gpt-4');
+
+      const agents = session.getAgents();
+      expect(agents).toHaveLength(2); // Coordinator + 1 spawned agent
+
+      const spawnedAgent = agents[1];
+      expect(spawnedAgent).toEqual(
+        expect.objectContaining({
+          name: 'GPT Agent',
+          provider: 'openai',
+          model: 'gpt-4',
+          status: expect.any(String) as string,
+        })
+      );
+    });
+
+    it('should fall back to session defaults when no provider/model specified', () => {
+      const session = Session.create(
+        'Test Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
+
+      // Spawn agent without specifying provider/model
+      session.spawnAgent('Default Agent');
+
+      const agents = session.getAgents();
+      expect(agents).toHaveLength(2); // Coordinator + 1 spawned agent
+
+      const spawnedAgent = agents[1];
+      expect(spawnedAgent).toEqual(
+        expect.objectContaining({
+          name: 'Default Agent',
+          provider: 'anthropic', // Should fall back to session provider
+          model: 'claude-3-haiku-20240307', // Should fall back to session model
           status: expect.any(String) as string,
         })
       );

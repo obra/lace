@@ -51,7 +51,7 @@ export async function GET(
           data: JSON.stringify({
             sessionId,
             status: 'connected',
-            timestamp: new Date().toISOString(),
+            timestamp: new Date(),
           }),
         };
 

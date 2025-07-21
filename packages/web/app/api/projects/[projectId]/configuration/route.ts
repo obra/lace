@@ -15,9 +15,10 @@ const ConfigurationSchema = z.object({
   environmentVariables: z.record(z.string()).optional(),
 });
 
-export function GET(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
   try {
-    const project = Project.getById(params.projectId);
+    const resolvedParams = await params;
+    const project = Project.getById(resolvedParams.projectId);
 
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
@@ -34,12 +35,13 @@ export function GET(request: NextRequest, { params }: { params: { projectId: str
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = ConfigurationSchema.parse(body);
 
-    const project = Project.getById(params.projectId);
+    const resolvedParams = await params;
+    const project = Project.getById(resolvedParams.projectId);
 
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });

@@ -1,0 +1,180 @@
+// ABOUTME: Simple code block component with syntax highlighting for web interface
+// ABOUTME: Uses highlight.js with CSS theme integration, no complex theme management
+
+'use client';
+
+import React, { useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCopy, faCheck, faExpand, faCompress } from '@/lib/fontawesome';
+import DOMPurify from 'dompurify';
+import hljs from 'highlight.js';
+
+interface CodeBlockProps {
+  code: string;
+  language?: string;
+  filename?: string;
+  showLineNumbers?: boolean;
+  showCopyButton?: boolean;
+  showLanguageLabel?: boolean;
+  showHeader?: boolean;
+  maxHeight?: string;
+  className?: string;
+  onCopy?: (code: string) => void;
+  collapsed?: boolean;
+  collapsible?: boolean;
+}
+
+export default function CodeBlock({
+  code,
+  language,
+  filename,
+  showLineNumbers = false,
+  showCopyButton = true,
+  showLanguageLabel = true,
+  showHeader = true,
+  maxHeight = '400px',
+  className = '',
+  onCopy,
+  collapsed = false,
+  collapsible = false,
+}: CodeBlockProps) {
+  const [copied, setCopied] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(!collapsed);
+
+  // Simple syntax highlighting
+  const highlightCode = (code: string, lang?: string) => {
+    if (!lang) {
+      return { value: code, language: 'plaintext' };
+    }
+
+    try {
+      // Format JSON if it's JSON
+      let codeToHighlight = code;
+      if (lang === 'json' || code.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(code) as unknown;
+          codeToHighlight = JSON.stringify(parsed, null, 2);
+        } catch {
+          // Keep original if not valid JSON
+        }
+      }
+
+      const result = hljs.highlight(codeToHighlight, { language: lang });
+      return { value: result.value, language: result.language || lang };
+    } catch {
+      // Fallback to auto-detection or plain text
+      try {
+        const result = hljs.highlightAuto(code);
+        return { value: result.value, language: result.language || 'plaintext' };
+      } catch {
+        return { value: code, language: 'plaintext' };
+      }
+    }
+  };
+
+  const handleCopy = async () => {
+    if (onCopy) {
+      onCopy(code);
+    } else {
+      try {
+        await navigator.clipboard.writeText(code);
+      } catch (err) {
+        console.error('Failed to copy code:', err);
+        return;
+      }
+    }
+
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const renderLineNumbers = (lines: string[]) => {
+    if (!showLineNumbers) return null;
+
+    return (
+      <div className="line-numbers">
+        {lines.map((_, index) => (
+          <div key={index} className="text-right">
+            {index + 1}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const highlightResult = highlightCode(code, language);
+  const lines = highlightResult.value.split('\n');
+  const detectedLanguage = highlightResult.language;
+  const displayLanguage = detectedLanguage === 'plaintext' ? 'text' : detectedLanguage;
+
+  return (
+    <div className={`code-block ${className}`}>
+      {showHeader && (
+        <div className="code-block-header">
+          <div className="flex items-center gap-2">
+            {filename && (
+              <span className="text-sm font-mono text-base-content/80">
+                {filename}
+              </span>
+            )}
+            {showLanguageLabel && (
+              <span className="code-block-language">
+                {displayLanguage}
+              </span>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {collapsible && (
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="text-xs text-base-content/60 hover:text-base-content px-2 py-1 rounded hover:bg-base-200"
+                title={isExpanded ? 'Collapse' : 'Expand'}
+              >
+                <FontAwesomeIcon icon={isExpanded ? faCompress : faExpand} className="w-3 h-3" />
+              </button>
+            )}
+            
+            {showCopyButton && (
+              <button
+                onClick={handleCopy}
+                className="code-block-copy px-2 py-1 rounded hover:bg-base-200"
+                title="Copy code"
+              >
+                <FontAwesomeIcon 
+                  icon={copied ? faCheck : faCopy} 
+                  className={`w-3 h-3 ${copied ? 'text-success' : ''}`} 
+                />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isExpanded && (
+        <div 
+          className="code-block-content"
+          style={{ maxHeight }}
+        >
+          <div className="font-mono text-sm">
+            <div className="code-line">
+              {showLineNumbers && renderLineNumbers(lines)}
+              <div className="code-line-content">
+                {detectedLanguage === 'plaintext' ? (
+                  <pre className="whitespace-pre-wrap p-4">
+                    {code}
+                  </pre>
+                ) : (
+                  <code
+                    className="hljs"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlightResult.value) }}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

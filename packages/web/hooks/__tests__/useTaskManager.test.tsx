@@ -7,6 +7,7 @@ import { act } from 'react';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { TaskAPIClient } from '@/lib/client/task-api';
 import type { Task } from '@/types/api';
+import { asThreadId } from '@/lib/server/core-types';
 import { setupTestPersistence, teardownTestPersistence } from '~/__tests__/setup/persistence-helper';
 
 // Mock the TaskAPIClient
@@ -36,8 +37,8 @@ describe('useTaskManager', () => {
     prompt: 'Test Prompt',
     status: 'pending',
     priority: 'high',
-    createdBy: 'lace_20240101_agent1',
-    threadId: 'lace_20240101_session',
+    createdBy: asThreadId('lace_20240101_agent1'),
+    threadId: asThreadId('lace_20240101_session'),
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
     notes: [],

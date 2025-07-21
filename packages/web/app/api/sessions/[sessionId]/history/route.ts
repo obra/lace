@@ -59,7 +59,7 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
 
   const baseEvent = {
     threadId,
-    timestamp: threadEvent.timestamp.toISOString(),
+    timestamp: threadEvent.timestamp,
   };
 
   switch (threadEvent.type) {
@@ -138,12 +138,12 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     }
 
     case 'LOCAL_SYSTEM_MESSAGE': {
-      const message =
+      const content =
         typeof threadEvent.data === 'string' ? threadEvent.data : String(threadEvent.data);
       return {
         ...baseEvent,
         type: 'LOCAL_SYSTEM_MESSAGE',
-        data: { message },
+        data: { content },
       };
     }
 
@@ -153,7 +153,7 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
       return {
         ...baseEvent,
         type: 'LOCAL_SYSTEM_MESSAGE',
-        data: { message: `Unknown event: ${eventType}` },
+        data: { content: `Unknown event: ${eventType}` },
       };
     }
   }

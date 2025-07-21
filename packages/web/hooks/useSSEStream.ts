@@ -2,7 +2,8 @@
 // ABOUTME: Handles connection state, reconnection, and event parsing
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { SessionEvent, ThreadId } from '@/types/api';
+import { SessionEvent } from '@/types/api';
+import { type ThreadId } from '@/lib/server/core-types';
 
 interface SSEStreamState {
   connected: boolean;

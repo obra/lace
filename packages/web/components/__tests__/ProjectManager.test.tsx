@@ -9,7 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { ProjectManager } from '@/components/ProjectManager';
+import { ProjectManager } from '@/components/old/ProjectManager';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { Project } from '@/lib/server/lace-imports';
 import type { ProjectInfo } from '@/types/api';

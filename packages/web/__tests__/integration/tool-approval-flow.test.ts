@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
 import { getApprovalManager } from '@/lib/server/approval-manager';
-import { Agent, ApprovalDecision, Project } from '@/lib/server/lace-imports';
+import { Agent, AgentEvents, ApprovalDecision, Project } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
@@ -16,6 +16,7 @@ import { tmpdir } from 'os';
 
 // Mock the file-read tool for testing
 import { Tool } from '~/tools/tool';
+import { ToolAnnotations } from '~/tools/types';
 import { z } from 'zod';
 
 // Type definitions for test
@@ -43,15 +44,16 @@ class MockFileReadTool extends Tool {
     path: z.string().min(1, 'File path cannot be empty'),
   });
 
-  get annotations() {
-    return {
-      readOnlyHint: true,
-      destructiveHint: false,
-    };
-  }
+  annotations = {
+    readOnlyHint: true,
+    destructiveHint: false,
+  };
 
   protected async executeValidated(_args: z.infer<typeof this.schema>) {
-    return this.createResult('File content here');
+    return {
+      content: [{ type: 'text' as const, text: 'File content here' }],
+      isError: false,
+    };
   }
 }
 
@@ -68,7 +70,7 @@ describe('Tool Approval Flow Integration', () => {
 
   function logEvent(event: string, data: unknown): void {
     eventLog.push({ event, data, timestamp: Date.now() });
-    console.log(`[${new Date().toISOString()}] ${event}:`, data);
+    // Debug logging removed for production
   }
 
   beforeEach(async () => {
@@ -113,10 +115,11 @@ describe('Tool Approval Flow Integration', () => {
     }
 
     // Get the coordinator agent (every session has one)
-    agent = sessionInstance.getAgent(sessionId);
-    if (!agent) {
+    const agentResult = sessionInstance.getAgent(sessionId);
+    if (!agentResult) {
       throw new Error('Failed to get coordinator agent');
     }
+    agent = agentResult;
 
     // Register mock tool with correct name
     const mockTool = new MockFileReadTool();
@@ -124,9 +127,9 @@ describe('Tool Approval Flow Integration', () => {
 
     // Add event logging to agent
     const originalEmit = agent.emit.bind(agent);
-    agent.emit = vi.fn().mockImplementation((event: string, ...args: unknown[]) => {
-      logEvent(`agent.emit(${event})`, args[0]);
-      return originalEmit(event, ...args);
+    agent.emit = vi.fn().mockImplementation((event: keyof AgentEvents, ...args: unknown[]) => {
+      logEvent(`agent.emit(${String(event)})`, args[0]);
+      return (originalEmit as any)(event, ...args);
     });
 
     // Add event logging to approval manager
@@ -157,7 +160,7 @@ describe('Tool Approval Flow Integration', () => {
             sessionId,
             toolName,
             description,
-            context,
+            context as ToolAnnotations | undefined,
             input,
             isReadOnly
           );
@@ -169,7 +172,7 @@ describe('Tool Approval Flow Integration', () => {
       sessionId,
       agentId: agent.threadId,
       toolExecutorSet: !!agent.toolExecutor,
-      approvalCallbackSet: !!(agent.toolExecutor as ToolExecutorWithApproval).approvalCallback,
+      approvalCallbackSet: !!(agent.toolExecutor as unknown as ToolExecutorWithApproval).approvalCallback,
     });
   });
 
@@ -187,7 +190,7 @@ describe('Tool Approval Flow Integration', () => {
       try {
         await rm(tempDir, { recursive: true, force: true });
       } catch (error) {
-        console.warn('Failed to cleanup temp directory:', error);
+        // Failed to cleanup temp directory silently
       }
     }
   });
@@ -200,7 +203,7 @@ describe('Tool Approval Flow Integration', () => {
     expect(agent.toolExecutor).toBeDefined();
 
     // Step 2: Verify approval callback is set
-    const toolExecutor = agent.toolExecutor as ToolExecutorWithApproval;
+    const toolExecutor = agent.toolExecutor as unknown as ToolExecutorWithApproval;
     logEvent('approval.callback.check', {
       callbackExists: !!toolExecutor.approvalCallback,
       callbackType: typeof toolExecutor.approvalCallback,
@@ -270,19 +273,13 @@ describe('Tool Approval Flow Integration', () => {
     expect(toolResult).toBeDefined();
     expect(toolResult.isError).toBe(false);
 
-    // Print event log for debugging
-    console.log('\n=== EVENT FLOW LOG ===');
-    eventLog.forEach((entry, index) => {
-      console.log(`${index + 1}. [${new Date(entry.timestamp).toISOString()}] ${entry.event}`);
-      console.log('   Data:', JSON.stringify(entry.data, null, 2));
-    });
-    console.log('=====================\n');
+    // Event log available for debugging if needed
   });
 
   it('should test approval callback directly', async () => {
     logEvent('test.start', { testName: 'direct approval callback' });
 
-    const toolExecutor = agent.toolExecutor as ToolExecutorWithApproval;
+    const toolExecutor = agent.toolExecutor as unknown as ToolExecutorWithApproval;
     const approvalCallback = toolExecutor.approvalCallback;
 
     expect(approvalCallback).toBeDefined();
@@ -423,7 +420,7 @@ describe('Tool Approval Flow Integration', () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Check if there are any pending approvals
-    const approvalManagerWithState = approvalManager as ApprovalManagerWithPending;
+    const approvalManagerWithState = approvalManager as unknown as ApprovalManagerWithPending;
     const pendingApprovals = approvalManagerWithState.pendingApprovals;
     const pendingKeys = Array.from(pendingApprovals.keys());
     logEvent('approval_manager.state', {

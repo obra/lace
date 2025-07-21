@@ -139,7 +139,7 @@ describe('Task SSE Stream', () => {
         actor: 'human',
         isHuman: true,
       },
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
     };
 
     // Emit event - in real scenario, this would stream to client

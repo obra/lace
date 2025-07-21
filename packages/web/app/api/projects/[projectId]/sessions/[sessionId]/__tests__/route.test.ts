@@ -1,12 +1,9 @@
 // ABOUTME: Test suite for individual session API endpoints - GET/PATCH/DELETE operations
 // ABOUTME: Tests session ownership validation and proper CRUD operations within project context
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
 import { NextRequest } from 'next/server';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest';
 import { GET, PATCH, DELETE } from '@/app/api/projects/[projectId]/sessions/[sessionId]/route';
 import { Project } from '@/lib/server/lace-imports';
 
@@ -19,9 +16,9 @@ vi.mock('@/lib/server/lace-imports', () => ({
 
 describe('Individual session API endpoints', () => {
   let mockProject: {
-    getSession: vi.MockedFunction<(id: string) => unknown>;
-    updateSession: vi.MockedFunction<(id: string, data: Record<string, unknown>) => unknown>;
-    deleteSession: vi.MockedFunction<(id: string) => boolean>;
+    getSession: MockedFunction<(id: string) => unknown>;
+    updateSession: MockedFunction<(id: string, data: Record<string, unknown>) => unknown>;
+    deleteSession: MockedFunction<(id: string) => boolean>;
   };
 
   const mockSession = {
@@ -41,7 +38,7 @@ describe('Individual session API endpoints', () => {
       updateSession: vi.fn(),
       deleteSession: vi.fn(),
     };
-    const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
+    const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
     mockedGetById.mockReturnValue(mockProject as unknown as ReturnType<typeof Project.getById>);
   });
 
@@ -49,9 +46,9 @@ describe('Individual session API endpoints', () => {
     it('should return session when it exists and belongs to project', async () => {
       mockProject.getSession.mockReturnValue(mockSession);
 
-      const response = GET(
+      const response = await GET(
         new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
-        { params: { projectId: 'project1', sessionId: 'session1' } }
+        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
       const data = (await response.json()) as { session: typeof mockSession };
@@ -64,12 +61,12 @@ describe('Individual session API endpoints', () => {
     });
 
     it('should return 404 when project does not exist', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
+      const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
       mockedGetById.mockReturnValue(null);
 
-      const response = GET(
+      const response = await GET(
         new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
-        { params: { projectId: 'project1', sessionId: 'session1' } }
+        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
       const data = (await response.json()) as { error: string };
@@ -81,9 +78,9 @@ describe('Individual session API endpoints', () => {
     it('should return 404 when session does not exist', async () => {
       mockProject.getSession.mockReturnValue(null);
 
-      const response = GET(
+      const response = await GET(
         new NextRequest('http://localhost/api/projects/project1/sessions/nonexistent'),
-        { params: { projectId: 'project1', sessionId: 'nonexistent' } }
+        { params: Promise.resolve({ projectId: 'project1', sessionId: 'nonexistent' }) }
       );
 
       const data = (await response.json()) as { error: string };
@@ -97,9 +94,9 @@ describe('Individual session API endpoints', () => {
         throw new Error('Database error');
       });
 
-      const response = GET(
+      const response = await GET(
         new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
-        { params: { projectId: 'project1', sessionId: 'session1' } }
+        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
       const data = (await response.json()) as { error: string };
@@ -131,7 +128,7 @@ describe('Individual session API endpoints', () => {
       });
 
       const response = await PATCH(request, {
-        params: { projectId: 'project1', sessionId: 'session1' },
+        params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
       });
 
       const data = (await response.json()) as { session: typeof updatedSession };
@@ -148,7 +145,7 @@ describe('Individual session API endpoints', () => {
     });
 
     it('should return 404 when project does not exist', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
+      const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
       mockedGetById.mockReturnValue(null);
 
       const request = new NextRequest('http://localhost/api/projects/project1/sessions/session1', {
@@ -159,7 +156,7 @@ describe('Individual session API endpoints', () => {
       });
 
       const response = await PATCH(request, {
-        params: { projectId: 'project1', sessionId: 'session1' },
+        params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
       });
 
       const data = (await response.json()) as { error: string };
@@ -182,7 +179,7 @@ describe('Individual session API endpoints', () => {
       );
 
       const response = await PATCH(request, {
-        params: { projectId: 'project1', sessionId: 'nonexistent' },
+        params: Promise.resolve({ projectId: 'project1', sessionId: 'nonexistent' }),
       });
 
       const data = (await response.json()) as { error: string };
@@ -200,7 +197,7 @@ describe('Individual session API endpoints', () => {
       });
 
       const response = await PATCH(request, {
-        params: { projectId: 'project1', sessionId: 'session1' },
+        params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
       });
 
       const data = (await response.json()) as { error: string; details?: unknown };
@@ -227,7 +224,7 @@ describe('Individual session API endpoints', () => {
       });
 
       const response = await PATCH(request, {
-        params: { projectId: 'project1', sessionId: 'session1' },
+        params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
       });
 
       const data = (await response.json()) as { session: typeof updatedSession };
@@ -253,7 +250,7 @@ describe('Individual session API endpoints', () => {
       });
 
       const response = await PATCH(request, {
-        params: { projectId: 'project1', sessionId: 'session1' },
+        params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
       });
 
       const data = (await response.json()) as { error: string };
@@ -267,9 +264,9 @@ describe('Individual session API endpoints', () => {
     it('should delete session successfully', async () => {
       mockProject.deleteSession.mockReturnValue(true);
 
-      const response = DELETE(
+      const response = await DELETE(
         new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
-        { params: { projectId: 'project1', sessionId: 'session1' } }
+        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
       const data = (await response.json()) as { success: boolean };
@@ -280,12 +277,12 @@ describe('Individual session API endpoints', () => {
     });
 
     it('should return 404 when project does not exist', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
+      const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
       mockedGetById.mockReturnValue(null);
 
-      const response = DELETE(
+      const response = await DELETE(
         new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
-        { params: { projectId: 'project1', sessionId: 'session1' } }
+        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
       const data = (await response.json()) as { error: string };
@@ -297,9 +294,9 @@ describe('Individual session API endpoints', () => {
     it('should return 404 when session does not exist', async () => {
       mockProject.deleteSession.mockReturnValue(false);
 
-      const response = DELETE(
+      const response = await DELETE(
         new NextRequest('http://localhost/api/projects/project1/sessions/nonexistent'),
-        { params: { projectId: 'project1', sessionId: 'nonexistent' } }
+        { params: Promise.resolve({ projectId: 'project1', sessionId: 'nonexistent' }) }
       );
 
       const data = (await response.json()) as { error: string };
@@ -313,9 +310,9 @@ describe('Individual session API endpoints', () => {
         throw new Error('Database error');
       });
 
-      const response = DELETE(
+      const response = await DELETE(
         new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
-        { params: { projectId: 'project1', sessionId: 'session1' } }
+        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
       const data = (await response.json()) as { error: string };
