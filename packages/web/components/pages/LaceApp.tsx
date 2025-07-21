@@ -11,6 +11,7 @@ import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/component
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { TimelineView } from '@/components/timeline/TimelineView';
 import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
+import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import type {
   Session,
@@ -281,6 +282,32 @@ export function LaceApp() {
     }
     setSendingMessage(false);
   }
+
+  // Handle tool approval decision
+  const handleApprovalDecision = async (decision: ApprovalDecision) => {
+    if (!approvalRequest) return;
+
+    try {
+      const res = await fetch(`/api/approvals/${approvalRequest.requestId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision }),
+      });
+
+      if (res.ok) {
+        setApprovalRequest(null);
+      } else {
+        console.error('Failed to submit approval decision');
+      }
+    } catch (error) {
+      console.error('Failed to submit approval decision:', error);
+    }
+  };
+
+  // Handle approval timeout
+  const handleApprovalTimeout = () => {
+    void handleApprovalDecision(ApprovalDecision.DENY);
+  };
 
   // Session creation function
   const createSession = async () => {
@@ -758,6 +785,15 @@ export function LaceApp() {
           )}
         </div>
       </motion.div>
+
+      {/* Tool Approval Modal */}
+      {approvalRequest && (
+        <ToolApprovalModal
+          request={approvalRequest}
+          onDecision={handleApprovalDecision}
+          onTimeout={handleApprovalTimeout}
+        />
+      )}
     </motion.div>
   );
 }
