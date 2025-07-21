@@ -623,7 +623,7 @@ export function LaceApp() {
       </div>
 
       {/* Main Content - copy structure from AnimatedLaceApp */}
-      <motion.div className="flex-1 flex flex-col min-w-0">
+      <motion.div className="flex-1 flex flex-col min-w-0 h-full">
         {/* Top Bar */}
         <motion.div className="bg-transparent sticky top-0 z-30">
           <motion.div className="flex items-center justify-between p-4 lg:px-6">
@@ -644,7 +644,7 @@ export function LaceApp() {
         </motion.div>
 
         {/* Content Area */}
-        <div className="flex-1 flex flex-col text-base-content">{/* Remove centering for chat interface */}
+        <div className="flex-1 flex flex-col h-full text-base-content">{/* Remove centering for chat interface */}
           {loadingProjects ? (
             <div className="flex-1 flex items-center justify-center p-6">
               <div className="flex items-center gap-2">
