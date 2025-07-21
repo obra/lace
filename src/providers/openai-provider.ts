@@ -46,7 +46,7 @@ export class OpenAIProvider extends AIProvider {
   }
 
   get defaultModel(): string {
-    return 'gpt-4o-mini';
+    return 'gpt-4o';
   }
 
   get supportsStreaming(): boolean {
@@ -56,12 +56,23 @@ export class OpenAIProvider extends AIProvider {
   get contextWindow(): number {
     const model = this.modelName.toLowerCase();
 
+    // GPT-4.1 series with 1M token context
+    if (model.includes('gpt-4.1')) {
+      return 1000000;
+    }
+
     // GPT-4o and GPT-4-turbo models
     if (model.includes('gpt-4o') || model.includes('gpt-4-turbo')) {
       return 128000;
     }
 
-    // O1 models
+    // O-series models
+    if (model === 'o3' || model === 'o3-pro') {
+      return 200000;
+    }
+    if (model === 'o4-mini' || model.includes('o4-mini')) {
+      return 128000;
+    }
     if (model === 'o1' || model === 'o1-preview') {
       return 200000;
     }
@@ -89,7 +100,13 @@ export class OpenAIProvider extends AIProvider {
   get maxCompletionTokens(): number {
     const model = this.modelName.toLowerCase();
 
-    // O1 models have larger output limits
+    // O-series models have larger output limits
+    if (model === 'o3' || model === 'o3-pro') {
+      return 100000;
+    }
+    if (model === 'o4-mini' || model.includes('o4-mini')) {
+      return 65536;
+    }
     if (model === 'o1' || model === 'o1-preview') {
       return 100000;
     }
@@ -413,14 +430,80 @@ export class OpenAIProvider extends AIProvider {
 
   getAvailableModels(): ModelInfo[] {
     return [
+      // O-Series Reasoning Models (2025)
+      {
+        id: 'o3',
+        displayName: 'OpenAI o3',
+        description: 'Most capable reasoning model for complex tasks',
+        contextWindow: 200000,
+        maxOutputTokens: 100000,
+        capabilities: ['reasoning', 'math', 'coding'],
+      },
+      {
+        id: 'o3-pro',
+        displayName: 'OpenAI o3 Pro',
+        description: 'Enhanced o3 with superior performance',
+        contextWindow: 200000,
+        maxOutputTokens: 100000,
+        capabilities: ['reasoning', 'math', 'coding'],
+      },
+      {
+        id: 'o4-mini',
+        displayName: 'OpenAI o4 Mini',
+        description: 'Efficient reasoning model optimized for speed and cost',
+        contextWindow: 128000,
+        maxOutputTokens: 65536,
+        capabilities: ['reasoning', 'math', 'coding', 'vision'],
+      },
+      {
+        id: 'o4-mini-high',
+        displayName: 'OpenAI o4 Mini High',
+        description: 'Premium o4-mini with enhanced accuracy and speed (paid users)',
+        contextWindow: 128000,
+        maxOutputTokens: 65536,
+        capabilities: ['reasoning', 'math', 'coding', 'vision'],
+      },
+      // GPT Models (2025)
       {
         id: 'gpt-4o',
         displayName: 'GPT-4o',
-        description: 'Most capable GPT-4 model with vision',
+        description: 'Default flagship model for chat and complex tasks',
         contextWindow: 128000,
         maxOutputTokens: 16384,
         capabilities: ['vision', 'function-calling'],
         isDefault: true,
+      },
+      {
+        id: 'gpt-4.5',
+        displayName: 'GPT-4.5',
+        description: 'Largest and best model for chat (Pro users)',
+        contextWindow: 128000,
+        maxOutputTokens: 16384,
+        capabilities: ['vision', 'function-calling'],
+      },
+      {
+        id: 'gpt-4.1',
+        displayName: 'GPT-4.1',
+        description: 'Flagship multimodal model with 1M token context and coding improvements',
+        contextWindow: 1000000,
+        maxOutputTokens: 16384,
+        capabilities: ['vision', 'function-calling', 'coding'],
+      },
+      {
+        id: 'gpt-4.1-mini',
+        displayName: 'GPT-4.1 Mini',
+        description: 'High performance small model with 1M token context, beats GPT-4o',
+        contextWindow: 1000000,
+        maxOutputTokens: 16384,
+        capabilities: ['vision', 'function-calling'],
+      },
+      {
+        id: 'gpt-4.1-nano',
+        displayName: 'GPT-4.1 Nano',
+        description: 'Fastest and cheapest model with 1M token context',
+        contextWindow: 1000000,
+        maxOutputTokens: 4096,
+        capabilities: ['function-calling'],
       },
       {
         id: 'gpt-4o-mini',
@@ -430,6 +513,7 @@ export class OpenAIProvider extends AIProvider {
         maxOutputTokens: 16384,
         capabilities: ['vision', 'function-calling'],
       },
+      // Legacy Models (still available)
       {
         id: 'gpt-4-turbo',
         displayName: 'GPT-4 Turbo',
@@ -453,6 +537,23 @@ export class OpenAIProvider extends AIProvider {
         contextWindow: 16384,
         maxOutputTokens: 4096,
         capabilities: ['function-calling'],
+      },
+      // Legacy O1 models
+      {
+        id: 'o1',
+        displayName: 'OpenAI o1',
+        description: 'Previous generation reasoning model',
+        contextWindow: 200000,
+        maxOutputTokens: 100000,
+        capabilities: ['reasoning', 'math', 'coding'],
+      },
+      {
+        id: 'o1-mini',
+        displayName: 'OpenAI o1 Mini',
+        description: 'Smaller reasoning model',
+        contextWindow: 128000,
+        maxOutputTokens: 65536,
+        capabilities: ['reasoning', 'math', 'coding'],
       },
     ];
   }
