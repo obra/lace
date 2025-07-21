@@ -1,6 +1,7 @@
 // ABOUTME: Test suite for LaceMessageDisplay component using design system
 // ABOUTME: Covers all event types, streaming states, and visual requirements
 
+import React from 'react';
 import { describe, test, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { SessionEvent, Agent, ThreadId } from '@/types/api';
@@ -193,8 +194,8 @@ describe('LaceMessageDisplay', () => {
     // Should display thinking indicator (implementation will add visual thinking state)
     expect(screen.getByText(/thinking/i)).toBeInTheDocument();
 
-    // Should include agent information
-    expect(screen.getByText(/Claude/)).toBeInTheDocument();
+    // Should include agent information (use more specific text match)
+    expect(screen.getByText('Claude is thinking...')).toBeInTheDocument();
   });
 
   test('handles empty content gracefully', () => {
@@ -255,11 +256,14 @@ describe('LaceMessageDisplay', () => {
 
     render(<LaceMessageDisplay event={event} />);
 
-    // Should display system message content
-    expect(screen.getByText('Connected to session stream')).toBeInTheDocument();
+    // Should display system message content (wrapped with em dashes)
+    expect(screen.getByText(/Connected to session stream/)).toBeInTheDocument();
 
     // Should use appropriate styling for system messages (implementation will add system variant)
-    expect(screen.getByTestId('message-bubble')).toBeInTheDocument();
+    const bubble = screen.getByTestId('message-bubble');
+    expect(bubble).toBeInTheDocument();
+    expect(bubble).toHaveAttribute('data-variant', 'system');
+    expect(bubble).toHaveAttribute('data-align', 'center');
   });
 
   test('handles tool calls with no parameters', () => {
