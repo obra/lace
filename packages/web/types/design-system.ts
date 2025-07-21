@@ -106,6 +106,7 @@ export interface Task {
 export interface RecentFile {
   name: string;
   path: string;
+  lastModified: Date;
 }
 
 export interface Theme {

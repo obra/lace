@@ -6,6 +6,7 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TaskList } from '@/components/old/TaskList';
 import type { Task } from '@/types/api';
+import { asThreadId, type ThreadId } from '@/lib/server/core-types';
 
 const mockTasks: Task[] = [
   {
@@ -15,9 +16,9 @@ const mockTasks: Task[] = [
     prompt: 'Implement X feature with Y requirements',
     status: 'pending' as const,
     priority: 'high' as const,
-    assignedTo: 'lace_20240101_agent1',
-    createdBy: 'lace_20240101_creator',
-    threadId: 'lace_20240101_session',
+    assignedTo: asThreadId('lace_20240101_agent1'),
+    createdBy: asThreadId('lace_20240101_creator'),
+    threadId: asThreadId('lace_20240101_session'),
     createdAt: '2024-01-01T10:00:00Z',
     updatedAt: '2024-01-01T10:00:00Z',
     notes: [],
@@ -29,15 +30,15 @@ const mockTasks: Task[] = [
     prompt: 'Debug and fix the issue',
     status: 'in_progress' as const,
     priority: 'medium' as const,
-    assignedTo: 'lace_20240101_agent2',
-    createdBy: 'human',
-    threadId: 'lace_20240101_session',
+    assignedTo: asThreadId('lace_20240101_agent2'),
+    createdBy: asThreadId('lace_20240101_human'),
+    threadId: asThreadId('lace_20240101_session'),
     createdAt: '2024-01-01T11:00:00Z',
     updatedAt: '2024-01-01T12:00:00Z',
     notes: [
       {
         id: 'note_20240101_n1',
-        author: 'lace_20240101_agent2',
+        author: asThreadId('lace_20240101_agent2'),
         content: 'Working on this',
         timestamp: '2024-01-01T11:30:00Z',
       },
@@ -50,8 +51,8 @@ const mockTasks: Task[] = [
     prompt: 'Update documentation for new feature',
     status: 'completed' as const,
     priority: 'low' as const,
-    createdBy: 'human',
-    threadId: 'lace_20240101_session',
+    createdBy: asThreadId('lace_20240101_human'),
+    threadId: asThreadId('lace_20240101_session'),
     createdAt: '2024-01-01T09:00:00Z',
     updatedAt: '2024-01-01T13:00:00Z',
     notes: [],

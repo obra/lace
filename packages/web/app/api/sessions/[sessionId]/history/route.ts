@@ -153,7 +153,7 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
       return {
         ...baseEvent,
         type: 'LOCAL_SYSTEM_MESSAGE',
-        data: { message: `Unknown event: ${eventType}` },
+        data: { content: `Unknown event: ${eventType}` },
       };
     }
   }

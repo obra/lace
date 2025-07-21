@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session, Project } from '@/lib/server/lace-imports';
-import { asThreadId } from '@/lib/server/core-types';
+import { asThreadId, type ThreadId } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
   teardownTestPersistence,
@@ -100,9 +100,9 @@ describe('Session.spawnAgent Method', () => {
     expect(agent3.threadId).toBe(`${session.getId()}.3`);
 
     // Verify all agents are retrievable
-    expect(session.getAgent(agent1.threadId)).toBeDefined();
-    expect(session.getAgent(agent2.threadId)).toBeDefined();
-    expect(session.getAgent(agent3.threadId)).toBeDefined();
+    expect(session.getAgent(asThreadId(agent1.threadId))).toBeDefined();
+    expect(session.getAgent(asThreadId(agent2.threadId))).toBeDefined();
+    expect(session.getAgent(asThreadId(agent3.threadId))).toBeDefined();
 
     // Verify session reports correct number of agents
     const agents = session.getAgents();
@@ -139,7 +139,7 @@ describe('Session.spawnAgent Method', () => {
     expect(sessionAgent).toBeDefined();
 
     const sessionThreadManager = (
-      sessionAgent as {
+      sessionAgent as unknown as {
         _threadManager: {
           getThread: (id: ThreadId) => unknown;
           getEvents: (id: ThreadId) => unknown[];
@@ -148,7 +148,7 @@ describe('Session.spawnAgent Method', () => {
     )._threadManager;
     expect(sessionThreadManager).toBeDefined();
 
-    const threadFromSession = sessionThreadManager.getThread(agentThreadId);
+    const threadFromSession = sessionThreadManager.getThread(asThreadId(agentThreadId));
     expect(threadFromSession).toBeDefined();
 
     // Create a new ThreadManager instance
@@ -169,8 +169,8 @@ describe('Session.spawnAgent Method', () => {
     expect(event.threadId).toBe(agentThreadId);
 
     // Verify the event is visible from both ThreadManager instances
-    const eventsFromSession = sessionThreadManager.getEvents(agentThreadId);
-    const eventsFromNew = newThreadManager.getEvents(agentThreadId);
+    const eventsFromSession = sessionThreadManager.getEvents(asThreadId(agentThreadId));
+    const eventsFromNew = newThreadManager.getEvents(asThreadId(agentThreadId));
 
     expect(eventsFromSession).toHaveLength(1);
     expect(eventsFromNew).toHaveLength(1);
@@ -188,7 +188,7 @@ describe('Session.spawnAgent Method', () => {
     expect(sessionAgent).toBeDefined();
 
     const sessionThreadManager = (
-      sessionAgent as {
+      sessionAgent as unknown as {
         _threadManager: {
           createThread: () => unknown;
           setCurrentThread: (id: ThreadId) => void;
@@ -205,13 +205,13 @@ describe('Session.spawnAgent Method', () => {
     sessionThreadManager.setCurrentThread(otherThreadId);
 
     // Verify the delegate thread is still accessible
-    const delegateThread = sessionThreadManager.getThread(agentThreadId);
+    const delegateThread = sessionThreadManager.getThread(asThreadId(agentThreadId));
     expect(delegateThread).toBeDefined();
     expect((delegateThread as { id: ThreadId } | undefined)?.id).toBe(agentThreadId);
 
     // Try to add event to the delegate thread
     const event = sessionThreadManager.addEvent(
-      agentThreadId,
+      asThreadId(agentThreadId),
       'USER_MESSAGE',
       'Hello after switch'
     );

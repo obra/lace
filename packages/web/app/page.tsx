@@ -186,8 +186,15 @@ export default function Home() {
         return;
       }
 
-      const historyData = data as { events: SessionEvent[] };
-      setEvents(historyData.events || []);
+      const historyData = data as { events: Array<SessionEvent & { timestamp: string }> };
+      
+      // Convert string timestamps to Date objects
+      const eventsWithDateTimestamps: SessionEvent[] = (historyData.events || []).map(event => ({
+        ...event,
+        timestamp: new Date(event.timestamp)
+      }));
+      
+      setEvents(eventsWithDateTimestamps);
     } catch (error) {
       console.error('Failed to load conversation history:', error);
     }
