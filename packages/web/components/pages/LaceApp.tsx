@@ -678,15 +678,32 @@ export function LaceApp() {
                 </div>
               </div>
             ) : selectedAgent ? (
-              <div className="text-center space-y-2">
-                <h2 className="text-lg font-medium">
-                  Agent: {selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'Unknown Agent'}
-                </h2>
-                <p className="text-base-content/60">Conversation and tools will be shown here</p>
-                <div className="text-sm text-base-content/40">
-                  Agent ID: {selectedAgent}
-                </div>
-              </div>
+              <>
+                {/* Conversation Display */}
+                <TimelineView
+                  entries={timelineEntries}
+                  isTyping={sendingMessage}
+                  currentAgent={selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'Agent'}
+                />
+
+                {/* Chat Input */}
+                <motion.div
+                  initial={{ y: 100, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  className="sticky bottom-0 bg-base-200 border-t border-base-300 p-4"
+                >
+                  <EnhancedChatInput
+                    value={message}
+                    onChange={setMessage}
+                    onSubmit={sendMessage}
+                    disabled={sendingMessage}
+                    isListening={false}
+                    onStartVoice={() => {}}
+                    onStopVoice={() => {}}
+                    placeholder={`Message ${selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'agent'}...`}
+                  />
+                </motion.div>
+              </>
             ) : selectedSession ? (
               <div className="text-center space-y-2">
                 <h2 className="text-lg font-medium">Session: {sessions.find(s => s.id === selectedSession)?.name}</h2>

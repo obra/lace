@@ -20,11 +20,10 @@ export function convertSessionEventsToTimeline(
 ): TimelineEntry[] {
   // 1. Filter events by selected agent
   const filteredEvents = filterEventsByAgent(events, context.selectedAgent);
-  
-  
+
   // 2. Process streaming tokens (merge AGENT_TOKEN into AGENT_STREAMING)
   const processedEvents = processStreamingTokens(filteredEvents);
-  
+
   // 3. Convert to TimelineEntry format
   return processedEvents.map((event, index) => convertEvent(event, index, context));
 }
@@ -34,12 +33,12 @@ function filterEventsByAgent(events: SessionEvent[], selectedAgent?: ThreadId): 
     return events;
   }
 
-  return events.filter(event => {
+  return events.filter((event) => {
     // Always show user messages and system messages
     if (event.type === 'USER_MESSAGE' || event.type === 'LOCAL_SYSTEM_MESSAGE') {
       return true;
     }
-    
+
     // Show events from the selected agent's thread
     return event.threadId === selectedAgent;
   });
@@ -54,10 +53,11 @@ function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
       // Accumulate tokens by threadId
       const key = event.threadId;
       const existing = streamingMessages.get(key);
-      
+
       if (existing) {
         existing.content += event.data.token;
-        existing.timestamp = event.timestamp instanceof Date ? event.timestamp : new Date(event.timestamp);
+        existing.timestamp =
+          event.timestamp instanceof Date ? event.timestamp : new Date(event.timestamp);
       } else {
         streamingMessages.set(key, {
           content: event.data.token,
@@ -95,13 +95,19 @@ function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
 
   // Sort by timestamp to maintain chronological order
   return processed.sort((a, b) => {
-    const aTime = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
-    const bTime = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
+    const aTime =
+      a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
+    const bTime =
+      b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
     return aTime - bTime;
   });
 }
 
-function convertEvent(event: SessionEvent, index: number, context: ConversionContext): TimelineEntry {
+function convertEvent(
+  event: SessionEvent,
+  index: number,
+  context: ConversionContext
+): TimelineEntry {
   const agent = getAgentName(event.threadId, context.agents);
   const timestamp = event.timestamp instanceof Date ? event.timestamp : new Date(event.timestamp);
   const id = `${event.threadId}-${timestamp.getTime()}-${index}`;
@@ -162,6 +168,22 @@ function convertEvent(event: SessionEvent, index: number, context: ConversionCon
         timestamp,
       };
 
+    case 'SYSTEM_PROMPT':
+      return {
+        id,
+        type: 'admin',
+        content: `System prompt loaded`,
+        timestamp,
+      };
+
+    case 'USER_SYSTEM_PROMPT':
+      return {
+        id,
+        type: 'admin',
+        content: `User instructions loaded`,
+        timestamp,
+      };
+
     default:
       // Fallback for unknown events
       return {
@@ -174,17 +196,15 @@ function convertEvent(event: SessionEvent, index: number, context: ConversionCon
 }
 
 function getAgentName(threadId: ThreadId, agents: Agent[]): string {
-  const agent = agents.find(a => a.threadId === threadId);
+  const agent = agents.find((a) => a.threadId === threadId);
   if (agent) return agent.name;
-  
+
   // Fallback: extract from threadId
   const parts = String(threadId).split('.');
   if (parts.length > 1) {
     const agentPart = parts.pop();
     // Handle both agent-X and X-agent patterns
-    const cleanAgentPart = agentPart
-      ?.replace(/^agent-/, '')
-      ?.replace(/-agent$/, '') || 'unknown';
+    const cleanAgentPart = agentPart?.replace(/^agent-/, '')?.replace(/-agent$/, '') || 'unknown';
     return `Agent ${cleanAgentPart}`;
   }
   return 'Agent';
@@ -194,10 +214,10 @@ function formatToolResult(result: unknown): string {
   if (typeof result === 'string') {
     return result;
   }
-  
+
   if (result && typeof result === 'object') {
     return JSON.stringify(result, null, 2);
   }
-  
+
   return String(result);
 }
