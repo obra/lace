@@ -86,7 +86,7 @@ export async function POST(
     const userMessageEvent: SessionEvent = {
       type: 'USER_MESSAGE' as const,
       threadId,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
       data: { content: body.message },
     };
     sseManager.broadcast(sessionId, userMessageEvent);
@@ -108,8 +108,8 @@ export async function POST(
         const errorEvent: SessionEvent = {
           type: 'LOCAL_SYSTEM_MESSAGE' as const,
           threadId,
-          timestamp: new Date().toISOString(),
-          data: { message: `Error: ${errorMessage}` },
+          timestamp: new Date(),
+          data: { content: `Error: ${errorMessage}` },
         };
         sseManager.broadcast(sessionId, errorEvent);
       });
