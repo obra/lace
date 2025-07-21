@@ -644,7 +644,7 @@ export function LaceApp() {
         </motion.div>
 
         {/* Content Area */}
-        <div className="flex-1 flex flex-col text-base-content">{/* Remove centering for chat interface */}
+        <div className="flex-1 flex flex-col min-h-0 text-base-content">{/* Remove centering for chat interface */}
           {loadingProjects ? (
             <div className="flex-1 flex items-center justify-center p-6">
               <div className="flex items-center gap-2">

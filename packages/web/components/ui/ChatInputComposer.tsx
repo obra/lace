@@ -130,7 +130,7 @@ export default function ChatInputComposer({
         : placeholder;
 
   return (
-    <div className="relative bg-base-100 border-t border-base-300 p-4">
+    <div className="relative">
       {/* Mobile Status Bar */}
       {disabled && (
         <div className="flex items-center justify-center text-xs text-base-content/60 mb-3 lg:hidden">
