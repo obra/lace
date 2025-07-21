@@ -4,14 +4,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
+import { BaseMockProvider } from '~/test-utils-dir/base-mock-provider';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { Tool } from '~/tools/tool';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Mock provider that can emit retry events
 class MockRetryProvider extends BaseMockProvider {

@@ -7,11 +7,8 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { ProviderResponse } from '~/providers/base-provider';
 import { logger } from '~/utils/logger';
-import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { BaseMockProvider } from '~/test-utils-dir/base-mock-provider';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Mock provider that returns predictable responses for stable testing
 class MockConversationProvider extends BaseMockProvider {

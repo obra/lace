@@ -5,12 +5,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
-import { TestProvider } from '~/__tests__/utils/test-provider';
+import { TestProvider } from '~/test-utils-dir/test-provider';
 import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';

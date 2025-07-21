@@ -3,15 +3,12 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent';
-import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
+import { BaseMockProvider } from '~/test-utils-dir/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Type helper for accessing private methods in tests
 type AgentWithPrivateMethods = Agent & {

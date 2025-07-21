@@ -8,10 +8,7 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { AnthropicProvider } from '~/providers/anthropic-provider';
 import type { AIProvider } from '~/providers/base-provider';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Note: Tool approval is not yet implemented in lace
 // When it is, subagent tool calls should use the same approval flow
@@ -21,8 +18,7 @@ vi.mock('~/providers/anthropic-provider');
 vi.mock('~/providers/lmstudio-provider');
 vi.mock('~/providers/ollama-provider');
 
-// Mock the Agent
-vi.mock('~/agents/agent');
+// DO NOT MOCK: Agent - this is core business logic we need to test
 
 describe('DelegateTool', () => {
   let tool: DelegateTool;

@@ -4,10 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolResult } from '~/tools/types';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 describe('Thread Compaction', () => {
   let threadManager: ThreadManager;

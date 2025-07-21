@@ -3,17 +3,14 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, AgentConfig, AgentState } from '~/agents/agent';
-import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
+import { BaseMockProvider } from '~/test-utils-dir/base-mock-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
 import { ToolCall, ToolResult, ToolContext } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
 import { ThreadManager } from '~/threads/thread-manager';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {

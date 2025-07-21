@@ -2,7 +2,7 @@
 // ABOUTME: Extend this class in tests to avoid boilerplate
 
 import { AIProvider } from '~/providers/base-provider';
-import { mockProviderMethods } from '~/__tests__/utils/mock-provider-methods';
+import { mockProviderMethods } from '~/test-utils-dir/mock-provider-methods';
 
 export abstract class BaseMockProvider extends AIProvider {
   // Add mock provider methods as bound arrow functions

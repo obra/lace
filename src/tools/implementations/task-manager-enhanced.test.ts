@@ -4,10 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Task, TaskNote } from '~/tools/implementations/task-manager/types';
 import { createThreadId, createNewAgentSpec, isAssigneeId } from '~/threads/types';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 describe('Enhanced Task Data Model', () => {
   let testTask: Task;

@@ -13,7 +13,7 @@ import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '~/projects/project';
 import { asThreadId } from '@/lib/server/core-types';
 
-// ✅ ESSENTIAL MOCK - Next.js server-side module compatibility in test environment  
+// ✅ ESSENTIAL MOCK - Next.js server-side module compatibility in test environment
 // Required for Next.js framework compatibility during testing
 vi.mock('server-only', () => ({}));
 
@@ -371,7 +371,7 @@ describe('Session Detail API Route', () => {
   });
 
   describe('TDD: Direct Session Data Access', () => {
-    it('should call Session.getSession() directly instead of sessionService.getSessionData()', async () => {
+    it('should return session data when session exists', async () => {
       // This test verifies that PATCH route uses Session.getSession() directly
       // instead of going through sessionService.getSessionData()
 
@@ -389,7 +389,9 @@ describe('Session Detail API Route', () => {
       };
 
       // This should spy on the core Session.getSession() method being called directly
-      const sessionGetSpy = vi.spyOn(Session, 'getSession').mockReturnValue(mockDirectSessionData as never);
+      const sessionGetSpy = vi
+        .spyOn(Session, 'getSession')
+        .mockReturnValue(mockDirectSessionData as never);
 
       // Create a real session first for the route to work with
       const testProject = Project.create('TDD Test Project', '/test/path', 'TDD test project', {});

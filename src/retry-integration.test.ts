@@ -6,10 +6,7 @@ import { Agent } from '~/agents/agent';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { AIProvider } from '~/providers/base-provider';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 describe('Retry System Integration Tests', () => {
   let agent: Agent;
@@ -194,23 +191,7 @@ describe('Retry System Integration Tests', () => {
       );
     });
 
-    it('should verify UI theme includes retry symbols', async () => {
-      // Import the UI theme and verify retry symbols are defined
-      const { UI_SYMBOLS } = await import('./interfaces/terminal/theme');
-
-      expect(UI_SYMBOLS.RETRY).toBeDefined();
-      expect(typeof UI_SYMBOLS.RETRY).toBe('string');
-      expect(UI_SYMBOLS.RETRY.length).toBeGreaterThan(0);
-    });
-
-    it('should verify StatusBar component accepts retry status', async () => {
-      // Import StatusBar and verify it accepts retry status props
-      const StatusBarModule = await import('./interfaces/terminal/components/status-bar');
-
-      // This test verifies the component exists and can be imported
-      // The actual functionality is tested in the component-specific tests
-      expect(StatusBarModule.default).toBeDefined();
-    });
+    // Terminal interface tests removed - UI no longer exists
 
     it('should verify all provider tests include retry functionality', async () => {
       // This test validates that all providers have retry test files

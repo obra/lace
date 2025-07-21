@@ -7,12 +7,9 @@ import { Agent } from '~/agents/agent';
 import { ToolExecutor } from '~/tools/executor';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { BashTool } from '~/tools/implementations/bash';
-import { TestProvider } from '~/__tests__/utils/test-provider';
+import { TestProvider } from '~/test-utils-dir/test-provider';
 import { logger } from '~/utils/logger';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';

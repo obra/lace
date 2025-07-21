@@ -1,5 +1,40 @@
 # Test Remediation Plan - Detailed Task Breakdown
 
+## ⚠️ AUDIT RESULTS - CRITICAL ISSUES REMAINING
+
+**Status as of 2025-07-21:** Phases 1-4 are **INCOMPLETE**. Major violations still exist.
+
+### 🚨 Critical Failures Found
+
+**126 files still have mock interaction testing** - widespread violation of core principle.
+
+#### Core Business Logic Still Mocked (CRITICAL)
+- `src/app.test.ts:27-29` - **STILL mocks Agent, ThreadManager, ToolExecutor**
+- `src/tools/delegate.test.ts:25` - **STILL mocks Agent it should test**
+- `src/cli-flow.test.ts` - **STILL mocks Agent**
+
+#### File Organization Incomplete
+- `src/__tests__/` and `src/tools/__tests__/` directories **STILL EXIST**
+- **Terminal interface NOT REMOVED** - `src/interfaces/terminal/` still exists
+- 20+ terminal test files remain
+
+#### Implementation-Focused Test Names Still Present
+- `"should call Session.getSession() directly..."` - tests implementation details
+- `"should call onClose when close button clicked"` - tests prop callbacks
+- Multiple "should call X" patterns remain
+
+### Success Criteria Status
+| Criteria | Status | Evidence |
+|----------|--------|----------|
+| ✅ All tests pass | **PASS** | Exit code 0, 3.8s execution |
+| ❌ Zero mocks of business logic | **CRITICAL FAIL** | Still mocking core components |
+| ❌ Terminal interface removed | **FAIL** | `src/interfaces/terminal/` exists |
+| ❌ Colocated test pattern | **FAIL** | `__tests__/` directories remain |
+| ❌ Behavior-focused names | **FAIL** | "should call X" patterns remain |
+| ✅ API tests use real HTTP | **PASS** | Web package fixed |
+
+---
+
 ## Overview
 
 This plan fixes fundamental testing issues in the Lace codebase by eliminating mocks that test mock behavior instead of real functionality, reorganizing test files, and establishing proper testing patterns.
@@ -13,30 +48,36 @@ This plan fixes fundamental testing issues in the Lace codebase by eliminating m
 
 ## Phase 1: Cleanup & Reorganization
 
-### Task 1.1: Remove Terminal Interface Tests
+### Task 1.1: Remove Terminal Interface Tests ❌ INCOMPLETE
 **Files to delete:**
 ```bash
-rm -rf src/interfaces/terminal/__tests__/
+rm -rf src/interfaces/terminal/
 ```
 
-**Why:** We're moving to web-only interface. Terminal tests are no longer needed.
+**ISSUE FOUND:** The entire terminal interface directory still exists, not just tests.
+
+**Why:** We're moving to web-only interface. Terminal interface is no longer needed.
 
 **Test it:** Run `npm test` - should have fewer test files, no terminal-related failures.
 
-**Commit:** `refactor: remove terminal interface tests - web interface only`
+**Commit:** `refactor: remove terminal interface - web interface only`
 
-### Task 1.2: Move Tests to Colocated Pattern
+### Task 1.2: Move Tests to Colocated Pattern ❌ INCOMPLETE
 **What to do:** Move all `__tests__/` directory tests to colocated pattern.
+
+**ISSUE FOUND:** These directories still exist:
+- `src/__tests__/` - Should be moved to colocated pattern
+- `src/tools/__tests__/` - Should be moved to colocated pattern
 
 **Example transformation:**
 ```
-BEFORE:
-src/agents/__tests__/agent.test.ts
-src/threads/__tests__/thread-manager.test.ts
+BEFORE (STILL EXISTS):
+src/__tests__/setup.ts → src/test-setup.ts
+src/tools/__tests__/temp-utils.ts → src/tools/temp-utils.ts
 
-AFTER:  
-src/agents/agent.test.ts
-src/threads/thread-manager.test.ts
+AFTER (TARGET):  
+src/agents/agent.test.ts (already done)
+src/threads/thread-manager.test.ts (already done)
 ```
 
 **Script to help:**
@@ -58,25 +99,35 @@ done
 
 **Commit:** `refactor: move tests to colocated pattern`
 
-### Task 1.3: Rename Tests with Behavior Focus
+### Task 1.3: Rename Tests with Behavior Focus ❌ INCOMPLETE
 **Pattern:** Change implementation-focused names to behavior-focused names.
 
-**Examples:**
+**ISSUES FOUND:** These bad test names still exist:
 ```typescript
-// ❌ Before
-it('should call updateSession with correct params', () => {});
+// ❌ packages/web/app/api/sessions/[sessionId]/route.test.ts:374
+"should call Session.getSession() directly instead of sessionService.getSessionData()"
 
-// ✅ After  
-it('should save updated session name and reflect in session list', () => {});
+// ❌ packages/web/components/TaskDetailModal.test.tsx:71  
+"should call onClose when close button clicked"
+
+// ❌ packages/web/components/TaskDetailModal.test.tsx:214
+"should call onDelete when delete button clicked"
+```
+
+**Fix these to:**
+```typescript
+// ✅ Better names that describe behavior
+"should return session data when session exists"
+"should close modal when close button clicked"  
+"should remove task when delete button clicked"
 ```
 
 **Files to check:** Every `.test.ts` and `.test.tsx` file.
 
-**How to find bad names:**
+**How to find remaining bad names:**
 ```bash
 # Find tests with implementation-focused names
-grep -r "should call\|should invoke\|toHaveBeenCalled" src --include="*.test.*"
-grep -r "should mock\|mock.*called" src --include="*.test.*"
+grep -r "should call\|should invoke" . --include="*.test.*" | grep -v node_modules
 ```
 
 **Test it:** Read test names aloud - they should describe user-observable behavior.
@@ -139,11 +190,89 @@ vi.mock('fs/promises', () => ({
 
 ## Phase 3: Core Logic De-mocking
 
-### Task 3.1: Fix Service Layer Tests
+### Task 3.1: Fix Service Layer Tests ✅ COMPLETED
 **High priority files:**
-- `packages/web/lib/server/session-service.test.ts`
-- `src/agents/agent.test.ts` 
-- `src/threads/thread-manager.test.ts`
+- `packages/web/lib/server/session-service.test.ts` ✅ DONE
+- `src/agents/agent.test.ts` ❌ **CRITICAL ISSUE REMAINS**
+- `src/threads/thread-manager.test.ts` ❌ **CRITICAL ISSUE REMAINS**
+
+### 🚨 URGENT: Fix Core Business Logic Mocks
+
+#### Task 3.1.1: Fix src/app.test.ts - CRITICAL
+**File:** `src/app.test.ts` **Lines 27-29**
+
+**ISSUE:** Still mocks the core components it should test:
+```typescript
+// ❌ CRITICAL VIOLATION - REMOVE THESE MOCKS
+vi.mock('~/agents/agent');
+vi.mock('~/threads/thread-manager'); 
+vi.mock('~/tools/executor');
+```
+
+**Problem:** Tests mock orchestration instead of real app initialization.
+
+**Fix:** Remove these mocks and test real app behavior:
+```typescript
+// ✅ Test real app initialization
+it('should initialize app with real components', async () => {
+  // Use real persistence setup
+  setupTestPersistence();
+  
+  // Mock only external dependencies
+  vi.mocked(getEnvVar).mockImplementation((key) => {
+    if (key === 'ANTHROPIC_KEY') return 'test-key';
+    return undefined;
+  });
+  
+  // Test real app initialization - no component mocks
+  await run(mockCliOptions);
+  
+  // Verify real behavior, not mock calls
+  expect(/* real observable outcomes */).toBe(/* expected */);
+});
+```
+
+#### Task 3.1.2: Fix src/tools/delegate.test.ts - CRITICAL  
+**File:** `src/tools/delegate.test.ts` **Line 25**
+
+**ISSUE:** Still mocks the Agent it should delegate to:
+```typescript
+// ❌ CRITICAL VIOLATION - REMOVE THIS MOCK
+vi.mock('~/agents/agent');
+```
+
+**Fix:** Use real Agent for delegation testing:
+```typescript  
+// ✅ Test real delegation behavior
+it('should create real subagent and delegate task', async () => {
+  // Use real Agent with mock provider (external dependency only)
+  const realAgent = new Agent({
+    provider: mockProvider,
+    threadManager: new ThreadManager(),
+    toolExecutor: new ToolExecutor(),
+    threadId: 'parent-thread'
+  });
+  
+  const tool = new DelegateTool();
+  tool.setDependencies(realAgent, mockToolExecutor);
+  
+  const result = await tool.execute({
+    task: 'Write a function that adds two numbers',
+    instructions: 'Use TypeScript'
+  });
+  
+  // Verify real delegation occurred
+  expect(result.success).toBe(true);
+  expect(result.output).toContain('function add');
+});
+```
+
+#### Task 3.1.3: Fix src/cli-flow.test.ts - CRITICAL
+**File:** `src/cli-flow.test.ts`
+
+**ISSUE:** Still mocks Agent system.
+
+**Fix:** Remove Agent mocks, test real CLI flow.
 
 **Pattern to fix:**
 ```typescript
@@ -241,6 +370,30 @@ it('should return file contents when file exists', async () => {
 **Test it:** Tool tests should verify outputs and error handling.
 
 **Commit after each tool:** `refactor: test file tool outputs not implementation calls`
+
+### 🚨 URGENT: Eliminate Mock Interaction Testing 
+**ISSUE:** 126 files still contain `toHaveBeenCalled` assertions - testing mock interactions instead of real behavior.
+
+**High priority files to fix:**
+- `src/app.test.ts` - Remove all mock verification assertions
+- `src/tools/delegate.test.ts` - Remove `expect(mockAgent.createDelegateAgent).toHaveBeenCalled()`  
+- `src/providers/*.test.ts` - Many files test provider mock calls instead of provider behavior
+
+**Pattern to eliminate:**
+```typescript
+// ❌ REMOVE - Tests mock interaction
+expect(mockService.create).toHaveBeenCalledWith(data);
+expect(mockAgent.sendMessage).toHaveBeenCalledWith('hello');
+
+// ✅ REPLACE - Tests actual behavior
+expect(result.id).toBeDefined();
+expect(agentState).toBe('thinking');
+```
+
+**Action required:**
+1. Find all files: `find . -name "*.test.*" | xargs grep -l "toHaveBeenCalled"`
+2. Replace mock interaction tests with behavior tests
+3. Focus on observable outcomes, not internal method calls
 
 ## Phase 4: API & Service Layer Testing
 

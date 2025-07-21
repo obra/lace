@@ -5,10 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
 import { Agent } from '~/agents/agent';
 import { EventEmitter } from 'events';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 describe('NonInteractiveInterface Race Condition', () => {
   beforeEach(() => {

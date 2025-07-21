@@ -2,7 +2,7 @@
 // ABOUTME: Tests tool approval flags, validation, and error cases with TDD approach
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { withConsoleCapture } from '~/__tests__/setup/console-capture';
+import { withConsoleCapture } from '~/test-setup-dir/console-capture';
 import { parseArgs, showHelp } from '~/cli/args';
 
 describe('CLI Arguments (Commander-based)', () => {

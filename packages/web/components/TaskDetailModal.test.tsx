@@ -68,7 +68,7 @@ describe('TaskDetailModal', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('should call onClose when close button clicked', () => {
+  it('should close modal when close button clicked', () => {
     const onClose = vi.fn();
     const { container } = render(
       <TaskDetailModal
@@ -211,7 +211,7 @@ describe('TaskDetailModal', () => {
     });
   });
 
-  it('should call onDelete when delete button clicked', () => {
+  it('should remove task when delete button clicked', () => {
     const onDelete = vi.fn();
     render(
       <TaskDetailModal

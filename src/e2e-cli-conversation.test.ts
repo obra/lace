@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { runCLI } from '~/__tests__/helpers/cli-runner';
+import { runCLI } from '~/test-helpers/cli-runner';
 
 describe('CLI Conversation Tests', () => {
   let testDir: string;

@@ -14,7 +14,7 @@ export default defineConfig({
       exclude: ['node_modules/', 'dist/', '**/*.test.ts', '**/*.spec.ts'],
     },
     environment: 'jsdom', // Default to jsdom for React components
-    setupFiles: ['./src/__tests__/setup.ts'],
+    setupFiles: ['./src/test-setup.ts'],
     env: {
       // Disable colors in test environment to ensure consistent output
       NO_COLOR: '1',
@@ -28,7 +28,7 @@ export default defineConfig({
         include: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
         exclude: ['packages/**'],
         environment: 'jsdom',
-        setupFiles: ['./src/__tests__/setup.ts'],
+        setupFiles: ['./src/test-setup.ts'],
       },
     },
   ],

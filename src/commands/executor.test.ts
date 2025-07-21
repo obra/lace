@@ -6,10 +6,7 @@ import { CommandExecutor } from '~/commands/executor';
 import { CommandRegistry } from '~/commands/registry';
 import type { Command, UserInterface } from '~/commands/types';
 import type { Agent } from '~/agents/agent';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 describe('CommandExecutor', () => {
   let registry: CommandRegistry;

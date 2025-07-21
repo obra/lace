@@ -5,11 +5,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
 import type { Agent } from '~/agents/agent';
 import { EventEmitter } from 'events';
-import { withConsoleCapture } from '~/__tests__/setup/console-capture';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { withConsoleCapture } from '~/test-setup-dir/console-capture';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Mock dependencies
 

@@ -15,18 +15,13 @@ import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface'
 // Don't import TerminalInterface at top level - it loads React/Ink
 import { createGlobalPolicyCallback } from '~/tools/policy-wrapper';
 import { OllamaProvider } from '~/providers/ollama-provider';
-import { withConsoleCapture } from '~/__tests__/setup/console-capture';
+import { withConsoleCapture } from '~/test-setup-dir/console-capture';
 import { resetPersistence } from '~/persistence/database';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock external dependencies at the module level
-vi.mock('~/agents/agent');
-vi.mock('~/threads/thread-manager');
-vi.mock('~/tools/executor');
+// DO NOT MOCK: Agent, ThreadManager, ToolExecutor - these are core business logic we need to test
 // Use real temporary directory instead of mocking lace-dir - tests real file system behavior
 // Mock env-loader to control environment variables in tests without affecting actual environment
 vi.mock('~/config/env-loader');
@@ -38,13 +33,7 @@ vi.mock('~/interfaces/non-interactive-interface', () => ({
     executePrompt: vi.fn().mockResolvedValue(undefined),
   })),
 }));
-vi.mock('~/interfaces/terminal/terminal-interface', () => ({
-  TerminalInterface: vi.fn(() => ({
-    startInteractive: vi.fn().mockResolvedValue(undefined),
-    stop: vi.fn().mockResolvedValue(undefined),
-    requestApproval: vi.fn(),
-  })),
-}));
+// Terminal interface removed - no longer needed
 vi.mock('~/tools/policy-wrapper');
 
 // Mock providers - these need to be dynamic imports for the app.ts to work
@@ -456,26 +445,11 @@ describe('App Initialization (run function)', () => {
     expect(process.exit).toHaveBeenCalledWith(0);
   });
 
-  it('should start interactive mode if no prompt is given', async () => {
-    const { TerminalInterface } = await import('~/interfaces/terminal/terminal-interface');
+  it('should exit with help message if no prompt is given', async () => {
+    // App now defaults to non-interactive mode and shows help
     await run(mockCliOptions);
-    expect(TerminalInterface).toHaveBeenCalledWith(expect.any(Agent));
-    const mockInstance = vi.mocked(TerminalInterface).mock.results[0]?.value as {
-      startInteractive: ReturnType<typeof vi.fn>;
-    };
-    expect(mockInstance.startInteractive).toHaveBeenCalledTimes(1);
+    expect(process.exit).toHaveBeenCalledWith(0);
   });
 
-  it('should set global policy callback on tool executor', async () => {
-    const mockPolicyCallback = { requestApproval: vi.fn() };
-    vi.mocked(createGlobalPolicyCallback).mockReturnValue(mockPolicyCallback);
-    await run(mockCliOptions);
-    expect(vi.mocked(createGlobalPolicyCallback)).toHaveBeenCalledWith(
-      expect.any(Object), // Mocked TerminalInterface instance
-      mockCliOptions,
-      expect.any(ToolExecutor) // Agent's toolExecutor
-    );
-    const agentInstance = vi.mocked(Agent).mock.results[0].value as Agent;
-    expect(agentInstance.toolExecutor.setApprovalCallback).toHaveBeenCalledWith(mockPolicyCallback);
-  });
+  // Policy callback test removed - no longer used in non-interactive mode
 });

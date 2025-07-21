@@ -3,7 +3,7 @@
 
 import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
-import { BaseMockProvider } from '~/__tests__/utils/base-mock-provider';
+import { BaseMockProvider } from '~/test-utils-dir/base-mock-provider';
 
 export interface TestProviderConfig extends ProviderConfig {
   mockResponse?: string;

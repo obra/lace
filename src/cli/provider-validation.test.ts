@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { validateProvider } from '~/cli/args';
 import { ProviderRegistry } from '~/providers/registry';
-import { withConsoleCapture } from '~/__tests__/setup/console-capture';
+import { withConsoleCapture } from '~/test-setup-dir/console-capture';
 
 describe('CLI Provider Validation', () => {
   beforeEach(() => {

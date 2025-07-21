@@ -7,7 +7,7 @@ import { FileReadTool } from '~/tools/implementations/file-read';
 import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
-import { createTestTempDir } from '~/tools/__tests__/test-utils';
+import { createTestTempDir } from '~/tools/test-utils';
 
 describe('ToolExecutor with new schema-based tools', () => {
   const tempDir = createTestTempDir();

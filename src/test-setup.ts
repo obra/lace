@@ -5,7 +5,7 @@ import { afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
 // Import console capture setup (runs global beforeEach/afterEach)
-import '~/__tests__/setup/console-capture';
+import '~/test-setup-dir/console-capture';
 
 // Cleanup after each test
 afterEach(() => {

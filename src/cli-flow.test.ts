@@ -6,20 +6,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { withConsoleCapture } from '~/__tests__/setup/console-capture';
+import { withConsoleCapture } from '~/test-setup-dir/console-capture';
 import { run } from '~/app';
 import { CLIOptions } from '~/cli/args';
 import { Agent } from '~/agents/agent';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock all external dependencies
-vi.mock('~/agents/agent');
-vi.mock('~/threads/thread-manager');
-vi.mock('~/tools/executor');
+// DO NOT MOCK: Agent, ThreadManager, ToolExecutor - these are core business logic we need to test
 // Use real temporary directory instead of mocking lace-dir - tests real file system behavior
 // Mock env-loader to control environment variables in tests without affecting actual environment
 vi.mock('~/config/env-loader');
@@ -27,7 +22,7 @@ vi.mock('~/config/env-loader');
 vi.mock('~/utils/logger');
 vi.mock('~/utils/traffic-logger');
 vi.mock('~/interfaces/non-interactive-interface');
-vi.mock('~/interfaces/terminal/terminal-interface');
+// Terminal interface removed - no longer needed
 vi.mock('~/tools/policy-wrapper');
 
 // Mock providers with realistic behavior
@@ -113,9 +108,7 @@ describe('CLI Flow Tests', () => {
     const { NonInteractiveInterface } = vi.mocked(
       await import('~/interfaces/non-interactive-interface')
     );
-    const { TerminalInterface } = vi.mocked(
-      await import('~/interfaces/terminal/terminal-interface')
-    );
+    // TerminalInterface removed - app now defaults to non-interactive
     const { createGlobalPolicyCallback } = vi.mocked(await import('~/tools/policy-wrapper'));
 
     // Mock environment variables
@@ -185,7 +178,7 @@ describe('CLI Flow Tests', () => {
 
     // Mock interfaces
     NonInteractiveInterface.prototype.executePrompt = vi.fn().mockResolvedValue(undefined);
-    TerminalInterface.prototype.startInteractive = vi.fn().mockResolvedValue(undefined);
+    // TerminalInterface removed - app now defaults to non-interactive
 
     // Mock logger
     logger.configure = vi.fn();
@@ -393,16 +386,10 @@ describe('CLI Flow Tests', () => {
       expect(process.exit).toHaveBeenCalledWith(0);
     });
 
-    it('should use TerminalInterface for interactive mode', async () => {
-      const { TerminalInterface } = vi.mocked(
-        await import('~/interfaces/terminal/terminal-interface')
-      );
-
+    it('should exit with help message in non-interactive mode', async () => {
+      // App now defaults to non-interactive mode and shows help
       await run(mockCliOptions);
-
-      expect(TerminalInterface).toHaveBeenCalledWith(expect.any(Object));
-      const startInteractiveSpy = vi.mocked(TerminalInterface.prototype.startInteractive);
-      expect(startInteractiveSpy).toHaveBeenCalled();
+      expect(process.exit).toHaveBeenCalledWith(0);
     });
   });
 
