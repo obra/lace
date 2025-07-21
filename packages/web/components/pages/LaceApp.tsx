@@ -766,7 +766,7 @@ export function LaceApp() {
             </div>
           ) : (
             /* Project Selection Panel - When no project selected */
-            <div className="flex-1 p-6">
+            <div className="flex-1 p-6 min-h-0">
               <ProjectSelectorPanel
                 projects={projectsForSidebar}
                 selectedProject={currentProject.id ? currentProject : null}

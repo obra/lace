@@ -55,9 +55,9 @@ export function ProjectSelectorPanel({
   };
 
   return (
-    <div className="bg-base-100 rounded-lg border border-base-300 p-6">
+    <div className="bg-base-100 rounded-lg border border-base-300 p-6 flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-semibold text-base-content">Select Project</h1>
           <p className="text-base-content/60 mt-1">
@@ -79,7 +79,7 @@ export function ProjectSelectorPanel({
 
       {/* Search */}
       {projects.length > 6 && (
-        <div className="mb-6">
+        <div className="mb-6 flex-shrink-0">
           <input
             type="text"
             placeholder="Search projects..."
@@ -90,44 +90,45 @@ export function ProjectSelectorPanel({
         </div>
       )}
 
-      {/* Projects Grid */}
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="flex items-center gap-3">
-            <div className="loading loading-spinner loading-md"></div>
-            <span>Loading projects...</span>
+      {/* Projects Grid - Scrollable */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="flex items-center gap-3">
+              <div className="loading loading-spinner loading-md"></div>
+              <span>Loading projects...</span>
+            </div>
           </div>
-        </div>
-      ) : filteredProjects.length === 0 ? (
-        <div className="text-center py-12">
-          {projects.length === 0 ? (
-            <>
-              <FontAwesomeIcon icon={faFolder} className="w-16 h-16 text-base-content/20 mb-4" />
-              <h3 className="text-lg font-medium text-base-content mb-2">No Projects Yet</h3>
-              <p className="text-base-content/60 mb-6">
-                Create your first project to start working with AI agents
-              </p>
-              {onProjectCreate && (
-                <button
-                  onClick={onProjectCreate}
-                  className="btn btn-primary"
-                >
-                  <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-                  Create First Project
-                </button>
-              )}
-            </>
-          ) : (
-            <>
-              <h3 className="text-lg font-medium text-base-content mb-2">No matching projects</h3>
-              <p className="text-base-content/60">
-                Try adjusting your search terms
-              </p>
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        ) : filteredProjects.length === 0 ? (
+          <div className="text-center py-12">
+            {projects.length === 0 ? (
+              <>
+                <FontAwesomeIcon icon={faFolder} className="w-16 h-16 text-base-content/20 mb-4" />
+                <h3 className="text-lg font-medium text-base-content mb-2">No Projects Yet</h3>
+                <p className="text-base-content/60 mb-6">
+                  Create your first project to start working with AI agents
+                </p>
+                {onProjectCreate && (
+                  <button
+                    onClick={onProjectCreate}
+                    className="btn btn-primary"
+                  >
+                    <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
+                    Create First Project
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <h3 className="text-lg font-medium text-base-content mb-2">No matching projects</h3>
+                <p className="text-base-content/60">
+                  Try adjusting your search terms
+                </p>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 pb-4">
           {filteredProjects.map((project) => (
             <div
               key={project.id}
@@ -196,8 +197,9 @@ export function ProjectSelectorPanel({
               )}
             </div>
           ))}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
