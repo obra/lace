@@ -416,6 +416,26 @@ export function LaceApp() {
     setEvents([]);
   };
 
+  // Handle project updates (archive/unarchive)
+  const handleProjectUpdate = async (projectId: string, updates: { isArchived?: boolean; name?: string; description?: string }) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      
+      if (res.ok) {
+        // Reload projects to reflect the changes
+        void loadProjects();
+      } else {
+        console.error('Failed to update project');
+      }
+    } catch (error) {
+      console.error('Failed to update project:', error);
+    }
+  };
+
   // Convert projects to format expected by Sidebar
   const currentProject = selectedProject 
     ? projects.find(p => p.id === selectedProject) || { id: '', name: 'Unknown', workingDirectory: '/' }
@@ -426,10 +446,10 @@ export function LaceApp() {
     name: p.name,
     workingDirectory: p.workingDirectory,
     description: p.description,
-    isArchived: false,
-    createdAt: new Date(),
-    lastUsedAt: new Date(),
-    sessionCount: 0,
+    isArchived: p.isArchived || false,
+    createdAt: new Date(p.createdAt),
+    lastUsedAt: new Date(p.lastUsedAt),
+    sessionCount: p.sessionCount || 0,
   }));
 
   // These timeline variables are no longer needed with the new composable sidebar
@@ -771,6 +791,7 @@ export function LaceApp() {
                 projects={projectsForSidebar}
                 selectedProject={currentProject.id ? currentProject : null}
                 onProjectSelect={handleProjectSelect}
+                onProjectUpdate={handleProjectUpdate}
                 loading={loadingProjects}
               />
             </div>
