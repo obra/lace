@@ -10,6 +10,7 @@ import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/[sessionId]/history/route';
 import { getSessionService } from '@/lib/server/session-service';
 import type { SessionEvent, ApiErrorResponse } from '@/types/api';
+import { asThreadId } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
   teardownTestPersistence,
@@ -121,10 +122,10 @@ describe('Session History API', () => {
     it('should return conversation history through the API route', async () => {
       // Test that the route properly calls the session service and returns data
       // We don't need to add specific messages - just verify the route works end-to-end
-      const session = await sessionService.getSession(realSessionId);
+      const session = await sessionService.getSession(asThreadId(realSessionId));
       expect(session).toBeDefined();
 
-      const agent = session!.getAgent(realSessionId);
+      const agent = session!.getAgent(asThreadId(realSessionId));
       expect(agent).toBeDefined();
 
       const request = new NextRequest(`http://localhost/api/sessions/${realSessionId}/history`);

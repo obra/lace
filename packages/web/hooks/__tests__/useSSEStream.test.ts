@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useSSEStream } from '@/hooks/useSSEStream';
-import type { ThreadId } from '@/types/api';
+import { asThreadId, type ThreadId } from '@/lib/server/core-types';
 
 // Track created EventSource instances
 let eventSourceInstances: MockEventSource[] = [];
@@ -101,7 +101,7 @@ describe('useSSEStream', () => {
   });
 
   it('should connect when sessionId is provided', async () => {
-    const sessionId = 'lace_20250113_test123' as ThreadId;
+    const sessionId = asThreadId('lace_20250113_test123');
     const { result } = renderHook(() => useSSEStream(sessionId));
 
     await waitFor(() => {
@@ -112,7 +112,7 @@ describe('useSSEStream', () => {
   });
 
   it('should handle incoming events', async () => {
-    const sessionId = 'lace_20250113_test123' as ThreadId;
+    const sessionId = asThreadId('lace_20250113_test123');
     const { result } = renderHook(() => useSSEStream(sessionId));
 
     await waitFor(() => {
@@ -154,7 +154,7 @@ describe('useSSEStream', () => {
   });
 
   it('should clear events when requested', async () => {
-    const sessionId = 'lace_20250113_test123' as ThreadId;
+    const sessionId = asThreadId('lace_20250113_test123');
     const { result } = renderHook(() => useSSEStream(sessionId));
 
     await waitFor(() => {
@@ -183,7 +183,7 @@ describe('useSSEStream', () => {
   });
 
   it('should handle connection errors', async () => {
-    const sessionId = 'lace_20250113_test123' as ThreadId;
+    const sessionId = asThreadId('lace_20250113_test123');
 
     // Mock EventSource to simulate error
     class ErrorEventSource extends MockEventSource {
@@ -213,9 +213,9 @@ describe('useSSEStream', () => {
   });
 
   it('should disconnect when sessionId becomes null', async () => {
-    const sessionId = 'lace_20250113_test123' as ThreadId;
+    const sessionId = asThreadId('lace_20250113_test123');
     const { result, rerender } = renderHook(({ id }: { id: ThreadId | null }) => useSSEStream(id), {
-      initialProps: { id: sessionId },
+      initialProps: { id: sessionId } as { id: ThreadId | null },
     });
 
     await waitFor(() => {
@@ -223,7 +223,7 @@ describe('useSSEStream', () => {
     });
 
     // Change sessionId to null
-    rerender({ id: null });
+    rerender({ id: null as ThreadId | null });
 
     await waitFor(() => {
       expect(result.current.connected).toBe(false);
@@ -231,8 +231,8 @@ describe('useSSEStream', () => {
   });
 
   it('should reconnect when changing sessionId', async () => {
-    const sessionId1 = 'lace_20250113_test123' as ThreadId;
-    const sessionId2 = 'lace_20250113_test456' as ThreadId;
+    const sessionId1 = asThreadId('lace_20250113_test123');
+    const sessionId2 = asThreadId('lace_20250113_test456');
 
     const { result, rerender } = renderHook(({ id }) => useSSEStream(id), {
       initialProps: { id: sessionId1 },
@@ -268,7 +268,7 @@ describe('useSSEStream', () => {
   });
 
   it('should handle all event types', async () => {
-    const sessionId = 'lace_20250113_test123' as ThreadId;
+    const sessionId = asThreadId('lace_20250113_test123');
     const { result } = renderHook(() => useSSEStream(sessionId));
 
     await waitFor(() => {
@@ -305,7 +305,7 @@ describe('useSSEStream', () => {
   });
 
   it('should clean up on unmount', async () => {
-    const sessionId = 'lace_20250113_test123' as ThreadId;
+    const sessionId = asThreadId('lace_20250113_test123');
     const { unmount } = renderHook(() => useSSEStream(sessionId));
 
     await waitFor(() => {

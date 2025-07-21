@@ -10,6 +10,7 @@ import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/threads/[threadId]/message/route';
 import type { MessageResponse } from '@/types/api';
 import { Project } from '@/lib/server/lace-imports';
+import { asThreadId } from '@/lib/server/core-types';
 import { getSessionService } from '@/lib/server/session-service';
 import {
   setupTestPersistence,
@@ -176,7 +177,7 @@ describe('Thread Messaging API', () => {
 
   it('should work with delegate agents', async () => {
     // Create a delegate agent
-    const session = await sessionService.getSession(realSessionId);
+    const session = await sessionService.getSession(asThreadId(realSessionId));
     expect(session).toBeDefined();
 
     const delegateAgent = session!.spawnAgent('Test Delegate');
@@ -212,8 +213,8 @@ describe('Thread Messaging API', () => {
     expect(response.status).toBe(202);
 
     // Verify agent is running after message
-    const session = await sessionService.getSession(realSessionId);
-    const agent = session!.getAgent(realThreadId);
+    const session = await sessionService.getSession(asThreadId(realSessionId));
+    const agent = session!.getAgent(asThreadId(realThreadId));
     expect(agent!.isRunning).toBe(true);
   });
 });

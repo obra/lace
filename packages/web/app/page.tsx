@@ -38,10 +38,13 @@ export default function Home() {
 
   // Convert SessionEvents to TimelineEntries for the design system
   const timelineEntries = useMemo(() => {
-    return convertSessionEventsToTimeline(events, {
+    
+    const entries = convertSessionEventsToTimeline(events, {
       agents: selectedSessionDetails?.agents || [],
       selectedAgent,
     });
+    
+    return entries;
   }, [events, selectedSessionDetails?.agents, selectedAgent]);
 
   const loadSessions = useCallback(async () => {

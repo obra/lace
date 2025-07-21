@@ -2,7 +2,8 @@
 // ABOUTME: Comprehensive TDD tests for timeline converter functionality
 
 import { describe, test, expect } from 'vitest';
-import type { SessionEvent, Agent, ThreadId } from '@/types/api';
+import type { SessionEvent, Agent } from '@/types/api';
+import { asThreadId, type ThreadId } from '@/lib/server/core-types';
 import { 
   convertSessionEventsToTimeline,
   type ConversionContext 
@@ -10,7 +11,7 @@ import {
 
 const mockAgents: Agent[] = [
   {
-    threadId: 'session-123.agent-1' as ThreadId,
+    threadId: asThreadId('session-123.agent-1'),
     name: 'Claude',
     provider: 'anthropic',
     model: 'claude-3-sonnet',
@@ -18,7 +19,7 @@ const mockAgents: Agent[] = [
     createdAt: '2025-07-21T10:00:00Z',
   },
   {
-    threadId: 'session-123.agent-2' as ThreadId,
+    threadId: asThreadId('session-123.agent-2'),
     name: 'GPT-4',
     provider: 'openai',
     model: 'gpt-4',
@@ -30,19 +31,19 @@ const mockAgents: Agent[] = [
 const mockSessionEvents: SessionEvent[] = [
   {
     type: 'USER_MESSAGE',
-    threadId: 'session-123' as ThreadId,
+    threadId: asThreadId('session-123'),
     timestamp: new Date('2025-07-21T10:30:00Z'),
     data: { content: 'Hello, can you help me with TypeScript?' },
   },
   {
     type: 'AGENT_MESSAGE',
-    threadId: 'session-123.agent-1' as ThreadId,
+    threadId: asThreadId('session-123.agent-1'),
     timestamp: new Date('2025-07-21T10:30:30Z'),
     data: { content: 'Of course! I\'d be happy to help you with TypeScript.' },
   },
   {
     type: 'TOOL_CALL',
-    threadId: 'session-123.agent-1' as ThreadId,
+    threadId: asThreadId('session-123.agent-1'),
     timestamp: new Date('2025-07-21T10:31:00Z'),
     data: {
       toolName: 'file_read',
@@ -51,7 +52,7 @@ const mockSessionEvents: SessionEvent[] = [
   },
   {
     type: 'TOOL_RESULT',
-    threadId: 'session-123.agent-1' as ThreadId,
+    threadId: asThreadId('session-123.agent-1'),
     timestamp: new Date('2025-07-21T10:31:15Z'),
     data: {
       toolName: 'file_read',
@@ -60,13 +61,13 @@ const mockSessionEvents: SessionEvent[] = [
   },
   {
     type: 'THINKING',
-    threadId: 'session-123.agent-1' as ThreadId,
+    threadId: asThreadId('session-123.agent-1'),
     timestamp: new Date('2025-07-21T10:31:30Z'),
     data: { status: 'start' },
   },
   {
     type: 'LOCAL_SYSTEM_MESSAGE',
-    threadId: 'session-123' as ThreadId,
+    threadId: asThreadId('session-123'),
     timestamp: new Date('2025-07-21T10:32:00Z'),
     data: { content: 'Connected to session stream' },
   },
@@ -165,7 +166,7 @@ describe('convertSessionEventsToTimeline', () => {
   test('filters events by selected agent', () => {
     const contextWithSelectedAgent: ConversionContext = {
       ...defaultContext,
-      selectedAgent: 'session-123.agent-1' as ThreadId,
+      selectedAgent: asThreadId('session-123.agent-1'),
     };
     
     const result = convertSessionEventsToTimeline(mockSessionEvents, contextWithSelectedAgent);
@@ -186,19 +187,19 @@ describe('convertSessionEventsToTimeline', () => {
     const streamingEvents: SessionEvent[] = [
       {
         type: 'AGENT_TOKEN',
-        threadId: 'session-123.agent-1' as ThreadId,
+        threadId: asThreadId('session-123.agent-1'),
         timestamp: new Date('2025-07-21T10:35:00Z'),
         data: { token: 'Hello ' },
       },
       {
         type: 'AGENT_TOKEN',
-        threadId: 'session-123.agent-1' as ThreadId,
+        threadId: asThreadId('session-123.agent-1'),
         timestamp: new Date('2025-07-21T10:35:01Z'),
         data: { token: 'there!' },
       },
       {
         type: 'AGENT_MESSAGE',
-        threadId: 'session-123.agent-1' as ThreadId,
+        threadId: asThreadId('session-123.agent-1'),
         timestamp: new Date('2025-07-21T10:35:02Z'),
         data: { content: 'Hello there!' },
       },
@@ -221,13 +222,13 @@ describe('convertSessionEventsToTimeline', () => {
     const incompleteStreamingEvents: SessionEvent[] = [
       {
         type: 'AGENT_TOKEN',
-        threadId: 'session-123.agent-1' as ThreadId,
+        threadId: asThreadId('session-123.agent-1'),
         timestamp: new Date('2025-07-21T10:36:00Z'),
         data: { token: 'Hello ' },
       },
       {
         type: 'AGENT_TOKEN',
-        threadId: 'session-123.agent-1' as ThreadId,
+        threadId: asThreadId('session-123.agent-1'),
         timestamp: new Date('2025-07-21T10:36:01Z'),
         data: { token: 'incomplete...' },
       },
@@ -252,7 +253,7 @@ describe('convertSessionEventsToTimeline', () => {
     for (let i = 0; i < 150; i++) {
       manyTokenEvents.push({
         type: 'AGENT_TOKEN',
-        threadId: 'session-123.agent-1' as ThreadId,
+        threadId: asThreadId('session-123.agent-1'),
         timestamp: new Date(`2025-07-21T10:40:${String(i).padStart(2, '0')}Z`),
         data: { token: `token${i} ` },
       });
@@ -268,7 +269,7 @@ describe('convertSessionEventsToTimeline', () => {
     const unknownAgentEvent: SessionEvent[] = [
       {
         type: 'AGENT_MESSAGE',
-        threadId: 'session-123.unknown-agent' as ThreadId,
+        threadId: asThreadId('session-123.unknown-agent'),
         timestamp: new Date('2025-07-21T10:37:00Z'),
         data: { content: 'Message from unknown agent' },
       },
@@ -308,10 +309,10 @@ describe('convertSessionEventsToTimeline', () => {
   test('handles unknown event types gracefully', () => {
     const unknownEvent = {
       type: 'UNKNOWN_EVENT_TYPE',
-      threadId: 'session-123' as ThreadId,
+      threadId: asThreadId('session-123'),
       timestamp: new Date('2025-07-21T10:38:00Z'),
       data: { someData: 'test' },
-    } as SessionEvent; // Cast to SessionEvent to test fallback handling
+    } as unknown as SessionEvent; // Cast to SessionEvent to test fallback handling
 
     const result = convertSessionEventsToTimeline([unknownEvent], defaultContext);
     

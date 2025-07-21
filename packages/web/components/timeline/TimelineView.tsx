@@ -19,6 +19,7 @@ export function TimelineView({
   streamingContent,
 }: TimelineViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  
 
   useEffect(() => {
     if (containerRef.current) {
@@ -29,6 +30,11 @@ export function TimelineView({
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto overscroll-contain">
       <div className="p-4 space-y-4 pb-32">
+        {entries.length === 0 && (
+          <div className="text-gray-400 text-center py-8">
+            No conversation data loaded. {entries.length} entries.
+          </div>
+        )}
         {entries.map((entry) => (
           <TimelineMessage key={entry.id} entry={entry} />
         ))}

@@ -231,7 +231,7 @@ describe('Session.spawnAgent Method', () => {
     const agentThreadId = agent.threadId;
 
     // Verify agent is accessible in the current session
-    const currentAgent = session.getAgent(agentThreadId);
+    const currentAgent = session.getAgent(asThreadId(agentThreadId));
     expect(currentAgent).toBeDefined();
     expect(currentAgent?.threadId).toBe(agentThreadId);
 

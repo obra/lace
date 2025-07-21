@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/route';
 import type { Session } from '@/types/api';
 import type { ThreadId } from '@/lib/validation/schemas';
+import { asThreadId } from '@/lib/server/core-types';
 import type { SessionService } from '@/lib/server/session-service';
 import {
   setupTestPersistence,
@@ -15,7 +16,7 @@ import {
 // Test data factory functions
 function createMockSession(overrides: Partial<Session> = {}): Session {
   return {
-    id: 'lace_20240101_abcd12' as ThreadId,
+    id: asThreadId('lace_20240101_abcd12'),
     name: 'Test Session',
     createdAt: '2024-01-01T12:00:00Z',
     agents: [],
@@ -25,7 +26,7 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 
 function createMockAgent(overrides: Partial<Session['agents'][0]> = {}): Session['agents'][0] {
   return {
-    threadId: 'lace_20240101_abcd12.1' as ThreadId,
+    threadId: asThreadId('lace_20240101_abcd12.1'),
     name: 'Test Agent',
     provider: 'anthropic',
     model: 'claude-3-opus',
@@ -75,17 +76,17 @@ describe('Session API Routes', () => {
     it('should list all sessions', async () => {
       const mockSessions: Session[] = [
         createMockSession({
-          id: 'lace_20240101_abcd12' as ThreadId,
+          id: asThreadId('lace_20240101_abcd12'),
           name: 'Session 1',
           createdAt: '2024-01-01T12:00:00Z',
         }),
         createMockSession({
-          id: 'lace_20240101_efgh56' as ThreadId,
+          id: asThreadId('lace_20240101_efgh56'),
           name: 'Session 2',
           createdAt: '2024-01-01T13:00:00Z',
           agents: [
             createMockAgent({
-              threadId: 'lace_20240101_efgh56.1' as ThreadId,
+              threadId: asThreadId('lace_20240101_efgh56.1'),
               name: 'Agent 1',
               createdAt: '2024-01-01T13:01:00Z',
             }),

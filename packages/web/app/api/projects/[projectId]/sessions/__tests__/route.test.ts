@@ -1,10 +1,6 @@
 // ABOUTME: Test suite for session API endpoints under projects hierarchy
 // ABOUTME: Tests CRUD operations with proper project-session relationships and validation
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-
 import { NextRequest } from 'next/server';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GET, POST } from '@/app/api/projects/[projectId]/sessions/route';
