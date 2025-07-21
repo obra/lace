@@ -34,6 +34,11 @@ export function LaceApp() {
   // UI State (from AnimatedLaceApp but remove demo data)
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [showDesktopSidebar, setShowDesktopSidebar] = useState(true);
+  
+  // Debug: Track sidebar state changes
+  useEffect(() => {
+    console.log('showDesktopSidebar changed to:', showDesktopSidebar);
+  }, [showDesktopSidebar]);
 
   // Business Logic State (from current app/page.tsx)
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
@@ -235,7 +240,7 @@ export function LaceApp() {
       eventSource.removeEventListener('connection', connectionListener);
       eventSource.close();
     };
-  }, [selectedAgent, loadSessionDetails]);
+  }, [selectedAgent, selectedSession]);
 
   async function loadConversationHistory(sessionId: ThreadId) {
     try {
@@ -323,8 +328,10 @@ export function LaceApp() {
 
   // Handle agent selection within a session
   const handleAgentSelect = (agentThreadId: string) => {
+    console.log('handleAgentSelect called:', agentThreadId, 'showDesktopSidebar:', showDesktopSidebar);
     setSelectedAgent(agentThreadId as ThreadId);
     setEvents([]);
+    console.log('handleAgentSelect completed, showDesktopSidebar should still be:', showDesktopSidebar);
   };
 
   // Convert projects to format expected by Sidebar
@@ -483,12 +490,12 @@ export function LaceApp() {
         )}
       </AnimatePresence>
 
-      {/* Desktop Sidebar - copy structure from AnimatedLaceApp */}
-      <motion.div
-        initial={{ x: showDesktopSidebar ? 0 : -320 }}
-        animate={{ x: showDesktopSidebar ? 0 : -320 }}
-        className="hidden lg:block"
-      >
+      {/* Desktop Sidebar */}
+      <div className="h-full">
+        {/* Debug info - Add more debugging */}
+        <div className="fixed top-0 left-0 bg-red-500 text-white p-2 z-50 text-xs">
+          Sidebar: {showDesktopSidebar ? 'VISIBLE' : 'HIDDEN'} | Agent: {selectedAgent || 'none'} | Session: {selectedSession || 'none'}
+        </div>
         <Sidebar
           isOpen={showDesktopSidebar}
           onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
@@ -596,7 +603,7 @@ export function LaceApp() {
             </SidebarSection>
           )}
         </Sidebar>
-      </motion.div>
+      </div>
 
       {/* Main Content - copy structure from AnimatedLaceApp */}
       <motion.div className="flex-1 flex flex-col min-w-0">
@@ -620,16 +627,19 @@ export function LaceApp() {
         </motion.div>
 
         {/* Content Area */}
-        <div className="flex-1 flex items-center justify-center text-base-content p-6">
+        <div className="flex-1 flex flex-col text-base-content">{/* Remove centering for chat interface */}
           {loadingProjects ? (
-            <div className="flex items-center gap-2">
-              <div className="loading loading-spinner loading-md"></div>
-              <span>Loading projects...</span>
+            <div className="flex-1 flex items-center justify-center p-6">
+              <div className="flex items-center gap-2">
+                <div className="loading loading-spinner loading-md"></div>
+                <span>Loading projects...</span>
+              </div>
             </div>
           ) : selectedProject ? (
             creatingSession ? (
               // Session creation form
-              <div className="w-full max-w-md">
+              <div className="flex-1 flex items-center justify-center p-6">
+                <div className="w-full max-w-md">
                 <div className="bg-base-100 rounded-lg shadow-lg p-6">
                   <h2 className="text-xl font-semibold mb-4">Create New Session</h2>
                   <p className="text-base-content/60 mb-6">
@@ -676,9 +686,10 @@ export function LaceApp() {
                     </div>
                   </div>
                 </div>
+                </div>
               </div>
             ) : selectedAgent ? (
-              <>
+              <div className="flex-1 flex flex-col min-h-0">
                 {/* Conversation Display */}
                 <TimelineView
                   entries={timelineEntries}
@@ -690,7 +701,7 @@ export function LaceApp() {
                 <motion.div
                   initial={{ y: 100, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
-                  className="sticky bottom-0 bg-base-200 border-t border-base-300 p-4"
+                  className="flex-shrink-0 bg-base-200 border-t border-base-300 p-4"
                 >
                   <EnhancedChatInput
                     value={message}
@@ -703,44 +714,54 @@ export function LaceApp() {
                     placeholder={`Message ${selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'agent'}...`}
                   />
                 </motion.div>
-              </>
+              </div>
             ) : selectedSession ? (
-              <div className="text-center space-y-2">
-                <h2 className="text-lg font-medium">Session: {sessions.find(s => s.id === selectedSession)?.name}</h2>
-                <p className="text-base-content/60">Select an agent from the sidebar to continue</p>
-                <div className="text-sm text-base-content/40">
-                  {selectedSessionDetails?.agents?.length || 0} agent{(selectedSessionDetails?.agents?.length || 0) !== 1 ? 's' : ''} available
+              <div className="flex-1 flex items-center justify-center p-6">
+                <div className="text-center space-y-2">
+                  <h2 className="text-lg font-medium">Session: {sessions.find(s => s.id === selectedSession)?.name}</h2>
+                  <p className="text-base-content/60">Select an agent from the sidebar to continue</p>
+                  <div className="text-sm text-base-content/40">
+                    {selectedSessionDetails?.agents?.length || 0} agent{(selectedSessionDetails?.agents?.length || 0) !== 1 ? 's' : ''} available
+                  </div>
                 </div>
               </div>
             ) : sessions.length === 0 ? (
-              <div className="text-center space-y-2">
-                <h2 className="text-lg font-medium">Project: {currentProject.name}</h2>
-                <p className="text-base-content/60">No sessions found</p>
-                <button 
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setCreatingSession(true)}
-                >
-                  Create Session
-                </button>
+              <div className="flex-1 flex items-center justify-center p-6">
+                <div className="text-center space-y-2">
+                  <h2 className="text-lg font-medium">Project: {currentProject.name}</h2>
+                  <p className="text-base-content/60">No sessions found</p>
+                  <button 
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setCreatingSession(true)}
+                  >
+                    Create Session
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="text-center space-y-2">
-                <h2 className="text-lg font-medium">Project: {currentProject.name}</h2>
-                <p className="text-base-content/60">Select a session from the sidebar to continue</p>
-                <div className="text-sm text-base-content/40">
-                  {sessions.length} session{sessions.length !== 1 ? 's' : ''} available
+              <div className="flex-1 flex items-center justify-center p-6">
+                <div className="text-center space-y-2">
+                  <h2 className="text-lg font-medium">Project: {currentProject.name}</h2>
+                  <p className="text-base-content/60">Select a session from the sidebar to continue</p>
+                  <div className="text-sm text-base-content/40">
+                    {sessions.length} session{sessions.length !== 1 ? 's' : ''} available
+                  </div>
                 </div>
               </div>
             )
           ) : projects.length === 0 ? (
-            <div className="text-center space-y-2">
-              <h2 className="text-lg font-medium">No Projects Found</h2>
-              <p className="text-base-content/60">Create a project to get started</p>
+            <div className="flex-1 flex items-center justify-center p-6">
+              <div className="text-center space-y-2">
+                <h2 className="text-lg font-medium">No Projects Found</h2>
+                <p className="text-base-content/60">Create a project to get started</p>
+              </div>
             </div>
           ) : (
-            <div className="text-center space-y-2">
-              <h2 className="text-lg font-medium">Select a Project</h2>
-              <p className="text-base-content/60">Choose a project from the sidebar to continue</p>
+            <div className="flex-1 flex items-center justify-center p-6">
+              <div className="text-center space-y-2">
+                <h2 className="text-lg font-medium">Select a Project</h2>
+                <p className="text-base-content/60">Choose a project from the sidebar to continue</p>
+              </div>
             </div>
           )}
         </div>
