@@ -38,10 +38,26 @@ export default function Home() {
 
   // Convert SessionEvents to TimelineEntries for the design system
   const timelineEntries = useMemo(() => {
+    console.log('🔄 Timeline entries recalculation:', {
+      totalEvents: events.length,
+      selectedAgent,
+      availableAgents: selectedSessionDetails?.agents?.map(a => ({
+        name: a.name,
+        threadId: a.threadId
+      })) || []
+    });
     
     const entries = convertSessionEventsToTimeline(events, {
       agents: selectedSessionDetails?.agents || [],
       selectedAgent,
+    });
+    
+    console.log('✅ Timeline entries result:', {
+      totalEntries: entries.length,
+      entryTypes: entries.reduce((acc, e) => {
+        acc[e.type] = (acc[e.type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>)
     });
     
     return entries;
@@ -453,13 +469,11 @@ export default function Home() {
                     {selectedAgent ? (
                       <>
                         {/* Conversation Display */}
-                        <div className="flex-1 overflow-hidden">
-                          <TimelineView
-                            entries={timelineEntries}
-                            isTyping={loading}
-                            currentAgent={selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'Agent'}
-                          />
-                        </div>
+                        <TimelineView
+                          entries={timelineEntries}
+                          isTyping={loading}
+                          currentAgent={selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'Agent'}
+                        />
 
                         {/* Message Input at Bottom */}
                         <div className="border-t border-gray-700 p-4 bg-gray-800">

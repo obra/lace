@@ -15,7 +15,7 @@ const mockAgents: Agent[] = [
     name: 'Claude',
     provider: 'anthropic',
     model: 'claude-3-sonnet',
-    status: 'active',
+    status: 'idle',
     createdAt: '2025-07-21T10:00:00Z',
   },
   {
@@ -23,7 +23,7 @@ const mockAgents: Agent[] = [
     name: 'GPT-4',
     provider: 'openai',
     model: 'gpt-4',
-    status: 'active',
+    status: 'idle',
     createdAt: '2025-07-21T10:05:00Z',
   },
 ];

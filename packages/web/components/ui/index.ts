@@ -5,6 +5,7 @@ export { default as SkeletonLoader } from './SkeletonLoader';
 export { default as IconButton } from './IconButton';
 export { default as StatusDot } from './StatusDot';
 export { default as Badge } from './Badge';
+export { default as LLMModelBadge } from './LLMModelBadge';
 export { default as ChatTextarea } from './ChatTextarea';
 export { default as VoiceButton } from './VoiceButton';
 export { default as SendButton } from './SendButton';

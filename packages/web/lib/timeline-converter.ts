@@ -1,5 +1,8 @@
 // ABOUTME: Converts SessionEvent arrays to TimelineEntry format for design system
 // ABOUTME: Handles event filtering, streaming token processing, and agent resolution
+// TODO: This adapter exists because we have an impedance mismatch between SessionEvent and TimelineEntry.
+// TODO: We should refactor to eliminate this conversion layer - either make TimelineEntry match SessionEvent
+// TODO: or standardize on one event format throughout the system to avoid this translation step.
 
 import type { SessionEvent, Agent, ThreadId } from '@/types/api';
 import type { TimelineEntry } from '@/types/design-system';
@@ -15,8 +18,17 @@ export function convertSessionEventsToTimeline(
   events: SessionEvent[],
   context: ConversionContext
 ): TimelineEntry[] {
-  // 1. Filter events by selected agent (preserve existing logic)
+  // 1. Filter events by selected agent
   const filteredEvents = filterEventsByAgent(events, context.selectedAgent);
+  
+  console.log('🎯 Agent Filtering:', {
+    selectedAgent: context.selectedAgent,
+    totalEvents: events.length,
+    filteredEvents: filteredEvents.length,
+    agentEvents: filteredEvents.filter(e => 
+      e.type === 'AGENT_MESSAGE' || e.type === 'TOOL_CALL' || e.type === 'TOOL_RESULT'
+    ).length
+  });
   
   // 2. Process streaming tokens (merge AGENT_TOKEN into AGENT_STREAMING)
   const processedEvents = processStreamingTokens(filteredEvents);
@@ -31,12 +43,7 @@ function filterEventsByAgent(events: SessionEvent[], selectedAgent?: ThreadId): 
   }
 
   return events.filter(event => {
-    // Always include user messages and system messages
-    if (event.type === 'USER_MESSAGE' || event.type === 'LOCAL_SYSTEM_MESSAGE') {
-      return true;
-    }
-
-    // Include events from the selected agent
+    // Only show events from the selected agent's thread - nothing else
     return event.threadId === selectedAgent;
   });
 }

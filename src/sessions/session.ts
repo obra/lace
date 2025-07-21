@@ -22,7 +22,6 @@ import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url-fetch';
 import { logger } from '~/utils/logger';
 import type { ApprovalCallback } from '~/tools/approval-types';
-import { randomUUID } from 'crypto';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 
 export interface SessionInfo {
@@ -72,7 +71,7 @@ export class Session {
 
     // Create session record in sessions table
     const sessionData = {
-      id: randomUUID(),
+      id: threadManager.generateThreadId(),
       projectId,
       name,
       description: '',

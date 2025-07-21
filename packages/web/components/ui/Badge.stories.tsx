@@ -120,10 +120,10 @@ export const Accent: Story = {
   },
 };
 
-export const Ghost: Story = {
+export const Outline: Story = {
   args: {
-    children: 'Ghost',
-    variant: 'ghost',
+    children: 'Outline',
+    variant: 'outline',
     size: 'md',
   },
 };
@@ -167,7 +167,7 @@ export const AllVariants: Story = {
       <Badge variant="primary">Primary</Badge>
       <Badge variant="secondary">Secondary</Badge>
       <Badge variant="accent">Accent</Badge>
-      <Badge variant="ghost">Ghost</Badge>
+      <Badge variant="outline">Outline</Badge>
     </div>
   ),
   parameters: {
@@ -230,7 +230,7 @@ export const InteractiveDemo: Story = {
         </div>
         
         <div className="text-center">
-          <Badge variant="ghost" size="lg" className="cursor-pointer">
+          <Badge variant="outline" size="lg" className="cursor-pointer">
             Amazing!
           </Badge>
           <p className="text-xs text-gray-500 mt-1">Ghost Badge</p>

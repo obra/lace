@@ -186,6 +186,7 @@ export default function ChatInputComposer({
               onDrop={handleDrop}
               className="pr-20"
               autoFocus={!disabled}
+              data-testid="message-input"
             />
 
             {/* Right Side Controls */}

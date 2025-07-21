@@ -139,7 +139,6 @@ export const WithClaudeBadge: Story = {
     role: 'assistant',
     badge: {
       text: 'Claude',
-      variant: 'claude',
     },
   },
 };
@@ -151,7 +150,6 @@ export const WithGPT4Badge: Story = {
     role: 'assistant',
     badge: {
       text: 'GPT-4',
-      variant: 'gpt-4',
     },
   },
 };
@@ -163,7 +161,6 @@ export const WithGeminiBadge: Story = {
     role: 'assistant',
     badge: {
       text: 'Gemini',
-      variant: 'gemini',
     },
   },
 };
@@ -267,19 +264,19 @@ export const AIAssistants: Story = {
         name="Claude"
         timestamp={new Date()}
         role="assistant"
-        badge={{ text: 'Claude', variant: 'claude' }}
+        badge={{ text: 'Claude' }}
       />
       <MessageHeader
         name="GPT-4"
         timestamp={new Date()}
         role="assistant"
-        badge={{ text: 'GPT-4', variant: 'gpt-4' }}
+        badge={{ text: 'GPT-4' }}
       />
       <MessageHeader
         name="Gemini"
         timestamp={new Date()}
         role="assistant"
-        badge={{ text: 'Gemini', variant: 'gemini' }}
+        badge={{ text: 'Gemini' }}
       />
     </div>
   ),
@@ -331,7 +328,7 @@ export const InteractiveDemo: Story = {
             name="GPT-4"
             timestamp={new Date(Date.now() - 1 * 60 * 1000)}
             role="assistant"
-            badge={{ text: 'GPT-4', variant: 'gpt-4' }}
+            badge={{ text: 'GPT-4' }}
           />
           <div className="mt-2 text-sm text-gray-600">
             GPT-4 with custom green badge styling

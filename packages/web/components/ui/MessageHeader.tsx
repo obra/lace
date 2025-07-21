@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Avatar } from '@/components/ui';
 import { formatTime } from '@/lib/format';
+import LLMModelBadge from './LLMModelBadge';
 
 interface MessageHeaderProps {
   name: string;
@@ -41,15 +42,14 @@ export default function MessageHeader({
         return `${baseClasses} bg-error/20 text-error`;
       case 'info':
         return `${baseClasses} bg-info/20 text-info`;
-      case 'claude':
-        return `${baseClasses} bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400`;
-      case 'gpt-4':
-        return `${baseClasses} bg-green-900/20 text-green-600 dark:bg-green-900/30 dark:text-green-400`;
-      case 'gemini':
-        return `${baseClasses} bg-blue-900/20 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400`;
       default:
         return `${baseClasses} bg-base-content/10 text-base-content/60`;
     }
+  };
+
+  const isLLMModel = (text: string) => {
+    const lowerText = text.toLowerCase();
+    return lowerText.includes('claude') || lowerText.includes('gpt') || lowerText.includes('gemini');
   };
 
   return (
@@ -67,9 +67,13 @@ export default function MessageHeader({
             {typeof timestamp === 'string' ? timestamp : formatTime(timestamp)}
           </span>
           {badge && (
-            <span className={badge.className || getBadgeClasses(badge.variant)}>
-              {badge.text}
-            </span>
+            isLLMModel(badge.text) ? (
+              <LLMModelBadge model={badge.text} className={badge.className} />
+            ) : (
+              <span className={badge.className || getBadgeClasses(badge.variant)}>
+                {badge.text}
+              </span>
+            )
           )}
         </div>
       </div>
