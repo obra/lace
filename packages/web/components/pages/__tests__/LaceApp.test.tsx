@@ -31,6 +31,9 @@ vi.mock('framer-motion', () => ({
 // Mock child components to avoid React import issues
 vi.mock('@/components/layout/Sidebar', () => ({
   Sidebar: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar">{children}</div>,
+  SidebarSection: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar-section">{children}</div>,
+  SidebarItem: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar-item">{children}</div>,
+  SidebarButton: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar-button">{children}</div>,
 }));
 
 vi.mock('@/components/layout/MobileSidebar', () => ({
@@ -43,6 +46,10 @@ vi.mock('@/components/timeline/TimelineView', () => ({
 
 vi.mock('@/components/chat/EnhancedChatInput', () => ({
   EnhancedChatInput: () => <div data-testid="chat-input">Chat Input</div>,
+}));
+
+vi.mock('@/components/modals/ToolApprovalModal', () => ({
+  ToolApprovalModal: () => <div data-testid="tool-approval-modal">Tool Approval Modal</div>,
 }));
 
 vi.mock('@/lib/timeline-converter', () => ({
