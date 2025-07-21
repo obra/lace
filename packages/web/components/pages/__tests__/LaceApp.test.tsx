@@ -1,4 +1,4 @@
-// ABOUTME: Unit tests for LaceAppWithDesignSystem component
+// ABOUTME: Unit tests for LaceApp component
 // ABOUTME: Tests component rendering, theme integration, and basic UI interactions
 
 /**
@@ -9,7 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { LaceAppWithDesignSystem } from '../LaceAppWithDesignSystem';
+import { LaceApp } from '../LaceApp';
 
 // Mock the theme context
 vi.mock('@/components/providers/ThemeProvider', () => ({
@@ -64,7 +64,7 @@ global.EventSource = vi.fn().mockImplementation(() => ({
   onerror: vi.fn(),
 }));
 
-describe('LaceAppWithDesignSystem', () => {
+describe('LaceApp', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (fetch as vi.MockedFunction<typeof fetch>).mockClear();
@@ -81,7 +81,7 @@ describe('LaceAppWithDesignSystem', () => {
   });
 
   it('renders without crashing', async () => {
-    render(<LaceAppWithDesignSystem />);
+    render(<LaceApp />);
     
     // Should show loading initially
     expect(screen.getByText('Loading projects...')).toBeInTheDocument();
@@ -92,14 +92,14 @@ describe('LaceAppWithDesignSystem', () => {
   });
 
   it('shows correct initial state in header', async () => {
-    render(<LaceAppWithDesignSystem />);
+    render(<LaceApp />);
     
     // Should show "Select a Project" initially
     expect(screen.getByText('Select a Project')).toBeInTheDocument();
   });
 
   it('has mobile navigation button', () => {
-    render(<LaceAppWithDesignSystem />);
+    render(<LaceApp />);
     
     // Should have a mobile navigation button (hamburger menu)
     const mobileNavButton = screen.getByRole('button');
@@ -107,7 +107,7 @@ describe('LaceAppWithDesignSystem', () => {
   });
 
   it('applies correct CSS classes for theme', () => {
-    const { container } = render(<LaceAppWithDesignSystem />);
+    const { container } = render(<LaceApp />);
     
     // Should have base theme classes
     const mainContainer = container.firstChild as HTMLElement;
@@ -115,7 +115,7 @@ describe('LaceAppWithDesignSystem', () => {
   });
 
   it('initializes with empty business logic state', async () => {
-    render(<LaceAppWithDesignSystem />);
+    render(<LaceApp />);
     
     // Component should render with loading state initially
     expect(screen.getByText('Loading projects...')).toBeInTheDocument();
@@ -143,7 +143,7 @@ describe('LaceAppWithDesignSystem', () => {
       json: () => Promise.resolve({ projects: mockProjects }),
     } as Response);
 
-    render(<LaceAppWithDesignSystem />);
+    render(<LaceApp />);
     
     // Should call projects API
     expect(fetch).toHaveBeenCalledWith('/api/projects');
