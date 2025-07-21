@@ -13,10 +13,12 @@ import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '~/projects/project';
 import { asThreadId } from '@/lib/server/core-types';
 
-// Mock external dependencies to avoid real API calls
+// ✅ ESSENTIAL MOCK - Next.js server-side module compatibility in test environment  
+// Required for Next.js framework compatibility during testing
 vi.mock('server-only', () => ({}));
 
-// Mock provider to avoid real API calls
+// ✅ ESSENTIAL MOCK - Provider registry to avoid real AI API calls during testing
+// Prevents external network dependencies while testing API route behavior
 vi.mock('~/providers/registry', () => ({
   ProviderRegistry: {
     createWithAutoDiscovery: vi.fn().mockReturnValue({

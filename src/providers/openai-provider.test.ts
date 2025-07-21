@@ -8,7 +8,8 @@ import { ToolResult, ToolContext } from '~/tools/types';
 import { z } from 'zod';
 import { StreamingEvents } from '~/providers/types';
 
-// Mock the OpenAI SDK
+// Mock external OpenAI SDK to avoid real API calls during tests
+// Tests focus on provider logic, not OpenAI API implementation
 const mockCreate = vi.fn();
 
 vi.mock('openai', () => {
@@ -23,7 +24,7 @@ vi.mock('openai', () => {
   };
 });
 
-// Mock logger
+// Mock logger to prevent test output noise and control log verification
 vi.mock('../../utils/logger.js', () => ({
   logger: {
     debug: vi.fn(),

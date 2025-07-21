@@ -9,7 +9,8 @@ import { ProviderMessage } from '~/providers/base-provider';
 const mockChat = vi.fn();
 const mockList = vi.fn();
 
-// Mock the Ollama SDK
+// Mock external Ollama SDK to avoid dependency on Ollama being installed/running locally
+// Tests focus on retry logic, not Ollama SDK implementation
 vi.mock('ollama', () => {
   const MockOllama = vi.fn().mockImplementation(() => ({
     chat: mockChat,

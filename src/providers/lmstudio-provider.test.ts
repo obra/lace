@@ -7,7 +7,8 @@ import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
 import { z } from 'zod';
 
-// Mock the LMStudio SDK
+// Mock external LMStudio SDK to avoid dependency on LMStudio being installed/running locally
+// Tests focus on provider logic, not LMStudio SDK implementation
 vi.mock('@lmstudio/sdk', () => {
   const mockModel = {
     port: {

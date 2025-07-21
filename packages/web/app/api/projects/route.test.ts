@@ -37,6 +37,9 @@ interface ErrorResponse {
   details?: unknown;
 }
 
+// ❌ PROBLEMATIC MOCK - This mocks the entire Project backend logic
+// Should use real Project class with test database for proper integration testing
+// Tests currently validate mock responses instead of actual API functionality
 vi.mock('@/lib/server/lace-imports', () => ({
   Project: {
     getAll: vi.fn(),

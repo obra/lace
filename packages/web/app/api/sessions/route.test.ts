@@ -42,7 +42,9 @@ const mockSessionService = {
   getSession: vi.fn<SessionService['getSession']>(),
 };
 
-// Mock the session service
+// ❌ PROBLEMATIC MOCK - This mocks business logic instead of testing real HTTP behavior
+// Should use real SessionService with test database for proper integration testing
+// Tests currently validate mock responses instead of actual API functionality
 vi.mock('@/lib/server/session-service', () => ({
   getSessionService: () => mockSessionService,
 }));
@@ -55,7 +57,8 @@ describe('Session API Routes', () => {
     setupTestPersistence();
     vi.clearAllMocks();
 
-    // Mock console methods to prevent stderr pollution during tests
+    // ✅ ESSENTIAL MOCK - Console suppression to prevent test output noise and control log verification
+    // These mocks are necessary for clean test output and error handling verification
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });

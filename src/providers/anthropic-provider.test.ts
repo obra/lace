@@ -9,7 +9,8 @@ import { z } from 'zod';
 import type Anthropic from '@anthropic-ai/sdk';
 import { StreamingEvents } from '~/providers/types';
 
-// Mock the Anthropic SDK
+// Mock external Anthropic SDK to avoid real API calls during tests
+// Tests focus on provider logic, not Anthropic API implementation
 const mockCreateResponse = vi.fn();
 const mockStreamResponse = vi.fn();
 
@@ -24,7 +25,7 @@ vi.mock('@anthropic-ai/sdk', () => {
   };
 });
 
-// Mock logger
+// Mock logger to prevent test output noise and control log verification
 vi.mock('../../utils/logger.js', () => ({
   logger: {
     debug: vi.fn(),

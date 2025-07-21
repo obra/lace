@@ -21,15 +21,16 @@ import {
   setupTestPersistence,
   teardownTestPersistence,
 } from '~/__tests__/setup/persistence-helper';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock external dependencies at the module level
 vi.mock('~/agents/agent');
 vi.mock('~/threads/thread-manager');
 vi.mock('~/tools/executor');
-vi.mock('~/config/lace-dir', () => ({
-  getLaceDbPath: vi.fn(() => '/mock/db/path'),
-}));
+// Use real temporary directory instead of mocking lace-dir - tests real file system behavior
+// Mock env-loader to control environment variables in tests without affecting actual environment
 vi.mock('~/config/env-loader');
+// Mock logger to prevent test output noise and control log verification
 vi.mock('~/utils/logger');
 vi.mock('~/utils/traffic-logger');
 vi.mock('~/interfaces/non-interactive-interface', () => ({
@@ -97,6 +98,8 @@ vi.mock('~/providers/ollama-provider', () => ({
 }));
 
 describe('App Initialization (run function)', () => {
+  const _tempLaceDir = useTempLaceDir();
+  
   const mockCliOptions: CLIOptions = {
     provider: 'anthropic',
     model: 'claude-3-opus',
