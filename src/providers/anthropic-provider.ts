@@ -87,13 +87,18 @@ export class AnthropicProvider extends AIProvider {
   get maxCompletionTokens(): number {
     const model = this.modelName.toLowerCase();
 
-    // Claude 3.5 and Claude 4 models support 8192 output tokens
+    // Claude 4 and Claude 3.7 models support 8192 output tokens
     if (
-      model.includes('claude-3-5') ||
       model.includes('claude-4') ||
       model.includes('claude-sonnet-4') ||
-      model.includes('claude-opus-4')
+      model.includes('claude-opus-4') ||
+      model.includes('claude-3-7')
     ) {
+      return 8192;
+    }
+
+    // Claude 3.5 models support 8192 output tokens
+    if (model.includes('claude-3-5')) {
       return 8192;
     }
 
@@ -394,23 +399,51 @@ export class AnthropicProvider extends AIProvider {
 
   getAvailableModels(): ModelInfo[] {
     return [
+      // Claude 4 Series (Latest - May 2025)
+      {
+        id: 'claude-sonnet-4-20250514',
+        displayName: 'Claude Sonnet 4',
+        description: 'Latest Sonnet model with hybrid reasoning capabilities',
+        contextWindow: 200000,
+        maxOutputTokens: 8192,
+        capabilities: ['vision', 'function-calling', 'reasoning'],
+        isDefault: true,
+      },
+      {
+        id: 'claude-opus-4-20250514',
+        displayName: 'Claude Opus 4',
+        description: 'World\'s best coding model with sustained performance',
+        contextWindow: 200000,
+        maxOutputTokens: 8192,
+        capabilities: ['vision', 'function-calling', 'coding', 'reasoning'],
+      },
+      // Claude 3.7 Series (February 2025)
+      {
+        id: 'claude-3-7-sonnet-20250224',
+        displayName: 'Claude 3.7 Sonnet',
+        description: 'Pioneering hybrid AI reasoning model',
+        contextWindow: 200000,
+        maxOutputTokens: 8192,
+        capabilities: ['vision', 'function-calling', 'reasoning'],
+      },
+      // Claude 3.5 Series (Current Generation)
       {
         id: 'claude-3-5-sonnet-20241022',
         displayName: 'Claude 3.5 Sonnet',
-        description: 'Most intelligent model, best for complex tasks',
+        description: 'High-performance model with enhanced capabilities',
         contextWindow: 200000,
         maxOutputTokens: 8192,
         capabilities: ['vision', 'function-calling'],
-        isDefault: true,
       },
       {
         id: 'claude-3-5-haiku-20241022',
         displayName: 'Claude 3.5 Haiku',
-        description: 'Fast and efficient for simple tasks',
+        description: 'Fast model matching Claude 3 Opus performance',
         contextWindow: 200000,
         maxOutputTokens: 8192,
         capabilities: ['function-calling'],
       },
+      // Claude 3 Series (Legacy)
       {
         id: 'claude-3-opus-20240229',
         displayName: 'Claude 3 Opus',

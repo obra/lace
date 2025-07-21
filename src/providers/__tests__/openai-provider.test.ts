@@ -71,7 +71,7 @@ describe('OpenAIProvider', () => {
     });
 
     it('should have correct default model', () => {
-      expect(provider.defaultModel).toBe('gpt-4o-mini');
+      expect(provider.defaultModel).toBe('gpt-4o');
     });
 
     it('should support streaming', () => {
@@ -114,7 +114,7 @@ describe('OpenAIProvider', () => {
         messages: Array<{ role: string; content: string }>;
         tools?: Array<{ type: string; function: { name: string } }>;
       };
-      expect(callArgs.model).toBe('gpt-4o-mini');
+      expect(callArgs.model).toBe('gpt-4o');
       expect(callArgs.max_tokens).toBe(4000);
       expect(callArgs.messages[0]).toEqual({ role: 'system', content: 'Test system prompt' });
       expect(callArgs.messages[1]).toEqual({ role: 'user', content: 'Hello' });
