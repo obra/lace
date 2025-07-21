@@ -174,6 +174,7 @@ describe('convertSessionEventsToTimeline', () => {
     
     const result = convertSessionEventsToTimeline(mockSessionEvents, contextWithSelectedAgent);
     
+    
     // Should include: user message + agent-1 messages, exclude agent-2 messages
     // Expecting: USER_MESSAGE, AGENT_MESSAGE, TOOL_CALL, TOOL_RESULT, THINKING, LOCAL_SYSTEM_MESSAGE
     expect(result).toHaveLength(6);

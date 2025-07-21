@@ -60,7 +60,7 @@ export async function POST(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    const agent = session.spawnAgent(body.name, body.provider, body.model);
+    const agent = await session.spawnAgent(body.name, body.provider, body.model);
 
     // Setup agent approvals using utility
     const { setupAgentApprovals } = await import('@/lib/server/agent-utils');

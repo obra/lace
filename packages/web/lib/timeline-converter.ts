@@ -35,7 +35,12 @@ function filterEventsByAgent(events: SessionEvent[], selectedAgent?: ThreadId): 
   }
 
   return events.filter(event => {
-    // Only show events from the selected agent's thread - nothing else
+    // Always show user messages and system messages
+    if (event.type === 'USER_MESSAGE' || event.type === 'LOCAL_SYSTEM_MESSAGE') {
+      return true;
+    }
+    
+    // Show events from the selected agent's thread
     return event.threadId === selectedAgent;
   });
 }
