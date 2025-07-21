@@ -11,10 +11,7 @@ import { GET } from '@/app/api/sessions/[sessionId]/history/route';
 import { getSessionService } from '@/lib/server/session-service';
 import type { SessionEvent, ApiErrorResponse } from '@/types/api';
 import { asThreadId } from '@/lib/server/core-types';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 import { Project } from '@/lib/server/lace-imports';
 
 interface HistoryResponse {

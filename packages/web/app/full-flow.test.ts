@@ -19,10 +19,7 @@ import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessi
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { GET as streamEvents } from '@/app/api/sessions/[sessionId]/events/stream/route';
 import type { ThreadId, Session } from '@/types/api';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 
@@ -122,7 +119,9 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ sessionId: sessionId as string }),
     });
     expect(agentResponse.status).toBe(201);
-    const agentData = (await agentResponse.json()) as { agent: { threadId: ThreadId; name: string } };
+    const agentData = (await agentResponse.json()) as {
+      agent: { threadId: ThreadId; name: string };
+    };
     expect(agentData.agent.name).toBe(agentName);
     const agentThreadId: ThreadId = agentData.agent.threadId as ThreadId;
 

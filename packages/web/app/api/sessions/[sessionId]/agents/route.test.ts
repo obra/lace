@@ -7,10 +7,7 @@ import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
 import type { ThreadId, Agent } from '@/types/api';
 // Import SessionService type is not needed since we define our own mock interface
 import type { Session } from '@/types/api';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Response types
 interface AgentResponse {
@@ -407,9 +404,7 @@ describe('Agent Spawning API', () => {
       });
 
       secondMockSession.spawnAgent.mockResolvedValue(secondAgent);
-      mockSessionService.getSession.mockResolvedValueOnce(
-        secondMockSession as unknown as Session
-      );
+      mockSessionService.getSession.mockResolvedValueOnce(secondMockSession as unknown as Session);
 
       const request2 = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
         method: 'POST',

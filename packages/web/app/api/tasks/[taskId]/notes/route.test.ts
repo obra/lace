@@ -1,16 +1,12 @@
 // ABOUTME: Unit tests for task notes API endpoints
 // ABOUTME: Tests adding notes to tasks
 
-
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/tasks/[taskId]/notes/route';
 import type { SessionService } from '@/lib/server/session-service';
 // Note: We can't import the actual Session class due to server-only restrictions in tests
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Helper function for tests to avoid server-only imports
 function createThreadId(id: string): import('@/types/api').ThreadId {
@@ -123,7 +119,9 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
+      const response = await POST(request, {
+        params: Promise.resolve({ taskId: 'task_20240101_abc123' }),
+      });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
@@ -139,7 +137,9 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
+      const response = await POST(request, {
+        params: Promise.resolve({ taskId: 'task_20240101_abc123' }),
+      });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(400);
@@ -182,8 +182,13 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
-      const data = (await response.json()) as { message: string; task: { notes: Array<{ content: string }> } };
+      const response = await POST(request, {
+        params: Promise.resolve({ taskId: 'task_20240101_abc123' }),
+      });
+      const data = (await response.json()) as {
+        message: string;
+        task: { notes: Array<{ content: string }> };
+      };
 
       expect(response.status).toBe(201);
       expect(data.message).toBe('Note added successfully');
@@ -210,7 +215,9 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_notfound' }) });
+      const response = await POST(request, {
+        params: Promise.resolve({ taskId: 'task_20240101_notfound' }),
+      });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(404);
@@ -254,7 +261,9 @@ describe('Task Notes API Routes', () => {
         }
       );
 
-      const response = await POST(request, { params: Promise.resolve({ taskId: 'task_20240101_abc123' }) });
+      const response = await POST(request, {
+        params: Promise.resolve({ taskId: 'task_20240101_abc123' }),
+      });
       const _data = (await response.json()) as { message: string };
 
       expect(response.status).toBe(201);

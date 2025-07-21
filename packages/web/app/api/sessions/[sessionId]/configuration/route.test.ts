@@ -6,10 +6,7 @@ import { NextRequest } from 'next/server';
 import { GET, PUT } from '@/app/api/sessions/[sessionId]/configuration/route';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Type interfaces for API responses
 interface ConfigurationResponse {
@@ -79,7 +76,9 @@ describe('Session Configuration API', () => {
 
     it('should return 404 when session not found', async () => {
       const request = new NextRequest('http://localhost/api/sessions/nonexistent/configuration');
-      const response = await GET(request, { params: Promise.resolve({ sessionId: 'nonexistent' }) });
+      const response = await GET(request, {
+        params: Promise.resolve({ sessionId: 'nonexistent' }),
+      });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);
@@ -91,7 +90,9 @@ describe('Session Configuration API', () => {
       const request = new NextRequest(
         'http://localhost/api/sessions/invalid-session-id/configuration'
       );
-      const response = await GET(request, { params: Promise.resolve({ sessionId: 'invalid-session-id' }) });
+      const response = await GET(request, {
+        params: Promise.resolve({ sessionId: 'invalid-session-id' }),
+      });
 
       // Should return 404 for non-existent session (which is the actual behavior)
       expect(response.status).toBe(404);
@@ -135,7 +136,9 @@ describe('Session Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, { params: Promise.resolve({ sessionId: 'nonexistent' }) });
+      const response = await PUT(request, {
+        params: Promise.resolve({ sessionId: 'nonexistent' }),
+      });
       const data = (await response.json()) as ErrorResponse;
 
       expect(response.status).toBe(404);

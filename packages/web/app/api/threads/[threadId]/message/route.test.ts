@@ -12,10 +12,7 @@ import type { MessageResponse } from '@/types/api';
 import { Project } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/lib/server/core-types';
 import { getSessionService } from '@/lib/server/session-service';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Mock SSE manager to capture events
 const mockSSEManager = {

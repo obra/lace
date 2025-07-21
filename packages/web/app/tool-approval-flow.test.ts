@@ -6,10 +6,7 @@ import { getSessionService } from '@/lib/server/session-service';
 import { getApprovalManager } from '@/lib/server/approval-manager';
 import { Agent, AgentEvents, ApprovalDecision, Project } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/lib/server/core-types';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';

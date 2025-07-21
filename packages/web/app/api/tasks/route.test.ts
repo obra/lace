@@ -5,10 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/tasks/route';
 import type { Task } from '@/types/api';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Mock environment variables - avoid requiring real API keys in tests
 vi.mock('~/config/env-loader', () => ({

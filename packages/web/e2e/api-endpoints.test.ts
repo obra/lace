@@ -7,10 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -100,7 +97,9 @@ describe('API Endpoints E2E Tests', () => {
         }),
       });
 
-      const response = await createProjectSession(request, { params: Promise.resolve({ projectId }) });
+      const response = await createProjectSession(request, {
+        params: Promise.resolve({ projectId }),
+      });
       expect(response.status).toBe(201);
 
       const responseData: unknown = await response.json();
@@ -248,7 +247,7 @@ describe('API Endpoints E2E Tests', () => {
       const responseData: unknown = await response.json();
       const data = responseData as { session: SessionType };
 
-      expect(data.session.agents || []).toHaveLength(2); // Coordinator + spawned agent  
+      expect(data.session.agents || []).toHaveLength(2); // Coordinator + spawned agent
       expect(data.session.agents?.find((a) => a.name === 'Reflected Agent')).toBeDefined();
     });
   });
@@ -363,7 +362,9 @@ describe('API Endpoints E2E Tests', () => {
         body: 'invalid json',
       });
 
-      const response = await createProjectSession(request, { params: Promise.resolve({ projectId }) });
+      const response = await createProjectSession(request, {
+        params: Promise.resolve({ projectId }),
+      });
       expect(response.status).toBe(500); // JSON parsing error is caught by outer try-catch
     });
 
