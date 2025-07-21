@@ -5,56 +5,24 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/tasks/route';
 import type { Task } from '@/types/api';
+import {
+  setupTestPersistence,
+  teardownTestPersistence,
+} from '~/__tests__/setup/persistence-helper';
 
-// Mock external dependencies (database persistence) but not business logic
-const projectStore = new Map<string, any>();
-const sessionStore = new Map<string, any>();
-
-vi.mock('~/persistence/database', () => {
-  return {
-    getPersistence: vi.fn(() => ({
-      // Project persistence methods
-      loadAllProjects: vi.fn(() => {
-        return Array.from(projectStore.values());
-      }),
-      loadProject: vi.fn((projectId: string) => {
-        return projectStore.get(projectId) || null;
-      }),
-      saveProject: vi.fn((project: any) => {
-        projectStore.set(project.id, project);
-      }),
-      loadSessionsByProject: vi.fn((projectId: string) => {
-        return Array.from(sessionStore.values()).filter((s) => s.projectId === projectId);
-      }),
-
-      // Session persistence methods
-      loadAllSessions: vi.fn(() => {
-        return Array.from(sessionStore.values());
-      }),
-      loadSession: vi.fn((sessionId: string) => {
-        return sessionStore.get(sessionId) || null;
-      }),
-      saveSession: vi.fn((session: any) => {
-        sessionStore.set(session.id, session);
-      }),
-
-      // Thread persistence methods (needed for session functionality)
-      loadThreadEvents: vi.fn(() => []),
-      saveThreadEvents: vi.fn(),
-      deleteThread: vi.fn(),
-    })),
-  };
-});
-
-// Mock ThreadManager for session management - external dependency
-vi.mock('~/threads/thread-manager', () => ({
-  ThreadManager: vi.fn(() => ({
-    getSessionsForProject: vi.fn(() => []), // Empty array for clean tests
-  })),
+// Mock environment variables - avoid requiring real API keys in tests
+vi.mock('~/config/env-loader', () => ({
+  getEnvVar: vi.fn((key: string) => {
+    const envVars: Record<string, string> = {
+      ANTHROPIC_KEY: 'test-anthropic-key',
+      OPENAI_API_KEY: 'test-openai-key',
+    };
+    return envVars[key] || '';
+  }),
 }));
 
-// Now using real TaskManager and SessionService for proper integration testing
-// No more mocking of business logic - tests validate real HTTP behavior
+// Using real TaskManager and SessionService with temporary database
+// Minimal mocking - only env vars. Tests validate real HTTP behavior
 
 describe('Task API Routes', () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
@@ -64,9 +32,9 @@ describe('Task API Routes', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    // Clear the in-memory stores between tests
-    projectStore.clear();
-    sessionStore.clear();
+
+    // Set up isolated test persistence
+    setupTestPersistence();
 
     // ✅ ESSENTIAL MOCK - Console suppression to prevent test output noise and control log verification
     // These mocks are necessary for clean test output and error handling verification
@@ -84,13 +52,16 @@ describe('Task API Routes', () => {
       'Test Session',
       'anthropic',
       'claude-3-haiku-20240307',
-      testProject.id
+      testProject.getId()
     );
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
+
+    // Clean up test persistence
+    teardownTestPersistence();
   });
 
   describe('GET /api/tasks', () => {
@@ -115,7 +86,7 @@ describe('Task API Routes', () => {
     });
 
     it('should return tasks for a valid session', async () => {
-      // Arrange: Create real tasks using the test session
+      // Arrange: Create tasks using the real session
       const { getSessionService } = await import('@/lib/server/session-service');
       const sessionService = getSessionService();
       const session = await sessionService.getSession(testSession.id);
@@ -127,7 +98,7 @@ describe('Task API Routes', () => {
       const taskManager = session.getTaskManager();
 
       // Create two real tasks
-      const task1 = await taskManager.createTask(
+      await taskManager.createTask(
         {
           title: 'Test Task 1',
           description: 'Description 1',
@@ -137,7 +108,7 @@ describe('Task API Routes', () => {
         { actor: 'human', isHuman: true }
       );
 
-      const task2 = await taskManager.createTask(
+      await taskManager.createTask(
         {
           title: 'Test Task 2',
           description: 'Description 2',
@@ -182,7 +153,7 @@ describe('Task API Routes', () => {
     });
 
     it('should filter tasks by status', async () => {
-      // Arrange: Create tasks with different statuses
+      // Arrange: Create a session and task
       const { getSessionService } = await import('@/lib/server/session-service');
       const sessionService = getSessionService();
       const session = await sessionService.getSession(testSession.id);
