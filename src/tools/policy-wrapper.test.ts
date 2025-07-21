@@ -161,7 +161,7 @@ describe('Global Policy Wrapper', () => {
   });
 
   describe('interface callback fallback', () => {
-    it('should call interface callback when no policies apply', async () => {
+    it('should prompt user for approval when no auto-policies apply', async () => {
       const options = baseCLIOptions; // No special policies
       const policyCallback = createGlobalPolicyCallback(mockInterface, options, toolExecutor);
 

@@ -97,7 +97,7 @@ describe('TimelineItemContext', () => {
       expect(frame).toContain('ItemStartLine: none');
     });
 
-    it('should call onToggle when toggle button is clicked', () => {
+    it('should toggle expansion state when toggle button is clicked', () => {
       const mockOnToggle = vi.fn();
 
       render(

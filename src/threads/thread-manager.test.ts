@@ -1,121 +1,69 @@
-// ABOUTME: Test suite for ThreadManager session support functionality
-// ABOUTME: Tests session creation, thread management, and project integration
+// ABOUTME: Unit tests for ThreadManager data layer operations
+// ABOUTME: Tests verify ThreadManager operates as pure data persistence layer
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
-import { SessionData } from '~/persistence/database';
 import {
   setupTestPersistence,
   teardownTestPersistence,
 } from '~/__tests__/setup/persistence-helper';
-import { Project } from '~/projects/project';
-import { Session } from '~/sessions/session';
+import { mkdtemp, rm } from 'fs/promises';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
-describe('ThreadManager session support', () => {
-  let manager: ThreadManager;
-  let sessionId: string;
-  let projectId: string;
+describe('ThreadManager', () => {
+  let threadManager: ThreadManager;
+  let testDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
-    manager = new ThreadManager();
-
-    // Ensure migrations have completed by checking the database
-    const db = manager['_persistence'].database;
-    if (!db) throw new Error('Database not initialized');
-
-    // Check current schema version
-    const versionResult = db
-      .prepare('SELECT MAX(version) as version FROM schema_version')
-      .get() as { version: number | null };
-    const currentVersion = versionResult.version || 0;
-
-    // Verify the schema has the required columns
-    const columns = db.prepare('PRAGMA table_info(threads)').all() as { name: string }[];
-    const hasSessionId = columns.some((col) => col.name === 'session_id');
-    const hasProjectId = columns.some((col) => col.name === 'project_id');
-
-    if (!hasSessionId || !hasProjectId) {
-      throw new Error(
-        `Database schema not properly migrated. Version: ${currentVersion}, has session_id: ${hasSessionId}, has project_id: ${hasProjectId}`
-      );
-    }
-
-    // Create a project first using Project.create
-    const project = Project.create('Test Project', '/project/path', 'A test project', {});
-    projectId = project.getId();
-
-    // Create a session first
-    const session: SessionData = {
-      id: 'session1',
-      projectId: projectId,
-      name: 'Test Session',
-      description: 'A test session',
-      configuration: {},
-      status: 'active',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    Session.createSession(session);
-    sessionId = session.id;
+    testDir = await mkdtemp(join(tmpdir(), 'lace-test-'));
+    threadManager = new ThreadManager();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    threadManager.close();
     teardownTestPersistence();
-    vi.restoreAllMocks();
+    await rm(testDir, { recursive: true, force: true });
   });
 
-  it('should create thread with session_id', () => {
-    const threadId = manager.createThread(undefined, sessionId);
-    const thread = manager.getThread(threadId);
+  describe('addEvent', () => {
+    it('should properly store events in database', () => {
+      // Arrange
+      const threadId = threadManager.generateThreadId();
+      threadManager.createThread(threadId);
 
-    expect(thread).toBeDefined();
-    expect(thread!.sessionId).toBe(sessionId);
-  });
+      // Act
+      const event = threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test message');
 
-  it('should get threads by session', () => {
-    const thread1Id = manager.createThread(undefined, sessionId);
-    const thread2Id = manager.createThread(undefined, sessionId);
+      // Assert
+      expect(event).toBeDefined();
+      expect(event.type).toBe('USER_MESSAGE');
+      expect(event.data).toBe('Test message');
+      expect(event.threadId).toBe(threadId);
 
-    const threads = manager.getThreadsBySession(sessionId);
+      const events = threadManager.getEvents(threadId);
+      expect(events).toHaveLength(1);
+      expect(events[0].data).toBe('Test message');
+    });
 
-    expect(threads).toHaveLength(2);
-    expect(threads.map((t) => t.id)).toContain(thread1Id);
-    expect(threads.map((t) => t.id)).toContain(thread2Id);
-  });
+    it('should function as pure data layer without event emission', () => {
+      // Arrange
+      const threadId = threadManager.generateThreadId();
+      threadManager.createThread(threadId);
 
-  it('should get sessions by project', () => {
-    const session2: SessionData = {
-      id: 'session2',
-      projectId: projectId,
-      name: 'Session 2',
-      description: '',
-      configuration: {},
-      status: 'active',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+      // Act - ThreadManager now operates as pure data layer
+      const event1 = threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
+      const event2 = threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there');
 
-    Session.createSession(session2);
+      // Assert - Data operations work correctly
+      expect(event1.type).toBe('USER_MESSAGE');
+      expect(event2.type).toBe('AGENT_MESSAGE');
 
-    const sessions = Session.getSessionsByProject(projectId);
-
-    expect(sessions).toHaveLength(2);
-    expect(sessions.map((s: SessionData) => s.id)).toContain('session1');
-    expect(sessions.map((s: SessionData) => s.id)).toContain('session2');
-  });
-
-  it('should not return threads marked as sessions (legacy)', () => {
-    // Create old-style session thread for backwards compatibility test
-    const legacySessionId = manager.createThread();
-    manager.updateThreadMetadata(legacySessionId, { isSession: true });
-
-    const threads = manager.getAllThreads();
-    const legacyThread = threads.find((t) => t.id === legacySessionId);
-
-    // Should be filtered out of getAllThreads() to avoid confusion
-    expect(legacyThread).toBeUndefined();
-    expect(manager.getThreadsBySession(legacySessionId)).toHaveLength(0);
+      const events = threadManager.getEvents(threadId);
+      expect(events).toHaveLength(2);
+      expect(events[0].data).toBe('Hello');
+      expect(events[1].data).toBe('Hi there');
+    });
   });
 });

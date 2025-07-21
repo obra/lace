@@ -102,7 +102,7 @@ describe('System Commands', () => {
       expect(typeof exitCommand.execute).toBe('function');
     });
 
-    it('should call UI exit method', async () => {
+    it('should terminate the application', async () => {
       await exitCommand.execute('', mockUI);
 
       expect(mockUI.exit).toHaveBeenCalled();
@@ -122,7 +122,7 @@ describe('System Commands', () => {
       expect(typeof clearCommand.execute).toBe('function');
     });
 
-    it('should call UI clearSession method', async () => {
+    it('should clear the conversation session', async () => {
       await clearCommand.execute('', mockUI);
 
       expect(mockUI.clearSession).toHaveBeenCalled();
