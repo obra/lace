@@ -36,10 +36,12 @@ export function LaceAppWithDesignSystem() {
   const [showDesktopSidebar, setShowDesktopSidebar] = useState(true);
 
   // Business Logic State (from current app/page.tsx)
+  const [projects, setProjects] = useState<ProjectInfo[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [loadingProjects, setLoadingProjects] = useState(true);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedSession, setSelectedSession] = useState<ThreadId | null>(null);
   const [selectedSessionDetails, setSelectedSessionDetails] = useState<Session | null>(null);
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<SessionEvent[]>([]);
@@ -57,6 +59,24 @@ export function LaceAppWithDesignSystem() {
     
     return entries;
   }, [events, selectedSessionDetails?.agents, selectedAgent]);
+
+  // Project loading function
+  const loadProjects = useCallback(async () => {
+    setLoadingProjects(true);
+    try {
+      const res = await fetch('/api/projects');
+      const data: unknown = await res.json();
+      
+      // Type guard for API response
+      if (typeof data === 'object' && data !== null && 'projects' in data) {
+        const projectsData = data as { projects: ProjectInfo[] };
+        setProjects(projectsData.projects);
+      }
+    } catch (error) {
+      console.error('Failed to load projects:', error);
+    }
+    setLoadingProjects(false);
+  }, []);
 
   const loadSessions = useCallback(async () => {
     if (!selectedProject) {
@@ -80,10 +100,24 @@ export function LaceAppWithDesignSystem() {
     }
   }, [selectedProject]);
 
+  // Load projects on mount
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
+
   // Load sessions when project is selected
   useEffect(() => {
     void loadSessions();
   }, [selectedProject, loadSessions]);
+
+  // Handle project selection
+  const handleProjectSelect = (projectId: string) => {
+    setSelectedProject(projectId);
+    // Clear session selection when switching projects
+    setSelectedSession(null);
+    setSelectedAgent(undefined);
+    setEvents([]);
+  };
 
   const loadSessionDetails = useCallback(async (sessionId: ThreadId) => {
     try {
@@ -239,6 +273,22 @@ export function LaceAppWithDesignSystem() {
     setSendingMessage(false);
   }
 
+  // Convert projects to format expected by Sidebar
+  const currentProject = selectedProject 
+    ? projects.find(p => p.id === selectedProject) || { id: '', name: 'Unknown', workingDirectory: '/' }
+    : { id: '', name: 'No project selected', workingDirectory: '/' };
+
+  const projectsForSidebar = projects.map(p => ({
+    id: p.id,
+    name: p.name,
+    workingDirectory: p.workingDirectory,
+    description: p.description,
+    isArchived: false,
+    createdAt: new Date(),
+    lastUsedAt: new Date(),
+    sessionCount: 0,
+  }));
+
   return (
     <motion.div
       className="flex h-screen bg-base-200 text-base-content font-sans overflow-hidden"
@@ -257,9 +307,8 @@ export function LaceAppWithDesignSystem() {
             <MobileSidebar
               isOpen={showMobileNav}
               onClose={() => setShowMobileNav(false)}
-              // TODO: Pass real props instead of demo data
-              currentProject={{ id: '1', name: 'Loading...', workingDirectory: '/' }}
-              projects={[]}
+              currentProject={currentProject}
+              projects={projectsForSidebar}
               currentTimeline={{ id: 1, name: 'Main', agent: 'Claude' }}
               timelines={[]}
               activeTasks={[]}
@@ -268,7 +317,7 @@ export function LaceAppWithDesignSystem() {
                 { name: 'light', colors: { primary: '#570DF8', secondary: '#F000B8', accent: '#37CDBE' } },
                 { name: 'dark', colors: { primary: '#661AE6', secondary: '#D926AA', accent: '#1FB2A5' } },
               ]}
-              onProjectChange={() => {}}
+              onProjectChange={handleProjectSelect}
               onTimelineChange={() => {}}
               onThemeChange={setTheme}
               onTriggerTool={() => {}}
@@ -289,15 +338,14 @@ export function LaceAppWithDesignSystem() {
         <Sidebar
           isOpen={showDesktopSidebar}
           onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
-          // TODO: Pass real props instead of demo data
-          currentProject={{ id: '1', name: 'Loading...', workingDirectory: '/' }}
-          projects={[]}
+          currentProject={currentProject}
+          projects={projectsForSidebar}
           currentTimeline={{ id: 1, name: 'Main', agent: 'Claude' }}
           timelines={[]}
           activeTasks={[]}
           recentFiles={[]}
           currentTheme={theme}
-          onProjectChange={() => {}}
+          onProjectChange={handleProjectSelect}
           onTimelineChange={() => {}}
           onNewTimeline={() => {}}
           onOpenTask={() => {}}
@@ -324,16 +372,36 @@ export function LaceAppWithDesignSystem() {
               </motion.button>
               <div className="flex items-center gap-2">
                 <h1 className="font-semibold text-base-content truncate">
-                  {selectedSession ? 'Session Active' : 'No Session'}
+                  {selectedProject ? currentProject.name : 'Select a Project'}
                 </h1>
               </div>
             </motion.div>
           </motion.div>
         </motion.div>
 
-        {/* Content Area - TODO: Replace with actual business logic */}
+        {/* Content Area */}
         <div className="flex-1 flex items-center justify-center text-base-content">
-          <p>TODO: Add real project/session/agent management here</p>
+          {loadingProjects ? (
+            <div className="flex items-center gap-2">
+              <div className="loading loading-spinner loading-md"></div>
+              <span>Loading projects...</span>
+            </div>
+          ) : selectedProject ? (
+            <div className="text-center space-y-2">
+              <h2 className="text-lg font-medium">Project: {currentProject.name}</h2>
+              <p className="text-base-content/60">Sessions and agents will be shown here</p>
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="text-center space-y-2">
+              <h2 className="text-lg font-medium">No Projects Found</h2>
+              <p className="text-base-content/60">Create a project to get started</p>
+            </div>
+          ) : (
+            <div className="text-center space-y-2">
+              <h2 className="text-lg font-medium">Select a Project</h2>
+              <p className="text-base-content/60">Choose a project from the sidebar to continue</p>
+            </div>
+          )}
         </div>
       </motion.div>
     </motion.div>

@@ -68,24 +68,34 @@ describe('LaceAppWithDesignSystem', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (fetch as vi.MockedFunction<typeof fetch>).mockClear();
+    
+    // Set up default fetch mock to return empty projects
+    (fetch as vi.MockedFunction<typeof fetch>).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ projects: [] }),
+    } as Response);
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it('renders without crashing', () => {
+  it('renders without crashing', async () => {
     render(<LaceAppWithDesignSystem />);
     
-    // Should show placeholder content initially
-    expect(screen.getByText('TODO: Add real project/session/agent management here')).toBeInTheDocument();
+    // Should show loading initially
+    expect(screen.getByText('Loading projects...')).toBeInTheDocument();
+    
+    // Wait for loading to complete
+    await screen.findByText('No Projects Found');
+    expect(screen.getByText('Create a project to get started')).toBeInTheDocument();
   });
 
-  it('shows correct initial state in header', () => {
+  it('shows correct initial state in header', async () => {
     render(<LaceAppWithDesignSystem />);
     
-    // Should show "No Session" when no session is selected
-    expect(screen.getByText('No Session')).toBeInTheDocument();
+    // Should show "Select a Project" initially
+    expect(screen.getByText('Select a Project')).toBeInTheDocument();
   });
 
   it('has mobile navigation button', () => {
@@ -104,11 +114,42 @@ describe('LaceAppWithDesignSystem', () => {
     expect(mainContainer).toHaveClass('bg-base-200', 'text-base-content');
   });
 
-  it('initializes with empty business logic state', () => {
+  it('initializes with empty business logic state', async () => {
     render(<LaceAppWithDesignSystem />);
     
-    // Component should render with initial empty state
-    // This is verified by the placeholder text being visible
-    expect(screen.getByText('TODO: Add real project/session/agent management here')).toBeInTheDocument();
+    // Component should render with loading state initially
+    expect(screen.getByText('Loading projects...')).toBeInTheDocument();
+    
+    // Then show empty state after loading
+    await screen.findByText('No Projects Found');
+    expect(screen.getByText('Create a project to get started')).toBeInTheDocument();
+  });
+
+  it('loads and displays projects from API', async () => {
+    const mockProjects = [
+      {
+        id: 'project-1',
+        name: 'Test Project',
+        description: 'A test project',
+        workingDirectory: '/test',
+        isArchived: false,
+        createdAt: new Date(),
+        lastUsedAt: new Date(),
+      },
+    ];
+
+    (fetch as vi.MockedFunction<typeof fetch>).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ projects: mockProjects }),
+    } as Response);
+
+    render(<LaceAppWithDesignSystem />);
+    
+    // Should call projects API
+    expect(fetch).toHaveBeenCalledWith('/api/projects');
+    
+    // Wait for loading to complete and show select prompt
+    await screen.findByText('Select a Project');
+    expect(screen.getByText('Choose a project from the sidebar to continue')).toBeInTheDocument();
   });
 });
