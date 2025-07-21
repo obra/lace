@@ -90,7 +90,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 // Interactive wrapper component
-const DragDropDemo = ({ disabled = false, ...props }: any) => {
+interface DragDropDemoProps {
+  disabled?: boolean;
+  className?: string;
+}
+
+const DragDropDemo = ({ disabled = false, ...props }: DragDropDemoProps) => {
   const [droppedFiles, setDroppedFiles] = useState<File[]>([]);
   const [lastDropTime, setLastDropTime] = useState<string>('');
 
@@ -123,9 +128,13 @@ const DragDropDemo = ({ disabled = false, ...props }: any) => {
       },
     } as FileList;
     
-    // Add array access
+    // Add array access using object property assignment
     mockFiles.forEach((file, index) => {
-      (mockFileList as any)[index] = file;
+      Object.defineProperty(mockFileList, index.toString(), {
+        value: file,
+        enumerable: true,
+        configurable: true,
+      });
     });
     
     handleFilesDropped(mockFileList);

@@ -111,8 +111,17 @@ A cohesive molecule that combines 4-5 atoms to solve the specific UI pattern of 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+interface AnimatedModalDemoProps {
+  initialOpen?: boolean;
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  showCloseButton?: boolean;
+  closeOnBackdropClick?: boolean;
+  closeOnEscape?: boolean;
+  className?: string;
+}
+
 // Interactive wrapper component
-const AnimatedModalDemo = ({ initialOpen = false, ...props }: any) => {
+const AnimatedModalDemo = ({ initialOpen = false, ...props }: AnimatedModalDemoProps) => {
   const [isOpen, setIsOpen] = useState(initialOpen);
 
   const handleOpen = () => setIsOpen(true);
@@ -477,21 +486,21 @@ export const InteractiveDemo: Story = {
         </div>
         
         <div className="cursor-pointer">
-          {FormModal.render ? (FormModal.render as any)() : <div>Form Modal</div>}
+          {FormModal.render ? FormModal.render({} as Parameters<NonNullable<typeof FormModal.render>>[0]) : <div>Form Modal</div>}
         </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="cursor-pointer">
-          {ConfirmModal.render ? (ConfirmModal.render as any)() : <div>Confirm Modal</div>}
+          {ConfirmModal.render ? ConfirmModal.render({} as Parameters<NonNullable<typeof ConfirmModal.render>>[0]) : <div>Confirm Modal</div>}
         </div>
         
         <div className="cursor-pointer">
-          {WarningModal.render ? (WarningModal.render as any)() : <div>Warning Modal</div>}
+          {WarningModal.render ? WarningModal.render({} as Parameters<NonNullable<typeof WarningModal.render>>[0]) : <div>Warning Modal</div>}
         </div>
         
         <div className="cursor-pointer">
-          {InfoModal.render ? (InfoModal.render as any)() : <div>Info Modal</div>}
+          {InfoModal.render ? InfoModal.render({} as Parameters<NonNullable<typeof InfoModal.render>>[0]) : <div>Info Modal</div>}
         </div>
       </div>
       

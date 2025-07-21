@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { SwipeableCard, SwipeableTimelineMessage, PullToRefresh, FloatingActionButton, LongPress } from './SwipeableCard';
 
 const meta: Meta<typeof SwipeableCard> = {
@@ -89,8 +89,13 @@ A cohesive molecule that combines 4-5 atoms to solve the specific UI pattern of 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Interactive wrapper component
-const SwipeableCardDemo = ({ swipeThreshold = 100, ...props }: any) => {
+// Interactive wrapper component  
+interface SwipeableCardDemoProps {
+  swipeThreshold?: number;
+  [key: string]: unknown;
+}
+
+const SwipeableCardDemo = ({ swipeThreshold = 100, ...props }: SwipeableCardDemoProps) => {
   const [lastAction, setLastAction] = useState<string>('');
   const [actionCount, setActionCount] = useState(0);
 
@@ -402,17 +407,17 @@ export const InteractiveDemo: Story = {
         
         <div className="cursor-pointer">
           <h4 className="font-medium mb-3">Long Press</h4>
-          {LongPressDemo.render ? (LongPressDemo.render as any)() : <div>Long Press Demo</div>}
+          {LongPressDemo.render ? (LongPressDemo.render as () => React.ReactElement)() : <div>Long Press Demo</div>}
         </div>
         
         <div className="cursor-pointer">
           <h4 className="font-medium mb-3">Floating Action Button</h4>
-          {FloatingActionButtonDemo.render ? (FloatingActionButtonDemo.render as any)() : <div>Floating Action Button Demo</div>}
+          {FloatingActionButtonDemo.render ? (FloatingActionButtonDemo.render as () => React.ReactElement)() : <div>Floating Action Button Demo</div>}
         </div>
         
         <div className="cursor-pointer">
           <h4 className="font-medium mb-3">Pull to Refresh</h4>
-          {PullToRefreshDemo.render ? (PullToRefreshDemo.render as any)() : <div>Pull to Refresh Demo</div>}
+          {PullToRefreshDemo.render ? (PullToRefreshDemo.render as () => React.ReactElement)() : <div>Pull to Refresh Demo</div>}
         </div>
       </div>
       

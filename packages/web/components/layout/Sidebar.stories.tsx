@@ -275,45 +275,45 @@ const SidebarWrapper = ({ initialOpen = true, ...props }: SidebarWrapperProps) =
 
   const handleProjectChange = (project: Project) => {
     setCurrentProject(project);
-    console.log('Project changed:', project.name);
+    void ('Project changed:', project.name);
   };
 
   const handleTimelineChange = (timeline: Timeline) => {
     setCurrentTimeline(timeline);
-    console.log('Timeline changed:', timeline.name);
+    void ('Timeline changed:', timeline.name);
   };
 
   const handleNewTimeline = () => {
-    console.log('New timeline requested');
+    void ('New timeline requested');
   };
 
   const handleOpenTask = (task: Task) => {
-    console.log('Task opened:', task.title);
+    void ('Task opened:', task.title);
   };
 
   const handleOpenFile = (file: RecentFile) => {
-    console.log('File opened:', file.name);
+    void ('File opened:', file.name);
   };
 
   const handleTriggerTool = (tool: string) => {
-    console.log('Tool triggered:', tool);
+    void ('Tool triggered:', tool);
   };
 
   const handleOpenTaskBoard = () => {
-    console.log('Task board opened');
+    void ('Task board opened');
   };
 
   const handleOpenFileManager = () => {
-    console.log('File manager opened');
+    void ('File manager opened');
   };
 
   const handleOpenRulesFile = () => {
-    console.log('Rules file opened');
+    void ('Rules file opened');
   };
 
   const handleThemeChange = (theme: string) => {
     setCurrentTheme(theme);
-    console.log('Theme changed:', theme);
+    void ('Theme changed:', theme);
   };
 
   return (

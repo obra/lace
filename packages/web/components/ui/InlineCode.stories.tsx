@@ -90,7 +90,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    code: 'console.log("Hello, world!");',
+    code: 'void ("Hello, world!");',
     language: 'javascript',
     enableHighlighting: false,
   },
@@ -178,7 +178,7 @@ export const AllLanguages: Story = {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="p-3 border rounded-lg">
           <h4 className="font-medium mb-2">JavaScript</h4>
-          <p>Function call: <InlineCode code='console.log("Hello");' language="javascript" enableHighlighting /></p>
+          <p>Function call: <InlineCode code='void ("Hello");' language="javascript" enableHighlighting /></p>
         </div>
         
         <div className="p-3 border rounded-lg">

@@ -249,8 +249,8 @@ export const Default: Story = {
     isOpen: true,
     onClose: () => {},
     tasks: sampleTasks,
-    onTaskUpdate: (task) => console.log('Task updated:', task),
-    onTaskCreate: (task) => console.log('Task created:', task),
+    onTaskUpdate: (task) => void ('Task updated:', task),
+    onTaskCreate: (task) => void ('Task created:', task),
   },
   parameters: {
     docs: {
@@ -266,8 +266,8 @@ export const EmptyBoard: Story = {
     isOpen: true,
     onClose: () => {},
     tasks: [],
-    onTaskUpdate: (task) => console.log('Task updated:', task),
-    onTaskCreate: (task) => console.log('Task created:', task),
+    onTaskUpdate: (task) => void ('Task updated:', task),
+    onTaskCreate: (task) => void ('Task created:', task),
   },
   parameters: {
     docs: {
@@ -283,8 +283,8 @@ export const MinimalTasks: Story = {
     isOpen: true,
     onClose: () => {},
     tasks: minimalTasks,
-    onTaskUpdate: (task) => console.log('Task updated:', task),
-    onTaskCreate: (task) => console.log('Task created:', task),
+    onTaskUpdate: (task) => void ('Task updated:', task),
+    onTaskCreate: (task) => void ('Task created:', task),
   },
   parameters: {
     docs: {
@@ -300,8 +300,8 @@ export const HighPriorityTasks: Story = {
     isOpen: true,
     onClose: () => {},
     tasks: sampleTasks.filter(task => task.priority === 'high'),
-    onTaskUpdate: (task) => console.log('Task updated:', task),
-    onTaskCreate: (task) => console.log('Task created:', task),
+    onTaskUpdate: (task) => void ('Task updated:', task),
+    onTaskCreate: (task) => void ('Task created:', task),
   },
   parameters: {
     docs: {
@@ -317,8 +317,8 @@ export const CompletedTasks: Story = {
     isOpen: true,
     onClose: () => {},
     tasks: sampleTasks.filter(task => task.status === 'completed'),
-    onTaskUpdate: (task) => console.log('Task updated:', task),
-    onTaskCreate: (task) => console.log('Task created:', task),
+    onTaskUpdate: (task) => void ('Task updated:', task),
+    onTaskCreate: (task) => void ('Task created:', task),
   },
   parameters: {
     docs: {
@@ -334,8 +334,8 @@ export const MobileView: Story = {
     isOpen: true,
     onClose: () => {},
     tasks: sampleTasks,
-    onTaskUpdate: (task) => console.log('Task updated:', task),
-    onTaskCreate: (task) => console.log('Task created:', task),
+    onTaskUpdate: (task) => void ('Task updated:', task),
+    onTaskCreate: (task) => void ('Task created:', task),
   },
   parameters: {
     viewport: {
@@ -354,8 +354,8 @@ export const TaskCreationFlow: Story = {
     isOpen: true,
     onClose: () => {},
     tasks: minimalTasks,
-    onTaskUpdate: (task) => console.log('Task updated:', task),
-    onTaskCreate: (task) => console.log('Task created:', task),
+    onTaskUpdate: (task) => void ('Task updated:', task),
+    onTaskCreate: (task) => void ('Task created:', task),
   },
   render: (args) => (
     <div className="space-y-4">
@@ -385,8 +385,8 @@ export const DragAndDropDemo: Story = {
     isOpen: true,
     onClose: () => {},
     tasks: sampleTasks,
-    onTaskUpdate: (task) => console.log('Task updated:', task),
-    onTaskCreate: (task) => console.log('Task created:', task),
+    onTaskUpdate: (task) => void ('Task updated:', task),
+    onTaskCreate: (task) => void ('Task created:', task),
   },
   render: (args) => (
     <div className="space-y-4">
@@ -459,8 +459,8 @@ export const PriorityDistribution: Story = {
         notes: [],
       })),
     ],
-    onTaskUpdate: (task) => console.log('Task updated:', task),
-    onTaskCreate: (task) => console.log('Task created:', task),
+    onTaskUpdate: (task) => void ('Task updated:', task),
+    onTaskCreate: (task) => void ('Task created:', task),
   },
   parameters: {
     docs: {
@@ -476,8 +476,8 @@ export const InteractiveDemo: Story = {
     isOpen: true,
     onClose: () => {},
     tasks: sampleTasks,
-    onTaskUpdate: (task) => console.log('Task updated:', task),
-    onTaskCreate: (task) => console.log('Task created:', task),
+    onTaskUpdate: (task) => void ('Task updated:', task),
+    onTaskCreate: (task) => void ('Task created:', task),
   },
   render: (args) => (
     <div className="space-y-6">

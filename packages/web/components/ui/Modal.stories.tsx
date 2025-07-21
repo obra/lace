@@ -246,7 +246,7 @@ export const WithForm: Story = {
     
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      console.log('Form submitted:', formData);
+      void ('Form submitted:', formData);
       setIsOpen(false);
       setFormData({ name: '', email: '', message: '' });
     };

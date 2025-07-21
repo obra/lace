@@ -11,7 +11,7 @@ import {
 } from './performance-utils';
 
 // Language registry for lazy loading
-const LANGUAGE_REGISTRY = new Map<string, () => Promise<any>>();
+const _LANGUAGE_REGISTRY = new Map<string, () => Promise<unknown>>();
 
 // Common programming languages with their lazy import functions
 const LANGUAGE_IMPORTS = {
@@ -167,7 +167,7 @@ const LANGUAGE_PATTERNS = {
 } as const;
 
 // Cached language modules
-const languageCache = new Map<string, any>();
+const languageCache = new Map<string, unknown>();
 
 // Initialize the syntax highlighting service
 export class SyntaxHighlightingService {
@@ -221,10 +221,10 @@ export class SyntaxHighlightingService {
     }
 
     try {
-      const module = await importFn();
-      if (module && module.default) {
-        hljs.registerLanguage(normalizedLang, module.default);
-        languageCache.set(normalizedLang, module.default);
+      const languageModule = await importFn();
+      if (languageModule && languageModule.default) {
+        hljs.registerLanguage(normalizedLang, languageModule.default);
+        languageCache.set(normalizedLang, languageModule.default);
       }
     } catch (error) {
       console.warn(`Failed to load language ${normalizedLang}:`, error);

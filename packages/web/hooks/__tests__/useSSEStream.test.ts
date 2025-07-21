@@ -74,19 +74,12 @@ describe('useSSEStream', () => {
   });
 
   afterEach(() => {
-    // Clean up mocks
-    const globalWithEventSource = global as typeof globalThis & {
-      EventSource?: typeof EventSource;
-    };
-    if (globalWithEventSource.EventSource === (MockEventSource as unknown as typeof EventSource)) {
-      delete globalWithEventSource.EventSource;
-    }
-    if (typeof window !== 'undefined') {
-      const windowWithEventSource = window as typeof window & { EventSource?: typeof EventSource };
-      if (
-        windowWithEventSource.EventSource === (MockEventSource as unknown as typeof EventSource)
-      ) {
-        delete windowWithEventSource.EventSource;
+    // Clean up mocks by restoring original EventSource if it existed
+    const originalEventSource = (globalThis as typeof globalThis).EventSource;
+    if (originalEventSource) {
+      (global as typeof globalThis).EventSource = originalEventSource;
+      if (typeof window !== 'undefined') {
+        (window as typeof window).EventSource = originalEventSource;
       }
     }
     eventSourceInstances = [];

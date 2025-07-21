@@ -38,12 +38,10 @@ export default function Home() {
 
   // Convert SessionEvents to TimelineEntries for the design system
   const timelineEntries = useMemo(() => {
-    
     const entries = convertSessionEventsToTimeline(events, {
       agents: selectedSessionDetails?.agents || [],
       selectedAgent,
     });
-    
     
     return entries;
   }, [events, selectedSessionDetails?.agents, selectedAgent]);
@@ -129,12 +127,17 @@ export default function Home() {
               setApprovalRequest(eventData.data as ToolApprovalRequestData);
             } else {
               // Convert timestamp from string to Date if needed
-              const sessionEvent: SessionEvent = {
-                ...eventData as Omit<SessionEvent, 'timestamp'>,
-                timestamp: eventData.timestamp 
-                  ? (typeof eventData.timestamp === 'string' ? new Date(eventData.timestamp) : eventData.timestamp)
-                  : new Date()
-              };
+              const timestamp = eventData.timestamp 
+                ? (typeof eventData.timestamp === 'string' ? new Date(eventData.timestamp) : eventData.timestamp)
+                : new Date();
+
+              // Create the session event with proper type narrowing
+              const sessionEvent = {
+                ...eventData,
+                threadId: selectedSession as ThreadId,
+                timestamp
+              } as SessionEvent;
+
               setEvents((prev) => [...prev, sessionEvent]);
             }
           }
@@ -246,7 +249,8 @@ export default function Home() {
 
   const handleProjectCreated = (project: ProjectInfo) => {
     // Project created successfully - could show a notification
-    console.warn('Project created:', project);
+    // TODO: Show user notification for project creation
+    void project; // Acknowledge parameter
   };
 
   const handleProjectSelect = (projectId: string) => {

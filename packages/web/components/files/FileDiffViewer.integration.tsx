@@ -108,7 +108,7 @@ export function CodeReviewDiffViewer({
         showLineNumbers={true}
         maxLines={200}
         onCopy={(content) => {
-          console.log('Copied diff content for review');
+          void ('Copied diff content for review');
         }}
       />
       

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import ChatInputComposer from './ChatInputComposer';
+import type { AttachedFile } from './FileAttachment';
 
 const meta: Meta<typeof ChatInputComposer> = {
   title: 'Molecules/ChatInputComposer',
@@ -107,15 +108,23 @@ A cohesive unit that combines 2-5 atoms to solve the specific UI pattern of chat
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+interface ChatInputWrapperProps {
+  initialValue?: string;
+  disabled?: boolean;
+  placeholder?: string;
+  showVoiceButton?: boolean;
+  showFileAttachment?: boolean;
+}
+
 // Interactive wrapper component
-const ChatInputWrapper = ({ initialValue = '', ...props }: any) => {
+const ChatInputWrapper = ({ initialValue = '', ...props }: ChatInputWrapperProps) => {
   const [value, setValue] = useState(initialValue);
   const [isListening, setIsListening] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [attachedFiles, setAttachedFiles] = useState<any[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
 
   const handleSubmit = () => {
-    console.log('Message sent:', value);
+    void ('Message sent:', value);
     setValue('');
   };
 
@@ -130,10 +139,10 @@ const ChatInputWrapper = ({ initialValue = '', ...props }: any) => {
 
   const handleInterrupt = () => {
     setIsStreaming(false);
-    console.log('Interrupted');
+    void ('Interrupted');
   };
 
-  const handleFilesAttached = (files: any[]) => {
+  const handleFilesAttached = (files: AttachedFile[]) => {
     setAttachedFiles([...attachedFiles, ...files]);
   };
 
@@ -343,7 +352,7 @@ export const InteractiveDemo: Story = {
     const [value, setValue] = useState('');
     const [isListening, setIsListening] = useState(false);
     const [isStreaming, setIsStreaming] = useState(false);
-    const [attachedFiles, setAttachedFiles] = useState<any[]>([]);
+    const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
     const [messages, setMessages] = useState<string[]>([]);
 
     // Create proper mock File objects
@@ -393,7 +402,7 @@ export const InteractiveDemo: Story = {
       setIsStreaming(false);
     };
 
-    const handleFilesAttached = (files: any[]) => {
+    const handleFilesAttached = (files: AttachedFile[]) => {
       // Ensure files have proper File objects
       const filesWithMockData = files.map(file => ({
         ...file,

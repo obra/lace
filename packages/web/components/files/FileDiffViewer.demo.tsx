@@ -10,7 +10,7 @@ import { Button } from './Button';
 
 function MyComponent({ title, count }) {
   const handleClick = () => {
-    console.log('Button clicked');
+    void ('Button clicked');
   };
 
   return (
@@ -32,7 +32,7 @@ import { Counter } from './Counter';
 
 function MyComponent({ title, count, onIncrement }) {
   const handleClick = () => {
-    console.log('Button clicked');
+    void ('Button clicked');
     onIncrement();
   };
 
@@ -163,7 +163,7 @@ export default function FileDiffViewerDemo() {
           showLineNumbers={true}
           maxLines={100}
           onCopy={(content) => {
-            console.log('Copied:', content);
+            void ('Copied:', content);
           }}
         />
       </div>

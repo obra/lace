@@ -125,7 +125,7 @@ export default function FileDiffViewer({
               }
             } catch (error) {
               // Silently fail for individual lines
-              console.debug('Failed to highlight line:', error);
+              // Silently fail for individual line highlighting
             }
           }
         }

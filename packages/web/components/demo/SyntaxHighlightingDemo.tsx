@@ -10,6 +10,25 @@ import { syntaxHighlighting } from '@/lib/syntax-highlighting';
 import { syntaxThemeManager } from '@/lib/syntax-themes';
 import { performanceMonitor } from '@/lib/performance-utils';
 
+// Type definitions for test results
+interface SuccessfulTestResult {
+  success: true;
+  language: string;
+  highlightedLength: number;
+  originalLength: number;
+  processingTime: number;
+  error: null;
+}
+
+interface FailedTestResult {
+  success: false;
+  error: string;
+}
+
+type TestResult = SuccessfulTestResult | FailedTestResult;
+
+type TestResults = Record<string, TestResult>;
+
 // Sample code for different languages
 const SAMPLE_CODE = {
   javascript: `// JavaScript with async/await
@@ -569,14 +588,14 @@ DELIMITER ;`
 
 export default function SyntaxHighlightingDemo() {
   const [selectedLanguage, setSelectedLanguage] = useState<string>('javascript');
-  const [testResults, setTestResults] = useState<Record<string, any>>({});
+  const [testResults, setTestResults] = useState<TestResults>({});
   const [isRunningTests, setIsRunningTests] = useState(false);
 
   const runTests = async () => {
     setIsRunningTests(true);
     setTestResults({});
     
-    const results: Record<string, any> = {};
+    const results: TestResults = {};
     
     for (const [lang, code] of Object.entries(SAMPLE_CODE)) {
       try {
@@ -700,12 +719,12 @@ export default function SyntaxHighlightingDemo() {
                         {result.success ? 'Success' : 'Failed'}
                       </div>
                     </td>
-                    <td className="font-mono">{result.language || 'N/A'}</td>
-                    <td>{result.originalLength?.toLocaleString() || 'N/A'}</td>
-                    <td>{result.highlightedLength?.toLocaleString() || 'N/A'}</td>
-                    <td>{result.processingTime ? `\${result.processingTime.toFixed(2)}ms` : 'N/A'}</td>
+                    <td className="font-mono">{result.success ? result.language : 'N/A'}</td>
+                    <td>{result.success ? result.originalLength.toLocaleString() : 'N/A'}</td>
+                    <td>{result.success ? result.highlightedLength.toLocaleString() : 'N/A'}</td>
+                    <td>{result.success ? `\${result.processingTime.toFixed(2)}ms` : 'N/A'}</td>
                     <td>
-                      {result.error && (
+                      {!result.success && (
                         <div className="text-error text-sm" title={result.error}>
                           {result.error.length > 50 ? `\${result.error.substring(0, 50)}...` : result.error}
                         </div>

@@ -245,13 +245,13 @@ const defaultArgs = {
   activeTasks: sampleTasks,
   currentTheme: 'dark',
   availableThemes,
-  onProjectChange: (project: Project) => console.log('Project changed:', project),
-  onTimelineChange: (timeline: Timeline) => console.log('Timeline changed:', timeline),
-  onThemeChange: (theme: string) => console.log('Theme changed:', theme),
-  onTriggerTool: (tool: string) => console.log('Tool triggered:', tool),
-  onOpenTaskBoard: () => console.log('Task board opened'),
-  onOpenFileManager: () => console.log('File manager opened'),
-  onOpenTaskDetail: (task: Task) => console.log('Task detail opened:', task),
+  onProjectChange: (project: Project) => void ('Project changed:', project),
+  onTimelineChange: (timeline: Timeline) => void ('Timeline changed:', timeline),
+  onThemeChange: (theme: string) => void ('Theme changed:', theme),
+  onTriggerTool: (tool: string) => void ('Tool triggered:', tool),
+  onOpenTaskBoard: () => void ('Task board opened'),
+  onOpenFileManager: () => void ('File manager opened'),
+  onOpenTaskDetail: (task: Task) => void ('Task detail opened:', task),
 };
 
 export const Default: Story = {

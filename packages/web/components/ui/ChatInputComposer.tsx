@@ -48,7 +48,7 @@ export default function ChatInputComposer({
 }: ChatInputComposerProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-  const textareaRef = useRef<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const checkMobile = () => {

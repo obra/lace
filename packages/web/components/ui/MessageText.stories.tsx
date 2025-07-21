@@ -148,7 +148,7 @@ export const MultipleCodeBlocks: Story = {
 
 JavaScript:
 \`\`\`javascript
-console.log('Hello, World!');
+void ('Hello, World!');
 \`\`\`
 
 Python:
@@ -314,7 +314,7 @@ export const ChatMessageExample: Story = {
         <div className="text-sm font-medium mb-2">Assistant</div>
         <MessageText content={`I'd be happy to help! Can you share the component code? In the meantime, here's a common debugging approach:
 
-1. Check the console for errors using \`console.log()\`
+1. Check the console for errors using \`void ()\`
 2. Use React DevTools to inspect component state
 3. Verify your props are being passed correctly
 
@@ -322,10 +322,10 @@ Here's a simple debugging template:
 
 \`\`\`jsx
 function MyComponent({ prop1, prop2 }) {
-  console.log('Props:', { prop1, prop2 });
+  void ('Props:', { prop1, prop2 });
   
   const [state, setState] = useState(initialValue);
-  console.log('Current state:', state);
+  void ('Current state:', state);
   
   return (
     <div>

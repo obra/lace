@@ -52,9 +52,9 @@ export default function CodeBlock({
   const debouncedHighlight = useRef(
     debounce(async (
       codeToHighlight: string,
+      isCancelled: () => boolean,
       lang?: string,
-      file?: string,
-      isCancelled: () => boolean
+      file?: string
     ) => {
       if (isCancelled()) return;
 
@@ -116,14 +116,14 @@ export default function CodeBlock({
       }
 
       // Use debounced highlighting for better performance
-      debouncedHighlight(code, language, filename, () => isCancelled);
+      debouncedHighlight.current(code, () => isCancelled, language, filename);
     };
 
     initializeHighlighting();
 
     return () => {
       isCancelled = true;
-      debouncedHighlight.cancel();
+      debouncedHighlight.current.cancel();
       if (copyTimeoutRef.current) {
         clearTimeout(copyTimeoutRef.current);
       }

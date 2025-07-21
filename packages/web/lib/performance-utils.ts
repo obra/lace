@@ -158,6 +158,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
       func(...args);
       timeout = null;
     }, wait);
+    return undefined as ReturnType<T>;
   }) as T & { cancel: () => void };
 
   debounced.cancel = () => {
@@ -173,7 +174,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 /**
  * Throttle function for limiting execution frequency
  */
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: unknown[]) => unknown>(
   func: T,
   limit: number
 ): T & { cancel: () => void } {
@@ -182,7 +183,7 @@ export function throttle<T extends (...args: any[]) => any>(
 
   const throttled = ((...args: Parameters<T>) => {
     if (!inThrottle) {
-      lastResult = func(...args);
+      lastResult = func(...args) as ReturnType<T>;
       inThrottle = true;
       setTimeout(() => {
         inThrottle = false;

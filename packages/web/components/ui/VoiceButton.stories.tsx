@@ -81,14 +81,14 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     isListening: false,
-    onToggle: () => console.log('Voice button toggled'),
+    onToggle: () => {},
   },
 };
 
 export const Listening: Story = {
   args: {
     isListening: true,
-    onToggle: () => console.log('Voice button toggled'),
+    onToggle: () => {},
   },
 };
 
@@ -96,7 +96,7 @@ export const Disabled: Story = {
   args: {
     disabled: true,
     isListening: false,
-    onToggle: () => console.log('This should not trigger'),
+    onToggle: () => {},
   },
 };
 
@@ -104,7 +104,7 @@ export const DisabledListening: Story = {
   args: {
     disabled: true,
     isListening: true,
-    onToggle: () => console.log('This should not trigger'),
+    onToggle: () => {},
   },
 };
 
@@ -112,7 +112,7 @@ export const SmallSize: Story = {
   args: {
     size: 'sm',
     isListening: false,
-    onToggle: () => console.log('Small voice button toggled'),
+    onToggle: () => {},
   },
 };
 
@@ -120,7 +120,7 @@ export const MediumSize: Story = {
   args: {
     size: 'md',
     isListening: false,
-    onToggle: () => console.log('Medium voice button toggled'),
+    onToggle: () => {},
   },
 };
 
@@ -128,7 +128,7 @@ export const LargeSize: Story = {
   args: {
     size: 'lg',
     isListening: false,
-    onToggle: () => console.log('Large voice button toggled'),
+    onToggle: () => {},
   },
 };
 
@@ -136,7 +136,7 @@ export const PrimaryVariant: Story = {
   args: {
     variant: 'primary',
     isListening: false,
-    onToggle: () => console.log('Primary voice button toggled'),
+    onToggle: () => {},
   },
 };
 
@@ -144,7 +144,7 @@ export const GhostVariant: Story = {
   args: {
     variant: 'ghost',
     isListening: false,
-    onToggle: () => console.log('Ghost voice button toggled'),
+    onToggle: () => {},
   },
 };
 
@@ -152,7 +152,7 @@ export const OutlineVariant: Story = {
   args: {
     variant: 'outline',
     isListening: false,
-    onToggle: () => console.log('Outline voice button toggled'),
+    onToggle: () => {},
   },
 };
 
@@ -163,7 +163,7 @@ export const AllSizes: Story = {
         <VoiceButton 
           size="sm" 
           isListening={false}
-          onToggle={() => console.log('Small voice button')}
+          onToggle={() => {}}
         />
         <p className="text-xs text-gray-500 mt-2">SM</p>
       </div>
@@ -171,7 +171,7 @@ export const AllSizes: Story = {
         <VoiceButton 
           size="md" 
           isListening={false}
-          onToggle={() => console.log('Medium voice button')}
+          onToggle={() => {}}
         />
         <p className="text-xs text-gray-500 mt-2">MD</p>
       </div>
@@ -179,7 +179,7 @@ export const AllSizes: Story = {
         <VoiceButton 
           size="lg" 
           isListening={false}
-          onToggle={() => console.log('Large voice button')}
+          onToggle={() => {}}
         />
         <p className="text-xs text-gray-500 mt-2">LG</p>
       </div>
@@ -201,7 +201,7 @@ export const AllVariants: Story = {
         <VoiceButton 
           variant="primary" 
           isListening={false}
-          onToggle={() => console.log('Primary variant')}
+          onToggle={() => {}}
         />
         <p className="text-xs text-gray-500 mt-2">Primary</p>
       </div>
@@ -209,7 +209,7 @@ export const AllVariants: Story = {
         <VoiceButton 
           variant="ghost" 
           isListening={false}
-          onToggle={() => console.log('Ghost variant')}
+          onToggle={() => {}}
         />
         <p className="text-xs text-gray-500 mt-2">Ghost</p>
       </div>
@@ -217,7 +217,7 @@ export const AllVariants: Story = {
         <VoiceButton 
           variant="outline" 
           isListening={false}
-          onToggle={() => console.log('Outline variant')}
+          onToggle={() => {}}
         />
         <p className="text-xs text-gray-500 mt-2">Outline</p>
       </div>
@@ -238,7 +238,7 @@ export const AllStates: Story = {
       <div className="flex items-center gap-4">
         <VoiceButton 
           isListening={false}
-          onToggle={() => console.log('Ready to listen')}
+          onToggle={() => {}}
         />
         <span className="text-sm">Ready to listen</span>
       </div>
@@ -246,7 +246,7 @@ export const AllStates: Story = {
       <div className="flex items-center gap-4">
         <VoiceButton 
           isListening={true}
-          onToggle={() => console.log('Currently listening')}
+          onToggle={() => {}}
         />
         <span className="text-sm">Currently listening (animated)</span>
       </div>
@@ -255,7 +255,7 @@ export const AllStates: Story = {
         <VoiceButton 
           disabled={true}
           isListening={false}
-          onToggle={() => console.log('Disabled')}
+          onToggle={() => {}}
         />
         <span className="text-sm">Disabled</span>
       </div>
@@ -264,7 +264,7 @@ export const AllStates: Story = {
         <VoiceButton 
           disabled={true}
           isListening={true}
-          onToggle={() => console.log('Disabled while listening')}
+          onToggle={() => {}}
         />
         <span className="text-sm">Disabled while listening</span>
       </div>

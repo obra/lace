@@ -106,7 +106,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 // Interactive wrapper component
-const VoiceRecognitionWrapper = ({ initialListening = false, ...props }: any) => {
+interface VoiceRecognitionWrapperProps {
+  initialListening?: boolean;
+  [key: string]: unknown;
+}
+
+const VoiceRecognitionWrapper = ({ initialListening = false, ...props }: VoiceRecognitionWrapperProps) => {
   const [isListening, setIsListening] = useState(initialListening);
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');

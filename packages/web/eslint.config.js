@@ -67,14 +67,14 @@ const config = [
   {
     files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx'],
     rules: {
-      'no-console': 'off',
+      'no-console': ['error', { allow: ['warn', 'error'] }], // Allow only warn/error in tests
       'no-restricted-imports': 'off',
     },
   },
   {
     files: ['**/*.stories.tsx', '**/*.stories.ts'],
     rules: {
-      'no-console': 'off', // Allow console.log in Storybook stories for debugging and examples
+      'no-console': ['error', { allow: ['warn', 'error'] }], // Enforce no-console in Storybook stories
       'react-hooks/rules-of-hooks': 'off', // Allow hooks in Storybook render functions
     },
   },

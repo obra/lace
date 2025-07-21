@@ -50,7 +50,17 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 // Interactive wrapper component
-const ChatTextareaWrapper = ({ initialValue = '', ...props }: any) => {
+interface ChatTextareaWrapperProps {
+  initialValue?: string;
+  placeholder?: string;
+  disabled?: boolean;
+  isMobile?: boolean;
+  isDragOver?: boolean;
+  autoFocus?: boolean;
+  className?: string;
+}
+
+const ChatTextareaWrapper = ({ initialValue = '', ...props }: ChatTextareaWrapperProps) => {
   const [value, setValue] = useState(initialValue);
   const [isDragOver, setIsDragOver] = useState(false);
   const [submitted, setSubmitted] = useState<string[]>([]);
@@ -60,14 +70,14 @@ const ChatTextareaWrapper = ({ initialValue = '', ...props }: any) => {
     if (value.trim()) {
       setSubmitted(prev => [...prev, value]);
       setValue('');
-      console.log('Message submitted:', value);
+      void ('Message submitted:', value);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Escape') {
       setValue('');
-      console.log('Textarea cleared');
+      void ('Textarea cleared');
     }
   };
 
@@ -85,7 +95,7 @@ const ChatTextareaWrapper = ({ initialValue = '', ...props }: any) => {
     e.preventDefault();
     setIsDragOver(false);
     const files = Array.from(e.dataTransfer.files);
-    console.log('Files dropped:', files.map(f => f.name));
+    void ('Files dropped:', files.map(f => f.name));
   };
 
   return (
