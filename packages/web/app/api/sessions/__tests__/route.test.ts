@@ -23,7 +23,7 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
   };
 }
 
-function createMockAgent(overrides: Partial<Session['agents'][0]> = {}): Session['agents'][0] {
+function createMockAgent(overrides: Partial<NonNullable<Session['agents']>[0]> = {}): NonNullable<Session['agents']>[0] {
   return {
     threadId: asThreadId('lace_20240101_abcd12.1'),
     name: 'Test Agent',
@@ -40,8 +40,6 @@ const mockSessionService = {
   createSession: vi.fn<SessionService['createSession']>(),
   listSessions: vi.fn<SessionService['listSessions']>(),
   getSession: vi.fn<SessionService['getSession']>(),
-  spawnAgent: vi.fn<SessionService['spawnAgent']>(),
-  getAgent: vi.fn<SessionService['getAgent']>(),
 };
 
 // Mock the session service

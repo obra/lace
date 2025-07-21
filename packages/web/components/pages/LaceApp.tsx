@@ -165,28 +165,60 @@ export function LaceApp() {
 
   const [activeTasks] = useState<Task[]>([
     {
-      id: 1,
+      id: 'lace-task-001',
       title: 'AI Model Integration',
       description: 'Integrate latest language model',
+      prompt: 'Integrate the latest language model into our AI system with proper error handling and performance optimization',
       priority: 'high',
-      assignee: 'Claude',
+      assignedTo: 'claude-agent',
       status: 'in_progress',
+      createdBy: 'session-001',
+      threadId: 'session-001.1',
+      createdAt: new Date('2024-01-15T08:00:00Z'),
+      updatedAt: new Date('2024-01-15T10:30:00Z'),
+      notes: [
+        {
+          id: 'note-001',
+          content: 'Started integration process, reviewing API compatibility',
+          author: 'session-001.1',
+          createdAt: new Date('2024-01-15T09:15:00Z'),
+        },
+      ],
     },
     {
-      id: 2,
+      id: 'lace-task-002',
       title: 'Auth Bug Fix',
       description: 'Fix login timeout',
+      prompt: 'Fix the authentication system timeout issue that is causing users to be logged out prematurely',
       priority: 'medium',
-      assignee: 'Human',
+      assignedTo: 'human-developer',
       status: 'pending',
+      createdBy: 'session-002',
+      threadId: 'session-002.1',
+      createdAt: new Date('2024-01-14T14:00:00Z'),
+      updatedAt: new Date('2024-01-14T14:00:00Z'),
+      notes: [],
     },
     {
-      id: 3,
+      id: 'lace-task-003',
       title: 'Update Docs',
       description: 'API documentation',
+      prompt: 'Update the API documentation to reflect the latest changes and add examples for new endpoints',
       priority: 'low',
-      assignee: 'Claude',
-      status: 'review',
+      assignedTo: 'claude-agent',
+      status: 'blocked',
+      createdBy: 'session-003',
+      threadId: 'session-003.1',
+      createdAt: new Date('2024-01-13T16:30:00Z'),
+      updatedAt: new Date('2024-01-14T12:00:00Z'),
+      notes: [
+        {
+          id: 'note-002',
+          content: 'Waiting for API changes to be finalized before updating documentation',
+          author: 'session-003.1',
+          createdAt: new Date('2024-01-14T12:00:00Z'),
+        },
+      ],
     },
   ]);
 
@@ -675,7 +707,8 @@ Try visiting \`/admin/design\` to explore all the components we've built!`,
 
   const handleTaskCreate = (newTask: Omit<Task, 'id'>) => {
     // In a real app, this would create in backend
-    const task = { ...newTask, id: Date.now() };
+    const taskId = `lace-task-${String(Date.now()).slice(-6)}`;
+    const task = { ...newTask, id: taskId };
     addSystemMessage(`New task created: "${task.title}"`);
   };
 

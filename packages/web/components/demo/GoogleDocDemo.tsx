@@ -200,7 +200,7 @@ export default function GoogleDocDemo() {
                 </li>
                 <li>
                   <strong>Meta Scraper API:</strong> Server-side endpoint extracts{' '}
-                  <code>&lt;meta property="og:image"&gt;</code> tags
+                  <code>&lt;meta property=&quot;og:image&quot;&gt;</code> tags
                 </li>
                 <li>
                   <strong>Loading States:</strong> Shows skeleton loader while fetching metadata
@@ -214,7 +214,7 @@ export default function GoogleDocDemo() {
                 </li>
               </ul>
               <p className="text-sm text-base-content/60 mt-2">
-                The "Dynamic OG Image" scenario demonstrates real-time OG image extraction from the
+                The &quot;Dynamic OG Image&quot; scenario demonstrates real-time OG image extraction from the
                 live Google Doc URL.
               </p>
 

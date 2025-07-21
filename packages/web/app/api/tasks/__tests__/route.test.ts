@@ -6,7 +6,6 @@ import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/tasks/route';
 import type { SessionService } from '@/lib/server/session-service';
 import type { Task } from '@/types/api';
-import type { Session as CoreSession } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/lib/server/core-types';
 import {
   setupTestPersistence,
@@ -40,10 +39,10 @@ const mockSessionService = {
 
 // Set up the default mock behavior for getSession - properly typed mock
 mockSessionService.getSession.mockImplementation(
-  async (sessionId: string): Promise<CoreSession | null> => {
+  async (sessionId: string): Promise<unknown> => {
     if (sessionId === 'lace_20240101_session') {
       // Create a partial mock session with the required methods for testing
-      const mockSessionResult: Partial<CoreSession> = {
+      const mockSessionResult: Record<string, unknown> = {
         getId: () => mockSessionId,
         getInfo: () => ({
           id: mockSessionId,

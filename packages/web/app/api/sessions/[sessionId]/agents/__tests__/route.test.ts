@@ -340,7 +340,7 @@ describe('Agent Spawning API', () => {
         agents: [],
       });
 
-      mockSession.spawnAgent.mockReturnValue(newAgent);
+      mockSession.spawnAgent.mockResolvedValue(newAgent);
       mockSessionService.getSession.mockResolvedValueOnce(mockSession as unknown as Session);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {

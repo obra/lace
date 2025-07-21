@@ -68,9 +68,9 @@ A cohesive molecule that combines 4-5 atoms to solve the specific UI pattern of 
 ✓ **Do**: Combine atoms logically for message display  
 ✓ **Do**: Maintain single responsibility for message presentation  
 ✓ **Do**: Provide consistent status and badge semantics  
-✗ **Don't**: Mix unrelated functionality  
-✗ **Don't**: Override individual atom styles  
-✗ **Don't**: Create complex nested message structures
+✗ **Don&apos;t**: Mix unrelated functionality  
+✗ **Don&apos;t**: Override individual atom styles  
+✗ **Don&apos;t**: Create complex nested message structures
         `,
       },
     },
@@ -114,7 +114,7 @@ export const UserMessage: Story = {
     },
     children: (
       <div>
-        <p>Hey there! I'm working on a new project and could use some help with the implementation.</p>
+        <p>Hey there! I&apos;m working on a new project and could use some help with the implementation.</p>
       </div>
     ),
   },
@@ -132,7 +132,7 @@ export const AssistantMessage: Story = {
     },
     children: (
       <div>
-        <p>I'd be happy to help! What kind of project are you working on? Please share more details about the specific implementation you need assistance with.</p>
+        <p>I&apos;d be happy to help! What kind of project are you working on? Please share more details about the specific implementation you need assistance with.</p>
       </div>
     ),
   },
@@ -151,7 +151,7 @@ export const WithStatus: Story = {
     },
     children: (
       <div>
-        <p>I'm currently online and available for discussion!</p>
+        <p>I&apos;m currently online and available for discussion!</p>
       </div>
     ),
   },
@@ -171,7 +171,7 @@ export const WithMultipleBadges: Story = {
     },
     children: (
       <div>
-        <p>I'm an advanced AI assistant with multiple capabilities including code generation, analysis, and problem-solving.</p>
+        <p>I&apos;m an advanced AI assistant with multiple capabilities including code generation, analysis, and problem-solving.</p>
       </div>
     ),
   },
@@ -189,7 +189,7 @@ export const WithActions: Story = {
     },
     children: (
       <div>
-        <p>Here's a comprehensive solution to your problem. You can like, share, or bookmark this response for future reference.</p>
+        <p>Here&apos;s a comprehensive solution to your problem. You can like, share, or bookmark this response for future reference.</p>
       </div>
     ),
     actions: (
@@ -272,12 +272,12 @@ export const LongMessage: Story = {
     },
     children: (
       <div className="space-y-4">
-        <p>Here's a comprehensive explanation of the topic you asked about:</p>
+        <p>Here&apos;s a comprehensive explanation of the topic you asked about:</p>
         <ul className="list-disc list-inside space-y-2">
-          <li>First, let's understand the fundamental concepts</li>
-          <li>Then we'll explore the practical applications</li>
-          <li>Next, we'll dive into advanced techniques</li>
-          <li>Finally, we'll discuss best practices and optimization</li>
+          <li>First, let&apos;s understand the fundamental concepts</li>
+          <li>Then we&apos;ll explore the practical applications</li>
+          <li>Next, we&apos;ll dive into advanced techniques</li>
+          <li>Finally, we&apos;ll discuss best practices and optimization</li>
         </ul>
         <p>This approach ensures you get a complete understanding of the subject matter while maintaining clarity and practical applicability.</p>
       </div>

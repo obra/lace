@@ -38,27 +38,12 @@ export default function Home() {
 
   // Convert SessionEvents to TimelineEntries for the design system
   const timelineEntries = useMemo(() => {
-    console.log('🔄 Timeline entries recalculation:', {
-      totalEvents: events.length,
-      selectedAgent,
-      availableAgents: selectedSessionDetails?.agents?.map(a => ({
-        name: a.name,
-        threadId: a.threadId
-      })) || []
-    });
     
     const entries = convertSessionEventsToTimeline(events, {
       agents: selectedSessionDetails?.agents || [],
       selectedAgent,
     });
     
-    console.log('✅ Timeline entries result:', {
-      totalEntries: entries.length,
-      entryTypes: entries.reduce((acc, e) => {
-        acc[e.type] = (acc[e.type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>)
-    });
     
     return entries;
   }, [events, selectedSessionDetails?.agents, selectedAgent]);

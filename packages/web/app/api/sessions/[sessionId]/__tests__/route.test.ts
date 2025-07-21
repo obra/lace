@@ -382,10 +382,12 @@ describe('Session Detail API Route', () => {
         status: 'active',
         createdAt: new Date(),
         updatedAt: new Date(),
+        projectId: 'test-project',
+        configuration: { provider: 'anthropic' },
       };
 
       // This should spy on the core Session.getSession() method being called directly
-      const sessionGetSpy = vi.spyOn(Session, 'getSession').mockReturnValue(mockDirectSessionData);
+      const sessionGetSpy = vi.spyOn(Session, 'getSession').mockReturnValue(mockDirectSessionData as unknown);
 
       // Create a real session first for the route to work with
       const testProject = Project.create('TDD Test Project', '/test/path', 'TDD test project', {});

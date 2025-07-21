@@ -21,14 +21,6 @@ export function convertSessionEventsToTimeline(
   // 1. Filter events by selected agent
   const filteredEvents = filterEventsByAgent(events, context.selectedAgent);
   
-  console.log('🎯 Agent Filtering:', {
-    selectedAgent: context.selectedAgent,
-    totalEvents: events.length,
-    filteredEvents: filteredEvents.length,
-    agentEvents: filteredEvents.filter(e => 
-      e.type === 'AGENT_MESSAGE' || e.type === 'TOOL_CALL' || e.type === 'TOOL_RESULT'
-    ).length
-  });
   
   // 2. Process streaming tokens (merge AGENT_TOKEN into AGENT_STREAMING)
   const processedEvents = processStreamingTokens(filteredEvents);

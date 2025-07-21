@@ -382,7 +382,7 @@ export const MobileView: Story = {
         <h3 className="text-lg font-semibold mb-4">Mobile Chat</h3>
         <div className="space-y-3">
           <div className="bg-base-200 p-3 rounded-lg">
-            <div className="text-sm">What's the weather like?</div>
+            <div className="text-sm">What&apos;s the weather like?</div>
           </div>
           <div className="bg-primary/10 p-3 rounded-lg">
             <div className="text-sm">Let me check the current weather for you...</div>

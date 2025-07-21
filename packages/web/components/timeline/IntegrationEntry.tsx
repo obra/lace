@@ -141,7 +141,7 @@ export function IntegrationTimelineEntry({ entry, compact = false }: Integration
           <div className="text-xs text-base-content/60 space-y-1">
             <div>Channel: <span className="font-mono">{slackEntry.channel}</span></div>
             {slackEntry.messagePreview && (
-              <div className="italic">"{slackEntry.messagePreview}"</div>
+              <div className="italic">&quot;{slackEntry.messagePreview}&quot;</div>
             )}
             {slackEntry.reactions && slackEntry.reactions.length > 0 && (
               <div className="flex gap-2">
@@ -207,7 +207,7 @@ export function IntegrationTimelineEntry({ entry, compact = false }: Integration
           </div>
           <div>
             <div className="text-sm font-medium text-base-content">
-              {getActionText(entry.action, entry.type)} "{entry.title}"
+              {getActionText(entry.action, entry.type)} &quot;{entry.title}&quot;
             </div>
             <div className="text-xs text-base-content/60">
               {integrationInfo.name} • {formatTimestamp(entry.timestamp)}

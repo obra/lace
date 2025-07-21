@@ -87,7 +87,7 @@ const mockCoreSession: MockCoreSession = {
 const mockSessionService = {
   createSession: vi.fn<SessionService['createSession']>(),
   listSessions: vi.fn<SessionService['listSessions']>(),
-  getSession: vi.fn<SessionService['getSession']>().mockResolvedValue(mockCoreSession),
+  getSession: vi.fn<SessionService['getSession']>().mockResolvedValue(mockSession),
   spawnAgent: vi.fn<SessionService['spawnAgent']>(),
   getAgent: vi.fn<SessionService['getAgent']>(),
 };

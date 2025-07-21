@@ -207,7 +207,7 @@ export const Sizes: Story = {
             <div className="space-y-4">
               <p><strong>Size:</strong> {size.name}</p>
               <p><strong>Description:</strong> {size.description}</p>
-              <p>This modal demonstrates the {size.name.toLowerCase()} size variant. The content automatically adjusts to fit the modal's constraints while maintaining proper spacing and readability.</p>
+              <p>This modal demonstrates the {size.name.toLowerCase()} size variant. The content automatically adjusts to fit the modal&apos;s constraints while maintaining proper spacing and readability.</p>
               
               {size.id === 'full' && (
                 <div className="bg-base-200 p-4 rounded-lg">
@@ -516,7 +516,7 @@ export const MultipleModals: Story = {
           size="md"
         >
           <div className="space-y-4">
-            <p>This is the first modal. You can open a second modal from here, but it's not recommended.</p>
+            <p>This is the first modal. You can open a second modal from here, but it&apos;s not recommended.</p>
             <button onClick={() => setSecondModal(true)} className="btn btn-secondary">
               Open Second Modal (Not Recommended)
             </button>

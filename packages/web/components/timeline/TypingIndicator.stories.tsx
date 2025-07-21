@@ -216,7 +216,7 @@ export const DarkMode: Story = {
           </div>
           <div className="bg-base-100 border border-base-300 rounded-2xl px-4 py-3">
             <p className="text-base-content">
-              What's the best approach for state management in React?
+              What&apos;s the best approach for state management in React?
             </p>
           </div>
         </div>

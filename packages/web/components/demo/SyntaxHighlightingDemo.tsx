@@ -724,7 +724,7 @@ export default function SyntaxHighlightingDemo() {
         <h3 className="text-lg font-semibold mb-3">Inline Code Demo</h3>
         <div className="prose max-w-none">
           <p>
-            Here's some inline code examples: <InlineCode code="const x = 42;" />,{' '}
+            Here&apos;s some inline code examples: <InlineCode code="const x = 42;" />,{' '}
             <InlineCode code="import React from 'react'" />, and{' '}
             <InlineCode code="SELECT * FROM users WHERE active = true" />.
           </p>
