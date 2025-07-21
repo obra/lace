@@ -16,9 +16,11 @@ export type {
   GoogleDocAttachment,
   TimelineEntry,
   CarouselItem,
-  Project,
   Timeline,
   Task,
   RecentFile,
   Theme,
 } from './design-system';
+
+// Core project types
+export type { ProjectInfo as Project } from '@/lib/server/core-types';

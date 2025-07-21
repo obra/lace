@@ -82,11 +82,6 @@ export interface CarouselItem {
   commit: string;
 }
 
-export interface Project {
-  id: number;
-  name: string;
-  path: string;
-}
 
 export interface Timeline {
   id: number;

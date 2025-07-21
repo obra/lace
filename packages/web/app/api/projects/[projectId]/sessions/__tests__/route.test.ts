@@ -28,17 +28,20 @@ vi.mock('@/lib/utils/id-generator', () => ({
 }));
 
 describe('Session API endpoints under projects', () => {
-  let mockProject: {
-    getSessions: vi.MockedFunction<() => unknown[]>;
-    createSession: vi.MockedFunction<
-      (name: string, description: string, config: Record<string, unknown>) => unknown
-    >;
-  };
+  interface MockProject {
+    getSessions: () => unknown[];
+    createSession: (name: string, description: string, config: Record<string, unknown>) => unknown;
+  }
+  
+  let mockProject: MockProject;
 
   beforeEach(() => {
+    const getSessionsMock = vi.fn<[], unknown[]>();
+    const createSessionMock = vi.fn<[string, string, Record<string, unknown>], unknown>();
+    
     mockProject = {
-      getSessions: vi.fn(),
-      createSession: vi.fn(),
+      getSessions: getSessionsMock,
+      createSession: createSessionMock,
     };
     const mockedGetById = vi.mocked(Project.getById);
     mockedGetById.mockReturnValue(mockProject as unknown as ReturnType<typeof Project.getById>);
@@ -69,7 +72,7 @@ describe('Session API endpoints under projects', () => {
         },
       ];
 
-      (mockProject.getSessions as unknown as vi.MockedFunction<() => unknown[]>).mockReturnValue(mockSessions);
+      vi.mocked(mockProject.getSessions).mockReturnValue(mockSessions);
 
       const response = await GET(
         new NextRequest('http://localhost/api/projects/project1/sessions'),
@@ -88,7 +91,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should return empty array when no sessions exist', async () => {
-      (mockProject.getSessions as unknown as vi.MockedFunction<() => unknown[]>).mockReturnValue([]);
+      vi.mocked(mockProject.getSessions).mockReturnValue([]);
 
       const response = await GET(
         new NextRequest('http://localhost/api/projects/project1/sessions'),
@@ -121,7 +124,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should handle database errors', async () => {
-      (mockProject.getSessions as unknown as vi.MockedFunction<() => unknown[]>).mockImplementation(() => {
+      vi.mocked(mockProject.getSessions).mockImplementation(() => {
         throw new Error('Database error');
       });
 

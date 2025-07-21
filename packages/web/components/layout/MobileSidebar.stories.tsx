@@ -102,10 +102,46 @@ type Story = StoryObj<typeof meta>;
 
 // Sample data for stories
 const sampleProjects: Project[] = [
-  { id: 1, name: 'AI Research', path: '/projects/ai-research' },
-  { id: 2, name: 'Web Application', path: '/projects/webapp' },
-  { id: 3, name: 'Data Pipeline', path: '/projects/data-pipeline' },
-  { id: 4, name: 'Mobile App', path: '/projects/mobile' },
+  { 
+    id: 'ai-research-project',
+    name: 'AI Research',
+    description: 'Advanced AI research and development project',
+    workingDirectory: '/projects/ai-research',
+    isArchived: false,
+    createdAt: new Date('2024-01-01T08:00:00Z'),
+    lastUsedAt: new Date('2024-01-15T10:00:00Z'),
+    sessionCount: 25,
+  },
+  { 
+    id: 'web-application',
+    name: 'Web Application',
+    description: 'Full-stack web application development',
+    workingDirectory: '/projects/webapp',
+    isArchived: false,
+    createdAt: new Date('2023-12-20T10:00:00Z'),
+    lastUsedAt: new Date('2024-01-14T15:30:00Z'),
+    sessionCount: 18,
+  },
+  { 
+    id: 'data-pipeline',
+    name: 'Data Pipeline',
+    description: 'ETL data processing pipeline',
+    workingDirectory: '/projects/data-pipeline',
+    isArchived: false,
+    createdAt: new Date('2023-11-15T12:00:00Z'),
+    lastUsedAt: new Date('2024-01-13T09:15:00Z'),
+    sessionCount: 32,
+  },
+  { 
+    id: 'mobile-app',
+    name: 'Mobile App',
+    description: 'Cross-platform mobile application',
+    workingDirectory: '/projects/mobile',
+    isArchived: false,
+    createdAt: new Date('2024-01-05T14:00:00Z'),
+    lastUsedAt: new Date('2024-01-12T16:45:00Z'),
+    sessionCount: 12,
+  },
 ];
 
 const sampleTimelines: Timeline[] = [

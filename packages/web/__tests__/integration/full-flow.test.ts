@@ -18,7 +18,7 @@ import { POST as createProjectSession } from '@/app/api/projects/[projectId]/ses
 import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessionId]/agents/route';
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { GET as streamEvents } from '@/app/api/sessions/[sessionId]/events/stream/route';
-import type { ThreadId } from '@/types/api';
+import type { ThreadId, Session } from '@/types/api';
 import {
   setupTestPersistence,
   teardownTestPersistence,
@@ -98,7 +98,7 @@ describe('Full Conversation Flow', () => {
     }
 
     expect(sessionResponse.status).toBe(201);
-    const sessionData = (await sessionResponse.json()) as { session: { id: string; name: string } };
+    const sessionData = (await sessionResponse.json()) as { session: Session };
     expect(sessionData.session.name).toBe(sessionName);
     const sessionId: ThreadId = sessionData.session.id as ThreadId;
 
@@ -122,7 +122,7 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ sessionId: sessionId as string }),
     });
     expect(agentResponse.status).toBe(201);
-    const agentData = (await agentResponse.json()) as { agent: { threadId: string; name: string } };
+    const agentData = (await agentResponse.json()) as { agent: { threadId: ThreadId; name: string } };
     expect(agentData.agent.name).toBe(agentName);
     const agentThreadId: ThreadId = agentData.agent.threadId as ThreadId;
 
@@ -188,7 +188,7 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ projectId }),
     });
     expect(sessionResponse.status).toBe(201);
-    const sessionData = (await sessionResponse.json()) as { session: { id: string } };
+    const sessionData = (await sessionResponse.json()) as { session: Session };
     const sessionId: ThreadId = sessionData.session.id as ThreadId;
 
     // Spawn first agent
@@ -274,7 +274,7 @@ describe('Full Conversation Flow', () => {
       }),
       { params: Promise.resolve({ projectId: projectId1 }) }
     );
-    const session1Data = (await session1Response.json()) as { session: { id: string } };
+    const session1Data = (await session1Response.json()) as { session: Session };
     const session1Id: ThreadId = session1Data.session.id as ThreadId;
 
     const session2Response = await createProjectSession(
@@ -291,7 +291,7 @@ describe('Full Conversation Flow', () => {
       }),
       { params: Promise.resolve({ projectId: projectId2 }) }
     );
-    const session2Data = (await session2Response.json()) as { session: { id: string } };
+    const session2Data = (await session2Response.json()) as { session: Session };
     const session2Id: ThreadId = session2Data.session.id as ThreadId;
 
     // Connect to streams

@@ -122,31 +122,34 @@ type Story = StoryObj<typeof meta>;
 // Mock data for stories
 const mockProjects: Project[] = [
   {
-    id: '1',
+    id: 'lace-ai-assistant',
     name: 'Lace AI Assistant',
-    description: 'Main AI assistant project',
-    path: '/Users/user/code/lace',
-    language: 'TypeScript',
-    framework: 'Next.js',
-    lastOpened: new Date('2024-01-15T10:00:00Z'),
+    description: 'Main AI assistant project with TypeScript and Next.js',
+    workingDirectory: '/Users/user/code/lace',
+    isArchived: false,
+    createdAt: new Date('2024-01-01T08:00:00Z'),
+    lastUsedAt: new Date('2024-01-15T10:00:00Z'),
+    sessionCount: 42,
   },
   {
-    id: '2',
+    id: 'ecommerce-platform',
     name: 'E-commerce Platform',
-    description: 'Online store platform',
-    path: '/Users/user/code/ecommerce',
-    language: 'Python',
-    framework: 'Django',
-    lastOpened: new Date('2024-01-14T15:30:00Z'),
+    description: 'Online store platform built with Python and Django',
+    workingDirectory: '/Users/user/code/ecommerce',
+    isArchived: false,
+    createdAt: new Date('2023-12-15T12:00:00Z'),
+    lastUsedAt: new Date('2024-01-14T15:30:00Z'),
+    sessionCount: 28,
   },
   {
-    id: '3',
+    id: 'mobile-app',
     name: 'Mobile App',
-    description: 'React Native mobile app',
-    path: '/Users/user/code/mobile',
-    language: 'JavaScript',
-    framework: 'React Native',
-    lastOpened: new Date('2024-01-13T09:15:00Z'),
+    description: 'React Native mobile app for cross-platform development',
+    workingDirectory: '/Users/user/code/mobile',
+    isArchived: false,
+    createdAt: new Date('2023-11-20T14:30:00Z'),
+    lastUsedAt: new Date('2024-01-13T09:15:00Z'),
+    sessionCount: 15,
   },
 ];
 
@@ -241,7 +244,14 @@ const mockRecentFiles: RecentFile[] = [
 ];
 
 // Interactive wrapper component
-const SidebarWrapper = ({ initialOpen = true, ...props }: any) => {
+interface SidebarWrapperProps {
+  initialOpen?: boolean;
+  activeTasks?: Task[];
+  timelines?: Timeline[];
+  currentTheme?: string;
+}
+
+const SidebarWrapper = ({ initialOpen = true, ...props }: SidebarWrapperProps) => {
   const [isOpen, setIsOpen] = useState(initialOpen);
   const [currentProject, setCurrentProject] = useState(mockProjects[0]);
   const [currentTimeline, setCurrentTimeline] = useState(mockTimelines[0]);
@@ -302,10 +312,10 @@ const SidebarWrapper = ({ initialOpen = true, ...props }: any) => {
         currentProject={currentProject}
         projects={mockProjects}
         currentTimeline={currentTimeline}
-        timelines={mockTimelines}
-        activeTasks={mockTasks}
+        timelines={props.timelines || mockTimelines}
+        activeTasks={props.activeTasks || mockTasks}
         recentFiles={mockRecentFiles}
-        currentTheme={currentTheme}
+        currentTheme={props.currentTheme || currentTheme}
         onProjectChange={handleProjectChange}
         onTimelineChange={handleTimelineChange}
         onNewTimeline={handleNewTimeline}
