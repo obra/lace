@@ -248,8 +248,8 @@ describe('API Endpoints E2E Tests', () => {
       const responseData: unknown = await response.json();
       const data = responseData as { session: SessionType };
 
-      expect(data.session.agents).toHaveLength(2); // Coordinator + spawned agent
-      expect(data.session.agents.find((a) => a.name === 'Reflected Agent')).toBeDefined();
+      expect(data.session.agents || []).toHaveLength(2); // Coordinator + spawned agent  
+      expect(data.session.agents?.find((a) => a.name === 'Reflected Agent')).toBeDefined();
     });
   });
 

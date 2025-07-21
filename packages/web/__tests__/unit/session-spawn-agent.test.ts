@@ -200,7 +200,7 @@ describe('Session.spawnAgent Method', () => {
     expect(sessionThreadManager).toBeDefined();
 
     // Create another thread and make it current
-    const otherThreadId = asThreadId(sessionThreadManager.createThread());
+    const otherThreadId = asThreadId(String(sessionThreadManager.createThread()));
     sessionThreadManager.setCurrentThread(otherThreadId);
 
     // Verify the delegate thread is still accessible

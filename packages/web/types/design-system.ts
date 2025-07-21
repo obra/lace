@@ -89,14 +89,6 @@ export interface Timeline {
   agent: 'Claude' | 'GPT-4' | 'Gemini';
 }
 
-export interface Task {
-  id: number;
-  title: string;
-  description: string;
-  priority: 'high' | 'medium' | 'low';
-  assignee: string;
-  status: 'pending' | 'in_progress' | 'review' | 'completed';
-}
 
 export interface RecentFile {
   name: string;

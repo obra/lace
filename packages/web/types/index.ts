@@ -17,10 +17,9 @@ export type {
   TimelineEntry,
   CarouselItem,
   Timeline,
-  Task,
   RecentFile,
   Theme,
 } from './design-system';
 
-// Core project types
-export type { ProjectInfo as Project } from '@/lib/server/core-types';
+// Core project and task types
+export type { ProjectInfo as Project, Task, TaskNote, TaskStatus, TaskPriority } from '@/lib/server/core-types';

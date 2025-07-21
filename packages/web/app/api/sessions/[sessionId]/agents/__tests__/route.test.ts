@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
 import type { ThreadId, Agent } from '@/types/api';
 // Import SessionService type is not needed since we define our own mock interface
-import type { Session as CoreSession } from '@/lib/server/core-types';
+import type { Session } from '@/types/api';
 import {
   setupTestPersistence,
   teardownTestPersistence,
@@ -143,7 +143,7 @@ interface MockSessionService {
     (name: string, provider: string, model: string, projectId: string) => Promise<unknown>
   >;
   listSessions: MockedFunction<() => Promise<unknown[]>>;
-  getSession: MockedFunction<(sessionId: ThreadId) => Promise<CoreSession | null>>;
+  getSession: MockedFunction<(sessionId: ThreadId) => Promise<Session | null>>;
   updateSession: MockedFunction<(sessionId: ThreadId, updates: Record<string, unknown>) => void>;
   clearActiveSessions: MockedFunction<() => void>;
   spawnAgent: MockedFunction<(name: string, provider?: string, model?: string) => Promise<Agent>>;
@@ -191,7 +191,7 @@ describe('Agent Spawning API', () => {
         getAgents: vi.fn().mockReturnValue([]),
       };
 
-      mockSessionService.getSession.mockResolvedValueOnce(mockSession as unknown as CoreSession);
+      mockSessionService.getSession.mockResolvedValueOnce(mockSession as unknown as Session);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
         method: 'POST',
@@ -252,7 +252,7 @@ describe('Agent Spawning API', () => {
         agents: existingAgents,
       });
 
-      mockSessionService.getSession.mockResolvedValueOnce(mockSession as unknown as CoreSession);
+      mockSessionService.getSession.mockResolvedValueOnce(mockSession as unknown as Session);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
         method: 'POST',
@@ -300,9 +300,9 @@ describe('Agent Spawning API', () => {
       });
 
       // Mock the spawnAgent method to return the new agent
-      mockSession.spawnAgent.mockReturnValue(newAgent);
+      mockSession.spawnAgent.mockResolvedValue(newAgent);
 
-      mockSessionService.getSession.mockResolvedValueOnce(mockSession as unknown as CoreSession);
+      mockSessionService.getSession.mockResolvedValueOnce(mockSession as unknown as Session);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
         method: 'POST',
@@ -341,7 +341,7 @@ describe('Agent Spawning API', () => {
       });
 
       mockSession.spawnAgent.mockReturnValue(newAgent);
-      mockSessionService.getSession.mockResolvedValueOnce(mockSession as unknown as CoreSession);
+      mockSessionService.getSession.mockResolvedValueOnce(mockSession as unknown as Session);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
         method: 'POST',
@@ -368,7 +368,7 @@ describe('Agent Spawning API', () => {
           name: 'Test Session',
           createdAt: new Date().toISOString(),
           agents: [],
-        }) as unknown as CoreSession
+        }) as unknown as Session
       );
       const firstAgent: Agent = createAgent({
         threadId: createThreadId(`${sessionId}.1`),
@@ -408,7 +408,7 @@ describe('Agent Spawning API', () => {
 
       secondMockSession.spawnAgent.mockReturnValue(secondAgent);
       mockSessionService.getSession.mockResolvedValueOnce(
-        secondMockSession as unknown as CoreSession
+        secondMockSession as unknown as Session
       );
 
       const request2 = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
@@ -445,7 +445,7 @@ describe('Agent Spawning API', () => {
           name: 'Test Session',
           createdAt: new Date().toISOString(),
           agents: [],
-        }) as unknown as CoreSession
+        }) as unknown as Session
       );
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
@@ -469,7 +469,7 @@ describe('Agent Spawning API', () => {
           id: sessionId,
           name: 'Test Session',
           agents: [],
-        }) as unknown as CoreSession
+        }) as unknown as Session
       );
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
@@ -515,7 +515,7 @@ describe('Agent Spawning API', () => {
           name: 'Test Session',
           createdAt: new Date().toISOString(),
           agents,
-        }) as unknown as CoreSession
+        }) as unknown as Session
       );
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`);
@@ -554,7 +554,7 @@ describe('Agent Spawning API', () => {
           name: 'Test Session',
           createdAt: new Date().toISOString(),
           agents: [testAgent],
-        }) as unknown as CoreSession
+        }) as unknown as Session
       );
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`);
@@ -578,7 +578,7 @@ describe('Agent Spawning API', () => {
           name: 'Test Session',
           createdAt: new Date().toISOString(),
           agents: [],
-        }) as unknown as CoreSession
+        }) as unknown as Session
       );
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`);

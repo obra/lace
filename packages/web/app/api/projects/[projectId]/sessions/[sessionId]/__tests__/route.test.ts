@@ -3,7 +3,7 @@
 
 
 import { NextRequest } from 'next/server';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest';
 import { GET, PATCH, DELETE } from '@/app/api/projects/[projectId]/sessions/[sessionId]/route';
 import { Project } from '@/lib/server/lace-imports';
 
@@ -16,9 +16,9 @@ vi.mock('@/lib/server/lace-imports', () => ({
 
 describe('Individual session API endpoints', () => {
   let mockProject: {
-    getSession: vi.MockedFunction<(id: string) => unknown>;
-    updateSession: vi.MockedFunction<(id: string, data: Record<string, unknown>) => unknown>;
-    deleteSession: vi.MockedFunction<(id: string) => boolean>;
+    getSession: MockedFunction<(id: string) => unknown>;
+    updateSession: MockedFunction<(id: string, data: Record<string, unknown>) => unknown>;
+    deleteSession: MockedFunction<(id: string) => boolean>;
   };
 
   const mockSession = {
@@ -38,7 +38,7 @@ describe('Individual session API endpoints', () => {
       updateSession: vi.fn(),
       deleteSession: vi.fn(),
     };
-    const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
+    const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
     mockedGetById.mockReturnValue(mockProject as unknown as ReturnType<typeof Project.getById>);
   });
 
@@ -61,7 +61,7 @@ describe('Individual session API endpoints', () => {
     });
 
     it('should return 404 when project does not exist', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
+      const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
       mockedGetById.mockReturnValue(null);
 
       const response = await GET(
@@ -145,7 +145,7 @@ describe('Individual session API endpoints', () => {
     });
 
     it('should return 404 when project does not exist', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
+      const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
       mockedGetById.mockReturnValue(null);
 
       const request = new NextRequest('http://localhost/api/projects/project1/sessions/session1', {
@@ -277,7 +277,7 @@ describe('Individual session API endpoints', () => {
     });
 
     it('should return 404 when project does not exist', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as vi.MockedFunction<typeof Project.getById>;
+      const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
       mockedGetById.mockReturnValue(null);
 
       const response = await DELETE(

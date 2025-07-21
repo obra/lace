@@ -126,28 +126,46 @@ export function AnimatedLaceApp() {
 
   const [activeTasks] = useState<Task[]>([
     {
-      id: 1,
+      id: 'animated-task-001',
       title: 'AI Model Integration',
       description: 'Integrate latest language model',
+      prompt: 'Integrate the latest language model API with our existing codebase, ensuring proper error handling and performance optimization',
       priority: 'high',
-      assignee: 'Claude',
+      assignedTo: 'claude-agent-thread-id' as any,
       status: 'in_progress',
+      createdBy: 'session-main-thread' as any,
+      threadId: 'session-main' as any,
+      createdAt: new Date('2024-01-15T09:00:00Z'),
+      updatedAt: new Date('2024-01-15T10:30:00Z'),
+      notes: [],
     },
     {
-      id: 2,
+      id: 'animated-task-002',
       title: 'Auth Bug Fix',
       description: 'Fix login timeout',
+      prompt: 'Investigate and fix the authentication timeout issue occurring in production environment',
       priority: 'medium',
-      assignee: 'Human',
+      assignedTo: undefined,
       status: 'pending',
+      createdBy: 'session-main-thread' as any,
+      threadId: 'session-main' as any,
+      createdAt: new Date('2024-01-14T14:00:00Z'),
+      updatedAt: new Date('2024-01-14T14:00:00Z'),
+      notes: [],
     },
     {
-      id: 3,
+      id: 'animated-task-003',
       title: 'Update Docs',
       description: 'API documentation',
+      prompt: 'Update the API documentation to reflect the recent changes in authentication endpoints and response formats',
       priority: 'low',
-      assignee: 'Claude',
-      status: 'review',
+      assignedTo: 'claude-agent-thread-id' as any,
+      status: 'blocked',
+      createdBy: 'session-main-thread' as any,
+      threadId: 'session-main' as any,
+      createdAt: new Date('2024-01-13T16:00:00Z'),
+      updatedAt: new Date('2024-01-13T16:30:00Z'),
+      notes: [],
     },
   ]);
 
@@ -355,7 +373,10 @@ export function AnimatedLaceApp() {
   };
 
   const handleTaskCreate = (newTask: Omit<Task, 'id'>) => {
-    const task = { ...newTask, id: Date.now() };
+    const task = { 
+      ...newTask, 
+      id: `animated-task-${Date.now()}`,
+    };
     addSystemMessage(`New task created: "${task.title}"`);
     setNotification(`Task created: ${task.title}`);
   };

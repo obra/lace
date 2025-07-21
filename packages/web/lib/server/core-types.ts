@@ -11,7 +11,7 @@ export type { ApprovalCallback } from '~/tools/approval-types';
 export type { ToolAnnotations } from '~/tools/types';
 export type { AgentState } from '~/agents/agent';
 export type { ProviderInfo, ModelInfo } from '~/providers/base-provider';
-export type { TaskFilters } from '~/tasks/types';
+export type { TaskFilters, Task, TaskNote, TaskStatus, TaskPriority } from '~/tasks/types';
 export type { ProjectInfo } from '~/projects/project';
 
 // Constants
