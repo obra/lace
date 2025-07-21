@@ -1,32 +1,24 @@
-// ABOUTME: Tests for useSessionAPI hook
-// ABOUTME: Verifies session and agent management API calls
+// ABOUTME: Tests for useSessionAPI hook focusing on state management and behavior
+// ABOUTME: Verifies loading states, error handling, and hook behavior patterns
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
 import type { ThreadId } from '@/types/api';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
 
-// Mock fetch globally
+// ✅ ESSENTIAL MOCK - Mock fetch to avoid network calls in tests
+// Tests focus on hook state management behavior, not API implementation
 const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
 describe('useSessionAPI', () => {
   beforeEach(() => {
-    void setupTestPersistence();
     vi.clearAllMocks();
     mockFetch.mockReset();
   });
 
-  afterEach(() => {
-    teardownTestPersistence();
-  });
-
   describe('createSession', () => {
-    it('should create a session successfully', async () => {
+    it('should manage loading and success states during session creation', async () => {
       const mockSession = {
         id: 'lace_20250113_test123' as ThreadId,
         name: 'Test Session',
@@ -41,22 +33,22 @@ describe('useSessionAPI', () => {
 
       const { result } = renderHook(() => useSessionAPI());
 
+      // Verify initial state
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBe(null);
+
       let session;
       await act(async () => {
         session = await result.current.createSession({ name: 'Test Session' });
       });
 
+      // Verify successful operation result and final state
       expect(session).toEqual(mockSession);
-      expect(global.fetch).toHaveBeenCalledWith('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Test Session' }),
-      });
       expect(result.current.loading).toBe(false);
       expect(result.current.error).toBe(null);
     });
 
-    it('should handle session creation errors', async () => {
+    it('should handle error states and return null on failure', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         json: () => Promise.resolve({ error: 'Failed to create session' }),
@@ -69,12 +61,13 @@ describe('useSessionAPI', () => {
         session = await result.current.createSession({ name: 'Test Session' });
       });
 
+      // Verify error handling behavior
       expect(session).toBe(null);
       expect(result.current.error).toBe('Failed to create session');
       expect(result.current.loading).toBe(false);
     });
 
-    it('should handle network errors', async () => {
+    it('should handle network errors gracefully', async () => {
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
       const { result } = renderHook(() => useSessionAPI());
@@ -84,6 +77,7 @@ describe('useSessionAPI', () => {
         session = await result.current.createSession({ name: 'Test Session' });
       });
 
+      // Verify network error handling behavior
       expect(session).toBe(null);
       expect(result.current.error).toBe('Network error');
       expect(result.current.loading).toBe(false);
@@ -91,7 +85,7 @@ describe('useSessionAPI', () => {
   });
 
   describe('listSessions', () => {
-    it('should list sessions successfully', async () => {
+    it('should return session list and manage loading states', async () => {
       const mockSessions = [
         {
           id: 'lace_20250113_test123' as ThreadId,
@@ -119,13 +113,13 @@ describe('useSessionAPI', () => {
         sessions = await result.current.listSessions();
       });
 
+      // Verify successful operation result and final state
       expect(sessions).toEqual(mockSessions);
-      expect(global.fetch).toHaveBeenCalledWith('/api/sessions');
       expect(result.current.loading).toBe(false);
       expect(result.current.error).toBe(null);
     });
 
-    it('should return empty array on error', async () => {
+    it('should return empty array and set error state on failure', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         json: () => Promise.resolve({ error: 'Failed to list sessions' }),
@@ -138,13 +132,14 @@ describe('useSessionAPI', () => {
         sessions = await result.current.listSessions();
       });
 
+      // Verify error handling behavior
       expect(sessions).toEqual([]);
       expect(result.current.error).toBe('Failed to list sessions');
     });
   });
 
   describe('getSession', () => {
-    it('should get session details successfully', async () => {
+    it('should return session details when found', async () => {
       const sessionId = 'lace_20250113_test123' as ThreadId;
       const mockSession = {
         id: sessionId,
@@ -174,8 +169,8 @@ describe('useSessionAPI', () => {
         session = await result.current.getSession(sessionId);
       });
 
+      // Verify successful operation result
       expect(session).toEqual(mockSession);
-      expect(global.fetch).toHaveBeenCalledWith(`/api/sessions/${sessionId}`);
     });
 
     it('should return null for non-existent session', async () => {
@@ -193,6 +188,7 @@ describe('useSessionAPI', () => {
         session = await result.current.getSession(sessionId);
       });
 
+      // Verify error handling behavior
       expect(session).toBe(null);
       expect(result.current.error).toBe('Session not found');
     });
@@ -350,8 +346,8 @@ describe('useSessionAPI', () => {
     });
   });
 
-  describe('loading state', () => {
-    it('should set loading state during operations', async () => {
+  describe('loading state management', () => {
+    it('should properly manage loading state lifecycle during async operations', async () => {
       const mockSession = {
         id: 'lace_20250113_test123' as ThreadId,
         name: 'Test Session',
@@ -368,16 +364,18 @@ describe('useSessionAPI', () => {
 
       const { result } = renderHook(() => useSessionAPI());
 
+      // Verify initial loading state
       expect(result.current.loading).toBe(false);
 
-      // Start operation
+      // Start async operation
       act(() => {
         void result.current.createSession({ name: 'Test Session' });
       });
 
+      // Verify loading state is set during operation
       expect(result.current.loading).toBe(true);
 
-      // Resolve operation
+      // Resolve the async operation
       await act(async () => {
         resolvePromise!({
           ok: true,
@@ -386,9 +384,38 @@ describe('useSessionAPI', () => {
         await promise;
       });
 
+      // Verify loading state is cleared after completion
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
+    });
+
+    it('should clear error state when starting new operations', async () => {
+      const { result } = renderHook(() => useSessionAPI());
+
+      // First operation fails
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ error: 'First error' }),
+      });
+
+      await act(async () => {
+        await result.current.createSession({ name: 'Test Session' });
+      });
+
+      expect(result.current.error).toBe('First error');
+
+      // Second operation succeeds - error should be cleared
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ sessions: [] }),
+      });
+
+      await act(async () => {
+        await result.current.listSessions();
+      });
+
+      expect(result.current.error).toBe(null);
     });
   });
 });

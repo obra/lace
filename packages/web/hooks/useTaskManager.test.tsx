@@ -1,5 +1,5 @@
-// ABOUTME: Unit tests for useTaskManager React hook
-// ABOUTME: Tests task management operations in React components
+// ABOUTME: Unit tests for useTaskManager hook focusing on state management behavior 
+// ABOUTME: Tests task management operations, loading states, and error handling
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
@@ -8,12 +8,13 @@ import { useTaskManager } from '@/hooks/useTaskManager';
 import { TaskAPIClient } from '@/lib/client/task-api';
 import type { Task } from '@/types/api';
 import { asThreadId } from '@/lib/server/core-types';
-import { setupTestPersistence, teardownTestPersistence } from '~/__tests__/setup/persistence-helper';
 
-// Mock the TaskAPIClient
+// ✅ ESSENTIAL MOCK - Mock TaskAPIClient to avoid real API calls in tests
+// Tests focus on hook state management behavior, not API client implementation
 vi.mock('@/lib/client/task-api');
 
-// Mock EventSource for tests
+// ✅ ESSENTIAL MOCK - Mock EventSource to avoid real SSE connections in tests
+// Tests focus on hook behavior, not SSE implementation details
 class MockEventSource {
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
@@ -45,7 +46,6 @@ describe('useTaskManager', () => {
   };
 
   beforeEach(() => {
-    void setupTestPersistence();
     mockClient = {
       listTasks: vi.fn().mockResolvedValue([mockTask]),
       createTask: vi.fn().mockResolvedValue(mockTask),
@@ -65,21 +65,22 @@ describe('useTaskManager', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-    teardownTestPersistence();
   });
 
-  it('should initialize with loading state', async () => {
+  it('should initialize with loading state and transition to loaded state', async () => {
     const { result } = renderHook(() => useTaskManager(mockSessionId));
 
-    // Initial state should be loading
+    // Verify initial loading state and empty data
     expect(result.current.isLoading).toBe(true);
     expect(result.current.tasks).toEqual([]);
     expect(result.current.error).toBeNull();
 
-    // Wait for the initial fetch to complete
+    // Wait for the initial fetch to complete and verify final state  
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
+    expect(result.current.tasks).toEqual([mockTask]);
+    expect(result.current.error).toBeNull();
   });
 
   it('should fetch tasks on mount', async () => {
