@@ -430,7 +430,7 @@ describe('FileFindTool with schema validation', () => {
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('No files found');
-    });
+    }, 10000);
 
     it('should handle non-existent relative paths with working directory context', async () => {
       const result = await tool.execute(

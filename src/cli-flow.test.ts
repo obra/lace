@@ -16,21 +16,21 @@ import {
 } from '~/__tests__/setup/persistence-helper';
 
 // Mock all external dependencies
-vi.mock('../agents/agent.js');
-vi.mock('../threads/thread-manager.js');
-vi.mock('../tools/executor.js');
-vi.mock('../config/lace-dir.js', () => ({
+vi.mock('~/agents/agent');
+vi.mock('~/threads/thread-manager');
+vi.mock('~/tools/executor');
+vi.mock('~/config/lace-dir', () => ({
   getLaceDbPath: vi.fn(() => '/mock/db/path'),
 }));
-vi.mock('../config/env-loader.js');
-vi.mock('../utils/logger.js');
-vi.mock('../utils/traffic-logger.js');
-vi.mock('../interfaces/non-interactive-interface.js');
-vi.mock('../interfaces/terminal/terminal-interface.js');
-vi.mock('../tools/policy-wrapper.js');
+vi.mock('~/config/env-loader');
+vi.mock('~/utils/logger');
+vi.mock('~/utils/traffic-logger');
+vi.mock('~/interfaces/non-interactive-interface');
+vi.mock('~/interfaces/terminal/terminal-interface');
+vi.mock('~/tools/policy-wrapper');
 
 // Mock providers with realistic behavior
-vi.mock('../providers/anthropic-provider.js', () => ({
+vi.mock('~/providers/anthropic-provider', () => ({
   AnthropicProvider: vi.fn(() => ({
     providerName: 'anthropic',
     cleanup: vi.fn(),
@@ -42,7 +42,7 @@ vi.mock('../providers/anthropic-provider.js', () => ({
   })),
 }));
 
-vi.mock('../providers/openai-provider.js', () => ({
+vi.mock('~/providers/openai-provider', () => ({
   OpenAIProvider: vi.fn(() => ({
     providerName: 'openai',
     cleanup: vi.fn(),
@@ -54,7 +54,7 @@ vi.mock('../providers/openai-provider.js', () => ({
   })),
 }));
 
-vi.mock('../providers/lmstudio-provider.js', () => ({
+vi.mock('~/providers/lmstudio-provider', () => ({
   LMStudioProvider: vi.fn(() => ({
     providerName: 'lmstudio',
     cleanup: vi.fn(),
@@ -66,7 +66,7 @@ vi.mock('../providers/lmstudio-provider.js', () => ({
   })),
 }));
 
-vi.mock('../providers/ollama-provider.js', () => ({
+vi.mock('~/providers/ollama-provider', () => ({
   OllamaProvider: vi.fn(() => ({
     providerName: 'ollama',
     cleanup: vi.fn(),

@@ -12,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Load the same real failing thread data used in conversation building tests
-const threadDataPath = join(__dirname, '../../../agents/__tests__/data/full_thread_events.json');
+const threadDataPath = join(__dirname, '../../agents/test-data/full_thread_events.json');
 const rawThreadEventsData = JSON.parse(readFileSync(threadDataPath, 'utf8')) as Array<{
   timestamp: string;
   [key: string]: unknown;
