@@ -7,7 +7,7 @@ import { getApprovalManager } from '@/lib/server/approval-manager';
 import { Agent, AgentEvents, ApprovalDecision, Project } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/lib/server/core-types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
-import { mkdtemp, rm } from 'fs/promises';
+import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -57,6 +57,12 @@ describe('Tool Approval Flow Integration', () => {
 
     // Create temp directory
     tempDir = await mkdtemp(join(tmpdir(), 'lace-approval-test-'));
+
+    // Create a test file for reading
+    await writeFile(
+      join(tempDir, 'test-file.txt'),
+      'This is test content for approval flow testing'
+    );
 
     // Clear event log
     eventLog.length = 0;
@@ -203,9 +209,10 @@ describe('Tool Approval Flow Integration', () => {
     expect(listenerCount).toBeGreaterThan(0);
 
     // Step 4: Execute a tool that requires approval
+    const testFilePath = join(tempDir, 'test-file.txt');
     logEvent('tool.execution.start', {
       toolName: 'file-read',
-      args: { path: '/test/file.txt' },
+      args: { path: testFilePath },
     });
 
     // Create a promise to track approval request
@@ -230,7 +237,7 @@ describe('Tool Approval Flow Integration', () => {
     const toolCall = {
       id: 'test-call-id',
       name: 'file-read',
-      arguments: { path: '/test/file.txt' },
+      arguments: { path: testFilePath },
     };
     const toolResult = await agent.toolExecutor.executeTool(toolCall, undefined);
 
@@ -286,8 +293,9 @@ describe('Tool Approval Flow Integration', () => {
 
     logEvent('direct.callback.calling', { toolName: 'file-read' });
 
+    const testFilePath = join(tempDir, 'test-file.txt');
     const decision = await approvalCallback.requestApproval('file-read', {
-      path: '/test/file.txt',
+      path: testFilePath,
     });
 
     logEvent('direct.callback.complete', {
@@ -353,14 +361,15 @@ describe('Tool Approval Flow Integration', () => {
       );
 
     const testPromise = new Promise<ApprovalDecision>((resolve) => {
+      const testFilePath = join(tempDir, 'test-file.txt');
       logEvent('manual.approval_request.emitting', {
         toolName: 'file-read',
-        input: { path: '/test/file.txt' },
+        input: { path: testFilePath },
       });
 
       agent.emit('approval_request', {
         toolName: 'file-read',
-        input: { path: '/test/file.txt' },
+        input: { path: testFilePath },
         isReadOnly: true,
         requestId: 'test-request-123',
         resolve,
@@ -385,13 +394,14 @@ describe('Tool Approval Flow Integration', () => {
     logEvent('test.start', { testName: 'ApprovalManager SSE integration' });
 
     // Test ApprovalManager directly
+    const testFilePath = join(tempDir, 'test-file.txt');
     const approvalPromise = approvalManager.requestApproval(
       asThreadId(agent.threadId),
       sessionId,
       'file-read',
       'Test approval request',
       undefined,
-      { path: '/test/file.txt' },
+      { path: testFilePath },
       true
     );
 

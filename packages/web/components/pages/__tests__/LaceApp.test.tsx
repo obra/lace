@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { LaceApp } from '@/components/pages/LaceApp';
 
@@ -97,47 +97,64 @@ describe('LaceApp', () => {
   });
 
   it('renders without crashing', async () => {
-    render(<LaceApp />);
+    await act(async () => {
+      render(<LaceApp />);
+    });
     
     // Should show loading initially
     expect(screen.getByText('Loading projects...')).toBeInTheDocument();
     
     // Wait for loading to complete
-    await screen.findByText('No Projects Found');
+    await act(async () => {
+      await screen.findByText('No Projects Found');
+    });
     expect(screen.getByText('Create a project to get started')).toBeInTheDocument();
   });
 
   it('shows correct initial state in header', async () => {
-    render(<LaceApp />);
+    await act(async () => {
+      render(<LaceApp />);
+    });
     
     // Should show "Select a Project" initially
     expect(screen.getByText('Select a Project')).toBeInTheDocument();
   });
 
-  it('has mobile navigation button', () => {
-    render(<LaceApp />);
+  it('has mobile navigation button', async () => {
+    await act(async () => {
+      render(<LaceApp />);
+    });
     
     // Should have a mobile navigation button (hamburger menu)
     const mobileNavButton = screen.getByRole('button');
     expect(mobileNavButton).toBeInTheDocument();
   });
 
-  it('applies correct CSS classes for theme', () => {
-    const { container } = render(<LaceApp />);
+  it('applies correct CSS classes for theme', async () => {
+    let container: HTMLElement;
+    await act(async () => {
+      const result = render(<LaceApp />);
+      container = result.container;
+    });
     
     // Should have base theme classes
-    const mainContainer = container.firstChild as HTMLElement;
-    expect(mainContainer).toHaveClass('bg-base-200', 'text-base-content');
+    const mainContainer = container.firstChild as HTMLElement | null;
+    expect(mainContainer).toBeTruthy();
+    expect(mainContainer!).toHaveClass('bg-base-200', 'text-base-content');
   });
 
   it('initializes with empty business logic state', async () => {
-    render(<LaceApp />);
+    await act(async () => {
+      render(<LaceApp />);
+    });
     
     // Component should render with loading state initially
     expect(screen.getByText('Loading projects...')).toBeInTheDocument();
     
     // Then show empty state after loading
-    await screen.findByText('No Projects Found');
+    await act(async () => {
+      await screen.findByText('No Projects Found');
+    });
     expect(screen.getByText('Create a project to get started')).toBeInTheDocument();
   });
 
@@ -159,13 +176,17 @@ describe('LaceApp', () => {
       json: () => Promise.resolve({ projects: mockProjects }),
     } as Response);
 
-    render(<LaceApp />);
+    await act(async () => {
+      render(<LaceApp />);
+    });
     
     // Should call projects API
     expect(fetch).toHaveBeenCalledWith('/api/projects');
     
     // Wait for loading to complete and show select prompt
-    await screen.findByText('Select a Project');
+    await act(async () => {
+      await screen.findByText('Select a Project');
+    });
     expect(screen.getByText('Choose a project from the sidebar to continue')).toBeInTheDocument();
   });
 
@@ -217,10 +238,14 @@ describe('LaceApp', () => {
       } as Response);
     });
 
-    render(<LaceApp />);
+    await act(async () => {
+      render(<LaceApp />);
+    });
     
     // Wait for projects to load
-    await screen.findByText('Select a Project');
+    await act(async () => {
+      await screen.findByText('Select a Project');
+    });
 
     // Should show project selection initially
     expect(screen.getByText('Choose a project from the sidebar to continue')).toBeInTheDocument();

@@ -104,7 +104,7 @@ describe('ProjectSelectorPanel', () => {
     expect(screen.getByText(/new project/i)).toBeInTheDocument();
   });
 
-  it('should call onProjectCreate when create button is clicked', async () => {
+  it('should open create project modal when create button is clicked', async () => {
     render(
       <ProjectSelectorPanel
         projects={mockProjects}
@@ -115,7 +115,8 @@ describe('ProjectSelectorPanel', () => {
     );
 
     await user.click(screen.getByText(/new project/i));
-    expect(mockOnProjectCreate).toHaveBeenCalled();
+    expect(screen.getByText('Create New Project')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Enter project name')).toBeInTheDocument();
   });
 
   it('should handle empty project list', () => {
