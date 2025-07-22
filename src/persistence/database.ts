@@ -587,23 +587,8 @@ export class DatabasePersistence {
     });
   }
 
-  getThreadsByProject(projectId: string): Thread[] {
-    return this.executeThreadQuery('WHERE project_id = ?', projectId);
-  }
-
   getThreadsBySession(sessionId: string): Thread[] {
     return this.executeThreadQuery('WHERE session_id = ?', sessionId);
-  }
-
-  getThreadCountBySession(sessionId: string): number {
-    if (this._disabled || !this.db) return 0;
-
-    const stmt = this.db.prepare(`
-      SELECT COUNT(*) as count FROM threads WHERE session_id = ?
-    `);
-
-    const result = stmt.get(sessionId) as { count: number };
-    return result.count;
   }
 
   getCurrentVersion(canonicalId: string): string | null {
@@ -1187,7 +1172,7 @@ export class DatabasePersistence {
     `);
 
     const rows = stmt.all(projectId) as Array<{
-      id: string;
+      id: ThreadId;
       project_id: string;
       name: string;
       description: string;
