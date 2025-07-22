@@ -178,10 +178,8 @@ export function LaceApp() {
 
   // Handle project selection
   const handleProjectSelect = (project: { id: string }) => {
+    // Hash router automatically clears session/agent when project changes
     setSelectedProject(project.id);
-    // Clear session selection when switching projects
-    setSelectedSession(null);
-    setSelectedAgent(undefined);
     setEvents([]);
   };
 
@@ -412,10 +410,8 @@ export function LaceApp() {
 
   // Handle session selection - load session details but don't auto-select agent
   const handleSessionSelect = (sessionId: string) => {
-    const threadId = sessionId as ThreadId;
-    setSelectedSession(threadId);
-    // Don't automatically select an agent - let user choose
-    setSelectedAgent(undefined);
+    // Hash router automatically clears agent when session changes
+    setSelectedSession(sessionId as ThreadId);
     setEvents([]);
   };
 
@@ -446,9 +442,22 @@ export function LaceApp() {
   };
 
   // Convert projects to format expected by Sidebar
-  const currentProject = selectedProject 
-    ? projects.find(p => p.id === selectedProject) || { id: '', name: 'Unknown', workingDirectory: '/' }
-    : { id: '', name: 'No project selected', workingDirectory: '/' };
+  // If selectedProject ID doesn't match any actual project, clear the selection
+  const foundProject = selectedProject ? projects.find(p => p.id === selectedProject) : null;
+  const currentProject = foundProject || { id: '', name: 'No project selected', workingDirectory: '/' };
+  
+  // Clear invalid project selection from URL  
+  // useEffect(() => {
+  //   // Clear any project ID that doesn't match loaded projects after loading is complete
+  //   // This handles invalid URLs gracefully by falling back to project selection
+  //   if (selectedProject && 
+  //       !loadingProjects && 
+  //       projects.length > 0 && 
+  //       !foundProject) {
+  //     console.log('Clearing invalid project ID from URL:', selectedProject);
+  //     setSelectedProject(null, true); // Use replaceState to avoid polluting history
+  //   }
+  // }, [selectedProject, projects, foundProject, setSelectedProject, loadingProjects]);
 
   const projectsForSidebar = projects.map(p => ({
     id: p.id,
@@ -748,7 +757,7 @@ export function LaceApp() {
                 <span>Loading...</span>
               </div>
             </div>
-          ) : selectedProject ? (
+          ) : selectedProject && foundProject ? (
             selectedAgent ? (
               <div className="flex-1 flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
                 {/* Conversation Display */}
@@ -801,7 +810,7 @@ export function LaceApp() {
               </div>
             </div>
           ) : (
-            /* Project Selection Panel - When no project selected */
+            /* Project Selection Panel - When no project selected or invalid project ID */
             <div className="flex-1 p-6 min-h-0">
               <ProjectSelectorPanel
                 projects={projectsForSidebar}
