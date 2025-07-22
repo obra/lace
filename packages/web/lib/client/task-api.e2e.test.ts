@@ -92,7 +92,7 @@ describe('TaskAPIClient E2E Tests', () => {
               const response = await getTask(request, {
                 params: Promise.resolve({ taskId: taskId! }),
               });
-              const responseData = await response.json();
+              const responseData = (await response.json()) as unknown;
               return new Response(JSON.stringify(responseData), {
                 status: response.status,
                 headers: { 'Content-Type': 'application/json' },
