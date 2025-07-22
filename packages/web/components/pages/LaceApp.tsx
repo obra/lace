@@ -32,10 +32,22 @@ import type {
 import { isApiError } from '@/types/api';
 import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
 import { getAllEventTypes } from '@/types/events';
+import { useHashRouter } from '@/hooks/useHashRouter';
 
 export function LaceApp() {
   // Theme state
   const { theme, setTheme } = useTheme();
+
+  // Hash-based routing state (replaces selectedProject, selectedSession, selectedAgent)
+  const {
+    project: selectedProject,
+    session: selectedSession,
+    agent: selectedAgent,
+    setProject: setSelectedProject,
+    setSession: setSelectedSession,
+    setAgent: setSelectedAgent,
+    isHydrated: urlStateHydrated,
+  } = useHashRouter();
 
   // UI State (from AnimatedLaceApp but remove demo data)
   const [showMobileNav, setShowMobileNav] = useState(false);
@@ -44,18 +56,15 @@ export function LaceApp() {
 
   // Business Logic State (from current app/page.tsx)
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [selectedSession, setSelectedSession] = useState<ThreadId | null>(null);
   const [selectedSessionDetails, setSelectedSessionDetails] = useState<Session | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [message, setMessage] = useState('');
-  const [selectedAgent, setSelectedAgent] = useState<ThreadId | undefined>(undefined);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [approvalRequest, setApprovalRequest] = useState<ToolApprovalRequestData | null>(null);
   const [creatingSession, setCreatingSession] = useState(false);
@@ -452,7 +461,14 @@ export function LaceApp() {
     sessionCount: p.sessionCount || 0,
   }));
 
-  // These timeline variables are no longer needed with the new composable sidebar
+  // Wait for URL state hydration before rendering to avoid hydration mismatches
+  if (!urlStateHydrated) {
+    return (
+      <div className="flex h-screen bg-base-200 text-base-content font-sans items-center justify-center">
+        <div className="loading loading-spinner loading-lg"></div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
