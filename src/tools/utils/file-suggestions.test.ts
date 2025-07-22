@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { findSimilarPaths } from '~/tools/utils/file-suggestions';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
-import { createTestTempDir } from '~/tools/__tests__/test-utils';
+import { createTestTempDir } from '~/tools/test-utils';
 
 describe('File suggestions utility', () => {
   const tempDir = createTestTempDir();

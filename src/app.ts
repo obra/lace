@@ -9,7 +9,6 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { logger } from '~/utils/logger';
 import { CLIOptions } from '~/cli/args';
 import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
-import { createGlobalPolicyCallback } from '~/tools/policy-wrapper';
 import { enableTrafficLogging } from '~/utils/traffic-logger';
 import { getEnvVar } from '~/config/env-loader';
 import { ProviderRegistry } from '~/providers/registry';
@@ -106,17 +105,17 @@ export async function run(options: CLIOptions): Promise<void> {
   // Use Agent to handle session resumption with automatic replay
   handleSessionWithAgent(agent, options.continue);
 
+  // Default to non-interactive mode with ephemeral session in ephemeral project
+  const nonInteractive = new NonInteractiveInterface(agent);
+
   if (options.prompt) {
-    const nonInteractive = new NonInteractiveInterface(agent);
     await nonInteractive.executePrompt(options.prompt);
     process.exit(0);
   }
 
-  const { TerminalInterface } = await import('~/interfaces/terminal/terminal-interface');
-  const cli = new TerminalInterface(agent);
-
-  const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);
-  agent.toolExecutor.setApprovalCallback(policyCallback);
-
-  await cli.startInteractive();
+  // For now, if no prompt provided, show help or enter simple prompt mode
+  console.log('Lace AI Assistant - Non-interactive mode');
+  console.log('Use --prompt "your message" to send a message to the agent');
+  console.log('Example: lace --prompt "List files in current directory"');
+  process.exit(0);
 }

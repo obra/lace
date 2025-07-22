@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(npx:*)",
+      "Bash(npm --prefix /Users/jesse/Documents/GitHub/lace/.worktrees/f-integrate-spicy-web run typecheck)",
+      "Bash(npm --prefix /Users/jesse/Documents/GitHub/lace/.worktrees/f-integrate-spicy-web test)",
+      "Bash(npm test:*)",
+      "mcp__secret-journal__process_thoughts",
+      "mcp__secret-journal__read_journal_entry",
+      "Bash(npm run test:run:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run lint:fix:*)",
+      "Bash(sed:*)",
+      "Bash(npm run lint)",
+      "mcp__secret-journal__search_journal",
+      "Bash(npm run build:*)"
+    ],
+    "deny": []
+  }
+}

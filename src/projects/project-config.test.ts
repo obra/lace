@@ -4,10 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
-import {
-  setupTestPersistence,
-  teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 describe('Project configuration', () => {
   let project: Project;
